@@ -1,0 +1,513 @@
+# CONTENT: objectives  version 1.5.0
+# 1.5.0 — КАТАЛОГ 8.0 «с ценой» (полный рерайт, замена 1.4.0).
+# Источник: "Карты/Задания 8.0 — каталог с ценой (2026-08-11).md" + замены §9
+# (o07 -> Засада, o22 -> Зачистка). Решения дизайнера 2026-08-11:
+#   - старт по СВОДу (без добытчика, 5 МОН всем) -> ruleset 1.5.0 setup;
+#   - o35 платит трофейными ОЧКАМИ-кубиками (resources.trophy);
+#   - оборонительная «Под огнём» НЕ входит; состав 14С/20Э/6Ж как в 8.0;
+#   - n1 = 2 здания (порог «3» в 8.0 был под симовский старт с добытчиком).
+# Тест цены: у каждого низа названа цена (см. каталог). ТРФ в базах НЕТ нигде.
+# 12.08.2026 (дизайнер): КАЖДОЕ задание дополнительно даёт +1 МОН за выполнение.
+#   Карты, уже дававшие монеты, дают на одну больше. Начальные (n1-n8) получили
+#   base_reward: {coin: 1} — раньше base у них не было вовсе.
+# Верхи: канонические имена А/Б; реактивные Б-III (щиты/ремонт) в симе
+# аппроксимированы heal_one, «страховка» и ресурсные Б — gain (помечено «аппрокс.»).
+meta:
+  id: 1.5.0
+  type: objectives
+
+objectives:
+  # ===== A. РАЗРАБОТКА — конвейер и рудник (o01-o10) =====
+  - id: o01
+    name: "Полный залп"
+    kind: regular
+    type: incident
+    # цена: отказ — ни одного войска в ход
+    requirement: {predicate: assembly_all_chose_ammo, params: {count: 2}}
+    enhanced:    {predicate: assembly_all_chose_ammo, params: {count: 2, include_types: [factory, airbase]}}
+    base_reward: {coin: 1, ammo: 2, container: 2}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: build}, label: "ДЕСАНТ (аппрокс.: стройка)"}
+    описание: "Снарядите минимум 2 войска боеприпасами вместо орудий прямо на сборочной линии — получите монету, 2 боеприпаса и 2 контейнера. Сделайте то же самое на заводе или авиабазе, и награда вырастет до 2 трофейных очков и новой карты задания. Разыграйте карту — и высадите десант, бесплатную стройку сверху. Патроны в Жёлтой Зоне экономят, а залп бьёт разом по всем стволам."
+  - id: o02
+    name: "Конвейер"
+    kind: regular
+    type: incident
+    requirement: {predicate: produced_units_ex_tower, params: {count: 2, distinct_buildings: 2}}
+    enhanced:    {predicate: produced_units_ex_tower, params: {count: 2, distinct_buildings: 2, building_types_any: [airbase]}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: build}, label: "ЛЬГОТНАЯ СТРОЙКА"}
+    описание: "Произведите 2 войска в двух разных зданиях, не считая вышку — награда: монета, 3 боеприпаса и контейнер. Если одно из зданий — авиабаза, условие усилено и приносит 2 трофейных очка и карту задания. Разыграйте карту и стройте бесплатно на льготных условиях — конвейер простаивать не должен."
+  - id: o03
+    name: "Опорный пункт"
+    kind: regular
+    type: incident
+    # вышка (скорость 0, дот) поставлена вне гекса ЦУ — снять её нельзя
+    requirement: {predicate: tower_placed_off_cu, params: {}}
+    enhanced:    {predicate: tower_placed_off_cu, params: {borders_enemy: true}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {module: attack, debris: 1, objective_card: 1}
+    top: {effect: gain, params: {coin: 1}, label: "МАРОДЁРЫ (аппрокс.: +1 монета)"}
+    описание: "Поставьте вышку отдельно от центра управления — снять её будет уже нельзя — и заберите монету, 3 боеприпаса и контейнер. Если вышка при этом граничит с врагом, условие усилено: модуль атаки, трофейное очко и карта задания. Разыграйте карту — мародёры на передовой приносят лишнюю монету."
+  - id: o04
+    name: "Жила"
+    kind: regular
+    type: state
+    requirement: {predicate: powered_miners_distinct_spawns, params: {count: 2}}
+    enhanced:    {predicate: powered_miners_distinct_spawns, params: {count: 2, nonstart: 1}}
+    base_reward: {coin: 1, ammo: 2, container: 2}
+    special_reward: {kelium: 1, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ФОРСАЖ: войско на 1 гекс дальше"}
+    описание: "Запитайте энергией минимум 2 добытчика на разных тайлах зарождения — награда: монета, 2 боеприпаса и 2 контейнера. Если хотя бы один добытчик стоит не на стартовом тайле, условие усилено и приносит келемий и карту задания. Разыграйте карту ради форсажа — одно войско пройдёт на гекс дальше."
+  - id: o05
+    name: "Выработка"
+    kind: regular
+    type: incident
+    requirement: {predicate: last_kelium_nonstart, params: {}}
+    enhanced:    {predicate: last_kelium_nonstart, params: {claimed: true}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {arsenal: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: science}, label: "МАЛАЯ НАУКА"}
+    описание: "Забрав последний келемий с тайла зарождения, который не был стартовым, получите монету, 3 боеприпаса и контейнер. Если тайл к тому же остаётся за вами, условие усилено и приносит арсенальную карту и карту задания. Разыграйте карту ради малой науки — бесплатного шага по треку."
+  - id: o06
+    name: "Отзыв"
+    kind: regular
+    type: sacrifice
+    # жертва позицией: войска (не вышки) ВНЕ своих гексов, с разных гексов
+    sacrifice: {resource: units_off_base, amount: 2}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: units_off_base, amount: 3}}
+    base_reward: {coin: 1, ammo: 4}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: market}, label: "РАЗОВАЯ СДЕЛКА"}
+    описание: "Отзовите с фронта 2 своих войска (не вышки), стоящих вне ваших гексов и на разных клетках — заплатите ими и получите монету и 4 боеприпаса. Отзовите 3, и цена усиления окупится 2 трофейными очками и картой задания. Разыграйте карту ради разовой льготной сделки на рынке — иногда выгоднее отступить и обменять."
+  - id: o07
+    name: "Засада"
+    kind: regular
+    type: state
+    # из 7.1 (§9 каталога 8.0): войско укрыто в своём военном здании у фронта
+    requirement: {predicate: hidden_unit_near_enemy, params: {count: 1}}
+    enhanced:    {predicate: hidden_unit_near_enemy, params: {count: 2}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {arsenal: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ"}
+    описание: "Укройте войско в своём военном здании у самой границы с врагом — награда: монета, 3 боеприпаса и контейнер. Спрячьте так два войска сразу, и условие усилится до арсенала и карты задания. Разыграйте карту и сделайте одиночный выстрел бесплатно — засада бьёт первой."
+  - id: o08
+    name: "Разведка недр"
+    kind: regular
+    type: incident
+    requirement: {predicate: miner_took_container, params: {}}
+    enhanced:    {predicate: miner_took_container, params: {levels: [3, 4]}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {module: assembly, objective_card: 1}
+    top: {effect: gain, params: {coin: 1}, label: "ЭКОНОМИЯ КАБЕЛЯ: +1 монета"}
+    описание: "Пусть добытчик заберёт контейнер — получите монету, 3 боеприпаса и ещё один контейнер. Если контейнер окажется третьего или четвёртого уровня, условие усилено: модуль сборки и карта задания. Разыграйте карту — экономия на кабеле даёт лишнюю монету."
+  - id: o09
+    name: "Всеобщая мобилизация"
+    kind: regular
+    type: incident
+    requirement: {predicate: produced_units_ex_tower, params: {count: 2, no_ammo: true}}
+    enhanced:    {predicate: produced_units_ex_tower, params: {count: 3, no_ammo: true}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {module: assembly, objective_card: 1}
+    top: {effect: gain, params: {coin: 2}, label: "СТРАХОВКА (аппрокс.: +2 монеты)"}
+    описание: "Произведите 2 войска без боеприпасов, не считая вышки — награда: монета, 3 боеприпаса и контейнер. Доведите счёт до 3 войск, и условие усилится: модуль сборки и карта задания. Разыграйте карту — страховка приносит сразу 2 монеты."
+  - id: o10
+    name: "Форсаж производства"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: kelium, amount: 1}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: kelium, amount: 2}}
+    base_reward: {coin: 1, ammo: 4}
+    special_reward: {module: assembly, objective_card: 1}
+    top: {effect: free_action, params: {action: energy_swap}, label: "ПЕРЕКОММУТАЦИЯ"}
+    описание: "Отдайте 1 келемий — и получите монету и 4 боеприпаса. Отдайте 2 келемия, и цена окупится модулем сборки и картой задания. Разыграйте карту ради перекоммутации — бесплатно переставьте энергию между зданиями."
+
+  # ===== B. ИНФРАСТРУКТУРА — база, повёрнутая к фронту (o11-o20) =====
+  - id: o11
+    name: "Передовая база"
+    kind: regular
+    type: incident
+    requirement: {predicate: built_bordering_enemy, params: {enemy: units}}
+    enhanced:    {predicate: built_bordering_enemy, params: {enemy: building}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ОДИНОЧНЫЙ МАРШ"}
+    описание: "Постройте здание там, где оно граничит с войсками врага — награда: монета, 3 боеприпаса, контейнер. Постройте его впритык к зданию врага, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — одиночный марш перемещает войско на гекс без затрат."
+  - id: o12
+    name: "Наглая стройка"
+    kind: regular
+    type: state
+    requirement: {predicate: building_on_hex_with_enemy_units, params: {units: 1}}
+    enhanced:    {predicate: building_on_hex_with_enemy_units, params: {units: 2}}
+    base_reward: {coin: 1, ammo: 4, container: 1}
+    special_reward: {module: attack, debris: 1, objective_card: 1}
+    top: {effect: heal_one, params: {}, label: "ЩИТ — ПЕХОТА (аппрокс.: снять 1 урон)"}
+    описание: "Стройте прямо на гексе, где стоит войско врага — награда: монета, 4 боеприпаса, контейнер. Сделайте это там, где врагов сразу два, и условие усилится: модуль атаки, трофейное очко и карта задания. Разыграйте карту — щит снимает 1 урон с пехоты."
+  - id: o13
+    name: "Расчистка"
+    kind: regular
+    type: incident
+    requirement: {predicate: demolished_this_turn, params: {}}
+    enhanced:    {predicate: demolished_this_turn, params: {and_built: true}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {storage_token: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: mining}, label: "ОДИНОЧНАЯ ДОБЫЧА"}
+    описание: "Снесите здание в свой ход — награда: монета, 3 боеприпаса и контейнер. Успейте в тот же ход и построить новое, и условие усилится: жетон хранилища и карта задания. Разыграйте карту ради одиночной бесплатной добычи."
+  - id: o14
+    name: "Осадный лагерь"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: buildings_ring_around_hex, params: {count: 2, enemy_building_on_center: true}}
+    enhanced:    {predicate: buildings_ring_around_hex, params: {count: 3, enemy_building_on_center: true}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {module: attack, debris: 2, objective_card: 1}
+    top: {effect: heal_one, params: {}, label: "ЩИТ — ТЕХНИКА (аппрокс.: снять 1 урон)"}
+    описание: "Обложите вражеское здание своими постройками с двух сторон — награда: монета, 3 боеприпаса и контейнер. Обложите его с трёх сторон, и условие усилится: модуль атаки, 2 трофейных очка и карта задания. Разыграйте карту — щит снимает 1 урон с техники: осада держит крепость в кольце."
+  - id: o15
+    name: "Стройбум"
+    kind: regular
+    type: incident
+    # buildOps в журнале уже НЕ считает бесплатный перенос ЦУ
+    requirement: {predicate: build_ops_this_turn, params: {count: 2}}
+    enhanced:    {predicate: build_ops_this_turn, params: {count: 3}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ"}
+    описание: "Совершите 2 строительные операции за один ход — награда: монета, 3 боеприпаса и контейнер. Успейте сделать три, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — бесплатный одиночный выстрел довершает бум стройки."
+  - id: o16
+    name: "Переезд"
+    kind: regular
+    type: incident
+    requirement: {predicate: moved_noncu_building, params: {count: 1}}
+    enhanced:    {predicate: moved_noncu_building, params: {count: 2}}
+    base_reward: {coin: 1, ammo: 2, container: 2}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: gain, params: {kelium: 1}, label: "БОГАТАЯ ЖИЛА: +1 келемий"}
+    описание: "Перенесите здание, не считая центра управления — награда: монета, 2 боеприпаса и 2 контейнера. Перенесите два здания за ход, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — богатая жила приносит лишний келемий."
+  - id: o17
+    name: "Штаб на передовой"
+    kind: regular
+    type: incident
+    requirement: {predicate: moved_cu_to_virgin_hex, params: {}}
+    enhanced:    {predicate: moved_cu_to_virgin_hex, params: {borders_enemy: true}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: heal_one, params: {}, label: "ПОЛЕВОЙ РЕМОНТ: снять 1 урон"}
+    описание: "Перенесите центр управления на гекс, где ещё никто не строил — награда: монета, 3 боеприпаса и контейнер. Перенесите его так, чтобы он граничил с врагом, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — полевой ремонт снимает 1 урон."
+  - id: o18
+    name: "Полная нагрузка"
+    kind: regular
+    type: state
+    requirement: {predicate: no_unpowered_buildings, params: {min_buildings: 1}}
+    enhanced:    {predicate: no_unpowered_buildings, params: {min_buildings: 4}}
+    base_reward: {coin: 1, ammo: 2, container: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    top: {effect: gain, params: {ammo: 1}, label: "ТРОФЕЙНАЯ КОМАНДА (аппрокс.: +1 БПР)"}
+    описание: "Держите все свои здания под энергией — хотя бы одно у вас должно стоять — награда: монета, 2 боеприпаса и контейнер. Доведите число запитанных зданий до 4, и условие усилится до трофейного очка и карты задания. Разыграйте карту — трофейная команда приносит лишний боеприпас."
+  - id: o19
+    name: "Военпром"
+    kind: regular
+    type: state
+    # предикат считает ТОЛЬКО казарму/завод/авиабазу (ЦУ не военное здесь)
+    requirement: {predicate: military_buildings_of_distinct_types, params: {count: 2, all_powered: true}}
+    enhanced:    {predicate: military_buildings_of_distinct_types, params: {count: 3, all_powered: true}}
+    base_reward: {coin: 1, ammo: 3, container: 1}
+    special_reward: {kelium: 1, objective_card: 1}
+    top: {effect: place_damage, params: {}, label: "КОНВЕРСИЯ (аппрокс.: 1 урон соседу)"}
+    описание: "Постройте и запитайте энергией 2 разных вида военных зданий — казарму, завод или авиабазу — награда: монета, 3 боеприпаса и контейнер. Соберите все три вида под энергией, и условие усилится до келемия и карты задания. Разыграйте карту — конверсия наносит 1 урон соседнему врагу."
+  - id: o20
+    name: "Коммутация"
+    kind: regular
+    type: incident
+    requirement: {predicate: energy_swap_cross_hex, params: {sources: 2}}
+    enhanced:    {predicate: energy_swap_cross_hex, params: {sources: 2, and_built: true}}
+    base_reward: {coin: 1, ammo: 2, container: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    top: {effect: gain, params: {ammo: 1}, label: "ЛИШНЯЯ ОБОЙМА: +1 боеприпас"}
+    описание: "Перекиньте энергию между зданиями на разных гексах, используя минимум 2 источника — награда: монета, 2 боеприпаса и контейнер. Сделайте это и заодно постройте здание в тот же ход — условие усилится до трофейного очка и карты задания. Разыграйте карту — лишняя обойма добавляет боеприпас."
+
+  # ===== C. ОПЕРАЦИЯ — война платит (o21-o32) =====
+  - id: o21
+    name: "Первая кровь"
+    kind: regular
+    type: incident
+    requirement: {predicate: destroyed_enemy_this_turn, params: {count: 1}}
+    enhanced:    {predicate: destroyed_two_in_one_battle_this_turn, params: {}}
+    base_reward: {coin: 5, container: 1}
+    special_reward: {module: attack, objective_card: 1}
+    top: {effect: free_action, params: {action: assembly}, label: "МАЛАЯ СБОРКА"}
+    описание: "Уничтожьте войско врага за один ход — награда: 5 монет и контейнер. Уничтожьте сразу двоих в одном бою, и условие усилится: модуль атаки и карта задания. Разыграйте карту ради малой сборки — первая кровь окупает себя с запасом."
+  - id: o22
+    name: "Зачистка"
+    kind: regular
+    type: incident
+    # из 7.1 (§9): нейтральные постройки — вход в войну, работает и вдвоём
+    requirement: {predicate: destroyed_neutral_this_turn, params: {count: 1}}
+    enhanced:    {predicate: destroyed_neutral_this_turn, params: {count: 1, and_damaged_enemy: true}}
+    base_reward: {coin: 4, container: 1}
+    special_reward: {arsenal: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: science}, label: "МАЛАЯ НАУКА"}
+    описание: "Снесите нейтральную постройку за один ход — награда: 4 монеты и контейнер. Заодно нанесите урон вражескому войску, и условие усилится до арсенала и карты задания. Разыграйте карту ради малой науки — зачистка тыла освобождает руки для фронта."
+  - id: o23
+    name: "Подранки"
+    kind: regular
+    type: incident
+    requirement: {predicate: damaged_distinct_no_kills, params: {count: 2}}
+    enhanced:    {predicate: damaged_distinct_no_kills, params: {count: 3}}
+    base_reward: {coin: 4, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: gain, params: {containers: 1}, label: "ПОДРЯД (аппрокс.: +1 контейнер)"}
+    описание: "Раньте 2 разных войска врага за ход, не убив ни одного — награда: 4 монеты и контейнер. Раньте так же 3 войска, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — подряд приносит лишний контейнер: добить подранков успеете позже."
+  - id: o24
+    name: "Чистая работа"
+    kind: regular
+    type: incident
+    requirement: {predicate: destroyed_with_ammo_at_most, params: {ammo: 2}}
+    enhanced:    {predicate: destroyed_with_ammo_at_most, params: {ammo: 1}}
+    base_reward: {coin: 4, container: 1}
+    special_reward: {module: attack, objective_card: 1}
+    top: {effect: gain, params: {ammo: 1}, label: "ПЕРЕГРУЗ (аппрокс.: +1 БПР)"}
+    описание: "Уничтожьте вражеское войско, потратив не больше 2 боеприпасов — награда: 4 монеты и контейнер. Сделайте это одним-единственным боеприпасом, и условие усилится: модуль атаки и карта задания. Разыграйте карту — перегруз добавляет боеприпас."
+  - id: o25
+    name: "Осада"
+    kind: regular
+    type: incident
+    requirement: {predicate: enemy_building_hit_this_turn, params: {count: 1}}
+    enhanced:    {predicate: enemy_building_hit_this_turn, params: {count: 2}}
+    base_reward: {coin: 4, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: assembly}, label: "МАЛАЯ СБОРКА"}
+    описание: "Нанесите удар по вражескому зданию за один ход — награда: 4 монеты и контейнер. Ударьте по двум зданиям сразу, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту ради малой сборки — осада измеряется терпением."
+  - id: o26
+    name: "Блицкриг"
+    kind: regular
+    type: incident
+    requirement: {predicate: moved_and_destroyed_same_unit, params: {kills: 1}}
+    enhanced:    {predicate: moved_and_destroyed_same_unit, params: {kills: 2}}
+    base_reward: {coin: 5, container: 1}
+    special_reward: {module: attack, debris: 2, objective_card: 1}
+    top: {effect: gain, params: {arsenal: 1}, label: "ДВОЙНАЯ ПОСТАВКА (аппрокс.: 1 арсенал)"}
+    описание: "Одним и тем же войском переместитесь и уничтожьте врага в один ход — награда: 5 монет и контейнер. Сделайте так дважды подряд, и условие усилится: модуль атаки, 2 трофейных очка и карта задания. Разыграйте карту — двойная поставка приносит арсенальную карту."
+  - id: o27
+    name: "На чужом дворе"
+    kind: regular
+    type: state
+    requirement: {predicate: unit_on_hex_with_enemy_units, params: {count: 1}}
+    enhanced:    {predicate: unit_on_hex_with_enemy_units, params: {count: 2}}
+    base_reward: {coin: 4, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: assembly}, label: "АВТОНОМНЫЙ ЗАПУСК (аппрокс.)"}
+    описание: "Заведите своё войско на гекс, где уже стоят войска врага — награда: 4 монеты и контейнер. Держите там сразу 2 своих войска, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту ради автономного запуска — бесплатной сборки."
+  - id: o28
+    name: "Клещи"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: units_bordering_enemy_units_hex, params: {hexes: 2}}
+    enhanced:    {predicate: units_bordering_enemy_units_hex, params: {hexes: 3}}
+    base_reward: {coin: 4, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: gain, params: {coin: 1}, label: "ТЕНЕВОЙ КУРЬЕР (аппрокс.: +1 монета)"}
+    описание: "Окружите гекс с вражескими войсками своими войсками с двух соседних клеток — награда: 4 монеты и контейнер. Замкните клещи с трёх сторон, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — теневой курьер приносит монету."
+  - id: o29
+    name: "Пустой двор"
+    kind: regular
+    type: state
+    requirement: {predicate: units_off_own_hexes, params: {count: 2}}
+    enhanced:    {predicate: units_off_own_hexes, params: {count: 3}}
+    base_reward: {coin: 4, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: assembly}, label: "СВЕРХУРОЧНЫЕ (аппрокс.: сборка)"}
+    описание: "Выведите 2 своих войска за пределы собственных гексов — награда: 4 монеты и контейнер. Выведите 3, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — сверхурочные дают бесплатную сборку, пока двор дома пуст."
+  - id: o30
+    name: "Мародёр"
+    kind: regular
+    type: incident
+    requirement: {predicate: picked_container_by_unit, params: {count: 1}}
+    enhanced:    {predicate: picked_container_by_unit, params: {count: 2}}
+    base_reward: {coin: 4, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: gain, params: {debris: 1}, label: "ДВОЙНОЙ ЗАЧЁТ (аппрокс.: +1 ТРФ)"}
+    описание: "Заберите контейнер прямо войском на поле — награда: 4 монеты и контейнер. Заберите так два контейнера за ход, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — двойной зачёт приносит трофейное очко."
+  - id: o31
+    name: "Господство в небе"
+    kind: regular
+    type: state
+    requirement: {predicate: aircraft_on_enemy_hex, params: {}}
+    enhanced:    {predicate: aircraft_on_enemy_hex, params: {cu_on_hex: true}}
+    base_reward: {coin: 5, container: 1}
+    special_reward: {module: attack, debris: 2, objective_card: 1}
+    top: {effect: gain, params: {debris: 1}, label: "ОТКАТ (аппрокс.: +1 ТРФ)"}
+    описание: "Поставьте свою авиацию на гекс, занятый врагом — награда: 5 монет и контейнер. Сделайте это прямо на гексе с вражеским центром управления, и условие усилится: модуль атаки, 2 трофейных очка и карта задания. Разыграйте карту — откат приносит трофейное очко: небо решает исход."
+  - id: o32
+    name: "Разоружение"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: ammo, amount: 4}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: ammo, amount: 6}}
+    base_reward: {coin: 5}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: mining}, label: "ОДИНОЧНАЯ ДОБЫЧА"}
+    описание: "Сдайте 4 боеприпаса — получите 5 монет. Сдайте 6, и цена усиления окупится 2 трофейными очками и картой задания. Разыграйте карту ради одиночной бесплатной добычи — иногда разоружиться выгоднее, чем стрелять."
+
+  # ===== D. ПРИОБРЕТЕНИЯ — деньги, трек и наука (o33-o40) =====
+  - id: o33
+    name: "Биржа"
+    kind: regular
+    type: incident
+    cull: "[3+]"
+    requirement: {predicate: used_market_card_offer, params: {}}
+    enhanced:    {predicate: used_market_card_offer, params: {and_printed: true}}
+    base_reward: {coin: 3, ammo: 2}
+    special_reward: {arsenal: 1, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ОДИНОЧНЫЙ МАРШ"}
+    описание: "Воспользуйтесь карточным предложением на рынке — награда: 3 монеты и 2 боеприпаса. Обменяйтесь ещё и по напечатанному курсу в тот же ход, и условие усилится до арсенала и карты задания. Разыграйте карту — одиночный марш перемещает войско бесплатно."
+  - id: o34
+    name: "Военный заём"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: coin, amount: 6}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: coin, amount: 8}}
+    base_reward: {coin: 1, ammo: 4}
+    special_reward: {module: attack, objective_card: 1}
+    top: {effect: free_action, params: {action: assembly}, label: "МАЛАЯ СБОРКА"}
+    описание: "Возьмите военный заём — отдайте 6 монет и получите взамен монету и 4 боеприпаса. Отдайте 8 монет, и условие усилится: модуль атаки и карта задания. Разыграйте карту ради малой сборки — долги фронта платятся снарядами."
+  - id: o35
+    name: "Ставка на трек"
+    kind: regular
+    type: sacrifice
+    # решение дизайнера: платит трофейными ОЧКАМИ-кубиками (resources.trophy)
+    sacrifice: {resource: debris, amount: 2}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: debris, amount: 3}}
+    base_reward: {coin: 5}
+    special_reward: {kelium: 1, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ПРОСАЧИВАНИЕ (аппрокс.: марш)"}
+    описание: "Сделайте ставку — отдайте 2 трофейных очка и получите 5 монет. Поднимите ставку до 3 очков, и условие усилится до келемия и карты задания. Разыграйте карту ради просачивания — бесплатного марша на гекс."
+  - id: o36
+    name: "Научный рывок"
+    kind: regular
+    type: state
+    requirement: {predicate: tech_step_reached, params: {step: 3, tracks: 1}}
+    enhanced:    {predicate: tech_step_reached, params: {step: 4, tracks: 1}}
+    base_reward: {coin: 4, ammo: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: heal_one, params: {}, label: "ЩИТ — АВИАЦИЯ (аппрокс.: снять 1 урон)"}
+    описание: "Дойдите до третьего шага хотя бы на одном треке науки — награда: 4 монеты и боеприпас. Дойдите до четвёртого шага, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту — щит снимает 1 урон с авиации."
+  - id: o37
+    name: "Три трека"
+    kind: regular
+    type: state
+    requirement: {predicate: tracks_occupied, params: {tracks: 3, min_step: 1}}
+    enhanced:    {predicate: tracks_occupied, params: {tracks: 3, min_step: 2}}
+    base_reward: {coin: 4, ammo: 2}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: build}, label: "ЛЬГОТНАЯ СТРОЙКА"}
+    описание: "Продвиньтесь хотя бы на первый шаг сразу на всех трёх треках науки — награда: 4 монеты и 2 боеприпаса. Дойдите на каждом треке хотя бы до второго шага, и условие усилится до 2 трофейных очков и карты задания. Разыграйте карту ради льготной бесплатной стройки."
+  - id: o38
+    name: "Промышленник"
+    kind: regular
+    type: state
+    requirement: {predicate: powered_miners_count, params: {count: 3}}
+    enhanced:    {predicate: powered_miners_count, params: {count: 4}}
+    base_reward: {coin: 3, ammo: 2}
+    special_reward: {kelium: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ"}
+    описание: "Запитайте энергией сразу 3 добытчика — награда: 3 монеты и 2 боеприпаса. Доведите их число до 4, и условие усилится до келемия и карты задания. Разыграйте карту — одиночный выстрел бесплатно: промышленник платит за оборону."
+  - id: o39
+    name: "Штабная чистка"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: objective_cards, amount: 2}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: objective_cards, amount: 3}}
+    base_reward: {coin: 5}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: assembly}, label: "МАЛАЯ СБОРКА"}
+    описание: "Сдайте в штаб 2 выполненные карты заданий — получите 5 монет. Сдайте 3, и условие усилится до 2 трофейных очков и новой карты задания. Разыграйте карту ради малой сборки — чистка архива освобождает стол для новых планов."
+  - id: o40
+    name: "Ва-банк"
+    kind: regular
+    type: state
+    requirement: {predicate: resources_at_most, params: {coin: 0, ammo: 0}}
+    enhanced:    {predicate: resources_at_most, params: {coin: 0, ammo: 0, kelium: 0}}
+    base_reward: {coin: 3, ammo: 2}
+    special_reward: {debris: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: science}, label: "МАЛАЯ НАУКА"}
+    описание: "Дойдите до нуля монет и боеприпасов одновременно — награда: 3 монеты и 2 боеприпаса. Обнулите вместе с ними и запас келемия, и условие усилится до трофейного очка и карты задания. Разыграйте карту ради малой науки — ва-банк играют только на голом столе."
+
+  # ===== 8 начальных (раунд 1, награда 1 ТРФ + карта; без усиления и верха) =====
+  - id: n1
+    name: "Подъём"
+    kind: starting
+    type: state
+    # СВОД-старт: на поле только ЦУ -> одна Стройка (порог «3» в 8.0 был под
+    # симовский старт с добытчиком — возвращён СВОДовский «2»)
+    requirement: {predicate: buildings_on_field_count, params: {count: 2}}
+    base_reward: {coin: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    описание: "Постройте на поле хотя бы 2 здания — награда: монета, трофейное очко и новая карта задания. Лагерь встаёт на ноги, когда ставит вторую стену рядом с первой."
+  - id: n2
+    name: "Первый боец"
+    kind: starting
+    type: incident
+    # «произвёл в этот ход» (вышка ЦУ годится — это обучающая карта)
+    requirement: {predicate: produced_units_this_turn, params: {count: 1}}
+    base_reward: {coin: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    описание: "Произведите в этот ход хотя бы одно войско, даже силами вышки центра управления — награда: монета, трофейное очко и карта задания. Первый боец встаёт в строй ещё до того, как достроен завод."
+  - id: n3
+    name: "Патроны"
+    kind: starting
+    type: state
+    requirement: {predicate: resource_at_least, params: {resource: ammo, amount: 2}}
+    base_reward: {coin: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    описание: "Накопите не меньше 2 боеприпасов — награда: монета, трофейное очко и карта задания. Пустой магазин на фронте не прощают."
+  - id: n4
+    name: "Первая сделка"
+    kind: starting
+    type: incident
+    requirement: {predicate: used_market_this_turn, params: {printed_rate: true}}
+    base_reward: {coin: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    описание: "Совершите сделку на рынке по напечатанному курсу — награда: монета, трофейное очко и карта задания. Первая сделка учит: даже в Жёлтой Зоне цены не берутся из воздуха."
+  - id: n5
+    name: "Коммутация"
+    kind: starting
+    type: state
+    # смягчённая редакция СВОДа: хотя бы 1 кубик энергии на здании (не ЦУ)
+    requirement: {predicate: non_cu_building_has_energy, params: {}}
+    base_reward: {coin: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    описание: "Поставьте хотя бы 1 кубик энергии на любое здание, кроме центра управления — награда: монета, трофейное очко и карта задания. Сеть начинает работать, когда ток идёт не только через штаб."
+  - id: n6
+    name: "Выход"
+    kind: starting
+    type: state
+    requirement: {predicate: unit_off_cu_hex, params: {}}
+    base_reward: {coin: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    описание: "Выведите войско с гекса, где стоит центр управления — награда: монета, трофейное очко и карта задания. Первый шаг за периметр решает больше, чем кажется."
+  - id: n7
+    name: "Жила"
+    kind: starting
+    type: state
+    requirement: {predicate: resource_at_least, params: {resource: kelium, amount: 2}}
+    base_reward: {coin: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    описание: "Накопите не меньше 2 келемия — награда: монета, трофейное очко и карта задания. Жила без запаса — просто дырка в земле."
+  - id: n8
+    name: "Находка"
+    kind: starting
+    type: state
+    requirement: {predicate: has_unopened_container, params: {}}
+    base_reward: {coin: 1}
+    special_reward: {debris: 1, objective_card: 1}
+    описание: "Держите при себе хотя бы 1 неоткрытый контейнер — награда: монета, трофейное очко и карта задания. Находка ценна уже тем, что до неё не добрались другие."

@@ -1,0 +1,197 @@
+# ============================================================================
+#  RULESET: 1.1.0
+# ============================================================================
+#  A "ruleset" is a VERSIONED, SWAPPABLE set of RULE VALUES and RULE VARIANTS.
+#  The game's immutable core (turn structure, boards, cards, field, tokens)
+#  lives in code and never changes. Everything tunable or arguable lives here.
+#
+#  Source of truth: "СВОД — механика игры (для работы над картами).md" (2026-08-07)
+#  Open questions come from "БЭКЛОГ — открытые вопросы.md" (item ids like E10).
+#
+#  CHANGELOG 2026-08-11 (от 1.0.0):
+#    - новая версия для соревновательного агрессивного ИИ;
+#    - objectives -> 1.1.0 (задания на экспансию/войну).
+#    Прочий контент наследуется от 1.0.0 (версии независимы).
+# ============================================================================
+
+meta:
+  id: 1.1.0
+  based_on: "1.0.0 + соревновательный ИИ (2026-08-11)"
+  description: >
+    Baseline ruleset. Disputed backlog items set to the doc's provisional
+    choice and flagged with their backlog id.
+
+# ----------------------------------------------------------------------------
+#  Global economy / VP conversion
+# ----------------------------------------------------------------------------
+economy:
+  coins_per_vp: 5
+  trophy_per_vp: 3
+  kelium_per_vp: 2             # 1 ПО за каждые 2 куба келемия в хранилище (было 1:1)
+  buildings_per_vp: 4
+  units_per_vp: 4
+  kelium_value_coins: 5        # VP-economy lens
+  kelium_value_ue: 3           # card-calibration lens (backlog E15)
+  trophy_value_coins_via_kelium: 3
+
+rounds:
+  min: 6
+  max: 7
+  circles_per_round: 4
+  order_hand_size: 5
+  objective_hand_limit: 3
+
+# ----------------------------------------------------------------------------
+#  ASYMMETRY MODULE  (designer will tune this)
+#  Controls which boards players use + the HP/energy variant values. This is a
+#  first-class rule module because it is exactly what balance work toggles.
+# ----------------------------------------------------------------------------
+asymmetry:
+  # mode A = every player uses the identical side A (training / symmetric).
+  # mode B = each player takes a variant side Б1..Бn (the asymmetric game).
+  mode: A                       # A | B
+
+  # Optional explicit side assignment per seat; overrides the mode default.
+  # e.g. [A, B1, B2, B3]. null = derive from mode.
+  board_sides: null
+
+  # "+1 HP for everyone" style experiments. Applied uniformly to every token
+  # (tokens stay identical across players — the iron rule of asymmetry).
+  token_hp_bonus_all: 0
+
+  # Placeholder for future explicit overrides of printed token stats
+  # (per-building HP/energy, per-unit HP). null = use the boards content file.
+  # When we start tuning these, fill e.g.:
+  #   token_overrides: {buildings: {factory: {hp: 3}}, units: {aircraft: {hp: 2}}}
+  token_overrides: null
+
+# ----------------------------------------------------------------------------
+#  Action rule variants
+# ----------------------------------------------------------------------------
+actions:
+  spec_per_turn: 1
+  coincidence_rule_enabled: true
+
+  build:
+    # CONFIRMED by designer: flat +1 coin per extra build operation this action.
+    # [0,1] with clamping => 1st op printed price, every extra op +1 coin.
+    surcharge_coins: [0, 1]
+    demolish_refund_coins: 1
+    move_building_repays_full_price: true
+    cu_free_move_per_turn: 1
+
+  combat:
+    # backlog E11: 2nd-combat cost model. Provisional = flat +1 ammo "right to
+    # open another battle" (matches the flat-surcharge principle).
+    surcharge_model: right_to_battle      # right_to_battle | per_attack
+    open_battle_surcharge_ammo: [0, 1]    # flat +1 ammo per extra battle
+    primary_row_ammo_cost: 1
+    secondary_row_ammo_cost: 2
+    retaliation_enabled: true
+    retaliation_is_free: true
+    retaliation_to_retaliation: false
+
+  movement:
+    # CONFIRMED: flat +1 ammo per extra move (one move free per action).
+    cost_model: flat                      # flat | escalating
+    first_hex_free: true
+    flat_ammo_per_extra_move: 1
+    escalating_surcharge_ammo: [0, 1, 2, 3]
+
+  # Компенсация энергии монетами — ТОЛЬКО в приказе Разработка (Сборка/Добыча).
+  # Одноразовая: действует на одно действие, кубик не кладётся, в следующий раз
+  # платить заново. Решение дизайнера 2026-08-12.
+  empty_energy_slot_coin_cost: 1
+
+  energy_swap:
+    # CONFIRMED by designer: flat +1 coin per extra source-hex this action.
+    surcharge_coins: [0, 1]
+
+
+# ----------------------------------------------------------------------------
+#  Combat / token model
+# ----------------------------------------------------------------------------
+combat_model:
+  all_attacks_damage: 1
+  damage_persists_until_refresh: true
+
+# ----------------------------------------------------------------------------
+#  TECH / SCIENCE MODULE  (designer will tune this)
+# ----------------------------------------------------------------------------
+tech:
+  tracks: 3
+  steps_per_track: 4
+  step_cost_trophy: [1, 2, 3, 4]          # full track = 10 trophy
+  step_vp_cumulative: [1, 1, 2, 3]        # ПО за шаг 1/2/3/4; полная лестница = 7 VP
+
+  # Capacity (spots) per step, BY PLAYER COUNT — capacity shrinks with fewer
+  # players. null = unlimited. Steps 1-2 unlimited; 3 and 4 limited.
+  # ⚠ 2p/3p rows are DRAFT — designer to confirm exact spot counts.
+  step_capacity_by_players:
+    "2": [null, null, 1, 1]               # DRAFT
+    "3": [null, null, 2, 1]               # DRAFT
+    "4": [null, null, 2, 1]
+
+  science_one_step_per_track_per_action: true
+
+  # Exchanges available in the Science action ("Научный отдел"), ≤1×/action each.
+  science_exchanges:
+    - {id: trophy_to_coin,  give_trophy: [1, 2], get_coin: [1, 2]}
+    - {id: move_module,     give_trophy: 1, effect: move_module}
+    - {id: draw_arsenal,    give_trophy: 2, effect: draw2_keep1}
+    - {id: gild_module,     give_trophy: 3, effect: gild_module}
+
+# ----------------------------------------------------------------------------
+#  MARKET MODULE  (designer will tune this)
+#  Base exchange rates (printed board rates, doubled per the market rule). One
+#  market card is active per round; card specifics live in the market content
+#  file, these are the underlying rates a cell can offer. Cost: 1 kelium/cell.
+# ----------------------------------------------------------------------------
+market:
+  cell_cost_kelium: 1
+  base_exchanges:
+    - {id: kelium_to_coin,      per_kelium_coin: 3}     # 1-2 kel -> 3-6 coin
+    - {id: kelium_to_ammo,      per_kelium_ammo: 2}     # 1-2 kel -> 2-4 ammo
+    - {id: kelium_to_objective, per_kelium_cards: 2}    # 1 кел -> 2 карты задания
+    - {id: kelium_to_energy,    effect: place_on_energy_cell}
+
+# ----------------------------------------------------------------------------
+#  End-of-round Return step
+# ----------------------------------------------------------------------------
+return_step:
+  # DESIGNER CHANGE: end-of-round trophy->upgrade exchange REMOVED.
+  trophy_to_upgrade_exchange_enabled: false
+  return_destroyed_tokens: true
+  refill_objectives_to_limit: true
+
+# ----------------------------------------------------------------------------
+#  Contested cards (backlog E12/E13/E14) — legal only if toggled on.
+# ----------------------------------------------------------------------------
+contested_cards:
+  energy_without_source_enabled: false
+  effect_survives_round_enabled: false
+  attack_first_initiative_enabled: false
+
+# ----------------------------------------------------------------------------
+#  Command center
+# ----------------------------------------------------------------------------
+command_center:
+  # DESIGNER-CONFIRMED: CU gives NO trophy points. It yields the owner's own
+  # CU-destruction token (3 VP) to the attacker; a 2nd destruction of the same
+  # owner's CU yields nothing (3-4p); a would-be 2nd token = instant win.
+  destruction_token_vp: 3
+  respawns: true
+  military_win_on_second_cu_kill: true
+  owner_compensation_containers: 2        # 2 containers to the CU's owner
+
+# ----------------------------------------------------------------------------
+#  Content versions this ruleset expects (separate versioned files).
+# ----------------------------------------------------------------------------
+content_versions:
+  boards: 1.0.0
+  objectives: 1.1.0
+  arsenal: 1.0.0
+  containers: 1.0.0
+  market: 1.0.0
+  orders: 1.0.0
+  super_objectives: 1.0.0

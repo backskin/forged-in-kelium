@@ -1,0 +1,446 @@
+# CONTENT: objectives  version 1.0.0
+# 40 regular + 8 starting. Encoded from "Карты/Задания — каталог 40 карт и 8 начальных.md".
+# Each card: requirement (base predicate) -> base_reward; enhanced (predicate) -> special_reward.
+# Predicate ids resolve in forge/engine/predicates.py (geometry ones are stubbed
+# until the scenario loader lands, so those cards simply won't fire yet).
+# Chain rule: base reward feeds OTHER order families; kelium only in special.
+meta:
+  id: 1.0.0
+  type: objectives
+
+objectives:
+  # ---------------- РАЗРАБОТКА (Development) — reward ammo(+container) -------
+  - id: o01
+    name: "Конвейер"
+    kind: regular
+    type: incident
+    requirement: {predicate: produced_units_this_turn, params: {count: 2}}
+    enhanced:    {predicate: produced_units_this_turn, params: {count: 3, distinct_buildings: 3}}
+    base_reward: {ammo: 3}
+    special_reward: {module: assembly, objective_card: 1}
+    # А6 ОДИНОЧНЫЙ ВЫСТРЕЛ: сжечь ради бесплатной атаки прямо сейчас (про-война).
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o02
+    name: "Оружейный барон"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: ammo, amount: 4}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: ammo, amount: 6}}
+    base_reward: {container: 2}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o03
+    name: "И то, и то"
+    kind: regular
+    type: incident
+    requirement: {predicate: mixed_assembly_outputs_this_turn, params: {}}
+    base_reward: {ammo: 3}
+    special_reward: {module: assembly, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ОДИНОЧНЫЙ МАРШ: войско на 1 гекс"}
+  - id: o04
+    name: "Глубокая жила"
+    kind: regular
+    type: state
+    requirement: {predicate: powered_miners_bordering_grids, params: {count: 2}}
+    enhanced:    {predicate: powered_miners_bordering_grids, params: {count: 3}}
+    base_reward: {ammo: 2, container: 1}
+    special_reward: {kelium: 1, objective_card: 1}
+    top: {effect: place_damage, params: {}, label: "ПРИСТРЕЛКА: 1 урон соседнему врагу"}
+  - id: o05
+    name: "Выработка"
+    kind: regular
+    type: incident
+    requirement: {predicate: took_last_kelium_this_turn, params: {}}
+    base_reward: {ammo: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    # Верхний утилизационный эффект (сжечь карту ради мгновенного эффекта вместо
+    # выполнения низа). Б1 БОГАТАЯ ЖИЛА.
+    top: {effect: gain, params: {kelium: 1}, label: "БОГАТАЯ ЖИЛА: +1 келемий"}
+  - id: o06
+    name: "Реквизиция"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: container, amount: 2}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    base_reward: {ammo: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o07
+    name: "Гарнизон"
+    kind: regular
+    type: state
+    requirement: {predicate: units_on_field, params: {count: 4, on_building_hexes: true}}
+    enhanced:    {predicate: units_on_field, params: {count: 6, on_building_hexes: true, distinct_kinds: 3}}
+    base_reward: {ammo: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ОДИНОЧНЫЙ МАРШ: войско на 1 гекс"}
+  - id: o08
+    name: "Разоружение"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: units, amount: 2}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    base_reward: {ammo: 2, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: market}, label: "РАЗОВАЯ СДЕЛКА"}
+  - id: o09
+    name: "Дорогой запуск"
+    kind: regular
+    type: state
+    cull: "[3+]"
+    requirement: {predicate: building_powered, params: {types: [airbase]}}
+    enhanced:    {predicate: building_powered, params: {types: [airbase, factory]}}
+    base_reward: {ammo: 3}
+    special_reward: {module: assembly, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o10
+    name: "Три цеха"
+    kind: regular
+    type: state
+    cull: "[3+]"
+    requirement: {predicate: military_buildings_of_distinct_types, params: {count: 3}}
+    enhanced:    {predicate: military_buildings_of_distinct_types, params: {count: 3, all_powered: true}}
+    base_reward: {ammo: 2, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+
+  # ---------------- ИНФРАСТРУКТУРА (Infrastructure) ------------------------
+    top: {effect: gain, params: {coin: 1}, label: "ЭКОНОМИЯ КАБЕЛЯ: +1 монета"}
+  - id: o11
+    name: "Линия снабжения"
+    kind: regular
+    type: state
+    requirement: {predicate: plant_and_miner_same_hex, params: {}}
+    base_reward: {ammo: 3}
+    special_reward: {module: assembly, objective_card: 1}
+    top: {effect: place_damage, params: {}, label: "ПРИСТРЕЛКА: 1 урон соседнему врагу"}
+  - id: o12
+    name: "Энергосеть"
+    kind: regular
+    type: state
+    requirement: {predicate: plant_borders_own_buildings, params: {count: 2}}
+    enhanced:    {predicate: plant_borders_own_buildings, params: {count: 3}}
+    base_reward: {ammo: 2, container: 1}
+    special_reward: {module: storage, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o13
+    name: "Цепь"
+    kind: regular
+    type: state
+    cull: "[3+]"
+    requirement: {predicate: building_chain_adjacent, params: {count: 3}}
+    enhanced:    {predicate: building_chain_adjacent, params: {count: 4}}
+    base_reward: {ammo: 3}
+    special_reward: {kelium: 1, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ОДИНОЧНЫЙ МАРШ: войско на 1 гекс"}
+  - id: o14
+    name: "Кольцо"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: buildings_ring_around_hex, params: {count: 3}}
+    enhanced:    {predicate: buildings_ring_around_hex, params: {count: 3, enemy_on_center: true}}
+    base_reward: {ammo: 2, container: 1}
+    special_reward: {module: attack, objective_card: 1}
+    top: {effect: free_action, params: {action: mining}, label: "ОДИНОЧНАЯ ДОБЫЧА"}
+  - id: o15
+    name: "Строительный бум"
+    kind: regular
+    type: incident
+    requirement: {predicate: build_ops_this_turn, params: {count: 2}}
+    enhanced:    {predicate: build_ops_this_turn, params: {count: 3}}
+    base_reward: {ammo: 3}
+    special_reward: {module: assembly, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o16
+    name: "Переезд"
+    kind: regular
+    type: incident
+    requirement: {predicate: moved_building_this_turn, params: {}}
+    base_reward: {ammo: 2, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: place_damage, params: {}, label: "ПРИСТРЕЛКА: 1 урон соседнему врагу"}
+  - id: o17
+    name: "Снос"
+    kind: regular
+    type: incident
+    requirement: {predicate: razed_and_rebuilt_same_hex_this_turn, params: {}}
+    base_reward: {ammo: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: science}, label: "МАЛАЯ НАУКА"}
+  - id: o18
+    name: "Передовая база"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: building_adjacent_to_enemy, params: {}}
+    enhanced:    {predicate: building_on_hex_with_enemy, params: {}}
+    base_reward: {ammo: 2, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o19
+    name: "Чужие руины"
+    kind: regular
+    type: state
+    cull: "[3+]"
+    requirement: {predicate: building_on_enemy_structure_hex, params: {count: 1}}
+    enhanced:    {predicate: building_on_enemy_structure_hex, params: {count: 2}}
+    base_reward: {ammo: 3}
+    special_reward: {arsenal: 1, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ОДИНОЧНЫЙ МАРШ: войско на 1 гекс"}
+  - id: o20
+    name: "Коммутация"
+    kind: regular
+    type: incident
+    requirement: {predicate: energy_swap_sources_this_turn, params: {count: 2}}
+    enhanced:    {predicate: energy_swap_sources_this_turn, params: {count: 3}}
+    base_reward: {ammo: 2, container: 1}
+    special_reward: {module: storage, objective_card: 1}
+
+  # ---------------- ОПЕРАЦИЯ (Operation) — reward coin(+container) ---------
+    top: {effect: free_action, params: {action: assembly}, label: "МАЛАЯ СБОРКА"}
+  - id: o21
+    name: "Первая кровь"
+    kind: regular
+    type: incident
+    requirement: {predicate: destroyed_enemy_this_turn, params: {count: 1}}
+    enhanced:    {predicate: destroyed_two_in_one_battle_this_turn, params: {}}
+    base_reward: {coin: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: gain, params: {kelium: 1}, label: "БОГАТАЯ ЖИЛА: +1 келемий"}
+  - id: o22
+    name: "Распределённый огонь"
+    kind: regular
+    type: incident
+    cull: "[4]"
+    requirement: {predicate: damaged_distinct_enemy_this_turn, params: {count: 3}}
+    enhanced:    {predicate: damaged_distinct_enemy_this_turn, params: {count: 4}}
+    base_reward: {coin: 2, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: mining}, label: "ОДИНОЧНАЯ ДОБЫЧА"}
+  - id: o23
+    name: "Раненые"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: damaged_enemy_tokens_standing, params: {count: 3}}
+    enhanced:    {predicate: damaged_enemy_tokens_standing, params: {count: 4, include_vehicle_or_tower: true}}
+    base_reward: {coin: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: gain, params: {coin: 1}, label: "ЭКОНОМИЯ КАБЕЛЯ: +1 монета"}
+  - id: o24
+    name: "Чистая работа"
+    kind: regular
+    type: incident
+    requirement: {predicate: destroyed_enemy_this_turn, params: {count: 1, lost_none: true}}
+    enhanced:    {predicate: destroyed_enemy_this_turn, params: {count: 1, lost_none: true, victim_types: [vehicle, tower]}}
+    base_reward: {coin: 2, container: 1}
+    special_reward: {module: attack, objective_card: 1}
+    top: {effect: free_action, params: {action: build}, label: "ЛЬГОТНАЯ СТРОЙКА"}
+  - id: o25
+    name: "Осада"
+    kind: regular
+    type: state
+    cull: "[3+]"
+    requirement: {predicate: enemy_building_damaged, params: {count: 1}}
+    enhanced:    {predicate: enemy_building_damaged, params: {count: 2}}
+    base_reward: {coin: 3}
+    special_reward: {kelium: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: science}, label: "МАЛАЯ НАУКА"}
+  - id: o26
+    name: "Крепкая оборона"
+    kind: regular
+    type: incident
+    requirement: {predicate: destroyed_in_retaliation_this_turn, params: {}}
+    enhanced:    {predicate: destroyed_in_retaliation_this_turn, params: {lost_none: true}}
+    base_reward: {coin: 2, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: gain, params: {ammo: 1}, label: "ЛИШНЯЯ ОБОЙМА: +1 боеприпас"}
+  - id: o27
+    name: "Зачистка"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: building_adjacent_to_enemy, params: {enemy_no_units: true}}
+    enhanced:    {predicate: building_adjacent_to_enemy, params: {enemy_no_units: true, enemy_building_damaged: true}}
+    base_reward: {coin: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: market}, label: "РАЗОВАЯ СДЕЛКА"}
+  - id: o28
+    name: "Полуокружение"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: buildings_ring_around_hex, params: {count: 2, enemy_on_center: true}}
+    enhanced:    {predicate: buildings_ring_around_hex, params: {count: 3, enemy_on_center: true}}
+    base_reward: {coin: 2, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: energy_swap}, label: "ПЕРЕКОММУТАЦИЯ"}
+  - id: o29
+    name: "Глубокий рейд"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: unit_far_from_own_buildings, params: {distance: 4}}
+    enhanced:    {predicate: unit_far_from_own_buildings, params: {distance: 4, on_enemy_hex: true}}
+    base_reward: {coin: 3}
+    special_reward: {arsenal: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: assembly}, label: "МАЛАЯ СБОРКА"}
+  - id: o30
+    name: "Сборщик"
+    kind: regular
+    type: incident
+    cull: "[3+]"
+    requirement: {predicate: containers_opened_this_turn, params: {count: 2}}
+    enhanced:    {predicate: containers_opened_this_turn, params: {count: 3}}
+    base_reward: {coin: 2, container: 1}
+    special_reward: {storage_token: 1, objective_card: 1}
+    top: {effect: gain, params: {coin: 1}, label: "ЭКОНОМИЯ КАБЕЛЯ: +1 монета"}
+  - id: o31
+    name: "Гроза небес"
+    kind: regular
+    type: state
+    cull: "[4]"
+    requirement: {predicate: aircraft_on_enemy_hex, params: {}}
+    enhanced:    {predicate: aircraft_on_enemy_hex, params: {enemy_aircraft_damaged: true}}
+    base_reward: {coin: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: science}, label: "МАЛАЯ НАУКА"}
+  - id: o32
+    name: "Марш"
+    kind: regular
+    type: incident
+    requirement: {predicate: moved_units_this_turn, params: {count: 3}}
+    enhanced:    {predicate: moved_units_this_turn, params: {count: 3, distinct_hexes: 3}}
+    base_reward: {coin: 2, container: 1}
+    special_reward: {debris: 2, objective_card: 1}
+
+  # ---------------- ПРИОБРЕТЕНИЯ (Acquisitions) — reward coin+ammo ---------
+    top: {effect: gain, params: {container: 1}, label: "ПОДРЯД: +1 контейнер"}
+  - id: o33
+    name: "Биржевой день"
+    kind: regular
+    type: incident
+    requirement: {predicate: used_market_this_turn, params: {}}
+    enhanced:    {predicate: used_market_this_turn, params: {printed_rate: true}}
+    base_reward: {coin: 2, ammo: 2}
+    special_reward: {arsenal: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o34
+    name: "Казна"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: coin, amount: 4}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: coin, amount: 7}}
+    base_reward: {ammo: 3}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: move_unit, params: {hexes: 1}, label: "ОДИНОЧНЫЙ МАРШ: войско на 1 гекс"}
+  - id: o35
+    name: "Щедрость"
+    kind: regular
+    type: sacrifice
+    cull: "[3+]"
+    sacrifice: {resource: kelium, amount: 2}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: kelium, amount: 3}}
+    base_reward: {coin: 2, ammo: 2}
+    special_reward: {arsenal: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: mining}, label: "ОДИНОЧНАЯ ДОБЫЧА"}
+  - id: o36
+    name: "Лом"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: debris, amount: 3}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    enhanced:    {predicate: sacrifice_enhanced, params: {resource: debris, amount: 7}}
+    base_reward: {coin: 3, ammo: 1}
+    special_reward: {module: attack, objective_card: 1}
+    top: {effect: free_action, params: {action: build}, label: "ЛЬГОТНАЯ СТРОЙКА"}
+  - id: o37
+    name: "Распродажа"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: arsenal, amount: 1}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    base_reward: {coin: 2, ammo: 2}
+    special_reward: {debris: 2, objective_card: 1}
+    top: {effect: place_damage, params: {}, label: "ПРИСТРЕЛКА: 1 урон соседнему врагу"}
+  - id: o38
+    name: "Первая ступень"
+    kind: regular
+    type: state
+    requirement: {predicate: tech_step_reached, params: {step: 2, tracks: 1}}
+    enhanced:    {predicate: tech_step_reached, params: {step: 2, tracks: 2}}
+    base_reward: {coin: 3, ammo: 1}
+    special_reward: {module: attack, objective_card: 1}
+    top: {effect: free_action, params: {action: assembly}, label: "МАЛАЯ СБОРКА"}
+  - id: o39
+    name: "Вершина"
+    kind: regular
+    type: state
+    cull: "[3+]"
+    requirement: {predicate: tech_step_reached, params: {step: 4, tracks: 1}}
+    enhanced:    {predicate: tech_step_reached, params: {step: 5, tracks: 1}}
+    base_reward: {coin: 2, ammo: 2}
+    special_reward: {kelium: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: combat}, label: "ОДИНОЧНЫЙ ВЫСТРЕЛ: бесплатный бой"}
+  - id: o40
+    name: "Разборка"
+    kind: regular
+    type: sacrifice
+    sacrifice: {resource: module, amount: 1}
+    requirement: {predicate: sacrifice_paid, params: {}}
+    base_reward: {coin: 3, ammo: 1}
+    special_reward: {debris: 2, objective_card: 1}
+
+  # ---------------- 8 starting objectives (single step; reward 1 trophy + 1 card)
+  - id: n1
+    name: "Подъём"
+    kind: starting
+    type: state
+    requirement: {predicate: buildings_on_field_count, params: {count: 2}}
+    special_reward: {debris: 1, objective_card: 1}
+  - id: n2
+    name: "Первый боец"
+    kind: starting
+    type: state
+    requirement: {predicate: units_on_field, params: {count: 1}}
+    special_reward: {debris: 1, objective_card: 1}
+  - id: n3
+    name: "Патроны"
+    kind: starting
+    type: state
+    requirement: {predicate: resource_at_least, params: {resource: ammo, amount: 2}}
+    special_reward: {debris: 1, objective_card: 1}
+  - id: n4
+    name: "Первая сделка"
+    kind: starting
+    type: incident
+    requirement: {predicate: used_market_this_turn, params: {printed_rate: true}}
+    special_reward: {debris: 1, objective_card: 1}
+  - id: n5
+    name: "Коммутация (старт)"
+    kind: starting
+    type: state
+    requirement: {predicate: non_cu_building_powered, params: {}}
+    special_reward: {debris: 1, objective_card: 1}
+  - id: n6
+    name: "Выход"
+    kind: starting
+    type: state
+    requirement: {predicate: unit_off_cu_hex, params: {}}
+    special_reward: {debris: 1, objective_card: 1}
+  - id: n7
+    name: "Жила"
+    kind: starting
+    type: state
+    requirement: {predicate: resource_at_least, params: {resource: kelium, amount: 2}}
+    special_reward: {debris: 1, objective_card: 1}
+  - id: n8
+    name: "Находка"
+    kind: starting
+    type: state
+    requirement: {predicate: has_unopened_container, params: {}}
+    special_reward: {debris: 1, objective_card: 1}
+    top: {effect: free_action, params: {action: energy_swap}, label: "ПЕРЕКОММУТАЦИЯ"}

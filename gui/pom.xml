@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  kelium-gui — конструктор раскладок, проигрыватель партий (Replay2), раннер
+  прогонов ботов, справочник (gui + gui.replay2). Единственный модуль со
+  сторонними UI-зависимостями (FlatLaf, MigLayout) и единственный, которому
+  разрешено импортировать Swing/AWT. Зависит от kelium-bots (и транзитивно от
+  kelium-engine) — окно вызывает боевые/учебные функции движка и ботов, но
+  движок и боты о существовании окна не знают.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>kelium</groupId>
+        <artifactId>forged-in-kelium-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+
+    <artifactId>kelium-gui</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>kelium</groupId>
+            <artifactId>kelium-bots</artifactId>
+        </dependency>
+        <!--
+          ОБОЛОЧКА ПРОИГРЫВАТЕЛЯ 2.0 (только интерфейс, движка не касается).
+
+          FlatLaf — современная тема для Swing: тёмная и светлая, дизайн-токены
+          задаются в .properties, HiDPI из коробки. 800 КБ, Apache-2.0, без
+          собственных зависимостей; java.desktop в сборке и так есть, поэтому
+          jlink не меняется, а дистрибутив растёт на пару мегабайт.
+          Выбрана вместо перехода на JavaFX/Compose: «вид 1990-х» создают
+          оболочки, а не тулкит, а отрисовка поля у нас уже вынесена в
+          FieldPainter/FieldCanvas и от тулкита не зависит.
+
+          MigLayout — раскладка по сетке 4/8 без ручных вложенных разделителей
+          (именно они разъезжались в 1.0).
+        -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.miglayout</groupId>
+            <artifactId>miglayout-swing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              Fat-jar со всеми зависимостями (engine+bots+snakeyaml+FlatLaf,
+              разрешёнными реактором) для запуска GUI-раннера руками на
+              Windows: `mvn -q -pl gui -am -DskipTests package` собирает
+              gui/target/kelium-runner.jar, который стартует двойным кликом или
+              через `java -jar` — classpath не нужен. Главный класс — GUI-раннер.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <finalName>kelium-runner</finalName>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>kelium.gui.RunnerGui</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

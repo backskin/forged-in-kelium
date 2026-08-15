@@ -1,0 +1,133 @@
+# CONTENT: arsenal  version 1.0.0
+# 24 regular + 4 starting. Each card: top (one-shot burn) + bottom (permanent
+# POST or SPEC action while installed). Playing a card is a SPEC action: BURN the
+# top OR INSTALL for the bottom. 3 install slots/player. Deck scales 24->20->16.
+# Encoded from "Карты/Арсенал 4.0 — колода 24+4.md".
+#
+# top: {effect, params, label}  — resource tops are live via the effect registry;
+#   immediate-action / conditional tops use effect: noop (recorded, not yet
+#   mechanized).
+# bottom: {kind: POST|SPEC, passive: <id>, label}  — passive ids name a rule
+#   modifier; those not yet integrated are tagged and currently inert. This keeps
+#   every card as versioned DATA and bot-selectable now; deep passive wiring is
+#   a follow-up (tracked with the modules work).
+meta:
+  id: 1.0.0
+  type: arsenal
+
+arsenal:
+  # -------- 4 starting --------
+  - {id: as1, name: "Ударное звено", kind: starting,
+     top: {effect: free_action, params: {action: combat}, label: "free infantry attack"},
+     bottom: {kind: SPEC, passive: unit_makes_one_attack, label: "SPEC: a unit makes one attack"},
+     описание: "Утиль даёт одну бесплатную атаку пехоты без расхода приказа на бой. Пока карта установлена, спец-действием можно заставить один отряд провести одну атаку. Надёжная основа для игрока, ставящего на постоянный огневой контакт."}
+  - {id: as2, name: "Старатели", kind: starting,
+     top: {effect: gain, params: {coin: 2, ammo: 1}, label: "2 coin + 1 ammo"},
+     bottom: {kind: POST, passive: extraction_flip_bonus_trophy, label: "POST: +1 trophy on extraction flip"},
+     описание: "Утиль сразу приносит 2 монеты и 1 боеприпас — быстрый разгон в начале партии. Пока карта установлена, каждый переворот добычи на трофейной стороне даёт дополнительное трофейное очко."}
+  - {id: as3, name: "Окопы", kind: starting,
+     top: {effect: heal_hex, params: {}, label: "heal all own in one hex"},
+     bottom: {kind: POST, passive: buildings_plus1_hp, label: "POST: your buildings +1 HP"},
+     описание: "Утиль лечит все свои жетоны на одном гексе за раз. Пока карта установлена, все ваши здания получают +1 к прочности и дольше держатся под обстрелом. Хорошая опора для игрока, ставящего на оборону."}
+  - {id: as4, name: "Связной", kind: starting,
+     top: {effect: move_unit, params: {hexes: 2}, label: "move a unit 2 hexes"},
+     bottom: {kind: SPEC, passive: move_one_unit_1, label: "SPEC: move a unit 1 hex"},
+     описание: "Утиль сразу перемещает один отряд на 2 гекса без приказа на перемещение. Пока карта установлена, спец-действием можно передвинуть отряд на 1 гекс. Удобно для быстрой перестановки войск между раундами."}
+
+  # -------- 24 regular --------
+  - {id: a01, name: "Пристрелка",
+     top: {effect: place_damage, params: {}, label: "1 damage to adjacent enemy"},
+     bottom: {kind: POST, passive: first_attack_minus1_ammo, label: "POST: first attack each battle -1 ammo"},
+     описание: "Утиль наносит 1 повреждение вражескому отряду на соседнем гексе, без боя. Пока карта установлена, первая атака в каждом бою стоит на 1 боеприпас меньше. Экономит боеприпасы тому, кто много воюет."}
+  - {id: a02, name: "Мародёры",
+     top: {effect: gain, params: {ammo: 3}, label: "3 ammo"},
+     bottom: {kind: POST, passive: ammo_on_kill, label: "POST: +1 ammo when you destroy a token"},
+     описание: "Утиль сразу приносит 3 боеприпаса. Пока карта установлена, за каждый уничтоженный вами жетон вы получаете 1 дополнительный боеприпас. Чем агрессивнее бой, тем быстрее пополняются запасы."}
+  - {id: a03, name: "Штурмовая группа",
+     top: {effect: free_action, params: {action: combat}, label: "free Combat"},
+     bottom: {kind: SPEC, passive: unit_makes_one_attack, label: "SPEC: a unit makes one attack"},
+     описание: "Утиль даёт бесплатное действие боя без расхода приказа. Пока карта установлена, спец-действием можно заставить один отряд провести одну атаку. Хороша для тех, кто хочет усилить эту способность второй такой картой."}
+  - {id: a04, name: "Бронебойщики",
+     top: {effect: place_damage, params: {finish_off: true}, label: "finish off adjacent enemy"},
+     bottom: {kind: POST, passive: anti_armor_minus1_ammo, label: "POST: attacks vs vehicle/buildings/towers -1 ammo"},
+     описание: "Утиль позволяет добить вражеский отряд на соседнем гексе одним ударом. Пока карта установлена, атаки по технике, зданиям и вышкам стоят на 1 боеприпас меньше. Незаменима против укреплённого противника."}
+  - {id: a05, name: "Двойной залп", cull: "[4]",
+     top: {effect: free_action, params: {action: combat}, label: "two battles, no 2nd surcharge"},
+     bottom: {kind: POST, passive: no_second_battle_surcharge, label: "POST: no 2nd-battle surcharge"},
+     описание: "Утиль даёт бесплатное действие боя, в котором можно провести два боя подряд без надбавки за второй. Пока карта установлена, второй бой в действии всегда обходится без обычной надбавки. Карта для тех, кто строит игру на сериях атак."}
+  - {id: a06, name: "Трофейная бригада", cull: "[3+]",
+     top: {effect: gain, params: {debris: 2}, label: "2 trophy"},
+     bottom: {kind: POST, passive: bonus_trophy_on_kill, label: "POST: +1 trophy per token destroyed"},
+     описание: "Утиль сразу приносит 2 трофейных очка. Пока карта установлена, за каждый уничтоженный жетон вы получаете 1 дополнительное трофейное очко."}
+  - {id: a07, name: "Перекупщик",
+     top: {effect: gain, params: {coin: 4}, label: "4 coin"},
+     bottom: {kind: POST, passive: market_second_kelium_full, label: "POST: 2nd kelium in a market deal pays full"},
+     описание: "Утиль сразу приносит 4 монеты. Пока карта установлена, второй келемий в одной сделке на маркете обходится по полной цене — скидка за объём не действует. Подходит тому, кто ценит быстрые деньги здесь и сейчас больше, чем выгодную торговлю."}
+  - {id: a08, name: "Геологи",
+     top: {effect: free_action, params: {action: mining}, label: "free Mining"},
+     bottom: {kind: SPEC, passive: miner_takes_container, label: "SPEC: a powered miner takes a container"},
+     описание: "Утиль даёт бесплатное действие добычи без расхода приказа. Пока карта установлена, спец-действием можно заставить один запитанный добытчик забрать контейнер. Небольшая, но постоянно доступная прибавка для игрока, ставящего на добычу."}
+  - {id: a09, name: "Складчина",
+     top: {effect: gain, params: {objective_cards: 2, coin: 2}, label: "2 objectives + 2 coin"},
+     bottom: {kind: POST, passive: plus1_storage_cell, label: "POST: +1 storage cell"},
+     описание: "Утиль сразу приносит 2 карты заданий и 2 монеты. Пока карта установлена, у вас на 1 ячейку хранения больше."}
+  - {id: a10, name: "Лаборатория",
+     top: {effect: free_action, params: {action: science}, label: "free Science"},
+     bottom: {kind: SPEC, passive: commit_1_trophy_to_track, label: "SPEC: put 1 trophy on any track"},
+     описание: "Утиль даёт бесплатное действие науки без расхода приказа. Пока карта установлена, спец-действием можно отложить 1 трофейное очко на любой трек науки. Удобный способ продвигаться по трекам мелкими шагами."}
+  - {id: a11, name: "Глубокое бурение", cull: "[4]",
+     top: {effect: free_action, params: {action: mining}, label: "free Mining x2"},
+     bottom: {kind: POST, passive: miner_takes_kelium_and_container, label: "POST: each miner takes kelium AND container"},
+     описание: "Утиль даёт бесплатное действие добычи, выполненное дважды подряд. Пока карта установлена, каждый добытчик берёт сразу и келемий, и контейнер за один заход. Мощная технология для игрока, ставящего на добычу."}
+  - {id: a12, name: "Промышленник", cull: "[3+]",
+     top: {effect: free_action, params: {action: build}, label: "free Build (no surcharge)"},
+     bottom: {kind: SPEC, passive: build_minus2_coin, label: "SPEC: build one building -2 coin"},
+     описание: "Утиль даёт бесплатное действие постройки без обычной надбавки. Пока карта установлена, спец-действием можно построить одно здание со скидкой 2 монеты. Снижает стоимость расширения базы."}
+  - {id: a13, name: "Полевой госпиталь",
+     top: {effect: heal_hex, params: {}, label: "heal all own in one hex"},
+     bottom: {kind: SPEC, passive: heal_one_damage, label: "SPEC: remove 1 damage from a token"},
+     описание: "Утиль лечит все свои жетоны на одном гексе за раз. Пока карта установлена, спец-действием можно снять 1 повреждение с одного жетона. Гибкая поддержка войск без привязки к конкретному гексу."}
+  - {id: a14, name: "Заграждения",
+     top: {effect: free_action, params: {action: build}, label: "free tower"},
+     bottom: {kind: POST, passive: defenders_cost_more, label: "POST: attacks on your units in your building-hexes cost +1 ammo"},
+     описание: "Утиль строит бесплатную вышку без расхода приказа на постройку. Пока карта установлена, атаки по вашим отрядам на гексах с вашими зданиями обходятся противнику на 1 боеприпас дороже. Делает оборону дороже для нападающего."}
+  - {id: a15, name: "Резерв",
+     top: {effect: deploy_units, params: {count: 2}, label: "deploy 2 units"},
+     bottom: {kind: SPEC, passive: deploy_1_unit, label: "SPEC: deploy 1 matching unit from reserve"},
+     описание: "Утиль сразу выводит на поле 2 отряда из резерва. Пока карта установлена, спец-действием можно вывести 1 подходящий отряд из резерва. Ускоряет пополнение войск на поле."}
+  - {id: a16, name: "Автономный контур",
+     top: {effect: free_action, params: {action: assembly}, label: "free full Assembly"},
+     bottom: {kind: POST, passive: plants_plus1_energy, label: "POST: your power plants give +1 energy"},
+     описание: "Утиль даёт полное бесплатное действие сборки без расхода приказа. Пока карта установлена, каждая ваша энергостанция выдаёт на 1 энергию больше. Прибавка к энергии для тех, кто вкладывается в энергоснабжение."}
+  - {id: a17, name: "Глубокая оборона", cull: "[4]", contested: attack_first_initiative,
+     top: {effect: heal_all_own, params: {}, label: "heal all own tokens"},
+     bottom: {kind: POST, passive: retaliation_strikes_first, label: "POST: in retaliation your units strike first"},
+     описание: "Утиль лечит сразу все свои жетоны на поле. Пока карта установлена, в ответном ударе ваши отряды бьют первыми. Сильная опора для того, кто держит оборону и рассчитывает на контратаку."}
+  - {id: a18, name: "Бастион", cull: "[3+]",
+     top: {effect: free_action, params: {action: build}, label: "free building"},
+     bottom: {kind: POST, passive: cu_plus2_hp, label: "POST: your CU +2 HP"},
+     описание: "Утиль строит бесплатное здание без расхода приказа. Пока карта установлена, ваш центр управления получает +2 к прочности. Продлевает жизнь ЦУ под давлением противника."}
+  - {id: a19, name: "Разведка",
+     top: {effect: gain, params: {containers: 2}, label: "2 containers"},
+     bottom: {kind: SPEC, passive: grab_adjacent_container, label: "SPEC: take a container from a hex adjacent to a unit"},
+     описание: "Утиль сразу приносит 2 контейнера без похода за ними. Пока карта установлена, спец-действием можно забрать контейнер с гекса, соседнего с вашим отрядом. Даёт доступ к контейнерам даже без добытчика на месте."}
+  - {id: a20, name: "Форсированный марш",
+     top: {effect: free_action, params: {action: movement}, label: "free Movement"},
+     bottom: {kind: POST, passive: first_extra_move_free, label: "POST: first over-speed hex each Movement is free"},
+     описание: "Утиль даёт бесплатное действие перемещения без расхода приказа. Пока карта установлена, первый гекс сверх обычной скорости в каждом перемещении достаётся бесплатно. Разгоняет войска дальше обычного без лишних трат."}
+  - {id: a21, name: "Диспетчер",
+     top: {effect: free_action, params: {action: energy_swap}, label: "free module + energy swap"},
+     bottom: {kind: SPEC, passive: move_one_module, label: "SPEC: move one module"},
+     описание: "Утиль сразу двигает модуль и бесплатно меняет энергию. Пока карта установлена, спец-действием можно передвинуть один модуль. Удобно перестраивать план застройки на ходу."}
+  - {id: a22, name: "Переброска",
+     top: {effect: move_unit, params: {hexes: 2}, label: "move 2 units 2 hexes"},
+     bottom: {kind: POST, passive: first_two_moves_free, label: "POST: first two off-hex moves each Movement are free"},
+     описание: "Утиль сразу перемещает 2 отряда на 2 гекса каждый без приказа на перемещение. Пока карта установлена, первые два выхода с гекса в каждом перемещении бесплатны. Заметно ускоряет перегруппировку войск."}
+  - {id: a23, name: "Штабная работа", cull: "[3+]",
+     top: {effect: free_action, params: {action: assembly}, label: "two actions of one order"},
+     bottom: {kind: POST, passive: two_spec_actions, label: "POST: you have two SPEC actions per turn"},
+     описание: "Утиль даёт две сборки одним приказом подряд. Пока карта установлена, у вас два спец-действия за круг вместо одного. Заметно расширяет число доступных действий за игру."}
+  - {id: a24, name: "Воздушный мост", cull: "[4]",
+     top: {effect: move_unit, params: {hexes: 2}, label: "redeploy a unit"},
+     bottom: {kind: POST, passive: aircraft_speed3_spawn, label: "POST: your aircraft speed 3, may enter spawn hexes"},
+     описание: "Утиль перебрасывает отряд на 2 гекса — удобно для срочной переброски авиации. Пока карта установлена, ваша авиация двигается со скоростью 3 и может входить в тайлы зарождения. Делает авиацию быстрее и мобильнее в бою."}

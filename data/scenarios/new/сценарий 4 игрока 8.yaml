@@ -1,0 +1,104 @@
+version: editor
+scenarios:
+- id: сценарий 4 игрока 8
+  players: 4
+  _made_with: LayoutEditor
+  hexes:
+  - q: 0
+    r: 0
+    content: kelium_tile
+    stack: 2
+  - q: 1
+    r: 0
+  - q: 0
+    r: 1
+    neutral_list:
+    - size: small
+      corners:
+      - 6
+      - 1
+  - q: -1
+    r: 1
+  - q: -1
+    r: 0
+    neutral_list:
+    - size: big
+      corners:
+      - 1
+      - 2
+      - 3
+  - q: 0
+    r: -1
+    content: kelium_tile
+    stack: 2
+  - q: 1
+    r: -1
+    neutral_list:
+    - size: big
+      corners:
+      - 4
+      - 5
+      - 6
+  - q: 2
+    r: -1
+  - q: 2
+    r: -2
+  - q: 1
+    r: -2
+  - q: 0
+    r: -2
+    neutral_list:
+    - size: small
+      corners:
+      - 3
+      - 4
+  - q: -1
+    r: -1
+  - q: -2
+    r: 0
+  - q: -2
+    r: 1
+  - q: -2
+    r: 2
+    content: spawn_start
+  - q: -1
+    r: 2
+  - q: -3
+    r: 2
+  - q: -3
+    r: 1
+    content: player_start
+    seat: 3
+  - q: -3
+    r: 0
+  - q: -2
+    r: -1
+    content: spawn_start
+  - q: -1
+    r: -2
+  - q: 0
+    r: -3
+    content: player_start
+    seat: 0
+  - q: 1
+    r: -3
+  - q: 2
+    r: -3
+    content: spawn_start
+  - q: 2
+    r: 0
+    content: spawn_start
+  - q: 1
+    r: 1
+  - q: 0
+    r: 2
+    content: player_start
+    seat: 1
+  - q: 3
+    r: -2
+    content: player_start
+    seat: 2
+  - q: 3
+    r: -3
+  - q: 3
+    r: -1

@@ -1,0 +1,1006 @@
+package kelium.engine;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+
+import kelium.core.BuildingToken;
+import kelium.core.BuildingType;
+import kelium.core.GameState;
+import kelium.core.Hex;
+import kelium.core.PlayerState;
+import kelium.core.Resource;
+import kelium.core.Target;
+import kelium.core.Token;
+import kelium.core.UnitToken;
+import kelium.core.UnitType;
+import kelium.dataio.GameConfig;
+import kelium.rules.Ruleset;
+import kelium.core.TurnJournal;
+import kelium.core.Agent;
+import kelium.core.Choice;
+import kelium.dataio.Ctx;
+
+/**
+ * Разрешение боя — по документу «Бой — полные правила». Порт из
+ * forge/engine/combat.py.
+ *
+ * <p>Процедура из 6 шагов: выбрать свой гекс с юнитом -> выбрать один смежный
+ * гекс-цель -> выбрать атакующие юниты -> разрешать атаки по одной (платить
+ * боеприпасы, наносить урон, сразу проверять уничтожение) -> ответный бой.
+ *
+ * <p>Правило закрытого гекса: пока на цели стоит вражеское/нейтральное здание,
+ * наземные юниты бьют там только по зданиям/вышкам; авиация игнорирует
+ * закрытость. Ответный бой: любой игрок, чьи жетоны повреждены, получает один
+ * бесплатный Бой только по атакующему; ответки на ответку нет; наценки нет.
+ * Модуль управляется агентом через объекты Choice.
+ */
+public final class CombatResolver {
+
+    private final GameState state;
+    private final Consumer<Map<String, Object>> emit;
+    private final Ruleset rs;
+    private List<Agent> agents;
+
+    public CombatResolver(GameState state, Consumer<Map<String, Object>> emit) {
+        this.state = state;
+        this.emit = emit;
+        this.rs = Ctx.rules(state);
+    }
+
+    /** Привязать агентов по местам (для ответных ударов) и вернуть self. */
+    public CombatResolver bindAgents(List<Agent> agents) {
+        this.agents = agents;
+        return this;
+    }
+
+    private TurnJournal journal() {
+        return state.journal;
+    }
+
+    private void emit(Object... kv) {
+        Map<String, Object> m = new HashMap<>();
+        for (int i = 0; i + 1 < kv.length; i += 2) {
+            m.put((String) kv[i], kv[i + 1]);
+        }
+        emit.accept(m);
+    }
+
+    /** Категория цели — свойство самого жетона ({@link Token#category()}). */
+    static Target targetCategory(Token token) {
+        return token.category();
+    }
+
+    private static String victimLabel(Token t) {
+        if (t instanceof BuildingToken b) {
+            String lvl = b.level != null ? "L" + b.level : "";
+            return b.type.code + lvl;
+        }
+        return ((UnitToken) t).type.code;
+    }
+
+    // -- вспомогательные ------------------------------------------------------
+    /**
+     * Есть ли в гексе {@code source} хоть один живой жетон игрока, который
+     * ДОСТАЁТ до соседнего гекса {@code target}: авиация достаёт всегда,
+     * наземные — только если сторона не закрыта чужим или нейтральным зданием.
+     */
+    private boolean anyCanShootAcross(int seat, String source, String target) {
+        for (UnitToken u : unitsOf(seat, source)) {
+            if (Passability.canShootAcross(state, u, target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<UnitToken> unitsOf(int seat, String hexId) {
+        List<UnitToken> out = new ArrayList<>();
+        for (UnitToken u : state.player(seat).units) {
+            if (hexId.equals(u.hexId) && u.alive()) {
+                out.add(u);
+            }
+        }
+        return out;
+    }
+
+    private List<Token> allTokensOn(String hexId) {
+        List<Token> out = new ArrayList<>();
+        for (PlayerState p : state.players) {
+            for (UnitToken u : p.units) {
+                if (hexId.equals(u.hexId) && u.alive()) {
+                    out.add(u);
+                }
+            }
+            for (BuildingToken b : p.buildings) {
+                if (hexId.equals(b.hexId) && b.alive()) {
+                    out.add(b);
+                }
+            }
+        }
+        return out;
+    }
+
+    private boolean hexClosedAgainst(String hexId, int attackerSeat) {
+        Hex h = state.field.get(hexId);
+        if (h.hasNeutral()) {
+            return true;
+        }
+        for (PlayerState p : state.players) {
+            if (p.seat == attackerSeat) {
+                continue;
+            }
+            for (BuildingToken b : p.buildings) {
+                if (hexId.equals(b.hexId) && b.alive()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Одна строка атаки: ключ строки, стоимость боеприпасов, категория цели. */
+    private record AttackRow(String row, int ammoCost, Target target) {
+    }
+
+    /**
+     * Строки (row, стоимость, цель) для юнита из таблицы его планшета. Красный
+     * модуль заменяет цель ВТР-строки выбором из двух; позолота — обе цели.
+     */
+    private List<AttackRow> attackRows(int seat, UnitToken unit) {
+        // СУПЕР-ВОЙСКО (карта супер-арсенала): собственные УНИВЕРСАЛЬНЫЕ атаки —
+        // по любому жетону ВОЙСК за 1 БП (выбор цели = три строки с ОБЩИМ ключом
+        // «super_any»: сработает не более одной за бой) и по ЗДАНИЯМ-ВЫШКАМ за 2.
+        if (unit.superUnit) {
+            List<AttackRow> sup = new ArrayList<>();
+            sup.add(new AttackRow("super_any", 1, Target.INFANTRY));
+            sup.add(new AttackRow("super_any", 1, Target.VEHICLE));
+            sup.add(new AttackRow("super_any", 1, Target.AIRCRAFT));
+            sup.add(new AttackRow("super_bld", 2, Target.BUILDINGS_TOWERS));
+            return sup;
+        }
+        var side = state.player(seat).board.troop;
+        Target[] pair = side.attacks(unit.type);
+        if (pair == null) {
+            return List.of();
+        }
+        int primCost = rs.getInt("actions.combat.primary_row_ammo_cost");
+        int secCost = rs.getInt("actions.combat.secondary_row_ammo_cost");
+        List<AttackRow> rows = new ArrayList<>();
+        rows.add(new AttackRow("primary", primCost, pair[0]));
+
+        Map<String, Object> mod = Modules.redModuleOn(state.player(seat), unit.type);
+        if (mod == null) {
+            rows.add(new AttackRow("secondary", secCost, pair[1]));
+        } else {
+            String[] tcodes = (String[]) mod.get("targets");
+            Target t0 = Target.fromCode(tcodes[0]);
+            Target t1 = Target.fromCode(tcodes[1]);
+            if (Boolean.TRUE.equals(mod.get("gold"))) {
+                rows.add(new AttackRow("secondary_a", secCost, t0));
+                rows.add(new AttackRow("secondary_b", secCost, t1));
+            } else {
+                rows.add(new AttackRow("secondary", secCost, t0));
+                rows.add(new AttackRow("secondary", secCost, t1));
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * КАКИЕ КАТЕГОРИИ ЦЕЛЕЙ этот жетон вообще способен поражать прямо сейчас —
+     * с учётом красного модуля и супер-войска, а не только печатной пары на
+     * планшете.
+     *
+     * <p>Публичный вход для ботов: раньше они смотрели одну лишь печатную
+     * таблицу и потому «не видели», что модуль дал юниту право бить, скажем,
+     * ЦУ, — планировали не тот ход.
+     */
+    public java.util.Set<Target> reachableTargets(int seat, UnitToken unit) {
+        java.util.Set<Target> out = new java.util.LinkedHashSet<>();
+        for (AttackRow r : attackRows(seat, unit)) {
+            out.add(r.target());
+        }
+        return out;
+    }
+
+    /** Способен ли жетон {@code unit} игрока {@code seat} поразить этот жетон. */
+    public boolean canHit(int seat, UnitToken unit, Token enemy) {
+        return reachableTargets(seat, unit).contains(enemy.category());
+    }
+
+    /**
+     * То же, но по состоянию партии: боты держат {@link GameState}, а не
+     * резолвер. Если бой ещё не привязан (сцена собрана вручную), честно
+     * откатываемся на печатную таблицу планшета.
+     */
+    public static boolean canHit(GameState state, int seat, UnitToken unit, Token enemy) {
+        if (state.combat instanceof CombatResolver cr) {
+            return cr.canHit(seat, unit, enemy);
+        }
+        Target[] pair = state.player(seat).board.troop.attacks(unit.type);
+        if (pair == null) {
+            return false;
+        }
+        Target cat = enemy.category();
+        for (Target t : pair) {
+            if (t == cat) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Провести один бой для места {@code seat} (обычный вход из действия Бой). */
+    /**
+     * МОГ ЛИ вообще состояться бой у игрока прямо сейчас.
+     *
+     * <p>Замечание дизайнера (12.08.2026): «холостым» бой считать честно —
+     * только когда бой был ВОЗМОЖЕН, но не состоялся. Приказ Операция сплошь и
+     * рядом вскрывают ради Движения, чтобы подвигаться или выждать момент, и
+     * бить при этом попросту некого — такой розыгрыш холостым не является.
+     *
+     * <p>Проверяем ту же цепочку, что и настоящий бой: у игрока есть живой
+     * юнит; на СОСЕДНЕМ гексе есть допустимая цель; по таблице атак этого
+     * юнита есть строка, которая до цели дотягивается; и хватает боеприпасов
+     * на её стоимость.
+     */
+    public boolean anyAttackPossible(int attackerSeat) {
+        GameState s = state;
+        PlayerState p = s.player(attackerSeat);
+        for (UnitToken u : p.units) {
+            if (u.hexId == null || !u.alive()) {
+                continue;
+            }
+            for (String target : s.field.neighbors(u.hexId)) {
+                if (!validTarget(target, attackerSeat, null)
+                        || !Passability.canShootAcross(s, u, target)) {
+                    continue;   // между гексами стена — этот жетон не достаёт
+                }
+                boolean closed = hexClosedAgainst(target, attackerSeat);
+                for (AttackRow ar : attackRows(attackerSeat, u)) {
+                    boolean[] firstAttackUsed = {false};
+                    int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
+                        firstAttackUsed);
+                    if (!p.resources.canPay(Resource.AMMO, cost)) {
+                        continue;
+                    }
+                    if (pickVictimCategory(target, attackerSeat, ar.target(), null, closed, u)
+                            != null) {
+                        return true;
+                    }
+                    if (ar.target() == Target.BUILDINGS_TOWERS
+                            && s.field.get(target).hasNeutral()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean runBattle(int seat, Agent agent) {
+        return runBattle(seat, agent, false, null);
+    }
+
+    /**
+     * Разрешить один бой. Возвращает true, если состоялась хоть одна атака.
+     * {@code isRetaliation} — ответка (без повторной ответки и наценки);
+     * {@code restrictTargetOwner} ограничивает цели одним владельцем.
+     */
+    public boolean runBattle(int attackerSeat, Agent agent, boolean isRetaliation,
+                             Integer restrictTargetOwner) {
+        GameState s = state;
+        PlayerState p = s.player(attackerSeat);
+
+        // Шаг 1: выбрать свой гекс, где есть хотя бы один живой юнит.
+        Set<String> srcSet = new java.util.TreeSet<>();
+        for (UnitToken u : p.units) {
+            if (u.hexId != null && u.alive()) {
+                srcSet.add(u.hexId);
+            }
+        }
+        if (srcSet.isEmpty()) {
+            return false;
+        }
+        List<Choice> srcOpts = new ArrayList<>();
+        for (String h : srcSet) {
+            srcOpts.add(new Choice("combat_source", h, h));
+        }
+        srcOpts.add(new Choice("pass", null, "не бить"));
+        Choice src = agent.choose(s, srcOpts,
+            Map.of("kind", "combat_source", "retaliation", isRetaliation));
+        if (src.payload() == null) {
+            return false;
+        }
+        String source = (String) src.payload();
+
+        // Шаг 2: выбрать один смежный гекс-цель с допустимой целью.
+        //
+        // ДОСТАЁТ ЛИ ВООБЩЕ. Соседство по полю — ещё не значит, что до гекса можно
+        // дотянуться: сторону могло закрыть чужое или нейтральное здание, и тогда
+        // между гексами стена. Раньше Бой брал просто всех соседей и стрелял
+        // сквозь неё — дизайнер поймал случай, где техника выстрелила через
+        // нейтральную постройку, стоявшую в её же гексе (сид 770698, «сценарий 4
+        // игрока 1»). Правило проходимости одно и то же для Движения и для Боя,
+        // живёт в Passability. Авиация стенок не замечает — она бьёт сверху.
+        // ТОЧКА ПРАВИЛ: дальность выбора цели. По умолчанию только соседний гекс;
+        // карта арсенала «Целеуказание» поднимает до двух, если на гексе-источнике
+        // есть своя авиация.
+        int range = (int) Math.round(kelium.engine.ability.RuleQuery
+            .of(s, attackerSeat, kelium.engine.ability.Hook.ATTACK_RANGE)
+            .about(source).base(1).ask());
+        List<String> targets = new ArrayList<>();
+        for (String h : s.field.neighbors(source)) {
+            if (validTarget(h, attackerSeat, restrictTargetOwner)
+                    && anyCanShootAcross(attackerSeat, source, h)) {
+                targets.add(h);
+            }
+        }
+        if (range >= 2) {
+            // Второй пояс: соседи соседей. Стенки на пути не проверяем — цель
+            // указывает авиация сверху, а бьют по указанному гексу.
+            for (String near : s.field.neighbors(source)) {
+                for (String far : s.field.neighbors(near)) {
+                    if (!far.equals(source) && !targets.contains(far)
+                            && validTarget(far, attackerSeat, restrictTargetOwner)) {
+                        targets.add(far);
+                    }
+                }
+            }
+        }
+        if (targets.isEmpty()) {
+            return false;
+        }
+        List<Choice> tgtOpts = new ArrayList<>();
+        for (String h : targets) {
+            tgtOpts.add(new Choice("combat_target", h, h));
+        }
+        Choice tgt = agent.choose(s, tgtOpts,
+            Map.of("kind", "combat_target", "source", source));
+        String target = (String) tgt.payload();
+
+        // Шаги 3-5: разрешать атаки по одной.
+        boolean didDamage = false;
+        Set<Integer> damagedOwners = new HashSet<>();
+        List<UnitToken> attackers = unitsOf(attackerSeat, source);
+        Set<String> usedRows = new HashSet<>();   // "uid:row"
+        boolean[] firstAttackUsed = {false};
+        int killsThisBattle = 0;
+        boolean neutralRazedThisBattle = false;
+        boolean enemyDamagedThisBattle = false;
+
+        while (true) {
+            boolean closed = hexClosedAgainst(target, attackerSeat);
+            List<Choice> options = new ArrayList<>();
+            for (UnitToken u : attackers) {
+                if (!Passability.canShootAcross(s, u, target)) {
+                    continue;   // этому жетону цель закрыта стеной, а другому — нет
+                }
+                for (AttackRow ar : attackRows(attackerSeat, u)) {
+                    String key = u.uid + ":" + ar.row();
+                    if (usedRows.contains(key)) {
+                        continue;
+                    }
+                    int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target, firstAttackUsed);
+                    if (!p.resources.canPay(Resource.AMMO, cost)) {
+                        continue;
+                    }
+                    Token victim = pickVictimCategory(target, attackerSeat, ar.target(),
+                        restrictTargetOwner, closed, u);
+                    if (victim != null) {
+                        Map<String, Object> pl = new HashMap<>();
+                        pl.put("uid", u.uid);
+                        pl.put("row", ar.row());
+                        pl.put("ammo", cost);
+                        pl.put("base_ammo", ar.ammoCost());
+                        pl.put("tcat", ar.target().code);
+                        options.add(new Choice("attack", pl,
+                            u.type.code + "." + ar.row() + "->" + ar.target().code));
+                    } else if (ar.target() == Target.BUILDINGS_TOWERS
+                            && s.field.get(target).hasNeutral()
+                            && restrictTargetOwner == null) {
+                        Map<String, Object> pl = new HashMap<>();
+                        pl.put("uid", u.uid);
+                        pl.put("row", ar.row());
+                        pl.put("ammo", cost);
+                        pl.put("tcat", ar.target().code);
+                        pl.put("neutral", Boolean.TRUE);
+                        options.add(new Choice("attack", pl,
+                            u.type.code + "." + ar.row() + "->raze neutral"));
+                    }
+                }
+            }
+            if (options.isEmpty()) {
+                break;
+            }
+            options.add(new Choice("pass", null, "stop attacking"));
+            Choice pick = agent.choose(s, options, Map.of("kind", "attack", "target", target));
+            if (pick.payload() == null) {
+                break;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> pl = (Map<String, Object>) pick.payload();
+            int uid = ((Number) pl.get("uid")).intValue();
+            String row = (String) pl.get("row");
+            int ammo = ((Number) pl.get("ammo")).intValue();
+            Target tcat = Target.fromCode((String) pl.get("tcat"));
+            String key = uid + ":" + row;
+            closed = hexClosedAgainst(target, attackerSeat);
+            UnitToken unit = null;
+            for (UnitToken u : attackers) {
+                if (u.uid == uid) {
+                    unit = u;
+                    break;
+                }
+            }
+
+            // Снос нейтральной постройки: на гексе их может быть несколько —
+            // бьётся ПЕРВАЯ живая; при обнулении HP — трофеи + контейнеры
+            // (награда зависит от размера), без ответки.
+            if (Boolean.TRUE.equals(pl.get("neutral"))) {
+                Hex nh = s.field.get(target);
+                if (!nh.hasNeutral()) {
+                    usedRows.add(key);
+                    continue;
+                }
+                p.resources.pay(Resource.AMMO, ammo);
+                usedRows.add(key);
+                // K4: если нейтралов на гексе несколько — какой сносить, выбирает игрок
+                Hex.NeutralBuilding nb;
+                if (nh.neutrals.size() > 1) {
+                    List<Choice> nopts = new ArrayList<>();
+                    for (Hex.NeutralBuilding cand : nh.neutrals) {
+                        nopts.add(new Choice("neutral_victim", cand,
+                            (cand.big ? "двойное" : "одинарное") + " HP " + cand.hp));
+                    }
+                    Choice npick = agent.choose(s, nopts,
+                        Map.of("kind", "neutral_victim", "target", target));
+                    nb = (Hex.NeutralBuilding) npick.payload();
+                } else {
+                    nb = nh.neutrals.get(0);
+                }
+                nb.hp -= 1;
+                if (nb.hp <= 0) {
+                    nh.neutrals.remove(nb);
+                    nh.freeSidesByToken(nb.uid);   // §12.3: стенки нейтрала освобождаются
+                    int tro = nb.trophyReward();
+                    int con = nb.containerReward();
+                    Storage.addDebrisCapped(s, p, tro);
+                    Storage.addContainersCapped(s, p, con, "снос нейтрала");
+                    emit("type", "raze_neutral", "seat", attackerSeat, "target", target,
+                        "debris", tro, "containers", con,
+                        "big", Boolean.valueOf(nb.big),
+                        "left", nh.neutrals.size());
+                    journal().of(attackerSeat).neutralsRazed += 1;   // o22 «Зачистка»
+                    neutralRazedThisBattle = true;
+                } else {
+                    emit("type", "damage_neutral", "seat", attackerSeat, "target", target,
+                        "hpLeft", nb.hp);
+                }
+                continue;
+            }
+
+            // K4: жертву внутри категории выбирает ИГРОК (поимённо): важно для
+            // добивания раненых и выбора, ЧЕЙ жетон бить (кто получит ответку).
+            List<Token> victims = victimCandidates(target, attackerSeat, tcat,
+                restrictTargetOwner, closed, unit);
+            Token victim;
+            if (victims.isEmpty()) {
+                victim = null;
+            } else if (victims.size() == 1) {
+                victim = victims.get(0);
+            } else {
+                List<Choice> vopts = new ArrayList<>();
+                for (Token t : victims) {
+                    vopts.add(new Choice("combat_victim", t,
+                        victimLabel(t) + " игрока " + t.owner()
+                        + " (урон " + damageOf(t) + "/" + Passives.effectiveHp(s, t) + ")"));
+                }
+                Choice vpick = agent.choose(s, vopts,
+                    Map.of("kind", "combat_victim", "target", target));
+                victim = (Token) vpick.payload();
+            }
+            if (victim == null) {
+                usedRows.add(key);
+                continue;
+            }
+            p.resources.pay(Resource.AMMO, ammo);
+            firstAttackUsed[0] = true;
+            usedRows.add(key);
+            int dmg = rs.getInt("combat_model.all_attacks_damage");
+            if (victim instanceof UnitToken vt) {
+                vt.damage += dmg;
+            } else {
+                ((BuildingToken) victim).damage += dmg;
+            }
+            didDamage = true;
+            boolean destroyed = damageOf(victim) >= Passives.effectiveHp(s, victim);
+            int owner = victim.owner();
+            damagedOwners.add(owner);
+            String vtype = victim instanceof UnitToken vt2 ? vt2.type.code : "building";
+            journal().noteCombatHit(attackerSeat, owner, uidOf(victim), vtype, destroyed, isRetaliation);
+            TurnJournal.TurnFacts af = journal().of(attackerSeat);
+            enemyDamagedThisBattle = true;
+            if (victim instanceof BuildingToken) {
+                af.enemyBuildingHits += 1;   // o25 «Осада»
+            }
+            if (destroyed) {
+                af.minKillAmmoCost = Math.min(af.minKillAmmoCost, ammo);   // o24
+                if (af.movedUids.contains(unit.uid)) {                     // o26 «Блицкриг»
+                    af.movedAndKilledSameUnit = true;
+                    af.killsByMovedUnit.merge(unit.uid, 1, Integer::sum);
+                }
+            }
+            // ТРОФЕЙНЫЕ ОЧКИ убитого — в событие: без этого поля трофейную
+            // экономику нечем мерить, а она половина смысла боя. Ценность
+            // напечатана на КОНКРЕТНОМ жетоне (у пехоты четвёртый жетон стоит 2 ТО,
+            // у техники и авиации — два жетона из четырёх).
+            emit("type", "combat_hit", "seat", attackerSeat, "source", source, "target", target,
+                "attacker", unit.type.code + "." + row, "victim_owner", owner,
+                "victim", victimLabel(victim), "destroyed", destroyed, "ammo", ammo,
+                "trophy", destroyed ? victim.trophyValue() : 0,
+                "base_ammo", pl.getOrDefault("base_ammo", ammo));
+            if (destroyed) {
+                killsThisBattle++;
+                destroy(victim, attackerSeat);
+            }
+        }
+        if (killsThisBattle > journal().of(attackerSeat).maxKillsOneBattle) {
+            journal().of(attackerSeat).maxKillsOneBattle = killsThisBattle;
+        }
+        if (neutralRazedThisBattle && enemyDamagedThisBattle) {
+            // o22-усил: в ОДНОМ бою снёс нейтрала и достал жетон противника
+            // (цель боя — один гекс, так что «на том же гексе» выполняется).
+            journal().of(attackerSeat).razedNeutralAndHitEnemySameBattle = true;
+        }
+
+        // Шаг 6 / §4: ответный бой (один раз, не для самой ответки).
+        if (didDamage && !isRetaliation && rs.getBool("actions.combat.retaliation_enabled", true)) {
+            boolean gotRetaliated = false;
+            for (int owner : clockwise(attackerSeat, damagedOwners)) {
+                if (owner == attackerSeat) {
+                    continue;
+                }
+                gotRetaliated |= runBattle(owner, agentFor(owner), true, attackerSeat);
+                if (s.finished) {
+                    break;
+                }
+            }
+            // «Ответный залп» (арсенал 2.0.0): контратаковали в ответ на твой
+            // Бой — 1 боеприпас. Реакция вне реестра способностей (ON_EVENT там
+            // не диспетчеризуется никем) — прямая проверка, как у легаси-пассивок.
+            if (gotRetaliated && Passives.hasPassive(s, attackerSeat, "ammo_on_being_retaliated")) {
+                p.resources.add(Resource.AMMO, 1);
+                emit("type", "ability_reaction", "seat", attackerSeat,
+                    "ability", "ammo_on_being_retaliated", "got_ammo", 1);
+            }
+        }
+        return didDamage;
+    }
+
+    private int effCost(int baseAmmo, Target tcat, int attackerSeat, String target,
+                        boolean[] firstAttackUsed) {
+        int cost = baseAmmo;
+        if (!firstAttackUsed[0] && Passives.firstAttackDiscountActive(state, attackerSeat)) {
+            cost -= 1;
+        }
+        if (Passives.antiArmorDiscountActive(state, attackerSeat)
+                && (tcat == Target.VEHICLE || tcat == Target.BUILDINGS_TOWERS)) {
+            cost -= 1;
+        }
+        cost += Passives.defenderAmmoSurcharge(state, defenderAt(target, attackerSeat), target);
+        // Супер-арсенал «Военная машина»: все атаки на 1 БП дешевле (минимум 1).
+        if (Passives.superArsenalPassive(state, attackerSeat, "all_attacks_minus1_ammo")) {
+            cost = Math.max(1, cost - 1);
+        }
+        // ТОЧКА ПРАВИЛ: цена атаки в боеприпасах. База — печатная строка со всеми
+        // легаси-скидками и наценкой защитника; карта арсенала правит поверх.
+        cost = kelium.engine.ability.RuleQuery
+            .of(state, attackerSeat, kelium.engine.ability.Hook.ATTACK_AMMO_COST)
+            .about(tcat).base(cost).ask();
+        // C6: единый пол — платная строка не может стать бесплатной, сколько бы
+        // скидок ни сложилось (наценка защитника уже учтена выше).
+        return baseAmmo > 0 ? Math.max(1, cost) : Math.max(0, cost);
+    }
+
+    /**
+     * Есть ли с гекса source хоть ОДНА реально оплачиваемая атака по гексу
+     * target — ровно та же логика, что и в бою (строки, стоимость, категория
+     * жертвы, закрытый гекс, скрытые юниты, нейтралы). Для ботов: гарантия,
+     * что выбранный бой не будет пустым.
+     */
+    public boolean canAttack(int attackerSeat, String source, String target) {
+        PlayerState p = state.player(attackerSeat);
+        boolean closed = hexClosedAgainst(target, attackerSeat);
+        for (UnitToken u : unitsOf(attackerSeat, source)) {
+            for (AttackRow ar : attackRows(attackerSeat, u)) {
+                int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
+                    new boolean[]{true});
+                if (!p.resources.canPay(Resource.AMMO, cost)) {
+                    continue;
+                }
+                if (pickVictimCategory(target, attackerSeat, ar.target(), null, closed, u) != null) {
+                    return true;
+                }
+                if (ar.target() == Target.BUILDINGS_TOWERS
+                        && state.field.get(target).hasNeutral()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Ценность реально атакуемых целей вокруг источника: сумма по соседям, где
+     * {@link #canAttack} истинен (ЦУ ценнее). 0 = бой отсюда будет пустым.
+     */
+    public double attackableValue(int attackerSeat, String source) {
+        double v = 0;
+        for (String nb : state.field.neighbors(source)) {
+            if (!validTarget(nb, attackerSeat, null) || !canAttack(attackerSeat, source, nb)) {
+                continue;
+            }
+            v += 1.0;
+            for (PlayerState pl : state.players) {
+                if (pl.seat == attackerSeat) {
+                    continue;
+                }
+                for (BuildingToken b : pl.buildingsOnField()) {
+                    if (nb.equals(b.hexId) && b.type == kelium.core.BuildingType.COMMAND_CENTER) {
+                        v += 2.0;
+                    }
+                }
+            }
+        }
+        return v;
+    }
+
+    private boolean validTarget(String hx, int attackerSeat, Integer restrictOwner) {
+        // Гекс с нейтральной постройкой — легальная цель (снос по HP);
+        // при ответном бое (restrictOwner) нейтралы не цель.
+        if (restrictOwner == null && state.field.get(hx).hasNeutral()) {
+            return true;
+        }
+        for (Token t : allTokensOn(hx)) {
+            if (restrictOwner != null && t.owner() != restrictOwner) {
+                continue;
+            }
+            if (t.owner() != attackerSeat) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int defenderAt(String hexId, int attackerSeat) {
+        for (PlayerState pl : state.players) {
+            if (pl.seat == attackerSeat) {
+                continue;
+            }
+            for (UnitToken t : pl.unitsOnField()) {
+                if (hexId.equals(t.hexId)) {
+                    return pl.seat;
+                }
+            }
+            for (BuildingToken t : pl.buildingsOnField()) {
+                if (hexId.equals(t.hexId)) {
+                    return pl.seat;
+                }
+            }
+        }
+        return attackerSeat;
+    }
+
+    /**
+     * K3: энергия уничтоженного ИСТОЧНИКА — его кубики (по принадлежности)
+     * снимаются со всех потребителей владельца и исчезают вместе с источником.
+     */
+    private void removeSourceEnergy(int ownerSeat, int sourceUid) {
+        for (BuildingToken b : state.player(ownerSeat).buildingsOnField()) {
+            b.stripEnergyOf(sourceUid);
+        }
+    }
+
+    /**
+     * K3 (§3.2): кубики уничтоженного ПОТРЕБИТЕЛЯ возвращаются каждый на СВОЙ
+     * источник (простаивать); источника нет на поле — кубик исчезает.
+     */
+    private void returnConsumerEnergy(BuildingToken victim) {
+        PlayerState owner = state.player(victim.owner);
+        for (Map.Entry<Integer, Integer> e : victim.energyBySource.entrySet()) {
+            for (BuildingToken src : owner.buildingsOnField()) {
+                if (src.uid == e.getKey()) {
+                    src.energyIdle += e.getValue();
+                    break;
+                }
+            }
+        }
+        victim.energyBySource.clear();
+        victim.energyPlaced = 0;
+        victim.energyIdle = 0;
+    }
+
+    /**
+     * ВОЙСКО ВНУТРИ ЗДАНИЯ НЕ АТАКУЕМО, пока здание живо: сперва надо снести
+     * здание. Состояние ЯВНОЕ — {@link UnitToken#insideBuildingUid}.
+     *
+     * <p>Раньше укрытие ВЫЧИСЛЯЛОСЬ по совпадению «войско стоит на гексе своего
+     * здания подходящего рода», и из-за этого неуязвимыми становились ВСЕ войска у
+     * своих зданий (казарма превращалась в крепость), а также вышка на гексе ЦУ —
+     * при прямом запрете правила «вышки спрятаться не могут нигде». По уточнению
+     * дизайнера укрытие — тактический приём: внутри здания стоит РОВНО ОДНО войско,
+     * и такое здание у игрока только одно.
+     */
+    private boolean unitHidden(UnitToken unit) {
+        if (!unit.inside()) {
+            return false;
+        }
+        for (BuildingToken b : state.player(unit.owner).buildings) {
+            if (b.uid == unit.insideBuildingUid) {
+                // Здание снесено — укрытия больше нет (жетон уже выселен, но
+                // проверка остаётся на случай рассинхронизации).
+                return b.alive() && b.hexId != null;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * ВЫСЕЛИТЬ войско из снесённого здания: укрытие держалось на здании, и с его
+     * падением жетон становится обычной целью на своём гексе.
+     */
+    private void evictFromBuilding(BuildingToken destroyed) {
+        for (UnitToken u : state.player(destroyed.owner).units) {
+            if (u.inside() && u.insideBuildingUid == destroyed.uid) {
+                u.insideBuildingUid = null;
+            }
+        }
+    }
+
+    /**
+     * Вернуть допустимую жертву категории tcat на гексе, или null. Соблюдает
+     * правило закрытого гекса (наземка при закрытости бьёт только здания/вышки;
+     * авиация игнорирует) и правило спрятанного юнита.
+     */
+    private Token pickVictimCategory(String hexId, int attackerSeat, Target tcat,
+                                     Integer restrictOwner, boolean closed, UnitToken unit) {
+        List<Token> candidates =
+            victimCandidates(hexId, attackerSeat, tcat, restrictOwner, closed, unit);
+        return candidates.isEmpty() ? null : candidates.get(0);
+    }
+
+    /**
+     * K4: все допустимые жертвы категории tcat на гексе (закрытый гекс,
+     * спрятанные юниты и владелец-ограничение учтены). Детерминированный
+     * порядок: здания вперёд, затем по uid — но КОГО бить, выбирает игрок
+     * (см. вызов с kind = "combat_victim").
+     */
+    private List<Token> victimCandidates(String hexId, int attackerSeat, Target tcat,
+                                         Integer restrictOwner, boolean closed, UnitToken unit) {
+        boolean isAircraft = unit.type == UnitType.AIRCRAFT;
+        if (closed && !isAircraft && tcat != Target.BUILDINGS_TOWERS) {
+            return List.of();
+        }
+        List<Token> candidates = new ArrayList<>();
+        for (Token t : allTokensOn(hexId)) {
+            if (t.owner() == attackerSeat) {
+                continue;
+            }
+            // ТОЧКА ПРАВИЛ: жетоны владельца могут быть ЗАЩИЩЕНЫ на этом гексе
+            // (карта арсенала «Крыло прикрытия»: пока жива своя авиация, её
+            // соседей по гексу атаковать нельзя). Здания под защиту не попадают:
+            // авиация прикрывает войска, а не бетон.
+            if (!(t instanceof kelium.core.BuildingToken)
+                    && kelium.engine.ability.RuleQuery
+                        .of(state, t.owner(), kelium.engine.ability.Hook.ATTACK_PROTECT_HEX)
+                        .about(hexId).base(0).ask() >= 1.0) {
+                continue;
+            }
+            if (restrictOwner != null && t.owner() != restrictOwner) {
+                continue;
+            }
+            if (targetCategory(t) != tcat) {
+                continue;
+            }
+            if (t instanceof UnitToken ut && unitHidden(ut)) {
+                continue;
+            }
+            candidates.add(t);
+        }
+        candidates.sort((a, b) -> {
+            int ra = a instanceof BuildingToken ? 0 : 1;
+            int rb = b instanceof BuildingToken ? 0 : 1;
+            if (ra != rb) {
+                return Integer.compare(ra, rb);
+            }
+            return Integer.compare(uidOf(a), uidOf(b));
+        });
+        return candidates;
+    }
+
+    private static int uidOf(Token t) {
+        return t instanceof UnitToken u ? u.uid : ((BuildingToken) t).uid;
+    }
+
+    private static int damageOf(Token t) {
+        return t instanceof UnitToken u ? u.damage : ((BuildingToken) t).damage;
+    }
+
+    /**
+     * Уничтожить жертву: ЦУ обрабатывается отдельно, прочие переходят на
+     * трофейное поле убийцы; владельцу зданий выдаётся компенсация контейнерами,
+     * уничтожение энергостанции снимает выданную ею энергию; применяются пассивы
+     * арсенала (доп. боеприпас/ТО за убийство).
+     */
+    public void destroy(Token victim, int attackerSeat) {
+        GameState s = state;
+        PlayerState attacker = s.player(attackerSeat);
+
+        if (victim instanceof BuildingToken bt && bt.type == BuildingType.COMMAND_CENTER) {
+            destroyCu(bt, attackerSeat);
+            return;
+        }
+
+        // Нарастающий счётчик уничтожений (в отличие от трофеев, он не сбрасывается
+        // в Возврат). Сам по себе очков не даёт — только если это включено в опыте
+        // ключом economy.vp_per_kill.
+        attacker.killsTotal++;
+        if (victim instanceof UnitToken ut) {
+            ut.trophyValue = scaledUnitTrophy(attackerSeat, ut.type);
+            ut.setHexId(null);   // уходит в трофеи — и из здания, если был внутри
+            ut.damage = 0;
+            ut.capturedBy = attackerSeat;
+            attacker.trophySpace.add(ut);
+        } else {
+            BuildingToken bt = (BuildingToken) victim;
+            // Войско, стоявшее ВНУТРИ этого здания, теряет укрытие и остаётся на
+            // гексе обычной целью: место освободилось вместе со зданием.
+            evictFromBuilding(bt);
+            if (s.field.hexes.containsKey(bt.hexId)) {
+                s.field.get(bt.hexId).freeSidesByToken(bt.uid);
+            }
+            bt.hexId = null;
+            bt.damage = 0;
+            bt.capturedBy = attackerSeat;
+            // K3: сначала вернуть кубики жетона на их источники (в трофеи
+            // жетон уезжает БЕЗ энергии), затем — если это источник — снять
+            // его кубики со всех потребителей.
+            returnConsumerEnergy(bt);
+            if (bt.type == BuildingType.POWER_PLANT) {
+                removeSourceEnergy(bt.owner, bt.uid);
+            }
+            attacker.trophySpace.add(bt);
+            int comp = buildingCompensation(bt);
+            if (comp > 0) {
+                Storage.addContainersCapped(s, s.player(bt.owner), comp,
+                    "компенсация за снесённое здание");
+            }
+        }
+
+        int bonusAmmo = Passives.ammoOnKill(s, attackerSeat);
+        if (bonusAmmo > 0) {
+            attacker.resources.add(Resource.AMMO, bonusAmmo);
+        }
+        int bonusTrophy = Passives.bonusTrophyOnKill(s, attackerSeat);
+        if (bonusTrophy > 0) {
+            Storage.addDebrisCapped(s, attacker, bonusTrophy);
+        }
+    }
+
+    /**
+     * Уничтожение ЦУ — каноническое правило (решение дизайнера 2026-08-11,
+     * ревизия §12.1): ЦУ не даёт ТО и не идёт в трофейное пространство. Награда —
+     * жетон уничтожения ЦУ ВЛАДЕЛЬЦА (перманентные 3 ПО), если он ещё у него.
+     * ПРОВЕРКА ПОБЕДЫ в момент любого сноса ЦУ: если у атакующего УЖЕ есть
+     * чей-либо чужой жетон — мгновенная военная победа (не счётчик убийств!).
+     * Жертва немедленно забирает ЦУ себе В ЗАПАС (на поле — обычной Стройкой)
+     * и получает 2 контейнера (напечатаны на обороте жетона).
+     */
+    private void destroyCu(BuildingToken cu, int attackerSeat) {
+        GameState s = state;
+        PlayerState attacker = s.player(attackerSeat);
+        PlayerState owner = s.player(cu.owner);
+
+        attacker.cuKills += 1;   // телеметрия, к победе отношения не имеет
+        // СКОЛЬКО ЖЕТОНОВ РАЗРУШЕНИЯ НУЖНО ДЛЯ ВОЕННОЙ ПОБЕДЫ. Правило — ДВА
+        // (СВОД), это и значение по умолчанию: при 2 условие ниже совпадает с
+        // прежним «у меня уже был чужой жетон» во ВСЕХ случаях, включая тот, где
+        // за снос жетон не достался (владелец отдал его раньше другому).
+        //
+        // Ключ вынесен ради замера, а не ради изменения правила. Замер 14.08.2026:
+        // военная победа случается в 0.8% партий, ПЕРВЫЙ снос ЦУ приходится на
+        // раунд 6.0 при длине партии 6.0 — второму сносу физически негде
+        // поместиться. Отсюда вопрос, на который нельзя ответить рассуждением:
+        // сколько даст порог в один жетон. Цель дизайнера — 20%.
+        int need = ((Number) rs.get("command_center.cu_tokens_for_military_win", 2))
+            .intValue();
+        boolean heldForeignToken = attacker.cuDestructionTokens >= need - 1;
+        if (owner.ownCuTokenAvailable) {
+            owner.ownCuTokenAvailable = false;
+            attacker.cuDestructionTokens += 1;
+        }
+
+        // ЦУ — в запас владельца: с поля долой, урон снят, энергия обнулена
+        evictFromBuilding(cu);   // войско внутри ЦУ теряет укрытие
+        if (cu.hexId != null && s.field.hexes.containsKey(cu.hexId)) {
+            s.field.get(cu.hexId).freeSidesByToken(cu.uid);
+        }
+        cu.hexId = null;
+        cu.damage = 0;
+        // ЦУ — источник И потребитель: его кубики исчезают с ним (K3)
+        removeSourceEnergy(cu.owner, cu.uid);
+        cu.energyBySource.clear();
+        cu.energyPlaced = 0;
+        cu.energyIdle = 0;
+
+        Storage.addContainersCapped(s, owner,
+            rs.getInt("command_center.owner_compensation_containers"),
+            "компенсация за снесённое ЦУ");
+
+        if (heldForeignToken
+                && rs.getBool("command_center.military_win_on_second_cu_kill", true)) {
+            s.finished = true;
+            s.winner = attackerSeat;
+            s.winCondition = "military";
+        }
+    }
+
+    private int scaledUnitTrophy(int attackerSeat, UnitType unitType) {
+        List<Integer> vals = state.tokenStats.unitTrophyList(unitType);
+        int already = 0;
+        for (Token t : state.player(attackerSeat).trophySpace) {
+            if (t instanceof UnitToken u && u.type == unitType) {
+                already++;
+            }
+        }
+        return vals.get(Math.min(already, vals.size() - 1));
+    }
+
+    /**
+     * Компенсация контейнерами владельцу уничтоженного здания — из ruleset
+     * `building_compensation_containers` (решение дизайнера §12.2): казарма/
+     * завод/авиабаза = 1, добытчики и ЭС №1/№3 = 1, №2/№4 = 0, ЦУ = 2 (отдельно).
+     */
+    private int buildingCompensation(BuildingToken b) {
+        String key = switch (b.type) {
+            case BARRACKS -> "barracks";
+            case FACTORY -> "factory";
+            case AIRBASE -> "airbase";
+            case MINER -> "miner_by_level";
+            case POWER_PLANT -> "power_station_by_level";
+            default -> null;
+        };
+        if (key == null) {
+            return 0;
+        }
+        Object v = rs.get("building_compensation_containers." + key, 1);
+        if (v instanceof List<?> lst) {
+            int lv = b.level != null ? b.level : 1;
+            int idx = Math.max(0, Math.min(lst.size() - 1, lv - 1));
+            return ((Number) lst.get(idx)).intValue();
+        }
+        return ((Number) v).intValue();
+    }
+
+    private List<Integer> clockwise(int startSeat, Set<Integer> owners) {
+        int n = state.numPlayers();
+        List<Integer> out = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            int o = (startSeat + i) % n;
+            if (owners.contains(o)) {
+                out.add(o);
+            }
+        }
+        return out;
+    }
+
+    private Agent agentFor(int seat) {
+        return agents.get(seat);
+    }
+}

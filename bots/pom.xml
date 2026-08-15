@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  kelium-bots — интерфейс агента, эвристики, обучение и просчёт вперёд (agents),
+  плюс все консольные балансовые стенды и пробники (голый пакет kelium —
+  CardUsage, RuleExperiment, MatchLab, CardLab, Arena и т. д.). Зависит от
+  kelium-engine. НЕ ЗНАЕТ о GUI (Swing/AWT) — стенды печатают в консоль и
+  markdown-отчёты, окно им не нужно.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>kelium</groupId>
+        <artifactId>forged-in-kelium-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+
+    <artifactId>kelium-bots</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>kelium</groupId>
+            <artifactId>kelium-engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>kelium</groupId>
+            <artifactId>kelium-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              Запуск партии (живой лог в консоль + файл):
+                mvn -q -pl bots -am compile exec:java
+                mvn -q -pl bots -am exec:java -Dexec.args="[опции]"
+              Опции (двойное тире): players N, seed S,
+                agent random|heuristic|personality:a,b,c, lang ru|en, out PATH, quiet.
+              -am (also-make) обязателен: bots зависит от engine, а вне полного
+              реактора Maven не пересоберёт его сам.
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>kelium.Main</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

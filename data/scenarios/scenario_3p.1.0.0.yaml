@@ -1,0 +1,86 @@
+# СЦЕНАРИЙ: 3 игрока. v1/v2 — диктовка дизайнера (2026-08-10); v3 — эксперимент Клода.
+# Формат: см. scenario_2p — shape {offset,count}, special/neutrals с абсолютными
+# колонками; дизайнер диктует «ряд-номер гекса В РЯДУ» (col = offset + номер).
+meta:
+  id: 1.0.0
+  type: scenario
+  players: 3
+  _needs_verification: true
+
+scenarios:
+  # ===== ВАРИАНТ 1 (диктовка 2026-08-10; игрок 3 в (6,4) — коррекция дизайнера) =====
+  - id: field_3p_v1
+    shape:
+      - {offset: 1, count: 2}   # ряд 1: колонки 2-3
+      - {offset: 1, count: 4}   # ряд 2: колонки 2-5
+      - {offset: 0, count: 5}   # ряд 3: колонки 1-5
+      - {offset: 1, count: 4}   # ряд 4: колонки 2-5
+      - {offset: 0, count: 5}   # ряд 5: колонки 1-5
+      - {offset: 1, count: 4}   # ряд 6: колонки 2-5
+    special:
+      - {row: 1, col: 2, content: spawn_start}                # 1-1
+      - {row: 1, col: 3, content: player_start, seat: 0}      # 1-2 игрок 1
+      - {row: 3, col: 1, content: container, count: 1}        # 3-1
+      - {row: 3, col: 2, content: kelium_tile}                # 3-2
+      - {row: 3, col: 3, content: container, count: 1}        # 3-3
+      - {row: 3, col: 4, content: kelium_tile}                # 3-4
+      - {row: 3, col: 5, content: container, count: 1}        # 3-5
+      - {row: 4, col: 2, content: container, count: 1}        # 4-1
+      - {row: 4, col: 3, content: container, count: 1}        # 4-2
+      - {row: 4, col: 4, content: container, count: 1}        # 4-3
+      - {row: 4, col: 5, content: container, count: 1}        # 4-4
+      - {row: 5, col: 1, content: spawn_start}                # 5-1
+      - {row: 5, col: 3, content: kelium_tile}                # 5-3
+      - {row: 5, col: 5, content: spawn_start}                # 5-5
+      - {row: 6, col: 2, content: player_start, seat: 1}      # 6-1 игрок 2
+      - {row: 6, col: 5, content: player_start, seat: 2}      # 6-4 игрок 3
+    neutrals:
+      - {row: 2, col: 3, size: small, corners: [4, 5]}        # 2-2
+      - {row: 2, col: 5, size: small, corners: [4, 5]}        # 2-4
+      - {row: 3, col: 3, size: big, corners: [1, 2, 3]}       # 3-3 двойное 1-3
+      - {row: 4, col: 3, size: small, corners: [2, 3]}        # 4-2
+      - {row: 4, col: 4, size: small, corners: [5, 6]}        # 4-3
+      - {row: 6, col: 3, size: small, corners: [5, 6]}        # 6-2 (два здания на гексе)
+      - {row: 6, col: 3, size: big, corners: [1, 2, 3]}       # 6-2 двойное 1-3
+      - {row: 6, col: 4, size: big, corners: [5, 6, 1]}       # 6-3 двойное 5-1
+      - {row: 6, col: 4, size: small, corners: [2, 3]}        # 6-3 (два здания на гексе)
+
+  # ===== ВАРИАНТ 2 (диктовка 2026-08-10; коррекция дизайнера: ряды 3 и 5 — отступ 0) =====
+  - id: field_3p_v2
+    shape:
+      - {offset: 2, count: 2}   # ряд 1: колонки 3-4
+      - {offset: 1, count: 4}   # ряд 2: колонки 2-5
+      - {offset: 0, count: 5}   # ряд 3: колонки 1-5
+      - {offset: 0, count: 5}   # ряд 4: колонки 1-5
+      - {offset: 0, count: 5}   # ряд 5: колонки 1-5
+      - {offset: 2, count: 3}   # ряд 6: колонки 3-5
+    special:
+      - {row: 1, col: 3, content: player_start, seat: 0}      # 1-1 игрок 1
+      - {row: 1, col: 4, content: spawn_start}                # 1-2
+      - {row: 2, col: 5, content: container, count: 1}        # 2-4
+      - {row: 3, col: 1, content: container, count: 1}        # 3-1
+      - {row: 3, col: 2, content: kelium_tile}                # 3-2
+      - {row: 3, col: 3, content: container, count: 1}        # 3-3
+      - {row: 3, col: 4, content: kelium_tile}                # 3-4
+      - {row: 4, col: 1, content: spawn_start}                # 4-1
+      - {row: 4, col: 3, content: container, count: 1}        # 4-3
+      - {row: 4, col: 4, content: container, count: 1}        # 4-4
+      - {row: 5, col: 1, content: player_start, seat: 2}      # 5-1 игрок 3
+      - {row: 5, col: 3, content: kelium_tile}                # 5-3
+      - {row: 5, col: 5, content: player_start, seat: 1}      # 5-5 игрок 2
+      - {row: 6, col: 4, content: container, count: 1}        # 6-2
+      - {row: 6, col: 5, content: spawn_start}                # 6-3
+    neutrals:
+      - {row: 2, col: 2, size: big, corners: [1, 2, 3]}       # 2-1 двойное 1-3
+      - {row: 3, col: 3, size: small, corners: [5, 6]}        # 3-3
+      - {row: 3, col: 5, size: big, corners: [4, 5, 6]}       # 3-5 двойное 4-6
+      - {row: 4, col: 3, size: small, corners: [3, 4]}        # 4-3
+      - {row: 4, col: 4, size: small, corners: [1, 2]}        # 4-4
+      - {row: 6, col: 3, size: big, corners: [5, 6, 1]}       # 6-1 двойное 5-1
+
+  # ===== ВАРИАНТ 3 «Треугольник» (эксперимент Клода — НЕ раскладка дизайнера) =====
+  # Идея: три старта на РАЗНЫХ сторонах (верх-право, низ, середина-лево) на
+  # честных дистанциях 5/5/4; центр — гекс с двумя контейнерами за стеной
+  # двойного нейтрала; по одной обычной грядке при каждом игроке.
+  # Нормы: 30 гексов (10/игрока); грядки 3 стартовые + 3 обычные (= игрокам);
+  # у стартов по 2+ свободных соседа.

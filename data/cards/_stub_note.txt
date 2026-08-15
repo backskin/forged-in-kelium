@@ -1,0 +1,2 @@
+These card files are versioned CONTENT. Fully populated in task "Encode game data".
+Each file's top-level list key MUST match its content type (objectives, arsenal, ...).

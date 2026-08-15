@@ -1,0 +1,145 @@
+# CONTENT: containers  version 1.0.0
+# 32 cards, each offers a CHOICE of 2 variants (a/b). Encoded from
+# "Карты/Контейнеры — 32 карты с выбором.md". Each variant = {effect, params, label}.
+# Effect ids resolve in forge/engine/effects.py. Variants whose effect isn't
+# mechanized yet use effect: noop (recorded, no state change) so the card is
+# still legal and the bot can still pick the other variant.
+# Calibration: coin 1u, ammo 1.5u, objective card 2u, trophy 1u, kelium 3u.
+meta:
+  id: 1.0.0
+  type: containers
+
+containers:
+  # -------- 20 common (~2u/variant) --------
+  - {id: c01, name: "Ящик с патронами", tier: common,
+     a: {effect: gain, params: {ammo: 2}, label: "2 ammo"},
+     b: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     описание: "Обычный армейский цинк, брошенный при отходе. Вскрыв его, забирайте либо 2 боеприпаса, либо 2 монеты — если патроны не по калибру."}
+  - {id: c02, name: "Полевая касса", tier: common,
+     a: {effect: gain, params: {coin: 3}, label: "3 coin"},
+     b: {effect: gain, params: {ammo: 1, coin: 1}, label: "1 ammo + 1 coin"},
+     описание: "Наличность полевого казначея, спрятанная в спешке. Забирайте все 3 монеты сразу или разложите добычу поровну: 1 боеприпас и 1 монету."}
+  - {id: c03, name: "Штабная почта", tier: common,
+     a: {effect: gain, params: {objective_cards: 1}, label: "1 objective"},
+     b: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     описание: "Пакет донесений из штаба — с приказами или с деньгами на их исполнение. Вскрыв печать, получаете либо 1 карту задания, либо 2 монеты."}
+  - {id: c04, name: "Архив", tier: common,
+     a: {effect: gain, params: {objective_cards: 1}, label: "1 objective"},
+     b: {effect: gain, params: {debris: 1}, label: "1 trophy"},
+     описание: "Пыльные стеллажи хранят либо чужие планы, либо чужие трофеи. Забирайте 1 карту задания или 1 трофейное очко — что вам сейчас нужнее."}
+  - {id: c05, name: "Ремкомплект", tier: common,
+     a: {effect: heal_one, params: {amount: 1}, label: "remove 1 damage"},
+     b: {effect: gain, params: {ammo: 1}, label: "1 ammo"},
+     описание: "Набор инструментов и запчастей для латания техники в поле. Снимите 1 повреждение с одного своего жетона или возьмите 1 боеприпас, если ремонт подождёт."}
+  - {id: c06, name: "Топливный бак", tier: common,
+     a: {effect: move_unit, params: {hexes: 1}, label: "move a unit 1 hex"},
+     b: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     описание: "Канистра горючего — для рывка по гексу или для продажи на сторону. Сдвиньте одну свою фигуру на 1 гекс или заберите 2 монеты."}
+  - {id: c07, name: "Сигнальная ракета", tier: common,
+     a: {effect: free_action, params: {action: combat}, label: "free attack"},
+     b: {effect: gain, params: {ammo: 2}, label: "2 ammo"},
+     описание: "Осветительный заряд, который можно пустить как сигнал к атаке. Проведите одну бесплатную атаку или сохраните заряд как 2 боеприпаса."}
+  - {id: c08, name: "Инструмент", tier: common,
+     a: {effect: free_action, params: {action: build}, label: "build -2 coin"},
+     b: {effect: gain, params: {coin: 3}, label: "3 coin"},
+     описание: "Рабочий набор мастера. Используйте его, чтобы провести постройку со скидкой 2 монеты, или сдайте инструмент на металл за 3 монеты."}
+  - {id: c09, name: "Аккумулятор", tier: common,
+     a: {effect: free_action, params: {action: energy_swap}, label: "shift energy"},
+     b: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     описание: "Заряженный аккумулятор для перекидывания энергии между зданиями. Проведите бесплатное действие переброски энергии или разрядите находку на 2 монеты."}
+  - {id: c10, name: "Образцы породы", tier: common,
+     a: {effect: gain, params: {debris: 1}, label: "1 trophy"},
+     b: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     описание: "Геологические образцы — их ценность зависит от того, кому показать. Берите 1 трофейное очко за редкость находки или 2 монеты за металл."}
+  - {id: c11, name: "Пайка", tier: common,
+     a: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     b: {effect: gain, params: {objective_cards: 1}, label: "1 objective"},
+     описание: "Мешочек с расходным ломом и монетами старателя. Заберите 2 монеты сразу или обменяйте находку на 1 карту задания."}
+  - {id: c12, name: "ЗИП", tier: common,
+     a: {effect: heal_one, params: {amount: 1}, label: "remove 1 damage"},
+     b: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     описание: "Запасные части и принадлежности для полевого ремонта. Снимите 1 повреждение с одного жетона или заберите 2 монеты, если техника цела."}
+  - {id: c13, name: "Геологическая карта", tier: common,
+     a: {effect: free_action, params: {action: mining}, label: "mine once"},
+     b: {effect: gain, params: {objective_cards: 1}, label: "1 objective"},
+     описание: "Карта залежей, отмеченных прежними хозяевами. Проведите по ней одну бесплатную добычу или обменяйте карту на 1 задание."}
+  - {id: c14, name: "Проволока", tier: common,
+     a: {effect: noop, params: {note: "cancel one attack on your token"}, label: "cancel an attack"},
+     b: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     описание: "Моток колючей проволоки — либо защита, либо металл на продажу. Отложите находку, чтобы отменить одну атаку по своему жетону, или заберите 2 монеты."}
+  - {id: c15, name: "Радиоперехват", tier: common,
+     a: {effect: gain, params: {objective_cards: 1}, label: "1 objective"},
+     b: {effect: gain, params: {ammo: 1, coin: 1}, label: "1 ammo + 1 coin"},
+     описание: "Обрывок перехваченной радиограммы наводит либо на чужие планы, либо на брошенный тайник. Возьмите 1 карту задания или сразу 1 боеприпас и 1 монету."}
+  - {id: c16, name: "Канистра", tier: common,
+     a: {effect: move_unit, params: {hexes: 1}, label: "unit +1 move"},
+     b: {effect: gain, params: {ammo: 2}, label: "2 ammo"},
+     описание: "Канистра с топливом для форсированного марша. Дайте одной фигуре +1 к перемещению или заберите 2 боеприпаса, если бензин сейчас ни к чему."}
+  - {id: c17, name: "Запасной ствол", tier: common,
+     a: {effect: free_action, params: {action: combat}, label: "wild attack"},
+     b: {effect: gain, params: {ammo: 2}, label: "2 ammo"},
+     описание: "Ствол не по стандарту, но бьёт метко. Проведите одну дикую бесплатную атаку или оставьте находку как 2 боеприпаса."}
+  - {id: c18, name: "Документы", tier: common,
+     a: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     b: {effect: gain, params: {objective_cards: 1}, label: "1 objective"},
+     описание: "Пачка бумаг с печатями — деньги или указания, как их получить. Заберите 2 монеты или обменяйте документы на 1 карту задания."}
+  - {id: c19, name: "Медикаменты", tier: common,
+     a: {effect: heal_one, params: {amount: all}, label: "remove all damage from one token"},
+     b: {effect: gain, params: {coin: 3}, label: "3 coin"},
+     описание: "Полный набор медикаментов для тяжёлого случая. Снимите всё повреждение с одного жетона целиком или заберите 3 монеты, если лечить некого."}
+  - {id: c20, name: "Крепёж", tier: common,
+     a: {effect: noop, params: {note: "one building counts powered for one action"}, label: "free power 1 action"},
+     b: {effect: gain, params: {coin: 2}, label: "2 coin"},
+     описание: "Комплект крепежа для быстрой подпорки конструкции. Считайте одно здание запитанным на одно действие без затрат или заберите 2 монеты."}
+
+  # -------- 8 good (~3.5u/variant) --------
+  - {id: c21, name: "Сейф", tier: good,
+     a: {effect: gain, params: {coin: 5}, label: "5 coin"},
+     b: {effect: gain, params: {kelium: 1}, label: "1 kelium"},
+     описание: "Взломанный сейф с содержимым на любой вкус. Забирайте все 5 монет или единственный келемий, спрятанный на дне."}
+  - {id: c22, name: "Склад боеприпасов", tier: good,
+     a: {effect: gain, params: {ammo: 4}, label: "4 ammo"},
+     b: {effect: gain, params: {objective_cards: 2}, label: "2 objectives"},
+     описание: "Целый склад снаряжения — патроны для боя или папки с чужими планами. Заберите 4 боеприпаса или 2 карты задания."}
+  - {id: c23, name: "Чертежи", tier: good,
+     a: {effect: gain, params: {objective_cards: 2}, label: "2 objectives"},
+     b: {effect: gain, params: {debris: 2}, label: "2 trophy"},
+     описание: "Инженерные чертежи, за которые дорого платят и штаб, и коллекционеры. Обменяйте их на 2 карты задания или на 2 трофейных очка."}
+  - {id: c24, name: "Обогащённая порода", tier: good,
+     a: {effect: gain, params: {kelium: 1}, label: "1 kelium"},
+     b: {effect: gain, params: {debris: 2}, label: "2 trophy"},
+     описание: "Кусок породы с прожилками келемия — редкий и по сути, и по цене. Заберите 1 келемий целиком или переплавьте находку на 2 трофейных очка."}
+  - {id: c25, name: "Трофейный тягач", tier: good,
+     a: {effect: free_action, params: {action: movement}, label: "free Movement action"},
+     b: {effect: gain, params: {containers: 2}, label: "2 containers"},
+     описание: "Захваченный тягач тащит либо ваши войска, либо трофеи прежнего владельца. Проведите бесплатное действие перемещения или заберите ещё 2 контейнера впридачу."}
+  - {id: c26, name: "Резервный генератор", tier: good, contested: energy_without_source,
+     a: {effect: noop, params: {note: "+1 permanent energy cube on a building"}, label: "+1 permanent energy"},
+     b: {effect: gain, params: {coin: 4}, label: "4 coin"},
+     описание: "Аварийный генератор питает здание без всякой энергостанции. Поставьте на здание постоянный кубик энергии или продайте находку за 4 монеты."}
+  - {id: c27, name: "Полевая мастерская", tier: good,
+     a: {effect: free_action, params: {action: assembly}, label: "free Assembly (1 building)"},
+     b: {effect: gain, params: {ammo: 3}, label: "3 ammo"},
+     описание: "Передвижная мастерская для стройки без чертежей и лишних затрат. Проведите бесплатную Сборку одного здания или заберите 3 боеприпаса вместо инструмента."}
+  - {id: c28, name: "Шифровка", tier: good, contested: effect_survives_round,
+     a: {effect: noop, params: {note: "take first-player token next round"}, label: "grab first player"},
+     b: {effect: gain, params: {objective_cards: 2}, label: "2 objectives"},
+     описание: "Перехваченная шифровка даёт либо инициативу, либо чужие секретные планы. Возьмите фишку первого игрока на следующий раунд или заберите 2 карты задания."}
+
+  # -------- 4 rare (~5u/variant) --------
+  - {id: c29, name: "Оружейный контейнер", tier: rare,
+     a: {effect: gain, params: {module_half: attack}, label: "half attack module"},
+     b: {effect: gain, params: {ammo: 3, coin: 2}, label: "3 ammo + 2 coin"},
+     описание: "Армейская укладка с деталями боевого модуля — или тем, что за них можно выручить. Заберите половину боевого модуля целиком или возьмите 3 боеприпаса и 2 монеты."}
+  - {id: c30, name: "Заводской контейнер", tier: rare,
+     a: {effect: gain, params: {module_half: assembly}, label: "half assembly module"},
+     b: {effect: gain, params: {coin: 4, objective_cards: 1}, label: "4 coin + 1 objective"},
+     описание: "Заводская укладка с деталями сборочного модуля или с чистой прибылью. Заберите половину модуля сборки или возьмите 4 монеты и 1 карту задания."}
+  - {id: c31, name: "Гермобокс", tier: rare,
+     a: {effect: gain, params: {module_half: choice}, label: "half module (choice)"},
+     b: {effect: gain, params: {kelium: 1}, label: "1 kelium"},
+     описание: "Герметичный бокс хранит половину модуля любого типа по вашему выбору или чистый келемий. Заберите половину модуля на свой вкус или возьмите 1 келемий."}
+  - {id: c32, name: "Чёрный ящик", tier: rare,
+     a: {effect: gain, params: {gild_module: true}, label: "gild a module"},
+     b: {effect: gain, params: {debris: 2, coin: 2}, label: "2 trophy + 2 coin"},
+     описание: "Загадочный чёрный ящик способен позолотить уже стоящий у вас модуль или выплатить трофейную премию. Позолотите один свой модуль или заберите 2 трофейных очка и 2 монеты."}

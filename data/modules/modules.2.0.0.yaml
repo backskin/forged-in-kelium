@@ -1,0 +1,88 @@
+# CONTENT: modules  version 2.0.0
+#
+# НАБОРЫ ЖЕТОНОВ МОДУЛЕЙ — подключаемые (решение дизайнера 12.08.2026).
+# Раньше красные M1–M4 были вшиты в Modules.java; теперь набор выбирается
+# правилами (modules.red_sets / modules.blue_sets), а старый набор остался
+# версией R0 и никуда не делся.
+#
+# МЕШКИ: награда «модуль» = тянуть СЛУЧАЙНЫЙ жетон из мешка своего цвета.
+# В мешок со старта кладутся полные наборы на состав: 2/3/4 набора по четыре
+# жетона = 8/12/16 жетонов. Жетон из мешка извлекается навсегда.
+#
+# targets: infantry | vehicle | aircraft | buildings_towers | any_unit
+# mode: choice — обычная сторона даёт цель НА ВЫБОР; both — золотая бьёт обе
+#       (каждая атака платится отдельно, по разным жетонам).
+# stat: hp/speed — жетон не про цель, а про характеристику рода войск.
+meta:
+  id: 2.0.0
+  type: modules
+
+red_sets:
+  # ---- R0: прежний набор, оставлен как версия (цена печатная, 2 БП) ----
+  - id: R0
+    name: "Старый набор (цели парами)"
+    ammo: 2
+    tokens:
+      - {id: R0-1, plain: [infantry, vehicle],          gold_mode: both}
+      - {id: R0-2, plain: [vehicle, aircraft],          gold_mode: both}
+      - {id: R0-3, plain: [aircraft, buildings_towers], gold_mode: both}
+      - {id: R0-4, plain: [buildings_towers, infantry], gold_mode: both}
+
+  # ---- R1: размен целей, все атаки за 1 БП (диктовка 12.08.2026) ----
+  - id: R1
+    name: "Размен целей"
+    ammo: 1
+    tokens:
+      - {id: R1-1, plain: [infantry, vehicle],         gold_mode: both}
+      - {id: R1-2, plain: [vehicle, aircraft],         gold_mode: both}
+      - {id: R1-3, plain: [infantry, buildings_towers], gold_mode: both}
+      - {id: R1-4, plain: [vehicle, buildings_towers],  gold_mode: both}
+
+  # ---- R2: характеристики и универсальность (диктовка 12.08.2026) ----
+  - id: R2
+    name: "Характеристики и универсальность"
+    ammo: 1
+    tokens:
+      - {id: R2-1, stat: hp,    plus: 1, gold_stats: {hp: 1, speed: 1}}
+      - {id: R2-2, stat: speed, plus: 1, gold_stats: {hp: 1, speed: 1}}
+      - {id: R2-3, plain: [any_unit], gold: [any_unit, buildings_towers], gold_mode: choice}
+      - {id: R2-4, plain: [buildings_towers], gold: [any_unit, buildings_towers],
+         gold_mode: choice}
+
+  # ---- R3: ПРЕДЛОЖЕНИЕ СИМУЛЯТОРА, ждёт вердикта дизайнера ----
+  # Закрывает две дыры, которых не закрывают R1/R2: досягаемость (войска
+  # застревают в двух гексах от врага) и налог на второй бой.
+  - id: R3
+    proposal: true
+    name: "Досягаемость и напор (предложение)"
+    ammo: 1
+    tokens:
+      - {id: R3-1, plain: [any_unit], range: 2, gold: [any_unit, buildings_towers],
+         gold_range: 2}
+      - {id: R3-2, effect: no_second_battle_surcharge,
+         gold_effect: no_second_third_battle_surcharge}
+      - {id: R3-3, plain: [any_unit], requires: moved_this_action,
+         gold: [any_unit], gold_requires: none}
+      - {id: R3-4, effect: plus1_damage_once_per_round,
+         gold_effect: plus1_damage_always}
+
+# Смеси: из каких наборов собирается мешок конкретной партии.
+red_bags:
+  - {id: bag_R1, sets: [R1]}
+  - {id: bag_R2, sets: [R2]}
+  - {id: bag_R1_R2, sets: [R1, R2]}     # по четыре жетона каждого набора
+  - {id: bag_legacy, sets: [R0]}
+
+# СИНИЕ наборы пока одни — прежние C1–C4 (дизайнер решил не менять).
+# {ammo, units} — выходы Сборки; gild — какой параметр растёт на золотой стороне.
+blue_sets:
+  - id: C
+    name: "Сборка (прежний набор)"
+    tokens:
+      - {id: C1, ammo: 2, units: 1, gild: units}
+      - {id: C2, ammo: 2, units: 1, gild: ammo}
+      - {id: C3, ammo: 1, units: 2, gild: units}
+      - {id: C4, ammo: 1, units: 2, gild: ammo}
+
+blue_bags:
+  - {id: bag_C, sets: [C]}

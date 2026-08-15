@@ -1,0 +1,53 @@
+# CONTENT: super_objectives  version 1.0.0
+# 8 projects, one per player, open from setup. FACE = assembly (place parts via
+# SPEC action, one part per SPEC); once complete, flip. BACK = deploy pattern
+# (geometry) via a SPEC action on a later turn = INSTANT WIN.
+# Encoded from "Карты/Задания — супер задания (8 проектов).md".
+#
+# assembly: what must be contributed. `parts` is a list of {kind, amount}:
+#   resource (kelium/coin/ammo/trophy), enemy_unit_token, enemy_building_token,
+#   own_miner_bordering_grid, own_building_adjacent_enemy, own_unit_on_enemy_hex.
+# win_pattern: a named geometric descriptor (predicate id, geometry) checked at
+#   deploy time. These win predicates are GEOMETRY-dependent; registered as
+#   stubs in predicates.py until the deploy-check is mechanized (like geo cards),
+#   so a super-objective can be ASSEMBLED now, with deploy wired in the modules
+#   follow-up. Contributed parts NEVER return (enemy tokens lost forever).
+meta:
+  id: 1.0.0
+  type: super_objectives
+
+super_objectives:
+  - id: prizma
+    name: "Призма"
+    subtitle: "келемиевый излучатель"
+    assembly: {parts: [{kind: kelium, amount: 4}]}
+    win_pattern: {id: sp_line_of_three_buildings_mid_adjacent_enemy}
+  - id: liteynya
+    name: "Литейня"
+    subtitle: "переплавка брони"
+    assembly: {parts: [{kind: enemy_unit_token, amount: 3}]}
+    win_pattern: {id: sp_three_buildings_one_hex_touching}
+  - id: koloss
+    name: "Колосс"
+    assembly: {parts: [{kind: own_building_adjacent_enemy, amount: 2}]}
+    win_pattern: {id: sp_triangle_three_buildings_one_adjacent_enemy}
+  - id: zavesa
+    name: "Завеса"
+    assembly: {parts: [{kind: coin, amount: 8}]}
+    win_pattern: {id: sp_four_buildings_around_common_hex}
+  - id: krot
+    name: "Крот"
+    assembly: {parts: [{kind: own_miner_bordering_grid, amount: 2}]}
+    win_pattern: {id: sp_chain_three_miners_bordering_grids}
+  - id: yadro
+    name: "Ядро"
+    assembly: {parts: [{kind: debris, amount: 6}]}
+    win_pattern: {id: sp_three_unit_hexes_adjacent_one_enemy_hex}
+  - id: roy
+    name: "Рой"
+    assembly: {parts: [{kind: enemy_building_token, amount: 2}, {kind: coin, amount: 2}]}
+    win_pattern: {id: sp_four_hexes_diamond_each_with_unit}
+  - id: zenit
+    name: "Зенит"
+    assembly: {parts: [{kind: own_unit_on_enemy_hex, amount: 3}]}
+    win_pattern: {id: sp_three_tower_building_pairs}

@@ -1,0 +1,164 @@
+# CONTENT: super_objectives  version 2.0.0
+#
+# СУПЕР ЗАДАНИЯ 2.0 (правило дизайнера 12.08.2026, источник правды —
+# «СУПЕР ЗАДАНИЯ 2.0 — символы и полная игра»). Что изменилось против 1.0.0:
+#
+#   1. Игроку раздаются ДВЕ карты, он выбирает ОДНУ (setup.deal/choose в ruleset).
+#   2. ЛИЦО (сборка) — как было: части вносятся СПЕЦ-действиями, по одной за СПЕЦ.
+#   3. РУБАШКА (развёртывание) требует ТРЁХ вещей сразу:
+#        - рисунок из КОНКРЕТНЫХ объектов на поле (не абстрактный узор);
+#        - НАБОР СИМВОЛОВ под планшетом войск (3 символа, ровно 2 одинаковых);
+#        - СПЕЦ-действие проверки с этой карты (оно же вскрывает последний символ).
+#
+# ФОРМАТ РИСУНКА (deploy). objects — что должно быть, relation — как расположено.
+#   objects: список {what, count}, где what:
+#     building:<тип>   — своё здание: miner|power_plant|barracks|factory|airbase|cu
+#     unit:<род>       — своё войско: infantry|vehicle|aircraft|tower
+#     enemy:any        — любой чужой жетон
+#     enemy:building   — чужое здание
+#     neutral          — нейтральная постройка
+#   relation:
+#     line3            — три гекса в одну линию (подряд по одному направлению)
+#     triangle         — три гекса, попарно соседние
+#     around_hex       — все объекты на гексах, окружающих ОДИН общий гекс
+#     chain            — цепочка: каждый следующий гекс соседний предыдущему
+#     same_hex         — все объекты на ОДНОМ гексе
+#     adjacent_pairs   — объекты разбиты на пары, внутри пары гексы соседние
+#   anchor (не обязателен) — дополнительное условие на «середину» рисунка:
+#     mid_adjacent_enemy — средний гекс линии примыкает к чужому жетону
+#
+# ФОРМАТ СИМВОЛОВ (symbols): три формы из symbols.1.0.0.yaml, ровно две одинаковые.
+meta:
+  id: 2.0.0
+  type: super_objectives
+
+super_objectives:
+  - id: prizma
+    name: "Призма"
+    subtitle: "келемиевый излучатель"
+    описание: "Призма направляет добытый келемий в один слепящий луч. Лицо карты собирается вложением 4 келемиев. Рубашка требует три гекса в одну линию — свою энергостанцию, своего добытчика и свою технику, — а средний гекс линии должен примыкать к чужому жетону."
+    assembly: {parts: [{kind: kelium, amount: 4}]}
+    # ПО ЗА ПЕРВУЮ ЧАСТЬ (решение дизайнера 13.08.2026): 2-5 очков по
+    # стоимости того, что сдаётся в лицо карты.
+    first_part_vp: 3
+    deploy:
+      relation: line3
+      anchor: mid_adjacent_enemy
+      objects:
+        - {what: "building:power_plant", count: 1}
+        - {what: "building:miner", count: 1}
+        - {what: "unit:vehicle", count: 1}
+    symbols: [circle, circle, triangle]
+
+  - id: liteynya
+    name: "Литейня"
+    subtitle: "переплавка брони"
+    описание: "Литейня переплавляет снятые с поля жетоны противника в собственную сталь. Лицо карты собирается из трёх чужих жетонов войск. Рубашка требует треугольник из трёх соседних гексов: свой завод, свою технику и любой чужой жетон рядом."
+    assembly: {parts: [{kind: enemy_unit_token, amount: 3}]}
+    # ПО ЗА ПЕРВУЮ ЧАСТЬ (решение дизайнера 13.08.2026): 2-5 очков по
+    # стоимости того, что сдаётся в лицо карты.
+    first_part_vp: 5
+    deploy:
+      relation: triangle
+      objects:
+        - {what: "building:factory", count: 1}
+        - {what: "unit:vehicle", count: 1}
+        - {what: "enemy:any", count: 1}
+    symbols: [square, square, circle]
+
+  - id: koloss
+    name: "Колосс"
+    subtitle: "шагающая батарея"
+    описание: "Колосс — шагающая батарея, выросшая прямо на линии соприкосновения. Лицо карты собирается из двух своих зданий, что стоят рядом с чужими постройками. Рубашка требует цепочку соседних гексов: свою казарму, свою вышку, свою пехоту и рядом — чужое здание."
+    assembly: {parts: [{kind: own_building_adjacent_enemy, amount: 2}]}
+    # ПО ЗА ПЕРВУЮ ЧАСТЬ (решение дизайнера 13.08.2026): 2-5 очков по
+    # стоимости того, что сдаётся в лицо карты.
+    first_part_vp: 3
+    deploy:
+      relation: chain
+      objects:
+        - {what: "building:barracks", count: 1}
+        - {what: "unit:tower", count: 1}
+        - {what: "unit:infantry", count: 1}
+        - {what: "enemy:building", count: 1}
+    symbols: [triangle, triangle, hourglass]
+
+  - id: zavesa
+    name: "Завеса"
+    subtitle: "глушитель приказов"
+    описание: "Завеса — глушитель, что забивает чужие приказы помехами. Лицо карты собирается за 8 монет. Рубашка требует, чтобы вокруг одного общего гекса стояли две свои энергостанции, своя пехота и своя вышка."
+    assembly: {parts: [{kind: coin, amount: 8}]}
+    # ПО ЗА ПЕРВУЮ ЧАСТЬ (решение дизайнера 13.08.2026): 2-5 очков по
+    # стоимости того, что сдаётся в лицо карты.
+    first_part_vp: 3
+    deploy:
+      relation: around_hex
+      objects:
+        - {what: "building:power_plant", count: 2}
+        - {what: "unit:infantry", count: 1}
+        - {what: "unit:tower", count: 1}
+    symbols: [hourglass, hourglass, square]
+
+  - id: krot
+    name: "Крот"
+    subtitle: "подземный конвейер"
+    описание: "Крот прокладывает подземный конвейер между собственными шахтами на краю поля. Лицо карты собирается из двух своих добытчиков, стоящих у границы. Рубашка требует цепочку соседних гексов: два своих добытчика, свою энергостанцию и свою пехоту."
+    assembly: {parts: [{kind: own_miner_bordering_grid, amount: 2}]}
+    # ПО ЗА ПЕРВУЮ ЧАСТЬ (решение дизайнера 13.08.2026): 2-5 очков по
+    # стоимости того, что сдаётся в лицо карты.
+    first_part_vp: 2
+    deploy:
+      relation: chain
+      objects:
+        - {what: "building:miner", count: 2}
+        - {what: "building:power_plant", count: 1}
+        - {what: "unit:infantry", count: 1}
+    symbols: [circle, circle, square]
+
+  - id: yadro
+    name: "Ядро"
+    subtitle: "критическая сборка"
+    описание: "Ядро — критическая сборка, что копит трофеи войны до предела. Лицо карты собирается за 6 трофейных очков. Рубашка требует, чтобы вокруг одного общего гекса стояли две свои пехоты, своя техника и любой чужой жетон."
+    assembly: {parts: [{kind: debris, amount: 6}]}
+    # ПО ЗА ПЕРВУЮ ЧАСТЬ (решение дизайнера 13.08.2026): 2-5 очков по
+    # стоимости того, что сдаётся в лицо карты.
+    first_part_vp: 4
+    deploy:
+      relation: around_hex
+      objects:
+        - {what: "unit:infantry", count: 2}
+        - {what: "unit:vehicle", count: 1}
+        - {what: "enemy:any", count: 1}
+    symbols: [square, square, triangle]
+
+  - id: roy
+    name: "Рой"
+    subtitle: "воздушный улей"
+    описание: "Рой — воздушный улей, что строится на обломках чужих баз. Лицо карты собирается из двух снятых чужих зданий и двух монет. Рубашка требует пары соседних гексов: свою авиабазу, две свои авиации и свою пехоту, каждую пару — соседями внутри себя."
+    assembly: {parts: [{kind: enemy_building_token, amount: 2}, {kind: coin, amount: 2}]}
+    # ПО ЗА ПЕРВУЮ ЧАСТЬ (решение дизайнера 13.08.2026): 2-5 очков по
+    # стоимости того, что сдаётся в лицо карты.
+    first_part_vp: 5
+    deploy:
+      relation: adjacent_pairs
+      objects:
+        - {what: "building:airbase", count: 1}
+        - {what: "unit:aircraft", count: 2}
+        - {what: "unit:infantry", count: 1}
+    symbols: [triangle, triangle, circle]
+
+  - id: zenit
+    name: "Зенит"
+    subtitle: "орбитальный маяк"
+    описание: "Зенит — орбитальный маяк, зажжённый там, где стояли чужие войска. Лицо карты собирается из трёх своих жетонов, что побывали на чужих гексах. Рубашка требует пары соседних гексов: две свои вышки, свой центр управления и любой чужой жетон."
+    assembly: {parts: [{kind: own_unit_on_enemy_hex, amount: 3}]}
+    # ПО ЗА ПЕРВУЮ ЧАСТЬ (решение дизайнера 13.08.2026): 2-5 очков по
+    # стоимости того, что сдаётся в лицо карты.
+    first_part_vp: 4
+    deploy:
+      relation: adjacent_pairs
+      objects:
+        - {what: "unit:tower", count: 2}
+        - {what: "building:cu", count: 1}
+        - {what: "enemy:any", count: 1}
+    symbols: [hourglass, hourglass, triangle]

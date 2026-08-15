@@ -1,0 +1,249 @@
+# ============================================================================
+#  RULESET: 1.3.0
+# ============================================================================
+#  A "ruleset" is a VERSIONED, SWAPPABLE set of RULE VALUES and RULE VARIANTS.
+#  The game's immutable core (turn structure, boards, cards, field, tokens)
+#  lives in code and never changes. Everything tunable or arguable lives here.
+#
+#  Source of truth: "СВОД — механика игры (для работы над картами).md"
+#  Open questions come from "БЭКЛОГ — открытые вопросы.md" (item ids like E10).
+#
+#  CHANGELOG:
+#    1.1.0 (от 1.0.0): соревновательный агрессивный ИИ; objectives 1.1.0.
+#    1.2.0 (от 1.1.0): каталог заданий 5.0 (K-баланс, тиры, стенки); objectives 1.2.0.
+#    1.3.0 (от 1.2.0): ПО за ОБОРОТ тайла зарождения (стартовый 1 / обычный 2).
+#    Прочий контент наследуется от 1.0.0 (версии независимы).
+# ============================================================================
+
+meta:
+  id: 1.4.0
+  based_on: "1.3.0 + треки 2.0 (диктовка дизайнера 2026-08-11)"
+  description: >
+    Baseline ruleset. Disputed backlog items set to the doc's provisional
+    choice and flagged with their backlog id.
+
+# ----------------------------------------------------------------------------
+#  Global economy / VP conversion
+# ----------------------------------------------------------------------------
+economy:
+  coins_per_vp: 5
+  trophy_per_vp: 3
+  kelium_per_vp: 2             # 1 ПО за каждые 2 куба келемия в хранилище (было 1:1)
+  # ПО за ОБОРОТ тайла зарождения при исчерпании лицевой стороны (2026-08-10):
+  spawn_flip_start_vp: 1       # оборот СТАРТОВОГО тайла = 1 ПО добытчику
+  spawn_flip_normal_vp: 2      # оборот ОБЫЧНОГО тайла = 2 ПО добытчику
+  buildings_per_vp: 4
+  units_per_vp: 4
+  kelium_value_coins: 5        # VP-economy lens
+  kelium_value_ue: 3           # card-calibration lens (backlog E15)
+  trophy_value_coins_via_kelium: 3
+
+rounds:
+  min: 6
+  max: 7
+  circles_per_round: 4
+  order_hand_size: 5
+  objective_hand_limit: 3
+  # Слепой сброс приказа (правило дизайнера 2026-08-11): true = игрок ВЫБИРАЕТ,
+  # какой приказ отложить под трофеи на раунд; false = случайный сброс.
+  blind_discard_choice: true
+
+# ----------------------------------------------------------------------------
+#  ASYMMETRY MODULE  (designer will tune this)
+#  Controls which boards players use + the HP/energy variant values. This is a
+#  first-class rule module because it is exactly what balance work toggles.
+# ----------------------------------------------------------------------------
+asymmetry:
+  # mode A = every player uses the identical side A (training / symmetric).
+  # mode B = each player takes a variant side Б1..Бn (the asymmetric game).
+  mode: A                       # A | B
+
+  # Optional explicit side assignment per seat; overrides the mode default.
+  # e.g. [A, B1, B2, B3]. null = derive from mode.
+  board_sides: null
+
+  # "+1 HP for everyone" style experiments. Applied uniformly to every token
+  # (tokens stay identical across players — the iron rule of asymmetry).
+  token_hp_bonus_all: 0
+
+  # Placeholder for future explicit overrides of printed token stats
+  # (per-building HP/energy, per-unit HP). null = use the boards content file.
+  # When we start tuning these, fill e.g.:
+  #   token_overrides: {buildings: {factory: {hp: 3}}, units: {aircraft: {hp: 2}}}
+  token_overrides: null
+
+# ----------------------------------------------------------------------------
+#  Action rule variants
+# ----------------------------------------------------------------------------
+actions:
+  spec_per_turn: 1
+  coincidence_rule_enabled: true
+
+  build:
+    # CONFIRMED by designer: flat +1 coin per extra build operation this action.
+    # [0,1] with clamping => 1st op printed price, every extra op +1 coin.
+    surcharge_coins: [0, 1]
+    demolish_refund_coins: 1
+    move_building_repays_full_price: true
+    cu_free_move_per_turn: 1
+
+  combat:
+    # backlog E11: 2nd-combat cost model. Provisional = flat +1 ammo "right to
+    # open another battle" (matches the flat-surcharge principle).
+    surcharge_model: right_to_battle      # right_to_battle | per_attack
+    open_battle_surcharge_ammo: [0, 1]    # flat +1 ammo per extra battle
+    primary_row_ammo_cost: 1
+    secondary_row_ammo_cost: 2
+    retaliation_enabled: true
+    retaliation_is_free: true
+    retaliation_to_retaliation: false
+
+  movement:
+    # CONFIRMED: flat +1 ammo per extra move (one move free per action).
+    cost_model: flat                      # flat | escalating
+    first_hex_free: true
+    flat_ammo_per_extra_move: 1
+    escalating_surcharge_ammo: [0, 1, 2, 3]
+
+  # Компенсация энергии монетами — ТОЛЬКО в приказе Разработка (Сборка/Добыча).
+  # Одноразовая: действует на одно действие, кубик не кладётся, в следующий раз
+  # платить заново. Решение дизайнера 2026-08-12.
+  empty_energy_slot_coin_cost: 1
+
+  energy_swap:
+    # CONFIRMED by designer: flat +1 coin per extra source-hex this action.
+    surcharge_coins: [0, 1]
+
+
+# ----------------------------------------------------------------------------
+#  Combat / token model
+# ----------------------------------------------------------------------------
+combat_model:
+  all_attacks_damage: 1
+  damage_persists_until_refresh: true
+
+# ----------------------------------------------------------------------------
+#  TECH / SCIENCE MODULE  (designer will tune this)
+# ----------------------------------------------------------------------------
+tech:
+  tracks: 3
+  steps_per_track: 4
+  step_cost_trophy: [1, 2, 3, 4]          # full track = 10 trophy
+  step_vp_cumulative: [1, 1, 2, 3]        # ПО за шаг 1/2/3/4; полная лестница = 7 VP
+
+  # ТРЕКИ 2.0 (диктовка 2026-08-11): ёмкость шагов ЕДИНАЯ для всех составов —
+  # шаг 1: 3 места, шаги 2-3: по 2, шаг 4 (вершина): 1. Занятие всех трёх
+  # вершин = условие конца партии (реализовано: all_peaks_occupied).
+  step_capacity: [3, 2, 2, 1]
+
+  # Приз шага 1 (кубики у трека): ПЕРВОМУ ступившему полный, ВТОРОМУ — половина,
+  # третьему — ничего. Красный (left) — боеприпасы, зелёный (middle) — келемий,
+  # синий (right) — монеты.
+  step1_prize:
+    left:   {first: {ammo: 2},   second: {ammo: 1}}
+    middle: {first: {kelium: 2}, second: {kelium: 1}}
+    right:  {first: {coin: 4},   second: {coin: 2}}
+
+  science_one_step_per_track_per_action: true
+
+  # Exchanges available in the Science action ("Научный отдел"), ≤1×/action each.
+  science_exchanges:
+    - {id: trophy_to_coin,  give_trophy: [1, 2], get_coin: [1, 2]}
+    - {id: move_module,     give_trophy: 1, effect: move_module}
+    - {id: draw_arsenal,    give_trophy: 2, effect: draw2_keep1}
+    - {id: gild_module,     give_trophy: 3, effect: gild_module}
+
+# ----------------------------------------------------------------------------
+#  MARKET MODULE  (designer will tune this)
+#  Base exchange rates (printed board rates, doubled per the market rule). One
+#  market card is active per round; card specifics live in the market content
+#  file, these are the underlying rates a cell can offer. Cost: 1 kelium/cell.
+# ----------------------------------------------------------------------------
+market:
+  cell_cost_kelium: 1
+  base_exchanges:
+    - {id: kelium_to_coin,      per_kelium_coin: 3}     # 1-2 kel -> 3-6 coin
+    - {id: kelium_to_ammo,      per_kelium_ammo: 2}     # 1-2 kel -> 2-4 ammo
+    - {id: kelium_to_objective, per_kelium_cards: 2}    # 1 кел -> 2 карты задания
+    - {id: kelium_to_energy,    effect: place_on_energy_cell}
+
+# ----------------------------------------------------------------------------
+#  End-of-round Return step
+# ----------------------------------------------------------------------------
+return_step:
+  # DESIGNER CHANGE: end-of-round trophy->upgrade exchange REMOVED.
+  trophy_to_upgrade_exchange_enabled: false
+  return_destroyed_tokens: true
+  refill_objectives_to_limit: true
+
+# ----------------------------------------------------------------------------
+#  Contested cards (backlog E12/E13/E14) — legal only if toggled on.
+# ----------------------------------------------------------------------------
+contested_cards:
+  energy_without_source_enabled: false
+  effect_survives_round_enabled: false
+  attack_first_initiative_enabled: false
+
+# ----------------------------------------------------------------------------
+#  Command center
+# ----------------------------------------------------------------------------
+command_center:
+  # DESIGNER-CONFIRMED 2026-08-11: CU has 3 HP (boards) and gives NO trophy
+  # points — it never enters trophy space. Destroying a CU: the attacker takes
+  # the OWNER's CU-destruction token (permanent 3 VP); the owner immediately
+  # takes the CU back to reserve and gains 2 containers (printed on the token's
+  # back). One token per player; a player's OWN token also scores 3 VP at game
+  # end if their CU was never destroyed. WIN CHECK on every CU kill: if the
+  # attacker ALREADY holds any FOREIGN destruction token — instant military win
+  # (kill count is irrelevant; holding the token is what matters).
+  destruction_token_vp: 3
+  # ЖЕТОН УНИЧТОЖЕНИЯ ЦУ ДВУСТОРОННИЙ (решение дизайнера 12.08.2026):
+  #   лицом у своего владельца — 1 ПО (ЦУ уцелело);
+  #   перевёрнутый у того, кто снёс чужое ЦУ, — 3 ПО.
+  own_token_vp_if_cu_never_destroyed: 1   # СВОЙ жетон лицом = 1 ПО
+  respawns: true
+  returns_to_reserve: true                # владелец немедленно забирает ЦУ в запас (не авто-отстройка);
+                                          # отстраивается обычной Стройкой, как любое военное здание
+  military_win_on_second_cu_kill: true    # реализация: победа = уничтожил ЦУ, уже держа чужой жетон
+  owner_compensation_containers: 2        # 2 containers to the CU's owner (printed on token back)
+  # ВОПРОС ДИЗАЙНЕРУ: цена отстройки ЦУ из запаса обычной Стройкой (на планшете
+  # цены нет — ЦУ ставится бесплатно на сетапе). Временно 2 МОН.
+  build_price_coins: 2
+
+# Компенсация контейнерами владельцу за уничтоженные здания
+# (решение дизайнера 2026-08-11; ЦУ — см. command_center выше)
+building_compensation_containers:
+  barracks: 1
+  factory: 1
+  airbase: 1
+  miner_by_level: [1, 0, 1, 0]            # №1..№4
+  power_station_by_level: [1, 0, 1, 0]    # №1..№4
+
+# ----------------------------------------------------------------------------
+#  Content versions this ruleset expects (separate versioned files).
+# ----------------------------------------------------------------------------
+content_versions:
+  boards: 1.0.0
+  scenarios: 1.0.0              # версия раскладок поля (независимо от досок)
+  objectives: 1.4.0             # +4 верха «ОДИНОЧНАЯ НАУКА»; storage-награды -> сборка
+  arsenal: 1.2.0                # 8 стартовых карт (as1-as8, 2026-08-11); container_slot у ~трети
+  containers: 1.0.0
+  market: 1.0.0
+  orders: 1.0.0
+  super_objectives: 1.0.0
+  super_arsenal: 1.0.0          # 9 карт, 3 выкладываются на вершины треков
+
+# --- Супер-задания: выключатель (настройка партии) ---
+super_objectives:
+  enabled: true                 # false = не раздаются и не разыгрываются
+
+# --- Контейнеры: хранение и открытие (правило 2026-08-10) ---
+containers_storage:
+  # Открытие контейнера = СПЕЦ-действие (было свободным).
+  open_is_spec: true
+  # Ячейки под планшетом общие с арсеналом: каждая ячейка арсенала = 2 места
+  # под контейнеры. Закрытая карта арсенала занимает ячейку целиком; открытая
+  # (установленная) с container_slot даёт 1 место, без него — 0.
+  arsenal_cells: 3
+  slots_per_free_cell: 2
+  slots_on_open_card_with_slot: 1

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Forged in Kelium — симулятор настольной игры (Java-версия).
+
+  РЕЕСТР-АГРЕГАТОР трёх модулей (разделено 14.08.2026, заказ дизайнера
+  «чётко разделить код движка / ботов с обучением / GUI»):
+
+    engine — незыблемое ядро (core), версионируемые правила (rules) и контент
+             (dataio), сам движок (engine + engine.ability), геометрия/логи/
+             рендер для отчётов (report). Ни строки про GUI и ботов.
+    bots   — интерфейс агента + эвристики/обучение/просчёт (agents), а также
+             все консольные балансовые стенды и пробники (голый пакет kelium —
+             CardUsage, RuleExperiment, MatchLab и т. д.). Зависит от engine.
+    gui    — конструктор раскладок, проигрыватель партий, раннер прогонов,
+             справочник (gui + gui.replay2). Зависит от bots (и транзитивно
+             от engine) — движок и боты ничего не знают о GUI.
+
+  Зависимость СТРОГО в одну сторону: engine <- bots <- gui. Циклов нет и не
+  предполагается: движок и боты не имеют права ссылаться на Swing/AWT.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>kelium</groupId>
+    <artifactId>forged-in-kelium-parent</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>engine</module>
+        <module>bots</module>
+        <module>gui</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Общий каталог игровых данных (правила, карты, раскладки) — ОДИН
+             уровень выше java-sim у корневого агрегатора, но submodule.basedir
+             на уровень глубже, поэтому у каждого модуля своя копия свойства с
+             дополнительным "..". Держим версию здесь как единственный источник. -->
+        <snakeyaml.version>2.2</snakeyaml.version>
+        <flatlaf.version>3.7.2</flatlaf.version>
+        <miglayout.version>11.4.3</miglayout.version>
+        <junit.version>5.10.2</junit.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>kelium</groupId>
+                <artifactId>kelium-engine</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>kelium</groupId>
+                <artifactId>kelium-engine</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>kelium</groupId>
+                <artifactId>kelium-bots</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.formdev</groupId>
+                <artifactId>flatlaf</artifactId>
+                <version>${flatlaf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.miglayout</groupId>
+                <artifactId>miglayout-swing</artifactId>
+                <version>${miglayout.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- Прогон ТОЛЬКО балансовых тестов во всех модулях разом: mvn test -Pbalance -->
+    <profiles>
+        <profile>
+            <id>balance</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludedGroups combine.self="override"/>
+                            <groups>balance</groups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Версия компилятора закреплена явно: без этого сборка
+                     зависит от версии самого Maven на машине. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.5</version>
+                    <configuration>
+                        <!-- Каталог данных — явно, иначе тесты зависят от
+                             рабочего каталога и из IDE падают. Данные лежат в
+                             корне проекта, а basedir у submodule на уровень
+                             глубже, поэтому "../data". -->
+                        <systemPropertyVariables>
+                            <kelium.data>${project.basedir}/../data</kelium.data>
+                        </systemPropertyVariables>
+                        <!-- Тесты БАЛАНСА (десятки партий, зависят от настройки
+                             ботов) в обычный прогон не входят: они краснеют от
+                             правки эвристик, хотя правила не менялись.
+                             Запуск отдельно: mvn test -Pbalance -->
+                        <excludedGroups>balance</excludedGroups>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <!-- 3.5.0, а не более новая закреплённая версия проекта:
+                         офлайн-репозиторий содержит настоящий jar только для
+                         file-management 3.2.0 (транзитивная зависимость
+                         test-jar-цели), у 3.4.1 в кэше лежала только болванка
+                         pom без jar — сборка падала в offline режиме. -->
+                    <version>3.5.0</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

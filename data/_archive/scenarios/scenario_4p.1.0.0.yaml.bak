@@ -1,0 +1,126 @@
+# СЦЕНАРИЙ: 4 игрока. v2/v4 — диктовка дизайнера (2026-08-10); v3 — эксперимент Клода.
+# Старые варианты v1/v3 (неверная транскрипция картинок) УДАЛЕНЫ — дизайнер
+# передиктует их позже. Формат: см. scenario_2p.
+meta:
+  id: 1.0.0
+  type: scenario
+  players: 4
+  _needs_verification: true
+
+scenarios:
+  # ===== ВАРИАНТ 2 (диктовка дизайнера 2026-08-10) =====
+  - id: field_4p_v2
+    shape:
+      - {offset: 1, count: 3}   # ряд 1: колонки 2-4
+      - {offset: 1, count: 4}   # ряд 2: колонки 2-5
+      - {offset: 0, count: 5}   # ряд 3: колонки 1-5
+      - {offset: 0, count: 6}   # ряд 4: колонки 1-6
+      - {offset: 0, count: 5}   # ряд 5: колонки 1-5
+      - {offset: 1, count: 4}   # ряд 6: колонки 2-5
+      - {offset: 1, count: 3}   # ряд 7: колонки 2-4
+    special:
+      - {row: 1, col: 4, content: spawn_start}                    # 1-3
+      - {row: 2, col: 2, content: player_start, seat: 3}          # 2-1 игрок 4
+      - {row: 2, col: 5, content: player_start, seat: 0}          # 2-4 игрок 1
+      - {row: 3, col: 1, content: spawn_start}                    # 3-1
+      - {row: 3, col: 2, content: container, count: 1}            # 3-2
+      - {row: 3, col: 3, content: kelium_tile}                    # 3-3
+      - {row: 3, col: 4, content: container, count: 1}            # 3-4
+      - {row: 4, col: 2, content: kelium_tile}                    # 4-2
+      - {row: 4, col: 3, content: container, count: 2}            # 4-3
+      - {row: 4, col: 4, content: container, count: 2}            # 4-4
+      - {row: 4, col: 5, content: kelium_tile}                    # 4-5
+      - {row: 5, col: 2, content: container, count: 1}            # 5-2
+      - {row: 5, col: 3, content: kelium_tile}                    # 5-3
+      - {row: 5, col: 4, content: container, count: 1}            # 5-4
+      - {row: 5, col: 5, content: spawn_start}                    # 5-5
+      - {row: 6, col: 2, content: player_start, seat: 2}          # 6-1 игрок 3
+      - {row: 6, col: 5, content: player_start, seat: 1}          # 6-4 игрок 2
+      - {row: 7, col: 2, content: spawn_start}                    # 7-1
+    neutrals:
+      - {row: 2, col: 3, size: big, corners: [1, 2, 3]}           # 2-2 двойное 1-3
+      - {row: 2, col: 4, size: small, corners: [5, 6]}            # 2-3
+      - {row: 3, col: 5, size: small, corners: [4, 5]}            # 3-5
+      - {row: 5, col: 1, size: small, corners: [1, 2]}            # 5-1
+      - {row: 6, col: 3, size: small, corners: [2, 3]}            # 6-2
+      - {row: 6, col: 4, size: big, corners: [4, 5, 6]}           # 6-3 двойное 4-6
+
+  # ===== ВАРИАНТ 4 (диктовка дизайнера 2026-08-10) =====
+  - id: field_4p_v4
+    shape:
+      - {offset: 1, count: 2}   # ряд 1: колонки 2-3
+      - {offset: 1, count: 4}   # ряд 2: колонки 2-5
+      - {offset: 0, count: 5}   # ряд 3: колонки 1-5
+      - {offset: 0, count: 6}   # ряд 4: колонки 1-6
+      - {offset: 0, count: 5}   # ряд 5: колонки 1-5
+      - {offset: 1, count: 4}   # ряд 6: колонки 2-5
+      - {offset: 2, count: 2}   # ряд 7: колонки 3-4
+    special:
+      - {row: 1, col: 2, content: container, count: 2}            # 1-1
+      - {row: 2, col: 3, content: spawn_start, modifier: "-1"}    # 2-2
+      - {row: 2, col: 4, content: player_start, seat: 0}          # 2-3 игрок 1
+      - {row: 3, col: 1, content: player_start, seat: 3}          # 3-1 игрок 4
+      - {row: 3, col: 5, content: container, count: 2}            # 3-5
+      - {row: 4, col: 1, content: spawn_start}                    # 4-1
+      - {row: 4, col: 3, content: kelium_tile, modifier: "x2"}    # 4-3
+      - {row: 4, col: 4, content: kelium_tile, modifier: "x2"}    # 4-4
+      - {row: 4, col: 5, content: spawn_start}                    # 4-5
+      - {row: 5, col: 1, content: container, count: 2}            # 5-1
+      - {row: 5, col: 5, content: player_start, seat: 1}          # 5-5 игрок 2
+      - {row: 6, col: 3, content: player_start, seat: 2}          # 6-2 игрок 3
+      - {row: 6, col: 4, content: spawn_start, modifier: "-1"}    # 6-3
+      - {row: 7, col: 4, content: container, count: 2}            # 7-2
+    neutrals:
+      - {row: 1, col: 3, size: small, corners: [5, 6]}            # 1-2
+      - {row: 3, col: 3, size: big, corners: [4, 5, 6]}           # 3-3 двойное 4-6
+      - {row: 3, col: 4, size: small, corners: [3, 4]}            # 3-4
+      - {row: 3, col: 5, size: small, corners: [3, 4]}            # 3-5
+      - {row: 5, col: 1, size: small, corners: [6, 1]}            # 5-1
+      - {row: 5, col: 2, size: small, corners: [6, 1]}            # 5-2
+      - {row: 5, col: 3, size: big, corners: [1, 2, 3]}           # 5-3 двойное 1-3
+      - {row: 7, col: 3, size: small, corners: [2, 3]}            # 7-1
+
+  # ===== ВАРИАНТ 3 «Мельница» (эксперимент Клода — НЕ раскладка дизайнера) =====
+  # Идея: старты на СЕРЕДИНАХ четырёх сторон (не по углам), четыре запретных
+  # гекса вертушкой закручивают проходы к центру; в центре — гекс с двумя
+  # контейнерами; по обычной грядке на игрока, симметрия 180°.
+  # Нормы: 31 гекс (7.75/игрока); грядки 4 стартовые + 4 обычные (= игрокам);
+  # у стартов по 2+ свободных соседа.
+  - id: field_4p_claude
+    shape:
+      - {offset: 1, count: 4}   # ряд 1: колонки 2-5
+      - {offset: 1, count: 5}   # ряд 2: колонки 2-6
+      - {offset: 0, count: 6}   # ряд 3: колонки 1-6
+      - {offset: 1, count: 5}   # ряд 4: колонки 2-6
+      - {offset: 0, count: 6}   # ряд 5: колонки 1-6
+      - {offset: 1, count: 5}   # ряд 6: колонки 2-6
+      - {offset: 1, count: 4}   # ряд 7: колонки 2-5
+    special:
+      - {row: 1, col: 2, content: container, count: 1}
+      - {row: 1, col: 3, content: player_start, seat: 0}      # СЕВЕР — игрок 1
+      - {row: 2, col: 2, content: kelium_tile}
+      - {row: 2, col: 3, content: spawn_start}                # грядка севера
+      - {row: 2, col: 5, content: forbidden}                  # вертушка
+      - {row: 3, col: 1, content: spawn_start}                # грядка запада
+      - {row: 3, col: 3, content: forbidden}                  # вертушка
+      - {row: 3, col: 5, content: kelium_tile}
+      - {row: 3, col: 6, content: container, count: 2}
+      - {row: 4, col: 2, content: player_start, seat: 3}      # ЗАПАД — игрок 4
+      - {row: 4, col: 3, content: container, count: 1}
+      - {row: 4, col: 4, content: container, count: 2}        # ЦЕНТР — приз-контейнеры
+      - {row: 4, col: 5, content: container, count: 1}
+      - {row: 4, col: 6, content: player_start, seat: 1}      # ВОСТОК — игрок 2
+      - {row: 5, col: 1, content: container, count: 2}
+      - {row: 5, col: 2, content: kelium_tile}
+      - {row: 5, col: 4, content: forbidden}                  # вертушка
+      - {row: 5, col: 6, content: spawn_start}                # грядка востока
+      - {row: 6, col: 3, content: forbidden}                  # вертушка
+      - {row: 6, col: 5, content: spawn_start}                # грядка юга
+      - {row: 6, col: 6, content: kelium_tile}
+      - {row: 7, col: 4, content: player_start, seat: 2}      # ЮГ — игрок 3
+      - {row: 7, col: 5, content: container, count: 1}
+    neutrals:
+      - {row: 2, col: 4, size: big, corners: [4, 5, 6]}       # стены центра (север)
+      - {row: 6, col: 4, size: big, corners: [1, 2, 3]}       # стены центра (юг)
+      - {row: 3, col: 2, size: small, corners: [2, 3]}
+      - {row: 5, col: 5, size: small, corners: [5, 6]}

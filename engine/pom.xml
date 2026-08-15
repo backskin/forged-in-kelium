@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  kelium-engine — незыблемое ядро (core), версионируемые правила (rules) и
+  контент (dataio), сам движок (engine + engine.ability), геометрия/логи/рендер
+  для отчётов (report). НЕ ЗНАЕТ ни о ботах (agents), ни о GUI (Swing/AWT) —
+  единственная сторонняя зависимость это SnakeYAML для чтения данных.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>kelium</groupId>
+        <artifactId>forged-in-kelium-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+
+    <artifactId>kelium-engine</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- test-jar: kelium.support.Fix (сборка сцены для тестов механик)
+                 нужен и модулю bots — его тесты собирают ту же партию, что и
+                 тесты движка, только ещё и с ботами. Не дублировать класс, а
+                 переиспользовать через test-jar-зависимость. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
