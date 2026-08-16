@@ -30,7 +30,8 @@ class LayoutEditorFeaturesTest {
 
         Map<String, Object> scn = LayoutEditor.toScenarioMap(m, "t");
         var field = Scenario.buildFieldFromScenario(scn).field();
-        var hex = field.get("h1_0");
+        // координаты центрируются при записи: середина линии из трёх — h0_0
+        var hex = field.get("h0_0");
         assertTrue(hex.hasSpawnTile(), "тайл зарождения лежит на гексе");
         assertEquals(2, hex.spawnTile.stack, "стопка из двух тайлов");
         assertEquals(6, hex.spawnTile.kelium, "келемий на лице с правкой +2");

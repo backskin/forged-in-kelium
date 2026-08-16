@@ -36,16 +36,33 @@ class LayoutEditorTest {
         return m;
     }
 
+    /**
+     * Координаты в записи ЦЕНТРИРУЮТСЯ: (0,0) достаётся самому центральному
+     * гексу карты (правило дизайнера 16.08.2026). Линия из пяти гексов
+     * q = 0..4 записывается как q = −2..+2, поэтому средний гекс здесь —
+     * «h0_0», а не «h2_0».
+     */
     @Test
     void editorModelRoundTripsThroughSimLoader() {
         Map<String, Object> scn = LayoutEditor.toScenarioMap(tinyLayout(), "t");
         Scenario.FieldWithStarts fw = Scenario.buildFieldFromScenario(scn);
         assertEquals(5, fw.field().size(), "все гексы дошли до поля");
         assertEquals(2, fw.starts().size(), "оба старта распознаны");
-        var mid = fw.field().get("h2_0");
+        var mid = fw.field().get("h0_0");
         assertEquals(1, mid.neutrals.size(), "нейтрал на месте");
         assertTrue(mid.neutrals.get(0).big, "нейтрал большой");
-        assertEquals(3, fw.field().get("h1_0").spawnTile.kelium, "стартовая грядка: лицо 3");
+        assertEquals(3, fw.field().get("h-1_0").spawnTile.kelium, "стартовая грядка: лицо 3");
+    }
+
+    /** Самый центральный гекс карты получает координаты (0,0). */
+    @Test
+    void theMostCentralHexBecomesTheOrigin() {
+        Map<String, Object> scn = LayoutEditor.toScenarioMap(tinyLayout(), "t");
+        Scenario.FieldWithStarts fw = Scenario.buildFieldFromScenario(scn);
+        assertTrue(fw.field().get("h0_0") != null,
+            "в центре линии из пяти гексов обязан оказаться h0_0: " + fw.field().hexes.keySet());
+        assertTrue(fw.field().get("h-2_0") != null && fw.field().get("h2_0") != null,
+            "края линии — на равном удалении от нуля");
     }
 
     @Test

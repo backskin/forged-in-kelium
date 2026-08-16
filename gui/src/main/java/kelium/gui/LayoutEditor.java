@@ -830,9 +830,14 @@ public final class LayoutEditor {
      * и на неё есть тест по всем инструментам.
      */
     static String statusText(String toolLabel, int hexes, int starts, int players, int spawns) {
+        // ЗНАМЕНАТЕЛЬ — ПРЕДЕЛ МЕСТ, А НЕ СОСТАВ. Раньше здесь стояло
+        // starts/players, но с 12.08.2026 состав И ЕСТЬ число стартов
+        // (Model.players() считает те же гексы), поэтому дробь всегда читалась
+        // «N/N» и не сообщала ничего. Осмысленный знаменатель тут один — сколько
+        // мест вообще бывает: комплектов компонентов в коробке MAX_SEATS.
         return String.format(
-            "Инструмент: %s   ·   гексов: %d   ·   стартов: %d/%d   ·   зарождений: %d",
-            toolLabel, hexes, starts, players, spawns);
+            "Инструмент: %s   ·   гексов: %d   ·   стартов: %d из %d   ·   зарождений: %d",
+            toolLabel, hexes, starts, MAX_SEATS, spawns);
     }
 
     /**
@@ -2353,12 +2358,55 @@ public final class LayoutEditor {
     // ==================== сериализация ====================
 
     /** Модель → карта сценария (формат «hexes», который читает симулятор). */
+    /**
+     * На сколько сдвинуть координаты, чтобы (0,0) достался САМОМУ ЦЕНТРАЛЬНОМУ
+     * гексу карты. Центральный — это ближайший к геометрическому центру всех
+     * гексов, а не к середине диапазона q/r: гексовая сетка косая, и «средний
+     * номер» в ней запросто указывает за пределы поля.
+     *
+     * <p>Ничьей быть не может: при равном расстоянии берём меньший (q, r) —
+     * иначе одна и та же карта сохранялась бы с разным нулём.
+     */
+    private static int[] centreShift(Model m) {
+        if (m.hexes.isEmpty()) {
+            return new int[]{0, 0};
+        }
+        double sx = 0;
+        double sy = 0;
+        for (LHex h : m.hexes.values()) {
+            double[] c = kelium.report.FieldGeometry.hexCenter(h.q, h.r, 1.0);
+            sx += c[0];
+            sy += c[1];
+        }
+        sx /= m.hexes.size();
+        sy /= m.hexes.size();
+        LHex best = null;
+        double bestD = Double.MAX_VALUE;
+        for (LHex h : m.hexes.values()) {
+            double[] c = kelium.report.FieldGeometry.hexCenter(h.q, h.r, 1.0);
+            double d = (c[0] - sx) * (c[0] - sx) + (c[1] - sy) * (c[1] - sy);
+            if (d < bestD - 1e-9
+                    || (Math.abs(d - bestD) <= 1e-9 && best != null
+                        && (h.q < best.q || (h.q == best.q && h.r < best.r)))) {
+                bestD = d;
+                best = h;
+            }
+        }
+        return new int[]{best.q, best.r};
+    }
+
     public static Map<String, Object> toScenarioMap(Model m, String id) {
+        // НАЧАЛО КООРДИНАТ — В ГЕОМЕТРИЧЕСКОМ ЦЕНТРЕ ПОЛЯ (просьба дизайнера
+        // 16.08.2026). Рисовать раскладку начинают с любого места, и у готовой
+        // карты (0,0) оказывался где придётся — иногда у самого края. Сдвиг
+        // считаем один раз здесь, при записи: пока карту правят, номера гексов
+        // не должны прыгать под руками.
+        int[] shift = centreShift(m);
         List<Map<String, Object>> hexes = new ArrayList<>();
         for (LHex h : m.hexes.values()) {
             Map<String, Object> e = new LinkedHashMap<>();
-            e.put("q", h.q);
-            e.put("r", h.r);
+            e.put("q", h.q - shift[0]);
+            e.put("r", h.r - shift[1]);
             String content = h.content;
             if (!"normal".equals(content)) {
                 e.put("content", content);

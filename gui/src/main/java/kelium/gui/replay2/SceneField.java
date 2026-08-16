@@ -183,7 +183,15 @@ public final class SceneField extends JComponent {
                     hexIndex.put(h.id, h);
                 }
             }
-            fitPending = autoFit;
+            // НОВАЯ ЗАПИСЬ — ВСЕГДА ВПИСЫВАЕМ ПОЛЕ ЗАНОВО (просьба дизайнера
+            // 16.08.2026). Раньше здесь стояло fitPending = autoFit, то есть
+            // ручной зум или сдвиг отменял подгонку навсегда: сменил карту или
+            // нажал «всё случайно» — и поле оставалось в прежнем масштабе и
+            // прежней точке, а значит прыгало и частью уезжало за край окна.
+            // Прежний масштаб принадлежал ПРЕЖНЕМУ полю, у нового и размер, и
+            // центр другие — сохранять его нечестно.
+            autoFit = true;
+            fitPending = true;
             repaint();
         });
         session.whenFrameChanged(s -> repaint());
@@ -864,6 +872,10 @@ public final class SceneField extends JComponent {
             if (st.containerCell >= 0) {
                 sb.append("<br>печатный контейнер: ").append(st.containerCell == 6
                     ? "воздушная ячейка" : "ячейка " + st.containerCell);
+            }
+            if (st.energyCell >= 0) {
+                sb.append("<br>жёлтая ячейка: ").append(st.energyCell)
+                  .append(" (только на ней энергостанция даёт номинал)");
             }
             for (ReplayRecord.Neutral nt : st.neutrals) {
                 sb.append("<br>нейтральная постройка (")

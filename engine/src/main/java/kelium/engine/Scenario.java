@@ -310,26 +310,29 @@ public final class Scenario {
 
             Object mod = hx.get("modifier");
             if (tile != null) {
-                // СТАРЫЙ формат (одна строка): "+1" / "-1" / "x2"
+                // СТАРЫЙ формат (одна строка): "+1" / "-1" / "x2". Правка лица
+                // ложится туда же, куда и новая: на ЛИЦО ВЕРХНЕГО тайла.
+                int legacy = 0;
                 if ("+1".equals(mod)) {
-                    tile.faceKelium += 1;
+                    legacy = 1;
                 } else if ("-1".equals(mod)) {
-                    tile.faceKelium = Math.max(0, tile.faceKelium - 1);
+                    legacy = -1;
                 } else if ("x2".equals(mod)) {
                     tile.stack = 2;
                 }
+                if (legacy != 0) {
+                    tile.applyTopFaceDelta(legacy);
+                }
                 // НОВЫЙ формат (независимые поля, пишет конструктор раскладок):
                 // stack: 1|2 — сколько тайлов в стопке (двойной тайл зарождения);
-                // kelium_delta: -4..+4 — правка келемия НА ЛИЦЕ этого тайла.
+                // kelium_delta: -4..+4 — правка келемия НА ЛИЦЕ ВЕРХНЕГО тайла.
+                // Ни оборот этого тайла, ни второй тайл стопки она не трогает:
+                // напечатанное на картоне правкой раскладки не меняется.
                 int stack = intOr(hx.get("stack"), 0);
                 if (stack > 0) {
                     tile.stack = stack;
                 }
-                int delta = intOr(hx.get("kelium_delta"), 0);
-                if (delta != 0) {
-                    tile.faceKelium = Math.max(0, tile.faceKelium + delta);
-                }
-                tile.kelium = tile.faceKelium;
+                tile.applyTopFaceDelta(intOr(hx.get("kelium_delta"), 0));
             }
 
             Hex h = new Hex(hid);

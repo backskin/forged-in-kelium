@@ -16,17 +16,19 @@ import kelium.core.Hex;
 import kelium.core.HexKind;
 
 /**
- * BlockStamp — печатные контейнеры на поле.
+ * BlockStamp — ПЕЧАТНАЯ РАЗМЕТКА БЛОКОВ на поле: контейнеры и жёлтые ячейки.
  *
  * <p>Поле в реальности всегда собирается из картонных блоков: 5 малых (по 5
  * гексов) и 5 больших (по 6), каждый двусторонний — 20 разных сторон. Малый
  * блок несёт 4 напечатанных контейнера, большой — 5 (один гекс блока пустой),
- * и ровно один контейнер каждой стороны стоит в воздушной ячейке. Набор
- * физический и неизменный: {@code simulator/data/blocks/blocks.1.1.0.yaml}.
+ * и ровно один контейнер каждой стороны стоит в воздушной ячейке. На КАЖДОМ
+ * гексе, в отличие от контейнера, напечатана ещё и жёлтая ячейка — наземная и
+ * никогда не та же, что контейнерная. Набор физический и неизменный:
+ * {@code <data>/blocks/blocks.1.2.0.yaml}.
  *
  * <p>Класс делает то же, что дизайнер за столом: раскладывает поле блоками,
- * поворачивает каждый блок как ляжет и переносит напечатанные контейнеры на
- * ячейки гексов ({@link Hex#containerCell}).
+ * поворачивает каждый блок как ляжет и переносит печать на ячейки гексов —
+ * контейнер в {@link Hex#containerCell}, жёлтую ячейку в {@link Hex#energyCell}.
  *
  * <p><b>Честная оговорка про точность.</b> Разбиение поля на блоки берётся не
  * из перебора (он дорогой и живёт в конструкторе), а простой жадной нарезкой
@@ -44,8 +46,21 @@ public final class BlockStamp {
     /** Индекс воздушной ячейки (наземные — 0..5). */
     public static final int AIR = 6;
 
-    /** Одна сторона блока: список ячеек с контейнерами по её гексам. */
-    public record Face(String blockId, String side, String kind, List<Integer> cells) {
+    /**
+     * Печать ОДНОГО ГЕКСА стороны блока: ячейка контейнера (−1 нет, 0..5
+     * наземная, 6 воздушная) и ячейка жёлтая (0..5; −1 только у наборов,
+     * которые её ещё не несут).
+     *
+     * <p>Пара, а не два списка, нарочно: обе ячейки принадлежат ОДНОМУ гексу
+     * картона и обязаны ехать вместе и при перемешивании, и при повороте.
+     * Разъедини их — и жёлтая ячейка может встать на контейнерную, чего на
+     * картоне не бывает.
+     */
+    public record Cell(int container, int energy) {
+    }
+
+    /** Одна сторона блока: печать по её гексам. */
+    public record Face(String blockId, String side, String kind, List<Cell> cells) {
         public int size() {
             return cells.size();
         }
@@ -56,7 +71,7 @@ public final class BlockStamp {
     /**
      * Прочитать набор блоков. Файл лежит рядом с прочими данными игры
      * ({@code <data>/blocks/blocks.<версия>.yaml}); если его нет — работаем без
-     * печатных контейнеров, а не падаем.
+     * печатной разметки, а не падаем.
      */
     @SuppressWarnings("unchecked")
     public static synchronized List<Face> faces(Path dataRoot) {
@@ -64,7 +79,7 @@ public final class BlockStamp {
             return cache;
         }
         List<Face> out = new ArrayList<>();
-        Path p = dataRoot == null ? null : dataRoot.resolve("blocks").resolve("blocks.1.1.0.yaml");
+        Path p = dataRoot == null ? null : dataRoot.resolve("blocks").resolve("blocks.1.2.0.yaml");
         if (p != null && Files.exists(p)) {
             try (InputStream in = Files.newInputStream(p)) {
                 Map<String, Object> doc = new org.yaml.snakeyaml.Yaml().load(in);
@@ -77,10 +92,12 @@ public final class BlockStamp {
                         continue;
                     }
                     for (var e : facesMap.entrySet()) {
-                        List<Integer> cells = new ArrayList<>();
+                        List<Cell> cells = new ArrayList<>();
                         for (Object co : (List<Object>) e.getValue()) {
                             Map<String, Object> c = (Map<String, Object>) co;
-                            cells.add(((Number) c.get("cell")).intValue());
+                            Object en = c.get("energy");
+                            cells.add(new Cell(((Number) c.get("cell")).intValue(),
+                                en instanceof Number n ? n.intValue() : -1));
                         }
                         out.add(new Face(id, String.valueOf(e.getKey()), kind, cells));
                     }
@@ -101,8 +118,21 @@ public final class BlockStamp {
      */
     public static void stamp(Field field, Path dataRoot, Random rng,
                              kelium.rules.Ruleset rules) {
+        // Гексы, куда вообще можно встать жетоном (остальные картон не кормит).
+        List<String> free = new ArrayList<>();
+        for (Hex h : field.hexes.values()) {
+            h.containerCell = -1;
+            h.energyCell = -1;
+            if (h.kind != HexKind.FORBIDDEN && h.spawnTile == null) {
+                free.add(h.id);
+            }
+        }
+
         List<Face> all = faces(dataRoot);
         if (all.isEmpty()) {
+            // Набора блоков нет — печати не будет вовсе. Разыгрывать жёлтые
+            // ячейки самим тут нельзя: они напечатаны на том же картоне, что и
+            // контейнеры, и без картона их взять неоткуда.
             return;
         }
         List<Face> small = new ArrayList<>();
@@ -111,14 +141,6 @@ public final class BlockStamp {
             ("small".equals(f.kind()) ? small : big).add(f);
         }
 
-        // Гексы, куда вообще можно встать жетоном (остальные картон не кормит).
-        List<String> free = new ArrayList<>();
-        for (Hex h : field.hexes.values()) {
-            h.containerCell = -1;
-            if (h.kind != HexKind.FORBIDDEN && h.spawnTile == null) {
-                free.add(h.id);
-            }
-        }
         Collections.shuffle(free, rng);
         java.util.Set<String> left = new java.util.LinkedHashSet<>(free);
 
@@ -132,7 +154,9 @@ public final class BlockStamp {
             }
             Face face = pool.get(rng.nextInt(pool.size()));
             int rot = rng.nextInt(6);
-            List<Integer> cells = new ArrayList<>(face.cells());
+            // Перемешиваем ПАРАМИ: контейнер и жёлтая ячейка одного гекса
+            // картона едут вместе, иначе жёлтая может встать на контейнерную.
+            List<Cell> cells = new ArrayList<>(face.cells());
             Collections.shuffle(cells, rng);
             // УМЕНЬШЕННЫЙ НАБОР (правило-вариант containers.printed_per_small_block /
             // printed_per_big_block, запрос дизайнера 13.08.2026): на блоке
@@ -144,7 +168,8 @@ public final class BlockStamp {
                 : ((Number) rules.get("containers.printed_per_small_block", 4)).intValue();
             int placed = 0;
             for (int i = 0; i < piece.size(); i++) {
-                int cell = cells.get(i % cells.size());
+                Cell printed = cells.get(i % cells.size());
+                int cell = printed.container();
                 if (cell >= 0) {
                     if (placed >= limit) {
                         cell = -1;      // контейнеров на блоке уже достаточно
@@ -155,8 +180,13 @@ public final class BlockStamp {
                 // cell < 0 — гекс блока БЕЗ контейнера (малый блок несёт 4
                 // контейнера на 5 гексов, большой 5 на 6). Поворот блока на
                 // столе двигает НАЗЕМНЫЕ ячейки по кругу, воздушная остаётся.
-                field.get(piece.get(i)).containerCell =
+                Hex h = field.get(piece.get(i));
+                h.containerCell =
                     cell < 0 ? -1 : cell == AIR ? AIR : Math.floorMod(cell + rot, 6);
+                // ЖЁЛТАЯ ЯЧЕЙКА крутится тем же поворотом: она напечатана на том
+                // же картоне и относительно контейнера стоит намертво.
+                h.energyCell = printed.energy() < 0 ? -1
+                    : Math.floorMod(printed.energy() + rot, 6);
             }
             left.removeAll(piece);
         }

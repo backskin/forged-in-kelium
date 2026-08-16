@@ -127,14 +127,20 @@ class BoardsAndPodiumTest {
         }
     }
 
-    /** При четырёх игроках открыты все ячейки: 3 · 3 · 2 · 1 (правило 12.08.2026). */
+    /**
+     * Ячейки шагов открываются по составу (правило дизайнера 16.08.2026):
+     * шаг 1 — третья только вчетвером; шаг 2 — вторая втроём и вчетвером,
+     * третья только вчетвером; шаг 3 — вторая втроём и вчетвером; вершина
+     * одна всегда.
+     */
     @Test
     void cellCountsFollowThePlayerCount() {
         var rules = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 0L, null, null).ruleset;
         assertEquals(List.of(3, 3, 2, 1), rules.stepCapacity(4), "вчетвером открыто всё");
-        assertEquals(List.of(3, 2, 2, 1), rules.stepCapacity(3), "втроём закрыта третья на шаге 2");
-        assertEquals(List.of(3, 2, 1, 1), rules.stepCapacity(2),
-            "вдвоём закрыты третья на шаге 2 и вторая на шаге 3");
+        assertEquals(List.of(2, 2, 2, 1), rules.stepCapacity(3),
+            "втроём закрыты третьи ячейки шагов 1 и 2");
+        assertEquals(List.of(2, 1, 1, 1), rules.stepCapacity(2),
+            "вдвоём открыты только ячейки без пометки состава");
     }
 
     // ==================== рисование ====================

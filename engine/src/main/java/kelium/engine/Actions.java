@@ -46,6 +46,13 @@ public final class Actions {
      */
     public static final int ARSENAL_CARD_SOURCE_UID = -3;
 
+    /**
+     * Ключи приза шага 1 по порядку прихода на шаг: ячейка 1 · 2 · 3.
+     * Ячеек у шага 1 три, поэтому и ключей три — сколько призов реально
+     * прописано, решает свод, а не код.
+     */
+    public static final String[] PRIZE_RANK_KEYS = {"first", "second", "third"};
+
     /** Какой род войск собирает каждое военное здание. */
     static final Map<BuildingType, UnitType> ASSEMBLY_UNIT = new EnumMap<>(BuildingType.class);
 
@@ -702,7 +709,7 @@ public final class Actions {
             BuildingType btype = (BuildingType) spec.get("btype");
             int fp = buildingFootprint(btype);
             List<String> candidates = new ArrayList<>();
-            for (String hid : buildableHexes(state, player.seat)) {
+            for (String hid : buildSpots(player, btype)) {
                 // здание жёсткое, но войска на гексе НЕЖЁСТКИЕ: строить можно,
                 // если ПЕРЕУПАКОВКОЙ войск освобождается след из fp смежных ячеек
                 int[] ld = groundLoad(state, hid, -1);
@@ -763,11 +770,15 @@ public final class Actions {
                 int self = Math.min(gives, b.energySlots);
                 b.addEnergyFrom(b.uid, self);
                 b.energyIdle = gives - self;
-            } else if (btype == BuildingType.POWER_PLANT) {
-                b.energyIdle = state.tokenStats.plantEnergyGives(level);
             }
             Hex bh = state.field.get(targetHex);
             bh.occupySides(b.uid, sides);
+            if (btype == BuildingType.POWER_PLANT) {
+                // ПОСЛЕ occupySides: выработка станции зависит от того, накрыл
+                // ли её след ЖЁЛТУЮ ЯЧЕЙКУ гекса (см. Power.plantOutput), а до
+                // занятия ячеек этот вопрос ещё не имеет ответа.
+                b.energyIdle = Power.plantOutput(state, b);
+            }
             // ПЕЧАТНЫЙ КОНТЕЙНЕР: если след здания накрыл ячейку с
             // напечатанным контейнером — владелец берёт карту из запаса.
             PrintedContainers.onBuildingPlaced(state, player, b);
@@ -864,18 +875,20 @@ public final class Actions {
         }
 
         /**
-         * Стоимость переноса здания = полная цена его постройки. ЦУ переносится
-         * бесплатно (1 раз за ход, обрабатывается флагом в movable/performMove).
+         * ЦЕНА ПЕРЕНОСА — РОВНО 1 МОНЕТА, какое бы здание ни переносили
+         * (правило дизайнера 16.08.2026, {@code actions.build.move_cost_coins}).
+         *
+         * <p>Раньше перенос стоил полную цену постройки, и передвинуть авиабазу
+         * было втрое дороже, чем казарму, — хотя перекладывается один и тот же
+         * картонный жетон. ЦУ при этом переносилось бесплатно, то есть было
+         * исключением в другую сторону. Теперь исключений нет: любое стоящее на
+         * поле здание переезжает за монету, ЦУ в том числе.
+         *
+         * <p>Бесплатной осталась только ПОСТРОЙКА уничтоженного ЦУ заново —
+         * это не перенос, а возвращение в игру (см. {@code buildable}).
          */
         private int moveCost(PlayerState player, BuildingToken b) {
-            return switch (b.type) {
-                case MINER -> state.tokenStats.minerCost(b.level);
-                case POWER_PLANT -> state.tokenStats.plantCost(b.level);
-                case BARRACKS -> player.board.troop.buildingPrice("barracks");
-                case FACTORY -> player.board.troop.buildingPrice("factory");
-                case AIRBASE -> player.board.troop.buildingPrice("airbase");
-                case COMMAND_CENTER -> 0;   // ЦУ переносится бесплатно
-            };
+            return Math.max(0, Ctx.rules(state).getInt("actions.build.move_cost_coins", 1));
         }
 
         /**
@@ -884,6 +897,32 @@ public final class Actions {
          * более 1 раза за ход. Здание доступно, если оно на поле, игрок может
          * оплатить перенос и есть куда его поставить (кроме текущего гекса).
          */
+        /**
+         * КУДА МОЖНО ПОСТАВИТЬ СТРОЯЩЕЕСЯ ЗДАНИЕ. Обычно — только в свою зону
+         * стройки.
+         *
+         * <p>ИСКЛЮЧЕНИЕ ДЛЯ ПОТЕРЯННОГО ЦУ (правило дизайнера 16.08.2026):
+         * игрок, которому снесли ЦУ, ставит его заново на ЛЮБОЙ гекс поля —
+         * даже туда, где строить по обычным правилам не может. Иначе снос ЦУ
+         * у того, чья зона стройки держалась на самом ЦУ, означал бы, что
+         * поставить его негде вообще: не потеря, а выбывание из игры.
+         *
+         * <p>Гексы под запретом и под тайлами зарождения исключение не
+         * открывает: туда не встаёт вообще ни один жетон.
+         */
+        private List<String> buildSpots(PlayerState player, BuildingType btype) {
+            if (btype != BuildingType.COMMAND_CENTER) {
+                return buildableHexes(state, player.seat);
+            }
+            List<String> all = new ArrayList<>();
+            for (Hex h : state.field.hexes.values()) {
+                if (h.kind != kelium.core.HexKind.FORBIDDEN && !h.hasSpawnTile()) {
+                    all.add(h.id);
+                }
+            }
+            return all;
+        }
+
         private List<Map<String, Object>> movable(PlayerState player) {
             List<Map<String, Object>> out = new ArrayList<>();
             int coin = player.resources.coin();
@@ -891,11 +930,11 @@ public final class Actions {
             for (BuildingToken b : player.buildingsOnField()) {
                 boolean isCu = b.type == BuildingType.COMMAND_CENTER;
                 int cost = moveCost(player, b);
-                if (isCu) {
-                    if (cuMovedThisTurn) {
-                        continue;   // ЦУ уже переносили в этот ход
-                    }
-                } else if (cost > coin) {
+                if (isCu && cuMovedThisTurn) {
+                    continue;   // ЦУ уже переносили в этот ход
+                }
+                // ЦУ БОЛЬШЕ НЕ ПЕРЕЕЗЖАЕТ ДАРОМ: монету за перенос платят все.
+                if (cost > coin) {
                     continue;
                 }
                 int fp = buildingFootprint(b.type);
@@ -919,7 +958,7 @@ public final class Actions {
                 m.put("is_cu", isCu);
                 m.put("label", "move " + b.type.code
                     + (b.level != null ? " L" + b.level : "")
-                    + " (" + (isCu ? "free" : cost + " coin") + ")");
+                    + " (" + cost + " coin)");
                 out.add(m);
             }
             return out;
@@ -960,6 +999,26 @@ public final class Actions {
             }
             int fp = buildingFootprint(b.type);
             String fromHex = b.hexId;
+            // ЦЕНА ПОСТРОЙКИ спрашивается через точку правил: так карты вроде
+            // «Промышленник» (стройка дешевле) вмешиваются в одном месте, а не
+            // правкой каждого места, где считается цена (13.08.2026).
+            int cost = Math.max(0, kelium.engine.ability.RuleQuery
+                .of(state, player.seat, kelium.engine.ability.Hook.BUILD_PRICE)
+                .about(b.type)
+                .base(((Number) spec.get("cost")).intValue())
+                .ask());
+            // ПОРЯДОК ПЕРЕНОСА (правило дизайнера 16.08.2026): сначала СНЯТЬ
+            // здание, и только потом считать, куда его можно поставить. Снятый
+            // жетон больше не держит зону стройки — а раньше места считались,
+            // пока он ещё стоял, и здание могло переехать на гекс, который
+            // держало собой же.
+            //
+            // Войско, стоявшее ВНУТРИ здания, с ним не переезжает — остаётся на
+            // прежнем гексе и теряет укрытие.
+            evictFromBuilding(player, b);
+            state.field.get(fromHex).freeSidesByToken(b.uid);
+            b.hexId = null;
+
             List<String> candidates = new ArrayList<>();
             for (String hid : buildableHexes(state, player.seat)) {
                 if (hid.equals(fromHex)) {
@@ -971,6 +1030,15 @@ public final class Actions {
                 }
             }
             if (candidates.isEmpty()) {
+                // Ставить некуда — возвращаем здание туда, где стояло: ход не
+                // состоялся, а не «здание пропало».
+                b.hexId = fromHex;
+                List<Integer> back = state.field.get(fromHex)
+                    .chooseFootprint(fp, groundLoad(state, fromHex, -1)[0],
+                        groundLoad(state, fromHex, -1)[1]);
+                if (back != null) {
+                    state.field.get(fromHex).occupySides(b.uid, back);
+                }
                 ctx.actionsPlayed.add(name());
                 return ActionResult.fail("move: no room");
             }
@@ -980,19 +1048,6 @@ public final class Actions {
             }
             Choice hpick = agent.choose(state, hopts, Map.of("kind", "move_hex", "btype", b.type.code));
             String targetHex = (String) hpick.payload();
-            // ЦЕНА ПОСТРОЙКИ спрашивается через точку правил: так карты вроде
-            // «Промышленник» (стройка дешевле) вмешиваются в одном месте, а не
-            // правкой каждого места, где считается цена (13.08.2026).
-            int cost = Math.max(0, kelium.engine.ability.RuleQuery
-                .of(state, player.seat, kelium.engine.ability.Hook.BUILD_PRICE)
-                .about(b.type)
-                .base(((Number) spec.get("cost")).intValue())
-                .ask());
-            // снос: освободить стороны текущего гекса. Войско, стоявшее ВНУТРИ
-            // здания, с ним не переезжает — оно остаётся на прежнем гексе и
-            // теряет укрытие.
-            evictFromBuilding(player, b);
-            state.field.get(fromHex).freeSidesByToken(b.uid);
             if (cost > 0) {
                 player.resources.pay(Resource.COIN, cost);
             }
@@ -1015,6 +1070,26 @@ public final class Actions {
             }
             b.hexId = targetHex;
             targetH.occupySides(b.uid, sides);
+            // ЖЁЛТАЯ ЯЧЕЙКА И ПЕРЕНОС: у энергостанции выработка зависит от
+            // ячейки, на которой она стоит, поэтому переезд её меняет. Если
+            // число кубиков стало другим — источник забирает свои кубики
+            // обратно на себя (как при постройке) и раскладывает их заново
+            // ближайшей Сменой энергии. Без этого станция, съехавшая с жёлтой
+            // ячейки, продолжала бы кормить здания номиналом, которого больше
+            // не выдаёт.
+            if (b.type == BuildingType.POWER_PLANT) {
+                int now = Power.plantOutput(state, b);
+                int had = b.energyIdle;
+                for (BuildingToken c : player.buildingsOnField()) {
+                    had += c.energyBySource.getOrDefault(b.uid, 0);
+                }
+                if (now != had) {
+                    for (BuildingToken c : player.buildingsOnField()) {
+                        c.stripEnergyOf(b.uid);
+                    }
+                    b.energyIdle = now;
+                }
+            }
             // ПЕЧАТНЫЙ КОНТЕЙНЕР: перенос — тоже «здание встало на ячейку».
             PrintedContainers.onBuildingPlaced(state, player, b);
             // СТАРЫЙ РЕЖИМ: стройка на гексе СЖИГАЕТ лежащий там жетон
@@ -1236,12 +1311,13 @@ public final class Actions {
                     for (BuildingToken c : player.buildingsOnField()) {
                         c.stripEnergyOf(src.uid);
                     }
-                    // Пул = номинал источника (+ пассив «+1 станциям»): модель
-                    // самовосстанавливается при появлении/уходе пассивки.
-                    int pool = src.type == BuildingType.POWER_PLANT
-                        ? state.tokenStats.plantEnergyGives(src.level)
-                            + Passives.plantEnergyBonus(state, player.seat)
-                        : state.tokenStats.buildingEnergyGives(src.type);
+                    // Пул = выработка источника (+ пассив «+1 станциям»): модель
+                    // самовосстанавливается при появлении/уходе пассивки. Сама
+                    // выработка считается в Power.plantOutput — там же живёт
+                    // правило жёлтой ячейки.
+                    int pool = Power.plantOutput(state, src)
+                        + (src.type == BuildingType.POWER_PLANT
+                            ? Passives.plantEnergyBonus(state, player.seat) : 0);
                     placedTotal += placeCubes(player, agent, src.uid, pool, src);
                 }
                 doneHexes.add(hid);
@@ -2057,11 +2133,19 @@ public final class Actions {
                 reward = String.valueOf(rewards.get(reached - 1));
             }
             if ("prize_cube".equals(reward)) {
-                // Приз шага 1: ПЕРВОМУ полный, ВТОРОМУ половина, дальше ничего.
-                // Каким по счёту игрок ПРИШЁЛ на шаг 1: по числу стоящих сейчас
-                // это не определить — кубик уходит дальше, освобождая ячейку.
+                // Приз шага 1 убывает по мере занятия ячеек: чем позже пришёл,
+                // тем меньше досталось. Каким по счёту игрок ПРИШЁЛ на шаг 1:
+                // по числу стоящих сейчас это не определить — кубик уходит
+                // дальше, освобождая ячейку.
+                //
+                // Ключей ровно столько, сколько ячеек у шага, и они читаются из
+                // свода: у трека синих модулей приз есть и на ТРЕТЬЕЙ ячейке
+                // (правило дизайнера 16.08.2026), а у красного — только на двух.
+                // Раньше здесь стояли зашитые first/second, и третья ячейка не
+                // могла отдать приз, сколько бы его ни прописали в своде.
                 int rank = state.tech.stepOneRank(track);
-                String key = rank == 1 ? "first" : rank == 2 ? "second" : null;
+                String key = rank >= 1 && rank <= PRIZE_RANK_KEYS.length
+                    ? PRIZE_RANK_KEYS[rank - 1] : null;
                 if (key != null) {
                     Object prize = cfg.ruleset.get("tech.step1_prize." + track + "." + key, null);
                     if (prize instanceof Map<?, ?> pm) {

@@ -135,6 +135,14 @@ public final class FieldPainter {
     // Печатный контейнер: приглушённее и светлее прежнего (#E8C77B/#6E4E13) —
     // он подложка под жетоны и не должен спорить с ними за внимание
     // (просьба дизайнера 12.08.2026). Знак вопроса — цвет обводки.
+    /**
+     * ЖЁЛТАЯ ЯЧЕЙКА — та, где энергостанция даёт номинал (правило 16.08.2026).
+     * На тёмной теме цвет приглушённый: чистая жёлтая линия на тёмном поле
+     * светится и перетягивает взгляд с жетонов, а разметка картона должна
+     * лежать ПОД ними и по яркости тоже.
+     */
+    private static final String ENERGY_CELL_MARK = "#E8B71E";
+    private static final String ENERGY_CELL_MARK_DARK = "#8A7020";
     private static final String CONTAINER_FILL = "#F0E2BE";
     private static final String CONTAINER_EDGE = "#9A8455";
     private static final String CONTAINER_MARK = "#7A6636";
@@ -210,6 +218,13 @@ public final class FieldPainter {
         //    попал между нейтралом и зданиями — и лёг поверх нейтрала.)
         if (st != null && st.containerCell >= 0) {
             paintPrintedContainer(c, size, st.containerCell, cx, cy);
+        }
+
+        // 2б. ЖЁЛТАЯ ЯЧЕЙКА — тоже печать на картоне, тот же слой: лежит под
+        //     всем, что на гекс кладут. Только стоя на ней, энергостанция даёт
+        //     свой номинал.
+        if (st != null && st.energyCell >= 0 && st.energyCell < 6) {
+            paintEnergyCell(c, size, st.energyCell, cx, cy);
         }
 
         // 3. тайл зарождения — закрывает гекс целиком
@@ -1421,6 +1436,64 @@ public final class FieldPainter {
      * жетона, а не поля). В центре знак вопроса: что внутри — неизвестно, пока
      * контейнер не вскрыт.
      */
+    /**
+     * ЖЁЛТАЯ ЯЧЕЙКА гекса — место, где энергостанция даёт свой номинал.
+     *
+     * <p>Рисуется ВНУТРЕННЕЙ ОБВОДКОЙ ПО ФОРМЕ САМОЙ ЯЧЕЙКИ и жёлтым знаком
+     * молнии в середине. Линия чуть тоньше обводки жетона: это печать на
+     * картоне, она лежит ПОД жетонами и по весу тоже — вдвое жирнее жетонов
+     * она забивала собой всё поле (замечание дизайнера 16.08.2026).
+     *
+     * <p>Форма — ТРАПЕЦИЯ, а не клин до центра: в центре гекса лежит воздушная
+     * ячейка авиации, и наземная ячейка её не занимает. Поэтому внутреннее
+     * основание трапеции проходит по кромке воздушной ячейки, а не через центр.
+     *
+     * <p>Обводка именно внутренняя — трапеция ужата на полтолщины линии, чтобы
+     * линия не вылезала ни за ребро гекса, ни на воздушную ячейку.
+     */
+    private static void paintEnergyCell(FieldCanvas c, double size, int cell,
+                                        double cx, double cy) {
+        double stroke = TOKEN_STROKE * 0.55;
+        String mark = dark ? ENERGY_CELL_MARK_DARK : ENERGY_CELL_MARK;
+        double ang = FieldGeometry.edgeAngle(cell);
+        // ОТСТУП ОТ ГРАНИЦ ЯЧЕЙКИ. Впритык к кромке гекса на трапецию налезали
+        // краями соседние здания, и разметка читалась грязно (замечание
+        // дизайнера 16.08.2026). Поджимаем со всех сторон: снаружи по радиусу,
+        // с боков — сводя лучи к середине ячейки.
+        double margin = size * 0.07;
+        double side = 30 - 4;
+        double outer = size - stroke / 2 - margin;
+        // Внутреннее основание — ЗА кромкой воздушной ячейки, с видимым зазором.
+        // Ровно по её радиусу основание пряталось под самой воздушной ячейкой, и
+        // трапеция читалась треугольником до центра.
+        double inner = size * (FieldGeometry.AIR_CELL_R + 0.10) + stroke / 2;
+        double[] o1 = FieldGeometry.polar(cx, cy, outer, ang - side);
+        double[] o2 = FieldGeometry.polar(cx, cy, outer, ang + side);
+        // Внутренние углы держим на тех же лучах, что и внешние: иначе боковые
+        // стороны трапеции не совпадут с границами между соседними ячейками.
+        double[] i1 = FieldGeometry.polar(cx, cy, inner, ang - side);
+        double[] i2 = FieldGeometry.polar(cx, cy, inner, ang + side);
+        c.polygon(new double[][]{i1, o1, o2, i2}, "none", mark, stroke);
+
+        // Молния — в середине трапеции, там же, где у здания стоит подпись.
+        double[] spot = FieldGeometry.polar(cx, cy, size * 0.62, ang);
+        paintBolt(c, spot[0], spot[1], size * 0.24, mark);
+    }
+
+    /** Знак молнии высотой {@code h} с центром в точке (x, y). */
+    private static void paintBolt(FieldCanvas c, double x, double y, double h, String fill) {
+        double w = h * 0.52;
+        double[][] bolt = {
+            {x + 0.10 * w, y - 0.50 * h},
+            {x - 0.50 * w, y + 0.08 * h},
+            {x - 0.06 * w, y + 0.08 * h},
+            {x - 0.16 * w, y + 0.50 * h},
+            {x + 0.50 * w, y - 0.12 * h},
+            {x + 0.04 * w, y - 0.12 * h}
+        };
+        c.polygon(bolt, fill, null, 0);
+    }
+
     private static void paintPrintedContainer(FieldCanvas c, double size, int cell,
                                               double cx, double cy) {
         double s = size * 0.24;

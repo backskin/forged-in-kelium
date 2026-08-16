@@ -219,6 +219,25 @@ public final class PlayerStrip extends JComponent {
             badge(g, dvp, w - pad - Theme.px(26) - vpw - Theme.px(34), y + Theme.px(6));
         }
 
+        // ЖЕТОНЫ ПОБЕДНЫХ ОЧКОВ — ЗВЁЗДЫ, которые уже лежат перед игроком.
+        // Число «ПО» выше — это ВЕСЬ счёт, включая то, что будет посчитано по
+        // столу только в конце партии и пока может ещё пропасть. Звёзды же
+        // получены и не отнимаются, поэтому показываются отдельно: иначе по
+        // экрану не отличить прочное очко от предварительного.
+        int stars = 0;
+        for (String key : kelium.engine.Scoring.STAR_TOKEN_SOURCES) {
+            stars += p.vp.getOrDefault(key, 0);
+        }
+        if (stars > 0) {
+            String st = String.valueOf(stars);
+            g.setFont(f(11, java.awt.Font.BOLD));
+            int stw = g.getFontMetrics().stringWidth(st);
+            double sx = w - pad - Theme.px(14) - stw;
+            paintStar(g, sx - Theme.px(6), y + Theme.px(28), Theme.px(9));
+            g.setColor(Theme.points());
+            g.drawString(st, (int) sx + Theme.px(2), y + Theme.px(31));
+        }
+
         // ---- КНОПКА «ЛИЧНАЯ ЗОНА» — сразу за плашкой игрока, с подписью.
         // Раньше это был безымянный значок в правом верхнем углу: на кнопку он не
         // походил вовсе и вдобавок налезал на победные очки (замечание дизайнера
@@ -313,23 +332,66 @@ public final class PlayerStrip extends JComponent {
         }
     }
 
+    /**
+     * ЖЕТОН ПОБЕДНОГО ОЧКА — деревянная ЗОЛОТАЯ ПЯТИКОНЕЧНАЯ ЗВЕЗДА. Рисуется
+     * как есть, а не буквой «★» из шрифта: звезда должна выглядеть жетоном со
+     * стола, и её форма не должна зависеть от того, какой шрифт нашёлся в
+     * системе.
+     *
+     * @param cx центр звезды, {@code r} — радиус описанной окружности
+     */
+    private static void paintStar(java.awt.Graphics2D g, double cx, double cy, double r) {
+        java.awt.geom.Path2D.Double path = new java.awt.geom.Path2D.Double();
+        for (int i = 0; i < 10; i++) {
+            // Луч и впадина чередуются; впадина — 0,42 радиуса: при более
+            // глубокой звезда на девяти пикселях рассыпается в иголки.
+            double rr = i % 2 == 0 ? r : r * 0.42;
+            double a = Math.toRadians(-90 + i * 36);
+            double x = cx + rr * Math.cos(a);
+            double y = cy + rr * Math.sin(a);
+            if (i == 0) {
+                path.moveTo(x, y);
+            } else {
+                path.lineTo(x, y);
+            }
+        }
+        path.closePath();
+        g.setColor(new java.awt.Color(0xE8, 0xB3, 0x2A));
+        g.fill(path);
+        g.setColor(new java.awt.Color(0x8A, 0x63, 0x08));
+        g.setStroke(new java.awt.BasicStroke(1f));
+        g.draw(path);
+    }
+
+    /** Размер значка ресурса в плитке: прежние 11 пикселей плюс половина. */
+    private static int iconSize() {
+        return Theme.px(17);
+    }
+
     private void paintTile(Graphics2D g, Tile t, Rectangle r) {
+        final double ICON_SIZE = iconSize();
+        final int ICON_CX = Theme.px(12);
+        final int NUM_X = Theme.px(23);
         boolean over = t.key().equals(hot);
         g.setColor(over ? Theme.hover() : Theme.tile());
         g.fill(new RoundRectangle2D.Double(r.x, r.y, r.width, r.height,
             Theme.R_TILE * 2, Theme.R_TILE * 2));
-        MarkIcons.paint(g, t.icon(), r.x + Theme.px(9), r.y + r.height / 2.0,
-            Theme.px(11), t.colour());
+        // ЗНАЧОК РЕСУРСА КРУПНЕЕ НА ПОЛОВИНУ (просьба дизайнера 16.08.2026):
+        // 11 пикселей мелковато — ресурс в плитке узнают по значку, а не по
+        // числу. Центр значка и левый край числа сдвинуты вместе с ним, иначе
+        // разросшийся значок налезает на цифру.
+        MarkIcons.paint(g, t.icon(), r.x + ICON_CX, r.y + r.height / 2.0,
+            ICON_SIZE, t.colour());
 
         g.setFont(num(19));
         String v = String.valueOf(t.value());
         g.setColor(Theme.ink());
-        g.drawString(v, r.x + Theme.px(17), r.y + r.height - Theme.px(8));
+        g.drawString(v, r.x + NUM_X, r.y + r.height - Theme.px(8));
         if (t.cap() >= 0) {
             g.setFont(f(10, Font.PLAIN));
             g.setColor(Theme.ink3());
             g.drawString("/" + t.cap(),
-                r.x + Theme.px(17) + g.getFontMetrics(num(19)).stringWidth(v) + 1,
+                r.x + NUM_X + g.getFontMetrics(num(19)).stringWidth(v) + 1,
                 r.y + r.height - Theme.px(8));
         }
         int d = delta(t.key());

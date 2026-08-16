@@ -134,6 +134,21 @@ public final class Hex {
     public int containerCell = -1;
 
     /**
+     * ЖЁЛТАЯ ЯЧЕЙКА — единственная наземная ячейка гекса (0..5), на которой
+     * энергостанция выдаёт свой полный номинал. На картонном блоке она
+     * напечатана жёлтым, по одной на каждый гекс, и НИКОГДА не совпадает с
+     * ячейкой печатного контейнера ({@link #containerCell}).
+     *
+     * <p>Энергостанция, построенная на любой другой ячейке, даёт ровно
+     * 1 кубик энергии независимо от своего уровня (правило дизайнера
+     * 16.08.2026; см. {@code kelium.engine.Power.plantOutput}).
+     *
+     * <p>−1 бывает только там, где поле не размечено блоками (ручные сцены
+     * тестов): тогда правило жёлтой ячейки не применяется вовсе.
+     */
+    public int energyCell = -1;
+
+    /**
      * ЖЕТОН КОНТЕЙНЕРА НА ГЕКСЕ — СТАРЫЙ механизм (режим правил
      * {@code containers.mode: tokens}, версия 1.6.0-c1 от 12.08.2026).
      *
@@ -166,6 +181,7 @@ public final class Hex {
         }
         h.spawnTile = spawnTile == null ? null : spawnTile.copy();
         h.containerCell = containerCell;
+        h.energyCell = energyCell;
         h.containerTaken = containerTaken;
         h.containerTokens = containerTokens;
         return h;

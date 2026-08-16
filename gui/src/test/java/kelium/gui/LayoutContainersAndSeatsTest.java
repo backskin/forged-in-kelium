@@ -42,10 +42,13 @@ class LayoutContainersAndSeatsTest {
         LayoutEditor.loadScenarioIntoModel(scn);
         LayoutEditor.Model back = LayoutEditor.modelRef();
 
-        assertEquals(1, back.get(0, 0).containers, "один контейнер вернулся");
-        assertEquals(2, back.get(2, 0).containers, "два контейнера вернулись");
-        assertEquals(0, back.get(1, 0).containers, "где не рисовали — пусто");
-        assertEquals("normal", back.get(0, 0).content,
+        // Запись ЦЕНТРИРУЕТ координаты (правило дизайнера 16.08.2026): ряд
+        // q = 0..2 сохраняется как q = −1..+1, поэтому крайние гексы после
+        // загрузки лежат на −1 и +1, а середина — на нуле.
+        assertEquals(1, back.get(-1, 0).containers, "один контейнер вернулся");
+        assertEquals(2, back.get(1, 0).containers, "два контейнера вернулись");
+        assertEquals(0, back.get(0, 0).containers, "где не рисовали — пусто");
+        assertEquals("normal", back.get(-1, 0).content,
             "контейнер не занимает содержимое гекса: на нём по-прежнему строят");
     }
 

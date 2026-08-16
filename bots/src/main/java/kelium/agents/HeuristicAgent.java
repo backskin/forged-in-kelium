@@ -981,7 +981,9 @@ public class HeuristicAgent extends Agent {
         int demand = 0;
         for (BuildingToken b : me.buildingsOnField()) {
             if (b.type == BuildingType.POWER_PLANT) {
-                supply += state.tokenStats.plantEnergyGives(b.level);
+                // Через движок, а не по номиналу уровня: станция вне ЖЁЛТОЙ
+                // ЯЧЕЙКИ даёт 1 кубик, каким бы ни был её уровень.
+                supply += kelium.engine.Power.plantOutput(state, b);
             } else if (b.type == BuildingType.COMMAND_CENTER) {
                 supply += state.tokenStats.buildingEnergyGives(BuildingType.COMMAND_CENTER);
                 demand += b.energySlots;
@@ -1020,6 +1022,16 @@ public class HeuristicAgent extends Agent {
                 }
             }
             return 1.0;
+        }
+        if ("power_plant".equals(btype)) {
+            // ЖЁЛТАЯ ЯЧЕЙКА: только на ней станция даёт свой номинал. Гекс, где
+            // она уже накрыта чужим зданием или стенкой нейтрала, для станции
+            // почти бесполезен — там она выдаст 1 кубик любого уровня.
+            kelium.core.Hex h = state.field.get(hid);
+            if (h == null || h.energyCell < 0) {
+                return 1.0;   // поле без разметки — правило не действует
+            }
+            return h.sideOwner[h.energyCell] == null ? 9.0 : 0.5;
         }
         if ("factory".equals(btype) || "airbase".equals(btype) || "barracks".equals(btype)) {
             // УДАРНОЕ ЗДАНИЕ СТАВИМ БЛИЖЕ К ПРОТИВНИКУ. Раньше этот метод не
@@ -1130,6 +1142,11 @@ public class HeuristicAgent extends Agent {
             }
             if (h.containerCell == side) {
                 v -= 0.5;                   // накрываем печатный контейнер
+            }
+            if ("power_plant".equals(btype) && h.energyCell == side) {
+                // ЖЁЛТАЯ ЯЧЕЙКА: станция мимо неё даёт 1 кубик вместо номинала —
+                // самый дорогой поворот в игре, дороже любой стенки в поле.
+                v += 12.0;
             }
         }
         return v;

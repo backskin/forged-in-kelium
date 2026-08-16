@@ -130,6 +130,12 @@ public final class ReplayRecord {
         /** Ячейка с ПЕЧАТНЫМ контейнером: −1 нет, 0..5 наземная, 6 воздушная. */
         public int containerCell = -1;
         /**
+         * ЖЁЛТАЯ ЯЧЕЙКА (0..5, −1 если поле не размечено): только на ней
+         * энергостанция даёт свой номинал. Смотреть на неё в проигрывателе
+         * надо: она объясняет, почему станция №4 иногда кормит одним кубиком.
+         */
+        public int energyCell = -1;
+        /**
          * Чей это гекс для слабой подкраски: место игрока или −1.
          * {@link #ownerBuilt} — стоит ли тут его здание (подкраска заметнее)
          * или это только зона стройки (еле-еле). Подкраска заменила цветную
@@ -486,6 +492,7 @@ public final class ReplayRecord {
             HexState hs = new HexState();
             hs.id = h.id;
             hs.containerCell = h.containerCell;
+            hs.energyCell = h.energyCell;
             Integer built = builtBy.get(h.id);
             if (built != null) {
                 hs.ownerTint = built;
@@ -843,6 +850,7 @@ public final class ReplayRecord {
             Map<String, Object> ho = new LinkedHashMap<>();
             ho.put("id", h.id);
             ho.put("cont", h.containerCell);
+            ho.put("ecell", h.energyCell);
             ho.put("own", h.ownerTint);
             ho.put("ownb", h.ownerBuilt ? 1 : 0);
             if (h.spawn != null) {
@@ -1124,6 +1132,7 @@ public final class ReplayRecord {
             HexState st = new HexState();
             st.id = Json.s(h, "id");
             st.containerCell = h.containsKey("cont") ? Json.i(h, "cont") : -1;
+            st.energyCell = h.containsKey("ecell") ? Json.i(h, "ecell") : -1;
             st.ownerTint = h.containsKey("own") ? Json.i(h, "own") : -1;
             st.ownerBuilt = h.containsKey("ownb") && Json.i(h, "ownb") != 0;
             Map<String, Object> sp = Json.map(h, "spawn");

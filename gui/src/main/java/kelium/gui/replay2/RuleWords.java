@@ -38,6 +38,7 @@ public final class RuleWords {
             case "contested_cards" -> "Спорные карты";
             case "market" -> "Рынок";
             case "tech" -> "Наука";
+            case "energy" -> "Энергия";
             case "return_step" -> "Конец раунда";
             case "super_objectives" -> "Супер-задания";
             case "modules" -> "Модули";
@@ -60,9 +61,14 @@ public final class RuleWords {
         if (path.startsWith("tech.step1_prize.")) {
             String[] p = path.split("\\.");
             if (p.length == 5) {
+                String rank = switch (p[3]) {
+                    case "first" -> "кто занял первую ячейку";
+                    case "second" -> "кто занял вторую ячейку";
+                    case "third" -> "кто занял третью ячейку";
+                    default -> "по ячейке " + p[3];
+                };
                 return "приз за первый шаг " + Names.track(p[2]) + " трека, "
-                    + (("first".equals(p[3])) ? "кто пришёл первым" : "кто пришёл вторым")
-                    + ": " + resource(p[4]);
+                    + rank + ": " + resource(p[4]);
             }
         }
         if (path.startsWith("tech.step_capacity_by_players.")) {
@@ -190,6 +196,10 @@ public final class RuleWords {
             case "rounds.min" -> "наименьшее число раундов (в игре больше не действует)";
             case "rounds.max" -> "наибольшее число раундов (в игре больше не действует)";
             case "rounds.circles_per_round" -> "кругов в раунде";
+            case "rounds.reserve_cap" ->
+                "предел раундов: сколько кругов вообще отпущено партии";
+            case "energy.plant_off_cell_gives" ->
+                "сколько энергии даёт станция ВНЕ жёлтой ячейки (на ней — номинал уровня)";
             case "rounds.order_hand_size" -> "приказов в руке";
             case "rounds.objective_hand_limit" -> "предел заданий в руке";
             case "rounds.blind_discard_choice" ->
@@ -211,8 +221,14 @@ public final class RuleWords {
             case "actions.build.surcharge_coins" ->
                 "надбавка монетами за каждую лишнюю стройку в одном действии";
             case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
+            case "actions.build.move_cost_coins" ->
+                "монет за перенос любого стоящего на поле здания";
             case "actions.build.move_building_repays_full_price" ->
-                "перенос здания оплачивается полной ценой";
+                "перенос здания оплачивается полной ценой (выключено: перенос стоит монету)";
+            case "actions.build.cu_moves_per_turn" ->
+                "переносов центра управления за ход";
+            // Ключ прежних версий свода (до 1.10.0 перенос ЦУ был бесплатным).
+            // Подпись нужна, пока эти версии лежат в наборах правил.
             case "actions.build.cu_free_move_per_turn" ->
                 "бесплатных переносов центра управления за ход";
             case "actions.combat.primary_row_ammo_cost" ->

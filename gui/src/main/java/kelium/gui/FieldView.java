@@ -772,6 +772,10 @@ public final class FieldView extends JComponent {
                 sb.append("<br>печатный контейнер: ")
                   .append(st.containerCell == 6 ? "воздушная ячейка" : "ячейка " + st.containerCell);
             }
+            if (st.energyCell >= 0) {
+                sb.append("<br>жёлтая ячейка: ").append(st.energyCell)
+                  .append(" (только на ней энергостанция даёт номинал)");
+            }
             for (ReplayRecord.Neutral n : st.neutrals) {
                 sb.append("<br>нейтральная постройка (")
                   .append(n.big ? "большая" : "малая").append(')');
