@@ -159,7 +159,11 @@ public final class Scoring {
             .of(state, seat, kelium.engine.ability.Hook.SCORING_VP_SOURCE)
             .base(0).ask();
         if (cardVp != 0) {
-            breakdown.put("arsenal_vp", cardVp);
+            // СЛОЖИТЬ, А НЕ ЗАТЕРЕТЬ: строка "arsenal_vp" уже занята очками карт-целей
+            // (arsenalGoalVp, карты 2.1.0 v01-v06, data-driven bottom.scoring) — эта
+            // точка правил считает ДРУГОЙ источник (способность из реестра ability),
+            // и оба обязаны складываться, а не вытеснять друг друга.
+            breakdown.merge("arsenal_vp", cardVp, Integer::sum);
         }
 
         int total = 0;
