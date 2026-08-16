@@ -51,6 +51,29 @@ public final class Objectives {
     }
 
     /**
+     * Выполнено ли требование карты, УСТРОЙСТВО КОТОРОЙ ЖИВЁТ В КОДЕ
+     * ({@code checked_by: card}, модуль {@code cards} — заказ дизайнера
+     * 15.08.2026, «карты как объекты»).
+     *
+     * <p>НАЙДЕНО 16.08.2026: до этой правки такая карта никогда не считалась
+     * выполненной — {@link #requirementMet} проверяет id предиката против
+     * СТАРОГО реестра {@link Predicates}, а условия карт с {@code checked_by:
+     * card} в нём не регистрируются (они читаются кодом карты, не строкой).
+     * Замер: 4 военные карты каталога 1.7.0 (o41–o44) — 0 выполнений и 584
+     * сожжения за 150 партий. Молчит (false), если код карты ещё не привязан
+     * ({@link CardRegistry#find} вернул null) — то же поведение, что раньше у
+     * карты с незарегистрированным предикатом, ничего не падает.
+     */
+    private static boolean cardRequirementMet(GameState s, int seat, String cid, boolean enhanced) {
+        kelium.engine.cards.ObjectiveCard oc = kelium.engine.cards.CardRegistry.objective(cid);
+        if (oc == null) {
+            return false;
+        }
+        kelium.engine.cards.CardContext ctx = new kelium.engine.cards.EngineCardContext(s, seat);
+        return enhanced ? oc.satisfiedEnhanced(ctx) : oc.satisfied(ctx);
+    }
+
+    /**
      * Сколько единиц данного вида жертвы игрок может оплатить прямо сейчас.
      * -1 = вид жертвы неизвестен (карта не играбельна, не бесплатна!).
      */
@@ -166,7 +189,10 @@ public final class Objectives {
             if (!canPaySacrifice(s, p, card)) {
                 continue;
             }
-            if (requirementMet(s, seat, j, (Map<String, Object>) req)) {
+            boolean met = "card".equals(card.get("checked_by"))
+                ? cardRequirementMet(s, seat, cid, false)
+                : requirementMet(s, seat, j, (Map<String, Object>) req);
+            if (met) {
                 out.add(cid);
             }
         }
@@ -213,7 +239,9 @@ public final class Objectives {
                 paySacrifice(s, p, sacRes, diff, cid);
                 enhancedOk = true;
             }
-        } else if (enh instanceof Map<?, ?> && requirementMet(s, seat, j, (Map<String, Object>) enh)) {
+        } else if (enh instanceof Map<?, ?> && ("card".equals(card.get("checked_by"))
+                ? cardRequirementMet(s, seat, cid, true)
+                : requirementMet(s, seat, j, (Map<String, Object>) enh))) {
             enhancedOk = true;
         } else if (enh == null) {
             // У НАЧАЛЬНЫХ карт усиления нет вовсе (каталог: «без усиления и
