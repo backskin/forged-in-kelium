@@ -7,11 +7,11 @@ import kelium.core.BuildingToken;
 import kelium.core.BuildingType;
 import kelium.core.PlayerState;
 import kelium.core.UnitToken;
-import kelium.engine.Scoring;
 import kelium.engine.cards.CardContext;
 
 /**
- * ЧЕТЫРЕ НОВЫЕ ВОЕННЫЕ КАРТЫ каталога 1.7.0 (o41–o44).
+ * ВОЕННЫЕ КАРТЫ-ОБЪЕКТЫ (o41–o43), условие которых живёт в коде, а не в реестре
+ * предикатов.
  *
  * <p>Заведены, чтобы довести долю военных карт до половины колоды: в 1.6.0 война
  * оплачивалась шестью картами из 54 (11%), и каталог платил игроку за то, чтобы
@@ -22,11 +22,9 @@ import kelium.engine.cards.CardContext;
  *   <li><b>Ответный удар</b> — оборона перестаёт быть чистым убытком;</li>
  *   <li><b>Разорение</b> — платит за помеху чужому развитию, а не за размен
  *       войсками;</li>
- *   <li><b>Охота на лидера</b> — превращает «бей ведущего» из тайного расчёта
- *       в общий интерес, то есть чинит главную беду многопользовательской игры:
- *       гонку в одну калитку;</li>
- *   <li><b>Блокада</b> — платит за давление БЕЗ штурма, самый дешёвый вход в
- *       войну для того, у кого мало войск.</li>
+ *   <li><b>Охота на сильного</b> — превращает «бей оторвавшегося» из тайного
+ *       расчёта в общий интерес, то есть чинит главную беду игры на четверых:
+ *       гонку в одну калитку.</li>
  * </ul>
  */
 public final class GroupNewWar {
@@ -80,11 +78,13 @@ public final class GroupNewWar {
     // ==================================================================
 
     /**
-     * Уничтожить чужой ДОБЫТЧИК или ЭНЕРГОСТАНЦИЮ. Усиленно — запитанный.
+     * Уничтожить чужой ДОБЫТЧИК. Усиленно — запитанный.
      *
-     * <p>Самая прямая помеха сопернику в игре. Отнятый добытчик стоит владельцу
-     * всех оставшихся раундов добычи, и именно этой ценности не видел оценщик
-     * ботов: он считал трофей, а не то, чего противник лишился.
+     * <p>ЭНЕРГОСТАНЦИЯ УБРАНА ИЗ УСЛОВИЯ (ревью дизайнера 17.08.2026):
+     * «запитанная энергостанция» — не термин игры, станция энергию производит, а
+     * не потребляет, и усиление на ней читалось как ошибка. Осталась одна цель, и
+     * она же самая болезненная: отнятый добытчик стоит владельцу всех оставшихся
+     * раундов добычи.
      */
     public static final class Devastation extends Objective {
 
@@ -93,8 +93,7 @@ public final class GroupNewWar {
         }
 
         @Override public boolean satisfied(CardContext ctx) {
-            return ход(ctx).destroyedTypes.contains("miner")
-                || ход(ctx).destroyedTypes.contains("power_plant");
+            return ход(ctx).destroyedTypes.contains("miner");
         }
 
         @Override public boolean satisfiedEnhanced(CardContext ctx) {
@@ -123,9 +122,7 @@ public final class GroupNewWar {
                     continue;
                 }
                 for (BuildingToken b : other.buildingsOnField()) {
-                    boolean economy = b.type == BuildingType.MINER
-                        || b.type == BuildingType.POWER_PLANT;
-                    if (economy && b.hexId != null && mine.contains(b.hexId)) {
+                    if (b.type == BuildingType.MINER && b.hexId != null && mine.contains(b.hexId)) {
                         return true;
                     }
                 }
@@ -138,134 +135,98 @@ public final class GroupNewWar {
                 return "готово";
             }
             return economyInReach(ctx)
-                ? "снести чужой добытчик или энергостанцию — цель рядом"
-                : "подвести войска к чужому добытчику или энергостанции";
+                ? "снести чужой добытчик — цель рядом"
+                : "подвести войска к чужому добытчику";
         }
     }
 
     // ==================================================================
-    //  o43 «Охота на лидера»
+    //  o43 «Охота на сильного»
     // ==================================================================
 
     /**
-     * Уничтожить жетон игрока, который ВЕДЁТ по победным очкам. Усиленно — если
-     * это было здание.
+     * Уничтожить жетон игрока, у которого НА ПОЛЕ БОЛЬШЕ ЗДАНИЙ, чем у тебя.
+     * Усиленно — если уничтоженный жетон был зданием.
      *
-     * <p>Любимая карта этого каталога. Она делает то, чего не делает ни одно
-     * другое задание: платит за подавление сильнейшего. В игре на четверых это
-     * лечит главную беду — партию, которая превращается в гонку в одну калитку,
-     * потому что бить лидера каждому по отдельности невыгодно (тратишь своё
-     * действие, а обгоняет тебя всё равно кто-то третий). Карта превращает эту
-     * трату в награду, и коалиция против лидера складывается сама.
+     * <p>ПЕРЕПИСАНА ЦЕЛИКОМ (ревью дизайнера 17.08.2026). Прежняя редакция
+     * требовала бить того, кто ведёт по ПОБЕДНЫМ ОЧКАМ. За столом это условие
+     * непроверяемо: суммарные очки в середине партии никто не считает, они
+     * складываются из треков, келемия, монет, зданий, войск, тайлов и жетонов.
+     * Такое условие работает только внутри симуляции, а карта печатается для
+     * людей. Новое мерило видно глазами — здания на поле пересчитываются за
+     * секунду, — и сохраняет смысл прежней карты: догоняющему платят за то, что
+     * он бьёт оторвавшегося, и коалиция против лидера складывается сама.
      */
-    public static final class LeaderHunt extends Objective {
+    public static final class StrongerHunt extends Objective {
 
-        public LeaderHunt() {
+        public StrongerHunt() {
             super("o43");
         }
 
-        /** Кто ведёт по очкам среди СОПЕРНИКОВ (не я). */
-        private int leader(CardContext ctx) {
-            int best = -1;
-            int bestVp = Integer.MIN_VALUE;
+        private int buildingsOf(CardContext ctx, int seat) {
+            return ctx.state().player(seat).buildingsOnField().size();
+        }
+
+        /** Места соперников, у которых зданий на поле больше, чем у меня. */
+        private Set<Integer> stronger(CardContext ctx) {
+            int mine = buildingsOf(ctx, ctx.seat());
+            Set<Integer> out = new HashSet<>();
             for (PlayerState p : ctx.state().players) {
-                if (p.seat == ctx.seat()) {
-                    continue;
-                }
-                int vp = Scoring.scorePlayer(ctx.state(), p.seat).getOrDefault("total", 0);
-                if (vp > bestVp) {
-                    bestVp = vp;
-                    best = p.seat;
+                if (p.seat != ctx.seat() && buildingsOf(ctx, p.seat) > mine) {
+                    out.add(p.seat);
                 }
             }
-            return best;
+            return out;
         }
 
         @Override public boolean satisfied(CardContext ctx) {
-            return ход(ctx).destroyedOwners.contains(leader(ctx));
+            for (int seat : stronger(ctx)) {
+                if (ход(ctx).destroyedOwners.contains(seat)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override public boolean satisfiedEnhanced(CardContext ctx) {
-            return satisfied(ctx) && ход(ctx).destroyedLeaderBuilding;
+            if (!satisfied(ctx)) {
+                return false;
+            }
+            // Усиление: снесённый жетон был ЗДАНИЕМ. Здание — это ещё и минус
+            // одно строение у того, за счёт кого условие сработало.
+            for (String t : ход(ctx).destroyedTypes) {
+                if (!"infantry".equals(t) && !"vehicle".equals(t)
+                        && !"aircraft".equals(t) && !"tower".equals(t)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override public double progress(CardContext ctx) {
             if (satisfied(ctx)) {
                 return 1.0;
             }
-            // Ударил по лидеру, но не добил — половина.
-            return ход(ctx).damagedLeader ? 0.5 : 0.0;
+            if (stronger(ctx).isEmpty()) {
+                return 0.0;      // сильнее меня по застройке никого нет
+            }
+            return ход(ctx).enemyTokensDamaged.isEmpty() ? 0.2 : 0.5;
         }
 
         @Override public String needed(CardContext ctx) {
-            int l = leader(ctx);
-            return satisfied(ctx) ? "готово"
-                : "уничтожить жетон игрока на месте " + (l + 1) + " — он ведёт по очкам";
-        }
-    }
-
-    // ==================================================================
-    //  o44 «Блокада»
-    // ==================================================================
-
-    /**
-     * Держать свои войска у ДВУХ РАЗНЫХ чужих зданий. Усиленно — если хотя бы
-     * одно из них запитано.
-     *
-     * <p>Осада без штурма: соперник вынужден тратить действия на разблокировку.
-     * Самый дешёвый вход в войну — не нужно ни боеприпасов, ни выигранного боя,
-     * только выведенные в поле войска. Ровно то, чего боты не делали.
-     */
-    public static final class Blockade extends Objective {
-
-        public Blockade() {
-            super("o44");
-        }
-
-        /** Сколько РАЗНЫХ чужих зданий блокировано моими войсками. */
-        private int blockaded(CardContext ctx, boolean poweredOnly) {
-            Set<String> myHexes = new HashSet<>();
-            for (UnitToken u : моиВойска(ctx)) {
-                if (u.hexId != null) {
-                    myHexes.add(u.hexId);
-                }
+            if (satisfied(ctx)) {
+                return "готово";
             }
-            Set<Integer> hit = new HashSet<>();
-            for (PlayerState other : ctx.state().players) {
-                if (other.seat == ctx.seat()) {
-                    continue;
-                }
-                for (BuildingToken b : other.buildingsOnField()) {
-                    if (b.hexId == null || (poweredOnly && !b.powered())) {
-                        continue;
-                    }
-                    for (String nb : ctx.state().field.neighbors(b.hexId)) {
-                        if (myHexes.contains(nb)) {
-                            hit.add(b.uid());
-                            break;
-                        }
-                    }
-                }
+            Set<Integer> s = stronger(ctx);
+            if (s.isEmpty()) {
+                return "сейчас ни у кого нет зданий на поле больше, чем у тебя";
             }
-            return hit.size();
-        }
-
-        @Override public boolean satisfied(CardContext ctx) {
-            return blockaded(ctx, false) >= порог("count", 2);
-        }
-
-        @Override public boolean satisfiedEnhanced(CardContext ctx) {
-            return satisfied(ctx) && blockaded(ctx, true) >= 1;
-        }
-
-        @Override public double progress(CardContext ctx) {
-            return ratio(blockaded(ctx, false), порог("count", 2));
-        }
-
-        @Override public String needed(CardContext ctx) {
-            int need = порог("count", 2) - blockaded(ctx, false);
-            return need <= 0 ? "готово"
-                : "подвести войска ещё к " + need + " чужому зданию";
+            StringBuilder sb = new StringBuilder("уничтожить жетон игрока на месте");
+            for (int seat : s) {
+                sb.append(' ').append(seat + 1);
+            }
+            sb.append(" — у него зданий на поле больше");
+            return sb.toString();
         }
     }
 }

@@ -395,7 +395,13 @@ public final class Actions {
             int ammoMade = 0;
             int unitsMade = 0;
             int[] paid = {0, 0};
+            // ПРЕДЕЛ С КАРТЫ: бесплатная Сборка бывает «не более чем N зданиями».
+            int buildingLimit = ctx.objectLimit(name());
+            int buildingsUsed = 0;
             for (BuildingToken b : player.buildingsOnField()) {
+                if (buildingsUsed >= buildingLimit) {
+                    break;
+                }
                 if (!ASSEMBLY_UNIT.containsKey(b.type)) {
                     continue;
                 }
@@ -443,6 +449,7 @@ public final class Actions {
                 if (pick.payload() == null) {
                     continue;   // здание пропущено
                 }
+                buildingsUsed++;   // здание сделало выбор — оно израсходовано
                 @SuppressWarnings("unchecked")
                 Map<String, Object> payload = (Map<String, Object>) pick.payload();
                 // Выход зависит от ВЫБОРА (синий модуль задаёт свои числа
@@ -637,8 +644,13 @@ public final class Actions {
             // перенести), 2-я и далее с наценкой из ruleset. Цикл до паса.
             int ops = 0;
             int coinsSpent = 0;
+            // ПРЕДЕЛ С КАРТЫ: бесплатная Стройка бывает «одна операция».
+            int opLimit = ctx.objectLimit(name());
             StringBuilder detail = new StringBuilder();
             while (true) {
+                if (ops >= opLimit) {
+                    break;
+                }
                 ActionResult one = performOneOp(player, ctx, agent);
                 if (one == null) {
                     break;   // пас или ничего доступного
@@ -670,8 +682,17 @@ public final class Actions {
         /** Одна операция стройки/переноса; null = пас или нет доступного. */
         @SuppressWarnings("unchecked")
         private ActionResult performOneOp(PlayerState player, TurnContext ctx, Agent agent) {
+            // УДОРОЖАНИЕ КАСАЕТСЯ ТОЛЬКО РАЗМЕЩЕНИЯ ИЗ ЗАПАСА (правило дизайнера
+            // 17.08.2026). У Стройки три операции: разместить здание из запаса на
+            // поле, вернуть здание с поля в запас, переместить здание по полю
+            // (поворот на том же гексе — тоже перемещение). Дорожает только
+            // первая: первое размещение по напечатанной цене, каждое следующее на
+            // 1 монету дороже. Возврат и перемещение не дорожают никогда —
+            // перемещение стоит фиксированную монету, возврат даёт фиксированную
+            // компенсацию. Поэтому счётчик наценки ведётся по ключу build_place, а
+            // не по всем операциям подряд, как было раньше.
             List<Integer> schedule = rs.getIntList("actions.build.surcharge_coins");
-            int surcharge = ctx.nextOpSurcharge("build", schedule);
+            int surcharge = ctx.nextOpSurcharge("build_place", schedule);
             List<Map<String, Object>> menu = buildable(player, surcharge);
             List<Map<String, Object>> moveMenu = movable(player);
             if (menu.isEmpty() && moveMenu.isEmpty()) {
@@ -788,7 +809,12 @@ public final class Actions {
             TurnJournal.TurnFacts f = journal(state).of(player.seat);
             f.buildOps += 1;
             f.builtOnHexes.add(targetHex);
+            f.buildOpHexes.add(targetHex);      // o15 «Стройбум»: гексы операций
+            if (btype == BuildingType.COMMAND_CENTER) {
+                f.cuPlacedHexes.add(targetHex);  // o17 «Штаб на передовой»
+            }
             ctx.recordOp("build");
+            ctx.recordOp("build_place");   // дорожает только размещение из запаса
             Map<String, Object> tel = new HashMap<>();
             tel.put("coin_spent", cost);
             tel.put("hex", targetHex);
@@ -864,8 +890,9 @@ public final class Actions {
             TurnJournal.TurnFacts f = journal(state).of(player.seat);
             f.buildOps += 1;
             f.razedOwnHexes.add(hex);
+            f.buildOpHexes.add(hex);        // o15: снос — тоже операция стройки
             if (b.type != BuildingType.COMMAND_CENTER) {
-                f.demolishedNonCu = true;   // o13 «Расчистка»
+                f.demolishedNonCu = true;
             }
             ctx.recordOp("build");
             Map<String, Object> tel = new HashMap<>();
@@ -1101,16 +1128,20 @@ public final class Actions {
             f.razedOwnBuilding = true;
             f.razedOwnHexes.add(fromHex);
             f.builtOnHexes.add(targetHex);
+            // o16 «Переезд» 10.0: считаются ЛЮБЫЕ перенесённые здания, ЦУ — это
+            // усиление, а не исключение: перенос стоит одну монету всем.
+            f.movedAnyBuildingUids.add(b.uid);
+            f.buildOpHexes.add(targetHex);
+            f.buildOps += 1;
             if (b.type == BuildingType.COMMAND_CENTER) {
+                f.movedCuThisTurn = true;
+                f.cuPlacedHexes.add(targetHex);   // o17 «Штаб на передовой»
                 if (virgin) {
-                    f.movedCuToVirginHex = true;   // o17 «Штаб на передовой»
+                    f.movedCuToVirginHex = true;
                 }
             } else {
-                f.movedNonCuBuilding = true;       // o16 «Переезд»
+                f.movedNonCuBuilding = true;
                 f.movedNonCuUids.add(b.uid);
-                // платный перенос — полноценная операция стройки (o15);
-                // бесплатный перенос ЦУ в счёт операций НЕ идёт.
-                f.buildOps += 1;
             }
             ctx.recordOp("build");
             ctx.actionsPlayed.add(name());
@@ -1835,6 +1866,10 @@ public final class Actions {
                     // взяли именно этот обмен. Общее «сделок N» не отвечает на
                     // вопрос, какими из четырёх обменов боты вообще пользуются.
                     dealUses.merge(what, 1, Integer::sum);
+                    // o33 «Биржа»: РАЗНЫЕ предложения планшета маркета. Каждый
+                    // напечатанный курс — своё предложение, повтор одного и того
+                    // же курса второй раз не засчитывается.
+                    f.marketOffersUsed.add("printed:" + what);
                     switch (what) {
                         case "coin" -> {
                             player.resources.add(Resource.COIN, amount);
@@ -1881,8 +1916,9 @@ public final class Actions {
 
                 // ---- уникальное предложение карты ----
                 cardOfferUsed = true;
-                f.usedMarketCardOffer = true;   // o33 «Биржа»
+                f.usedMarketCardOffer = true;   // n4 «Первая сделка»
                 Map<String, Object> pl = (Map<String, Object>) pick.payload();
+                f.marketOffersUsed.add("card:" + pl.get("card") + ":" + pl.get("side"));
                 // КАКУЮ СТОРОНУ карты взяли — левую или правую. Нужно лаборатории
                 // карт: без этого нельзя сказать, какая половина карты мёртвая.
                 offerSides.add(String.valueOf(pl.get("side")));
@@ -2000,6 +2036,9 @@ public final class Actions {
                     break;
                 }
                 usedExchanges.add(got);
+                // Вечный курс — такое же ОТДЕЛЬНОЕ предложение планшета, как шаг
+                // по треку (o34 «Научный отдел»).
+                journal(state).of(player.seat).scienceOffersUsed.add("rate:" + got);
                 exchange = String.join("+", usedExchanges);
             }
             List<Integer> costs = rs.getIntList("tech.step_cost_trophy");
@@ -2067,7 +2106,16 @@ public final class Actions {
                 for (int to = step + 1; to <= target; to++) {
                     cost += sciStepCost(player, costs, to - 1, stepsMade);
                 }
+                // o39 «Сдача» и o34 «Научный отдел»: считаем СДАННЫЕ ЖЕТОНЫ (а не
+                // трофейные очки) и то, на какие треки они ушли. Жетоны уходят
+                // внутри payTrophy, поэтому меряем размер трофейного пространства
+                // до и после — другого места, где это видно, нет.
+                int trophiesBefore = player.trophySpace.size();
                 payTrophy(player, cost, agent);
+                TurnJournal.TurnFacts sf = journal(state).of(player.seat);
+                sf.scienceTrophiesSpent += Math.max(0, trophiesBefore - player.trophySpace.size());
+                sf.scienceTracksUsed.add(track);
+                sf.scienceOffersUsed.add("track:" + track);
                 player.techSteps.put(track, target);
                 // КУБИК ПЕРЕСТАВЛЯЕТСЯ, а не ставится новый: игрок освобождает
                 // прежний шаг (уточнение дизайнера 12.08.2026). Раньше он оставался

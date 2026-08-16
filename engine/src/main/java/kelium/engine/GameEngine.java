@@ -699,6 +699,9 @@ public final class GameEngine {
                     }
                 }
             }
+            // n11 «Второй заход»: открытый нижний приказ — факт хода, и он
+            // известен ещё до розыгрыша действий.
+            s.journal.of(seat).lowerOrderOpen = bottomOpen;
             emit(ev("type", "turn_orders", "seat", seat, "card", cardId,
                 "top", top.code, "top_actions", names, "top_allowed", maxA,
                 "coincided", coincided,
@@ -733,6 +736,10 @@ public final class GameEngine {
     private void playActions(PlayerState p, TurnContext ctx, List<String> actionNames,
                              int maxActions, boolean distinct) {
         GameState s = state;
+        // Что ещё можно сыграть в этом ходу — знание хода, а не приказа: его
+        // читают индикаторы заданий, когда строят план на этот ход.
+        ctx.orderActions.addAll(actionNames);
+        ctx.allowedActions = Math.max(ctx.allowedActions, maxActions);
         // СУПЕР ЗАДАНИЯ 2.0: подсунуть карты под планшет ради символов — не
         // действие и не СПЕЦ, поэтому предлагается один раз перед ходом.
         offerTuck(p);
@@ -892,13 +899,24 @@ public final class GameEngine {
         // I3: решение «открывать ли» уже принято (СПЕЦ/выбор в mass_open);
         // увидев карту, игрок ОБЯЗАН выбрать вариант — бесплатного подглядывания
         // с отказом (и утечки карты в сброс) больше нет.
-        List<Choice> opts = new ArrayList<>();
-        opts.add(new Choice("container_variant", new Object[]{"a", a},
-            card.getOrDefault("name", "") + ":" + a.getOrDefault("label", "")));
-        opts.add(new Choice("container_variant", new Object[]{"b", b},
-            card.getOrDefault("name", "") + ":" + b.getOrDefault("label", "")));
-        Choice ch = agents.get(p.seat).choose(s, opts, ev("kind", "open_container", "card", cid));
-        Object[] payload = (Object[]) ch.payload();
+        // ВЫБОР ЕСТЬ НЕ У КАЖДОГО КОНТЕЙНЕРА (правило дизайнера 17.08.2026):
+        // ровно половина колоды несёт две стороны, вторая половина — один
+        // напечатанный эффект. Карта без стороны b применяется сразу, без
+        // предложения выбора: спрашивать «выбери из одного» бессмысленно и за
+        // столом, и в движке.
+        Object[] payload;
+        if (b == null) {
+            payload = new Object[]{"a", a};
+        } else {
+            List<Choice> opts = new ArrayList<>();
+            opts.add(new Choice("container_variant", new Object[]{"a", a},
+                card.getOrDefault("name", "") + ":" + a.getOrDefault("label", "")));
+            opts.add(new Choice("container_variant", new Object[]{"b", b},
+                card.getOrDefault("name", "") + ":" + b.getOrDefault("label", "")));
+            Choice ch = agents.get(p.seat).choose(s, opts,
+                ev("kind", "open_container", "card", cid));
+            payload = (Object[]) ch.payload();
+        }
         Map<String, Object> variant = (Map<String, Object>) payload[1];
         p.containers -= 1;
         Map<String, Object> got;
@@ -915,12 +933,38 @@ public final class GameEngine {
             "label", variant.getOrDefault("label", ""), "got", got));
     }
 
+    /** Индикаторы заданий в виде, пригодном для журнала и проигрывателя. */
+    private static List<Map<String, Object>> hintsForLog(List<ObjectiveHints.Hint> hints) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (ObjectiveHints.Hint h : hints) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("card", h.cardId());
+            m.put("ready", h.ready());
+            m.put("enhanced_ready", h.enhancedReady());
+            m.put("reachable", h.reachable());
+            m.put("value", h.value());
+            m.put("max_value", h.maxValue());
+            m.put("needed", h.needed());
+            List<String> plans = new ArrayList<>();
+            for (ObjectiveHints.Plan pl : h.plans()) {
+                plans.add(pl.summary());
+            }
+            m.put("plans", plans);
+            out.add(m);
+        }
+        return out;
+    }
+
     /**
      * SPEC-действие: завершить выполненное задание, сжечь/установить карту
      * арсенала, внести часть в супер-задание или развернуть готовое супер-задание
      * (мгновенная победа). Порт из forge/engine/engine._offer_spec.
      */
     private void offerSpec(PlayerState p, TurnContext ctx) {
+        // ЭФФЕКТ «разыграй любое число СПЕЦ-действий до конца хода» снимает
+        // лимит на остаток хода. Флаг живёт в журнале: эффект карты не видит
+        // контекст хода, а «до конца хода» — ровно срок жизни журнала.
+        ctx.specUnlimited = state.journal.of(p.seat).unlimitedSpec;
         if (!ctx.canSpec()) {
             return;
         }
@@ -990,7 +1034,17 @@ public final class GameEngine {
             return;
         }
         opts.add(new Choice("pass", null, "без спец-действия"));
-        Choice ch = agents.get(p.seat).choose(s, opts, ev("kind", "spec"));
+        // ИНДИКАТОРЫ ЗАДАНИЙ (заказ дизайнера 17.08.2026). Движок сам считает по
+        // каждой карте руки: горит ли «ГОТОВО», горит ли «ДОСТИЖИМО В ЭТОТ ХОД»,
+        // и если достижимо — какими действиями. Кладём в контекст выбора, чтобы
+        // агент решал СПЕЦ-действие, видя пути к наградам, а не одни награды.
+        List<ObjectiveHints.Hint> hints = ObjectiveHints.forHand(s, p.seat, j,
+            ctx.remainingActionNames(), ctx.remainingActions());
+        Map<String, Object> specCtx = ev("kind", "spec");
+        specCtx.put("objective_hints", hints);
+        emit(ev("type", "objective_hints", "seat", p.seat, "round", s.round,
+            "hints", hintsForLog(hints)));
+        Choice ch = agents.get(p.seat).choose(s, opts, specCtx);
         if (ch.payload() == null) {
             return;
         }

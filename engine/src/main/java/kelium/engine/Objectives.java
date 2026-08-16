@@ -85,9 +85,17 @@ public final class Objectives {
                 // сама разыгрываемая карта ещё в руке — её сдать нельзя
                 return Math.max(0, p.objectiveHand.size() - 1);
             case "units_off_base":
-                // o06 «Отзыв»: войска (не вышки) вне гексов своих зданий,
+                // o10 «Разоружение»: войска (не вышки) вне гексов своих зданий,
                 // «с разных гексов» — считаем РАЗНЫЕ гексы с такими войсками
                 return unitsOffBaseHexes(s, p).size();
+            case "trophies":
+                // o22 «Зачистка»: трофейные ЖЕТОНЫ возвращаются владельцам мимо
+                // Науки — очков они не приносят, в этом и цена.
+                return p.trophySpace.size();
+            case "buildings_off_cu":
+                // o47 «Демонтаж»: своё здание уходит в запас БЕЗ компенсации
+                // (обычный снос даёт монету, здесь не даёт).
+                return ownBuildingsOffCu(p).size();
             default:
                 try {
                     Resource r = Resource.fromCode(res);
@@ -111,6 +119,17 @@ public final class Objectives {
             }
         }
         return new ArrayList<>(hexes);
+    }
+
+    /** Свои здания на поле, кроме ЦУ — их можно сдать в жертву (o47). */
+    private static List<kelium.core.BuildingToken> ownBuildingsOffCu(PlayerState p) {
+        List<kelium.core.BuildingToken> out = new ArrayList<>();
+        for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+            if (b.type != kelium.core.BuildingType.COMMAND_CENTER) {
+                out.add(b);
+            }
+        }
+        return out;
     }
 
     /** Оплатить amt единиц жертвы вида res (проверка ёмкости уже сделана). */
@@ -151,8 +170,58 @@ public final class Objectives {
                     }
                 }
             }
+            case "trophies" -> {
+                // o22 «Зачистка»: сдаём трофейные жетоны ВЛАДЕЛЬЦАМ. Первым уходит
+                // ЗДАНИЕ — карта требует именно его, и жадный «самый дешёвый»
+                // выбор здесь врал бы: он сдал бы пехоту, а здание осталось.
+                int left = amt;
+                List<kelium.core.Token> order = new ArrayList<>();
+                for (kelium.core.Token t : p.trophySpace) {
+                    if (t instanceof kelium.core.BuildingToken) {
+                        order.add(t);
+                    }
+                }
+                for (kelium.core.Token t : p.trophySpace) {
+                    if (!(t instanceof kelium.core.BuildingToken)) {
+                        order.add(t);
+                    }
+                }
+                for (kelium.core.Token t : order) {
+                    if (left == 0) {
+                        break;
+                    }
+                    p.trophySpace.remove(t);
+                    t.setCapturedBy(null);
+                    t.resetDamage();
+                    t.setHexId(null);
+                    left--;
+                }
+            }
+            case "buildings_off_cu" -> {
+                // o47 «Демонтаж»: здание уходит в запас, компенсации НЕТ.
+                int left = amt;
+                for (kelium.core.BuildingToken b : ownBuildingsOffCu(p)) {
+                    if (left == 0) {
+                        break;
+                    }
+                    Actions.returnOwnBuildingToReserve(s, p, b);
+                    left--;
+                }
+            }
             default -> p.resources.pay(Resource.fromCode(res), amt);
         }
+    }
+
+    /**
+     * МОЖЕТ ЛИ ИГРОК ОПЛАТИТЬ ЖЕРТВУ этой карты прямо сейчас.
+     *
+     * <p>Публично, потому что это и есть УСЛОВИЕ карты-жертвы: предикат у неё
+     * {@code sacrifice_paid}, который всегда истинен, а настоящая проверка —
+     * «есть ли чем заплатить». Без доступа сюда карта-объект отвечала бы
+     * «выполнено» на пустом столе.
+     */
+    public static boolean canPaySacrifice(GameState s, int seat, Map<String, Object> card) {
+        return canPaySacrifice(s, s.player(seat), card);
     }
 
     private static boolean canPaySacrifice(GameState s, PlayerState p, Map<String, Object> card) {
@@ -285,8 +354,31 @@ public final class Objectives {
                     into.merge("ammo", added, (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
                 }
                 case "container" -> {
+                    // Каталог 10.0 контейнеров в наградах не выдаёт вовсе (правило
+                    // дизайнера 17.08.2026), но ветка остаётся: старые версии
+                    // каталога должны продолжать работать без правки данных.
                     int addedC = Storage.addContainersCapped(s, p, n, "награда задания");
                     into.merge("container", addedC, (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
+                }
+                // НАЧАЛЬНЫЕ ЗАДАНИЯ 10.0 платят обломком и картой задания, а
+                // усиления у них нет вовсе — значит эта награда лежит в БАЗОВОЙ и
+                // выдаваться должна отсюда.
+                case "debris" -> {
+                    int addedD = Storage.addDebrisCapped(s, p, n);
+                    into.merge("debris", addedD, (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
+                }
+                case "objective_card", "objective_cards" -> {
+                    int drawn = 0;
+                    for (int i = 0; i < n; i++) {
+                        String c = s.decks.get("objectives").draw(s.rng);
+                        if (c == null) {
+                            break;
+                        }
+                        p.objectiveHand.add(c);
+                        drawn++;
+                    }
+                    into.merge("objective_card", drawn,
+                        (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
                 }
                 default -> { }
             }
@@ -335,11 +427,26 @@ public final class Objectives {
                     into.put("arsenal", 1);
                 }
                 case "objective_card" -> {
-                    String c = s.decks.get("objectives").draw(s.rng);
-                    if (c != null) {
+                    int drawn = 0;
+                    for (int i = 0; i < Math.max(1, n); i++) {
+                        String c = s.decks.get("objectives").draw(s.rng);
+                        if (c == null) {
+                            break;
+                        }
                         p.objectiveHand.add(c);
+                        drawn++;
                     }
-                    into.put("objective_card", 1);
+                    into.put("objective_card", drawn);
+                }
+                // Каталог 10.0 разрешает расходники и в усиленной награде
+                // (o34 «Научный отдел» платит монетами) — правило «особая награда
+                // только очковая» снято дизайнером 17.08.2026.
+                case "coin" -> {
+                    p.resources.add(Resource.COIN, n);
+                    into.put("coin", n);
+                }
+                case "ammo" -> {
+                    into.put("ammo", Storage.addAmmoCapped(s, p, n));
                 }
                 default -> { }
             }

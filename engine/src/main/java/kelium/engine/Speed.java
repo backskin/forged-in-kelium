@@ -41,6 +41,12 @@ public final class Speed {
         }
         // ЖЕТОН МОДУЛЯ на строке этого рода войск (набор R2)
         base += Modules.statBonus(p, type, "speed");
+        // РАЗОВЫЙ ЭФФЕКТ «+1 к скорости до конца хода» (Effects.speedBoost).
+        // Скорость 0 не разгоняется: вышка — дот, она не двигается ничем.
+        if (base > 0 && state.journal != null
+                && type.code.equals(state.journal.of(seat).speedBoostKind)) {
+            base += 1;
+        }
         // и всё, что скажут способности карт
         return Math.max(0, RuleQuery.of(state, seat, Hook.UNIT_SPEED)
             .about(type)

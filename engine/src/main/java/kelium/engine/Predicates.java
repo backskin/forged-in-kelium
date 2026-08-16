@@ -217,6 +217,11 @@ public final class Predicates {
             if (f.enemyTokensDestroyed < intp(p, "count", 1)) {
                 return false;
             }
+            // o21 «Первая кровь» 10.0: усиление платит за толстую цель — хотя бы
+            // один из уничтоженных имел прочность не меньше min_hp.
+            if (p.containsKey("min_hp") && f.maxDestroyedHp < intp(p, "min_hp", 2)) {
+                return false;
+            }
             if (Boolean.TRUE.equals(p.get("lost_none")) && f.lostOwnThisTurn > 0) {
                 return false;
             }
@@ -370,7 +375,11 @@ public final class Predicates {
             return false;
         });
 
-        reg("has_unopened_container", false, (s, seat, j, p) -> s.player(seat).containers > 0);
+        // ПАРАМЕТР count ЧИТАЛСЯ НЕ ВСЕГДА: предикат отвечал «есть хотя бы один»
+        // независимо от того, что просила карта. n8 «Находка» с порогом 2 и o49
+        // «Схрон» с порогом 4 выполнялись бы с одним контейнером на руках.
+        reg("has_unopened_container", false, (s, seat, j, p) ->
+            s.player(seat).containers >= intp(p, "count", 1));
 
         // === КАТАЛОГ 8.0 (objectives 1.5.0) ===
 
@@ -470,6 +479,16 @@ public final class Predicates {
             if (taken.size() < intp(p, "count", 2)) {
                 return false;
             }
+            // o04-усил 10.0: ВСЕ занятые тайлы — нестартовые. «Хотя бы один не на
+            // стартовом» было слишком мягко: стартовый тайл есть у каждого даром.
+            if (Boolean.TRUE.equals(p.get("nonstart_all"))) {
+                for (String g : taken) {
+                    if (s.field.get(g).spawnTile.isStart) {
+                        return false;
+                    }
+                }
+                return true;
+            }
             int needNonStart = intp(p, "nonstart", 0);
             if (needNonStart > 0) {
                 int ns = 0;
@@ -493,6 +512,11 @@ public final class Predicates {
         reg("miner_took_container", false, (s, seat, j, p) -> {
             TurnJournal.TurnFacts f = j.of(seat);
             if (!f.minerTookContainer) {
+                return false;
+            }
+            // o08-усил 10.0: и НИ ОДНОГО келемия за ход. У Добычи ровно два
+            // выхода, значит это настоящий отказ, а не бесплатная приписка.
+            if (Boolean.TRUE.equals(p.get("no_kelium")) && f.keliumMined > 0) {
                 return false;
             }
             if (!p.containsKey("levels")) {
@@ -687,18 +711,25 @@ public final class Predicates {
         });
 
         // o29 «Пустой двор»: ≥N войск вне своих гексов и НОЛЬ на своих
+        // (усил. 10.0: все они ещё и на РАЗНЫХ гексах)
         reg("units_off_own_hexes", true, (s, seat, j, p) -> {
             Set<String> ownBld = ownBuildingHexes(s, seat);
             int off = 0;
             int on = 0;
+            Set<String> offHexes = new HashSet<>();
             for (UnitToken u : s.player(seat).unitsOnField()) {
                 if (ownBld.contains(u.hexId)) {
                     on++;
                 } else {
                     off++;
+                    offHexes.add(u.hexId);
                 }
             }
-            return on == 0 && off >= intp(p, "count", 2);
+            if (on != 0 || off < intp(p, "count", 2)) {
+                return false;
+            }
+            return !Boolean.TRUE.equals(p.get("distinct_hexes"))
+                || offHexes.size() >= intp(p, "count", 2);
         });
 
         // o30 «Мародёр»: контейнер подобран войском с поля
@@ -1165,6 +1196,424 @@ public final class Predicates {
         /** Связная группа своих жетонов покрывает не меньше {@code hexes} гексов. */
         reg("figure_front", true, (s, seat, j, p) ->
             Shapes.largestConnectedHexes(s, seat) >= intp(p, "hexes", 3));
+
+        // ==================================================================
+        //  КАТАЛОГ 10.0 (objectives 1.8.0) — ревью дизайнера 17.08.2026
+        // ==================================================================
+
+        // o03 «Опорный пункт»: N ВЫШЕК на РАЗНЫХ гексах, ни одна не на гексе
+        // своего ЦУ. Вышка неподвижна (скорость 0), поэтому это состояние
+        // копится Сборками ЦУ и не закрывается одним действием с пустого места.
+        reg("towers_off_cu_hexes", true, (s, seat, j, p) -> {
+            PlayerState pl = s.player(seat);
+            Set<String> cuHexes = new HashSet<>();
+            for (BuildingToken b : pl.buildingsOnField()) {
+                if (b.type == BuildingType.COMMAND_CENTER) {
+                    cuHexes.add(b.hexId);
+                }
+            }
+            Set<String> hexes = new HashSet<>();
+            Set<String> onEnemy = new HashSet<>();
+            for (UnitToken u : pl.unitsOnField()) {
+                if (u.type != UnitType.TOWER || cuHexes.contains(u.hexId)) {
+                    continue;
+                }
+                hexes.add(u.hexId);
+                if (!enemyTokensOn(s, seat, u.hexId).isEmpty()) {
+                    onEnemy.add(u.hexId);
+                }
+            }
+            if (hexes.size() < intp(p, "count", 2)) {
+                return false;
+            }
+            return !Boolean.TRUE.equals(p.get("on_enemy_hex")) || !onEnemy.isEmpty();
+        });
+
+        // o12 «Наглая стройка»: В ЭТОТ ХОД здание поставлено на гекс, где стоят
+        // войска противника. Была карта состояния с императивом «строй» — это
+        // невозможно доказать за столом задним числом, поэтому теперь журнал.
+        reg("built_on_hex_with_enemy_units", true, (s, seat, j, p) -> {
+            int need = intp(p, "units", 1);
+            for (String hid : j.of(seat).builtOnHexes) {
+                int n = 0;
+                for (Token t : enemyTokensOn(s, seat, hid)) {
+                    if (t instanceof UnitToken) {
+                        n++;
+                    }
+                }
+                if (n >= need) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        // o17 «Штаб на передовой»: В ЭТОТ ХОД ЦУ поставлено или перенесено так,
+        // что до гекса с чужим ЦУ не больше distance гексов. Усиление — новое
+        // место ПРИМЫКАЕТ к зданию противника.
+        reg("cu_placed_near_enemy_cu", true, (s, seat, j, p) -> {
+            Set<String> enemyCu = new HashSet<>();
+            for (PlayerState other : s.players) {
+                if (other.seat == seat) {
+                    continue;
+                }
+                for (BuildingToken b : other.buildingsOnField()) {
+                    if (b.type == BuildingType.COMMAND_CENTER) {
+                        enemyCu.add(b.hexId);
+                    }
+                }
+            }
+            if (enemyCu.isEmpty()) {
+                return false;
+            }
+            int limit = intp(p, "distance", 2);
+            for (String hid : j.of(seat).cuPlacedHexes) {
+                Integer d = bfsDist(s, hid, enemyCu);
+                if (d == null || d > limit) {
+                    continue;
+                }
+                if (!Boolean.TRUE.equals(p.get("adjacent_enemy_building"))) {
+                    return true;
+                }
+                for (String nb : s.field.neighbors(hid)) {
+                    if (!enemyBuildingsOn(s, seat, nb).isEmpty()) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+
+        // o22/o25/n10: ЧТО ЛЕЖИТ В ТРОФЕЙНОМ ПРОСТРАНСТВЕ. Проверяется глазами по
+        // столу — трофеи лежат открыто перед игроком.
+        reg("trophy_contains", false, (s, seat, j, p) -> {
+            List<Token> trophies = s.player(seat).trophySpace;
+            if (p.containsKey("any")) {
+                return trophies.size() >= intp(p, "any", 1);
+            }
+            if (p.containsKey("building_types")) {
+                Set<String> want = new HashSet<>();
+                for (Object o : listp(p, "building_types")) {
+                    want.add(o.toString());
+                }
+                for (Token t : trophies) {
+                    if (t instanceof BuildingToken b && want.contains(b.type.code)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            int need = intp(p, "building", 1);
+            int n = 0;
+            for (Token t : trophies) {
+                if (t instanceof BuildingToken) {
+                    n++;
+                }
+            }
+            return n >= need;
+        });
+
+        // o46 «Трофейный обоз»: сколько РАЗНЫХ видов лежит в трофеях. Род войск и
+        // каждый тип здания считаются отдельным видом.
+        reg("trophy_distinct_kinds", false, (s, seat, j, p) -> {
+            Set<String> kinds = new HashSet<>();
+            for (Token t : s.player(seat).trophySpace) {
+                if (t instanceof UnitToken u) {
+                    kinds.add("unit:" + u.type.code);
+                } else if (t instanceof BuildingToken b) {
+                    kinds.add("building:" + b.type.code);
+                }
+            }
+            return kinds.size() >= intp(p, "count", 3);
+        });
+
+        // o45 «Пристрелка»: N РАЗНЫХ чужих ЗДАНИЙ получили урон в этот ход.
+        reg("damaged_distinct_enemy_buildings", false, (s, seat, j, p) ->
+            j.of(seat).enemyBuildingsDamaged.size() >= intp(p, "count", 2));
+
+        // o26 «Блицкриг» 10.0: N уничтожений ОДНИМ жетоном войска за ход
+        // (усил. — этот жетон указанного рода).
+        reg("kills_by_one_unit", false, (s, seat, j, p) -> {
+            TurnJournal.TurnFacts f = j.of(seat);
+            int need = intp(p, "count", 2);
+            Object wantType = p.get("unit_type");
+            for (var e : f.killsByUnit.entrySet()) {
+                if (e.getValue() < need) {
+                    continue;
+                }
+                if (wantType == null
+                        || wantType.toString().equals(f.killerUnitTypes.get(e.getKey()))) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        // o02/n2 «найм»: сколько РАЗНЫХ РОДОВ войск нанято в этот ход, с
+        // обязательными и запрещёнными родами. Заменяет прежний счёт «сколько
+        // войск в скольких зданиях» — дизайнер просил считать РОДА.
+        reg("hired_distinct_kinds", false, (s, seat, j, p) -> {
+            TurnJournal.TurnFacts f = j.of(seat);
+            Set<String> forbid = new HashSet<>();
+            for (Object o : listp(p, "forbid_kinds")) {
+                forbid.add(o.toString());
+            }
+            Set<String> hired = new HashSet<>();
+            for (var e : f.producedByType.entrySet()) {
+                if (e.getValue() > 0) {
+                    hired.add(e.getKey());
+                }
+            }
+            for (String bad : forbid) {
+                if (hired.contains(bad)) {
+                    return false;
+                }
+            }
+            if (hired.size() < intp(p, "count", 2)) {
+                return false;
+            }
+            for (Object o : listp(p, "require_kinds")) {
+                if (!hired.contains(o.toString())) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        // o15 «Стройбум» 10.0: N строительных операций на ПОПАРНО НЕСОСЕДНИХ
+        // гексах. Прежняя редакция считала только число операций и выполнялась
+        // сама собой; здесь застройка обязана разъехаться вширь.
+        reg("build_ops_on_nonadjacent_hexes", true, (s, seat, j, p) -> {
+            List<String> hexes = new ArrayList<>(new java.util.LinkedHashSet<>(
+                j.of(seat).buildOpHexes));
+            int need = intp(p, "count", 2);
+            return chooseNonAdjacent(s, hexes, 0, new ArrayList<>(), need);
+        });
+
+        // o16 «Переезд» 10.0: N перенесённых зданий за ход, усил. — среди них ЦУ.
+        reg("moved_buildings_this_turn", false, (s, seat, j, p) -> {
+            TurnJournal.TurnFacts f = j.of(seat);
+            if (f.movedAnyBuildingUids.size() < intp(p, "count", 2)) {
+                return false;
+            }
+            return !Boolean.TRUE.equals(p.get("include_cu")) || f.movedCuThisTurn;
+        });
+
+        // o19 «Военпром» 10.0: цепочка своих зданий, ПРИМЫКАЮЩИХ друг к другу
+        // общей стенкой и стоящих на РАЗНЫХ гексах. Примыкание — термин §11:
+        // соседняя ячейка чужого гекса через общее ребро.
+        reg("buildings_wall_chain", true, (s, seat, j, p) -> {
+            Set<BuildingType> mil = Set.of(BuildingType.BARRACKS, BuildingType.FACTORY,
+                BuildingType.AIRBASE);
+            boolean milOnly = Boolean.TRUE.equals(p.get("military_only"));
+            List<BuildingToken> pool = new ArrayList<>();
+            for (BuildingToken b : s.player(seat).buildingsOnField()) {
+                if (!milOnly || mil.contains(b.type)) {
+                    pool.add(b);
+                }
+            }
+            // Граф: ребро между зданиями на РАЗНЫХ гексах, примыкающими стенкой.
+            Map<Integer, List<Integer>> g = new HashMap<>();
+            for (BuildingToken b : pool) {
+                g.put(b.uid, new ArrayList<>());
+            }
+            for (int i = 0; i < pool.size(); i++) {
+                for (int k = i + 1; k < pool.size(); k++) {
+                    BuildingToken a = pool.get(i);
+                    BuildingToken b = pool.get(k);
+                    if (!a.hexId.equals(b.hexId) && abutsAcrossWall(s, a, b)) {
+                        g.get(a.uid).add(b.uid);
+                        g.get(b.uid).add(a.uid);
+                    }
+                }
+            }
+            Set<Integer> nodes = new HashSet<>(g.keySet());
+            return largestComponentOf(g, nodes) >= intp(p, "count", 2);
+        });
+
+        // o20 «Коммутация» 10.0: на КАЖДОМ своём источнике энергии лежит ровно
+        // один простаивающий кубик, и таких источников не меньше sources.
+        // Источник — энергостанция или ЦУ (§1.1). Держать простой размазанным
+        // неудобно намеренно: собрать его обратно стоит гекса в Смене энергии.
+        reg("idle_cube_on_each_source", false, (s, seat, j, p) -> {
+            int sources = 0;
+            for (BuildingToken b : s.player(seat).buildingsOnField()) {
+                if (b.type != BuildingType.POWER_PLANT && b.type != BuildingType.COMMAND_CENTER) {
+                    continue;
+                }
+                sources++;
+                if (b.energyIdle != 1) {
+                    return false;
+                }
+            }
+            return sources >= intp(p, "sources", 2);
+        });
+
+        // o33 «Биржа» / o34 «Научный отдел»: сколько РАЗНЫХ предложений оплачено
+        // за ход. Повтор одного и того же предложения не считается вторым.
+        reg("market_offers_used", false, (s, seat, j, p) ->
+            j.of(seat).marketOffersUsed.size() >= intp(p, "count", 3));
+        reg("science_offers_used", false, (s, seat, j, p) ->
+            j.of(seat).scienceOffersUsed.size() >= intp(p, "count", 3));
+
+        // o39 «Сдача»: сдано N трофейных ЖЕТОНОВ действием Наука (усил. — все на
+        // один трек; больше одного шага на трек за действие не делается, поэтому
+        // «оба на один трек» дороже, чем выглядит).
+        reg("science_trophies_spent", false, (s, seat, j, p) -> {
+            TurnJournal.TurnFacts f = j.of(seat);
+            if (f.scienceTrophiesSpent < intp(p, "count", 2)) {
+                return false;
+            }
+            return !Boolean.TRUE.equals(p.get("same_track")) || f.scienceTracksUsed.size() == 1;
+        });
+
+        // n5 «Коммутация»: запитанное здание НЕ на гексе своего ЦУ.
+        reg("powered_building_off_cu_hex", false, (s, seat, j, p) -> {
+            PlayerState pl = s.player(seat);
+            Set<String> cuHexes = new HashSet<>();
+            for (BuildingToken b : pl.buildingsOnField()) {
+                if (b.type == BuildingType.COMMAND_CENTER) {
+                    cuHexes.add(b.hexId);
+                }
+            }
+            for (BuildingToken b : pl.buildingsOnField()) {
+                if (b.powered() && !cuHexes.contains(b.hexId)) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        // n6 «Выход»: своё войско в distance и больше гексах от гекса своего ЦУ.
+        reg("unit_at_distance_from_cu", true, (s, seat, j, p) -> {
+            PlayerState pl = s.player(seat);
+            Set<String> cuHexes = new HashSet<>();
+            for (BuildingToken b : pl.buildingsOnField()) {
+                if (b.type == BuildingType.COMMAND_CENTER) {
+                    cuHexes.add(b.hexId);
+                }
+            }
+            if (cuHexes.isEmpty()) {
+                return false;
+            }
+            int need = intp(p, "distance", 2);
+            for (UnitToken u : pl.unitsOnField()) {
+                Integer d = bfsDist(s, u.hexId, cuHexes);
+                if (d != null && d >= need) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        // n11 / n12: факты самого приказа этого хода.
+        reg("lower_order_open_this_turn", false, (s, seat, j, p) -> j.of(seat).lowerOrderOpen);
+        reg("order_coincided_this_turn", false, (s, seat, j, p) -> j.of(seat).orderBlocked);
+
+        // o48 «Арсенальный набор»: карты арсенала на руках; усил. — ни одна не
+        // установлена, все лежат рубашкой вверх.
+        reg("arsenal_cards_held", false, (s, seat, j, p) -> {
+            PlayerState pl = s.player(seat);
+            int need = intp(p, "count", 3);
+            if (Boolean.TRUE.equals(p.get("all_face_down"))) {
+                return pl.arsenalInstalled.isEmpty() && pl.arsenalHand.size() >= need;
+            }
+            return pl.arsenalHand.size() + pl.arsenalInstalled.size() >= need;
+        });
+
+        // o50/o53/o54/o55 «рисунки» 10.0. Дизайнер: считать надо не жетоны, а
+        // СВЯЗЬ. Фигура задаётся тем, ЧТО она соединяет, — тогда её нельзя
+        // закрыть кучей жетонов на одном гексе, и требование остаётся честным
+        // на любом поле. Вся геометрия — в {@link Shapes#chainConnects}.
+        reg("chain_connects", true, (s, seat, j, p) -> Shapes.chainConnects(s, seat, p));
+    }
+
+    /**
+     * Можно ли выбрать {@code need} ПОПАРНО НЕСОСЕДНИХ гексов из списка — перебор
+     * с отсечением. Гексов операций за ход единицы, поэтому точный ответ дешевле
+     * приближённого (o15 «Стройбум»).
+     */
+    private static boolean chooseNonAdjacent(GameState s, List<String> pool, int from,
+                                             List<String> picked, int need) {
+        if (picked.size() >= need) {
+            return true;
+        }
+        if (pool.size() - from < need - picked.size()) {
+            return false;
+        }
+        for (int i = from; i < pool.size(); i++) {
+            String cand = pool.get(i);
+            boolean ok = true;
+            for (String taken : picked) {
+                if (taken.equals(cand) || s.field.neighbors(taken).contains(cand)) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (!ok) {
+                continue;
+            }
+            picked.add(cand);
+            if (chooseNonAdjacent(s, pool, i + 1, picked, need)) {
+                return true;
+            }
+            picked.remove(picked.size() - 1);
+        }
+        return false;
+    }
+
+    /**
+     * ПРИМЫКАЮТ ЛИ ДВА ЗДАНИЯ на РАЗНЫХ гексах общей стенкой: A занимает сторону,
+     * смотрящую на гекс B, а B — противоположную сторону той же грани.
+     */
+    private static boolean abutsAcrossWall(GameState s, BuildingToken a, BuildingToken b) {
+        Hex ha = s.field.get(a.hexId);
+        Hex hb = s.field.get(b.hexId);
+        if (ha == null || hb == null) {
+            return false;
+        }
+        for (int side = 0; side < 6; side++) {
+            Integer owner = ha.sideOwner[side];
+            if (owner == null || owner != a.uid) {
+                continue;
+            }
+            if (!b.hexId.equals(ha.neighborBySide[side])) {
+                continue;
+            }
+            Integer opp = hb.sideOwner[(side + 3) % 6];
+            if (opp != null && opp == b.uid) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Размер наибольшей связной компоненты в готовом графе смежности. */
+    private static int largestComponentOf(Map<Integer, List<Integer>> g, Set<Integer> nodes) {
+        Set<Integer> seen = new HashSet<>();
+        int best = 0;
+        for (Integer start : nodes) {
+            if (seen.contains(start)) {
+                continue;
+            }
+            int comp = 0;
+            Deque<Integer> stack = new ArrayDeque<>();
+            stack.push(start);
+            while (!stack.isEmpty()) {
+                Integer x = stack.pop();
+                if (!seen.add(x)) {
+                    continue;
+                }
+                comp++;
+                for (Integer nb : g.getOrDefault(x, List.of())) {
+                    if (!seen.contains(nb)) {
+                        stack.push(nb);
+                    }
+                }
+            }
+            best = Math.max(best, comp);
+        }
+        return best;
     }
 
     // ---- геометрические помощники ------------------------------------------

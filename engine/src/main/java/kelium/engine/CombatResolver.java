@@ -584,6 +584,18 @@ public final class CombatResolver {
             p.resources.pay(Resource.AMMO, ammo);
             firstAttackUsed[0] = true;
             usedRows.add(key);
+            // ЖЕТОН ЩИТА (эффект «щит», 17.08.2026) снимает ПЕРВОЕ попадание по
+            // жетону защищённого рода и уходит. Проверяется ДО начисления урона:
+            // у пехоты прочность 1, и «снять урон потом» её уже не спасает.
+            if (victim instanceof UnitToken shielded) {
+                PlayerState owner0 = s.player(shielded.owner());
+                if (owner0.shieldedKinds.remove(shielded.type)) {
+                    usedRows.add(key);
+                    emit("type", "shield_absorbed", "seat", shielded.owner(),
+                        "kind", shielded.type.code, "attacker", attackerSeat);
+                    continue;
+                }
+            }
             int dmg = rs.getInt("combat_model.all_attacks_damage");
             if (victim instanceof UnitToken vt) {
                 vt.damage += dmg;
@@ -599,14 +611,21 @@ public final class CombatResolver {
             TurnJournal.TurnFacts af = journal().of(attackerSeat);
             enemyDamagedThisBattle = true;
             if (victim instanceof BuildingToken) {
-                af.enemyBuildingHits += 1;   // o25 «Осада»
+                af.enemyBuildingHits += 1;   // o25 в прежней редакции
+                af.enemyBuildingsDamaged.add(uidOf(victim));   // o45 «Пристрелка»
             }
             if (destroyed) {
-                af.minKillAmmoCost = Math.min(af.minKillAmmoCost, ammo);   // o24
-                if (af.movedUids.contains(unit.uid)) {                     // o26 «Блицкриг»
+                af.minKillAmmoCost = Math.min(af.minKillAmmoCost, ammo);
+                if (af.movedUids.contains(unit.uid)) {
                     af.movedAndKilledSameUnit = true;
                     af.killsByMovedUnit.merge(unit.uid, 1, Integer::sum);
                 }
+                // o26 «Блицкриг» 10.0: двое ОДНИМ жетоном войска — без оговорки
+                // про перемещение, поэтому счёт ведётся по каждому убийце.
+                af.killsByUnit.merge(unit.uid, 1, Integer::sum);
+                af.killerUnitTypes.put(unit.uid, unit.type.code);
+                // o21 «Первая кровь» 10.0: усиление платит за толстую цель.
+                af.maxDestroyedHp = Math.max(af.maxDestroyedHp, Passives.effectiveHp(s, victim));
             }
             // ТРОФЕЙНЫЕ ОЧКИ убитого — в событие: без этого поля трофейную
             // экономику нечем мерить, а она половина смысла боя. Ценность
@@ -1006,9 +1025,10 @@ public final class CombatResolver {
                 j.destroyedTypes.add(u.type.code);
             } else if (victim instanceof BuildingToken b) {
                 j.destroyedTypes.add(b.type.name().toLowerCase(java.util.Locale.ROOT));
-                boolean economy = b.type == BuildingType.MINER
-                    || b.type == BuildingType.POWER_PLANT;
-                if (economy && b.energyPlaced > 0) {
+                // ТОЛЬКО ДОБЫТЧИК (правка 17.08.2026). Энергостанция энергию
+                // производит, а не потребляет: «запитанная энергостанция» — не
+                // состояние игры, и усиление o42 на ней срабатывало бы неверно.
+                if (b.type == BuildingType.MINER && b.energyPlaced > 0) {
                     j.destroyedPoweredEconomy = true;
                 }
                 if (victim.owner() == leadingRivalOf(attackerSeat)) {

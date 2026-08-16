@@ -75,6 +75,18 @@ public final class Deck {
     }
 
     /** Убрать карту из стопки добора (например, стартовые карты уходят игрокам). */
+    /**
+     * ВЗЯТЬ КАРТУ ИЗ СБРОСА (эффект «верни на маркет сброшенную карту сделок»).
+     * Возвращает null, если сброс пуст. Карта уходит из сброса насовсем — она
+     * снова в игре, и второй раз ту же вернуть нельзя.
+     */
+    public String takeFromDiscard(Random rng) {
+        if (discardPile.isEmpty()) {
+            return null;
+        }
+        return discardPile.remove(discardPile.size() - 1);
+    }
+
     public void removeCard(String cardId) {
         drawPile.remove(cardId);
     }

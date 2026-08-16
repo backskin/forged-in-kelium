@@ -33,9 +33,16 @@ public final class TurnContext {
         this.specLimit = specLimit;
     }
 
+    /**
+     * СНЯТ ЛИ ЛИМИТ СПЕЦ-ДЕЙСТВИЙ до конца хода (эффект карты «разыграй любое
+     * число спец-действий»). Ход синхронизирует флаг с журналом перед каждым
+     * предложением СПЕЦ.
+     */
+    public boolean specUnlimited = false;
+
     /** Осталось ли ещё разрешённое SPEC-действие в этот ход. */
     public boolean canSpec() {
-        return specUsed < specLimit;
+        return specUnlimited || specUsed < specLimit;
     }
 
     /** Отметить использование одного SPEC-действия; ошибка при превышении лимита. */
@@ -58,5 +65,48 @@ public final class TurnContext {
     /** Учесть проведённую операцию действия {@code action} (для роста наценки). */
     public void recordOp(String action) {
         opCounts.merge(action, 1, Integer::sum);
+    }
+
+    // ======================================================================
+    //  ЧТО ЕЩЁ МОЖНО СЫГРАТЬ В ЭТОМ ХОДУ
+    // ======================================================================
+    //  Нужно индикаторам заданий ({@link ObjectiveHints}): план из двух действий
+    //  бесполезен, если действие осталось одно, а план через Бой бесполезен, если
+    //  вскрыт приказ Разработка. Ход заполняет эти поля перед розыгрышем
+    //  действий; до того они пусты, и планировщик считает, что доступно всё.
+
+    /** Действия вскрытого приказа этого хода (в порядке из карты). */
+    public final Set<String> orderActions = new LinkedHashSet<>();
+    /** Сколько ОСНОВНЫХ действий разрешено этим приказом. */
+    public int allowedActions = 0;
+
+    /** Названия действий, которые в этом ходу ещё не сыграны. */
+    public Set<String> remainingActionNames() {
+        Set<String> out = new LinkedHashSet<>(orderActions);
+        out.removeAll(actionsPlayed);
+        return out;
+    }
+
+    /** Сколько основных действий ещё осталось сыграть. */
+    public int remainingActions() {
+        return Math.max(0, allowedActions - actionsPlayed.size());
+    }
+
+    /**
+     * ПОТОЛОК ОБЪЕКТОВ В ОДНОМ БЕСПЛАТНОМ ДЕЙСТВИИ (ревью дизайнера 17.08.2026).
+     *
+     * <p>Бесплатная Сборка «всеми зданиями сразу» и бесплатная Стройка «сколько
+     * влезет» были сильнее выполненного задания — карту выгоднее было сжечь, чем
+     * выполнить, и колода сама себя обесценивала. Теперь карта пишет предел:
+     * «Сборка не более чем двумя зданиями», «одна строительная операция».
+     *
+     * <p>Ноль или отсутствие ключа — предела нет (обычное действие своего хода).
+     */
+    public final Map<String, Integer> objectLimits = new HashMap<>();
+
+    /** Предел объектов для действия; {@link Integer#MAX_VALUE}, если не задан. */
+    public int objectLimit(String action) {
+        Integer v = objectLimits.get(action);
+        return v == null || v <= 0 ? Integer.MAX_VALUE : v;
     }
 }

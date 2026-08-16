@@ -1,7 +1,9 @@
 package kelium.core;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -121,6 +123,59 @@ public final class TurnJournal {
         public final Map<Integer, Integer> killsByMovedUnit = new HashMap<>();
         public int enemyBuildingHits = 0;
 
+        // === факты каталога 10.0 (objectives 1.8.0, ревью дизайнера 17.08.2026) ===
+        /**
+         * НАИБОЛЬШАЯ ПРОЧНОСТЬ среди уничтоженных за ход чужих жетонов — o21
+         * «Первая кровь» платит за то, что один из двоих был толстым.
+         */
+        public int maxDestroyedHp = 0;
+        /** РАЗНЫЕ чужие ЗДАНИЯ, получившие урон за ход — o45 «Пристрелка». */
+        public final Set<Integer> enemyBuildingsDamaged = new HashSet<>();
+        /**
+         * Убийства ПО КАЖДОМУ своему жетону войска: uid убийцы -> сколько снял
+         * за этот ход. o26 «Блицкриг» требует двоих ОДНИМ жетоном.
+         */
+        public final Map<Integer, Integer> killsByUnit = new HashMap<>();
+        /** Род войск каждого убийцы (uid -> код рода) — усиление o26. */
+        public final Map<Integer, String> killerUnitTypes = new HashMap<>();
+        /** Гексы, куда за этот ход поставлено или перенесено СВОЁ ЦУ — o17. */
+        public final Set<String> cuPlacedHexes = new HashSet<>();
+        /**
+         * Гексы всех строительных операций этого хода, ПО ПОРЯДКУ и с повторами:
+         * o15 «Стройбум» требует операций на попарно несоседних гексах, поэтому
+         * важны сами гексы, а не их число.
+         */
+        public final List<String> buildOpHexes = new ArrayList<>();
+        /** Сколько СВОИХ зданий перенесено за ход и было ли среди них ЦУ — o16. */
+        public final Set<Integer> movedAnyBuildingUids = new HashSet<>();
+        public boolean movedCuThisTurn = false;
+        /**
+         * РАЗНЫЕ ОПЛАЧЕННЫЕ ПРЕДЛОЖЕНИЯ планшета маркета за ход — o33 «Биржа».
+         * Ключ описывает предложение: {@code printed:<курс>} или {@code card:<id>}.
+         */
+        public final Set<String> marketOffersUsed = new HashSet<>();
+        /**
+         * РАЗНЫЕ ПРЕДЛОЖЕНИЯ планшета технологий за ход — o34 «Научный отдел».
+         * Ключ: {@code track:<id>} для шага по треку, {@code rate:<id>} для
+         * вечного курса.
+         */
+        public final Set<String> scienceOffersUsed = new HashSet<>();
+        /** Сдано трофейных ЖЕТОНОВ действием Наука за ход — o39 «Сдача». */
+        public int scienceTrophiesSpent = 0;
+        /** На какие треки они ушли: один трек на всё — усиление o39. */
+        public final Set<String> scienceTracksUsed = new HashSet<>();
+        /** Нижний приказ карты приказа открылся и дал действие — n11. */
+        public boolean lowerOrderOpen = false;
+        /**
+         * РОД ВОЙСК, ПОЛУЧИВШИЙ +1 К СКОРОСТИ ДО КОНЦА ХОДА (эффект speed_boost).
+         * «До конца хода» — ровно срок жизни журнала, поэтому и живёт здесь, а не
+         * новым состоянием объекта: плодить состояния ради одного эффекта правила
+         * запрещают (СВОД §9.1).
+         */
+        public String speedBoostKind = null;
+        /** Снят лимит СПЕЦ-действий до конца хода (эффект unlimited_spec). */
+        public boolean unlimitedSpec = false;
+
         /**
          * Скопировать в себя все факты из {@code o} — нужно копии состояния для
          * просчёта вперёд: без журнала просчёт «забывает», что игрок уже успел
@@ -198,6 +253,30 @@ public final class TurnJournal {
             damagedLeader = false;
             killsByMovedUnit.putAll(o.killsByMovedUnit);
             enemyBuildingHits = o.enemyBuildingHits;
+            maxDestroyedHp = o.maxDestroyedHp;
+            enemyBuildingsDamaged.clear();
+            enemyBuildingsDamaged.addAll(o.enemyBuildingsDamaged);
+            killsByUnit.clear();
+            killsByUnit.putAll(o.killsByUnit);
+            killerUnitTypes.clear();
+            killerUnitTypes.putAll(o.killerUnitTypes);
+            cuPlacedHexes.clear();
+            cuPlacedHexes.addAll(o.cuPlacedHexes);
+            buildOpHexes.clear();
+            buildOpHexes.addAll(o.buildOpHexes);
+            movedAnyBuildingUids.clear();
+            movedAnyBuildingUids.addAll(o.movedAnyBuildingUids);
+            movedCuThisTurn = o.movedCuThisTurn;
+            marketOffersUsed.clear();
+            marketOffersUsed.addAll(o.marketOffersUsed);
+            scienceOffersUsed.clear();
+            scienceOffersUsed.addAll(o.scienceOffersUsed);
+            scienceTrophiesSpent = o.scienceTrophiesSpent;
+            scienceTracksUsed.clear();
+            scienceTracksUsed.addAll(o.scienceTracksUsed);
+            lowerOrderOpen = o.lowerOrderOpen;
+            speedBoostKind = o.speedBoostKind;
+            unlimitedSpec = o.unlimitedSpec;
         }
 
         void reset() {
@@ -256,6 +335,21 @@ public final class TurnJournal {
             destroyedLeaderBuilding = false;
             damagedLeader = false;
             enemyBuildingHits = 0;
+            maxDestroyedHp = 0;
+            enemyBuildingsDamaged.clear();
+            killsByUnit.clear();
+            killerUnitTypes.clear();
+            cuPlacedHexes.clear();
+            buildOpHexes.clear();
+            movedAnyBuildingUids.clear();
+            movedCuThisTurn = false;
+            marketOffersUsed.clear();
+            scienceOffersUsed.clear();
+            scienceTrophiesSpent = 0;
+            scienceTracksUsed.clear();
+            lowerOrderOpen = false;
+            speedBoostKind = null;
+            unlimitedSpec = false;
         }
     }
 

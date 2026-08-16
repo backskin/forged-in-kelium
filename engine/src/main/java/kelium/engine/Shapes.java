@@ -221,6 +221,270 @@ public final class Shapes {
         return false;
     }
 
+    // ======================================================================
+    //  НЕПРЕРЫВНОЕ СОСЕДСТВО, СВЯЗЫВАЮЩЕЕ ЗАДАННЫЕ ГЕКСЫ (ревью 17.08.2026)
+    // ======================================================================
+    //  Дизайнер: считать надо не жетоны, а СВЯЗЬ. «Линия из четырёх» ничего не
+    //  значит — четыре жетона могут стоять кучей у себя дома. Правильная форма
+    //  требования — «твои жетоны образуют непрерывное соседство, СВЯЗЫВАЮЩЕЕ вот
+    //  эти два (три) гекса»: тогда фигура обязана куда-то тянуться, и её длина
+    //  задаётся полем, а не числом на карте.
+    //
+    //  Что задаёт карта:
+    //   what          — из чего строится соседство: any | unit:any | building:any
+    //   anchors       — ЧТО связывать: own_miner_hexes | straight_line |
+    //                   opposite_around_spawn | field_edge_cells
+    //   anchor_count  — сколько опорных гексов должно попасть в одну группу
+    //   forbid_kinds  — рода войск, которым в этой группе быть нельзя
+    //   require_types — типы зданий, которые в группе быть обязаны
+    //   require_count — сколько их должно быть (по умолчанию 1)
+    //   require_unit_kinds — рода войск, которые в группе быть обязаны
+
+    /** Проверка предиката {@code chain_connects} — см. комментарий выше. */
+    public static boolean chainConnects(GameState s, int seat, Map<String, Object> p) {
+        String what = String.valueOf(p.getOrDefault("what", "any"));
+        Set<Node> nodes = filterNodes(s, seat, what);
+        List<Set<String>> groups = componentsAsHexSets(s, nodes);
+        if (groups.isEmpty()) {
+            return false;
+        }
+        int needAnchors = p.get("anchor_count") instanceof Number n ? n.intValue() : 2;
+        List<Set<String>> anchorSets = anchorSets(s, seat,
+            String.valueOf(p.getOrDefault("anchors", "own_miner_hexes")), needAnchors);
+        for (Set<String> group : groups) {
+            boolean hit = false;
+            for (Set<String> anchors : anchorSets) {
+                if (group.containsAll(anchors)) {
+                    hit = true;
+                    break;
+                }
+            }
+            if (hit && groupSatisfiesExtras(s, seat, group, p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Узлы игрока, отфильтрованные по {@code what} с карты. */
+    private static Set<Node> filterNodes(GameState s, int seat, String what) {
+        if ("any".equals(what)) {
+            return ownNodes(s, seat);
+        }
+        boolean unitsOnly = what.startsWith("unit");
+        Set<Node> out = new HashSet<>();
+        PlayerState p = s.player(seat);
+        if (unitsOnly) {
+            for (UnitToken u : p.units) {
+                if (u.hexId == null || !u.alive()) {
+                    continue;
+                }
+                if (u.type == UnitType.AIRCRAFT) {
+                    out.add(new Node(u.hexId, -1));
+                } else {
+                    addCellsOf(s, u.hexId, u.uid, out);
+                }
+            }
+        } else {
+            for (BuildingToken b : p.buildings) {
+                if (b.hexId != null && b.alive()) {
+                    addCellsOf(s, b.hexId, b.uid, out);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Связные компоненты подграфа, приведённые к множествам гексов. */
+    private static List<Set<String>> componentsAsHexSets(GameState s, Set<Node> nodes) {
+        List<Node> list = new ArrayList<>(nodes);
+        Map<Node, List<Node>> g = new HashMap<>();
+        for (Node n : list) {
+            g.put(n, new ArrayList<>());
+        }
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                if (neighbours(s, list.get(i), list.get(j))) {
+                    g.get(list.get(i)).add(list.get(j));
+                    g.get(list.get(j)).add(list.get(i));
+                }
+            }
+        }
+        List<Set<String>> out = new ArrayList<>();
+        Set<Node> seen = new HashSet<>();
+        for (Node start : list) {
+            if (seen.contains(start)) {
+                continue;
+            }
+            Set<String> hexes = new HashSet<>();
+            Deque<Node> queue = new ArrayDeque<>();
+            queue.add(start);
+            seen.add(start);
+            while (!queue.isEmpty()) {
+                Node at = queue.poll();
+                hexes.add(at.hexId());
+                for (Node next : g.getOrDefault(at, List.of())) {
+                    if (seen.add(next)) {
+                        queue.add(next);
+                    }
+                }
+            }
+            out.add(hexes);
+        }
+        return out;
+    }
+
+    /**
+     * ВАРИАНТЫ ОПОРНЫХ НАБОРОВ: карта называет ВИД опоры, а конкретных наборов на
+     * поле бывает много (три гекса по прямой можно провести где угодно). Группа
+     * засчитывается, если она накрывает хотя бы один набор целиком.
+     */
+    private static List<Set<String>> anchorSets(GameState s, int seat, String kind, int count) {
+        List<Set<String>> out = new ArrayList<>();
+        switch (kind) {
+            case "own_miner_hexes" -> {
+                // Два РАЗНЫХ гекса, где стоят твои добытчики.
+                List<String> hexes = new ArrayList<>(new java.util.LinkedHashSet<>(
+                    minerHexes(s, seat)));
+                combinations(hexes, count, out);
+            }
+            case "straight_line" -> {
+                // count гексов подряд в одном направлении: h, h+d, h+2d, …
+                for (Hex h : s.field.hexes.values()) {
+                    for (int dir = 0; dir < 6; dir++) {
+                        Set<String> line = new java.util.LinkedHashSet<>();
+                        Hex at = h;
+                        while (at != null && line.size() < count) {
+                            line.add(at.id);
+                            String nb = at.neighborBySide[dir];
+                            at = nb == null ? null : s.field.get(nb);
+                        }
+                        if (line.size() == count) {
+                            out.add(line);
+                        }
+                    }
+                }
+            }
+            case "opposite_around_spawn" -> {
+                // Два гекса, лежащих по РАЗНЫЕ стороны одного тайла зарождения.
+                for (Hex h : s.field.hexes.values()) {
+                    if (!h.hasSpawnTile()) {
+                        continue;
+                    }
+                    for (int dir = 0; dir < 3; dir++) {
+                        String a = h.neighborBySide[dir];
+                        String b = h.neighborBySide[(dir + 3) % 6];
+                        if (a != null && b != null) {
+                            out.add(new HashSet<>(List.of(a, b)));
+                        }
+                    }
+                }
+            }
+            case "field_edge_cells" -> {
+                // Гексы у края поля: хотя бы одно ребро без соседнего гекса.
+                List<String> edge = new ArrayList<>();
+                for (Hex h : s.field.hexes.values()) {
+                    for (int side = 0; side < 6; side++) {
+                        if (h.neighborBySide[side] == null) {
+                            edge.add(h.id);
+                            break;
+                        }
+                    }
+                }
+                combinations(edge, count, out);
+            }
+            default -> { }
+        }
+        return out;
+    }
+
+    private static List<String> minerHexes(GameState s, int seat) {
+        List<String> out = new ArrayList<>();
+        for (BuildingToken b : s.player(seat).buildingsOnField()) {
+            if (b.type == kelium.core.BuildingType.MINER) {
+                out.add(b.hexId);
+            }
+        }
+        return out;
+    }
+
+    private static void combinations(List<String> pool, int k, List<Set<String>> out) {
+        if (pool.size() < k) {
+            return;
+        }
+        int[] idx = new int[k];
+        for (int i = 0; i < k; i++) {
+            idx[i] = i;
+        }
+        while (true) {
+            Set<String> pick = new HashSet<>();
+            for (int i : idx) {
+                pick.add(pool.get(i));
+            }
+            if (pick.size() == k) {
+                out.add(pick);
+            }
+            int i = k - 1;
+            while (i >= 0 && idx[i] == pool.size() - k + i) {
+                i--;
+            }
+            if (i < 0) {
+                return;
+            }
+            idx[i]++;
+            for (int j = i + 1; j < k; j++) {
+                idx[j] = idx[j - 1] + 1;
+            }
+        }
+    }
+
+    /** Запреты и обязательные участники соседства (усиления карт). */
+    private static boolean groupSatisfiesExtras(GameState s, int seat, Set<String> hexes,
+                                                Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        Set<String> forbid = codes(p.get("forbid_kinds"));
+        Set<String> needUnits = codes(p.get("require_unit_kinds"));
+        Set<String> needTypes = codes(p.get("require_types"));
+        int needCount = p.get("require_count") instanceof Number n ? n.intValue() : 1;
+
+        Set<String> unitKinds = new HashSet<>();
+        Map<String, Integer> buildingTypes = new HashMap<>();
+        for (UnitToken u : pl.unitsOnField()) {
+            if (hexes.contains(u.hexId)) {
+                unitKinds.add(u.type.code);
+            }
+        }
+        for (BuildingToken b : pl.buildingsOnField()) {
+            if (hexes.contains(b.hexId)) {
+                buildingTypes.merge(b.type.code, 1, Integer::sum);
+            }
+        }
+        for (String bad : forbid) {
+            if (unitKinds.contains(bad)) {
+                return false;
+            }
+        }
+        if (!unitKinds.containsAll(needUnits)) {
+            return false;
+        }
+        for (String t : needTypes) {
+            if (buildingTypes.getOrDefault(t, 0) < needCount) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Set<String> codes(Object listObj) {
+        Set<String> out = new HashSet<>();
+        if (listObj instanceof List<?> l) {
+            for (Object o : l) {
+                out.add(String.valueOf(o));
+            }
+        }
+        return out;
+    }
+
     /**
      * СКОЛЬКО ГЕКСОВ занимает связная группа жетонов игрока — грубая мера
      * «фронта», нужная заданиям вида «твои жетоны стоят непрерывно от края до

@@ -74,6 +74,16 @@ public final class Effects {
             case "permanent_energy" -> permanentEnergy(s, seat, p);
             case "cancel_attack" -> cancelAttack(s, seat, p);
             case "build_neutral" -> buildNeutral(s, seat, p);
+            // === ЭФФЕКТЫ РЕВЬЮ 17.08.2026 ===
+            case "shield" -> shield(s, seat, p);
+            case "landing" -> landing(s, seat, p);
+            case "speed_boost" -> speedBoost(s, seat, p);
+            case "energy_or_modules" -> energyOrModules(s, seat, p);
+            case "convert" -> convert(s, seat, p);
+            case "discard_enemy_arsenal" -> discardEnemyArsenal(s, seat, p);
+            case "unlimited_spec" -> unlimitedSpec(s, seat, p);
+            case "market_card_from_discard" -> marketCardFromDiscard(s, seat, p);
+            case "swap_order_card" -> swapOrderCard(s, seat, p);
             case "noop" -> Map.of("noop", p.getOrDefault("note", "unimplemented"));
             // E1: неизвестный эффект — ГРОМКАЯ ошибка, не тихий noop; карты с
             // такими эффектами отсеиваются из колод на сетапе (см. Setup).
@@ -94,7 +104,12 @@ public final class Effects {
                  // рынка) молча изымались из колод на подготовке: игрок их не
                  // видел, а в отчётах они выглядели просто редкими.
                  "grab_first_player", "power_building_free", "permanent_energy",
-                 "cancel_attack", "build_neutral" -> true;
+                 "cancel_attack", "build_neutral",
+                 // Девять эффектов ревью 17.08.2026: щит, десант, скорость,
+                 // выбор «энергия или модули», конверсия и четыре арсенальных.
+                 "shield", "landing", "speed_boost", "energy_or_modules", "convert",
+                 "discard_enemy_arsenal", "unlimited_spec",
+                 "market_card_from_discard", "swap_order_card" -> true;
             default -> false;   // включая "noop" — карта-заглушка не должна попасть в колоду
         };
     }
@@ -284,6 +299,15 @@ public final class Effects {
         // контекстом (наценки внутри него считаются с нуля — это дар карты, а
         // не продолжение хода), но ЖУРНАЛ и телеметрия обязаны его видеть.
         TurnContext ctx = new TurnContext(seat, 0);
+        // ПРЕДЕЛ ОБЪЕКТОВ с карты: «Сборка не более чем двумя зданиями»,
+        // «одна строительная операция». Без него бесплатное действие было
+        // сильнее выполненного задания, и карту выгоднее было сжечь.
+        if (p.get("buildings") instanceof Number bn) {
+            ctx.objectLimits.put(name, bn.intValue());
+        }
+        if (p.get("ops") instanceof Number on) {
+            ctx.objectLimits.put(name, on.intValue());
+        }
         var res = Actions.create(name, s).perform(s.player(seat), ctx, agent);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
             tj.onAction(seat, name, res.telemetry());
@@ -351,6 +375,280 @@ public final class Effects {
             moved++;
         }
         return Map.of("moved", moved);
+    }
+
+    // ==================================================================
+    //  ЭФФЕКТЫ РЕВЬЮ ОДНОРАЗОВЫХ ЭФФЕКТОВ (17.08.2026)
+    // ==================================================================
+
+    /**
+     * ЩИТ — положи жетон щита на строку ОДНОГО из двух названных на карте родов
+     * войск. Щит снимает ПЕРВОЕ попадание по жетону этого рода и уходит.
+     *
+     * <p>Заменяет прежнее «снять 1 урон с пехоты»: у пехоты прочность 1, снимать
+     * там нечего — жетон уже уничтожен. Защита обязана срабатывать ДО попадания.
+     * Сам жетон щита — физический объект на планшете, поэтому правило «эффект
+     * живёт, пока лежит объект» (СВОД §9.1) соблюдено.
+     *
+     * <p>Параметр {@code types} — два рода на выбор игрока.
+     */
+    static Map<String, Object> shield(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        List<UnitType> offer = new ArrayList<>();
+        if (p.get("types") instanceof List<?> l) {
+            for (Object o : l) {
+                try {
+                    offer.add(UnitType.fromCode(String.valueOf(o)));
+                } catch (RuntimeException ignored) {
+                    // род, которого нет в игре, просто не предлагается
+                }
+            }
+        }
+        if (offer.isEmpty()) {
+            offer = List.of(UnitType.INFANTRY, UnitType.VEHICLE);
+        }
+        UnitType pick = offer.get(0);
+        Agent ag = agentFor(s, seat);
+        if (ag != null && offer.size() > 1) {
+            List<Choice> opts = new ArrayList<>();
+            for (UnitType t : offer) {
+                opts.add(new Choice("shield_kind", t.code, "щит на " + t.code));
+            }
+            Choice ch = ag.choose(s, opts, Map.of("kind", "shield"));
+            if (ch != null && ch.payload() != null) {
+                pick = UnitType.fromCode(String.valueOf(ch.payload()));
+            }
+        }
+        pl.shieldedKinds.add(pick);
+        return Map.of("shield", pick.code);
+    }
+
+    /**
+     * ДЕСАНТ — размести на поле до {@code count} жетонов РАЗНЫХ родов войск.
+     *
+     * <p>Отличие от Сборки: жетоны не производятся зданиями и не требуют ни
+     * энергии, ни гекса со зданием — они высаживаются. Ограничение одно и оно
+     * жёсткое: рода должны быть РАЗНЫЕ, иначе карта превращалась бы в две
+     * бесплатные пехоты.
+     */
+    static Map<String, Object> landing(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        Agent agent = agentFor(s, seat);
+        int count = p.containsKey("count") ? asInt(p.get("count")) : 2;
+        java.util.Set<UnitType> used = java.util.EnumSet.noneOf(UnitType.class);
+        int placed = 0;
+        while (placed < count) {
+            List<Choice> opts = new ArrayList<>();
+            for (UnitType ut : UnitType.values()) {
+                if (used.contains(ut) || pl.unitsOfKind(ut) >= s.tokenStats.unitStock(ut)) {
+                    continue;
+                }
+                for (Hex h : s.field.hexes.values()) {
+                    if (!Movement.passable(s, h.id) || !roomForLanding(s, h.id, ut)) {
+                        continue;
+                    }
+                    Map<String, Object> mp = new HashMap<>();
+                    mp.put("type", ut.code);
+                    mp.put("hex", h.id);
+                    opts.add(new Choice("landing", mp, "высадить " + ut.code + " @" + h.id));
+                }
+            }
+            if (opts.isEmpty()) {
+                break;
+            }
+            opts.add(new Choice("pass", null, "хватит высаживать"));
+            Choice ch = agent != null ? agent.choose(s, opts, Map.of("kind", "landing"))
+                : opts.get(0);
+            if (ch.payload() == null) {
+                break;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> mp = (Map<String, Object>) ch.payload();
+            UnitType ut = UnitType.fromCode(String.valueOf(mp.get("type")));
+            String hex = String.valueOf(mp.get("hex"));
+            UnitToken u = s.tokenStats.makeUnit(ut, seat, Placement.nextUid(s), pl.unitsOfKind(ut));
+            u.hexId = hex;
+            pl.units.add(u);
+            PrintedContainers.onUnitPlaced(s, pl, hex, ut);
+            used.add(ut);
+            placed++;
+        }
+        return Map.of("landed", placed);
+    }
+
+    /**
+     * Есть ли на гексе свободная ячейка нужного размера. Правила размещения те
+     * же, что у Движения: техника просит две смежные наземные ячейки, авиация —
+     * свободную воздушную.
+     */
+    private static boolean roomForLanding(GameState s, String hexId, UnitType t) {
+        Hex h = s.field.get(hexId);
+        if (h == null) {
+            return false;
+        }
+        if (t == UnitType.AIRCRAFT) {
+            return h.airToken == null;
+        }
+        int busy = 0;
+        for (int i = 0; i < h.sideOwner.length; i++) {
+            if (h.sideOwner[i] != null) {
+                busy++;
+            }
+        }
+        return h.sideOwner.length - busy >= (t == UnitType.VEHICLE ? 2 : 1);
+    }
+
+    /**
+     * +1 К СКОРОСТИ одного рода войск ДО КОНЦА ХОДА.
+     *
+     * <p>Хранится в журнале хода: «до конца хода» — это ровно срок жизни журнала,
+     * и заводить ради этого новое состояние объекта правила запрещают.
+     */
+    static Map<String, Object> speedBoost(GameState s, int seat, Map<String, Object> p) {
+        Agent ag = agentFor(s, seat);
+        UnitType pick = UnitType.INFANTRY;
+        List<Choice> opts = new ArrayList<>();
+        for (UnitType t : UnitType.values()) {
+            if (Speed.of(s, seat, t) > 0) {      // вышка со скоростью 0 не разгоняется
+                opts.add(new Choice("speed_kind", t.code, "+1 скорости: " + t.code));
+            }
+        }
+        if (opts.isEmpty()) {
+            return Map.of("speed_boost", "нет подвижных родов");
+        }
+        if (ag != null) {
+            Choice ch = ag.choose(s, opts, Map.of("kind", "speed_boost"));
+            if (ch != null && ch.payload() != null) {
+                pick = UnitType.fromCode(String.valueOf(ch.payload()));
+            }
+        } else {
+            pick = UnitType.fromCode(String.valueOf(opts.get(0).payload()));
+        }
+        s.journal.of(seat).speedBoostKind = pick.code;
+        return Map.of("speed_boost", pick.code);
+    }
+
+    /**
+     * ВЫБОР НА ОДНОЙ КАРТЕ: сыграть Смену энергии ИЛИ Смену модулей.
+     *
+     * <p>Смена модулей — единственная перестановка на планшете, которая обычно
+     * доступна только в свой этап; карта даёт её вне очереди, и это настоящая
+     * альтернатива энергии, а не довесок.
+     */
+    static Map<String, Object> energyOrModules(GameState s, int seat, Map<String, Object> p) {
+        Agent ag = agentFor(s, seat);
+        String pick = "energy_swap";
+        if (ag != null) {
+            Choice ch = ag.choose(s, List.of(
+                new Choice("energy_or_modules", "energy_swap", "Смена энергии"),
+                new Choice("energy_or_modules", "modules", "Смена модулей на планшете")),
+                Map.of("kind", "energy_or_modules"));
+            if (ch != null && ch.payload() != null) {
+                pick = String.valueOf(ch.payload());
+            }
+        }
+        if ("modules".equals(pick)) {
+            Modules.moduleSwap(s, seat, ag, ev -> { });
+            return Map.of("chose", "modules");
+        }
+        Map<String, Object> got = new HashMap<>(freeAction(s, seat, Map.of("action", "energy_swap")));
+        got.put("chose", "energy_swap");
+        return got;
+    }
+
+    /**
+     * КОНВЕРСИЯ — обменять {@code amount} одного ресурса на другой.
+     *
+     * <p>Слово наконец значит то, что значит: раньше «конверсией» назывался урон
+     * соседу, что не имеет к слову никакого отношения.
+     */
+    static Map<String, Object> convert(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        int amount = p.containsKey("amount") ? asInt(p.get("amount")) : 1;
+        Resource from;
+        Resource to;
+        try {
+            from = Resource.fromCode(String.valueOf(p.getOrDefault("from", "kelium")));
+            to = Resource.fromCode(String.valueOf(p.getOrDefault("to", "ammo")));
+        } catch (RuntimeException e) {
+            return Map.of("converted", 0);
+        }
+        if (!pl.resources.canPay(from, amount)) {
+            return Map.of("converted", 0);
+        }
+        pl.resources.pay(from, amount);
+        int got = switch (to) {
+            case AMMO -> Storage.addAmmoCapped(s, pl, amount);
+            case DEBRIS -> Storage.addDebrisCapped(s, pl, amount);
+            case KELIUM -> Storage.addKeliumCapped(s, pl, amount);
+            default -> {
+                pl.resources.add(to, amount);
+                yield amount;
+            }
+        };
+        Map<String, Object> out = new HashMap<>();
+        out.put("converted", got);
+        out.put("from", from.code);
+        out.put("to", to.code);
+        return out;
+    }
+
+    /** СБРОСИТЬ 1 КАРТУ АРСЕНАЛА у другого игрока (у кого их больше всех). */
+    static Map<String, Object> discardEnemyArsenal(GameState s, int seat, Map<String, Object> p) {
+        PlayerState victim = null;
+        for (PlayerState o : s.players) {
+            if (o.seat == seat || o.arsenalHand.isEmpty()) {
+                continue;
+            }
+            if (victim == null || o.arsenalHand.size() > victim.arsenalHand.size()) {
+                victim = o;
+            }
+        }
+        if (victim == null) {
+            return Map.of("discarded", 0);
+        }
+        String card = victim.arsenalHand.remove(victim.arsenalHand.size() - 1);
+        s.decks.get("arsenal").discard(card);
+        return Map.of("discarded", 1, "from_seat", victim.seat, "card", card);
+    }
+
+    /**
+     * РАЗЫГРАЙ ЛЮБОЕ ЧИСЛО СПЕЦ-ДЕЙСТВИЙ ДО КОНЦА ХОДА.
+     *
+     * <p>Лимит СПЕЦ живёт в контексте хода, а эффект карты до него не дотягивается,
+     * поэтому снятие лимита отмечается в журнале хода — ход читает его перед
+     * следующим предложением СПЕЦ.
+     */
+    static Map<String, Object> unlimitedSpec(GameState s, int seat, Map<String, Object> p) {
+        s.journal.of(seat).unlimitedSpec = true;
+        return Map.of("unlimited_spec", true);
+    }
+
+    /** ВЕРНУТЬ НА МАРКЕТ сброшенную карту сделок на рынке. */
+    static Map<String, Object> marketCardFromDiscard(GameState s, int seat, Map<String, Object> p) {
+        var deck = s.decks.get("market");
+        if (deck == null) {
+            return Map.of("returned", 0);
+        }
+        String card = deck.takeFromDiscard(s.rng);
+        if (card == null) {
+            return Map.of("returned", 0);
+        }
+        s.marketActive = card;
+        return Map.of("returned", 1, "card", card);
+    }
+
+    /** ЗАМЕНИТЬ 1 КАРТУ ПРИКАЗА В РУКЕ на карту из своего сброса приказов. */
+    static Map<String, Object> swapOrderCard(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        if (pl.orderHand.isEmpty() || pl.orderPlayed.isEmpty()) {
+            return Map.of("swapped", 0);
+        }
+        String back = pl.orderPlayed.remove(pl.orderPlayed.size() - 1);
+        String out = pl.orderHand.remove(pl.orderHand.size() - 1);
+        pl.orderHand.add(back);
+        pl.orderPlayed.add(out);
+        return Map.of("swapped", 1, "took", back, "gave", out);
     }
 
     static Map<String, Object> deployUnits(GameState s, int seat, Map<String, Object> p) {
@@ -528,7 +826,22 @@ public final class Effects {
         // В конце раунда движок сдвигает жетон на следующего по кругу, поэтому
         // кладём его на ПРЕДЫДУЩЕГО: после сдвига он окажется у нас.
         s.firstPlayer = Math.floorMod(seat - 1, s.numPlayers());
-        return Map.of("first_player_was", was, "first_player_next", seat);
+        Map<String, Object> got = new HashMap<>();
+        got.put("first_player_was", was);
+        got.put("first_player_next", seat);
+        // steal_coin: жетон отбирается ВМЕСТЕ с монетой у прежнего владельца —
+        // отдельная просьба дизайнера 17.08.2026. Если у него монет нет, берётся
+        // сколько есть: долгов в игре не бывает.
+        if (p.get("steal_coin") instanceof Number cn && was != seat && was < s.numPlayers()) {
+            PlayerState victim = s.player(was);
+            int take = Math.min(cn.intValue(), victim.resources.coin());
+            if (take > 0) {
+                victim.resources.pay(Resource.COIN, take);
+                s.player(seat).resources.add(Resource.COIN, take);
+            }
+            got.put("stolen_coin", take);
+        }
+        return got;
     }
 
     /**

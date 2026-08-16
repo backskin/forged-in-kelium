@@ -126,6 +126,20 @@ public final class PlayerState {
     public int containers = 0;
 
     /**
+     * ЖЕТОНЫ ЩИТА, ЛЕЖАЩИЕ НА СТРОКАХ ПЛАНШЕТА ВОЙСК (эффект «щит», 17.08.2026).
+     *
+     * <p>Щит — физический жетон, он кладётся на строку РОДА войск и снимает
+     * ПЕРВОЕ попадание по любому жетону этого рода, после чего уходит. Правило
+     * «эффект действует, пока на столе лежит объект, который о нём сообщает»
+     * (СВОД §9.1) соблюдено: объект — сам жетон щита.
+     *
+     * <p>Заведено потому, что прежняя редакция утиля предлагала «снять 1 урон с
+     * пехоты», а у пехоты прочность 1: снимать там нечего, жетон уже уничтожен.
+     * Защита должна работать ДО попадания, а не после.
+     */
+    public final java.util.Set<UnitType> shieldedKinds = java.util.EnumSet.noneOf(UnitType.class);
+
+    /**
      * КАРТА, ПОДЛОЖЕННАЯ ПОД ПЛАНШЕТ ВОЙСК ради СИМВОЛА супер задания
      * (правило «Супер задания 2.0», 12.08.2026).
      *
@@ -260,6 +274,7 @@ public final class PlayerState {
         p.superArsenalCards.addAll(superArsenalCards);
         p.superPartProgress.putAll(superPartProgress);
         p.containers = containers;
+        p.shieldedKinds.addAll(shieldedKinds);
         p.cuDestructionTokens = cuDestructionTokens;
         p.ownCuTokenAvailable = ownCuTokenAvailable;
         p.claimedSpawnTiles = claimedSpawnTiles;
