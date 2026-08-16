@@ -66,6 +66,14 @@ public final class BotCatalog {
         new Entry("trained:warlord", "Обученный · воитель",
             "ЕДИНСТВЕННАЯ линия, которую учили НЕ на победу вообще, а на отрыв, "
                 + "добытый агрессией: больше уничтожений, больше найма, все рода войск на поле"),
+        new Entry("trained:axiom", "Обученный · аксиома",
+            "Очки и победа в её обучении не участвуют вовсе: линию учили трём "
+                + "заповедям напрямую — высота сразу на всех треках науки, "
+                + "уничтожения по трофейной цене, разнообразие жетонов на поле"),
+        new Entry("trained:reaper", "Обученный · жнец",
+            "Учили одному: снести за партию как можно больше чужих жетонов и "
+                + "уцелеть. Очки и победа в отборе не участвуют — это прибор, "
+                + "которым меряют потолок войны в игре"),
         new Entry("trained:chaos", "Обученный · вредитель",
             "Душит чужую экономику, на свои очки плевать"),
         new Entry("human", "Как человек",
@@ -105,7 +113,8 @@ public final class BotCatalog {
             return "search:" + id.substring("deep:".length());
         }
         return switch (id) {
-            case "explorer", "chaos", "hawk", "dove", "opportunist", "balanced" ->
+            case "explorer", "chaos", "hawk", "dove", "opportunist", "balanced",
+                 "warlord", "axiom", "reaper" ->
                 "trained:" + id;
             case "neural", "onnx", "default", "strategic" -> "trained:balanced";
             case "heuristic" -> "simple:balanced";

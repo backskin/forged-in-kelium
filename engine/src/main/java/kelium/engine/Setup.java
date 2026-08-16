@@ -72,6 +72,18 @@ public final class Setup {
             for (int i = 0; i < numPlayers; i++) {
                 out.add("B" + (i + 1));
             }
+        } else if ("V".equals(mode)) {
+            // НАБОР «В»: один общий планшет на всех, как сторона А, но с таблицей
+            // атак, где ни один род не бьёт себя.
+            for (int i = 0; i < numPlayers; i++) {
+                out.add("V");
+            }
+        } else if ("G".equals(mode)) {
+            // НАБОР «Г»: четыре варианта того же принципа, каждому игроку свой —
+            // различаются столпом, порядком целей и МЕСТАМИ ПОД КРАСНЫЕ МОДУЛИ.
+            for (int i = 0; i < numPlayers; i++) {
+                out.add("G" + (i % 4 + 1));
+            }
         } else {
             for (int i = 0; i < numPlayers; i++) {
                 out.add("A");
@@ -329,6 +341,15 @@ public final class Setup {
         var content = config.content;
         int n = config.numPlayers;
 
+        // ПРИВЯЗАТЬ ДАННЫЕ К КАРТАМ-ОБЪЕКТАМ (заказ дизайнера 15.08.2026, модуль
+        // cards). До этой строки CardRegistry.bindAll не вызывался НИГДЕ, кроме
+        // тестов: карта-объект существовала, но играла на пустых данных — её
+        // пороги брались из запасных значений в коде, а не из YAML партии. Без
+        // привязки Objective.progress()/needed() нельзя было спросить осмысленно
+        // ни разу за всю живую партию.
+        kelium.engine.cards.CardRegistry.bindAll("objectives", content.get("objectives").entries);
+        kelium.engine.cards.CardRegistry.bindAll("arsenal", content.get("arsenal").entries);
+
         List<Map<String, Object>> boardsEntries = content.get("boards").entries;
         // Запись о жетонах — печатная, если опыт не подменил её копией с правками
         // (см. GameConfig.tokenStatsOverride).
@@ -361,7 +382,12 @@ public final class Setup {
             String side = sides.get(seat);
             GameConfig.SeatPick pick = config.seatPick(seat);
             String troopSide = pick.troopSide() == null ? side : pick.troopSide();
-            String storageSide = pick.storageSide() == null ? side : pick.storageSide();
+            // СКЛАДСКИЕ СТОРОНЫ ЖИВУТ ОТДЕЛЬНО. Наборы «В» и «Г» (15.08.2026)
+            // меняют ТОЛЬКО планшет войск — таблицы атак и места под красные
+            // модули. Складских сторон с такими кодами не существует и не
+            // задумано, поэтому склад остаётся стороной А.
+            String storageSide = pick.storageSide() != null ? pick.storageSide()
+                : (side.startsWith("V") || side.startsWith("G") ? "A" : side);
             PlayerBoard board = PlayerBoard.fromContent(boardsEntries, troopSide, storageSide);
             // Стартовые монеты: из ruleset (setup.start_coins), иначе умолчание —
             // 5 всем (решение 2026-08-12).
@@ -578,6 +604,11 @@ public final class Setup {
         GameState s = new GameState(config, players, field, stats, tech, decks, rng, 0);
         s.journal = new kelium.core.TurnJournal(n);
 
+        // ВИТРИНА АРСЕНАЛА (правило дизайнера 15.08.2026): две открытые карты
+        // рядом с планшетом науки. Карты СНИМАЮТСЯ С КОЛОДЫ — вытянуть их
+        // вслепую, пока они лежат на витрине, нельзя, ровно как за столом.
+        refillArsenalDisplay(s);
+
         // МЕШКИ МОДУЛЕЙ («Модули 2.0», 12.08.2026): по полному набору жетонов на
         // каждого игрока — 8/12/16 жетонов на 2/3/4 игроков для мешка из одного
         // набора. Выключено правилами — списки остаются пустыми, и модули
@@ -650,6 +681,12 @@ public final class Setup {
                     Map<String, Object> bottom = (Map<String, Object>) card.get("bottom");
                     if (top != null && !Effects.isImplemented((String) top.get("effect"))) {
                         bad = "top effect " + top.get("effect");
+                    } else if (bottom != null && bottom.get("scoring") != null) {
+                        // КАРТА-ЦЕЛЬ (арсенал 2.1.0): низ не меняет правил, а
+                        // считает очки в конце партии. Способности у неё нет и не
+                        // должно быть — отсев по «нереализованной пассивке» здесь
+                        // выбросил бы совершенно рабочую карту.
+                        bad = null;
                     } else if (bottom != null
                             && !Passives.isImplemented((String) bottom.get("passive"))) {
                         bad = "passive " + bottom.get("passive");
@@ -688,4 +725,27 @@ public final class Setup {
         }
         return out;
     }
+
+    /**
+     * ПОПОЛНИТЬ ВИТРИНУ АРСЕНАЛА до двух открытых карт.
+     *
+     * <p>Вызывается на подготовке и сразу после того, как игрок забрал карту с
+     * витрины. Карты берутся С ВЕРХА КОЛОДЫ и физически уходят из неё; если
+     * колода и сброс исчерпаны, витрина остаётся неполной — это законное
+     * состояние партии, а не ошибка.
+     */
+    public static void refillArsenalDisplay(GameState s) {
+        kelium.core.Deck deck = s.decks.get("arsenal");
+        if (deck == null) {
+            return;
+        }
+        while (s.arsenalDisplay.size() < 2) {
+            String card = deck.draw(s.rng);
+            if (card == null) {
+                break;                    // карт больше нет — витрина неполная
+            }
+            s.arsenalDisplay.add(card);
+        }
+    }
+
 }

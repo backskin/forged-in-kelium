@@ -1672,6 +1672,11 @@ public final class Actions {
             Map<String, Integer> dealUses = new HashMap<>();
             // Какие стороны карт рынка брали за это действие (для лаборатории карт).
             List<String> offerSides = new ArrayList<>();
+            // КАКИЕ УТИЛЬ-ЭФФЕКТЫ СРАБОТАЛИ с карты рынка. Рынок был
+            // единственным из четырёх источников разовых эффектов, кто о них
+            // молчал, — и метрики утиля из-за этого считались неполными.
+            List<String> offerEffects = new ArrayList<>();
+            List<Map<String, Object>> offerResults = new ArrayList<>();
             StringBuilder detail = new StringBuilder();
 
             // СКИДКА ЗА ПАРУ: келемий, сданный сразу парой, идёт по лучшему курсу
@@ -1813,12 +1818,22 @@ public final class Actions {
                 if (cell >= 0) {
                     s.marketCells["right".equals(pl.get("side")) ? 1 : 0][cell] = player.seat;
                 }
+                Map<String, Object> gotOffer;
                 try {
-                    Effects.apply((String) offer.get("effect"), s, player.seat,
+                    gotOffer = Effects.apply((String) offer.get("effect"), s, player.seat,
                         (Map<String, Object>) offer.getOrDefault("params", Map.of()));
                 } catch (Effects.EffectError e) {
                     // предложение неприменимо — келемий уже уплачен, как за столом
+                    gotOffer = Map.of("failed", true);
                 }
+                // МЕТРИКИ УТИЛЯ: рынок — четвёртый источник разовых эффектов, и он
+                // единственный, кто о них молчал. Без этого события «сколько раз
+                // сработал такой-то эффект за партию» считается неверно.
+                offerEffects.add(String.valueOf(offer.get("effect")));
+                // РЕЗУЛЬТАТ эффекта тоже в телеметрию: без него нельзя отличить
+                // сработавший эффект от отработавшего вхолостую, а именно это и
+                // есть главный вопрос к утилю.
+                offerResults.add(gotOffer == null ? Map.of() : gotOffer);
                 detail.append(offer.getOrDefault("label", "предложение карты")).append("; ");
             }
 
@@ -1836,6 +1851,11 @@ public final class Actions {
             // отдельным полем: печатные сделки и предложение карты это разные
             // вещи, и мерить их надо порознь.
             tel.put("card_offer", cardOfferUsed);
+            if (!offerEffects.isEmpty()) {
+                tel.put("offer_effect", offerEffects.get(0));
+                tel.put("offer_effects", String.join(",", offerEffects));
+                tel.put("offer_got", offerResults.get(0));
+            }
             if (!offerSides.isEmpty()) {
                 tel.put("offer_side", offerSides.get(0));
                 tel.put("offer_sides", String.join(",", offerSides));
@@ -2240,14 +2260,13 @@ public final class Actions {
             if ("trophy_to_coin".equals(id)) {
                 player.resources.add(Resource.COIN, ((Number) ex.get("coin")).intValue());
             } else if ("draw_arsenal".equals(id)) {
-                String c = state.decks.get("arsenal").draw(state.rng);
-                if (c != null) {
-                    player.arsenalHand.add(c);
-                }
-                String c2 = state.decks.get("arsenal").draw(state.rng);
-                if (c2 != null) {
-                    state.decks.get("arsenal").discard(c2);
-                }
+                // ВЫБОР ИЗ ВИТРИНЫ (правило дизайнера 15.08.2026). Раньше игрок
+                // тянул две карты вслепую и одну выбрасывал — то есть половина
+                // колоды уходила в сброс, ничего не решая, а выбора не было
+                // вовсе. Теперь рядом с планшетом науки лежат ДВЕ ОТКРЫТЫЕ
+                // карты: игрок берёт одну, место немедленно пополняется с верха
+                // колоды.
+                takeFromArsenalDisplay(state, player, agent);
             } else if ("gild".equals(id)) {
                 player.goldModules += 1;
             } else if ("move_module".equals(id)) {
@@ -2255,5 +2274,38 @@ public final class Actions {
             }
             return id;
         }
+    }
+
+    /**
+     * ЗАБРАТЬ КАРТУ АРСЕНАЛА С ВИТРИНЫ и тут же пополнить витрину.
+     *
+     * <p>Витрина — часть стола: карта на ней ФИЗИЧЕСКИ ушла из колоды, и вытянуть
+     * её вслепую нельзя, пока она лежит открытой. Освободившееся место
+     * пополняется немедленно, с верха колоды.
+     *
+     * <p>Если витрина пуста (колода и сброс исчерпаны) — игрок не получает
+     * ничего. Это законный конец колоды, а не ошибка: карты кончились так же, как
+     * кончились бы за столом.
+     */
+    static void takeFromArsenalDisplay(GameState state, PlayerState player, Agent agent) {
+        if (state.arsenalDisplay.isEmpty()) {
+            kelium.engine.Setup.refillArsenalDisplay(state);
+        }
+        if (state.arsenalDisplay.isEmpty()) {
+            return;
+        }
+        List<Choice> opts = new ArrayList<>();
+        for (String cid : state.arsenalDisplay) {
+            Map<String, Object> card = Ctx.cards(state, "arsenal").find(cid);
+            String label = card == null ? cid : String.valueOf(card.getOrDefault("name", cid));
+            opts.add(new Choice("arsenal_display", cid, label));
+        }
+        Choice pick = agent == null ? opts.get(0)
+            : agent.choose(state, opts, Map.of("kind", "arsenal_display"));
+        String taken = pick != null && pick.payload() instanceof String c
+            ? c : state.arsenalDisplay.get(0);
+        state.arsenalDisplay.remove(taken);
+        player.arsenalHand.add(taken);
+        kelium.engine.Setup.refillArsenalDisplay(state);
     }
 }

@@ -71,6 +71,21 @@ public final class TurnJournal {
         public int destroyedInRetaliation = 0;
         public int maxKillsOneBattle = 0;
         public final Set<String> destroyedTypes = new HashSet<>();
+        /**
+         * ЧЬИ ЖЕТОНЫ УНИЧТОЖЕНЫ за этот ход — места владельцев.
+         *
+         * <p>Нужно карте «Охота на лидера» (o43): она платит за удар именно по
+         * тому, кто ведёт по очкам, а кто ведёт — известно только на момент
+         * проверки, не на момент удара. Поэтому храним владельцев, а сравнение
+         * с лидером делает сама карта.
+         */
+        public final Set<Integer> destroyedOwners = new HashSet<>();
+        /** Снесено ли ЗАПИТАННОЕ здание экономики (добытчик/энергостанция) — o42. */
+        public boolean destroyedPoweredEconomy = false;
+        /** Снесено ли ЗДАНИЕ игрока, ведущего по очкам — усиление o43. */
+        public boolean destroyedLeaderBuilding = false;
+        /** Повреждён ли (не обязательно добит) жетон ведущего — прогресс o43. */
+        public boolean damagedLeader = false;
 
         // === факты каталога 8.0 (objectives 1.5.0) ===
         // Сборка: producedByType[код рода] = сколько; типы зданий, давших
@@ -177,6 +192,10 @@ public final class TurnJournal {
             minKillAmmoCost = o.minKillAmmoCost;
             movedAndKilledSameUnit = o.movedAndKilledSameUnit;
             killsByMovedUnit.clear();
+            destroyedOwners.clear();
+            destroyedPoweredEconomy = false;
+            destroyedLeaderBuilding = false;
+            damagedLeader = false;
             killsByMovedUnit.putAll(o.killsByMovedUnit);
             enemyBuildingHits = o.enemyBuildingHits;
         }
@@ -232,6 +251,10 @@ public final class TurnJournal {
             minKillAmmoCost = Integer.MAX_VALUE;
             movedAndKilledSameUnit = false;
             killsByMovedUnit.clear();
+            destroyedOwners.clear();
+            destroyedPoweredEconomy = false;
+            destroyedLeaderBuilding = false;
+            damagedLeader = false;
             enemyBuildingHits = 0;
         }
     }

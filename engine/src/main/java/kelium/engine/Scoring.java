@@ -113,6 +113,7 @@ public final class Scoring {
         breakdown.put("kills", killVp);
         // «Военный трек» (эксперимент leftover_trophy_vp_per): накоплено в Возврат.
         breakdown.put("war_track", p.warTrackVp);
+        breakdown.put("objective_card_vp", p.objectiveCardVp);
         // Супер-арсенал: ПО, напечатанные на удерживаемых картах (vp_on_card у
         // супер-войск, vp_flat у «Мандата совета»).
         int saVp = 0;
@@ -135,6 +136,11 @@ public final class Scoring {
         // стоимости сданного в лицо карты. Очки остаются у игрока, даже если
         // рубашка так и не сложилась: иначе вложенное в первую часть пропадает.
         breakdown.put("super_first_part", p.superFirstPartVp);
+        // КАРТЫ-ЦЕЛИ АРСЕНАЛА (2.1.0): установленная карта может не менять правил,
+        // а считать очки в конце партии. Такого канала в игре не было вовсе —
+        // замер 15.08.2026 показал, что ни одна карта очков не печатает, хотя
+        // движок умеет их считать.
+        breakdown.put("arsenal_vp", arsenalGoalVp(state, p));
 
         int star = 0;
         for (BuildingToken b : p.buildingsOnField()) {
@@ -193,5 +199,130 @@ public final class Scoring {
             out.put(seat, scorePlayer(state, seat));
         }
         return out;
+    }
+
+    /**
+     * ОЧКИ ЗА КАРТЫ-ЦЕЛИ АРСЕНАЛА, установленные перед игроком.
+     *
+     * <p>Две формы записи в данных:
+     * <pre>
+     *   scoring: {per: 2, of: buildings_on_field, vp: 1}    // 1 ПО за каждые 2
+     *   scoring: {combo: [{of: unit_kinds, at_least: 3},
+     *                     {of: buildings_on_field, at_least: 4}], vp: 4}
+     * </pre>
+     *
+     * <p>Считается ТОЛЬКО по установленным картам: сожжённая на утиль карта
+     * очков не даёт, и это единственный честный размен, который карта предлагает
+     * — разовая выгода сейчас против очков в конце.
+     */
+    private static int arsenalGoalVp(GameState s, PlayerState p) {
+        int total = 0;
+        for (String cid : p.arsenalInstalled) {
+            Map<String, Object> card = kelium.dataio.Ctx.cards(s, "arsenal").find(cid);
+            if (card == null || !(card.get("bottom") instanceof Map<?, ?> bottom)
+                    || !(bottom.get("scoring") instanceof Map<?, ?> sc)) {
+                continue;
+            }
+            int vp = sc.get("vp") instanceof Number n ? n.intValue() : 0;
+            if (sc.get("combo") instanceof java.util.List<?> combo) {
+                boolean all = true;
+                for (Object part : combo) {
+                    if (!(part instanceof Map<?, ?> cond)) {
+                        continue;
+                    }
+                    int need = cond.get("at_least") instanceof Number n ? n.intValue() : 0;
+                    if (goalCount(s, p, String.valueOf(cond.get("of"))) < need) {
+                        all = false;
+                        break;
+                    }
+                }
+                if (all) {
+                    total += vp;
+                }
+            } else if (sc.get("per") instanceof Number per && per.intValue() > 0) {
+                total += vp * (goalCount(s, p, String.valueOf(sc.get("of")))
+                    / per.intValue());
+            }
+        }
+        return total;
+    }
+
+    /** Что именно считает карта-цель. */
+    private static int goalCount(GameState s, PlayerState p, String what) {
+        return switch (what) {
+            case "buildings_on_field" -> p.buildingsOnField().size();
+            case "aircraft_on_field" -> countUnits(p, kelium.core.UnitType.AIRCRAFT);
+            case "vehicles_on_field" -> countUnits(p, kelium.core.UnitType.VEHICLE);
+            case "airbase" -> countBuildings(p, kelium.core.BuildingType.AIRBASE);
+            case "military_buildings" ->
+                countBuildings(p, kelium.core.BuildingType.BARRACKS)
+                + countBuildings(p, kelium.core.BuildingType.FACTORY)
+                + countBuildings(p, kelium.core.BuildingType.AIRBASE);
+            case "level2_economy" -> {
+                int n = 0;
+                for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+                    boolean economy = b.type == kelium.core.BuildingType.MINER
+                        || b.type == kelium.core.BuildingType.POWER_PLANT;
+                    if (economy && b.level != null && b.level == 2) {
+                        n++;
+                    }
+                }
+                yield n;
+            }
+            case "units_off_home" -> {
+                java.util.Set<String> home = new java.util.HashSet<>();
+                for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+                    if (b.hexId != null) {
+                        home.add(b.hexId);
+                    }
+                }
+                int n = 0;
+                for (kelium.core.UnitToken u : p.unitsOnField()) {
+                    if (u.hexId != null && !home.contains(u.hexId)) {
+                        n++;
+                    }
+                }
+                yield n;
+            }
+            case "units_on_field" -> p.unitsOnField().size();
+            case "debris" -> p.resources.debris();
+            case "cu_tokens" -> p.cuDestructionTokens;
+            case "unit_kinds" -> {
+                java.util.Set<kelium.core.UnitType> kinds =
+                    java.util.EnumSet.noneOf(kelium.core.UnitType.class);
+                for (kelium.core.UnitToken u : p.unitsOnField()) {
+                    kinds.add(u.type);
+                }
+                yield kinds.size();
+            }
+            case "tech_steps" -> {
+                int n = 0;
+                for (String track : s.tech.tracks) {
+                    n += p.techSteps.getOrDefault(track, 0);
+                }
+                yield n;
+            }
+            default -> 0;
+        };
+    }
+
+    private static int countUnits(PlayerState p, kelium.core.UnitType type) {
+        int n = 0;
+        for (kelium.core.UnitToken u : p.unitsOnField()) {
+            if (u.type == type) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    private static int countBuildings(PlayerState p, kelium.core.BuildingType type) {
+        int n = 0;
+        for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+            if (b.type == type) {
+                n++;
+            }
+        }
+        return n;
     }
 }

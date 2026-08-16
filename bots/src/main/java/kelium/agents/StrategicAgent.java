@@ -110,10 +110,15 @@ public class StrategicAgent extends HeuristicAgent {
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
         String ctxKind = context != null ? String.valueOf(context.getOrDefault("kind", "")) : "";
-        // План пересчитываем в двух точках: при вскрытии приказа (начало хода) и
-        // перед выбором действия — обстановка к этому моменту уже свежая.
+        // ПЛАН ДЕРЖИТСЯ МЕЖДУ ХОДАМИ (15.08.2026). Раньше он пересоздавался с
+        // нуля при каждом вскрытии и каждом действии: при двух близких по
+        // ценности целях бот метался между ними и не доводил до конца НИ ОДНОЙ
+        // цепочки — со стороны это выглядело как случайные приказы и отсутствие
+        // тактики (разнос дизайнера, и разнос по делу). Теперь смена курса
+        // должна ОПРАВДАТЬ свою цену: новый план обязан быть заметно лучше
+        // свежей версии текущего (порог — ген plan.commit), иначе держим курс.
         if ("reveal_order".equals(ctxKind) || "action".equals(ctxKind)) {
-            plan = Plan.best(state, seat, genome);
+            plan = reconsiderPlan(state);
             sayPlan();
         } else if (plan == null) {
             plan = Plan.best(state, seat, genome);
@@ -509,6 +514,7 @@ public class StrategicAgent extends HeuristicAgent {
     @Override
     protected BiFunction<GameState, Choice, Double> scorerFor(String kind, Map<String, Object> ctx) {
         BiFunction<GameState, Choice, Double> base = switch (kind) {
+            case "reveal_order" -> (s, o) -> scoreRevealPlanned(s, o);
             case "move" -> (s, o) -> scoreMoveStrategic(s, o);
             case "combat_source" -> (s, o) -> scoreCombatSourceStrategic(s, o);
             case "combat_target" -> (s, o) -> scoreCombatTargetStrategic(s, o, ctx);
@@ -678,12 +684,85 @@ public class StrategicAgent extends HeuristicAgent {
     }
 
     /** Действие-развязка цели: то, ради чего вся цепочка и строилась. */
+    /**
+     * ВЫБОР КАРТЫ ПРИКАЗА — ОТ ПЛАНА (15.08.2026). До этого приказ выбирала
+     * формула весов действий, которая ПЛАН НЕ СПРАШИВАЛА ВООБЩЕ: бот мог вести
+     * набег и вскрыть Приобретения, потому что «у рынка вес повыше». Именно это
+     * дизайнер и видел как «каждый ход играют случайные карты приказов».
+     *
+     * <p>Теперь приказ, содержащий действие следующего шага плана, получает
+     * прибавку (ген plan.reveal_pull), а финальное действие готового плана —
+     * полуторную: дойти до конца цепочки важнее, чем начать её.
+     */
+    private double scoreRevealPlanned(GameState state, Choice o) {
+        double base = super.scorerFor("reveal_order", null).apply(state, o);
+        if (plan == null || o.payload() == null) {
+            return base;
+        }
+        String needNow = plan.nextStep != null ? plan.nextStep.action : finalAction(plan);
+        String needThen = finalAction(plan);
+        Map<String, Object> card = Ctx.cards(state, "orders").byId((String) o.payload());
+        if (card == null || Boolean.TRUE.equals(card.get("joker"))) {
+            return base;                      // джокер и так гибкий, тянуть не надо
+        }
+        Order top = Order.fromCode((String) card.get("top"));
+        double pull = genome.get("plan.reveal_pull", 6.0);
+        for (String a : Order.ORDER_ACTIONS.get(top)) {
+            if (a.equals(needNow)) {
+                // готовый план (nextStep == null) закрывается финальным действием
+                // — это самый ценный приказ на руке.
+                base += plan.nextStep == null ? pull * 1.5 : pull;
+            } else if (a.equals(needThen)) {
+                base += pull * 0.4;           // приказ пригодится на шаг позже
+            }
+        }
+        return base;
+    }
+
+    /**
+     * Пересмотр плана с ОБЯЗАТЕЛЬСТВОМ: держим текущий курс, пока новый не
+     * лучше его свежей оценки в {@code plan.commit} раз.
+     *
+     * <p>«Свежая версия текущего» — это план ТОЙ ЖЕ цели (и той же жертвы для
+     * набега), пересобранный по нынешней обстановке: шаги в нём уже отмечены
+     * сделанными, дистанции пересчитаны. Если цель умерла (жертву снесли,
+     * жилы кончились) — свежей версии не будет, и мы честно берём лучший из
+     * оставшихся. Это ровно та «инерция намерения», которой не хватало: у
+     * живого игрока начатый манёвр стоит дороже равноценной альтернативы.
+     */
+    private Plan reconsiderPlan(GameState state) {
+        java.util.List<Plan> all = Plan.candidates(state, seat, genome);
+        Plan refreshed = null;
+        Plan best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (Plan p : all) {
+            if (p == null) {
+                continue;
+            }
+            double sc = p.score(genome);
+            if (sc > bestScore) {
+                bestScore = sc;
+                best = p;
+            }
+            if (plan != null && p.goal == plan.goal
+                    && java.util.Objects.equals(p.targetHex, plan.targetHex)) {
+                refreshed = p;
+            }
+        }
+        if (refreshed == null) {
+            return best;                      // прежняя цель мертва — новый курс
+        }
+        double commit = Math.max(1.0, genome.get("plan.commit", 1.25));
+        return bestScore > refreshed.score(genome) * commit ? best : refreshed;
+    }
+
     private static String finalAction(Plan p) {
         return switch (p.goal) {
             case KELIUM -> "mining";
             case SELL, ECONOMY -> "market";
             case TECH -> "science";
             case ARMY -> "assembly";
+            case STRIKE -> "combat";       // финал набега — удар
             case OBJECTIVE -> null;
         };
     }
@@ -733,23 +812,60 @@ public class StrategicAgent extends HeuristicAgent {
         var killable = wv.killableEnemyHexes(mover.type);
         double agg = g("aggression");
 
-        // ОСАДА ЦУ: сводим ВСЮ ударную силу к ОДНОМУ плацдарму рядом с одним
-        // чужим ЦУ. Бой даёт залп ВСЕМ юнитам с ОДНОГО гекса-источника — поэтому
-        // важно копить технику на ОДНОЙ клетке (staging), а не размазывать по
-        // соседям. Урон копится между раундами, кучный залп добивает ЦУ.
-        String siege = siegeCuHex(state, wv, mover);
+        // НАБЕГ: сводим ВСЮ ударную силу к ОДНОМУ плацдарму рядом с одной ценной
+        // целью — ЦУ приоритетно, а если оно недостижимо, план переключается на
+        // любое другое чужое здание (см. siegeTargetHex). Бой даёт залп ВСЕМ
+        // юнитам с ОДНОГО гекса-источника — поэтому важно копить технику на ОДНОЙ
+        // клетке (staging), а не размазывать по соседям. Урон копится между
+        // раундами, кучный залп добивает цель.
+        // Цель берём из ПЛАНА, если он ведёт набег: движение, бой и приказы
+        // обязаны смотреть на одну и ту же жертву, иначе цепочка расползается.
+        String siege = plan != null && plan.goal == Plan.Goal.STRIKE
+            && plan.targetHex != null && тамЕщёВраг(state, plan.targetHex)
+            ? plan.targetHex : siegeTargetHex(state, wv, mover);
+        boolean siegeIsCu = siege != null && isCuHex(state, siege);
         if (siege != null) {
             String staging = stagingHexFor(state, siege);
             if (staging != null && staging.equals(dest)) {
-                return g("move.strike_range") * (1.2 + agg) + g("combat.cu_bonus");  // встал на плацдарм
+                // встал на плацдарм: за ЦУ бонус выше (мгновенная победа), за
+                // прочую цель — обычная ценность добивания здания.
+                return g("move.strike_range") * (1.2 + agg)
+                    + (siegeIsCu ? g("combat.cu_bonus") : g("combat.building_bonus"));
             }
             java.util.Set<String> stg = staging != null
                 ? java.util.Set.of(staging)
                 : new java.util.HashSet<>(state.field.neighbors(siege));
             Integer dc = wv.bfsDistanceTo(dest, stg);
             if (dc != null) {
-                return (g("move.toward_killable") + g("combat.cu_bonus") * 0.5) * (0.7 + agg / (dc + 1.0));
+                double bonus = siegeIsCu ? g("combat.cu_bonus") : g("combat.building_bonus");
+                return (g("move.toward_killable") + bonus * 0.5) * (0.7 + agg / (dc + 1.0));
             }
+        }
+
+        // КУЛАК (заказ дизайнера 15.08.2026, по замеру воронки боя). В бою
+        // участвует ОДИН гекс-источник против ОДНОГО гекса-цели, поэтому сила
+        // залпа — это сколько своих войск стоит НА ОДНОМ ГЕКСЕ, а вовсе не
+        // сколько их на поле. Замер: 88% стопок — одиночные, отсюда 1.45
+        // попадания на результативный бой и ноль военных побед. Двенадцать
+        // жетонов по одному на гекс бьют ровно так же слабо, как один.
+        //
+        // Поэтому за переход на гекс, где УЖЕ стоит своё войско, полагается
+        // прибавка — и тем больше, чем ближе оттуда до врага: собираться в кулак
+        // в тылу бессмысленно, а на передовой это и есть подготовка залпа.
+        double fist = 0.0;
+        int alliesAtDest = 0;
+        for (UnitToken u : state.player(seat).unitsOnField()) {
+            if (u != mover && dest.equals(u.hexId)) {
+                alliesAtDest++;
+            }
+        }
+        if (alliesAtDest > 0) {
+            Integer dEnemy = wv.distanceToNearestEnemy(dest);
+            // Насыщение по числу: третий и четвёртый жетон в стопке добавляют
+            // меньше второго — таблица атак всё равно ограничивает число рядов.
+            double mass = Math.min(2.0, alliesAtDest);
+            double front = dEnemy == null ? 0.3 : 1.0 / (1.0 + dEnemy);
+            fist = g("move.mass_up") * mass * (0.3 + front);
         }
 
         if (!killable.isEmpty()) {
@@ -771,23 +887,25 @@ public class StrategicAgent extends HeuristicAgent {
             Integer d = wv.bfsDistanceTo(dest, aim);
             if (d != null) {
                 if (d == 1) {
-                    return g("move.strike_range") * (0.6 + agg) * leaderMul;   // удар в след. ход
+                    // Встал на ударную позицию — и тем ценнее, чем больше своих
+                    // уже стоит здесь же: залп пойдёт всей стопкой разом.
+                    return g("move.strike_range") * (0.6 + agg) * leaderMul + fist;
                 }
                 if (d == 0) {
-                    return g("move.toward_killable") * 0.4;             // на гексе цели — бить нельзя
+                    return g("move.toward_killable") * 0.4 + fist;      // на гексе цели — бить нельзя
                 }
-                return g("move.toward_killable") * (0.5 + agg / (d + 1.0)) * leaderMul;
+                return g("move.toward_killable") * (0.5 + agg / (d + 1.0)) * leaderMul + fist;
             }
         }
         // убиваемых целей не видно — просто сближаемся с ближайшим врагом
         Integer de = wv.distanceToNearestEnemy(dest);
         if (de == null) {
-            return 0.6;
+            return 0.6 + fist;
         }
         if (de == 1) {
-            return g("move.toward_enemy") * (0.8 + agg);
+            return g("move.toward_enemy") * (0.8 + agg) + fist;
         }
-        return g("move.toward_enemy") * (0.5 + agg / (de + 1.0));
+        return g("move.toward_enemy") * (0.5 + agg / (de + 1.0)) + fist;
     }
 
     /**
@@ -871,15 +989,30 @@ public class StrategicAgent extends HeuristicAgent {
             score += g("combat.raze_neutral") * (0.3 + 1.2 * scarcity)
                 + 0.3 * nb.trophyReward();
         }
+        // ВЗГЛЯД НА ПАРТИЮ КАК НА ИГРУ С СОПЕРНИКАМИ (15.08.2026). Раньше здесь
+        // была одна поправка «бей лидера» по числу очков. Теперь цель оценивается
+        // с трёх сторон сразу: кому принадлежит (насколько этот игрок опасен),
+        // сколько противник потеряет ДО КОНЦА ПАРТИИ, и не подставляюсь ли я сам.
+        Rivalry riv = new Rivalry(state, seat);
         for (Token t : wv.enemyTokens) {
             if (!hx.equals(t.hexId())) {
                 continue;
             }
             boolean killable = wv.anyUnitCanKill(t);
+            // КОМУ ВРЕДИМ. Урон отстающему — подарок лидеру: действие потрачено,
+            // а разрыв с тем, кто обгоняет, не изменился. Множитель около 1.4 за
+            // удар по опасному и около 0.3 за удар по безобидному.
+            double whose = 1.0 + g("rivalry.pick_target") * (riv.damageValue(t.owner()) - 0.7);
+            // ЧЕГО ЛИШАЕМ. Уничтожение — это не разовый трофей, а изъятие всего,
+            // что жетон принёс бы владельцу до конца партии. Именно этой поправки
+            // не хватало: без неё размен всегда выглядел убытком, и бот копил
+            // боеприпасы вместо стрельбы (замер 15.08.2026: 5.4 боеприпаса на
+            // руках при 0.8 боя за раунд).
+            double future = 1.0 + g("rivalry.future_loss") * (riv.lostFutureValue(t) - 1.0);
             if (killable) {
-                score += g("combat.kill_value");
+                score += g("combat.kill_value") * whose * future;
             } else {
-                score += 0.5;   // цель есть, но убить нечем — почти бесполезно
+                score += 0.5 * whose;   // цель есть, но убить нечем
             }
             // БЕЙ ЛИДЕРА: подавление сильнейшего соперника (мои ПО − лидер).
             if (t.owner() == leader && killable) {
@@ -991,6 +1124,41 @@ public class StrategicAgent extends HeuristicAgent {
         return best;
     }
 
+    /** Жив ли на гексе хоть один чужой жетон — жертва плана могла быть снесена. */
+    private boolean тамЕщёВраг(GameState state, String hexId) {
+        for (PlayerState p : state.players) {
+            if (p.seat == seat) {
+                continue;
+            }
+            for (BuildingToken b : p.buildingsOnField()) {
+                if (hexId.equals(b.hexId)) {
+                    return true;
+                }
+            }
+            for (UnitToken u : p.unitsOnField()) {
+                if (hexId.equals(u.hexId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Стоит ли на этом гексе чужое ЦУ — различить, каким бонусом награждать плацдарм. */
+    private boolean isCuHex(GameState state, String hexId) {
+        for (PlayerState p : state.players) {
+            if (p.seat == seat) {
+                continue;
+            }
+            for (BuildingToken b : p.buildingsOnField()) {
+                if (b.type == BuildingType.COMMAND_CENTER && hexId.equals(b.hexId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private String siegeCuHex(GameState state, WorldView wv, UnitToken mover) {
         // мувер должен уметь бить здания (техника/авиация/вышка)
         Target[] atk = state.player(seat).board.troop.attacks(mover.type);
@@ -1028,6 +1196,77 @@ public class StrategicAgent extends HeuristicAgent {
             if (b.damage > bestDmg || (b.damage == bestDmg && (bestDist == null || dist < bestDist))) {
                 bestDmg = b.damage;
                 bestDist = dist;
+                best = b.hexId;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * ПЛАН НАБЕГА НА ЛЮБУЮ ЦЕННУЮ ЦЕЛЬ, не только на ЦУ (заказ дизайнера
+     * 15.08.2026, по замеру: жнец с глубоким просчётом сносил 2.61 жетона за
+     * партию вместо заявленных 8, а в 25% партий не сносил вообще ничего).
+     *
+     * <p>Единственный в коде механизм многоходового плана — сведение техники на
+     * один плацдарм — существовал ТОЛЬКО для осады чужого ЦУ ({@link
+     * #siegeCuHex}). А военная победа за 1350 замеренных партий не случилась ни
+     * разу: значит этот план почти никогда не активировался, и всё «планирование
+     * наперёд» у бота фактически было пустым местом всю партию, кроме редких
+     * случаев осады ЦУ.
+     *
+     * <p>Здесь та же схема (плацдарм → накопление силы → залп), но целью
+     * становится ЛЮБОЕ ценное чужое здание, до которого реально дотянуться. ЦУ
+     * остаётся приоритетом первого порядка (мгновенная победа), но если оно
+     * недостижимо — план не пустеет, а переключается на следующую по ценности
+     * цель, вместо того чтобы молчать всю партию.
+     *
+     * @return гекс-плацдарм рядом с целью, либо {@code null} — целей нет вовсе
+     */
+    private String siegeTargetHex(GameState state, WorldView wv, UnitToken mover) {
+        String cu = siegeCuHex(state, wv, mover);
+        if (cu != null) {
+            return cu;
+        }
+        Target[] atk = state.player(seat).board.troop.attacks(mover.type);
+        boolean canHitBld = atk != null
+            && (atk[0] == Target.BUILDINGS_TOWERS || atk[1] == Target.BUILDINGS_TOWERS);
+        if (!canHitBld) {
+            return null;
+        }
+        Rivalry riv = new Rivalry(state, seat);
+        String best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (Token t : wv.enemyTokens) {
+            if (!(t instanceof BuildingToken b) || b.hexId == null
+                    || b.type == BuildingType.COMMAND_CENTER) {
+                continue;                      // ЦУ уже разобран веткой выше
+            }
+            java.util.Set<String> adj = new java.util.HashSet<>(state.field.neighbors(b.hexId));
+            Integer dist = null;
+            for (UnitToken u : state.player(seat).unitsOnField()) {
+                Target[] ua = state.player(seat).board.troop.attacks(u.type);
+                boolean uHitsBld = ua != null
+                    && (ua[0] == Target.BUILDINGS_TOWERS || ua[1] == Target.BUILDINGS_TOWERS);
+                if (!uHitsBld) {
+                    continue;
+                }
+                Integer d = wv.bfsDistanceTo(u.hexId, adj);
+                if (d != null && (dist == null || d < dist)) {
+                    dist = d;
+                }
+            }
+            if (dist == null) {
+                continue;                      // недостижимо ни одним бьющим здания юнитом
+            }
+            // Ценность цели: чем опаснее владелец (по Rivalry) и чем дороже
+            // здание (по урону, уже накопленному, и по типу — экономика владельца
+            // ценнее казармы), тем выше приоритет; дальняя цель дешевле — план
+            // должен успеть сложиться за оставшуюся часть партии.
+            double value = 1.0 + b.damage
+                + (b.type == BuildingType.MINER || b.type == BuildingType.POWER_PLANT ? 1.5 : 0.5);
+            double score = value * (0.4 + riv.damageValue(b.owner())) / (1.0 + dist);
+            if (score > bestScore) {
+                bestScore = score;
                 best = b.hexId;
             }
         }

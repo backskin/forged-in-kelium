@@ -70,8 +70,20 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
 
     public SuperObjectivesPanel() {
         setBackground(kelium.gui.replay2.Theme.bg());
-        setPreferredSize(new Dimension(DESIGN_W, DESIGN_H));
-        setMinimumSize(new Dimension(DESIGN_W, DESIGN_H));
+    }
+
+    /** Расчётный размер — в масштабе интерфейса (см. {@code BoardsPanel.design}). */
+    private static Dimension design() {
+        return new Dimension(kelium.gui.replay2.Theme.px(DESIGN_W),
+            kelium.gui.replay2.Theme.px(DESIGN_H));
+    }
+
+    @Override public Dimension getPreferredSize() {
+        return design();
+    }
+
+    @Override public Dimension getMinimumSize() {
+        return design();
     }
 
     // ---- Scrollable: растягиваться, когда место есть, и прокручиваться, когда нет ----
@@ -91,11 +103,13 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
     }
 
     @Override public boolean getScrollableTracksViewportWidth() {
-        return getParent() instanceof javax.swing.JViewport v && v.getWidth() >= DESIGN_W;
+        return getParent() instanceof javax.swing.JViewport v
+            && v.getWidth() >= design().width;
     }
 
     @Override public boolean getScrollableTracksViewportHeight() {
-        return getParent() instanceof javax.swing.JViewport v && v.getHeight() >= DESIGN_H;
+        return getParent() instanceof javax.swing.JViewport v
+            && v.getHeight() >= design().height;
     }
 
     /** Подключить карточный набор супер-заданий той версии, в которой сыграна партия. */

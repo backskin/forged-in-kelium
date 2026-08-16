@@ -31,6 +31,19 @@ public final class PlayerState {
     // возвращается владельцу (уничтожение временно). Правило 2026-08-15.
     public final List<Token> trophySpace = new ArrayList<>();
 
+    /**
+     * ТРОФЕИ, ЗАДЕРЖАННЫЕ НА КАРТАХ АРСЕНАЛА («Трофейный склад», b13).
+     *
+     * <p>На карте нарисована ячейка под ОДИН трофейный жетон. В этап Возврата
+     * жетон кладётся сюда вместо возврата владельцу и лежит здесь раунд; если
+     * ячейка уже занята, лежавший жетон уходит владельцу, освобождая место.
+     *
+     * <p>Смысл эффекта — не в очках, а в отказе: пока чужой жетон лежит здесь,
+     * владелец не может выставить его заново, потому что личный запас у каждого
+     * ровно по четыре жетона рода.
+     */
+    public final List<Token> trophyHeldOnCards = new ArrayList<>();
+
     // Руки/установленные карты (id из контента).
     public List<String> orderHand = new ArrayList<>();
     public final List<String> orderPlayed = new ArrayList<>();   // вскрыто в этом раунде
@@ -159,6 +172,14 @@ public final class PlayerState {
     public int flippedNormalTiles = 0;
     // «Военный трек» (эксперимент): ПО за несданные трофеи в конце раунда.
     public int warTrackVp = 0;
+    /**
+     * Очки, начисленные КАРТАМИ-ОБЪЕКТАМИ напрямую ({@link
+     * kelium.engine.cards.CardContext#grantVp}) — например наградой задания за
+     * прямой пункт {@code vp} в данных. Отдельное поле по тому же образцу, что
+     * {@link #warTrackVp} и {@link #superFirstPartVp}: копится по ходу партии,
+     * суммируется в {@code Scoring}.
+     */
+    public int objectiveCardVp = 0;
     // Сколько ЦУ уничтожил этот игрок (ЛЮБЫХ: второй снос = военная победа).
     public int cuKills = 0;
     /**

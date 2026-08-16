@@ -457,16 +457,26 @@ public final class GameEngine {
             return;
         }
         s.firstPlayer = (s.firstPlayer + 1) % s.numPlayers();
-        // БАГ (найден дизайнером 14.08.2026): смена карты рынка застревала на
-        // 3+ раунда подряд. Старая активная карта нигде не уходила в сброс, а
-        // Deck.draw() при пустом доборе перетасовывает ИМЕННО сброс — если он
-        // всегда пуст, каждая карта колоды достаётся ровно один раз за партию,
-        // а дальше draw() молча возвращает null навсегда, и marketActive так и
-        // остаётся прежним без единого признака, что колода уже кончилась.
-        if (s.marketActive != null) {
-            s.decks.get("market").discard(s.marketActive);
-        }
+        // КАРТА РЫНКА УХОДИТ ИЗ ИГРЫ НАВСЕГДА (правило дизайнера 15.08.2026).
+        // Колода рынка тасуется на подготовке, каждый раунд с неё снимается одна
+        // карта — и больше в игру не возвращается. Восемь карт = восемь раундов,
+        // и последняя карта означает последний раунд: это одно из условий конца
+        // партии, а не отдельная константа.
+        //
+        // ИСТОРИЯ ОШИБКИ, чтобы её не починили обратно. 14.08.2026 чинили другую
+        // неполадку — «карта рынка залипала на несколько раундов» — и починили
+        // тем, что стали класть отыгравшую карту в СБРОС. Но Deck.draw() при
+        // пустом доборе перетасовывает именно сброс, поэтому карты пошли по
+        // второму кругу и начали повторяться за партию. Настоящая причина
+        // залипания была не в этом, а в том, что при исчерпанной колоде draw()
+        // молча возвращает null и прежняя карта остаётся лежать. Лечится это
+        // явной проверкой ниже, а не возвратом карт в игру.
         String newMarket = s.decks.get("market").draw(s.rng);
+        if (newMarket == null) {
+            // Колода кончилась — партия должна была закончиться этим раундом.
+            // Раньше здесь было молчание, и карта просто оставалась прежней.
+            emit(ev("type", "market_deck_empty", "round", rnd));
+        }
         if (newMarket != null) {
             s.marketActive = newMarket;
             // Новая карта — новые пустые ячейки предложений: кубики келемия с
@@ -900,7 +910,9 @@ public final class GameEngine {
         }
         s.decks.get("containers").discard(cid);
         s.journal.of(p.seat).containersOpened += 1;
-        emit(ev("type", "container", "seat", p.seat, "card", cid, "variant", payload[0], "got", got));
+        emit(ev("type", "container", "seat", p.seat, "card", cid, "variant", payload[0],
+            "effect", variant.getOrDefault("effect", ""),
+            "label", variant.getOrDefault("label", ""), "got", got));
     }
 
     /**
@@ -1320,7 +1332,12 @@ public final class GameEngine {
         }
         p.arsenalHand.remove(cid);
         s.decks.get("arsenal").discard(cid);
-        emit(ev("type", "arsenal", "seat", p.seat, "card", cid, "mode", "burn", "got", got));
+        // ЭФФЕКТ И ЯРЛЫК В СОБЫТИИ (заказ дизайнера 15.08.2026): без них в отчётах
+        // видно только «сожгли карту», а какой утиль-эффект сработал и что он дал —
+        // нет. Задания это сообщали, арсенал молчал, и метрики утиля были неполными.
+        emit(ev("type", "arsenal", "seat", p.seat, "card", cid, "mode", "burn",
+            "effect", top.getOrDefault("effect", ""),
+            "label", top.getOrDefault("label", ""), "got", got));
     }
 
     /**
@@ -1610,6 +1627,33 @@ public final class GameEngine {
         if (!gameEnding && rs.getBool("return_step.return_destroyed_tokens", true)) {
             int returned = 0;
             java.util.Set<Integer> ownersToReconcile = new java.util.HashSet<>();
+            // ТРОФЕЙНЫЙ СКЛАД (карта арсенала b13, правило дизайнера 15.08.2026).
+            // Сначала освобождаем ячейки: жетон, пролежавший на карте раунд,
+            // уходит владельцу. Потом игрок выбирает, какой трофей задержать —
+            // он не вернётся владельцу ещё раунд и не даст обломок.
+            for (PlayerState p : s.players) {
+                for (Token held : new ArrayList<>(p.trophyHeldOnCards)) {
+                    held.setCapturedBy(null);
+                    held.resetDamage();
+                    held.setHexId(null);
+                    emit(ev("type", "trophy_released", "seat", p.seat,
+                        "owner", held.owner(), "round", s.round));
+                }
+                p.trophyHeldOnCards.clear();
+                int slots = kelium.engine.ability.RuleQuery
+                    .of(s, p.seat, kelium.engine.ability.Hook.RETURN_KEEP_TROPHY)
+                    .base(0).ask();
+                for (int i = 0; i < slots && !p.trophySpace.isEmpty(); i++) {
+                    Token keep = chooseTrophyToHold(p);
+                    if (keep == null) {
+                        break;
+                    }
+                    p.trophySpace.remove(keep);
+                    p.trophyHeldOnCards.add(keep);
+                    emit(ev("type", "trophy_held", "seat", p.seat,
+                        "owner", keep.owner(), "round", s.round));
+                }
+            }
             for (PlayerState p : s.players) {
                 // ФЛАТ, не печатная ценность (уточнение 2026-08-15): несданный в
                 // Науку жетон даёт РОВНО 1 обломок, независимо от trophyValue()
@@ -1675,6 +1719,32 @@ public final class GameEngine {
             }
         }
         emit(ev("type", "return", "round", s.round));
+    }
+
+    /**
+     * Какой трофей задержать на карте «Трофейный склад».
+     *
+     * <p>Спрашиваем игрока: выбор осмысленный, а не механический. Задержать
+     * выгоднее тот жетон, который противнику нужнее всего — тогда он не сможет
+     * выставить его заново (личный запас у каждого ровно по четыре на род).
+     * Отказаться тоже можно: задержанный трофей не конвертируется в обломок,
+     * то есть за отказ платят одним очком экономики.
+     */
+    private Token chooseTrophyToHold(PlayerState p) {
+        GameState s = state;
+        if (agents == null || p.seat >= agents.size() || agents.get(p.seat) == null) {
+            return p.trophySpace.get(0);
+        }
+        List<kelium.core.Choice> opts = new ArrayList<>();
+        for (Token t : p.trophySpace) {
+            opts.add(new kelium.core.Choice("trophy_hold", t,
+                "задержать жетон игрока " + t.owner()
+                    + " (ценность " + t.trophyValue() + ")"));
+        }
+        opts.add(new kelium.core.Choice("pass", null, "не задерживать"));
+        kelium.core.Choice c = agents.get(p.seat).choose(s, opts,
+            java.util.Map.of("kind", "trophy_hold"));
+        return c.payload() instanceof Token t ? t : null;
     }
 
     // ---- условия конца партии --------------------------------------------

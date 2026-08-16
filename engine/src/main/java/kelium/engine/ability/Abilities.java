@@ -92,7 +92,8 @@ public final class Abilities {
         Hook.ATTACK_PROTECT_HEX,        // CombatResolver: защита жетонов на гексе
         Hook.ATTACK_RANGE,              // CombatResolver: дальность выбора цели
         Hook.TOKEN_HP,                  // Passives.effectiveHp: прочность жетона
-        Hook.MOVEMENT_JUMP_OVER);       // Actions: прыжок пехоты через тайл зарождения
+        Hook.MOVEMENT_JUMP_OVER,
+        Hook.RETURN_KEEP_TROPHY);       // Actions: прыжок пехоты через тайл зарождения
 
     /** Точки правил, объявленные подключёнными к движку. */
     public static Set<Hook> wiredHooks() {

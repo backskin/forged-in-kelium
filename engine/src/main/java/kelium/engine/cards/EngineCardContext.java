@@ -1,0 +1,200 @@
+package kelium.engine.cards;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import kelium.core.Agent;
+import kelium.core.Choice;
+import kelium.core.GameState;
+import kelium.core.PlayerState;
+import kelium.core.Resource;
+import kelium.core.Token;
+import kelium.core.UnitToken;
+import kelium.engine.Passability;
+import kelium.engine.Scoring;
+import kelium.engine.Storage;
+
+/**
+ * РЕАЛИЗАЦИЯ ДОГОВОРА КАРТЫ — недостающее звено между {@code Objective}/
+ * {@code ArsenalCard} и настоящей партией.
+ *
+ * <p>ПОЧЕМУ ЭТОГО НЕ БЫЛО И ПОЧЕМУ ЭТО ВАЖНО. {@link CardContext} был объявлен
+ * 15.08.2026 вместе с модулем карт, и javadoc обещал: «кто реализует —
+ * {@code kelium.engine.EngineCardContext}». Реализации не было НИКОГДА. Значит
+ * {@code Objective.progress()} и {@code needed()} — код, который физически
+ * НЕЛЬЗЯ было вызвать в живой партии: ни бот, ни движок не имели способа
+ * передать карте настоящее состояние игры. Каждая карта задания честно умела
+ * сказать «чего не хватает», а спросить её было некому. Это и есть прямая
+ * причина жалобы «боты не знают, как играть задания»: знание было написано и
+ * заперто без двери.
+ *
+ * <p>Один объект на вызов, лёгкий: оборачивает {@link GameState} + место, ничего
+ * не кэширует, создаётся и выбрасывается на каждый вопрос к карте.
+ */
+public final class EngineCardContext implements CardContext {
+
+    private final GameState state;
+    private final int seat;
+    private final Agent agent;   // может быть null — тогда ask() берёт первый вариант
+
+    public EngineCardContext(GameState state, int seat) {
+        this(state, seat, null);
+    }
+
+    public EngineCardContext(GameState state, int seat, Agent agent) {
+        this.state = state;
+        this.seat = seat;
+        this.agent = agent;
+    }
+
+    @Override public GameState state() {
+        return state;
+    }
+
+    @Override public int seat() {
+        return seat;
+    }
+
+    @Override public int roundsLeft() {
+        int cap = 8;
+        try {
+            cap = kelium.dataio.Ctx.cfg(state).content.get("market").entries.size();
+        } catch (RuntimeException e) {
+            // сцена без данных рынка (собранный вручную тест) — печатные восемь
+        }
+        return Math.max(0, cap - state.round);
+    }
+
+    @Override public List<Token> myTokensOnField() {
+        List<Token> out = new ArrayList<>();
+        out.addAll(me().unitsOnField());
+        out.addAll(me().buildingsOnField());
+        return out;
+    }
+
+    @Override public List<Token> enemyTokensOnField() {
+        List<Token> out = new ArrayList<>();
+        for (PlayerState p : state.players) {
+            if (p.seat == seat) {
+                continue;
+            }
+            out.addAll(p.unitsOnField());
+            out.addAll(p.buildingsOnField());
+        }
+        return out;
+    }
+
+    @Override public List<String> attackReach(UnitToken unit) {
+        if (unit.hexId == null) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>();
+        for (String nb : state.field.neighbors(unit.hexId)) {
+            if (Passability.canShootAcross(state, unit, nb)) {
+                out.add(nb);
+            }
+        }
+        return out;
+    }
+
+    @Override public void gain(Resource r, int amount) {
+        if (amount == 0) {
+            return;
+        }
+        switch (r) {
+            case KELIUM -> Storage.addKeliumCapped(state, me(), amount);
+            case AMMO -> Storage.addAmmoCapped(state, me(), amount);
+            case DEBRIS -> Storage.addDebrisCapped(state, me(), amount);
+            case COIN -> me().resources.add(Resource.COIN, amount);
+        }
+    }
+
+    @Override public int pay(Resource r, int amount) {
+        int have = me().resources.get(r);
+        int paid = Math.min(have, amount);
+        me().resources.pay(r, paid);
+        return paid;
+    }
+
+    @Override public void heal(Token token, int n) {
+        setDamage(token, Math.max(0, damageOf(token) - n));
+    }
+
+    @Override public void damage(Token token, int n) {
+        setDamage(token, damageOf(token) + n);
+    }
+
+    private static int damageOf(Token t) {
+        if (t instanceof kelium.core.UnitToken u) {
+            return u.damage;
+        }
+        if (t instanceof kelium.core.BuildingToken b) {
+            return b.damage;
+        }
+        return 0;
+    }
+
+    private static void setDamage(Token t, int v) {
+        if (t instanceof kelium.core.UnitToken u) {
+            u.damage = v;
+        } else if (t instanceof kelium.core.BuildingToken b) {
+            b.damage = v;
+        }
+    }
+
+    @Override public boolean move(UnitToken unit, String hexId) {
+        if (!state.field.neighbors(unit.hexId == null ? hexId : unit.hexId).contains(hexId)
+                && unit.hexId != null) {
+            return false;
+        }
+        unit.setHexId(hexId);
+        return true;
+    }
+
+    @Override public void freeAction(String action) {
+        // Разыгрывается той же машиной, что и обычные бесплатные действия карт
+        // (Effects.freeAction) — здесь только точка входа для карт-объектов,
+        // которые захотят выдавать свободное действие напрямую, а не через YAML.
+        kelium.engine.Effects.apply("free_action", state, seat, Map.of("action", action));
+    }
+
+    @Override public void grantVp(int amount, String source) {
+        if (amount == 0) {
+            return;
+        }
+        state.player(seat).objectiveCardVp += amount;
+    }
+
+    @Override @SuppressWarnings("unchecked")
+    public <T> T ask(String kind, List<T> options) {
+        if (options.isEmpty()) {
+            return null;
+        }
+        if (agent == null) {
+            return options.get(0);
+        }
+        List<Choice> choices = new ArrayList<>();
+        for (int i = 0; i < options.size(); i++) {
+            choices.add(new Choice(kind, i, String.valueOf(options.get(i))));
+        }
+        Choice picked = agent.choose(state, choices, Map.of("kind", kind));
+        if (picked == null || picked.payload() == null) {
+            return null;
+        }
+        return options.get((Integer) picked.payload());
+    }
+
+    @Override public void log(String event, Map<String, Object> details) {
+        // НАМЕРЕННО ПУСТО в этой реализации. У GameEngine есть свой канал
+        // событий (emit), и когда карты подключат к реальным действиям игрока
+        // (не только к признакам для бота), туда и нужно будет передавать —
+        // отдельным конструктором с Consumer<Map<String,Object>>. Пока контекст
+        // используется для ЧТЕНИЯ картой своего состояния (progress/needed),
+        // а не для розыгрыша, эмиттер не нужен.
+    }
+
+    @Override public PlayerState me() {
+        return state.player(seat);
+    }
+}

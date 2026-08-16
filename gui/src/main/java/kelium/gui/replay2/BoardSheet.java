@@ -329,7 +329,9 @@ public final class BoardSheet extends JComponent {
     private void paintBlueSlot(Graphics2D g, ReplayRecord.Player p, Slot s,
                                int x, int y, int width) {
         ReplayRecord.Module m = p.bluePlaced.get(s.type());
-        int side = px(18);
+        // МЕСТО КРУПНЕЕ ЖЕТОНА и само крупнее прежнего: на 18 точках площадка и
+        // жетон сливались в один квадратик (просьба дизайнера 15.08.2026).
+        int side = px(26);
         int sx = x + (width - side) / 2;
         ModuleSlot.paint(g, m, ModuleSlot.blue(), sx, y, side);
         moduleSpots.put(new Rectangle(sx, y, side, side),
@@ -595,29 +597,91 @@ public final class BoardSheet extends JComponent {
     private int paintStorage(Graphics2D g, ReplayRecord.Player p, int x, int y, int w) {
         caption(g, "ХРАНИЛИЩЕ", x, y);
         y += px(14);
-        int cell = px(22);
-        int gap = px(5);
+        int cell = px(26);
+        int gap = px(6);
         int cx = x;
         int cy = y;
+        // ---- ПЛАНШЕТ ХРАНИЛИЩА ОДНОЙ ПОЛОСОЙ, как он и напечатан: свои ячейки,
+        // за разделительной чертой — две ячейки, которые открывает жетон модуля,
+        // и ещё за чертой — площадка под свободные кубики энергии (диктовка
+        // дизайнера 15.08.2026). До этого на планшете были только свои ячейки, и
+        // по нему нельзя было понять, что даёт жетон и куда кладут лишние кубики.
         g.setFont(font(10, Font.PLAIN));
         g.setColor(Theme.ink3());
-        g.drawString("свои ячейки планшета:", x, cy + px(14));
-        cx = x + g.getFontMetrics().stringWidth("свои ячейки планшета:") + px(8);
+        g.drawString("свои ячейки:", x, cy + px(16));
+        cx = x + g.getFontMetrics().stringWidth("свои ячейки:") + px(8);
         for (int i = 0; i < startFill.length; i++) {
-            g.setColor(Theme.tile());
-            g.fill(new RoundRectangle2D.Double(cx, cy, cell, cell, Theme.R_TILE,
-                Theme.R_TILE));
-            g.setColor(Theme.border());
-            g.setStroke(new BasicStroke(1f));
-            g.draw(new RoundRectangle2D.Double(cx, cy, cell, cell, Theme.R_TILE,
-                Theme.R_TILE));
+            paintSquareCell(g, cx, cy, cell, true);
             if (startFill[i] != 0) {
                 MarkIcons.paint(g, cellIcon(startFill[i]), cx + cell / 2.0,
                     cy + cell / 2.0, cell * 0.62, cellIconColour(startFill[i]));
             }
             cx += cell + gap;
         }
-        cy += cell + px(8);
+
+        // ---- ЯЧЕЙКИ ОТ ЖЕТОНОВ МОДУЛЯ: их ровно две, и каждая открывается своим
+        // жетоном, положенным стороной «склад». Пока жетон не положен — место
+        // нарисовано, но погашено: видно, что открыть ещё можно.
+        cx += px(6);
+        cx = divider(g, cx, cy, cell);
+        int opened = 0;
+        for (String tok : p.storageTokens) {
+            if (tok != null && !tok.contains("energy")) {
+                opened++;
+            }
+        }
+        cellZones.clear();
+        for (int i = 0; i < 2; i++) {
+            boolean on = i < opened;
+            paintSquareCell(g, cx, cy, cell, on);
+            if (!on) {
+                g.setColor(Theme.alpha(Theme.ink3(), 0.5));
+                g.setStroke(new BasicStroke(Theme.pxf(1.2)));
+                g.drawLine(cx + px(6), cy + cell - px(6), cx + cell - px(6), cy + px(6));
+            }
+            cellZones.put(new Rectangle(cx, cy, cell, cell), on
+                ? "ЯЧЕЙКА ОТ ЖЕТОНА ХРАНИЛИЩА\n\nОткрыта: жетон положен стороной "
+                    + "«склад». Годится под келемий, боеприпасы и обломки."
+                : "ЯЧЕЙКА ОТ ЖЕТОНА ХРАНИЛИЩА\n\nПока закрыта. Откроется, когда "
+                    + "игрок положит сюда жетон модуля хранилища стороной «склад» "
+                    + "(жетоны приходят только с зелёного трека науки).");
+            cx += cell + gap;
+        }
+
+        // ---- ПЛОЩАДКА ПОД СВОБОДНЫЕ КУБИКИ ЭНЕРГИИ. Кубик жетона хранилища
+        // лежит здесь, пока не понадобится: во время смены энергии он ходит
+        // отсюда на любое своё здание и обратно, и денег это не стоит.
+        cx += px(6);
+        cx = divider(g, cx, cy, cell);
+        int cubes = 0;
+        for (String tok : p.storageTokens) {
+            if (tok != null && tok.contains("energy")) {
+                cubes++;
+            }
+        }
+        int zoneW = Math.max(cell * 2 + gap, cubes * (cell + gap));
+        g.setColor(Theme.alpha(Theme.energy(), Theme.isDark() ? 0.16 : 0.14));
+        g.fill(new RoundRectangle2D.Double(cx, cy, zoneW, cell, Theme.R_TILE,
+            Theme.R_TILE));
+        g.setColor(Theme.alpha(Theme.energy(), 0.75));
+        g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+            10f, new float[]{Theme.pxf(3), Theme.pxf(3)}, 0f));
+        g.draw(new RoundRectangle2D.Double(cx, cy, zoneW, cell, Theme.R_TILE,
+            Theme.R_TILE));
+        g.setStroke(new BasicStroke(1f));
+        for (int i = 0; i < cubes; i++) {
+            MarkIcons.paint(g, "ENERGY", cx + gap + i * (cell + gap) + cell / 2.0,
+                cy + cell / 2.0, cell * 0.58, Theme.energy());
+        }
+        cellZones.put(new Rectangle(cx, cy, zoneW, cell),
+            "СВОБОДНЫЕ КУБИКИ ЭНЕРГИИ\n\nПлощадка планшета: здесь лежат кубики, "
+            + "которые сейчас никого не питают. Во время смены энергии кубик "
+            + "ходит отсюда на любое своё здание и обратно, и это не стоит денег.\n\n"
+            + (cubes == 0
+                ? "Сейчас пусто: кубик даёт жетон модуля хранилища, положенный "
+                    + "стороной «энергия»."
+                : "Кубиков от жетонов: " + cubes + "."));
+        cy += cell + px(10);
         g.setFont(font(11, Font.PLAIN));
         g.setColor(Theme.ink2());
         g.drawString("занято " + (p.kelium + p.ammo + p.debris) + " из " + p.storeCap
@@ -649,6 +713,31 @@ public final class BoardSheet extends JComponent {
         return cy + px(26);
     }
 
+    /** Зоны планшета хранилища и их пояснения — под подсказку курсора. */
+    private final Map<Rectangle, String> cellZones = new LinkedHashMap<>();
+
+    /**
+     * КВАДРАТНАЯ ЯЧЕЙКА ПОД РЕСУРС — ровно так она напечатана на планшете
+     * (просьба дизайнера 15.08.2026: «места под жетоны сделать квадратными»).
+     * Погашенная ячейка рисуется бледнее: место есть, но пока не работает.
+     */
+    private void paintSquareCell(Graphics2D g, int x, int y, int side, boolean active) {
+        g.setColor(active ? Theme.tile() : Theme.alpha(Theme.tile(), 0.45));
+        g.fill(new RoundRectangle2D.Double(x, y, side, side, Theme.R_TILE, Theme.R_TILE));
+        g.setColor(active ? Theme.border() : Theme.alpha(Theme.border(), 0.55));
+        g.setStroke(new BasicStroke(1f));
+        g.draw(new RoundRectangle2D.Double(x, y, side, side, Theme.R_TILE, Theme.R_TILE));
+    }
+
+    /** Разделительная черта между зонами планшета; возвращает X за ней. */
+    private int divider(Graphics2D g, int x, int y, int height) {
+        g.setColor(Theme.alpha(Theme.ink3(), 0.8));
+        g.setStroke(new BasicStroke(Theme.pxf(2.2)));
+        g.drawLine(x, y - px(4), x, y + height + px(4));
+        g.setStroke(new BasicStroke(1f));
+        return x + px(12);
+    }
+
     /**
      * ДВА ЛИЧНЫХ ЖЕТОНА МОДУЛЯ ХРАНИЛИЩА. Их всегда ровно два, приходят только с
      * зелёного трека, и сторона выбирается при установке НАВСЕГДА — поэтому оба
@@ -658,8 +747,8 @@ public final class BoardSheet extends JComponent {
     private int paintStorageTokens(Graphics2D g, ReplayRecord.Player p, int x, int y) {
         g.setFont(font(11, Font.PLAIN));
         g.setColor(Theme.ink3());
-        g.drawString("жетоны хранилища:", x, y + px(13));
-        int side = px(18);
+        g.drawString("жетоны хранилища:", x, y + px(17));
+        int side = px(26);
         int sx = x + g.getFontMetrics().stringWidth("жетоны хранилища:") + px(8);
         for (int i = 0; i < 2; i++) {
             String tok = i < p.storageTokens.size() ? p.storageTokens.get(i) : null;
@@ -696,7 +785,7 @@ public final class BoardSheet extends JComponent {
                 pair[1]++;
             }
         }
-        int row = px(24);
+        int row = px(30);
         for (Map.Entry<String, int[]> e : byType.entrySet()) {
             int onField = e.getValue()[0];
             int all = Math.max(session.record().unitStockOf(e.getKey()),
@@ -709,7 +798,7 @@ public final class BoardSheet extends JComponent {
             g.drawString(Names.unit(e.getKey()), x, y + px(12));
             // стопка: закрашенные — в запасе, пустые — уже на поле
             int dot = px(9);
-            int dx = x + px(96);
+            int dx = x + px(104);
             for (int i = 0; i < all && i < 12; i++) {
                 boolean inReserve = i < reserve;
                 g.setColor(inReserve ? Theme.seat(p.seat) : Theme.alpha(Theme.ink3(), 0.5));
@@ -719,13 +808,13 @@ public final class BoardSheet extends JComponent {
             g.setFont(mono(11, Font.BOLD));
             g.setColor(Theme.ink2());
             g.drawString("в запасе " + reserve + " из " + all,
-                x + px(96) + 12 * (dot + px(3)) + px(8), y + px(12));
+                x + px(104) + 12 * (dot + px(3)) + px(8), y + px(12));
             // МЕСТО ПОД КРАСНЫЙ МОДУЛЬ — У РОДА, А НЕ У ЗДАНИЯ: красный ложится
             // на вторичный ряд атаки рода войск. Место есть у каждого рода
             // всегда, пустое показано штрихом.
-            int side = px(18);
-            int mx = x + px(74);
-            int my = y + px(2);
+            int side = px(26);
+            int mx = x + px(64);
+            int my = y - px(2);
             ReplayRecord.Module rm = p.redPlaced.get(e.getKey());
             ModuleSlot.paint(g, rm, ModuleSlot.red(), mx, my, side);
             moduleSpots.put(new Rectangle(mx, my, side, side),
@@ -1110,6 +1199,12 @@ public final class BoardSheet extends JComponent {
         for (Map.Entry<Rectangle, String> en : storeTokenSpots.entrySet()) {
             if (en.getKey().contains(e.getPoint())) {
                 return Ui2.tip(ModuleSlot.storageTokenName(en.getValue()));
+            }
+        }
+        // Зоны планшета хранилища: ячейки от жетона и площадка свободной энергии.
+        for (Map.Entry<Rectangle, String> en : cellZones.entrySet()) {
+            if (en.getKey().contains(e.getPoint())) {
+                return Ui2.tip(en.getValue());
             }
         }
         // ПОДСКАЗКА ПО МЕСТУ ЗДАНИЯ: главное в ней — ГДЕ здание сейчас, потому что

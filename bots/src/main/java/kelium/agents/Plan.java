@@ -51,7 +51,21 @@ public final class Plan {
         /** Довести до конца задание из руки. */
         OBJECTIVE("выполнить задание"),
         /** Развернуть экономику: денег ни на что не хватает. */
-        ECONOMY("поднять экономику");
+        ECONOMY("поднять экономику"),
+        /**
+         * НАБЕГ: выбрать чужую цель, довести до неё войско и ударить.
+         *
+         * <p>Заведён 15.08.2026 по прямому разносу дизайнера, и разнос был
+         * заслужен: до этой цели ни одна цепочка не соединяла «собрать войско»,
+         * «подвинуть его к противнику» и «провести атаку» — план армии
+         * ЗАКАНЧИВАЛСЯ на Сборке, а движение и бой оценивались каждый сам по
+         * себе, без общей цели. Ровно так и выглядит «бот без тактики»: он умеет
+         * всё по отдельности и ничего подряд. Это та же мысль, что в литературе
+         * по ботам стратегий (GOAP, портфельный поиск, Churchill/Buro): при
+         * огромном ветвлении искать надо не по атомарным ходам, а по ЦЕПОЧКАМ
+         * с предусловиями.
+         */
+        STRIKE("провести набег");
 
         public final String ru;
 
@@ -85,6 +99,12 @@ public final class Plan {
     }
 
     public final Goal goal;
+    /**
+     * Гекс цели набега (для {@link Goal#STRIKE}), иначе null. Хранится В ПЛАНЕ,
+     * а не пересчитывается на каждом выборе: план, который каждый ход выбирает
+     * новую жертву, — это не план, а генератор случайных блужданий.
+     */
+    public final String targetHex;
     public final List<Step> steps;
     /** Первый невыполненный шаг — «что мешает». null, если цель достижима сейчас. */
     public final Step nextStep;
@@ -92,7 +112,12 @@ public final class Plan {
     public final double value;
 
     private Plan(Goal goal, List<Step> steps, double value) {
+        this(goal, null, steps, value);
+    }
+
+    private Plan(Goal goal, String targetHex, List<Step> steps, double value) {
         this.goal = goal;
+        this.targetHex = targetHex;
         this.steps = steps;
         this.value = value;
         Step first = null;
@@ -153,6 +178,31 @@ public final class Plan {
      * характеров расходятся именно на выборе цели, а не только на тактике.
      */
     public static Plan best(GameState s, int seat, Genome g) {
+        List<Plan> all = candidates(s, seat, g);
+        // Штраф за длину ЦЕПОЧКИ мягкий, иначе бот вечно берёт самую короткую
+        // цель и никогда не начинает длинную — а длинные (добыча) как раз и есть
+        // развитие. Величина штрафа тоже ген: темп игры подбирает отбор.
+        Plan best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (Plan p : all) {
+            if (p == null) {
+                continue;
+            }
+            double sc = p.score(g);
+            if (sc > bestScore) {
+                bestScore = sc;
+                best = p;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * ВСЕ кандидаты-планы этого хода. Отдельным методом, потому что агенту для
+     * УДЕРЖАНИЯ плана между ходами нужен не только лучший, но и свежая версия
+     * ТЕКУЩЕГО плана — сравнить их и решить, стоит ли смена курса своей цены.
+     */
+    public static List<Plan> candidates(GameState s, int seat, Genome g) {
         List<Plan> all = new ArrayList<>();
         all.add(kelium(s, seat, g));
         all.add(sell(s, seat, g));
@@ -160,23 +210,14 @@ public final class Plan {
         all.add(army(s, seat, g));
         all.add(economy(s, seat, g));
         all.add(objective(s, seat, g));
-        // Штраф за длину ЦЕПОЧКИ мягкий, иначе бот вечно берёт самую короткую
-        // цель и никогда не начинает длинную — а длинные (добыча) как раз и есть
-        // развитие. Величина штрафа тоже ген: темп игры подбирает отбор.
+        all.add(strike(s, seat, g));
+        return all;
+    }
+
+    /** Ценность плана с поправкой на длину цепочки — единая формула выбора. */
+    public double score(Genome g) {
         double penalty = Math.max(0.05, g.get("plan.chain_penalty", 0.5));
-        Plan best = null;
-        double bestScore = Double.NEGATIVE_INFINITY;
-        for (Plan p : all) {
-            if (p == null) {
-                continue;
-            }
-            double sc = p.value / (1.0 + penalty * p.missing());
-            if (sc > bestScore) {
-                bestScore = sc;
-                best = p;
-            }
-        }
-        return best;
+        return value / (1.0 + penalty * missing());
     }
 
     /** Цепочка добычи: жила → добытчик рядом → запитан → место в хранилище. */
@@ -284,6 +325,137 @@ public final class Plan {
         int units = me.unitsOnField().size();
         double v = g.get("plan.value.army", 7.0) - 0.7 * units;
         return new Plan(Goal.ARMY, steps, Math.max(1.5, v));
+    }
+
+    /**
+     * ЦЕПОЧКА НАБЕГА — то, чего не хватало всей системе планов: военное здание →
+     * запитано → войско собрано → боеприпас есть → войско ДОВЕДЕНО до цели →
+     * Бой. Шесть шагов, три-четыре хода, одна цель на всю дорогу.
+     *
+     * <p>Цель выбирается один раз при построении плана и живёт в {@link
+     * #targetHex}: здание ценнее войска (его не уведут из-под удара), экономика
+     * владельца ценнее казарм, накопленный на цели урон повышает приоритет
+     * (добить дешевле, чем начать), опасный по {@link Rivalry} владелец — жирнее
+     * цель. Дальняя цель дешевле: план должен успеть сложиться за партию.
+     */
+    private static Plan strike(GameState s, int seat, Genome g) {
+        PlayerState me = s.player(seat);
+
+        // --- цель: лучшая по цене/дистанции среди чужих зданий ---
+        List<String> myUnitHexes = new ArrayList<>();
+        for (kelium.core.UnitToken u : me.unitsOnField()) {
+            if (u.hexId != null) {
+                myUnitHexes.add(u.hexId);
+            }
+        }
+        Rivalry riv = new Rivalry(s, seat);
+        String target = null;
+        int targetDist = 0;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (PlayerState other : s.players) {
+            if (other.seat == seat) {
+                continue;
+            }
+            for (BuildingToken b : other.buildingsOnField()) {
+                if (b.hexId == null) {
+                    continue;
+                }
+                int dist = myUnitHexes.isEmpty() ? 4 : bfs(s, myUnitHexes, b.hexId);
+                if (dist < 0) {
+                    continue;                    // недостижимо вовсе
+                }
+                double value = 1.0 + b.damage
+                    + (b.type == BuildingType.COMMAND_CENTER ? 3.0 : 0.0)
+                    + (b.type == BuildingType.MINER
+                        || b.type == BuildingType.POWER_PLANT ? 1.5 : 0.5);
+                double sc = value * (0.4 + riv.damageValue(other.seat)) / (1.0 + dist);
+                if (sc > bestScore) {
+                    bestScore = sc;
+                    target = b.hexId;
+                    targetDist = dist;
+                }
+            }
+        }
+        if (target == null) {
+            return null;                          // бить некого — цели нет
+        }
+
+        // --- цепочка с предусловиями ---
+        BuildingToken mil = null;
+        for (BuildingToken b : me.buildingsOnField()) {
+            if (isMilitary(b.type) && (mil == null || (!mil.powered() && b.powered()))) {
+                mil = b;
+            }
+        }
+        boolean haveUnit = !myUnitHexes.isEmpty();
+        // КУЛАК: сколько моих войск уже стоит вплотную к цели. Залп бьёт всеми
+        // с ОДНОГО гекса, значит два подведённых жетона — это двойной залп, а
+        // не два одиночных: единственный способ поднять скорость жатвы, не
+        // трогая правила (замер: одиночная стопка даёт 1.3 попадания за бой).
+        int nearTarget = 0;
+        for (String h : myUnitHexes) {
+            int d = bfs(s, java.util.List.of(h), target);
+            if (d >= 0 && d <= 1) {
+                nearTarget++;
+            }
+        }
+        // Требуем двоих, только если войска на двоих есть: с единственным
+        // жетоном план не должен зависать в ожидании несуществующего второго.
+        int fistWant = Math.min(2, myUnitHexes.size());
+        // НА ЗАЛП, А НЕ НА ВЫСТРЕЛ. Первый замер цепочки провалился ровно здесь:
+        // с порогом в один боеприпас бот шёл в набег, стрелял одиночным, царапал
+        // цель с двумя прочностями и возвращался за патроном — уничтожения УПАЛИ
+        // с 7.25 до 2.91 за партию. Залп по настоящей цели стоит 2-3 боеприпаса.
+        boolean haveAmmo = me.resources.ammo() >= 3;
+        boolean inPlace = targetDist <= 1;
+
+        List<Step> steps = new ArrayList<>();
+        steps.add(new Step("военное здание есть", haveUnit || mil != null, "build",
+            null, BuildingType.FACTORY));
+        steps.add(new Step("оно запитано", haveUnit || (mil != null && mil.powered()),
+            "energy_swap", mil != null ? mil.uid : null, null));
+        steps.add(Step.of("войско собрано", haveUnit, "assembly"));
+        steps.add(Step.of("боеприпасы на залп (" + me.resources.ammo() + " из 3)",
+            haveAmmo, "assembly"));
+        steps.add(Step.of("войско у цели (осталось " + Math.max(0, targetDist - 1)
+            + " шагов)", inPlace, "movement"));
+        steps.add(Step.of("кулак собран (" + nearTarget + " из " + Math.max(1, fistWant)
+            + " у цели)", nearTarget >= Math.max(1, fistWant), "movement"));
+        steps.add(Step.of("сыграть Бой", false, "combat"));
+
+        // Ценность растёт с готовностью: план, у которого осталось ударить,
+        // должен перевешивать что угодно — иначе бот дойдёт и передумает.
+        double v = g.get("plan.value.strike", 8.0) + Math.max(0.0, bestScore) * 2.0
+            + (nearTarget >= Math.max(1, fistWant) && haveAmmo ? 4.0 : 0.0);
+        return new Plan(Goal.STRIKE, target, steps, v);
+    }
+
+    /**
+     * Кратчайшее расстояние от любого из гексов {@code from} до гекса
+     * {@code to} по связям поля; −1 — недостижимо. Поле маленькое (20–30
+     * гексов), волновой обход дешевле любых ухищрений.
+     */
+    private static int bfs(GameState s, List<String> from, String to) {
+        java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<>();
+        java.util.Map<String, Integer> dist = new java.util.HashMap<>();
+        for (String f : from) {
+            dist.put(f, 0);
+            queue.add(f);
+        }
+        while (!queue.isEmpty()) {
+            String cur = queue.poll();
+            int d = dist.get(cur);
+            if (cur.equals(to)) {
+                return d;
+            }
+            for (String nb : s.field.neighbors(cur)) {
+                if (!dist.containsKey(nb)) {
+                    dist.put(nb, d + 1);
+                    queue.add(nb);
+                }
+            }
+        }
+        return -1;
     }
 
     /** Цепочка экономики: нет денег → нужна стройка источников дохода. */

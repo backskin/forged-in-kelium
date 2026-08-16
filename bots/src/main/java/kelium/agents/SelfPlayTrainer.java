@@ -109,6 +109,11 @@ public final class SelfPlayTrainer {
         if ("axiom".equals(character)) {
             return Fitness.Goal.АКСИОМА;
         }
+        if ("reaper".equals(character)) {
+            // Ступень задаётся снаружи через setGoal: жатва → наука → задания.
+            // Без указания линия учится первой ступени.
+            return Fitness.Goal.ЖНЕЦ;
+        }
         return Fitness.Goal.ПОБЕДА;
     }
 

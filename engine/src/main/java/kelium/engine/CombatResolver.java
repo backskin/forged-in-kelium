@@ -174,18 +174,49 @@ public final class CombatResolver {
         rows.add(new AttackRow("primary", primCost, pair[0]));
 
         Map<String, Object> mod = Modules.redModuleOn(state.player(seat), unit.type);
-        if (mod == null) {
+        // ЦЕЛИ МОДУЛЯ — не всегда пара. Набор R2 (characteristics, «Модули
+        // 2.0») кладёт сюда ЛИБО чисто характеристический жетон (R2-1/R2-2:
+        // ключа "targets" нет вовсе — меняет HP/скорость, не цель боя), ЛИБО
+        // жетон с ОДНОЙ печатной целью на обычной стороне (R2-3/R2-4: "any_unit"
+        // тоже пока не заведён в {@link Target} — designer ещё не решил, как
+        // это разыгрывать: свободный выбор рода войск при стрельбе — отдельная
+        // точка решения, а не готовая пара). Раньше код слепо читал tcodes[0]/
+        // tcodes[1], что падало с NPE/IndexOutOfBounds, стоило игроку положить
+        // такой жетон, — а падать посреди партии из-за недоделанного набора
+        // модулей нельзя: молча откатываемся на печатную вторичную строку.
+        Object rawTargets = mod == null ? null : mod.get("targets");
+        String[] tcodes = rawTargets instanceof String[] arr ? arr : null;
+        Target t0 = null;
+        Target t1 = null;
+        if (tcodes != null && tcodes.length >= 1) {
+            try {
+                t0 = Target.fromCode(tcodes[0]);
+                t1 = tcodes.length >= 2 ? Target.fromCode(tcodes[1]) : null;
+            } catch (IllegalArgumentException notYetSupported) {
+                t0 = null;   // код цели существует в данных, но Target его не знает (R3/"any_unit")
+            }
+        }
+        if (mod == null || t0 == null) {
             rows.add(new AttackRow("secondary", secCost, pair[1]));
         } else {
-            String[] tcodes = (String[]) mod.get("targets");
-            Target t0 = Target.fromCode(tcodes[0]);
-            Target t1 = Target.fromCode(tcodes[1]);
-            if (Boolean.TRUE.equals(mod.get("gold"))) {
-                rows.add(new AttackRow("secondary_a", secCost, t0));
-                rows.add(new AttackRow("secondary_b", secCost, t1));
+            // ЦЕНА ЖЕТОНА МОДУЛЯ, А НЕ ПЕЧАТНАЯ ВТОРИЧНАЯ. Раньше здесь стоял
+            // тот же secCost, что и без модуля — жетон менял ТОЛЬКО цели
+            // второй строки, а цену игнорировал целиком, хотя каждый набор
+            // модулей (data/modules/modules.2.0.0.yaml) несёт СВОЮ цену (у R1
+            // — 1 БП на весь набор, у R0/легаси-хардкода M1-M4 цены в данных
+            // нет вовсе — тогда честно остаёмся на печатной secCost).
+            // Замер designer'а 16.08.2026: боевой стенд с розданными R1
+            // модулями не показал НИКАКОГО падения цены удара именно из-за
+            // этой строки.
+            int modCost = mod.get("ammo") instanceof Number n ? n.intValue() : secCost;
+            if (t1 == null) {
+                rows.add(new AttackRow("secondary", modCost, t0));
+            } else if (Boolean.TRUE.equals(mod.get("gold"))) {
+                rows.add(new AttackRow("secondary_a", modCost, t0));
+                rows.add(new AttackRow("secondary_b", modCost, t1));
             } else {
-                rows.add(new AttackRow("secondary", secCost, t0));
-                rows.add(new AttackRow("secondary", secCost, t1));
+                rows.add(new AttackRow("secondary", modCost, t0));
+                rows.add(new AttackRow("secondary", modCost, t1));
             }
         }
         return rows;
@@ -305,6 +336,7 @@ public final class CombatResolver {
             }
         }
         if (srcSet.isEmpty()) {
+            dry(attackerSeat, null, null, "нет своих войск на поле");
             return false;
         }
         List<Choice> srcOpts = new ArrayList<>();
@@ -315,6 +347,32 @@ public final class CombatResolver {
         Choice src = agent.choose(s, srcOpts,
             Map.of("kind", "combat_source", "retaliation", isRetaliation));
         if (src.payload() == null) {
+            // Игрок сам отказался бить. Но отказ отказу рознь, и различие тут
+            // принципиальное: если бить было НЕЧЕМ, отказ правильный, а действие
+            // испортила прежняя решимость взять Бой при пустом поле. Если же
+            // выстрел был — это ошибка бота, и чинится она в оценке, а не в
+            // правилах. Проверяем честно: есть ли хоть один свой гекс, с которого
+            // достаём хоть одну допустимую цель.
+            // Проверять НАДО ТЕМ ЖЕ мерилом, каким пользуется игрок, иначе замер
+            // соврёт: «цель рядом есть» — ещё не «я могу по ней попасть». Род
+            // войск бьёт только две категории из четырёх, и рядом может стоять
+            // ровно то, чего он не пробивает. Поэтому canAttack, а не соседство.
+            boolean hadShot = false;
+            for (String h : srcSet) {
+                for (String n : s.field.neighbors(h)) {
+                    if (validTarget(n, attackerSeat, restrictTargetOwner)
+                            && canAttack(attackerSeat, h, n)) {
+                        hadShot = true;
+                        break;
+                    }
+                }
+                if (hadShot) {
+                    break;
+                }
+            }
+            dry(attackerSeat, null, null, hadShot
+                ? "сам отказался бить, ХОТЯ МОГ"
+                : "сам отказался бить (бить было нечем)");
             return false;
         }
         String source = (String) src.payload();
@@ -354,6 +412,7 @@ public final class CombatResolver {
             }
         }
         if (targets.isEmpty()) {
+            dry(attackerSeat, source, null, "рядом нет цели, до которой достаём");
             return false;
         }
         List<Choice> tgtOpts = new ArrayList<>();
@@ -416,6 +475,19 @@ public final class CombatResolver {
                 }
             }
             if (options.isEmpty()) {
+                // ПОЧЕМУ ЗАЛП НЕ СОСТОЯЛСЯ. Замер 15.08.2026: 69% действий Бой не
+                // дают НИ ОДНОГО попадания, и по событиям было не понять почему —
+                // движок просто молча выходил. Причин ровно три, и лечатся они
+                // по-разному, поэтому их надо различать: стенка (геометрия),
+                // нехватка боеприпаса (экономика) и НЕСОВПАДЕНИЕ ТАБЛИЦЫ АТАК
+                // (мой род войск не бьёт того, кто стоит в цели).
+                if (killsThisBattle == 0 && !enemyDamagedThisBattle
+                        && !neutralRazedThisBattle) {
+                    emit("type", "combat_dry", "seat", attackerSeat, "source", source,
+                        "target", target, "reason", dryReason(attackerSeat, attackers,
+                            source, target, restrictTargetOwner, firstAttackUsed),
+                        "round", s.round);
+                }
                 break;
             }
             options.add(new Choice("pass", null, "stop attacking"));
@@ -581,6 +653,53 @@ public final class CombatResolver {
             }
         }
         return didDamage;
+    }
+
+    /** Записать в журнал партии, почему бой ничего не дал. */
+    private void dry(int seat, String source, String target, String reason) {
+        emit("type", "combat_dry", "seat", seat, "source", source, "target", target,
+            "reason", reason, "round", state.round);
+    }
+
+    /**
+     * ПОЧЕМУ ЗАЛП НЕ СОСТОЯЛСЯ — одна из трёх причин, в порядке «что чинить».
+     *
+     * <p>Различать их обязательно: стенка — вопрос геометрии поля, боеприпас —
+     * вопрос экономики, а несовпадение таблицы атак — вопрос самих правил боя
+     * (род войск бьёт только две категории из четырёх, и в цели может не
+     * оказаться ни одной из них).
+     */
+    private String dryReason(int attackerSeat, List<UnitToken> attackers, String source,
+                             String target, Integer restrictTargetOwner,
+                             boolean[] firstAttackUsed) {
+        GameState s = state;
+        PlayerState p = s.player(attackerSeat);
+        boolean closed = hexClosedAgainst(target, attackerSeat);
+        boolean anyReaches = false;
+        boolean anyAffordable = false;
+        for (UnitToken u : attackers) {
+            if (!Passability.canShootAcross(s, u, target)) {
+                continue;
+            }
+            anyReaches = true;
+            for (AttackRow ar : attackRows(attackerSeat, u)) {
+                int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
+                    firstAttackUsed);
+                if (p.resources.canPay(Resource.AMMO, cost)) {
+                    anyAffordable = true;
+                }
+            }
+        }
+        if (!anyReaches) {
+            return "стенка";
+        }
+        if (!anyAffordable) {
+            return "нет боеприпасов";
+        }
+        if (closed) {
+            return "гекс закрыт";
+        }
+        return "таблица атак не бьёт эту цель";
     }
 
     private int effCost(int baseAmmo, Target tcat, int attackerSeat, String target,
@@ -838,6 +957,29 @@ public final class CombatResolver {
      * уничтожение энергостанции снимает выданную ею энергию; применяются пассивы
      * арсенала (доп. боеприпас/ТО за убийство).
      */
+    /**
+     * Кто ведёт по очкам среди СОПЕРНИКОВ этого места.
+     *
+     * <p>Нужно карте «Охота на лидера»: усиление платит за снос ЗДАНИЯ ведущего,
+     * и определять ведущего надо в момент удара, а не потом — к концу хода счёт
+     * уже другой.
+     */
+    private int leadingRivalOf(int seat) {
+        int best = -1;
+        int bestVp = Integer.MIN_VALUE;
+        for (PlayerState p : state.players) {
+            if (p.seat == seat) {
+                continue;
+            }
+            int vp = Scoring.scorePlayer(state, p.seat).getOrDefault("total", 0);
+            if (vp > bestVp) {
+                bestVp = vp;
+                best = p.seat;
+            }
+        }
+        return best;
+    }
+
     public void destroy(Token victim, int attackerSeat) {
         GameState s = state;
         PlayerState attacker = s.player(attackerSeat);
@@ -851,6 +993,30 @@ public final class CombatResolver {
         // в Возврат). Сам по себе очков не даёт — только если это включено в опыте
         // ключом economy.vp_per_kill.
         attacker.killsTotal++;
+
+        // ЖУРНАЛ ХОДА: что именно снесено. Раньше здесь заполнялся только счётчик
+        // уничтожений, а поле destroyedTypes было ОБЪЯВЛЕНО И НИКОГДА НЕ
+        // ЗАПОЛНЯЛОСЬ — то есть любое задание, опирающееся на «что снесли», не
+        // могло выполниться в принципе. Ровно та беда, из-за которой каталог
+        // выглядел рабочим и не работал.
+        {
+            TurnJournal.TurnFacts j = s.journal.of(attackerSeat);
+            j.destroyedOwners.add(victim.owner());
+            if (victim instanceof UnitToken u) {
+                j.destroyedTypes.add(u.type.code);
+            } else if (victim instanceof BuildingToken b) {
+                j.destroyedTypes.add(b.type.name().toLowerCase(java.util.Locale.ROOT));
+                boolean economy = b.type == BuildingType.MINER
+                    || b.type == BuildingType.POWER_PLANT;
+                if (economy && b.energyPlaced > 0) {
+                    j.destroyedPoweredEconomy = true;
+                }
+                if (victim.owner() == leadingRivalOf(attackerSeat)) {
+                    j.destroyedLeaderBuilding = true;
+                }
+            }
+        }
+
         if (victim instanceof UnitToken ut) {
             ut.trophyValue = scaledUnitTrophy(attackerSeat, ut.type);
             ut.setHexId(null);   // уходит в трофеи — и из здания, если был внутри

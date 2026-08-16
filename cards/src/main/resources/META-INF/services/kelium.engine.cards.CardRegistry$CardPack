@@ -1,0 +1,5 @@
+# Наборы карт, которые движок подхватывает через ServiceLoader.
+# Файл — единственная связь между движком и модулем карт во время работы;
+# связи по сборке нет вовсе (см. cards/pom.xml).
+kelium.cards.objectives.ObjectivePack
+kelium.cards.arsenal.ArsenalPack

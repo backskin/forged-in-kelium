@@ -58,17 +58,29 @@ final class ModuleSlot {
      */
     static void paint(Graphics2D g, ReplayRecord.Module m, Color colour,
                       double x, double y, double side) {
-        double arc = side * 0.22;
+        // МЕСТО И ЖЕТОН — ДВЕ РАЗНЫЕ ВЕЩИ (просьба дизайнера 15.08.2026). Раньше
+        // жетон заполнял место целиком, и на планшете нельзя было отличить
+        // «место, на котором лежит жетон» от «просто квадратик». Теперь у места
+        // своя тонкая рамка, а жетон лежит ВНУТРИ неё с зазором — как на столе,
+        // где картонный жетон меньше напечатанной под него площадки.
+        paintPlace(g, x, y, side);
+        double in = side * 0.15;
+        double t = side - 2 * in;
+        double tx = x + in;
+        double ty = y + in;
+        double arc = t * 0.22;
         if (m == null || m.id == null || m.id.isBlank()) {
-            paintEmpty(g, x, y, side, arc);
-            return;
+            return;                          // место есть, жетона на нём нет
         }
         // ТЕЛО ЖЕТОНА — своим цветом всегда, в том числе на золотой стороне.
         g.setColor(colour);
-        g.fill(new RoundRectangle2D.Double(x, y, side, side, arc, arc));
+        g.fill(new RoundRectangle2D.Double(tx, ty, t, t, arc, arc));
         g.setColor(Theme.alpha(Color.BLACK, 0.4));
         g.setStroke(new BasicStroke(1f));
-        g.draw(new RoundRectangle2D.Double(x, y, side, side, arc, arc));
+        g.draw(new RoundRectangle2D.Double(tx, ty, t, t, arc, arc));
+        x = tx;
+        y = ty;
+        side = t;
 
         if (m.gold) {
             paintGildMark(g, x, y, side, arc);
@@ -98,9 +110,15 @@ final class ModuleSlot {
             (float) (y + side / 2 + fm.getAscent() * 0.36));
     }
 
-    /** Пустое место: штриховая обводка и больше ничего. */
-    private static void paintEmpty(Graphics2D g, double x, double y, double side,
-                                   double arc) {
+    /**
+     * МЕСТО ПОД ЖЕТОН — напечатанная на планшете площадка. Рисуется ВСЕГДА, и
+     * когда жетон на ней лежит, и когда место пустует: так видно, сколько мест
+     * вообще есть и сколько ещё свободно.
+     */
+    static void paintPlace(Graphics2D g, double x, double y, double side) {
+        double arc = side * 0.22;
+        g.setColor(Theme.alpha(Theme.ink3(), 0.10));
+        g.fill(new RoundRectangle2D.Double(x, y, side, side, arc, arc));
         g.setColor(Theme.alpha(Theme.border(), 0.85));
         g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
             10f, new float[]{Theme.pxf(3), Theme.pxf(3)}, 0f));
@@ -142,16 +160,14 @@ final class ModuleSlot {
      */
     static void paintStorageToken(Graphics2D g, String token, double x, double y,
                                   double side) {
-        double d = side * 0.92;
+        // Место — КВАДРАТНОЕ (как напечатано на планшете), сам жетон — круглый и
+        // лежит внутри с зазором (просьба дизайнера 15.08.2026).
+        paintPlace(g, x, y, side);
+        double d = side * 0.70;
         double cx = x + side / 2;
         double cy = y + side / 2;
         if (token == null || token.isBlank()) {
-            g.setColor(Theme.alpha(Theme.border(), 0.85));
-            g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
-                10f, new float[]{Theme.pxf(3), Theme.pxf(3)}, 0f));
-            g.draw(new Ellipse2D.Double(cx - d / 2, cy - d / 2, d, d));
-            g.setStroke(new BasicStroke(1f));
-            return;
+            return;                          // место есть, жетон на него не положен
         }
         boolean energy = token.contains("energy");
         g.setColor(energy ? Theme.points() : store());

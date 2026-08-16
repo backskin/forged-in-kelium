@@ -68,6 +68,7 @@ public final class Arsenal2Abilities {
         Abilities.register(new BuildOnAdjacentWithoutWall());
         Abilities.register(new CardIsEnergySourceUpkeep());
         Abilities.register(new KeliumIgnoresBlock());
+        Abilities.register(new TrophyStorage());
     }
 
     /** Зарегистрировать {@code newId} как точную копию уже работающей способности. */
@@ -579,6 +580,47 @@ public final class Arsenal2Abilities {
      * энергии. Содержание — 1 монета в Обновление, иначе карта удаляется из игры
      * (см. {@code GameEngine.payArsenalUpkeep}).
      */
+    /**
+     * «ТРОФЕЙНЫЙ СКЛАД» (b13) — ячейка под ОДИН трофейный жетон.
+     *
+     * <p>Правило дизайнера 15.08.2026: в этап Возврата один трофей на выбор
+     * кладётся на карту вместо возврата владельцу и лежит там раунд. Если ячейка
+     * уже занята, лежавший жетон уходит владельцу — то есть карта держит ровно
+     * один жетон, но всегда.
+     *
+     * <p>Сила эффекта — не в очках, а в ОТКАЗЕ. Личный запас у каждого ровно по
+     * четыре жетона рода, и пока чужой жетон лежит на карте, владелец не может
+     * выставить его заново. Это единственная в игре возможность продлить чужую
+     * потерю за пределы раунда.
+     *
+     * <p>Цена тоже есть, и она честная: задержанный трофей не конвертируется в
+     * обломок, а обломки — источник победных очков.
+     */
+    private static final class TrophyStorage implements Ability {
+
+        @Override public String id() {
+            return "storage_holds_trophy_cubes";
+        }
+
+        @Override public Trigger trigger() {
+            return Trigger.PASSIVE;
+        }
+
+        @Override public java.util.Set<Hook> hooks() {
+            return java.util.EnumSet.of(Hook.RETURN_KEEP_TROPHY);
+        }
+
+        @Override public void modify(RuleQuery q) {
+            q.add(1);
+        }
+
+        @Override public Hint hint() {
+            return new Hint(Hint.Bottleneck.TROPHY, 2.5, Hint.Horizon.REST_OF_GAME,
+                null, "держу один чужой жетон у себя — владелец не выставит его заново",
+                false);
+        }
+    }
+
     private static final class CardIsEnergySourceUpkeep implements Ability {
 
         @Override public String id() {

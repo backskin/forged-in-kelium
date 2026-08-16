@@ -171,16 +171,25 @@ public final class ResultsPanel extends JComponent {
             gg.setColor(Theme.seat(p.seat));
             gg.fill(new Ellipse2D.Double(pad + Theme.px(40), y + (h - chip) / 2.0, chip, chip));
 
-            gg.setFont(Theme.font(champ ? 19 : 17, champ ? Font.BOLD : Font.PLAIN));
-            gg.setColor(Theme.ink());
-            gg.drawString(rec.playerName(p.seat), pad + Theme.px(40) + chip + Theme.px(10),
-                y + h / 2 + Theme.px(8));
-
+            // ОЧКИ МЕРЯЕМ ПЕРВЫМИ, ИМЯ ВПИСЫВАЕМ В ОСТАТОК. Имя бота длинное
+            // («Просчёт вперёд · агрессивный»), и в узком окне оно наезжало прямо
+            // на число очков (замечание дизайнера 15.08.2026). Теперь у числа своё
+            // место у правого края полосы, а имени достаётся всё, что осталось,
+            // с многоточием на конце.
             String vp = p.vp.getOrDefault("total", 0) + " ПО";
             gg.setFont(Theme.mono(champ ? 24 : 20, Font.BOLD));
+            int vpW = gg.getFontMetrics().stringWidth(vp);
+            int nameX = pad + Theme.px(40) + chip + Theme.px(10);
+            int nameRoom = pad + leftW - Theme.px(14) - vpW - Theme.px(10) - nameX;
+
+            gg.setFont(Theme.font(champ ? 19 : 17, champ ? Font.BOLD : Font.PLAIN));
+            gg.setColor(Theme.ink());
+            gg.drawString(fit(gg, rec.playerName(p.seat), nameRoom), nameX,
+                y + h / 2 + Theme.px(8));
+
+            gg.setFont(Theme.mono(champ ? 24 : 20, Font.BOLD));
             gg.setColor(champ ? Theme.points() : Theme.ink());
-            gg.drawString(vp, pad + leftW - Theme.px(14)
-                - gg.getFontMetrics().stringWidth(vp), y + h / 2 + Theme.px(8));
+            gg.drawString(vp, pad + leftW - Theme.px(14) - vpW, y + h / 2 + Theme.px(8));
             y += rowH;
         }
         int leftBottom = y;

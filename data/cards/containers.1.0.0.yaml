@@ -64,7 +64,7 @@ containers:
      b: {effect: gain, params: {objective_cards: 1}, label: "1 objective"},
      описание: "Карта залежей, отмеченных прежними хозяевами. Проведите по ней одну бесплатную добычу или обменяйте карту на 1 задание."}
   - {id: c14, name: "Проволока", tier: common,
-     a: {effect: noop, params: {note: "cancel one attack on your token"}, label: "cancel an attack"},
+     a: {effect: cancel_attack, params: {}, label: "снять урон с одного своего жетона"},
      b: {effect: gain, params: {coin: 2}, label: "2 coin"},
      описание: "Моток колючей проволоки — либо защита, либо металл на продажу. Отложите находку, чтобы отменить одну атаку по своему жетону, или заберите 2 монеты."}
   - {id: c15, name: "Радиоперехват", tier: common,
@@ -88,7 +88,7 @@ containers:
      b: {effect: gain, params: {coin: 3}, label: "3 coin"},
      описание: "Полный набор медикаментов для тяжёлого случая. Снимите всё повреждение с одного жетона целиком или заберите 3 монеты, если лечить некого."}
   - {id: c20, name: "Крепёж", tier: common,
-     a: {effect: noop, params: {note: "one building counts powered for one action"}, label: "free power 1 action"},
+     a: {effect: power_building_free, params: {}, label: "запитать одно здание"},
      b: {effect: gain, params: {coin: 2}, label: "2 coin"},
      описание: "Комплект крепежа для быстрой подпорки конструкции. Считайте одно здание запитанным на одно действие без затрат или заберите 2 монеты."}
 
@@ -114,7 +114,7 @@ containers:
      b: {effect: gain, params: {containers: 2}, label: "2 containers"},
      описание: "Захваченный тягач тащит либо ваши войска, либо трофеи прежнего владельца. Проведите бесплатное действие перемещения или заберите ещё 2 контейнера впридачу."}
   - {id: c26, name: "Резервный генератор", tier: good, contested: energy_without_source,
-     a: {effect: noop, params: {note: "+1 permanent energy cube on a building"}, label: "+1 permanent energy"},
+     a: {effect: permanent_energy, params: {}, label: "+1 постоянный кубик энергии"},
      b: {effect: gain, params: {coin: 4}, label: "4 coin"},
      описание: "Аварийный генератор питает здание без всякой энергостанции. Поставьте на здание постоянный кубик энергии или продайте находку за 4 монеты."}
   - {id: c27, name: "Полевая мастерская", tier: good,
@@ -122,7 +122,7 @@ containers:
      b: {effect: gain, params: {ammo: 3}, label: "3 ammo"},
      описание: "Передвижная мастерская для стройки без чертежей и лишних затрат. Проведите бесплатную Сборку одного здания или заберите 3 боеприпаса вместо инструмента."}
   - {id: c28, name: "Шифровка", tier: good, contested: effect_survives_round,
-     a: {effect: noop, params: {note: "take first-player token next round"}, label: "grab first player"},
+     a: {effect: grab_first_player, params: {}, label: "жетон первого игрока на следующий раунд"},
      b: {effect: gain, params: {objective_cards: 2}, label: "2 objectives"},
      описание: "Перехваченная шифровка даёт либо инициативу, либо чужие секретные планы. Возьмите фишку первого игрока на следующий раунд или заберите 2 карты задания."}
 

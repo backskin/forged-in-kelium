@@ -44,11 +44,11 @@ market:
     описание: "Труба играет тревогу — штаб поднимает войска без разговоров. Внезапный удар даёт бесплатный бой, Передислокация — бесплатное перемещение без затрат боеприпасов."
   - id: corps_hq
     name: "Штаб корпуса"
-    left:  {name: "Приоритет", effect: noop, params: {note: "take first-player token next round"}, label: "grab first player"}
+    left:  {name: "Приоритет", effect: grab_first_player, params: {}, label: "жетон первого игрока на следующий раунд"}
     right: {name: "Штабная работа", effect: gain, params: {objective_cards: 3}, label: "3 objectives"}
     описание: "Штаб корпуса решает, кто говорит первым и кому достаются лучшие бумаги. Приоритет отдаёт жетон первого игрока на следующий раунд, Штабная работа выдаёт 3 карты заданий."
   - id: civil_contract
     name: "Гражданский подряд"
-    left:  {name: "Восстановление", effect: noop, params: {note: "build a neutral building"}, label: "build neutral building"}
+    left:  {name: "Восстановление", effect: build_neutral, params: {}, label: "поставить нейтральное здание"}
     right: {name: "Эвакуация", effect: heal_all_own, params: {coin: 2}, label: "heal all own + 2 coin"}
     описание: "Гражданские подрядчики восстанавливают то, что война успела сломать. Восстановление отстраивает нейтральное здание, Эвакуация лечит все свои жетоны и приносит 2 монеты."

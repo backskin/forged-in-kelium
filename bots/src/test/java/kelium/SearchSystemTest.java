@@ -407,8 +407,18 @@ class SearchSystemTest {
         // Играем несколько раундов, чтобы позиции разошлись.
         new GameEngine(s, agents, null).withRoundLimit(4).run();
 
-        Genome onlyPoints = Genome.defaults().with("search.horizon_pos", 0.0);
-        Genome withPosition = Genome.defaults().with("search.horizon_pos", 1.0);
+        // ДВА ЧЛЕНА, А НЕ ОДИН (с 15.08.2026). Судья позиции складывает отрыв по
+        // очкам, положение (search.horizon_pos) и ЗАМЕТНОСТЬ ЛИДЕРА
+        // (rivalry.exposure_fear): за столом на четверых лидера бьют трое, и
+        // положение «я впереди в середине партии» хуже, чем выглядит по счёту.
+        // Чтобы проверить чистый отрыв по очкам, гасить надо ОБА члена — иначе
+        // тест ловит не ошибку, а вторую часть судьи.
+        Genome onlyPoints = Genome.defaults()
+            .with("search.horizon_pos", 0.0)
+            .with("rivalry.exposure_fear", 0.0);
+        Genome withPosition = Genome.defaults()
+            .with("search.horizon_pos", 1.0)
+            .with("rivalry.exposure_fear", 0.0);
         boolean anyDifference = false;
         for (int seat = 0; seat < 4; seat++) {
             double plain = Lookahead.horizonScore(s, seat, onlyPoints);

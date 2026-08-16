@@ -108,7 +108,27 @@ public final class Lookahead {
         }
         double vpMargin = rivalVp == Integer.MIN_VALUE ? vp : vp - rivalVp;
         double posMargin = Double.isInfinite(rivalPos) ? own : own - rivalPos;
-        return vpMargin + mine.get("search.horizon_pos", 0.5) * posMargin;
+        double score = vpMargin + mine.get("search.horizon_pos", 0.5) * posMargin;
+
+        // ЗАМЕТНОСТЬ ЛИДЕРА (15.08.2026). Это не украшение, а правило
+        // многопользовательской игры: за столом на четверых лидера бьют трое.
+        // Положение «я впереди на два очка в середине партии» на самом деле
+        // ХУЖЕ, чем оно выглядит по счёту, потому что следующий раунд я проведу
+        // под огнём. Судья позиции обязан это знать, иначе просчёт будет
+        // радоваться раннему отрыву и не понимать, почему тот не доживает до
+        // конца.
+        //
+        // Штраф гасится к концу партии: в последнем раунде мстить уже некогда,
+        // и быть первым — просто хорошо.
+        double fear = mine.get("rivalry.exposure_fear", 0.0);
+        if (fear > 0) {
+            Rivalry riv = new Rivalry(s, seat);
+            int left = riv.roundsLeft();
+            if (left > 1 && riv.iAmLeading()) {
+                score -= fear * riv.exposure() * Math.min(1.0, left / 4.0);
+            }
+        }
+        return score;
     }
 
     /**

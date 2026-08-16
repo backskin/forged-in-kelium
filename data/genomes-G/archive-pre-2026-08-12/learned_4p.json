@@ -1,0 +1,12 @@
+{
+  "action.build": 7.83,
+  "action.assembly": 5.71,
+  "action.mining": 8.02,
+  "action.energy_swap": 5.68,
+  "action.movement": 1.85,
+  "action.combat": 2.48,
+  "action.science": 4.72,
+  "action.market": 3.41,
+  "aggression": 0.28,
+  "military_build": 1.24
+}

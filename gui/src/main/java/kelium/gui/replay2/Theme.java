@@ -446,10 +446,15 @@ public final class Theme {
     // рисовались обычными (замечание дизайнера 13.08.2026 — «цифры можно пожирнее»).
     // Через deriveFont начертание сохраняется точно.
 
+    // ЖИРНОЕ НАЧЕРТАНИЕ СТАЛО НА СТУПЕНЬ ЛЕГЧЕ (просьба дизайнера 15.08.2026:
+    // «жирные шрифты слишком жирные»). Заголовки и числа набирались Bold, и на
+    // экране это читалось как крик: полужирного (SemiBold) хватает, чтобы
+    // выделить, и текст перестаёт быть тяжёлым. Файлы Bold оставлены в ресурсах —
+    // вернуть прежний вес можно одной строкой здесь.
     private static final Font UI = load("TekturNarrow-Medium.ttf", Font.SANS_SERIF);
-    private static final Font UI_SEMI = load("TekturNarrow-SemiBold.ttf", null);
-    private static final Font UI_BOLD = load("TekturNarrow-Bold.ttf", null);
-    private static final Font NUM = load("Tektur-Bold.ttf", null);
+    private static final Font UI_SEMI = load("TekturNarrow-Medium.ttf", null);
+    private static final Font UI_BOLD = load("TekturNarrow-SemiBold.ttf", null);
+    private static final Font NUM = load("Tektur-SemiBold.ttf", null);
     // ОПИСАНИЯ — САМОЕ ТОНКОЕ НАЧЕРТАНИЕ. Пояснительный текст набран тем же
     // семейством, но легче заголовков: рядом с полужирным заголовком среднее
     // начертание спорило с ним по весу и абзац читался как второй заголовок

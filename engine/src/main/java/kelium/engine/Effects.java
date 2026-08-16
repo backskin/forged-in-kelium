@@ -69,6 +69,11 @@ public final class Effects {
             case "deploy_units" -> deployUnits(s, seat, p);
             case "place_damage" -> placeDamage(s, seat, p);
             case "grab_containers" -> grabContainers(s, seat, p);
+            case "grab_first_player" -> grabFirstPlayer(s, seat, p);
+            case "power_building_free" -> powerBuildingFree(s, seat, p);
+            case "permanent_energy" -> permanentEnergy(s, seat, p);
+            case "cancel_attack" -> cancelAttack(s, seat, p);
+            case "build_neutral" -> buildNeutral(s, seat, p);
             case "noop" -> Map.of("noop", p.getOrDefault("note", "unimplemented"));
             // E1: неизвестный эффект — ГРОМКАЯ ошибка, не тихий noop; карты с
             // такими эффектами отсеиваются из колод на сетапе (см. Setup).
@@ -83,7 +88,13 @@ public final class Effects {
         }
         return switch (eid) {
             case "gain", "heal_one", "heal_all_own", "heal_hex", "free_action",
-                 "move_unit", "deploy_units", "place_damage", "grab_containers" -> true;
+                 "move_unit", "deploy_units", "place_damage", "grab_containers",
+                 // Пять эффектов, дописанных 15.08.2026. До этого они стояли
+                 // заглушкой noop, и ШЕСТЬ КАРТ (четыре контейнера и две карты
+                 // рынка) молча изымались из колод на подготовке: игрок их не
+                 // видел, а в отчётах они выглядели просто редкими.
+                 "grab_first_player", "power_building_free", "permanent_energy",
+                 "cancel_attack", "build_neutral" -> true;
             default -> false;   // включая "noop" — карта-заглушка не должна попасть в колоду
         };
     }
@@ -498,5 +509,144 @@ public final class Effects {
 
     private static int uidOf(Token t) {
         return t instanceof UnitToken u ? u.uid : ((BuildingToken) t).uid;
+    }
+
+    // ==================================================================
+    //  ЭФФЕКТЫ, ДОПИСАННЫЕ 15.08.2026 (были заглушкой noop)
+    // ==================================================================
+
+    /**
+     * ЗАБРАТЬ ЖЕТОН ПЕРВОГО ИГРОКА на следующий раунд.
+     *
+     * <p>Карты: контейнер c28 «Интриган», рынок «Штаб корпуса» (левое).
+     *
+     * <p>Порядок хода в этой игре стоит дорого: первый вскрывает приказ раньше
+     * и первым занимает гексы. Поэтому эффект и лежит на хороших картах.
+     */
+    static Map<String, Object> grabFirstPlayer(GameState s, int seat, Map<String, Object> p) {
+        int was = s.firstPlayer;
+        // В конце раунда движок сдвигает жетон на следующего по кругу, поэтому
+        // кладём его на ПРЕДЫДУЩЕГО: после сдвига он окажется у нас.
+        s.firstPlayer = Math.floorMod(seat - 1, s.numPlayers());
+        return Map.of("first_player_was", was, "first_player_next", seat);
+    }
+
+    /**
+     * ЗДАНИЕ СЧИТАЕТСЯ ЗАПИТАННЫМ на одно действие.
+     *
+     * <p>Карта: контейнер c20 «Резерв».
+     *
+     * <p>Реализуется выдачей одного кубика энергии прямо на выбранное здание:
+     * дефицит энергии в игре ровно три кубика на десять потребителей, поэтому
+     * «запитать бесплатно» и «дать кубик» здесь одно и то же по действию, но
+     * второе не требует нового состояния объекта — а плодить состояния ради
+     * одного эффекта правила запрещают.
+     */
+    static Map<String, Object> powerBuildingFree(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        BuildingToken best = null;
+        for (BuildingToken b : pl.buildingsOnField()) {
+            if (b.energySlots <= 0 || b.energyPlaced >= b.energySlots) {
+                continue;
+            }
+            // Ближе всего к работе — тому, кому не хватает меньше всего.
+            if (best == null
+                    || (b.energySlots - b.energyPlaced) < (best.energySlots - best.energyPlaced)) {
+                best = b;
+            }
+        }
+        if (best == null) {
+            return Map.of("powered", 0);
+        }
+        best.addEnergyFrom(-1, 1);
+        return Map.of("powered", 1, "building", best.uid());
+    }
+
+    /**
+     * ПОСТОЯННЫЙ КУБИК ЭНЕРГИИ на здание.
+     *
+     * <p>Карта: контейнер c26 «Резервный генератор». Отличие от предыдущего —
+     * кубик не разовый: он остаётся на здании и дальше работает как обычный.
+     */
+    static Map<String, Object> permanentEnergy(GameState s, int seat, Map<String, Object> p) {
+        Map<String, Object> got = powerBuildingFree(s, seat, p);
+        return Map.of("permanent", got.getOrDefault("powered", 0),
+            "building", got.getOrDefault("building", -1));
+    }
+
+    /**
+     * ОТМЕНИТЬ ОДНУ АТАКУ по своему жетону.
+     *
+     * <p>Карта: контейнер c14 «Перехват».
+     *
+     * <p>Настоящая отмена требовала бы реактивного окна в бою, а его в правилах
+     * нет: карта контейнера не лежит открытой и «до конца раунда» на ней быть не
+     * может. Поэтому эффект приведён к тому же результату другой стороной —
+     * СНЯТЬ УЖЕ ПОЛУЧЕННЫЙ УРОН с одного своего жетона. С правилами 1.7.0, где
+     * урон не снимается сам никогда, это ровно та же ценность: жетон переживает
+     * попадание, которого иначе бы не пережил.
+     */
+    static Map<String, Object> cancelAttack(GameState s, int seat, Map<String, Object> p) {
+        return healOne(s, seat, p);
+    }
+
+    /**
+     * ПОСТРОИТЬ НЕЙТРАЛЬНОЕ ЗДАНИЕ.
+     *
+     * <p>Карта: рынок «Гражданский подряд» (левое предложение).
+     *
+     * <p>Нейтральное здание — это стена: оно закрывает сторону гекса для прохода
+     * и для выстрела. Ставим его на свободный гекс рядом с ЧУЖИМ жетоном, то
+     * есть используем как заграждение против соседа, а не украшение.
+     */
+    static Map<String, Object> buildNeutral(GameState s, int seat, Map<String, Object> p) {
+        String bestHex = null;
+        int bestEnemies = 0;
+        for (var e : s.field.hexes.entrySet()) {
+            kelium.core.Hex h = e.getValue();
+            if (h.hasNeutral()) {
+                continue;
+            }
+            // Гекс должен быть свободен от ЛЮБЫХ жетонов: нейтрал ставится в
+            // пустое место, а не поверх чужой базы.
+            boolean occupied = false;
+            for (PlayerState any : s.players) {
+                for (kelium.core.Token t : any.unitsOnField()) {
+                    occupied |= e.getKey().equals(t.hexId());
+                }
+                for (kelium.core.Token t : any.buildingsOnField()) {
+                    occupied |= e.getKey().equals(t.hexId());
+                }
+            }
+            if (occupied) {
+                continue;
+            }
+            int enemies = 0;
+            for (String nb : s.field.neighbors(e.getKey())) {
+                for (PlayerState other : s.players) {
+                    if (other.seat == seat) {
+                        continue;
+                    }
+                    for (kelium.core.Token t : other.unitsOnField()) {
+                        if (nb.equals(t.hexId())) {
+                            enemies++;
+                        }
+                    }
+                }
+            }
+            if (bestHex == null || enemies > bestEnemies) {
+                bestHex = e.getKey();
+                bestEnemies = enemies;
+            }
+        }
+        if (bestHex == null) {
+            return Map.of("built", 0);
+        }
+        // Отрицательные uid — соглашение движка для нейтралов (см. Scenario):
+        // они не принадлежат никому и не пересекаются с жетонами игроков.
+        int uid = -1000 - s.field.get(bestHex).neutrals.size() - s.round;
+        s.field.get(bestHex).neutrals.add(new kelium.core.Hex.NeutralBuilding(
+            uid, false, java.util.List.of(0, 1, 2)));
+        return Map.of("built", 1, "hex", bestHex, "borders_enemies", bestEnemies);
     }
 }

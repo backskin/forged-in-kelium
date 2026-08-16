@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cards — КАРТЫ КАК ОБЪЕКТЫ, а не как строки в switch.
+
+  Зачем отдельный модуль (заказ дизайнера 15.08.2026). До этого карта была
+  записью в YAML плюс ветка в switch по строковому идентификатору эффекта
+  (Effects, Passives, Predicates). Следствия, которые это дало и которые
+  подтверждены замером:
+
+    * карту, чей эффект не реализован, движок молча ВЫБРАСЫВАЛ из колоды на
+      подготовке — шесть карт из игры исчезли, и заметить это можно было только
+      по строке в системном логе;
+    * условие задания жило в одном месте (Predicates), награда в другом
+      (Objectives), верхний эффект в третьем (Effects) — карта как целое не
+      существовала нигде, и проверить её целиком было нечем;
+    * из шести полученных за партию заданий выполнялось одно: боты не понимали,
+      что карта требует, потому что понимать было нечего.
+
+  Правило слоёв. Модуль карт зависит от engine (там живут и core, и сам движок),
+  а НАЗАД связи по сборке нет: движок объявляет договор в пакете
+  kelium.engine.cards и находит реализации через ServiceLoader. Поэтому цикла
+  зависимостей не возникает, а карты при этом умеют и читать состояние игры, и
+  менять его:
+
+      engine (договор) &lt;- cards (реализации) &lt;- bots &lt;- gui
+
+  А обратно, от движка к картам, связь есть только ВО ВРЕМЯ РАБОТЫ: движок
+  спрашивает ServiceLoader, кто предоставляет наборы карт, и получает их из
+  этого модуля. При сборке движок про карты не знает ничего.
+
+  Практическое следствие: engine собирается и тестируется без карт вообще, а
+  подключение карт — это наличие модуля на класспасе, и ничего больше.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>kelium</groupId>
+        <artifactId>forged-in-kelium-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+
+    <artifactId>kelium-cards</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>kelium</groupId>
+            <artifactId>kelium-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

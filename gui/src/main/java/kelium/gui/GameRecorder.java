@@ -525,7 +525,7 @@ public final class GameRecorder {
         private String turnOrders(Map<String, Object> ev) {
             String top = String.valueOf(ev.get("top"));
             StringBuilder sb = new StringBuilder();
-            sb.append("▸ ").append(who(ev.get("seat"))).append(" · ПРИКАЗ: ")
+            sb.append(who(ev.get("seat"))).append(" · ПРИКАЗ: ")
               .append(ORDERS.getOrDefault(top, top).toUpperCase(Locale.ROOT))
               .append(" (").append(ev.get("card")).append(')');
 
@@ -534,7 +534,7 @@ public final class GameRecorder {
             sb.append('\n').append("    сверху доступно: ").append(actionList(tops))
               .append(allowed >= tops.size() ? " — оба действия" : " — только ОДНО из двух");
             if (Boolean.TRUE.equals(ev.get("coincided"))) {
-                sb.append('\n').append("    ⚠ СОВПАДЕНИЕ: этот приказ вскрыл кто-то ещё, "
+                sb.append('\n').append("    ! СОВПАДЕНИЕ: этот приказ вскрыл кто-то ещё, "
                     + "поэтому сверху играется одно действие вместо двух");
             }
 
@@ -544,14 +544,14 @@ public final class GameRecorder {
                 boolean open = Boolean.TRUE.equals(ev.get("bottom_open"));
                 String bcode = String.valueOf(bottom);
                 sb.append('\n').append("    снизу ")
-                  .append(open ? "✔ ОТКРЫЛОСЬ: " : "✖ закрыто: ")
+                  .append(open ? "ОТКРЫЛОСЬ: " : "закрыто: ")
                   .append(ORDERS.getOrDefault(bcode, bcode)).append(" — ")
                   .append(actionList(bots))
                   .append(open ? " — одно действие"
                       : " (нужно, чтобы этот приказ кто-то вскрыл сверху)");
             }
             if (Boolean.TRUE.equals(ev.get("maneuver"))) {
-                sb.append('\n').append("    ⇢ манёвр: бесплатный ход одним жетоном войска");
+                sb.append('\n').append("    манёвр: бесплатный ход одним жетоном войска");
             }
             return sb.toString();
         }
@@ -651,7 +651,7 @@ public final class GameRecorder {
                 }
                 case "reveal": {
                     Map<Integer, String> rev = new TreeMap<>((Map<Integer, String>) ev.get("revealed"));
-                    StringBuilder sb = new StringBuilder("── Круг " + ev.get("circle") + ": ");
+                    StringBuilder sb = new StringBuilder("Круг " + ev.get("circle") + ": ");
                     boolean first = true;
                     for (Map.Entry<Integer, String> e : rev.entrySet()) {
                         if (!first) {
@@ -678,7 +678,12 @@ public final class GameRecorder {
                             && pc.intValue() > 0) {
                         paid = "  [энергия куплена за " + pc.intValue() + " МОН]";
                     }
-                    return "   " + (ok ? "▪ " : "▫ ") + name.toUpperCase(Locale.ROOT)
+                    // МЕТКА — ТОЧКОЙ, а не квадратиком. Символы ▪/▫ в шрифте
+                    // интерфейса отсутствуют, и на экране вместо них рисовался
+                    // перечёркнутый прямоугольник — «⊠ ДОБЫЧА» в поворотных
+                    // моментах (замечание дизайнера 15.08.2026). Смысл несёт не
+                    // значок, а приписка «— не вышло», она и остаётся.
+                    return "   " + (ok ? "· " : "· ") + name.toUpperCase(Locale.ROOT)
                         + (ok ? "" : " — не вышло")
                         + (detail.isBlank() || "null".equals(detail) ? "" : ": " + detail)
                         + paid;

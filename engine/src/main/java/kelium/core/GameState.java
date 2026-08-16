@@ -28,6 +28,20 @@ public final class GameState {
     public final Random rng;
 
     public int round = 0;                     // с 1 после старта
+
+    /**
+     * ВИТРИНА АРСЕНАЛА — две открытые карты рядом с планшетом науки.
+     *
+     * <p>Правило дизайнера 15.08.2026: карты арсенала больше не берут вслепую.
+     * Рядом с планшетом науки лежат ДВЕ открытые карты и колода; покупая арсенал,
+     * игрок ВЫБИРАЕТ одну из двух, и освободившееся место немедленно пополняется
+     * с верха колоды.
+     *
+     * <p>Карта на витрине ФИЗИЧЕСКИ ушла из колоды — вытянуть её вслепую нельзя,
+     * пока она лежит здесь. Награда «карта арсенала» с задания берётся, наоборот,
+     * вслепую с верха колоды, витрины не касаясь.
+     */
+    public final java.util.List<String> arsenalDisplay = new java.util.ArrayList<>();
     public int circle = 0;                    // 1..circlesPerRound
     public int firstPlayer = 0;               // место с жетоном первого игрока
     public String marketActive = null;        // id активной карты маркета
@@ -127,6 +141,10 @@ public final class GameState {
         s.circle = circle;
         s.marketActive = marketActive;
         s.superArsenalOffer.putAll(superArsenalOffer);
+        // Витрина арсенала — часть состояния стола, и копия партии для просчёта
+        // обязана её нести: без этого бот, доигрывая копию, «видел» бы пустую
+        // витрину и не мог оценить покупку арсенала вовсе.
+        s.arsenalDisplay.addAll(arsenalDisplay);
         s.redBag.addAll(redBag);
         s.blueBag.addAll(blueBag);
         for (int side = 0; side < marketCells.length; side++) {

@@ -271,6 +271,7 @@ public final class Storage {
         return totalMax(s, p) - p.resources.kelium() - p.resources.ammo();
     }
 
+
     /**
      * Правило 4: перед добавлением ЛЮБОГО кубика в хранилище (келемий,
      * боеприпас, обломок) спросить агента, не хочет ли он сначала переставить/

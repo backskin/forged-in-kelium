@@ -66,8 +66,29 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
 
     public BoardsPanel() {
         setBackground(kelium.gui.replay2.Theme.bg());
-        setPreferredSize(new Dimension(DESIGN_W, DESIGN_H));
-        setMinimumSize(new Dimension(DESIGN_W, DESIGN_H));
+    }
+
+    /**
+     * РАСЧЁТНЫЙ РАЗМЕР СЧИТАЕТСЯ В МАСШТАБЕ ИНТЕРФЕЙСА, а не в «сырых» пикселях.
+     *
+     * <p>Здесь и была главная причина наложений при смене масштаба (замечание
+     * дизайнера 15.08.2026): холст объявлял жёсткие 1180×780, а всё содержимое
+     * рисуется через {@code Theme.px()} и растёт вместе с масштабом. На 125%
+     * вёрстке нужно около 1475×975 — строки налезали друг на друга и вылезали за
+     * рамку. Теперь размер объявляется в тех же единицах, в которых рисуется, и
+     * пересчитывается сам: не хватило места — появляется прокрутка.
+     */
+    private static Dimension design() {
+        return new Dimension(kelium.gui.replay2.Theme.px(DESIGN_W),
+            kelium.gui.replay2.Theme.px(DESIGN_H));
+    }
+
+    @Override public Dimension getPreferredSize() {
+        return design();
+    }
+
+    @Override public Dimension getMinimumSize() {
+        return design();
     }
 
     // ---- Scrollable: растягиваться, когда место есть, и прокручиваться, когда нет ----
@@ -87,11 +108,13 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
     }
 
     @Override public boolean getScrollableTracksViewportWidth() {
-        return getParent() instanceof javax.swing.JViewport v && v.getWidth() >= DESIGN_W;
+        return getParent() instanceof javax.swing.JViewport v
+            && v.getWidth() >= design().width;
     }
 
     @Override public boolean getScrollableTracksViewportHeight() {
-        return getParent() instanceof javax.swing.JViewport v && v.getHeight() >= DESIGN_H;
+        return getParent() instanceof javax.swing.JViewport v
+            && v.getHeight() >= design().height;
     }
 
     /** Подключить правила и карточные наборы той версии, в которой сыграна партия. */
@@ -227,7 +250,8 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         int players = record == null ? snap.players.size() : record.players;
 
         int colW = (w - 40) / 3;
-        int cardH = 112;
+        // Высота карточки супер-арсенала: название плюс ТРИ строки пояснения.
+        int cardH = 128;
         int top = y + 44;
         int gridTop = top + cardH + 8;
         // ПАМЯТКА ПО ОБМЕНАМ НАУЧНОГО ОТДЕЛА занимает нижнюю полосу планшета:
@@ -678,13 +702,23 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             }
             return;
         }
-        // название карты супер-арсенала — тем же плакатным шрифтом
-        g.setFont(kelium.gui.replay2.Theme.display(20));
+        // НАЗВАНИЕ ВПИСЫВАЕТСЯ, А НЕ РЕЖЕТСЯ СРАЗУ. «Келемиевый рудник» не влезал
+        // в одну строку и превращался в «Келемиевый ру…», хотя на карточке есть
+        // место: сперва пробуем набрать на кегль меньше, и только потом режем.
+        String name = String.valueOf(card.get("name"));
+        int room = w - 20;
+        java.awt.Font big = kelium.gui.replay2.Theme.display(20);
+        g.setFont(big);
+        if (g.getFontMetrics().stringWidth(name) > room) {
+            g.setFont(kelium.gui.replay2.Theme.display(16));
+        }
         g.setColor(ink());
-        g.drawString(clip(g, String.valueOf(card.get("name")), w - 16), x + 10, y + 48);
+        g.drawString(clip(g, name, room), x + 10, y + 48);
+        // ПОЯСНЕНИЕ — ДО ТРЁХ СТРОК: на двух оно обрывалось посреди фразы
+        // («…+1 HP,»), хотя высота карточки третью строку позволяет.
         g.setFont(note(9.5));
         g.setColor(ink2());
-        wrap(g, String.valueOf(card.getOrDefault("label", "")), x + 10, y + 70, w - 20, 19, 2);
+        wrap(g, String.valueOf(card.getOrDefault("label", "")), x + 10, y + 68, w - 20, 18, 3);
     }
 
     private String prizeText(String track) {

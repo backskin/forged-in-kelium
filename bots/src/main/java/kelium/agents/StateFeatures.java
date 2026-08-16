@@ -67,12 +67,18 @@ public final class StateFeatures {
         "my_exposed",          // моих жетонов под ударом соперника (риск)
         "tiles_flipped",       // выработанных тайлов зарождения (это ПО)
         "tempo_economy",       // экономика, взвешенная по РАННОСТИ раунда
-        "buildings");          // зданий на поле
+        "buildings",           // зданий на поле
+        // ---- заданиях и сопернике (15.08.2026) ----
+        "best_objective_progress", // ближайшее к выполнению задание в руке (0..1)
+        "objectives_actionable",   // сколько карт в руке — до них один шаг
+        "rival_threat",            // насколько опасен самый опасный соперник
+        "rival_exposure");         // насколько Я САМ сейчас на мушке у стола
 
     /** Масштабы для нормировки (нейросети нужен вход около [0..1]). */
     public static final double[] SCALES = {
         12, 10, 15, 8, 8, 10, 3, 12, 6, 3, 4, 5, 3, 2, 10, 6,
-        12, 3, 3, 5, 3, 4, 2, 4, 6, 6, 4, 20, 8
+        12, 3, 3, 5, 3, 4, 2, 4, 6, 6, 4, 20, 8,
+        1, 3, 1.5, 1.5
     };
 
     /** Число признаков. */
@@ -212,6 +218,40 @@ public final class StateFeatures {
         double earliness = Math.max(0.0, (8.0 - s.round) / 8.0);
         f[27] = (minersWorking + plants + me.resources.kelium()) * earliness;
         f[28] = buildings;
+
+        // ==============================================================
+        //  ЗАДАНИЯ И СОПЕРНИК (15.08.2026) — то, чего у оценщика не было ВООБЩЕ.
+        //
+        //  До этих двух блоков бот не мог отличить руку, где до награды один
+        //  шаг, от руки, где всё безнадёжно: задание отвечало только «да/нет»,
+        //  и путь к «да» был ему не виден. Мост в игру только что достроен
+        //  (EngineCardContext + CardRegistry.bindAll в Setup); эти признаки —
+        //  первое, что через него прошло.
+        // ==============================================================
+        double bestProgress = 0.0;
+        int actionable = 0;               // карт в руке, до которых один шаг
+        kelium.engine.cards.EngineCardContext cardCtx =
+            new kelium.engine.cards.EngineCardContext(s, seat);
+        for (String cid : me.objectiveHand) {
+            var card = kelium.engine.cards.CardRegistry.objective(cid);
+            if (card == null) {
+                continue;              // код карты ещё не подключён (модуль не на classpath)
+            }
+            double p = card.progress(cardCtx);
+            bestProgress = Math.max(bestProgress, p);
+            if (p >= 0.5) {
+                actionable++;
+            }
+        }
+        f[29] = bestProgress;
+        f[30] = actionable;
+
+        // СОПЕРНИЧЕСТВО: партия — не набор личных показателей, а игра против
+        // живых противников (Rivalry, 15.08.2026). Два числа: насколько опасен
+        // САМЫЙ опасный соперник, и насколько Я САМ сейчас на мушке у стола.
+        Rivalry riv = new Rivalry(s, seat);
+        f[31] = riv.threat(riv.leader());
+        f[32] = riv.exposure();
         return f;
     }
 

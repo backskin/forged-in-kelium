@@ -188,6 +188,13 @@ public final class Modules {
                     continue;
                 }
                 for (UnitType t : UnitType.values()) {
+                    // МЕСТА ПОД КРАСНЫЕ МОДУЛИ НАПЕЧАТАНЫ НА ПЛАНШЕТЕ (наборы «В»
+                    // и «Г», 15.08.2026). До этого места были у всех родов
+                    // поровну и молча: планшет не мог сказать «у авиации мест
+                    // нет», и асимметрия по модулям была невозможна.
+                    if (redSlotsFor(p, t) <= 0) {
+                        continue;
+                    }
                     if (!p.redPlacements.containsKey(t)) {
                         Map<String, Object> pl = new HashMap<>();
                         pl.put("module", mod);
@@ -344,5 +351,22 @@ public final class Modules {
             Map<String, Object> sp = (Map<String, Object>) slot.payload();
             p.bluePlacements.put((BuildingType) sp.get("building"), placement);
         }
+    }
+
+    /**
+     * СКОЛЬКО МЕСТ ПОД КРАСНЫЙ МОДУЛЬ у этого рода на планшете игрока.
+     *
+     * <p>Читается из стороны планшета войск ({@code red_slots}). Если сторона
+     * ничего не говорит — считаем по одному месту на род, как было до наборов
+     * «В» и «Г»: старые планшеты не должны менять поведение.
+     */
+    public static int redSlotsFor(PlayerState p, UnitType type) {
+        Object raw = p.board == null || p.board.troop == null ? null
+            : p.board.troop.raw.get("red_slots");
+        if (!(raw instanceof Map<?, ?> slots)) {
+            return 1;
+        }
+        Object v = slots.get(type.name().toLowerCase(java.util.Locale.ROOT));
+        return v instanceof Number n ? n.intValue() : 0;
     }
 }

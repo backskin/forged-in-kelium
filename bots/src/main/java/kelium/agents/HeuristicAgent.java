@@ -1021,7 +1021,65 @@ public class HeuristicAgent extends Agent {
             }
             return 1.0;
         }
+        if ("factory".equals(btype) || "airbase".equals(btype) || "barracks".equals(btype)) {
+            // УДАРНОЕ ЗДАНИЕ СТАВИМ БЛИЖЕ К ПРОТИВНИКУ. Раньше этот метод не
+            // различал гексы вообще (плоская 1.0) — бот мог поставить завод в
+            // дальнем углу своей зоны, и весь набег потом уходил на марш через
+            // полполя вместо боя (замечание дизайнера 16.08.2026: реальные
+            // партии держат базы в 2-3 гексах друг от друга — тянуться некуда).
+            int dist = distanceToNearestEnemy(state, hid);
+            if (dist < 0) {
+                return 1.0;   // соперник не найден на поле — оценивать нечем
+            }
+            // ближе — лучше; авиабаза бьёт с шагом 2 (сама долетает дальше),
+            // поэтому ей чуть меньше важна вплотную-близость, чем заводу.
+            double farPenalty = "airbase".equals(btype) ? 0.6 : 1.0;
+            return 8.0 - farPenalty * dist;
+        }
         return 1.0;
+    }
+
+    /**
+     * Кратчайшее расстояние от гекса {@code hid} до ближайшего гекса с чужим
+     * живым войском или зданием. −1, если на поле нет ни одного видимого
+     * соперника (самое начало партии).
+     */
+    private int distanceToNearestEnemy(GameState state, String hid) {
+        Set<String> enemyHexes = new HashSet<>();
+        for (PlayerState p : state.players) {
+            if (p.seat == seat) {
+                continue;
+            }
+            for (UnitToken u : p.units) {
+                if (u.hexId != null && u.alive()) {
+                    enemyHexes.add(u.hexId);
+                }
+            }
+            for (BuildingToken b : p.buildingsOnField()) {
+                enemyHexes.add(b.hexId);
+            }
+        }
+        if (enemyHexes.isEmpty()) {
+            return -1;
+        }
+        ArrayDeque<String> queue = new ArrayDeque<>();
+        Map<String, Integer> dist = new HashMap<>();
+        dist.put(hid, 0);
+        queue.add(hid);
+        while (!queue.isEmpty()) {
+            String cur = queue.poll();
+            int d = dist.get(cur);
+            if (enemyHexes.contains(cur)) {
+                return d;
+            }
+            for (String nb : state.field.neighbors(cur)) {
+                if (!dist.containsKey(nb)) {
+                    dist.put(nb, d + 1);
+                    queue.add(nb);
+                }
+            }
+        }
+        return -1;
     }
 
     /**
@@ -1323,9 +1381,21 @@ public class HeuristicAgent extends Agent {
         double v = 1.0 + cnt;
         // Модуль с целью «здания-вышки» — самый ценный охват: здания у врага
         // есть всегда, а бить их умеет почти никто (война упирается в это).
-        kelium.core.Target[] pair = kelium.engine.Modules.RED_MODULES.get(mod);
-        if (pair != null && (pair[0] == kelium.core.Target.BUILDINGS_TOWERS
-                || pair[1] == kelium.core.Target.BUILDINGS_TOWERS)) {
+        // Модуль С МЕШКА (R1-x/R2-x) не найти в старом хардкоде M1-M4 — бонус
+        // немо для него не срабатывал НИ РАЗУ на актуальных данных партии
+        // (designer поймал 16.08.2026). Смотрим сперва в реальный набор
+        // жетона, легаси-хардкод — только запасной путь для старых M1-M4.
+        boolean hitsBuildings;
+        var tok = kelium.engine.ModuleSets.token(kelium.engine.ModuleSets.of(state), mod);
+        if (tok != null) {
+            hitsBuildings = tok.targets().contains("buildings_towers")
+                || tok.gold().contains("buildings_towers");
+        } else {
+            kelium.core.Target[] pair = kelium.engine.Modules.RED_MODULES.get(mod);
+            hitsBuildings = pair != null && (pair[0] == kelium.core.Target.BUILDINGS_TOWERS
+                || pair[1] == kelium.core.Target.BUILDINGS_TOWERS);
+        }
+        if (hitsBuildings) {
             v += 2.5;
         }
         return v;
@@ -1511,7 +1581,15 @@ public class HeuristicAgent extends Agent {
         val += num(params, "trophy") * trophyW + num(params, "coin") * coinW;
         val += num(params, "ammo") * ammoW + num(params, "containers") * contW;
         val += num(params, "objective_cards") * 1.0;
-        if (params.containsKey("module_half") || params.containsKey("gild_module")) {
+        // "module" (ЦЕЛЫЙ жетон из мешка) — формат с 13.08.2026, "module_half"
+        // остался только в старых записях контейнеров. Раньше здесь проверялся
+        // ТОЛЬКО module_half/gild_module — «Оружейная ярмарка» рынка
+        // (params: {module: choice}) получала 0 дополнительной ценности, и бот
+        // в упор не видел единственный ДЕШЁВЫЙ путь к модулю (1 келемий, без
+        // предварительной войны) — designer поймал 16.08.2026 при разборе,
+        // почему модуль добывается так поздно.
+        if (params.containsKey("module") || params.containsKey("module_half")
+                || params.containsKey("gild_module")) {
             val += 3.0;
         }
         Object eff = offer.get("effect");

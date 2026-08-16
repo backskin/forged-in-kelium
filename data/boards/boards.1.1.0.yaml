@@ -1,0 +1,255 @@
+﻿# ============================================================================
+#  CONTENT: boards  version 1.0.0
+# ============================================================================
+#  Versioned board definitions: token stats (identical for all players — the
+#  "iron rule of asymmetry": only boards vary, tokens never), the troop-board
+#  sides (A + Б1–Б4) with attack tables/speeds/military-building prices, the
+#  storage-board sides with cell layouts/prices, and the tech-track layout.
+#
+#  Source: "Планшеты — стороны А и Б1–Б4 (спецификация).md" (source of truth).
+#  DRAFT WARNING (backlog E10): troop-board SPEEDS and building PRICES are not
+#  yet reconciled with the printed boards. Attacks, HP and yield ARE confirmed.
+# ============================================================================
+
+#  НАБОРЫ «В» и «Г» — НОВЫЕ ТАБЛИЦЫ АТАК (заказ дизайнера 15.08.2026).
+#
+#  ЗАЧЕМ. На стороне А, которой играют все боты, У ДВУХ РОДОВ ИЗ ЧЕТЫРЁХ ОСНОВНАЯ
+#  АТАКА НАПРАВЛЕНА НА СОБСТВЕННЫЙ ТИП: пехота бьёт пехоту, авиация — авиацию.
+#  Для авиации это смертельно и образует замкнутый круг: авиации на поле 5% всех
+#  войск, значит её основной ряд не находит цели почти никогда; остаётся только
+#  вторичный (по зданиям), где техника делает то же дешевле. При этом авиацию
+#  бьёт ВЫШКА — самый массовый жетон игры (50% войск), который стоит ноль и
+#  выдаётся с ЦУ. Авиацию не строят → её основная атака бесполезна → её не
+#  строят. Замер 200 партий: 0.14 жетона авиации на игрока.
+#
+#  ПРАВИЛО ОБОИХ НАБОРОВ: каждый род бьёт ДВА ЧУЖИХ типа и НИКОГДА СЕБЯ.
+#  Свойства таблицы, которые при этом сохраняются:
+#    * каждую категорию целей бьют РОВНО ДВА рода — ни одна не безнаказанна;
+#    * осадных линий по-прежнему две (здания ломают техника и авиация);
+#    * у каждого рода ровно две строки атаки, как и было.
+#
+#  НАБОР «В» — ОДИН общий планшет на всех (замена стороне А для симметричной
+#  игры и обучения ботов).
+#
+#  НАБОР «Г» — четыре варианта того же принципа плюс АСИММЕТРИЯ ПО МЕСТАМ ПОД
+#  КРАСНЫЕ МОДУЛИ: у одного рода ОБЕ строки с местом под жетон атаки, у одного
+#  мест нет вовсе, у двух по одному. Кому что достаётся — своё в каждом варианте,
+#  и это единственное различие между Г1-Г4 помимо порядка целей.
+
+meta:
+  id: 1.1.0
+  type: boards
+  draft_fields: ["troop_side.speeds", "troop_side.building_prices"]
+
+# The single top-level list the loader validates; we group real structure under
+# named entries so each addressable chunk still has an id.
+boards:
+
+  # -- Token stats (fixed for everyone) ------------------------------------
+  - id: tokens
+    kind: token_stats
+    units:
+      # trophy value list = value depending on count already taken (1st/2nd/3rd/4th)
+      # count = ЛИЧНЫЙ ЗАПАС игрока по этому роду: ровно 4 жетона, и это не
+      # меняется за партию — уничтоженные возвращаются владельцу на этапе
+      # Возврата («Бой — полные правила», §трофеи). Раньше здесь стояло
+      # count: null, и движок ограничивал только ОБЩЕЕ число жетонов (16 на цвет)
+      # — то есть игрок мог выставить девять вышек. Поймано дизайнером в
+      # проигрывателе 13.08.2026.
+      # trophy = ЧТО НАПЕЧАТАНО НА ОБОРОТЕ каждого из четырёх жетонов рода
+      # (уточнение дизайнера 13.08.2026). Не «сколько дадут за первого,
+      # второго, третьего» — а именно жетон номер 1, 2, 3, 4.
+      #   вышки   — на всех четырёх по 1 ТО
+      #   пехота  — на трёх по 1, на четвёртом 2
+      #   техника — на двух по 2, на двух по 1
+      #   авиация — так же, как техника
+      infantry: {hp: 1, trophy: [1, 1, 1, 2], count: 4}
+      vehicle:  {hp: 2, trophy: [1, 1, 2, 2], count: 4}
+      aircraft: {hp: 1, trophy: [1, 1, 2, 2], count: 4}
+      tower:    {hp: 2, trophy: [1, 1, 1, 1], count: 4}
+    # Сумма личных запасов по родам: 4 рода × 4 жетона.
+    unit_tokens_per_color: 16
+    building_tokens_per_color: 12
+    buildings:
+      barracks:   {energy_slots: 1, hp: 1, assembly: [infantry, ammo], trophy: 2}
+      factory:    {energy_slots: 2, hp: 2, assembly: [vehicle, ammo],  trophy: 3}
+      # АВИАБАЗА: 2 ячейки энергии вместо 3, цена постройки +1 монета на всех
+      # сторонах (решение дизайнера 13.08.2026). Замер показывал, что при трёх
+      # ячейках авиабазу почти не строят: общий дефицит энергии 3 кубика, и она
+      # съедала его целиком. Два ячейки дают +48% авиации на поле; цена растёт,
+      # чтобы дешевле не стало.
+      airbase:    {energy_slots: 3, hp: 3, assembly: [aircraft, ammo], trophy: 4}
+      # hp 3 и trophy 0 — решение дизайнера 11.08.2026: ЦУ в трофеи не идёт,
+      # вся награда — жетон уничтожения ЦУ (см. ruleset command_center).
+      # ЦУ: ОДНА ячейка энергии как у военного здания (energy_slots), но даёт
+      # ДВА кубика как источник (energy_gives). Ключ energy_needed: 2 здесь был
+      # устаревшим и перебивал energy_slots — из-за него ЦУ просило две ячейки
+      # вместо одной (поправлено 12.08.2026 по указанию дизайнера).
+      command_center: {energy_gives: 2, energy_slots: 1, hp: 3, assembly: [tower, ammo], trophy: 0}
+    miners:   # №1–4
+      - {level: 1, energy_slots: 2, hp: 1, yield_kelium: 1, cost: 1, trophy: 1}
+      - {level: 2, energy_slots: 1, hp: 1, yield_kelium: 1, cost: 2, trophy: 1}
+      - {level: 3, energy_slots: 2, hp: 2, yield_kelium: 2, cost: 3, trophy: 2}
+      - {level: 4, energy_slots: 1, hp: 2, yield_kelium: 2, cost: 4, trophy: 3, vp_on_field: true}
+    power_plants:  # №1–4
+      - {level: 1, hp: 1, energy_gives: 1, cost: 1, trophy: 1}
+      - {level: 2, hp: 1, energy_gives: 2, cost: 2, trophy: 1}
+      - {level: 3, hp: 2, energy_gives: 2, cost: 3, trophy: 2}
+      - {level: 4, hp: 2, energy_gives: 3, cost: 4, trophy: 3, vp_on_field: true}
+    # Energy invariant: sources give 8 (1+2+2+3) + CU 2 = 10; consumers hold 13 → deficit 3.
+    energy_invariant: {sources: 10, consumer_slots: 13, deficit: 3}
+    modules:
+      red_per_player: 4    # attack modules, overlay secondary row
+      blue_per_player: 4   # assembly modules, overlay printed "1" -> 2 (gold 3)
+
+  # -- Troop board sides ----------------------------------------------------
+  # attacks: {unit: [primary_target, secondary_target]}; targets in
+  # {infantry, vehicle, aircraft, buildings_towers}. speeds order П·Т·А·В.
+  # ==================== НАБОР «В»: один планшет на всех ====================
+  - id: troop_V
+    kind: troop_side
+    side: V
+    name: "Единый устав"
+    shared: true          # одинаков у всех игроков
+    attacks:
+      infantry: [vehicle, aircraft]              # пехота бьёт технику и авиацию
+      vehicle:  [aircraft, buildings_towers]     # техника — авиацию и здания
+      aircraft: [infantry, buildings_towers]     # авиация — пехоту и здания
+      tower:    [infantry, vehicle]              # вышка — пехоту и технику
+    speeds: {infantry: 1, vehicle: 1, aircraft: 2, tower: 0}
+    building_prices: {barracks: 1, factory: 3, airbase: 2}
+    tower_hits_buildings: false
+    # Места под красные модули: поровну, по одному на род.
+    red_slots: {infantry: 1, vehicle: 1, aircraft: 1, tower: 1}
+
+  # ============ НАБОР «Г»: четыре варианта с асимметрией по модулям ============
+  # Различия между вариантами ровно три: чей род «столп» (ему дешевле здание и
+  # выше скорость), в каком порядке идут цели, и КОМУ ДОСТАЛИСЬ МЕСТА ПОД КРАСНЫЕ
+  # МОДУЛИ. Последнее — новая ось асимметрии: у столпа обе строки с местом, у
+  # одного рода мест нет вовсе, у двух по одному. Сумма мест везде 4.
+
+  - id: troop_G1
+    kind: troop_side
+    side: G1
+    name: "Ударная пехота"
+    pillar: infantry
+    attacks:
+      infantry: [vehicle, aircraft]
+      vehicle:  [aircraft, buildings_towers]
+      aircraft: [infantry, buildings_towers]
+      tower:    [infantry, vehicle]
+    speeds: {infantry: 2, vehicle: 1, aircraft: 2, tower: 0}
+    building_prices: {barracks: 1, factory: 3, airbase: 2}
+    tower_hits_buildings: false
+    # Места под красные модули: у столпа два, у одного рода ни одного.
+    red_slots: {infantry: 2, vehicle: 1, aircraft: 1, tower: 0}
+
+  - id: troop_G2
+    kind: troop_side
+    side: G2
+    name: "Бронированный кулак"
+    pillar: vehicle
+    attacks:
+      infantry: [aircraft, vehicle]
+      vehicle:  [buildings_towers, aircraft]
+      aircraft: [buildings_towers, infantry]
+      tower:    [vehicle, infantry]
+    speeds: {infantry: 1, vehicle: 2, aircraft: 2, tower: 0}
+    building_prices: {barracks: 2, factory: 1, airbase: 3}
+    tower_hits_buildings: false
+    # Места под красные модули: у столпа два, у одного рода ни одного.
+    red_slots: {infantry: 0, vehicle: 2, aircraft: 1, tower: 1}
+
+  - id: troop_G3
+    kind: troop_side
+    side: G3
+    name: "Господство в воздухе"
+    pillar: aircraft
+    attacks:
+      infantry: [vehicle, aircraft]
+      vehicle:  [aircraft, buildings_towers]
+      aircraft: [buildings_towers, infantry]
+      tower:    [vehicle, infantry]
+    speeds: {infantry: 1, vehicle: 1, aircraft: 3, tower: 0}
+    building_prices: {barracks: 2, factory: 3, airbase: 1}
+    tower_hits_buildings: false
+    # Места под красные модули: у столпа два, у одного рода ни одного.
+    red_slots: {infantry: 1, vehicle: 0, aircraft: 2, tower: 1}
+
+  - id: troop_G4
+    kind: troop_side
+    side: G4
+    name: "Линия обороны"
+    pillar: tower
+    attacks:
+      infantry: [aircraft, vehicle]
+      vehicle:  [buildings_towers, aircraft]
+      aircraft: [infantry, buildings_towers]
+      tower:    [infantry, vehicle]
+    speeds: {infantry: 1, vehicle: 1, aircraft: 2, tower: 1}
+    building_prices: {barracks: 1, factory: 2, airbase: 3}
+    tower_hits_buildings: false
+    # Места под красные модули: у столпа два, у одного рода ни одного.
+    red_slots: {infantry: 1, vehicle: 1, aircraft: 0, tower: 2}
+
+  # -- Storage board sides --------------------------------------------------
+  # cells: list per level 1..4; each is a string of cell types (У/К/Б) →
+  # normalized here as codes: U universal, K kelium, A ammo. "" = no cells.
+  - id: storage_A
+    kind: storage_side
+    side: A
+    shared: true
+    miners:  ["U", "U", "UU", "UU"]
+    plants:  ["U", "U", "UU", "UU"]
+    prices:  [1, 2, 3, 4]
+    storage_token: {sides: ["+1_energy", "+1_universal_cell"]}
+    vp_star_level: 4
+
+  - id: storage_B1
+    kind: storage_side
+    side: B1
+    miners: ["KK", "KK", "U", "U"]
+    plants: ["AA", "AA", "U", "U"]
+    prices: [1, 2, 3, 4]
+    vp_star_level: 4
+
+  - id: storage_B2
+    kind: storage_side
+    side: B2
+    miners: ["U", "U", "UU", "UU"]
+    plants: ["AA", "U", "UU", "U"]
+    prices: [2, 2, 3, 3]
+    vp_star_level: 4
+
+  - id: storage_B3
+    kind: storage_side
+    side: B3
+    miners: ["", "KK", "KK", "UU"]
+    plants: ["", "AA", "AA", "UU"]
+    prices: [1, 1, 4, 4]
+    vp_star_level: 4
+
+  - id: storage_B4
+    kind: storage_side
+    side: B4
+    miners: ["KU", "KU", "KU", "KU"]
+    plants: ["A", "A", "A", "A"]
+    prices: [3, 3, 2, 2]
+    vp_star_level: 4
+
+  # -- Tech / development board (3 shared tracks) ---------------------------
+  # Step numeric values (cost/vp/capacity) live in the RULESET so they can be
+  # tuned; here we describe the fixed *structure* — which track gives what.
+  - id: tech_tracks
+    kind: tech_board
+    tracks:
+      - {id: left,   modules: red,     ability: "+1 ammo in combat"}
+      - {id: middle, modules: storage, ability: "+1 kelium per Mining"}
+      - {id: right,  modules: blue,    ability: "+1 extra move"}
+    step_rewards: ["prize_cube", "module", "module", "super_arsenal_card"]
+    first_arriver_prizes: {left: "1_ammo", middle: "1_kelium", right: "1_coin"}
+    science_dept_exchanges:
+      - "1-2 trophy -> 1-2 coins"
+      - "1 trophy -> move 1 module"
+      - "2 trophy -> draw 2 arsenal keep 1"
+      - "3 trophy -> gild (upgrade) 1 module"

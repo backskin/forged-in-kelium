@@ -353,102 +353,180 @@ public final class PlayerStrip extends JComponent {
         g.drawString(s, x + Theme.px(11), y + h - Theme.px(3));
     }
 
+    /**
+     * ОДИН ПОКАЗАТЕЛЬ НИЖНЕЙ СВОДКИ: своя ширина и умение нарисоваться в точке.
+     *
+     * <p>Раньше строки складывались «по месту»: каждый следующий значок ставился
+     * от предыдущего плюс фиксированный отступ. Пока полоса широкая, это работало,
+     * а на четырёх игроков в узком окне хвост строки просто уезжал за край и
+     * обрезался — числа было не прочесть (замечание дизайнера 15.08.2026).
+     */
+    private interface Item {
+        /** Своя ширина показателя без отступов. */
+        int width(Graphics2D g);
+
+        /** Нарисовать в точке (x, y) — левый верхний угол своей клетки. */
+        void draw(Graphics2D g, int x, int y);
+
+        /** Ключ для подсказки (null — подсказки нет). */
+        String key();
+    }
+
+    /**
+     * РАЗЛОЖИТЬ РЯД ПОКАЗАТЕЛЕЙ ПО ШИРИНЕ. Сначала считаются собственные ширины,
+     * потом остаток делится на отступы: просторно — держим полный отступ, тесно —
+     * ужимаем до минимума. Что и после этого не влезло, переносится в следующий
+     * ряд, а не рисуется за краем.
+     *
+     * @return сколько показателей уместилось
+     */
+    private int layoutRow(Graphics2D g, java.util.List<Item> items, int x, int y,
+                          int w, int lineH) {
+        int minGap = Theme.px(10);
+        int maxGap = Theme.px(26);
+        int fit = 0;
+        int natural = 0;
+        for (Item it : items) {
+            int iw = it.width(g);
+            int need = natural + iw + (fit == 0 ? 0 : minGap);
+            if (fit > 0 && need > w) {
+                break;
+            }
+            natural += iw + (fit == 0 ? 0 : minGap);
+            fit++;
+        }
+        if (fit == 0) {
+            return 0;
+        }
+        int own = 0;
+        for (int i = 0; i < fit; i++) {
+            own += items.get(i).width(g);
+        }
+        int gaps = fit - 1;
+        int gap = gaps == 0 ? 0
+            : Math.max(minGap, Math.min(maxGap, (w - own) / gaps));
+        int cx = x;
+        for (int i = 0; i < fit; i++) {
+            Item it = items.get(i);
+            int iw = it.width(g);
+            it.draw(g, cx, y);
+            if (it.key() != null) {
+                detailSpots.put(it.key(),
+                    new Rectangle(cx - Theme.px(4), y, iw + Theme.px(8), lineH));
+            }
+            cx += iw + gap;
+        }
+        return fit;
+    }
+
+    /** Показатель «значок + число»: они читаются как одно целое и стоят вплотную. */
+    private Item markItem(String key, String icon, String value, Color colour) {
+        int tie = Theme.px(9);
+        int mark = Theme.px(15);
+        return new Item() {
+            @Override public int width(Graphics2D g) {
+                return mark + tie - Theme.px(6) + g.getFontMetrics().stringWidth(value);
+            }
+
+            @Override public void draw(Graphics2D g, int x, int y) {
+                MarkIcons.paint(g, icon, x, y + Theme.px(8), mark, colour);
+                g.setColor(colour);
+                g.drawString(value, x + tie, y + Theme.px(12));
+            }
+
+            @Override public String key() {
+                return key;
+            }
+        };
+    }
+
     private void paintDetails(Graphics2D g, ReplayRecord.Player p, ReplayRecord.Frame f,
                               int x, int y, int w) {
         g.setFont(f(12, Font.PLAIN));
         int lineH = Theme.px(18);
 
-        // ОТСТУПЫ ВНУТРИ ПАРЫ И МЕЖДУ ПАРАМИ РАЗНЫЕ. Значок и его число — это ОДИН
-        // показатель, и стоять они должны вплотную; а вот соседние показатели надо
-        // разводить заметно шире, иначе строка читается как одна каша из значков и
-        // цифр (просьба дизайнера 13.08.2026). Раньше оба отступа были почти равны.
-        int tie = Theme.px(9);       // значок → своё число
-        int apart = Theme.px(26);    // число → следующий значок
-
         detailSpots.clear();
 
-        // наука — три микро-шкалы цветами треков
-        int sx = x;
-        g.setColor(Theme.ink3());
-        // Отступ ПО ИЗМЕРЕННОЙ ШИРИНЕ слова, а не фиксированный: со сменой шрифта
-        // на Tektur жёсткие 34 пикселя перестали хватать, и «наука» упиралась в
-        // шкалы треков (13.08.2026).
-        g.drawString("наука", sx, y + Theme.px(10));
-        sx += g.getFontMetrics().stringWidth("наука") + Theme.px(6);
-        // ЗНАЧКИ И ШКАЛЫ ВДВОЕ КРУПНЕЕ (просьба дизайнера 13.08.2026): прежние
-        // 9 пикселей на значок и 4×8 на шкалу читались только с лупой.
-        String[] tracks = {"left", "middle", "right"};
-        Color[] colours = {new Color(0xC0392B), new Color(0x278B3E), new Color(0x2C62A8)};
-        for (int i = 0; i < 3; i++) {
-            int steps = p.tech.getOrDefault(tracks[i], 0);
-            for (int k = 0; k < 4; k++) {
-                g.setColor(k < steps ? colours[i] : Theme.alpha(Theme.ink3(), 0.35));
-                g.fillRect(sx + k * Theme.px(8), y + Theme.px(2), Theme.px(6),
-                    Theme.px(12));
-            }
-            sx += Theme.px(38);
-        }
-        detailSpots.put("tech", new Rectangle(x, y, sx - x, lineH));
-
-        // здания и войска — значками фигур, без символов шрифта
         int[] b = buildings(f, p.seat);
         int[] u = units(f, p.seat);
-        int mx = sx + apart - Theme.px(10);
-        int mark = Theme.px(15);
-        g.setColor(Theme.ink2());
-        MarkIcons.paint(g, "BUILDING", mx, y + Theme.px(8), mark, Theme.ink2());
-        String bs = b[0] + "·" + b[1] + "·" + b[2];
-        g.drawString(bs, mx + tie, y + Theme.px(12));
-        int wide = tie + g.getFontMetrics().stringWidth(bs);
-        detailSpots.put("buildings", new Rectangle(mx - Theme.px(6), y,
-            wide + Theme.px(10), lineH));
-        mx += wide + apart;
-        MarkIcons.paint(g, "UNIT", mx, y + Theme.px(8), mark, Theme.ink2());
-        String us = u[0] + "/" + u[1];
-        g.drawString(us, mx + tie, y + Theme.px(12));
-        detailSpots.put("units", new Rectangle(mx - Theme.px(6), y,
-            tie + g.getFontMetrics().stringWidth(us) + Theme.px(10), lineH));
-
-        // вторая строка деталей — если высота позволяет
-        if (getHeight() < Theme.px(Theme.H_STRIP)) {
-            return;
-        }
-        int y2 = y + lineH;
-        int cx2 = x + Theme.px(4);
-        g.setColor(Theme.ink3());
-        MarkIcons.paint(g, "CARD", cx2, y2 + Theme.px(8), mark, Theme.ink3());
-        String cards = String.valueOf(p.objectiveHand.size());
-        g.drawString(cards, cx2 + tie, y2 + Theme.px(12));
-        int wCards = tie + g.getFontMetrics().stringWidth(cards);
-        detailSpots.put("objectives", new Rectangle(cx2 - Theme.px(6), y2,
-            wCards + Theme.px(10), lineH));
-        cx2 += wCards + apart;
-        MarkIcons.paint(g, "ARSENAL", cx2, y2 + Theme.px(8), mark, Theme.ink3());
-        String ars = p.arsenalHand.size() + "+" + p.arsenalInstalled.size();
-        g.drawString(ars, cx2 + tie, y2 + Theme.px(12));
-        int wArs = tie + g.getFontMetrics().stringWidth(ars);
-        detailSpots.put("arsenal", new Rectangle(cx2 - Theme.px(6), y2,
-            wArs + Theme.px(10), lineH));
-        cx2 += wArs + apart;
-        // сыгранные приказы круга: залитые и пустые кружки
         int played = p.orderPlayed.size();
-        for (int i = 0; i < 4; i++) {
-            MarkIcons.paint(g, i < played ? "ORDER_DONE" : "ORDER_LEFT",
-                cx2 + i * Theme.px(14), y2 + Theme.px(8), Theme.px(11),
-                i < played ? Theme.seatInk(seat) : Theme.ink3());
-        }
-        detailSpots.put("orders", new Rectangle(cx2 - Theme.px(6), y2,
-            Theme.px(62), lineH));
-        cx2 += Theme.px(50) + apart;
+
+        // ВСЕ ПОКАЗАТЕЛИ ОДНИМ СПИСКОМ, в порядке важности. Раскладывает их
+        // layoutRow: что не влезло в первый ряд — уходит во второй, что не влезло
+        // и туда — не рисуется вовсе, а не вылезает за край полосы.
+        java.util.List<Item> items = new ArrayList<>();
+        items.add(techItem(p));
+        items.add(markItem("buildings", "BUILDING", b[0] + "·" + b[1] + "·" + b[2],
+            Theme.ink2()));
+        items.add(markItem("units", "UNIT", u[0] + "/" + u[1], Theme.ink2()));
+        items.add(markItem("objectives", "CARD",
+            String.valueOf(p.objectiveHand.size()), Theme.ink3()));
+        items.add(markItem("arsenal", "ARSENAL",
+            p.arsenalHand.size() + "+" + p.arsenalInstalled.size(), Theme.ink3()));
+        items.add(ordersItem(played));
         if (p.superObjective != null) {
-            MarkIcons.paint(g, "SUPER", cx2, y2 + Theme.px(8), mark,
-                p.superComplete ? Theme.points() : Theme.ink3());
-            g.setColor(p.superComplete ? Theme.points() : Theme.ink3());
-            String sp = String.valueOf(p.superProgress);
-            g.drawString(sp, cx2 + tie, y2 + Theme.px(12));
-            detailSpots.put("super", new Rectangle(cx2 - Theme.px(6), y2,
-                tie + g.getFontMetrics().stringWidth(sp) + Theme.px(10), lineH));
+            items.add(markItem("super", "SUPER", String.valueOf(p.superProgress),
+                p.superComplete ? Theme.points() : Theme.ink3()));
         }
+
+        int done = layoutRow(g, items, x, y, w, lineH);
+        // Второй ряд — только если высота полосы его позволяет.
+        if (done < items.size() && getHeight() >= Theme.px(Theme.H_STRIP)) {
+            layoutRow(g, items.subList(done, items.size()), x, y + lineH, w, lineH);
+        }
+    }
+
+    /** Наука: подпись и три микро-шкалы цветами треков. */
+    private Item techItem(ReplayRecord.Player p) {
+        String[] tracks = {"left", "middle", "right"};
+        Color[] colours = {new Color(0xC0392B), new Color(0x278B3E), new Color(0x2C62A8)};
+        return new Item() {
+            @Override public int width(Graphics2D g) {
+                return g.getFontMetrics().stringWidth("наука") + Theme.px(6)
+                    + 3 * Theme.px(38) - Theme.px(8);
+            }
+
+            @Override public void draw(Graphics2D g, int x, int y) {
+                g.setColor(Theme.ink3());
+                g.drawString("наука", x, y + Theme.px(10));
+                int sx = x + g.getFontMetrics().stringWidth("наука") + Theme.px(6);
+                for (int i = 0; i < 3; i++) {
+                    int steps = p.tech.getOrDefault(tracks[i], 0);
+                    for (int k = 0; k < 4; k++) {
+                        g.setColor(k < steps ? colours[i]
+                            : Theme.alpha(Theme.ink3(), 0.35));
+                        g.fillRect(sx + k * Theme.px(8), y + Theme.px(2), Theme.px(6),
+                            Theme.px(12));
+                    }
+                    sx += Theme.px(38);
+                }
+            }
+
+            @Override public String key() {
+                return "tech";
+            }
+        };
+    }
+
+    /** Приказы круга: четыре кружка, залитые — сыгранные. */
+    private Item ordersItem(int played) {
+        return new Item() {
+            @Override public int width(Graphics2D g) {
+                return 3 * Theme.px(14) + Theme.px(11);
+            }
+
+            @Override public void draw(Graphics2D g, int x, int y) {
+                for (int i = 0; i < 4; i++) {
+                    MarkIcons.paint(g, i < played ? "ORDER_DONE" : "ORDER_LEFT",
+                        x + i * Theme.px(14), y + Theme.px(8), Theme.px(11),
+                        i < played ? Theme.seatInk(seat) : Theme.ink3());
+                }
+            }
+
+            @Override public String key() {
+                return "orders";
+            }
+        };
     }
 
     /** Спарклайн победных очков по раундам — еле заметно, фоном. */
