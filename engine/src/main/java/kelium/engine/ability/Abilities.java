@@ -94,7 +94,11 @@ public final class Abilities {
         Hook.ATTACK_RANGE,              // CombatResolver: дальность выбора цели
         Hook.TOKEN_HP,                  // Passives.effectiveHp: прочность жетона
         Hook.MOVEMENT_JUMP_OVER,
-        Hook.RETURN_KEEP_TROPHY);       // Actions: прыжок пехоты через тайл зарождения
+        Hook.RETURN_KEEP_TROPHY,
+        // Точка спрашивается в Power.payMissingEnergyWithCoin, а в этом списке
+        // её не было — из-за одной строки карта b20 «Оборотный капитал» считалась
+        // нереализованной, хотя способность написана и зарегистрирована.
+        Hook.ASSEMBLY_PAY_ENERGY_WITH_COIN);       // Actions: прыжок пехоты через тайл зарождения
 
     /** Точки правил, объявленные подключёнными к движку. */
     public static Set<Hook> wiredHooks() {

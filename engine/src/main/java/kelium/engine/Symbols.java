@@ -51,6 +51,21 @@ public final class Symbols {
         public String glyph(String form) {
             return glyphs.getOrDefault(form, form);
         }
+
+        /**
+         * ВСЕ ФОРМЫ, КОТОРЫЕ ВСТРЕЧАЮТСЯ НА КАРТАХ АРСЕНАЛА.
+         *
+         * <p>Нужно, чтобы раскладывать символы по ячейкам супер-задания: класть
+         * туда форму, которой нет ни на одной карте арсенала, значит выдать
+         * игроку ячейку, которую нечем снять. Список берётся из самой разметки —
+         * поменяли колоду, поменялся и набор форм, без правки кода.
+         */
+        public List<String> allForms() {
+            java.util.LinkedHashSet<String> forms =
+                new java.util.LinkedHashSet<>(arsenal.values());
+            forms.remove(null);
+            return List.copyOf(forms);
+        }
     }
 
     private static final Map<String, Marking> CACHE = new ConcurrentHashMap<>();

@@ -141,7 +141,10 @@ public final class Setup {
      * <ul>
      *   <li>{@code expansions.super_objectives} — супер задания и супероружие;</li>
      *   <li>{@code expansions.starting_objectives} — начальные задания;</li>
-     *   <li>{@code expansions.super_arsenal} — карты на вершинах треков.</li>
+     *   <li>{@code expansions.super_arsenal} — карты на вершинах треков;</li>
+     *   <li>{@code expansions.market_cards} — карты предложений рынка. Выключено —
+     *       остаётся только напечатанный обмен на планшете маркета, колода рынка
+     *       не раздаётся, а карты, требующие предложение С КАРТЫ, изымаются.</li>
      * </ul>
      *
      * <p>СТАРЫЕ ВЕРСИИ ПРАВИЛ не знают этих ключей, поэтому значение по
@@ -159,6 +162,10 @@ public final class Setup {
                 && Boolean.TRUE.equals(ruleset.get("super_objectives.enabled", Boolean.TRUE));
             case "starting_objectives" -> "starters".equals(mode);
             case "super_arsenal" -> true;   // прежде выключателя не было вовсе
+            // КАРТЫ РЫНКА: на старых сводах их выключателя не было, и партии
+            // играли С НИМИ — значит по умолчанию включены, иначе прежние
+            // замеры поменяли бы смысл.
+            case "market_cards" -> true;
             default -> false;
         };
     }
@@ -571,6 +578,31 @@ public final class Setup {
             // изымает, но по-прежнему называет карты, у которых эффект или
             // пассивка не реализованы.
             reportUnimplemented(ctype, ids, content.get(ctype));
+
+            // КАРТЫ, ЗАВИСЯЩИЕ ОТ ВЫКЛЮЧЕННОГО ДОПОЛНЕНИЯ, изымаются из колоды.
+            // Признак стоит В ДАННЫХ карты (needs_expansion), а не списком
+            // номеров в коде: иначе следующая такая карта потеряется молча — так
+            // уже было с шестью картами, которые движок выбрасывал за спиной.
+            // Это ЕДИНСТВЕННЫЙ законный повод убрать карту из колоды: дополнение
+            // выключено целиком, и без него условие карты невыполнимо.
+            {
+                List<String> kept = new ArrayList<>();
+                List<String> dropped = new ArrayList<>();
+                for (String id : ids) {
+                    Map<String, Object> card = content.get(ctype).find(id);
+                    Object need = card == null ? null : card.get("needs_expansion");
+                    if (need != null && !expansionOn(ruleset, String.valueOf(need))) {
+                        dropped.add(id + " (нужно дополнение «" + need + "»)");
+                    } else {
+                        kept.add(id);
+                    }
+                }
+                if (!dropped.isEmpty()) {
+                    System.err.println("[SETUP] " + ctype
+                        + ": изъято по выключенному дополнению — " + dropped);
+                    ids = kept;
+                }
+            }
             // РЕЖИМ ИГРЫ (правило дизайнера 12.08.2026): супер задания и
             // НАЧАЛЬНЫЕ задания вместе не играются. В режиме super начальные
             // задания из колоды изымаются целиком.
@@ -618,6 +650,14 @@ public final class Setup {
                     }
                     ids = more;
                 }
+            }
+            if ("market".equals(ctype) && !expansionOn(ruleset, "market_cards")) {
+                // КАРТЫ РЫНКА ВЫКЛЮЧЕНЫ: колода не собирается вовсе, активной
+                // карты в партии нет, и на планшете маркета остаётся только
+                // напечатанный обмен. Пустая колода здесь — законное состояние,
+                // а не сбой: движок уже умеет жить без активной карты.
+                decks.put(ctype, Deck.fromIds(ctype, List.of(), rng));
+                continue;
             }
             decks.put(ctype, Deck.fromIds(ctype, ids, rng));
         }

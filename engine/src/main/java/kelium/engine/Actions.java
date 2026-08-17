@@ -437,7 +437,9 @@ public final class Actions {
                 if (!ASSEMBLY_UNIT.containsKey(b.type)) {
                     continue;
                 }
-                if (!effectivelyPowered(state, player, b, agent, paid)) {
+                // МОБИЛИЗАЦИЯ (карта рынка «Военный подряд»): в эту Сборку
+                // энергия не нужна вообще, все здания считаются запитанными.
+                if (!ctx.allPowered && !effectivelyPowered(state, player, b, agent, paid)) {
                     continue;
                 }
                 UnitType unitType = ASSEMBLY_UNIT.get(b.type);
@@ -633,20 +635,84 @@ public final class Actions {
 
         /** Есть ли на гексе место под юнит данного типа (ячейка по размеру). */
         private boolean hasRoomForUnit(PlayerState player, String hexId, UnitType t) {
-            Hex h = state.field.get(hexId);
-            if (t == UnitType.AIRCRAFT) {
-                for (PlayerState pl : state.players) {
-                    for (UnitToken u : pl.units) {
-                        if (u.type == UnitType.AIRCRAFT && hexId.equals(u.hexId)) {
-                            return false;   // воздушная ячейка занята
-                        }
+            return Actions.roomForUnit(state, hexId, t);
+        }
+    }
+
+    /**
+     * СКОЛЬКО ЯЧЕЕК ПРЕДЛОЖЕНИЯ ОТКРЫТО на карте рынка при таком числе игроков.
+     *
+     * <p>Одна — и ТОЛЬКО ПРИ ЧЕТЫРЁХ ИГРОКАХ две (ревью дизайнера 17.08.2026;
+     * прежде вторая открывалась с трёх). Предложение — дефицитный ресурс стола:
+     * при трёх игроках две ячейки на два предложения означают, что хватает почти
+     * всем, а на четверых без второй ячейки последний по кругу до рынка не
+     * доходил вообще.
+     *
+     * <p>ПОЧЕМУ ЭТО ОТДЕЛЬНЫЙ ПУБЛИЧНЫЙ МЕТОД, а не условие внутри действия:
+     * то же самое число нужно проигрывателю, который рисует ячейки на планшете
+     * рынка. Раньше правило лежало в трёх местах — в движке и в двух подписях
+     * интерфейса, — и после первой же правки они разошлись: движок открывал одну
+     * ячейку, а планшет рисовал две открытыми.
+     */
+    public static int marketCellsOpen(int numPlayers) {
+        return numPlayers >= 4 ? 2 : 1;
+    }
+
+    /**
+     * СТАНЦИЯ СЪЕХАЛА — ПЕРЕСЧИТАТЬ ЕЁ ВЫРАБОТКУ.
+     *
+     * <p>У энергостанции выработка зависит от сектора, на котором она стоит:
+     * полный номинал только на ЖЁЛТОМ секторе гекса, на любом другом — 1 кубик.
+     * Поэтому любой её переезд меняет число кубиков, и если оно изменилось,
+     * станция забирает свои кубики обратно на себя (как при постройке) и
+     * раскладывает их заново ближайшей Сменой энергии. Без этого станция,
+     * съехавшая с жёлтого сектора, продолжала бы кормить здания номиналом,
+     * которого больше не выдаёт.
+     *
+     * <p>Правило одно на все способы переезда — и на Стройку, и на «Эвакуацию».
+     * Второй копии этого расчёта быть не должно: она разойдётся с первой.
+     */
+    static void resettlePlant(GameState state, PlayerState player, BuildingToken b) {
+        if (b.type != BuildingType.POWER_PLANT) {
+            return;
+        }
+        int now = Power.plantOutput(state, b);
+        int had = b.energyIdle;
+        for (BuildingToken c : player.buildingsOnField()) {
+            had += c.energyBySource.getOrDefault(b.uid, 0);
+        }
+        if (now != had) {
+            for (BuildingToken c : player.buildingsOnField()) {
+                c.stripEnergyOf(b.uid);
+            }
+            b.energyIdle = now;
+        }
+    }
+
+    /**
+     * ВЛЕЗЕТ ЛИ ЖЕТОН ВОЙСКА НА ГЕКС ФИЗИЧЕСКИ — только про место, без правил
+     * проходимости.
+     *
+     * <p>Отделено от {@code canEnterHex} намеренно: у гекса шесть секторов земли и
+     * один сектор Неба, и это ограничение физическое — его не отменяет ни карта,
+     * ни телепорт. А вот запретные гексы, гряды зарождения, чужие здания и
+     * требование двух секторов технике — это правила ДВИЖЕНИЯ, и «Эвакуация» их
+     * не соблюдает, потому что она не движение.
+     */
+    static boolean roomForUnit(GameState state, String hexId, UnitType t) {
+        Hex h = state.field.get(hexId);
+        if (t == UnitType.AIRCRAFT) {
+            for (PlayerState pl : state.players) {
+                for (UnitToken u : pl.units) {
+                    if (u.type == UnitType.AIRCRAFT && hexId.equals(u.hexId)) {
+                        return false;   // сектор Неба на гексе занят
                     }
                 }
-                return true;
             }
-            int[] load = groundLoad(state, hexId, -1);
-            return h.fitsWithRepack(t == UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
+            return true;
         }
+        int[] load = groundLoad(state, hexId, -1);
+        return h.fitsWithRepack(t == UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
     }
 
     // ======================================================================
@@ -718,7 +784,10 @@ public final class Actions {
             // компенсацию. Поэтому счётчик наценки ведётся по ключу build_place, а
             // не по всем операциям подряд, как было раньше.
             List<Integer> schedule = rs.getIntList("actions.build.surcharge_coins");
-            int surcharge = ctx.nextOpSurcharge("build_place", schedule);
+            // ПОДРЯД НА СТРОЙКУ (карта рынка «Инженерная контора»): второе и
+            // третье здание ставятся по печатной цене, без надбавки.
+            int surcharge = ctx.noSurcharge.contains("build_place")
+                ? 0 : ctx.nextOpSurcharge("build_place", schedule);
             List<Map<String, Object>> menu = buildable(player, surcharge);
             List<Map<String, Object>> moveMenu = movable(player);
             if (menu.isEmpty() && moveMenu.isEmpty()) {
@@ -1130,19 +1199,7 @@ public final class Actions {
             // ближайшей Сменой энергии. Без этого станция, съехавшая с жёлтой
             // ячейки, продолжала бы кормить здания номиналом, которого больше
             // не выдаёт.
-            if (b.type == BuildingType.POWER_PLANT) {
-                int now = Power.plantOutput(state, b);
-                int had = b.energyIdle;
-                for (BuildingToken c : player.buildingsOnField()) {
-                    had += c.energyBySource.getOrDefault(b.uid, 0);
-                }
-                if (now != had) {
-                    for (BuildingToken c : player.buildingsOnField()) {
-                        c.stripEnergyOf(b.uid);
-                    }
-                    b.energyIdle = now;
-                }
-            }
+            resettlePlant(state, player, b);
             // ПЕЧАТНЫЙ КОНТЕЙНЕР: перенос — тоже «здание встало на ячейку».
             PrintedContainers.onBuildingPlaced(state, player, b);
             // СТАРЫЙ РЕЖИМ: стройка на гексе СЖИГАЕТ лежащий там жетон
@@ -1284,6 +1341,19 @@ public final class Actions {
             // оплачивается наценкой (actions.energy_swap.surcharge_coins).
             // «Вечный кубик» жетона хранилища — источник вне поля, доступен в
             // любой Смене энергии без наценки за гекс.
+            // ПЕРЕКОММУТАЦИЯ: когда наценки сняты со всех гексов, пошаговый выбор
+            // «взял гекс — разложил — взял следующий» становится выбором БЕЗ
+            // СИГНАЛА. Обычно шаги ограничивает цена: второй гекс стоит монету, и
+            // потому есть смысл решать по одному. Здесь цены нет, гексов бывает
+            // пять, кубиков восемь, и число разных последовательностей уходит в
+            // тысячи — а результат зависит только от ИТОГОВОЙ раскладки, не от
+            // порядка. Поэтому здесь предлагается сразу ГОТОВАЯ РАСКЛАДКА целиком.
+            if (ctx.noSurcharge.contains("energy_swap")) {
+                ActionResult whole = rewireEverything(player, ctx, agent);
+                if (whole != null) {
+                    return whole;
+                }
+            }
             List<Integer> schedule = rs.getIntList("actions.energy_swap.surcharge_coins");
             int placedTotal = 0;
             int hexesDone = 0;
@@ -1291,7 +1361,15 @@ public final class Actions {
             boolean cardSourceDone = false;
             java.util.Set<String> doneHexes = new java.util.HashSet<>();
             while (true) {
-                int surcharge = ctx.nextOpSurcharge("energy_swap", schedule);
+                // ПЕРЕКОММУТАЦИЯ (карта рынка «Инженерная контора»): энергия
+                // переставляется с любых своих гексов и полностью бесплатно —
+                // надбавки за второй и последующие гексы-исходы нет.
+                //
+                // ЗАЦИКЛИТЬСЯ ЗДЕСЬ НЕЛЬЗЯ, хотя цена и снята: каждый гекс-исход
+                // попадает в doneHexes и из меню уходит, поэтому выбор кончается
+                // сам, когда кончились гексы с источниками.
+                int surcharge = ctx.noSurcharge.contains("energy_swap")
+                    ? 0 : ctx.nextOpSurcharge("energy_swap", schedule);
                 // ТОЧКА ПРАВИЛ: карта арсенала может сделать второй гекс бесплатным
                 // («Ваше второе перемещение энергии тоже бесплатно»).
                 surcharge = (int) Math.round(kelium.engine.ability.RuleQuery
@@ -1391,6 +1469,185 @@ public final class Actions {
             tel.put("hexes", hexesDone);
             return ActionResult.ok("energy swap: " + placedTotal + " cubes over "
                 + hexesDone + " hex(es)", tel);
+        }
+
+        /**
+         * ПЕРЕКОММУТАЦИЯ ЦЕЛИКОМ: снять со стола ВСЮ свою энергию и разложить её
+         * заново одним решением.
+         *
+         * <p>Возвращает {@code null}, если раскладывать нечего — тогда действие
+         * идёт обычным пошаговым путём и честно сообщает «nothing to do».
+         *
+         * <p>ЧТО ТУТ ГЛАВНОЕ. Здание либо запитано целиком, либо не работает
+         * вовсе: кубик, положенный в здание, которому нужно два, не даёт ничего.
+         * Значит осмысленных раскладок немного — они отличаются тем, КОГО решили
+         * не питать. Поэтому игрок выбирает не кубик за кубиком, а ПОРЯДОК
+         * ВАЖНОСТИ, и раскладка достраивается по нему жадно: пока пула хватает
+         * закрыть здание целиком — закрываем, не хватает — идём к следующему.
+         * Для одинаковых кубиков это и есть оптимум по числу работающих зданий,
+         * когда порядок «сначала дешёвые».
+         *
+         * <p>Последний вариант — «разложить самому» — возвращает игрока к
+         * пошаговому выбору: живому человеку он нужен, боту нет.
+         */
+        private ActionResult rewireEverything(PlayerState player, TurnContext ctx, Agent agent) {
+            // 1. СКОЛЬКО ВСЕГО ЭНЕРГИИ У ИГРОКА. Пул каждого источника считается
+            // через Power.plantOutput — там живёт правило жёлтого сектора.
+            java.util.Map<Integer, Integer> pools = new java.util.LinkedHashMap<>();
+            for (BuildingToken src : player.buildingsOnField()) {
+                if (!isSource(src)) {
+                    continue;
+                }
+                pools.put(src.uid, Power.plantOutput(state, src)
+                    + (src.type == BuildingType.POWER_PLANT
+                        ? Passives.plantEnergyBonus(state, player.seat) : 0));
+            }
+            int storage = storageEnergyTokens(player);
+            if (storage > 0) {
+                pools.put(STORAGE_SOURCE_UID, storage);
+            }
+            int cardEnergy = kelium.engine.ability.RuleQuery
+                .of(state, player.seat, kelium.engine.ability.Hook.ENERGY_SOURCES)
+                .base(0).ask();
+            if (cardEnergy > 0) {
+                pools.put(ARSENAL_CARD_SOURCE_UID, cardEnergy);
+            }
+            int total = 0;
+            for (int n : pools.values()) {
+                total += n;
+            }
+            List<BuildingToken> consumers = new ArrayList<>();
+            for (BuildingToken c : player.buildingsOnField()) {
+                if (c.energySlots > 0) {
+                    consumers.add(c);
+                }
+            }
+            if (total == 0 || consumers.isEmpty()) {
+                return null;
+            }
+
+            // 2. ЧЕТЫРЕ ПОРЯДКА ВАЖНОСТИ. Это не «варианты алгоритма», а разные
+            // ответы на вопрос «что мне сейчас нужнее»: побольше работающих
+            // зданий, добыча, войска или самое крупное производство.
+            java.util.LinkedHashMap<String, java.util.Comparator<BuildingToken>> plans =
+                new java.util.LinkedHashMap<>();
+            plans.put("запитать как можно больше зданий",
+                java.util.Comparator.comparingInt((BuildingToken c) -> c.energySlots));
+            plans.put("сначала добыча",
+                java.util.Comparator.comparingInt((BuildingToken c) ->
+                    (c.type == BuildingType.MINER ? 0 : 1) * 100 + c.energySlots));
+            plans.put("сначала военные здания",
+                java.util.Comparator.comparingInt((BuildingToken c) ->
+                    (ASSEMBLY_UNIT.containsKey(c.type) ? 0 : 1) * 100 + c.energySlots));
+            plans.put("сначала крупные",
+                java.util.Comparator.comparingInt((BuildingToken c) -> -c.energySlots));
+
+            List<Choice> opts = new ArrayList<>();
+            java.util.Map<String, List<Integer>> layouts = new java.util.LinkedHashMap<>();
+            for (var e : plans.entrySet()) {
+                List<BuildingToken> order = new ArrayList<>(consumers);
+                order.sort(e.getValue());
+                List<Integer> uids = new ArrayList<>();
+                int left = total;
+                for (BuildingToken c : order) {
+                    if (c.energySlots <= left) {
+                        uids.add(c.uid);
+                        left -= c.energySlots;
+                    }
+                }
+                // Одинаковые по результату раскладки в меню не дублируются: две
+                // подписи на одно и то же — это выбор, которого нет.
+                if (layouts.containsValue(uids)) {
+                    continue;
+                }
+                layouts.put(e.getKey(), uids);
+                opts.add(new Choice("energy_layout", e.getKey(),
+                    e.getKey() + ": запитано " + uids.size() + " из " + consumers.size()));
+            }
+            opts.add(new Choice("energy_manual", null, "разложить кубики самому"));
+            Choice pick = agent.choose(state, opts,
+                Map.of("kind", "energy_layout", "cubes", total));
+            if (pick == null || pick.payload() == null) {
+                return null;            // «самому» — обычный пошаговый путь
+            }
+            List<Integer> chosen = layouts.get(String.valueOf(pick.payload()));
+            if (chosen == null) {
+                return null;
+            }
+
+            // 3. ПРИМЕНИТЬ ОДНИМ ДЕЙСТВИЕМ: снять всё и положить по раскладке.
+            for (BuildingToken c : player.buildingsOnField()) {
+                for (int srcUid : new ArrayList<>(c.energyBySource.keySet())) {
+                    c.stripEnergyOf(srcUid);
+                }
+            }
+            for (BuildingToken src : player.buildingsOnField()) {
+                if (isSource(src)) {
+                    src.energyIdle = 0;
+                }
+            }
+            java.util.Iterator<java.util.Map.Entry<Integer, Integer>> src = pools.entrySet().iterator();
+            java.util.Map.Entry<Integer, Integer> cur = src.hasNext() ? src.next() : null;
+            int placed = 0;
+            for (int uid : chosen) {
+                BuildingToken c = null;
+                for (BuildingToken t : player.buildingsOnField()) {
+                    if (t.uid == uid) {
+                        c = t;
+                        break;
+                    }
+                }
+                if (c == null) {
+                    continue;
+                }
+                int need = c.energySlots;
+                while (need > 0 && cur != null) {
+                    if (cur.getValue() <= 0) {
+                        cur = src.hasNext() ? src.next() : null;
+                        continue;
+                    }
+                    int take = Math.min(need, cur.getValue());
+                    c.addEnergyFrom(cur.getKey(), take);
+                    cur.setValue(cur.getValue() - take);
+                    need -= take;
+                    placed += take;
+                }
+            }
+            // ОСТАТОК ПРОСТАИВАЕТ НА СВОЁМ ИСТОЧНИКЕ — кубик из игры не исчезает.
+            while (cur != null) {
+                if (cur.getValue() > 0 && cur.getKey() >= 0) {
+                    for (BuildingToken s : player.buildingsOnField()) {
+                        if (s.uid == cur.getKey()) {
+                            s.energyIdle = cur.getValue();
+                            break;
+                        }
+                    }
+                }
+                cur = src.hasNext() ? src.next() : null;
+            }
+
+            // Все свои гексы-исходы пошли в дело — журнал должен видеть каждый:
+            // на этом стоят задания про Смену энергии («Перекоммутация» o20).
+            int hexes = 0;
+            java.util.Set<String> hexIds = new java.util.LinkedHashSet<>();
+            for (BuildingToken s : player.buildingsOnField()) {
+                if (isSource(s) && s.hexId != null) {
+                    hexIds.add(s.hexId);
+                }
+            }
+            for (String hid : hexIds) {
+                journal(state).of(player.seat).energySwapSourceHexes.add(hid);
+                ctx.recordOp("energy_swap");
+                hexes++;
+            }
+            ctx.actionsPlayed.add(name());
+            Map<String, Object> tel = new HashMap<>();
+            tel.put("energy_placed", placed);
+            tel.put("hexes", hexes);
+            tel.put("layout", String.valueOf(pick.payload()));
+            tel.put("powered", chosen.size());
+            return ActionResult.ok("перекоммутация целиком: " + placed + " кубиков, "
+                + chosen.size() + " зданий запитано (" + pick.payload() + ")", tel);
         }
 
         /**
@@ -1755,12 +2012,18 @@ public final class Actions {
 
         /**
          * Номер СВОБОДНОЙ ячейки предложения карты рынка, либо −1, если свободных
-         * нет. Ячеек две; ВТОРАЯ открыта только при 3–4 игроках (на карте помечена
-         * «3+») — именно это и показано в проигрывателе на планшете рынка.
+         * нет. Ячеек две; ВТОРАЯ открыта ТОЛЬКО ПРИ ЧЕТЫРЁХ ИГРОКАХ (на карте
+         * помечена «4») — именно это и показано в проигрывателе на планшете рынка.
+         *
+         * <p>Почему не «3+», как раньше: предложение — дефицитный ресурс стола, и
+         * при трёх игроках две ячейки на два предложения означают, что хватает
+         * почти всем. Один и тот же рынок должен поджимать одинаково при любом
+         * числе игроков, а на четверых без второй ячейки последний по кругу не
+         * доходил до рынка вообще.
          */
         static int freeMarketCell(GameState s, String side) {
             int[] cells = s.marketCells["right".equals(side) ? 1 : 0];
-            int open = s.numPlayers() >= 3 ? cells.length : 1;
+            int open = Math.min(cells.length, marketCellsOpen(s.numPlayers()));
             for (int i = 0; i < open; i++) {
                 if (cells[i] < 0) {
                     return i;

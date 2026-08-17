@@ -269,6 +269,19 @@ public final class ReplayRecord {
          */
         public final Map<String, Integer> superParts = new LinkedHashMap<>();
         public boolean superComplete;
+
+        /**
+         * ВТОРАЯ ПОЛОВИНА СУПЕР-ЗАДАНИЯ (версия правил 3.0, 17.08.2026).
+         *
+         * <p>Прежние поля {@code superProgress} и {@code superParts} остались от
+         * той версии, где вклад вносили ЧАСТЯМИ. Теперь вносят всё разом, а после
+         * вскрытия на карте живёт СЧЁТЧИК ЗАПУСКА: сколько ячеек ещё занято и
+         * какой символ напечатан на каждой. Без этих двух полей проигрыватель
+         * физически не мог показать вторую половину — он показывал «рубашку»,
+         * которой в правилах уже нет.
+         */
+        public int superCells = -1;
+        public final List<String> superCellSymbols = new ArrayList<>();
         public int cuTokens;
         public boolean ownCuToken = true;
         public String startHex = "";
@@ -634,6 +647,8 @@ public final class ReplayRecord {
         v.superProgress = p.superObjectiveProgress;
         v.superParts.putAll(new TreeMap<>(p.superPartProgress));
         v.superComplete = p.superObjectiveComplete;
+        v.superCells = p.superCells;
+        v.superCellSymbols.addAll(p.superCellSymbols);
         v.cuTokens = p.cuDestructionTokens;
         v.ownCuToken = p.ownCuTokenAvailable;
         v.startHex = p.startHex;

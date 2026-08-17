@@ -1133,7 +1133,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         g.setColor(ink3());
         wrap(g, "Ячейки предложений РАСХОДУЮТСЯ: занял — предложение для остальных "
             + "сузилось. Кубик келемия в ячейке и цветная метка рядом показывают, "
-            + "кто её занял. Вторая ячейка открыта только при 3–4 игроках.",
+            + "кто её занял. Вторая ячейка открыта только при ЧЕТЫРЁХ игроках.",
             x + 20, ey, w - 40, 21, 4);
     }
 
@@ -1160,8 +1160,19 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         g.setColor(ink());
         g.drawString(clip(g, String.valueOf(card.get("name")), w - 20), x + 12, y + 54);
 
-        int offY = y + 66;
-        int offH = (h - 76) / 2;
+        // ТЕКСТ КАРТЫ ЦЕЛИКОМ (просьба дизайнера 17.08.2026): раньше на планшете
+        // висели только названия предложений и короткая подпись, а описание — то,
+        // что на бумажной карте и написано, — не показывалось нигде. Сверять
+        // напечатанное с происходящим было нечем.
+        int textH = 0;
+        Object descr = card.get("описание");
+        if (descr != null) {
+            g.setFont(note(10));
+            g.setColor(ink3());
+            textH = wrap(g, String.valueOf(descr), x + 12, y + 72, w - 24, 14, 3);
+        }
+        int offY = y + 66 + textH;
+        int offH = (h - 76 - textH) / 2;
         paintOffer(g, x + 10, offY, w - 20, offH - 6, card.get("left"), "ЛЕВОЕ",
             cellCost, players);
         paintOffer(g, x + 10, offY + offH + 4, w - 20, offH - 6, card.get("right"), "ПРАВОЕ",
@@ -1194,7 +1205,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         wrap(g, label == null ? "" : kelium.gui.replay2.Names.offer(String.valueOf(label)),
             x + 10, y + 70, w - 140, 21, 2);
 
-        // ЯЧЕЙКИ ПРЕДЛОЖЕНИЯ: вторая открыта только при 3–4 игроках. Занятая
+        // ЯЧЕЙКИ ПРЕДЛОЖЕНИЯ: вторая открыта только при ЧЕТЫРЁХ игроках. Занятая
         // ячейка держит ОБЪЁМНЫЙ КУБИК КЕЛЕМИЯ, а рядом — цветная метка игрока,
         // который его туда поставил (просьба дизайнера 12.08.2026).
         int sideIdx = "ПРАВОЕ".equals(side) ? 1 : 0;
@@ -1203,7 +1214,9 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         int d = Math.min(34, h - 30);
         int cx = x + w - 14 - 2 * (d + 8);
         for (int i = 0; i < 2; i++) {
-            boolean live = i == 0 || players >= 3;
+            // ЧИСЛО ОТКРЫТЫХ ЯЧЕЕК СПРАШИВАЕМ У ДВИЖКА, а не повторяем условие
+            // здесь: правило уже расходилось между планшетом и действием.
+            boolean live = i < kelium.engine.Actions.marketCellsOpen(players);
             int cy = y + (h - d) / 2;
             g.setColor(live ? wash(new Color(0x2C, 0x62, 0xA8)) : emptyCell());
             g.fillRoundRect(cx, cy, d, d, 4, 4);
@@ -1353,11 +1366,18 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         return sb + "…";
     }
 
-    /** Перенос текста по словам: не более {@code maxLines} строк. */
-    static void wrap(Graphics2D g, String text, int x, int y, int width, int lineH,
-                     int maxLines) {
+    /**
+     * Перенос текста по словам: не более {@code maxLines} строк.
+     *
+     * @return сколько ПИКСЕЛЕЙ по высоте занял текст. Нужно тем, кто рисует под
+     *     текстом что-то ещё: текст карты бывает в две строки, бывает в три, и
+     *     верстать следующий блок от постоянного отступа значит либо наехать на
+     *     текст, либо оставить дыру.
+     */
+    static int wrap(Graphics2D g, String text, int x, int y, int width, int lineH,
+                    int maxLines) {
         if (text == null || text.isBlank() || "null".equals(text)) {
-            return;
+            return 0;
         }
         String[] words = text.split("\\s+");
         StringBuilder line = new StringBuilder();
@@ -1369,7 +1389,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                 g.drawString(line.toString(), x, cy);
                 cy += lineH;
                 if (++lines >= maxLines) {
-                    return;
+                    return lines * lineH;
                 }
                 line = new StringBuilder(word);
             } else {
@@ -1378,6 +1398,8 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         }
         if (line.length() > 0) {
             g.drawString(clip(g, line.toString(), width), x, cy);
+            lines++;
         }
+        return lines * lineH;
     }
 }

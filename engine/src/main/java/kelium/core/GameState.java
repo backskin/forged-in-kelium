@@ -44,6 +44,17 @@ public final class GameState {
     public final java.util.List<String> arsenalDisplay = new java.util.ArrayList<>();
     public int circle = 0;                    // 1..circlesPerRound
     public int firstPlayer = 0;               // место с жетоном первого игрока
+
+    /**
+     * ЖЕТОН ПЕРВОГО ИГРОКА НЕ ПЕРЕДАЁТСЯ в следующее Обновление.
+     *
+     * <p>Карта рынка «Штаб корпуса», предложение «Приоритет»: игрок ЗАБИРАЕТ
+     * жетон себе сейчас же, и правило передачи по кругу на этот один раз
+     * отменяется — иначе жетон уехал бы к соседу, не дав ничего.
+     *
+     * <p>Флаг одноразовый: Обновление, пропустив передачу, сразу его снимает.
+     */
+    public boolean firstPlayerHeld = false;
     public String marketActive = null;        // id активной карты маркета
     // Карты супер-арсенала, выложенные В ОТКРЫТУЮ на вершинах треков при
     // подготовке: {trackId -> cardId}. Забираются на шаге 4 (по одной).
@@ -140,6 +151,7 @@ public final class GameState {
         s.round = round;
         s.circle = circle;
         s.marketActive = marketActive;
+        s.firstPlayerHeld = firstPlayerHeld;
         s.superArsenalOffer.putAll(superArsenalOffer);
         // Витрина арсенала — часть состояния стола, и копия партии для просчёта
         // обязана её нести: без этого бот, доигрывая копию, «видел» бы пустую

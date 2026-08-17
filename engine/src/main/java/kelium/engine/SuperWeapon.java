@@ -86,18 +86,22 @@ public final class SuperWeapon {
         if (p.superObjective == null || p.superCells >= 0) {
             return false;
         }
-        if (!hasRequiredSymbol(s, p)) {
-            return false;
-        }
+        // СИМВОЛ ЗДЕСЬ БОЛЬШЕ НЕ ТРЕБУЕТСЯ (переделка правила 17.08.2026).
+        // Прежде вскрытие просило открытую карту арсенала с нужным символом, и
+        // это запирало всю механику: замер 240 игроков показал 196 случаев
+        // «нет символа» и НИ ОДНОГО возможного вскрытия за 100 партий, потому
+        // что открытых карт арсенала у игрока к концу партии 0.55. Символы
+        // переехали во ВТОРУЮ часть — теперь ими платят за снятие ячеек.
         return canPayAll(s, p, cells(s, p.superObjective));
     }
 
     /**
-     * ЕСТЬ ЛИ У ИГРОКА НУЖНЫЙ СИМВОЛ на ОТКРЫТОЙ карте арсенала.
+     * ЕСТЬ ЛИ У ИГРОКА КАРТА АРСЕНАЛА С ТАКИМ СИМВОЛОМ — среди тех, что лежат
+     * открытыми перед ним.
      *
-     * <p>Именно на открытой: закрытая карта на руке символа не показывает, а
-     * смысл требования в том, чтобы игрок занял слот планшета под карту с нужной
-     * формой — то есть заплатил за вскрытие ещё и местом.
+     * <p>С 17.08.2026 это нужно не для вскрытия, а для СНЯТИЯ ЯЧЕЙКИ: карту с
+     * подходящим символом игрок ЖЕРТВУЕТ. Метод оставлен для совместимости и
+     * отвечает на вопрос «есть ли вообще чем платить хоть за одну ячейку».
      */
     public static boolean hasRequiredSymbol(GameState s, PlayerState p) {
         Map<String, Object> card = Ctx.cards(s, "super_objectives").find(p.superObjective);
@@ -233,6 +237,18 @@ public final class SuperWeapon {
         }
         p.superCells = cellCount(s, p.superObjective);
         p.superObjectiveComplete = true;
+
+        // СИМВОЛЫ НА ЯЧЕЙКИ — по одному на ячейку, СЛУЧАЙНО и с повторами
+        // (правило 17.08.2026). Именно ими игрок платит за снятие: чтобы снять
+        // ячейку, он жертвует открытую карту арсенала с таким же символом.
+        // Повторы разрешены нарочно: две одинаковые ячейки можно снять за один
+        // СПЕЦ, если нашлось две подходящие карты.
+        p.superCellSymbols.clear();
+        List<String> forms = Symbols.of(s).allForms();
+        for (int i = 0; i < p.superCells; i++) {
+            p.superCellSymbols.add(forms.isEmpty() ? "" 
+                : forms.get(s.rng.nextInt(forms.size())));
+        }
 
         Map<String, Object> card = Ctx.cards(s, "super_objectives").find(p.superObjective);
         int vp = card != null && card.get("vp_on_reveal") instanceof Number n ? n.intValue() : 0;
@@ -371,7 +387,57 @@ public final class SuperWeapon {
                 return false;   // прячется в своей базе
             }
         }
-        return true;
+        // ОТЪЕХАЛ ОТ СВОЕГО ЗАВОДА (правило 17.08.2026): оружие должно стоять
+        // НЕ БЛИЖЕ одного гекса от здания, которое его произвело. Прежнего
+        // запрета «не на гексе найма» мало: жетон мог отойти на шаг и стоять там
+        // под прикрытием базы всю партию.
+        if (p.superWeaponHiredHex != null
+                && s.field.neighbors(p.superWeaponHiredHex).contains(w.hexId)) {
+            return false;
+        }
+        // ЧЕМ ПЛАТИТЬ. Снятие ячейки стоит ЖЕРТВЫ карты арсенала с тем символом,
+        // что напечатан на ячейке. Нет ни одной подходящей карты — снимать нечем.
+        return !payableCells(s, p).isEmpty();
+    }
+
+    /**
+     * КАКИЕ ЯЧЕЙКИ МОЖНО СНЯТЬ ПРЯМО СЕЙЧАС и чем именно за них платить.
+     *
+     * <p>Возвращает пары «номер ячейки → карта арсенала, которую придётся
+     * пожертвовать». Одна карта закрывает одну ячейку: если у игрока две карты с
+     * одинаковым символом и две таких ячейки — снимутся обе, за один СПЕЦ.
+     *
+     * <p>Именно это и есть правило дизайнера «за одно СПЕЦ-действие можно
+     * прощёлкать сразу несколько»: считается не число действий, а число
+     * подходящих карт на руках.
+     */
+    public static Map<Integer, String> payableCells(GameState s, PlayerState p) {
+        Map<Integer, String> plan = new java.util.LinkedHashMap<>();
+        if (p.superCells <= 0) {
+            return plan;
+        }
+        Symbols.Marking m = Symbols.of(s);
+        // Открытые карты арсенала по форме: одна карта — одна ячейка, поэтому
+        // расходуем список, а не проверяем наличие.
+        List<String> pool = new ArrayList<>(p.allInstalledArsenal());
+        for (int i = 0; i < p.superCellSymbols.size() && i < p.superCells; i++) {
+            String need = p.superCellSymbols.get(i);
+            if (need == null || need.isBlank()) {
+                continue;
+            }
+            String found = null;
+            for (String cid : pool) {
+                if (need.equals(m.ofArsenal(cid))) {
+                    found = cid;
+                    break;
+                }
+            }
+            if (found != null) {
+                pool.remove(found);
+                plan.put(i, found);
+            }
+        }
+        return plan;
     }
 
     /** Жетон супероружия игрока, если он существует. */
@@ -396,7 +462,21 @@ public final class SuperWeapon {
             return false;
         }
         UnitToken w = weaponToken(p);
-        p.superCells -= 1;
+        // СНИМАЕМ ВСЁ, ЧТО ОПЛАТИМО, ЗА ОДИН СПЕЦ (правило 17.08.2026): сколько
+        // подошло карт арсенала — столько ячеек и снялось. Карты уходят из игры
+        // жертвой, ячейки освобождаются вместе со своими символами.
+        Map<Integer, String> plan = payableCells(s, p);
+        java.util.List<Integer> cellsDone = new ArrayList<>(plan.keySet());
+        cellsDone.sort(java.util.Comparator.reverseOrder());
+        for (int idx : cellsDone) {
+            String sacrificed = plan.get(idx);
+            p.arsenalInstalled.remove(sacrificed);
+            s.decks.get("arsenal").discard(sacrificed);
+            if (idx < p.superCellSymbols.size()) {
+                p.superCellSymbols.remove(idx);
+            }
+            p.superCells -= 1;
+        }
         p.superLastLaunchCircle = s.circle;
         if (w != null && w.hexId != null) {
             p.superLaunchedFrom.add(w.hexId);

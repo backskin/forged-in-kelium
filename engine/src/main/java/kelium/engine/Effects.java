@@ -74,6 +74,7 @@ public final class Effects {
             case "permanent_energy" -> permanentEnergy(s, seat, p);
             case "cancel_attack" -> cancelAttack(s, seat, p);
             case "build_neutral" -> buildNeutral(s, seat, p);
+            case "evacuate" -> evacuate(s, seat, p);
             // === ЭФФЕКТЫ РЕВЬЮ 17.08.2026 ===
             case "shield" -> shield(s, seat, p);
             case "landing" -> landing(s, seat, p);
@@ -104,7 +105,7 @@ public final class Effects {
                  // рынка) молча изымались из колод на подготовке: игрок их не
                  // видел, а в отчётах они выглядели просто редкими.
                  "grab_first_player", "power_building_free", "permanent_energy",
-                 "cancel_attack", "build_neutral",
+                 "cancel_attack", "build_neutral", "evacuate",
                  // Девять эффектов ревью 17.08.2026: щит, десант, скорость,
                  // выбор «энергия или модули», конверсия и четыре арсенальных.
                  "shield", "landing", "speed_boost", "energy_or_modules", "convert",
@@ -148,6 +149,32 @@ public final class Effects {
                 drawn++;
             }
             got.put("objective_cards", drawn);
+            // «ТЯНИ ЧЕТЫРЕ, ОСТАВЬ ДВЕ» — карта рынка «Штаб корпуса», предложение
+            // «Штабная работа». Выбор из четырёх — это совсем другое предложение,
+            // чем три карты подряд: игрок берёт то, что подходит его положению, а
+            // не то, что легло. Лишние уходят в сброс.
+            if (p.containsKey("objective_cards_keep") && drawn > 0) {
+                int keep = asInt(p.get("objective_cards_keep"));
+                List<String> pool = new ArrayList<>(
+                    pl.objectiveHand.subList(pl.objectiveHand.size() - drawn, pl.objectiveHand.size()));
+                Agent ag = agentFor(s, seat);
+                while (pool.size() > keep) {
+                    List<Choice> opts = new ArrayList<>();
+                    for (String c : pool) {
+                        opts.add(new Choice("drop_objective", c, "сбросить " + c));
+                    }
+                    Choice pick = ag != null
+                        ? ag.choose(s, opts, Map.of("kind", "objective_keep", "keep", keep))
+                        : opts.get(opts.size() - 1);
+                    String drop = pick != null && pick.payload() != null
+                        ? String.valueOf(pick.payload()) : pool.get(pool.size() - 1);
+                    pool.remove(drop);
+                    pl.objectiveHand.remove(drop);
+                    s.decks.get("objectives").discard(drop);
+                }
+                got.put("objective_cards", pool.size());
+                got.put("objective_cards_dropped", drawn - pool.size());
+            }
         }
         if (p.containsKey("arsenal")) {
             int want = asInt(p.get("arsenal"));
@@ -295,6 +322,15 @@ public final class Effects {
             got.put("ran", false);
             return got;
         }
+        // ПОДАРОК К ДЕЙСТВИЮ — те же параметры, что у обычного gain: «бесплатная
+        // Наука и сверху 1 обломок» (Лицензия), «бесплатный Бой и 1 боеприпас в
+        // его начале» (Внезапный удар), «бесплатная Смена энергии и 2 монеты»
+        // (Перекоммутация).
+        //
+        // ПОРЯДОК ВАЖЕН: ресурсы выдаются ДО действия, потому что на карте так и
+        // написано — «в начале этого боя». Боеприпас, пришедший после боя, боем
+        // уже не потратишь, и предложение стало бы пустым.
+        got.putAll(gain(s, seat, p));
         // E4: бесплатное действие с карты — самостоятельное разрешение со своим
         // контекстом (наценки внутри него считаются с нуля — это дар карты, а
         // не продолжение хода), но ЖУРНАЛ и телеметрия обязаны его видеть.
@@ -307,6 +343,17 @@ public final class Effects {
         }
         if (p.get("ops") instanceof Number on) {
             ctx.objectLimits.put(name, on.intValue());
+        }
+        // МОБИЛИЗАЦИЯ: Сборка без энергии вообще.
+        if (Boolean.TRUE.equals(p.get("all_powered"))) {
+            ctx.allPowered = true;
+        }
+        // ПОДРЯД НА СТРОЙКУ / ПЕРЕКОММУТАЦИЯ: надбавки за вторую и последующие
+        // операции нет. Ключи в данных — те же, по которым движок ведёт счётчик.
+        if (p.get("no_surcharge") instanceof java.util.List<?> keys) {
+            for (Object k : keys) {
+                ctx.noSurcharge.add(String.valueOf(k));
+            }
         }
         var res = Actions.create(name, s).perform(s.player(seat), ctx, agent);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
@@ -823,9 +870,17 @@ public final class Effects {
      */
     static Map<String, Object> grabFirstPlayer(GameState s, int seat, Map<String, Object> p) {
         int was = s.firstPlayer;
-        // В конце раунда движок сдвигает жетон на следующего по кругу, поэтому
-        // кладём его на ПРЕДЫДУЩЕГО: после сдвига он окажется у нас.
-        s.firstPlayer = Math.floorMod(seat - 1, s.numPlayers());
+        if (Boolean.TRUE.equals(p.get("now"))) {
+            // ПРИОРИТЕТ (карта рынка «Штаб корпуса»): игрок ЗАБИРАЕТ жетон себе
+            // сейчас же, и в ближайшее Обновление жетон не передаётся — карта
+            // отменяет правило передачи на этот один раз, пока лежит на рынке.
+            s.firstPlayer = seat;
+            s.firstPlayerHeld = true;
+        } else {
+            // В конце раунда движок сдвигает жетон на следующего по кругу, поэтому
+            // кладём его на ПРЕДЫДУЩЕГО: после сдвига он окажется у нас.
+            s.firstPlayer = Math.floorMod(seat - 1, s.numPlayers());
+        }
         Map<String, Object> got = new HashMap<>();
         got.put("first_player_was", was);
         got.put("first_player_next", seat);
@@ -908,58 +963,182 @@ public final class Effects {
      *
      * <p>Карта: рынок «Гражданский подряд» (левое предложение).
      *
-     * <p>Нейтральное здание — это стена: оно закрывает сторону гекса для прохода
-     * и для выстрела. Ставим его на свободный гекс рядом с ЧУЖИМ жетоном, то
-     * есть используем как заграждение против соседа, а не украшение.
+     * <p>Нейтральное здание — это СТЕНА, и в этом весь смысл предложения: оно
+     * закрывает сектор гекса для прохода и для выстрела. Поэтому и ставится оно
+     * НА ЛЮБОЕ СВОБОДНОЕ МЕСТО поля — на любой гекс, где есть один или два
+     * свободных сектора, а не только на пустой гекс. Заграждение нужно ровно
+     * там, где сосед собирается пройти, то есть чаще всего на занятом гексе.
+     *
+     * <p>Размер здания — 1 или 2 сектора, по выбору игрока; больших нейтралов
+     * это предложение не ставит.
      */
     static Map<String, Object> buildNeutral(GameState s, int seat, Map<String, Object> p) {
-        String bestHex = null;
-        int bestEnemies = 0;
+        Agent agent = agentFor(s, seat);
+        List<Choice> opts = new ArrayList<>();
         for (var e : s.field.hexes.entrySet()) {
-            kelium.core.Hex h = e.getValue();
-            if (h.hasNeutral()) {
+            List<Integer> free = e.getValue().freeSideIndices();
+            if (free.isEmpty()) {
                 continue;
             }
-            // Гекс должен быть свободен от ЛЮБЫХ жетонов: нейтрал ставится в
-            // пустое место, а не поверх чужой базы.
-            boolean occupied = false;
-            for (PlayerState any : s.players) {
-                for (kelium.core.Token t : any.unitsOnField()) {
-                    occupied |= e.getKey().equals(t.hexId());
+            // Один сектор — на любой свободный. Два — только на два СОСЕДНИХ:
+            // здание на две доли занимает соседние доли, врозь оно не стоит.
+            for (Integer i : free) {
+                Map<String, Object> one = new HashMap<>();
+                one.put("hex", e.getKey());
+                one.put("sectors", List.of(i));
+                opts.add(new Choice("neutral", one, "нейтрал 1 сектор @" + e.getKey() + "/" + i));
+                int next = (i + 1) % 6;
+                if (free.contains(next)) {
+                    Map<String, Object> two = new HashMap<>();
+                    two.put("hex", e.getKey());
+                    two.put("sectors", List.of(i, next));
+                    opts.add(new Choice("neutral", two,
+                        "нейтрал 2 сектора @" + e.getKey() + "/" + i + "-" + next));
                 }
-                for (kelium.core.Token t : any.buildingsOnField()) {
-                    occupied |= e.getKey().equals(t.hexId());
-                }
-            }
-            if (occupied) {
-                continue;
-            }
-            int enemies = 0;
-            for (String nb : s.field.neighbors(e.getKey())) {
-                for (PlayerState other : s.players) {
-                    if (other.seat == seat) {
-                        continue;
-                    }
-                    for (kelium.core.Token t : other.unitsOnField()) {
-                        if (nb.equals(t.hexId())) {
-                            enemies++;
-                        }
-                    }
-                }
-            }
-            if (bestHex == null || enemies > bestEnemies) {
-                bestHex = e.getKey();
-                bestEnemies = enemies;
             }
         }
-        if (bestHex == null) {
+        if (opts.isEmpty()) {
             return Map.of("built", 0);
         }
+        Choice pick = agent != null
+            ? agent.choose(s, opts, Map.of("kind", "build_neutral"))
+            : opts.get(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> spec = (Map<String, Object>)
+            (pick != null && pick.payload() != null ? pick.payload() : opts.get(0).payload());
+        String hex = String.valueOf(spec.get("hex"));
+        @SuppressWarnings("unchecked")
+        List<Integer> sectors = (List<Integer>) spec.get("sectors");
         // Отрицательные uid — соглашение движка для нейтралов (см. Scenario):
         // они не принадлежат никому и не пересекаются с жетонами игроков.
-        int uid = -1000 - s.field.get(bestHex).neutrals.size() - s.round;
-        s.field.get(bestHex).neutrals.add(new kelium.core.Hex.NeutralBuilding(
-            uid, false, java.util.List.of(0, 1, 2)));
-        return Map.of("built", 1, "hex", bestHex, "borders_enemies", bestEnemies);
+        kelium.core.Hex h = s.field.get(hex);
+        int uid = -1000 - h.neutrals.size() - s.round;
+        h.neutrals.add(new kelium.core.Hex.NeutralBuilding(uid, false, List.copyOf(sectors)));
+        for (Integer i : sectors) {
+            h.sideOwner[i] = -1;   // сектор занят нейтралом
+        }
+        return Map.of("built", 1, "hex", hex, "sectors", sectors.size());
+    }
+
+    /**
+     * ЭВАКУАЦИЯ — карта рынка «Гражданский подряд», правое предложение.
+     *
+     * <p>Игрок переносит ЛЮБОЕ ЧИСЛО своих жетонов — зданий и войск в любом
+     * сочетании — на один гекс, к которому примыкает любое его здание (то есть
+     * на любой гекс, доступный ему для стройки). Перед переносом с ВСЕХ жетонов
+     * на выбранном гексе снимается весь урон.
+     *
+     * <p>ЭТО НЕ СТРОЙКА И НЕ ДВИЖЕНИЕ, А ТЕЛЕПОРТ (правило дизайнера
+     * 17.08.2026). Ни одно правило перемещения здесь не действует: не платится
+     * монета за перенос здания, не спрашивается поворот, не проверяются
+     * запретные гексы, гряды зарождения, чужие здания, требование двух смежных
+     * секторов технике. Жетон снимается с одного гекса и ставится на другой.
+     *
+     * <p>Единственное, чего телепорт не отменяет, — ФИЗИКА ГЕКСА: секторов земли
+     * шесть, сектор Неба один, и больше на гекс не влезет. Что не влезло,
+     * остаётся на месте.
+     *
+     * <p>Зачем предложение существует: это единственный способ собрать
+     * растянутую по полю группу в кулак и заодно вылечить её. Прежнее лечение
+     * «всех своих жетонов» такой цены не имело — оно ничего не меняло на поле.
+     */
+    static Map<String, Object> evacuate(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        Agent agent = agentFor(s, seat);
+        List<String> zone = new ArrayList<>(Actions.buildableHexes(s, seat));
+        if (zone.isEmpty()) {
+            return Map.of("moved", 0);
+        }
+        List<Choice> where = new ArrayList<>();
+        for (String hid : zone) {
+            where.add(new Choice("evac_hex", hid, "эвакуация на " + hid));
+        }
+        Choice pickHex = agent != null
+            ? agent.choose(s, where, Map.of("kind", "evacuate_hex"))
+            : where.get(0);
+        String target = pickHex != null && pickHex.payload() != null
+            ? String.valueOf(pickHex.payload()) : zone.get(0);
+
+        // СНАЧАЛА ЛЕЧЕНИЕ: карта снимает урон со всех жетонов на выбранном гексе,
+        // и это происходит ДО переноса — лечится тот, кто там уже стоял.
+        int healed = 0;
+        for (PlayerState any : s.players) {
+            for (kelium.core.Token t : damagedTokens(any)) {
+                if (target.equals(t.hexId())) {
+                    healed += damageOf(t);
+                    setDamage(t, 0);
+                }
+            }
+        }
+
+        // ЗДАНИЯ ИДУТ ПЕРВЫМИ, и это не мелочь: здание занимает жёсткие секторы,
+        // войско — мягкие. Набей гекс сперва пехотой — зданию уже не встать, и
+        // «любая комбинация» на деле сведётся к одним войскам.
+        int movedBuildings = 0;
+        for (kelium.core.BuildingToken b : new ArrayList<>(pl.buildingsOnField())) {
+            if (target.equals(b.hexId)) {
+                continue;
+            }
+            int fp = Actions.buildingFootprint(b.type);
+            int[] ld = Actions.groundLoad(s, target, -1);
+            List<Integer> sides = s.field.get(target).chooseFootprint(fp, ld[0], ld[1]);
+            if (sides == null) {
+                continue;               // физически не влезло — остаётся на месте
+            }
+            List<Choice> opts = List.of(
+                new Choice("evac", b.uid, "вывезти " + b.type.code + " на " + target),
+                new Choice("stay", null, "оставить " + b.type.code));
+            Choice pick = agent != null
+                ? agent.choose(s, opts, Map.of("kind", "evacuate_building"))
+                : opts.get(0);
+            if (pick == null || pick.payload() == null) {
+                continue;
+            }
+            // Войско, стоявшее ВНУТРИ здания, с ним не телепортируется: остаётся
+            // на прежнем гексе и теряет укрытие — как при обычном переносе.
+            Actions.evictFromBuilding(pl, b);
+            String fromHex = b.hexId;
+            s.field.get(fromHex).freeSidesByToken(b.uid);
+            b.hexId = target;
+            s.field.get(target).occupySides(b.uid, sides);
+            // ЖЁЛТЫЙ СЕКТОР действует и после телепорта: это печатное свойство
+            // самой станции, а не правило стройки.
+            Actions.resettlePlant(s, pl, b);
+            PrintedContainers.onBuildingPlaced(s, pl, b);
+            movedBuildings++;
+        }
+
+        int movedUnits = 0;
+        for (kelium.core.UnitToken u : new ArrayList<>(pl.unitsOnField())) {
+            if (target.equals(u.hexId)) {
+                continue;
+            }
+            // ЕДИНСТВЕННАЯ ПРОВЕРКА — место. Правила проходимости не спрашиваются:
+            // это телепорт, а не движение.
+            if (!Actions.roomForUnit(s, target, u.type)) {
+                continue;
+            }
+            List<Choice> opts = List.of(
+                new Choice("evac", u.uid, "вывести " + u.type.code + " на " + target),
+                new Choice("stay", null, "оставить " + u.type.code));
+            Choice pick = agent != null
+                ? agent.choose(s, opts, Map.of("kind", "evacuate_unit"))
+                : opts.get(0);
+            if (pick == null || pick.payload() == null) {
+                continue;
+            }
+            String wasAt = u.hexId;
+            boolean wasInside = u.inside();
+            u.setHexId(target);
+            PrintedContainers.onUnitMoved(s, pl, wasAt, u.hexId, u.type, wasInside);
+            movedUnits++;
+        }
+        Map<String, Object> got = new HashMap<>();
+        got.put("moved", movedBuildings + movedUnits);
+        got.put("moved_buildings", movedBuildings);
+        got.put("moved_units", movedUnits);
+        got.put("healed", healed);
+        got.put("hex", target);
+        return got;
     }
 }

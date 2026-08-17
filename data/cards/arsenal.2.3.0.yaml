@@ -282,7 +282,7 @@ arsenal:
      bottom: {kind: SCORING, scoring: {per: 1, of: miner_plant_level_pairs, vp: 1},
               label: "1 ПО за каждую пару «добытчик и энергостанция одного уровня» на поле"},
      описание: "Утиль даёт две карты задания. Установленная карта приносит очко за каждую пару из добытчика и энергостанции ОДНОГО уровня, стоящих у вас на поле. Заставляет строить экономику ровно, а не гнать один номер вперёд, пока второй отстаёт."}
-  - {id: v05, name: "Диверсионная группа", kind: regular,
+  - {id: v05, needs_expansion: market_cards, name: "Диверсионная группа", kind: regular,
      top: {effect: market_card_from_discard, params: {}, label: "верни на маркет сброшенную карту сделок на рынке"},
      bottom: {kind: SCORING, scoring: {per: 1, of: kelium_ammo_pairs, vp: 1},
               label: "1 ПО за каждую пару «келемий и боеприпас» в хранилище"},

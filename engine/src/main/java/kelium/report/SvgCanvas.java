@@ -11,6 +11,14 @@ import java.util.Locale;
  */
 public final class SvgCanvas implements FieldCanvas {
 
+    /**
+     * ТОЛЩИНА ОБВОДКИ ЦИФР — доля от кегля. То же значение, что в
+     * {@link Java2DCanvas}: картинка отчёта и живое окно обязаны выглядеть
+     * одинаково, иначе скриншот перестаёт что-либо доказывать.
+     */
+    private static final double OUTLINE_WEIGHT = 0.16;
+
+
     private final StringBuilder sb;
     private double alpha = 1;
 
@@ -138,7 +146,7 @@ public final class SvgCanvas implements FieldCanvas {
             "<text x='%.1f' y='%.1f' text-anchor='middle' font-size='%.1f' font-weight='bold' "
             + "fill='%s' stroke='%s' stroke-width='%.1f' paint-order='stroke' "
             + "style='paint-order:stroke'>%s</text>%n",
-            cx, baselineY, size, fill, outline, size * 0.28, esc(text)));
+            cx, baselineY, size, fill, outline, size * OUTLINE_WEIGHT, esc(text)));
     }
 
     @Override
@@ -149,7 +157,7 @@ public final class SvgCanvas implements FieldCanvas {
             + "<text x='0' y='%.1f' text-anchor='middle' font-size='%.1f' "
             + "font-weight='bold' fill='%s' stroke='%s' stroke-width='%.1f' "
             + "paint-order='stroke' style='paint-order:stroke'>%s</text></g>%n",
-            cx, cy, rotDeg, size * 0.36, size, fill, outline, size * 0.28, esc(text)));
+            cx, cy, rotDeg, size * 0.36, size, fill, outline, size * OUTLINE_WEIGHT, esc(text)));
     }
 
     /** Экранировать текст для XML. */

@@ -28,9 +28,19 @@ public final class Expansions {
     public static final String SUPER_OBJECTIVES = "super_objectives";
     public static final String STARTING_OBJECTIVES = "starting_objectives";
     public static final String SUPER_ARSENAL = "super_arsenal";
+    /**
+     * КАРТЫ ПРЕДЛОЖЕНИЙ РЫНКА (заказ дизайнера 17.08.2026).
+     *
+     * <p>Выключено — на планшете маркета остаётся только НАПЕЧАТАННЫЙ обмен, а
+     * колода карт рынка не раздаётся вовсе. Вместе с ними выключаются карты
+     * заданий и арсенала, которые ссылаются на предложение с карты: без карт
+     * рынка их условие невыполнимо, и держать их в колоде значит подсовывать
+     * игроку мёртвую карту.
+     */
+    public static final String MARKET_CARDS = "market_cards";
 
     private static final String[] ALL =
-        {SUPER_OBJECTIVES, STARTING_OBJECTIVES, SUPER_ARSENAL};
+        {SUPER_OBJECTIVES, STARTING_OBJECTIVES, SUPER_ARSENAL, MARKET_CARDS};
 
     /** Человеческое имя дополнения — для тумблера и для журнала. */
     public static String title(String name) {
@@ -38,6 +48,7 @@ public final class Expansions {
             case SUPER_OBJECTIVES -> "Супер задания";
             case STARTING_OBJECTIVES -> "Начальные задания";
             case SUPER_ARSENAL -> "Супер-арсенал";
+            case MARKET_CARDS -> "Карты рынка";
             default -> name;
         };
     }
@@ -56,6 +67,11 @@ public final class Expansions {
                 "Карты на вершинах треков технологий: супер-войска и постоянные "
                     + "способности. Выключено — вершина трека даёт ещё один свой жетон "
                     + "(красный трек красный модуль, синий синий, зелёный позолоту).";
+            case MARKET_CARDS ->
+                "Восемь карт с уникальными предложениями: каждый раунд действует одна. "
+                    + "Выключено — на планшете маркета остаётся только напечатанный обмен, "
+                    + "а карты заданий и арсенала, требующие предложение с карты, "
+                    + "изымаются из колод.";
             default -> name;
         };
     }

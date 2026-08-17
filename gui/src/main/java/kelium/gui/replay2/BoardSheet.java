@@ -867,8 +867,19 @@ public final class BoardSheet extends JComponent {
         bx = deckButton(g, bx, y, "арсенал установлен", p.arsenalInstalled.size(),
             "arsenal", p.arsenalInstalled);
         if (p.superObjective != null) {
-            bx = deckButton(g, bx, y, "супер-задание", 1, "super_objectives",
+            // СУПЕР-ЗАДАНИЕ: подпись говорит, на какой ПОЛОВИНЕ игрок стоит.
+            // Прежде кнопка называлась просто «супер-задание» и по ней нельзя
+            // было понять, вскрыта карта или нет, — а с версии 3.0 это два
+            // совершенно разных состояния: до вскрытия карта в руке, после
+            // вскрытия на ней ЯЧЕЙКИ СО СИМВОЛАМИ и счётчик запуска.
+            String label = p.superCells < 0
+                ? "супер-задание (1-я часть)"
+                : "супероружие: ячеек " + p.superCells;
+            bx = deckButton(g, bx, y, label, 1, "super_objectives",
                 java.util.List.of(p.superObjective));
+            if (p.superCells > 0) {
+                bx = superCounter(g, bx, y, p);
+            }
         }
         // КОНТЕЙНЕРЫ — только числом, и это честно: движок хранит их СЧЁТОМ, без
         // имён карт, поэтому читать в них нечего.
@@ -1245,5 +1256,41 @@ public final class BoardSheet extends JComponent {
             return Ui2.tip(sb.toString());
         }
         return null;
+    }
+
+    /**
+     * СЧЁТЧИК ЗАПУСКА — вторая половина супер-задания, нарисованная как она
+     * лежит на столе: занятые ячейки с символами, которыми за них платят.
+     *
+     * <p>Раньше на этом месте показывалась «рубашка» — двусторонняя карта с
+     * рисунком, которой в правилах больше нет (версия 3.0 её отменила). Показ
+     * рубашки не говорил ни-че-го: ни сколько ячеек осталось, ни чем их снимать.
+     * Теперь видно ровно то, что решает партию: сколько снятий до победы и какие
+     * символы для них нужны.
+     */
+    private int superCounter(Graphics2D g, int x, int y, ReplayRecord.Player p) {
+        int cell = px(22);
+        int gap = px(4);
+        int n = Math.max(0, p.superCells);
+        int w = n * (cell + gap) + px(8);
+        // Значки берём из разметки символов действующей версии данных: сама
+        // запись хранит формы («квадрат», «круг»), а не картинки.
+        kelium.engine.Symbols.Marking m = kelium.engine.Symbols.load(
+            kelium.dataio.GameConfig.resolveDataRoot(null), null);
+        for (int i = 0; i < n; i++) {
+            int cx = x + px(4) + i * (cell + gap);
+            g.setColor(Theme.alpha(Theme.accent(), 0.16));
+            g.fillRoundRect(cx, y, cell, cell, px(6), px(6));
+            g.setColor(Theme.alpha(Theme.ink3(), 0.55));
+            g.drawRoundRect(cx, y, cell, cell, px(6), px(6));
+            String form = i < p.superCellSymbols.size() ? p.superCellSymbols.get(i) : "";
+            String glyph = m == null || form == null || form.isBlank()
+                ? "?" : m.glyph(form);
+            g.setFont(font(13, Font.BOLD));
+            g.setColor(Theme.ink());
+            int gw = g.getFontMetrics().stringWidth(glyph);
+            g.drawString(glyph, cx + (cell - gw) / 2, y + cell - px(6));
+        }
+        return x + w;
     }
 }

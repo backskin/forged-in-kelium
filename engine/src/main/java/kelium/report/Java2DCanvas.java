@@ -24,6 +24,16 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class Java2DCanvas implements FieldCanvas {
 
+    /**
+     * ТОЛЩИНА ОБВОДКИ ЦИФР на жетонах — доля от размера шрифта.
+     *
+     * <p>Было 0.28, и дизайнер справедливо назвал это «слишком жирно»: обводка
+     * толщиной больше четверти кегля съедает саму цифру, особенно у единицы и
+     * семёрки. 0.16 читается на любом цвете жетона и не заплывает.
+     */
+    private static final double OUTLINE_WEIGHT = 0.16;
+
+
     private final Graphics2D g;
     private final double zoom;
     private final Font baseFont;
@@ -231,7 +241,7 @@ public final class Java2DCanvas implements FieldCanvas {
         Color oc = color(outline);
         if (oc != null) {
             g.setColor(oc);
-            g.setStroke(new BasicStroke((float) (f.getSize2D() * 0.28),
+            g.setStroke(new BasicStroke((float) (f.getSize2D() * OUTLINE_WEIGHT),
                 BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g.draw(shape);
         }
@@ -256,7 +266,7 @@ public final class Java2DCanvas implements FieldCanvas {
         Color oc = color(outline);
         if (oc != null) {
             g.setColor(oc);
-            g.setStroke(new BasicStroke((float) (f.getSize2D() * 0.28),
+            g.setStroke(new BasicStroke((float) (f.getSize2D() * OUTLINE_WEIGHT),
                 BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g.draw(shape);
         }

@@ -576,7 +576,8 @@ public final class SetupPanel extends JPanel {
         for (String name : new String[]{
                 kelium.gui.Expansions.SUPER_OBJECTIVES,
                 kelium.gui.Expansions.STARTING_OBJECTIVES,
-                kelium.gui.Expansions.SUPER_ARSENAL}) {
+                kelium.gui.Expansions.SUPER_ARSENAL,
+                kelium.gui.Expansions.MARKET_CARDS}) {
             Toggle t = new Toggle(kelium.gui.Expansions.title(name),
                 kelium.gui.Expansions.on(settings, name), kelium.gui.Expansions.tip(name));
             t.onChange(value -> {

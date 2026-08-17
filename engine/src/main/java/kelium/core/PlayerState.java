@@ -110,6 +110,18 @@ public final class PlayerState {
      * оружие обязано переезжать, а не стоять четыре круга на одном месте.
      */
     public final java.util.Set<String> superLaunchedFrom = new java.util.LinkedHashSet<>();
+
+    /**
+     * СИМВОЛЫ НА ЯЧЕЙКАХ СУПЕР-ЗАДАНИЯ — по одному на ячейку, могут повторяться.
+     *
+     * <p>Правило дизайнера 17.08.2026 (переделка): символ больше не нужен, чтобы
+     * ВСКРЫТЬ карту, — он нужен, чтобы СНЯТЬ ячейку. При вскрытии на четыре
+     * ячейки случайно раскладываются четыре символа; чтобы снять ячейку, игрок
+     * ЖЕРТВУЕТ карту арсенала с таким же символом.
+     *
+     * <p>Список сокращается по мере снятия: длина равна числу занятых ячеек.
+     */
+    public final List<String> superCellSymbols = new ArrayList<>();
     /**
      * ПОБЕДНЫЕ ОЧКИ ЗА ПЕРВУЮ ЧАСТЬ супер задания (решение дизайнера 13.08.2026):
      * 2–5 очков по стоимости того, что сдано в лицо карты. Начисляются один раз, в
@@ -306,6 +318,7 @@ public final class PlayerState {
         p.arsenalCardKelium.putAll(arsenalCardKelium);
         p.superObjective = superObjective;
         p.superObjectiveOffer.addAll(superObjectiveOffer);
+        p.superCellSymbols.addAll(superCellSymbols);
         p.startObjectiveOffer.addAll(startObjectiveOffer);
         p.superObjectiveProgress = superObjectiveProgress;
         p.superObjectiveComplete = superObjectiveComplete;
