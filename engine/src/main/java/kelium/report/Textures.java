@@ -128,6 +128,26 @@ public final class Textures {
         return find(list);
     }
 
+    /**
+     * ТЕКСТУРА КАРТЫ — рубашка колоды. Лежат в папке {@code card/}.
+     *
+     * <p>Отдельная папка, а не {@code field/}: рубашка не картон поля и не жетон,
+     * а третий вид вещи на столе, и у неё своя форма — прямоугольник со скруглением,
+     * а не гекс.
+     *
+     * <p>Ключи: {@code deck_objectives}, {@code deck_arsenal},
+     * {@code deck_containers}, {@code deck_orders}, {@code deck_market},
+     * {@code deck_super_objectives}, плюс общая {@code deck} на случай, когда своей
+     * рубашки для набора нет. Ищется от точного к общему — как у жетонов.
+     */
+    public static BufferedImage card(String... keys) {
+        List<String> list = new ArrayList<>(keys.length);
+        for (String k : keys) {
+            list.add("card/" + k);
+        }
+        return find(list);
+    }
+
     /** Имена-кандидаты в порядке убывания точности. */
     public static List<String> names(String type, Integer level, int seat) {
         List<String> out = new ArrayList<>(4);

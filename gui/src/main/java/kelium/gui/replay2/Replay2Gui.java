@@ -65,6 +65,7 @@ public final class Replay2Gui {
     private SceneField field;
     private Timeline timeline;
     private TransportBar transport;
+    private final DecksPanel decks = new DecksPanel();
     private Drawer drawer;
     private SetupPanel setup;
     private JSplitPane drawerSplit;
@@ -290,6 +291,7 @@ public final class Replay2Gui {
         stage.add(field, "field");
         stage.add(scrolled(boards), "boards");
         stage.add(supersWithOverlay(), "supers");
+        stage.add(scrolled(decks), "decks");
         stage.add(scrolled(results), "results");
 
         // ВКЛАДКИ СЦЕНЫ ВСЕГДА НА ВИДУ. Раньше планшеты и итоги открывались только
@@ -316,6 +318,7 @@ public final class Replay2Gui {
         {"field", "Поле"},
         {"boards", "Наука и рынок"},
         {"supers", "Супер-задания"},
+        {"decks", "Карты"},
         {"results", "Итоги партии"},
     };
 
@@ -545,6 +548,7 @@ public final class Replay2Gui {
         study.add(item("График партии", "G", () -> openDrawer(Drawer.View.CHART)));
         study.add(item("Планшеты науки и рынка", "S", () -> showStage("boards")));
         study.add(item("Супер-задания", null, () -> showStage("supers")));
+        study.add(item("Карты: колоды и сбросы", "K", () -> showStage("decks")));
         study.add(item("Итоги партии", "T", () -> showStage("results")));
         study.addSeparator();
         study.add(item("Журнал странностей", "control J",
@@ -867,11 +871,12 @@ public final class Replay2Gui {
         if (b != null) {
             b.setSelected(true);      // вкладка подсвечена и когда её открыли клавишей
         }
-        if ("boards".equals(card) || "supers".equals(card)) {
+        if ("boards".equals(card) || "supers".equals(card) || "decks".equals(card)) {
             ReplayRecord.Frame f = session.frame();
             if (f != null) {
                 boards.show(session.record(), f.snapshot);
                 supers.show(session.record(), f.snapshot);
+                decks.show(session.record(), f.snapshot);
             }
             say("Планшет открыт. Esc — вернуться к полю.");
         } else if ("results".equals(card)) {
@@ -926,6 +931,7 @@ public final class Replay2Gui {
     /** Наши подложки и рамки: цвет задаётся кодом, поэтому меняем его руками. */
     private void restyle() {
         frame.getContentPane().setBackground(Theme.bg());
+        decks.applyTheme();     // список и подписи вкладки «Карты» красятся кодом
         for (JComponent c : panelSurfaces) {
             c.setBackground(Theme.panel());
         }
@@ -1040,11 +1046,16 @@ public final class Replay2Gui {
             thought.setText("«" + t.text + "»");
             thought.setForeground(Theme.seatInk(t.seat));
         }
-        if ("boards".equals(currentCard) || "supers".equals(currentCard)) {
+        // ПАНЕЛИ ЭКРАНОВ ОБНОВЛЯЮТСЯ ВМЕСТЕ С ЛЕНТОЙ ВРЕМЕНИ, иначе прокрутка
+        // партии показывала бы старое состояние: колоды и сбросы меняются каждый
+        // ход, и «покрутить и посмотреть историю» без этого не работает.
+        if ("boards".equals(currentCard) || "supers".equals(currentCard)
+                || "decks".equals(currentCard)) {
             ReplayRecord.Frame f = session.frame();
             if (f != null) {
                 boards.show(session.record(), f.snapshot);
                 supers.show(session.record(), f.snapshot);
+                decks.show(session.record(), f.snapshot);
             }
         }
     }
@@ -1142,11 +1153,13 @@ public final class Replay2Gui {
                 Math.max(2, rec.players), 0L, null, null);
             boards.setRules(cfg.ruleset, cfg.content);
             supers.setContent(cfg.content);
+            decks.setContent(cfg.content);
             session.setContent(cfg.content);
         } catch (RuntimeException e) {
             // Не загрузилось — панели честно напишут «не задано», а не выдумают числа
             boards.setRules(null, null);
             supers.setContent(null);
+            decks.setContent(null);
             session.setContent(null);
         }
         updateSupersAvailability();

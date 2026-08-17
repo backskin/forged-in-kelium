@@ -66,7 +66,7 @@ public final class DevMode {
             }
             System.out.println();
             System.out.println("показать в окне:  DevMode <сцена>");
-            System.out.println("снять картинку:   DevMode <сцена> снимок [экран] [файл.png]");
+            System.out.println("снять картинку:   DevMode <сцена> снимок [экран] [ШxВ] [файл.png]");
             System.out.println("  экраны: field · boards · supers · results · player");
             System.out.println("все картинки:     DevMode всё снимок");
             return;
@@ -91,9 +91,26 @@ public final class DevMode {
             // рынок), supers (супер-задания), results (итоги), player (личная
             // зона игрока в правом ящике).
             String stage = args.length > 2 ? args[2] : null;
-            Path out = args.length > 3 ? Path.of(args[3])
-                : SHOTS.resolve(args[0] + (stage == null ? "" : "-" + stage) + ".png");
-            shoot(scene, out, stage);
+            // Четвёртый аргумент — РАЗМЕР ОКНА вида 1280x800. Нужен затем, что
+            // раскладку надо смотреть и скукоженной, и растянутой: половина
+            // наездов друг на друга видна только на узком окне.
+            int[] размер = {1920, 1200};
+            String файл = null;
+            for (int i = 3; i < args.length; i++) {
+                int[] p = разобратьРазмер(args[i]);
+                if (p != null) {
+                    размер = p;
+                } else {
+                    файл = args[i];
+                }
+            }
+            Path out = файл != null ? Path.of(файл)
+                // Двоеточие в имени экрана («decks:arsenal») в имя файла нельзя:
+                // Windows такой путь не примет.
+                : SHOTS.resolve(args[0]
+                    + (stage == null ? "" : "-" + stage.replace(':', '-'))
+                    + "-" + размер[0] + "x" + размер[1] + ".png");
+            shoot(scene, out, stage, размер[0], размер[1]);
             System.out.println("снято: " + out.toAbsolutePath());
             System.exit(0);
         }
@@ -132,6 +149,12 @@ public final class DevMode {
      *     рынка), живёт на других экранах.
      */
     public static void shoot(Scene scene, Path out, String stage) throws Exception {
+        shoot(scene, out, stage, 1920, 1200);
+    }
+
+    /** То же с заданным размером окна: раскладку надо смотреть на разных размерах. */
+    public static void shoot(Scene scene, Path out, String stage, int ширина, int высота)
+            throws Exception {
         kelium.dataio.Locations.applyDataFolder();
         applyTheme();
         final Replay2Gui[] box = new Replay2Gui[1];
@@ -145,7 +168,7 @@ public final class DevMode {
         });
         JFrame frame = frameOf(box[0]);
         SwingUtilities.invokeAndWait(() -> {
-            frame.setSize(1920, 1200);
+            frame.setSize(ширина, высота);
             frame.validate();
         });
         // Дать Swing разложить содержимое: снимок, взятый сразу, выходит пустым.
@@ -171,6 +194,15 @@ public final class DevMode {
      * на снимке для ревью — заметно лучше. Тёмная включается запуском
      * {@code -Dkelium.theme=dark}.
      */
+    /** «1280x800» -> {1280,800}; не размер — {@code null}. */
+    private static int[] разобратьРазмер(String s) {
+        if (s == null || !s.matches("[0-9]{3,5}[xX][0-9]{3,5}")) {
+            return null;
+        }
+        String[] p = s.toLowerCase(java.util.Locale.ROOT).split("x");
+        return new int[]{Integer.parseInt(p[0]), Integer.parseInt(p[1])};
+    }
+
     private static void applyTheme() {
         String forced = System.getProperty("kelium.theme", "light");
         kelium.gui.replay2.Theme.apply("dark".equals(forced));
@@ -218,11 +250,33 @@ public final class DevMode {
             });
             return;
         }
+        // «decks:arsenal» — вкладка «Карты» с заранее выбранной стопкой: снимок
+        // горизонтальной карты арсенала иначе не снять, её надо выбрать мышью.
+        String экран = stage;
+        String стопка = null;
+        int двоеточие = stage.indexOf(':');
+        if (двоеточие > 0) {
+            экран = stage.substring(0, двоеточие);
+            стопка = stage.substring(двоеточие + 1);
+        }
+        final String наборДляВыбора = стопка;
         Method show = Replay2Gui.class.getDeclaredMethod("showStage", String.class);
         show.setAccessible(true);
+        final String экранИтог = экран;
         SwingUtilities.invokeAndWait(() -> {
             try {
-                show.invoke(gui, stage);
+                show.invoke(gui, экранИтог);
+                if (наборДляВыбора != null) {
+                    Field df = Replay2Gui.class.getDeclaredField("decks");
+                    df.setAccessible(true);
+                    Object панель = df.get(gui);
+                    boolean сброс = наборДляВыбора.endsWith("!");
+                    String набор = сброс
+                        ? наборДляВыбора.substring(0, наборДляВыбора.length() - 1)
+                        : наборДляВыбора;
+                    панель.getClass().getMethod("выбрать", String.class, boolean.class)
+                        .invoke(панель, набор, сброс);
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

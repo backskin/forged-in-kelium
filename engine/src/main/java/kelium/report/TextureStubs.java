@@ -172,6 +172,30 @@ public final class TextureStubs {
         lines.add("| `field/container` | печатная ячейка контейнера | одна на всех "
             + "| квадрат |");
 
+        // ---- РУБАШКИ КОЛОД. Третий вид вещи на столе после жетонов и картона
+        // поля: не гекс и не жетон, а прямоугольник со скруглением. Своя папка,
+        // чтобы рубашку можно было принести отдельно и не путать с картоном.
+        // Общая `deck` — запасная: набор без своей рубашки берёт её.
+        Path cards = Files.createDirectories(root.resolve("card"));
+        made += put(cards, "deck.png", deckStub("#4A4A55", "#22222A", "?"), prints);
+        made += put(cards, "deck_objectives.png",
+            deckStub("#2C62A8", "#17325A", "З"), prints);
+        made += put(cards, "deck_arsenal.png",
+            deckStub("#6C4AA8", "#382558", "А"), prints);
+        made += put(cards, "deck_containers.png",
+            deckStub("#9A8455", "#5A4C2E", "К"), prints);
+        made += put(cards, "deck_orders.png",
+            deckStub("#2E7D32", "#17401A", "П"), prints);
+        made += put(cards, "deck_market.png",
+            deckStub("#A8552C", "#5A2C17", "Р"), prints);
+        made += put(cards, "deck_super_objectives.png",
+            deckStub("#A8912C", "#5A4C17", "С"), prints);
+        lines.add("| `card/deck_objectives`, `_arsenal`, `_containers`, `_orders`, "
+            + "`_market`, `_super_objectives` | рубашка колоды | по набору "
+            + "| карта вертикально |");
+        lines.add("| `card/deck` | рубашка на всё остальное | одна на всех "
+            + "| карта вертикально |");
+
         // ---- ОБРАЗЦЫ: та же форма, но с разметкой — гекс, центр, направление
         Map<String, FieldGeometry.Shape> shapes = new LinkedHashMap<>();
         for (BuildingType t : BuildingType.values()) {
@@ -373,6 +397,40 @@ public final class TextureStubs {
     }
 
     /** ЗАГОТОВКА ПЕЧАТНОЙ ЯЧЕЙКИ КОНТЕЙНЕРА: квадрат со знаком вопроса. */
+    /**
+     * ЗАГОТОВКА РУБАШКИ КОЛОДЫ: карта вертикально, скруглённые углы, буква набора.
+     *
+     * <p>Соотношение 63×88 — стандартная игральная карта. Заготовка нарочно
+     * простая: её открывают и рисуют поверх, ничего не вымеряя.
+     */
+    private static BufferedImage deckStub(String fill, String edge, String letter) {
+        int w = SIDE / 2;
+        int h = (int) Math.round(w * 88.0 / 63.0);
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        int r = Math.max(8, w / 12);
+        g.setColor(Color.decode(fill));
+        g.fillRoundRect(0, 0, w, h, r, r);
+        g.setColor(Color.decode(edge));
+        g.setStroke(new BasicStroke(Math.max(4f, w / 26f)));
+        g.drawRoundRect(3, 3, w - 6, h - 6, r, r);
+        // косая штриховка — чтобы заготовка сразу читалась как ЗАКРЫТАЯ сторона
+        g.setStroke(new BasicStroke(Math.max(2f, w / 60f)));
+        for (int i = -h; i < w; i += Math.max(10, w / 9)) {
+            g.drawLine(Math.max(3, i), Math.max(3, -i), Math.min(w - 3, i + h),
+                Math.min(h - 3, h - Math.max(0, i + h - w)));
+        }
+        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, (int) (w * 0.44)));
+        int tw = g.getFontMetrics().stringWidth(letter);
+        g.setColor(Color.decode(edge));
+        g.drawString(letter, (float) (w / 2.0 - tw / 2.0), (float) (h * 0.6));
+        g.dispose();
+        return img;
+    }
+
     private static BufferedImage containerStub() {
         int s = SIDE / 2;
         BufferedImage img = new BufferedImage(s, s, BufferedImage.TYPE_INT_ARGB);

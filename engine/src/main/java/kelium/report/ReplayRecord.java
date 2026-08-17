@@ -337,6 +337,42 @@ public final class ReplayRecord {
         public final List<HexState> hexes = new ArrayList<>();
         public final List<Tok> tokens = new ArrayList<>();
         public final List<Player> players = new ArrayList<>();
+
+        /**
+         * КОЛОДЫ НА СТОЛЕ на этом шаге: имя набора → что в ней лежит.
+         *
+         * <p>Лежит в КАЖДОМ кадре нарочно. Просьба дизайнера — крутить ленту
+         * времени и видеть, как колоды и сбросы меняются по ходу партии; а для
+         * этого состояние колоды обязано быть частью шага, а не шапки записи.
+         * Гексы лежат в шапке потому, что за партию не меняются, — колоды меняются
+         * каждый ход.
+         */
+        public final Map<String, DeckState> decks = new LinkedHashMap<>();
+
+        /**
+         * ДВЕ ОТКРЫТЫЕ КАРТЫ АРСЕНАЛА рядом с колодой (витрина обмена в Науке).
+         * Первая в списке лежит слева.
+         */
+        public final List<String> arsenalDisplay = new ArrayList<>();
+    }
+
+    /**
+     * ОДНА КОЛОДА И ЕЁ СБРОС, оба — В ПОРЯДКЕ СВЕРХУ ВНИЗ.
+     *
+     * <p>ВНИМАНИЕ НА ПОРЯДОК. В движке {@code Deck.draw} снимает карту с КОНЦА
+     * списка {@code drawPile}, то есть верх колоды — это последний элемент. Здесь
+     * порядок развёрнут в человеческий: {@code draw.get(0)} — та карта, которая
+     * уйдёт следующей. Иначе список в проигрывателе показывал бы колоду вверх
+     * ногами, и заметить это было бы нечем.
+     *
+     * <p>Сброс тоже сверху вниз: {@code discard.get(0)} — последняя сброшенная
+     * кем-либо карта, она и лежит лицом вверх на виду.
+     */
+    public static final class DeckState {
+        /** Карты в колоде, СВЕРХУ ВНИЗ: нулевая уйдёт следующей. */
+        public final List<String> draw = new ArrayList<>();
+        /** Карты в сбросе, СВЕРХУ ВНИЗ: нулевая сброшена последней. */
+        public final List<String> discard = new ArrayList<>();
     }
 
     /** Подсветка происходящего на этом шаге (§4.4 заказа). */
@@ -494,6 +530,7 @@ public final class ReplayRecord {
                 perStep.add(new ArrayList<>(seats));
             }
             snap.techOccupancy.put(track, perStep);
+            // (колоды заполняются ниже, после игроков)
         }
 
         // Чей гекс и чья зона стройки — для слабой подкраски в рисовальщике.
@@ -579,6 +616,28 @@ public final class ReplayRecord {
             }
             snap.players.add(playerView(s, p));
         }
+        // КОЛОДЫ И СБРОСЫ — с развортом в человеческий порядок «сверху вниз».
+        // Движок снимает карту с КОНЦА drawPile, значит верх колоды — последний
+        // элемент; в сбросе последняя положенная карта тоже в конце, а лежит она
+        // сверху. Разворачиваем оба списка здесь, один раз, чтобы каждый читатель
+        // записи не делал этого сам и не забыл.
+        if (s.decks != null) {
+            for (var e : s.decks.entrySet()) {
+                kelium.core.Deck d = e.getValue();
+                if (d == null) {
+                    continue;
+                }
+                DeckState ds = new DeckState();
+                for (int i = d.drawPile.size() - 1; i >= 0; i--) {
+                    ds.draw.add(d.drawPile.get(i));
+                }
+                for (int i = d.discardPile.size() - 1; i >= 0; i--) {
+                    ds.discard.add(d.discardPile.get(i));
+                }
+                snap.decks.put(e.getKey(), ds);
+            }
+        }
+        snap.arsenalDisplay.addAll(s.arsenalDisplay);
         return snap;
     }
 
@@ -870,6 +929,18 @@ public final class ReplayRecord {
             occ.put(e.getKey(), steps);
         }
         o.put("techOcc", occ);
+        // КОЛОДЫ: короткие ключи, потому что этот блок лежит в КАЖДОМ кадре.
+        // Замер: три колоды дают около килобайта на кадр — против семи мегабайт
+        // всей записи это терпимо, а иначе ленту времени по колодам не покрутить.
+        Map<String, Object> dk = new LinkedHashMap<>();
+        for (var e : s.decks.entrySet()) {
+            Map<String, Object> one = new LinkedHashMap<>();
+            one.put("d", new ArrayList<>(e.getValue().draw));
+            one.put("s", new ArrayList<>(e.getValue().discard));
+            dk.put(e.getKey(), one);
+        }
+        o.put("decks", dk);
+        o.put("arsDisplay", new ArrayList<>(s.arsenalDisplay));
         List<Object> hx = new ArrayList<>();
         for (HexState h : s.hexes) {
             Map<String, Object> ho = new LinkedHashMap<>();
@@ -1157,6 +1228,24 @@ public final class ReplayRecord {
                 }
                 s.techOccupancy.put(e.getKey(), steps);
             }
+        }
+        Map<String, Object> dk = Json.map(o, "decks");
+        if (dk != null) {
+            for (var e : dk.entrySet()) {
+                DeckState ds = new DeckState();
+                if (e.getValue() instanceof Map<?, ?> m) {
+                    for (Object x : Json.list((Map<String, Object>) m, "d")) {
+                        ds.draw.add(String.valueOf(x));
+                    }
+                    for (Object x : Json.list((Map<String, Object>) m, "s")) {
+                        ds.discard.add(String.valueOf(x));
+                    }
+                }
+                s.decks.put(e.getKey(), ds);
+            }
+        }
+        for (Object x : Json.list(o, "arsDisplay")) {
+            s.arsenalDisplay.add(String.valueOf(x));
         }
         for (Object ho : Json.list(o, "hexes")) {
             Map<String, Object> h = (Map<String, Object>) ho;
