@@ -130,12 +130,41 @@ public final class Setup {
      * автоподбор {@link #smartCuFacing}).
      */
     /**
-     * РЕЖИМ СТАРТОВЫХ ЗАДАНИЙ: {@code super} | {@code starters} | {@code none}
-     * (решение дизайнера 12.08.2026). Ключ — {@code super_objectives.mode};
-     * старые версии правил его не знают, там режим выводится из выключателя
-     * {@code super_objectives.enabled}, чтобы их поведение не менялось.
+     * ДОПОЛНЕНИЯ — ТРИ НЕЗАВИСИМЫХ ТУМБЛЕРА (решение дизайнера 17.08.2026).
+     *
+     * <p>Прежде это был ОДИН режим на три значения ({@code super} | {@code
+     * starters} | {@code none}), то есть супер задания и начальные задания
+     * исключали друг друга. Дизайнер это отменил: «можно включать и то и другое
+     * в партию пускай». Поэтому теперь три отдельных ключа, каждый со своим
+     * выключателем:
+     *
+     * <ul>
+     *   <li>{@code expansions.super_objectives} — супер задания и супероружие;</li>
+     *   <li>{@code expansions.starting_objectives} — начальные задания;</li>
+     *   <li>{@code expansions.super_arsenal} — карты на вершинах треков.</li>
+     * </ul>
+     *
+     * <p>СТАРЫЕ ВЕРСИИ ПРАВИЛ не знают этих ключей, поэтому значение по
+     * умолчанию выводится из прежнего {@code super_objectives.mode}: партии на
+     * старых сводах играются ровно так же, как играли.
      */
-    static String startObjectiveMode(Ruleset ruleset) {
+    public static boolean expansionOn(Ruleset ruleset, String name) {
+        Object direct = ruleset.get("expansions." + name, null);
+        if (direct != null) {
+            return Boolean.TRUE.equals(direct);
+        }
+        String mode = legacyMode(ruleset);
+        return switch (name) {
+            case "super_objectives" -> "super".equals(mode)
+                && Boolean.TRUE.equals(ruleset.get("super_objectives.enabled", Boolean.TRUE));
+            case "starting_objectives" -> "starters".equals(mode);
+            case "super_arsenal" -> true;   // прежде выключателя не было вовсе
+            default -> false;
+        };
+    }
+
+    /** Прежний трёхзначный режим — только для сводов, не знающих про дополнения. */
+    private static String legacyMode(Ruleset ruleset) {
         Object m = ruleset.get("super_objectives.mode", null);
         if (m != null) {
             return String.valueOf(m);
@@ -480,10 +509,8 @@ public final class Setup {
         //   none     — без стартовых заданий вообще.
         // Начальные задания (kind: starting) в любом режиме изымаются из ОБЩЕЙ
         // колоды заданий: это отдельный модуль старта, а не обычные карты.
-        String mode = startObjectiveMode(ruleset);
         int deal = Math.max(1, ((Number) ruleset.get("super_objectives.deal", 1)).intValue());
-        if ("super".equals(mode)
-                && Boolean.TRUE.equals(ruleset.get("super_objectives.enabled", Boolean.TRUE))) {
+        if (expansionOn(ruleset, "super_objectives")) {
             List<String> superIds = new ArrayList<>(content.get("super_objectives").ids());
             Collections.shuffle(superIds, rng);
             int at = 0;
@@ -496,7 +523,10 @@ public final class Setup {
                     ps.superObjective = ps.superObjectiveOffer.get(0);
                 }
             }
-        } else if ("starters".equals(mode)) {
+        }
+        // НЕЗАВИСИМЫЙ ТУМБЛЕР: начальные задания включаются отдельно и МОГУТ
+        // играться вместе с супер заданиями (решение дизайнера 17.08.2026).
+        if (expansionOn(ruleset, "starting_objectives")) {
             List<String> starters = new ArrayList<>();
             for (Map<String, Object> e : content.get("objectives").entries) {
                 if ("starting".equals(e.get("kind"))) {
@@ -530,9 +560,17 @@ public final class Setup {
         Map<String, Deck> decks = new HashMap<>();
         for (String ctype : new String[]{"objectives", "arsenal", "containers", "orders", "market"}) {
             List<String> ids = Deck.cullForPlayers(content.get(ctype).entries, n);
-            // E1/E2: карты с нереализованными эффектами/пассивками ИЗЫМАЮТСЯ
-            // из колоды (громко) — игрок не должен платить за карту-пустышку.
-            ids = cullUnimplemented(ctype, ids, content.get(ctype));
+            // ОТСЕВ НЕРЕАЛИЗОВАННЫХ КАРТ ОТМЕНЁН (решение дизайнера 17.08.2026).
+            // Это был артефакт симуляции, а не правило игры: за столом карту из
+            // колоды никто не вынимает, и «карта молча исчезла из партии» —
+            // худший из возможных способов сообщить о недоделке. Теперь колода
+            // играется целиком, а недоделки ловит тест каталога (CardCatalogTest)
+            // — громко и до партии, а не тихо и во время неё.
+            //
+            // cullUnimplemented оставлен как ДИАГНОСТИКА: он больше ничего не
+            // изымает, но по-прежнему называет карты, у которых эффект или
+            // пассивка не реализованы.
+            reportUnimplemented(ctype, ids, content.get(ctype));
             // РЕЖИМ ИГРЫ (правило дизайнера 12.08.2026): супер задания и
             // НАЧАЛЬНЫЕ задания вместе не играются. В режиме super начальные
             // задания из колоды изымаются целиком.
@@ -650,14 +688,18 @@ public final class Setup {
 
         // Супер-арсенал (треки 2.0): из 9 карт выложить В ОТКРЫТУЮ по одной на
         // вершину каждого трека; остальные — «в коробку» (не участвуют).
-        try {
-            List<String> saIds = new ArrayList<>(content.get("super_arsenal").ids());
-            Collections.shuffle(saIds, rng);
-            for (int i = 0; i < tech.tracks.size() && i < saIds.size(); i++) {
-                s.superArsenalOffer.put(tech.tracks.get(i), saIds.get(i));
+        // ДОПОЛНЕНИЕ: выключается тумблером, и тогда вершина трека даёт другой
+        // приз (см. Actions, ветка super_arsenal_card).
+        if (expansionOn(ruleset, "super_arsenal")) {
+            try {
+                List<String> saIds = new ArrayList<>(content.get("super_arsenal").ids());
+                Collections.shuffle(saIds, rng);
+                for (int i = 0; i < tech.tracks.size() && i < saIds.size(); i++) {
+                    s.superArsenalOffer.put(tech.tracks.get(i), saIds.get(i));
+                }
+            } catch (RuntimeException e) {
+                // контента может не быть в старых версиях правил — играем без вершин
             }
-        } catch (RuntimeException e) {
-            // контента может не быть в старых версиях правил — играем без вершин
         }
         return s;
     }
@@ -669,8 +711,8 @@ public final class Setup {
      * проходят через колоду и не отсеиваются (их мёртвые низы — вопрос дизайнеру).
      */
     @SuppressWarnings("unchecked")
-    private static List<String> cullUnimplemented(String ctype, List<String> ids,
-                                                  kelium.dataio.ContentSet set) {
+    private static List<String> reportUnimplemented(String ctype, List<String> ids,
+                                                    kelium.dataio.ContentSet set) {
         List<String> out = new ArrayList<>();
         for (String id : ids) {
             Map<String, Object> card = set.byId(id);
@@ -714,13 +756,14 @@ public final class Setup {
                     // objectives/orders: эффектных заглушек нет, не отсеиваем
                 }
             }
-            if (bad == null) {
-                out.add(id);
-            } else if (REPORTED_CULLS.add(ctype + "/" + id)) {
+            // КАРТА ОСТАЁТСЯ В КОЛОДЕ ВСЕГДА: отсева больше нет, есть только
+            // сообщение о недоделке.
+            out.add(id);
+            if (bad != null && REPORTED_CULLS.add(ctype + "/" + id)) {
                 // Один раз на процесс, а не на каждую партию: в батче это были
                 // десятки тысяч строк в консоль (92% всего лога прогона).
-                System.err.println("[SETUP] ОТСЕВ карты " + ctype + "/" + id
-                    + " (" + card.getOrDefault("name", "?") + "): нереализовано — " + bad);
+                System.err.println("[SETUP] НЕ РЕАЛИЗОВАНО в карте " + ctype + "/" + id
+                    + " (" + card.getOrDefault("name", "?") + "): " + bad);
             }
         }
         return out;

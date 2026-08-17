@@ -49,34 +49,44 @@ public final class CombinedExportShot {
         canvas.fitToView();
         java.awt.image.BufferedImage layoutImg = canvas.render(1600, 1100);
 
+        // ЛЕГЕНДА — НАСТОЯЩАЯ, а не выдуманная в снимке: иначе снимок показывает
+        // не то, что уйдёт в печать, и правка легенды остаётся непроверенной.
+        java.lang.reflect.Method legendM =
+            LayoutEditor.class.getDeclaredMethod("layoutLegend");
+        legendM.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.List<PngExport.Item> legend =
+            (java.util.List<PngExport.Item>) legendM.invoke(null);
         PngExport.Content content = new PngExport.Content(
-            java.util.List.of(
-                PngExport.Item.hex(new java.awt.Color(0xEFEDE4), "обычный гекс"),
-                PngExport.Item.hex(LayoutEditor.Canvas.SPAWN_NORMAL, "большое зарождение")),
-            LayoutEditor.playerBlocks(m), LayoutEditor.mapStats(m));
+            legend, LayoutEditor.playerBlocks(m), LayoutEditor.mapStats(m));
         java.awt.image.BufferedImage layoutComposed =
             PngExport.compose("Раскладка «тест»", "Гексов: 20 · игроков: 2", layoutImg, content);
 
         PngExport.Layout mode = PngExport.Layout.valueOf(modeArg);
         java.awt.image.BufferedImage out;
         if (mode == PngExport.Layout.FUSION) {
-            // Зовём РЕАЛЬНУЮ приватную формулу и реальные методы слоёв — не
-            // переизобретаем расчёт в тесте, иначе опечатка в тесте не поймает
-            // опечатку в продакшене.
-            java.lang.reflect.Method sharedFit =
-                LayoutEditor.class.getDeclaredMethod("sharedFit",
-                    LayoutEditor.Model.class, int.class, int.class);
-            sharedFit.setAccessible(true);
-            double[] fit = (double[]) sharedFit.invoke(null, m, 1600, 1100);
-            java.awt.image.BufferedImage blocksLayer =
-                asm.renderBlocksLayer(1600, 1100, fit[0], fit[1], fit[2]);
-            java.awt.image.BufferedImage contentLayer =
-                canvas.renderContentOnly(1600, 1100, fit[0], fit[1], fit[2]);
-            java.awt.Graphics2D fg = blocksLayer.createGraphics();
-            fg.drawImage(contentLayer, 0, 0, null);
-            fg.dispose();
+            // Зовём РЕАЛЬНУЮ сборку слоёв, а не переизобретаем её в снимке:
+            // иначе опечатка в снимке не поймает опечатку в продакшене.
+            // Сборка слоёв работает от статических полей окна конструктора —
+            // в снимке окна нет, поэтому подставляем те же холсты руками.
+            java.lang.reflect.Field canvasField =
+                LayoutEditor.class.getDeclaredField("canvas");
+            canvasField.setAccessible(true);
+            canvasField.set(null, canvas);
+            java.lang.reflect.Field asmField =
+                LayoutEditor.class.getDeclaredField("assemblyTab");
+            asmField.setAccessible(true);
+            asmField.set(null, asm);
+            java.lang.reflect.Method fuse =
+                LayoutEditor.class.getDeclaredMethod("fuseLayers",
+                    int.class, int.class, PngExport.Options.class);
+            fuse.setAccessible(true);
+            PngExport.Options fusionOptions = new PngExport.Options(
+                true, true, true, PngExport.Layout.FUSION, true, true);
+            java.awt.image.BufferedImage fused =
+                (java.awt.image.BufferedImage) fuse.invoke(null, 1600, 1100, fusionOptions);
             out = PngExport.compose("Раскладка «тест» — слияние", "Гексов: 20 · игроков: 2",
-                blocksLayer, content);
+                fused, content);
         } else if (mode == PngExport.Layout.SEPARATE) {
             out = asm.exportImage(new PngExport.Options(true, true, true, mode));
         } else {

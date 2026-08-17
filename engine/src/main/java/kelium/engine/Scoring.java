@@ -259,7 +259,7 @@ public final class Scoring {
      */
     private static int arsenalGoalVp(GameState s, PlayerState p) {
         int total = 0;
-        for (String cid : p.arsenalInstalled) {
+        for (String cid : p.allInstalledArsenal()) {
             Map<String, Object> card = kelium.dataio.Ctx.cards(s, "arsenal").find(cid);
             if (card == null || !(card.get("bottom") instanceof Map<?, ?> bottom)
                     || !(bottom.get("scoring") instanceof Map<?, ?> sc)) {
@@ -287,6 +287,51 @@ public final class Scoring {
             }
         }
         return total;
+    }
+
+    /** Есть ли на гексе хотя бы один ЧУЖОЙ жетон (карта-цель «Воздушное крыло»). */
+    private static boolean enemyOnHex(GameState s, int seat, String hexId) {
+        if (hexId == null) {
+            return false;
+        }
+        for (PlayerState other : s.players) {
+            if (other.seat == seat) {
+                continue;
+            }
+            for (kelium.core.UnitToken u : other.unitsOnField()) {
+                if (hexId.equals(u.hexId)) {
+                    return true;
+                }
+            }
+            for (kelium.core.BuildingToken b : other.buildingsOnField()) {
+                if (hexId.equals(b.hexId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Стоит ли жетон {@code uid} на своём гексе ОДИН — то есть без других СВОИХ
+     * войск и зданий. Чужие жетоны на гексе значения не имеют: карта платит за
+     * то, что жетон оторвался от своей группы, а не за то, что вокруг пусто.
+     */
+    private static boolean aloneOnHex(PlayerState p, String hexId, int uid) {
+        if (hexId == null) {
+            return false;
+        }
+        for (kelium.core.UnitToken u : p.unitsOnField()) {
+            if (u.uid != uid && hexId.equals(u.hexId)) {
+                return false;
+            }
+        }
+        for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+            if (hexId.equals(b.hexId)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Что именно считает карта-цель. */
@@ -337,6 +382,70 @@ public final class Scoring {
                 }
                 yield kinds.size();
             }
+            // ==== КРИТЕРИИ КАРТ-ЦЕЛЕЙ 2.3.0 (ревью дизайнера 17.08.2026) ====
+            // Прежние цели платили за НАКОПЛЕНИЕ («2 ПО за каждую авиацию на
+            // поле») — то есть за то, что игрок и так делает, и платили щедро.
+            // Новые платят за ПОЛОЖЕНИЕ жетона: за то, что он стоит там, где
+            // стоять неудобно и рискованно. Считать это так же легко глазами.
+
+            // Авиация на гексе, где есть жетоны противника.
+            case "aircraft_on_enemy_hex" -> {
+                int n = 0;
+                for (kelium.core.UnitToken u : p.unitsOnField()) {
+                    if (u.type == kelium.core.UnitType.AIRCRAFT
+                            && enemyOnHex(s, p.seat, u.hexId)) {
+                        n++;
+                    }
+                }
+                yield n;
+            }
+            // Техника на гексе, где нет НИ ОДНОГО другого своего жетона —
+            // ни войска, ни здания. Одинокий танк в чужом тылу.
+            case "vehicles_alone_on_hex" -> {
+                int n = 0;
+                for (kelium.core.UnitToken v : p.unitsOnField()) {
+                    if (v.type == kelium.core.UnitType.VEHICLE
+                            && aloneOnHex(p, v.hexId, v.uid)) {
+                        n++;
+                    }
+                }
+                yield n;
+            }
+            // Гексы, где стоит твоя вышка и больше ничего твоего.
+            case "lone_tower_hexes" -> {
+                java.util.Set<String> hexes = new java.util.HashSet<>();
+                for (kelium.core.UnitToken u : p.unitsOnField()) {
+                    if (u.type == kelium.core.UnitType.TOWER
+                            && aloneOnHex(p, u.hexId, u.uid)) {
+                        hexes.add(u.hexId);
+                    }
+                }
+                yield hexes.size();
+            }
+            // Пары «добытчик + энергостанция ОДНОГО уровня» на поле.
+            case "miner_plant_level_pairs" -> {
+                java.util.Map<Integer, Integer> miners = new java.util.HashMap<>();
+                java.util.Map<Integer, Integer> plants = new java.util.HashMap<>();
+                for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+                    if (b.level == null) {
+                        continue;
+                    }
+                    if (b.type == kelium.core.BuildingType.MINER) {
+                        miners.merge(b.level, 1, Integer::sum);
+                    } else if (b.type == kelium.core.BuildingType.POWER_PLANT) {
+                        plants.merge(b.level, 1, Integer::sum);
+                    }
+                }
+                int pairs = 0;
+                for (var e : miners.entrySet()) {
+                    pairs += Math.min(e.getValue(), plants.getOrDefault(e.getKey(), 0));
+                }
+                yield pairs;
+            }
+            // Пары «келемий + боеприпас» в хранилище: считается по меньшему из
+            // двух, то есть карта платит за РАВНОВЕСИЕ, а не за одну гору.
+            case "kelium_ammo_pairs" ->
+                Math.min(p.resources.kelium(), p.resources.ammo());
             case "tech_steps" -> {
                 int n = 0;
                 for (String track : s.tech.tracks) {

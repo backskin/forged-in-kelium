@@ -684,12 +684,13 @@ public final class Arsenal2Abilities {
                 out.add(new Choice("ability:" + id() + ":put", id(),
                     "СПЕЦ: положить келемий на «Резервный штаб»"));
             }
-            // Жечь есть смысл только когда блокировка ДЕЙСТВИТЕЛЬНО случилась в
-            // этот ход: иначе карта сгорит впустую.
-            if (onCard(state, seat) > 0 && state.journal != null
-                    && state.journal.of(seat).orderBlocked) {
+            // РЕДАКЦИЯ 17.08.2026: сожжённый келемий даёт ЕЩЁ ОДНО ОСНОВНОЕ
+            // ДЕЙСТВИЕ своего приказа — в том числе то, которое уже сыграно в
+            // этот ход. Прежде он лишь возвращал действие, отнятое блокировкой,
+            // и потому карта работала только в редкий ход совпадения приказов.
+            if (onCard(state, seat) > 0) {
                 out.add(new Choice("ability:" + id() + ":burn", id(),
-                    "СПЕЦ: сжечь келемий — обойти блокировку приказа"));
+                    "СПЕЦ: сжечь келемий — ещё одно действие своего приказа"));
             }
             return out;
         }
@@ -706,11 +707,13 @@ public final class Arsenal2Abilities {
                 return true;
             }
             if (kind.endsWith(":burn")) {
-                if (onCard(state, seat) <= 0 || state.journal == null
-                        || !state.journal.of(seat).orderBlocked) {
+                if (onCard(state, seat) <= 0 || state.journal == null) {
                     return false;
                 }
                 p.arsenalCardKelium.merge(CARD, -1, Integer::sum);
+                // Тот же счётчик, что и раньше: ход выдаёт по нему лишнее
+                // основное действие. Разница в том, что повод больше не обязан
+                // быть блокировкой — келемий покупает действие в любом ходу.
                 state.journal.of(seat).blockBypassGrants += 1;
                 return true;
             }
@@ -719,7 +722,7 @@ public final class Arsenal2Abilities {
 
         @Override public Hint hint() {
             return new Hint(Bottleneck.ACTIONS, 3.0, Horizon.THIS_ROUND, null,
-                "келемий на карте выкупает действие, отнятое блокировкой", false);
+                "келемий на карте покупает ещё одно действие своего приказа", false);
         }
     }
 

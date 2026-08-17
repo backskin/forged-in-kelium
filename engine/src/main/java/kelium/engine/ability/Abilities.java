@@ -45,6 +45,7 @@ public final class Abilities {
         // подготовке (Setup.cullUnimplemented) — либо алиасы уже работающих
         // способностей, либо новая механика.
         Arsenal2Abilities.install();
+        Arsenal3Abilities.install();
     }
 
     /** Зарегистрировать способность (обычно из статического блока набора). */
@@ -136,7 +137,9 @@ public final class Abilities {
     public static List<Ability> activeFor(GameState state, int seat) {
         List<Ability> out = new ArrayList<>();
         PlayerState p = state.player(seat);
-        for (String cid : p.arsenalInstalled) {
+        // allInstalledArsenal(): включает карту под sa8 «Мандат совета» —
+        // она работает как обычная установленная карта.
+        for (String cid : p.allInstalledArsenal()) {
             addFromCard(state, "arsenal", cid, out);
         }
         for (String cid : p.superArsenalCards) {

@@ -56,140 +56,94 @@ class SuperObjectiveTest {
     }
 
     /**
-     * Рисунок победы каждой карты ДОЛЖЕН быть реализован. Иначе карта тихо
-     * становится невыигрышной, и никто об этом не узнает.
+     * У КАЖДОЙ КАРТЫ ЧЕТЫРЕ ЯЧЕЙКИ, и каждая ячейка называет то, что движок
+     * умеет списать. Опечатка в виде взноса раньше означала бы карту, которую
+     * нельзя вскрыть вообще, и заметить это было бы нечем.
      */
     @Test
-    void everyWinPatternIsImplemented() {
+    void уКаждойКартыЧетыреПонятныеЯчейки() {
         GameState s = Fix.game();
-        List<String> broken = new ArrayList<>();
+        java.util.Set<String> known = java.util.Set.of(
+            "coin", "ammo", "kelium", "debris",
+            "enemy_unit_token", "enemy_building_token", "enemy_token",
+            "own_building", "own_miner", "own_power_plant", "own_unit");
+        List<String> bad = new ArrayList<>();
         for (Map<String, Object> card : cards(s).entries) {
-            // Формат 2.0 (12.08.2026): рисунок из конкретных объектов в блоке
-            // deploy, проверяется kelium.engine.DeployPattern. Формат 1.0.0 —
-            // предикат win_pattern; поддерживаем оба, но пустым рисунок быть не
-            // может, иначе карта тихо становится невыигрышной.
-            if (card.get("deploy") instanceof Map<?, ?> dm) {
-                if (!(dm.get("objects") instanceof List<?> objs) || objs.isEmpty()) {
-                    broken.add(card.get("id") + ": deploy без объектов");
+            String id = String.valueOf(card.get("id"));
+            Object cells = card.get("cells");
+            if (!(cells instanceof List<?> l) || l.size() != 4) {
+                bad.add(id + ": ячеек не четыре");
+                continue;
+            }
+            for (Object o : l) {
+                if (!(o instanceof Map<?, ?> cell)) {
+                    bad.add(id + ": ячейка не запись");
+                    continue;
                 }
-                if (!(card.get("symbols") instanceof List<?> syms) || syms.size() != 3) {
-                    broken.add(card.get("id") + ": нужно ровно 3 символа, а их "
-                        + (card.get("symbols") instanceof List<?> l ? l.size() : "нет"));
-                }
-                continue;
-            }
-            Object wp = card.get("win_pattern");
-            if (!(wp instanceof Map<?, ?> m)) {
-                broken.add(card.get("id") + ": нет ни deploy, ни win_pattern");
-                continue;
-            }
-            Object pid = m.get("id");
-            if (pid == null || !Predicates.isRegistered(String.valueOf(pid))) {
-                broken.add(card.get("id") + ": рисунок «" + pid + "» не реализован");
-            }
-        }
-        assertTrue(broken.isEmpty(), "супер-задания без рабочего рисунка победы: " + broken);
-    }
-
-    /** У каждой карты есть сборка из частей, и все части имеют положительный размер. */
-    @Test
-    void everyProjectHasAssemblyParts() {
-        GameState s = Fix.game();
-        List<String> broken = new ArrayList<>();
-        for (Map<String, Object> card : cards(s).entries) {
-            Object a = card.get("assembly");
-            if (!(a instanceof Map<?, ?> am) || !(am.get("parts") instanceof List<?> parts)
-                    || parts.isEmpty()) {
-                broken.add(card.get("id") + ": нет частей сборки");
-                continue;
-            }
-            for (Object o : parts) {
-                Map<?, ?> part = (Map<?, ?>) o;
-                Object amount = part.get("amount");
-                if (!(amount instanceof Number n) || n.intValue() <= 0) {
-                    broken.add(card.get("id") + ": часть " + part.get("kind")
-                        + " с размером " + amount);
+                String kind = String.valueOf(cell.get("kind"));
+                if (!known.contains(kind)) {
+                    bad.add(id + ": движок не знает вид взноса «" + kind + "»");
                 }
             }
         }
-        assertTrue(broken.isEmpty(), "сломанные сборки супер-заданий: " + broken);
+        assertTrue(bad.isEmpty(), "ячейки супер заданий: " + bad);
     }
 
     /**
-     * Прогресс ведётся ПО ЧАСТЯМ: карту нельзя закрыть, сдав одну и ту же
-     * дешёвую часть много раз (правило B5).
+     * ВСЕ КАРТЫ ДАЮТ ОДИНАКОВЫЕ ОЧКИ ЗА ВСКРЫТИЕ (правило дизайнера 17.08.2026:
+     * «сделай одинаково всем, а не разброс в 2-5»). Разброс возвращать нельзя —
+     * это была главная причина, по которой одни проекты брали, а другие нет.
      */
     @Test
-    void progressIsTrackedPerPartNotInTotal() {
+    void очкиЗаВскрытиеОдинаковыеУВсех() {
         GameState s = Fix.game();
-        PlayerState p = s.player(0);
-        if (p.superObjective == null && !p.superObjectiveOffer.isEmpty()) {
-            p.superObjective = p.superObjectiveOffer.get(0);   // выбор игрока
+        java.util.Set<Integer> vps = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> card : cards(s).entries) {
+            assertTrue(card.get("vp_on_reveal") instanceof Number,
+                card.get("id") + ": не сказано, сколько очков за вскрытие");
+            vps.add(((Number) card.get("vp_on_reveal")).intValue());
         }
-        Map<String, Object> card = cards(s).byId(p.superObjective);
-        Map<?, ?> assembly = (Map<?, ?>) card.get("assembly");
-        List<?> parts = (List<?>) assembly.get("parts");
+        assertEquals(1, vps.size(), "очки за вскрытие разошлись между картами: " + vps);
+    }
 
-        // «сдаём» первую часть столько раз, сколько всего нужно частей в карте
-        Map<?, ?> first = (Map<?, ?>) parts.get(0);
-        String kind = String.valueOf(first.get("kind"));
-        int need = ((Number) first.get("amount")).intValue();
-        int totalNeeded = 0;
-        for (Object o : parts) {
-            totalNeeded += ((Number) ((Map<?, ?>) o).get("amount")).intValue();
+    /**
+     * У КАЖДОЙ КАРТЫ НАЗВАН РОД ЖЕТОНА СУПЕРОРУЖИЯ, и роды разложены поровну:
+     * восемь карт на четыре рода — по две на род. Иначе один род оказался бы
+     * представлен вчетверо чаще другого.
+     */
+    @Test
+    void родыСупероружияРазложеныПоровну() {
+        GameState s = Fix.game();
+        Map<String, Integer> byUnit = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> card : cards(s).entries) {
+            Object u = card.get("weapon_unit");
+            assertNotNull(u, card.get("id") + ": не назван род жетона супероружия");
+            byUnit.merge(String.valueOf(u), 1, Integer::sum);
         }
-        p.superPartProgress.put(kind, need + 5);
-        p.superObjectiveProgress = totalNeeded + 5;
-
-        boolean complete = true;
-        for (Object o : parts) {
-            Map<?, ?> part = (Map<?, ?>) o;
-            int amount = ((Number) part.get("amount")).intValue();
-            if (p.superPartProgress.getOrDefault(String.valueOf(part.get("kind")), 0) < amount) {
-                complete = false;
-            }
-        }
-        if (parts.size() > 1) {
-            assertFalse(complete,
-                "перебор по одной части не должен закрывать карту из нескольких частей");
-        } else {
-            assertTrue(complete, "карта из одной части закрывается этой частью");
+        assertEquals(4, byUnit.size(), "родов должно быть четыре, а не " + byUnit);
+        for (var e : byUnit.entrySet()) {
+            assertEquals(2, e.getValue().intValue(),
+                "род " + e.getKey() + " встречается " + e.getValue() + " раз вместо двух");
         }
     }
 
     /**
-     * Собранное супер-задание и выложенный рисунок дают МГНОВЕННУЮ ПОБЕДУ —
-     * партия обрывается с нужным условием.
+     * ТРЕБУЕМЫЙ СИМВОЛ СУЩЕСТВУЕТ. Разметка символов уже один раз разошлась с
+     * колодой (ссылалась на карты a01-a24, которых в игре нет), и модуль молча
+     * не работал. Здесь такая опечатка падает сразу.
      */
     @Test
-    void aDeployedProjectEndsTheGameImmediately() {
+    void требуемыйСимволЕстьВРазметке() {
         GameState s = Fix.game();
-        PlayerState p = s.player(0);
-        // берём карту, чей рисунок проверяется без чужих жетонов на поле
-        p.superObjective = "sp_smelter";
-        p.superObjectiveComplete = true;
-
-        // движок разворачивает супер-задание своим путём; здесь проверяем
-        // сам ЭФФЕКТ развёртки, который и есть правило: конец партии.
-        s.finished = true;
-        s.winner = p.seat;
-        s.winCondition = "super_objective";
-        assertTrue(s.finished, "развёрнутое супер-задание обрывает партию");
-        assertEquals("super_objective", s.winCondition);
-        assertEquals(p.seat, s.winner);
-    }
-
-    /** Вклад ресурсом реально списывает ресурс, а не появляется из воздуха. */
-    @Test
-    void contributingAResourceActuallySpendsIt() {
-        GameState s = Fix.game();
-        PlayerState p = s.player(0);
-        p.resources.add(Resource.KELIUM, 5);
-        int before = p.resources.kelium();
-        p.resources.pay(Resource.KELIUM, 1);
-        p.superPartProgress.merge("kelium", 1, Integer::sum);
-        assertEquals(before - 1, p.resources.kelium(),
-            "вклад в супер-задание обязан стоить ресурса");
-        assertEquals(1, p.superPartProgress.get("kelium"));
+        java.util.Set<String> forms =
+            new java.util.HashSet<>(kelium.engine.Symbols.of(s).glyphs().keySet());
+        List<String> bad = new ArrayList<>();
+        for (Map<String, Object> card : cards(s).entries) {
+            Object need = card.get("requires_symbol");
+            if (need != null && !forms.contains(String.valueOf(need))) {
+                bad.add(card.get("id") + ": символа «" + need + "» в разметке нет");
+            }
+        }
+        assertTrue(bad.isEmpty(), String.valueOf(bad));
     }
 }

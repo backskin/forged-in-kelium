@@ -192,6 +192,18 @@ public final class AssemblyWindow extends JPanel {
      */
     java.awt.image.BufferedImage renderBlocksLayer(int w, int h, double fitSize,
                                                     double fitPanX, double fitPanY) {
+        return renderBlocksLayer(w, h, fitSize, fitPanX, fitPanY, true);
+    }
+
+    /**
+     * То же, но с явным выбором раскраски. {@code monochrome} — блоки заливаются
+     * БЕЛЫМ с тёмной обводкой, без палитры (правило дизайнера 17.08.2026: в
+     * слиянии цвет блоков только мешает читать содержимое поля). Цветная версия
+     * осталась для отдельной картинки сборки, где различить блоки — весь смысл.
+     */
+    java.awt.image.BufferedImage renderBlocksLayer(int w, int h, double fitSize,
+                                                    double fitPanX, double fitPanY,
+                                                    boolean monochrome) {
         double savedSize = view.size;
         double savedX = view.panX;
         double savedY = view.panY;
@@ -202,13 +214,47 @@ public final class AssemblyWindow extends JPanel {
             new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setColor(view.getBackground());
+        g.setColor(ExportPaint.FIELD_BG);
         g.fillRect(0, 0, w, h);
         int savedW = view.getWidth();
         int savedH = view.getHeight();
         view.setSize(w, h);
         if (hasResult()) {
-            view.drawBlocksAndBlacks(g);
+            view.drawBlocksOnly(g, monochrome);
+        }
+        view.setSize(savedW, savedH);
+        g.dispose();
+        view.size = savedSize;
+        view.panX = savedX;
+        view.panY = savedY;
+        return img;
+    }
+
+    /**
+     * ТОЛЬКО ЧЁРНЫЕ НАКЛАДКИ «недоступный гекс» — отдельный слой для слияния.
+     *
+     * <p>В порядке слоёв дизайнера (17.08.2026) накладки идут ПОСЛЕ игроков и
+     * зданий: физически это картонка, которую кладут поверх собранного поля, и
+     * на картинке она обязана лежать так же. Прозрачный фон — слой ложится на
+     * уже нарисованное.
+     */
+    java.awt.image.BufferedImage renderBlackOverlayLayer(int w, int h, double fitSize,
+                                                          double fitPanX, double fitPanY) {
+        double savedSize = view.size;
+        double savedX = view.panX;
+        double savedY = view.panY;
+        view.size = fitSize;
+        view.panX = fitPanX;
+        view.panY = fitPanY;
+        java.awt.image.BufferedImage img =
+            new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        int savedW = view.getWidth();
+        int savedH = view.getHeight();
+        view.setSize(w, h);
+        if (hasResult()) {
+            view.drawBlackOverlays(g);
         }
         view.setSize(savedW, savedH);
         g.dispose();
@@ -224,16 +270,27 @@ public final class AssemblyWindow extends JPanel {
      * здесь речь о картоне, а не об игровых обозначениях.
      */
     private List<PngExport.Item> assemblyLegend() {
+        // ТОЛЬКО ТО, ЧЕГО НЕ ВИДНО НА ВТОРОМ КАДРЕ (правка дизайнера 17.08.2026).
+        // Прежняя легенда объясняла ещё и тайлы зарождения, старты игроков и
+        // нейтральные здания — но на картинке сборки они нарисованы бледной
+        // тенью, а в полную силу их показывает соседний кадр с раскладкой, где
+        // и лежит своя, подробная легенда. Здесь остаётся ровно то, что есть
+        // только на этом кадре: два размера картонного блока и накладка.
         List<PngExport.Item> legend = new ArrayList<>();
-        legend.add(PngExport.Item.hex(new Color(0xCBD9EA),
-            "цвет заливки = отдельный блок картона"));
-        legend.add(PngExport.Item.hex(new Color(0x1A1A1A),
-            "чёрная накладка «недоступный гекс» — " + view.result.blacks().size() + " шт."));
-        legend.add(PngExport.Item.hex(new Color(0xF0EFEA),
-            "жирная линия — граница блока, тонкая — стык гексов внутри блока"));
-        legend.add(PngExport.Item.circle(new Color(0x2E7D32), "тайл зарождения (показан бледно)"));
-        legend.add(PngExport.Item.circle(new Color(0x3b82d0), "старт игрока (показан бледно)"));
-        legend.add(PngExport.Item.square(new Color(0x9AA0A6), "нейтральное здание (показано бледно)"));
+        int big = view.result.bigUsed();
+        int small = view.result.blocks().size() - big;
+        if (big > 0) {
+            legend.add(PngExport.Item.hex(new Color(0xCBD9EA),
+                "большой блок картона — 6 гексов, всего " + big));
+        }
+        if (small > 0) {
+            legend.add(PngExport.Item.hex(new Color(0xE3EAF3),
+                "малый блок картона — 5 гексов, всего " + small));
+        }
+        if (!view.result.blacks().isEmpty()) {
+            legend.add(PngExport.Item.hex(new Color(0x1A1A1A),
+                "тайл недоступного гекса — " + view.result.blacks().size() + " шт."));
+        }
         return legend;
     }
 
@@ -444,12 +501,17 @@ public final class AssemblyWindow extends JPanel {
             java.awt.image.BufferedImage img =
                 new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
             Graphics2D g = img.createGraphics();
-            g.setColor(getBackground());
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+            // ФОН КАДРА ЧУТЬ ТЕМНЕЕ БУМАГИ — общее правило всех видов экспорта
+            // (просьба дизайнера 17.08.2026): так кадр с полем читается как
+            // отдельный объект на листе.
+            g.setColor(ExportPaint.FIELD_BG);
             g.fillRect(0, 0, w, h);
             int savedW = getWidth();
             int savedH = getHeight();
             setSize(w, h);
-            paintComponent(g);
+            ExportPaint.with(() -> paintComponent(g));
             setSize(savedW, savedH);
             g.dispose();
             size = savedSize;
@@ -518,11 +580,17 @@ public final class AssemblyWindow extends JPanel {
          * силу, а не бледной тенью.
          */
         private void drawBlocksAndBlacks(Graphics2D g) {
+            drawBlocksOnly(g, false);
+            drawBlackOverlays(g);
+        }
+
+        /** Блоки без накладок; {@code monochrome} — белая заливка вместо палитры. */
+        private void drawBlocksOnly(Graphics2D g, boolean monochrome) {
             List<Placement> blocks = result.blocks();
             for (int i = 0; i < blocks.size(); i++) {
                 Placement p = blocks.get(i);
                 Set<Cell> own = new HashSet<>(p.cells());
-                g.setColor(palette[i % palette.length]);
+                g.setColor(monochrome ? ExportPaint.HEX_FILL : palette[i % palette.length]);
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
                     g.fillPolygon(hexPoly(xy[0], xy[1], size * 0.99));
@@ -535,7 +603,7 @@ public final class AssemblyWindow extends JPanel {
                     g.drawPolygon(hexPoly(xy[0], xy[1], size * 0.99));
                 }
                 // внешний контур блока
-                g.setColor(new Color(0x1F2933));
+                g.setColor(monochrome ? ExportPaint.HEX_EDGE : new Color(0x1F2933));
                 g.setStroke(new BasicStroke(4.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
@@ -557,7 +625,10 @@ public final class AssemblyWindow extends JPanel {
                 }
             }
 
-            // 3) чёрные накладки поверх блоков
+        }
+
+        /** Чёрные накладки «недоступный гекс» — свой слой (см. порядок слоёв). */
+        private void drawBlackOverlays(Graphics2D g) {
             for (Cell c : result.blacks()) {
                 double[] xy = center(c.q(), c.r());
                 g.setColor(new Color(0x14171A));
@@ -613,8 +684,13 @@ public final class AssemblyWindow extends JPanel {
         private void legend(Graphics2D g) {
             g.setFont(getFont().deriveFont(11f));
             g.setColor(new Color(0x555555));
-            g.drawString("жирная линия — граница физического блока · чёрный гекс — накладка "
-                + "«недоступен» · колесо — масштаб, перетаскивание — сдвиг", 12, getHeight() - 12);
+            // ПОДСКАЗКА ПРО МЫШЬ — ТОЛЬКО НА ЭКРАНЕ: в печатной картинке колесо
+            // и перетаскивание не значат ничего, а место занимают.
+            String text = "жирная линия — граница физического блока";
+            if (!ExportPaint.active()) {
+                text += " · колесо — масштаб, перетаскивание — сдвиг";
+            }
+            g.drawString(text, 12, getHeight() - 12);
         }
 
         private void message(Graphics2D g, String text, Color color) {

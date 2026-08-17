@@ -204,7 +204,7 @@ public final class Objectives {
                     if (left == 0) {
                         break;
                     }
-                    Actions.returnOwnBuildingToReserve(s, p, b);
+                    Actions.returnOwnBuildingToReserve(s, p, b, true);
                     left--;
                 }
             }

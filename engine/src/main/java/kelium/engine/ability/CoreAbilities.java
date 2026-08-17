@@ -148,7 +148,7 @@ public final class CoreAbilities {
         }
 
         @Override public void modify(RuleQuery q) {
-            if (q.subject() instanceof kelium.core.UnitType t && kinds.contains(t)) {
+            if (q.unitType() instanceof kelium.core.UnitType t && kinds.contains(t)) {
                 q.add(1).by(id);
             }
         }

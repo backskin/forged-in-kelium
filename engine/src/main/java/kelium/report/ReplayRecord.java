@@ -245,6 +245,14 @@ public final class ReplayRecord {
         public final Map<String, Module> bluePlaced = new LinkedHashMap<>();
         public final List<String> arsenalHand = new ArrayList<>();
         public final List<String> arsenalInstalled = new ArrayList<>();
+        /**
+         * «МАНДАТ СОВЕТА» (супер-арсенал sa8): отдельное место под картой —
+         * либо ОДНА карта арсенала (тогда {@code mandateContainers == 0}),
+         * либо {@code mandateContainers} (0..2) мест под контейнеры. Null/0 —
+         * место свободно или карты sa8 нет вовсе.
+         */
+        public String mandateArsenalCard = null;
+        public int mandateContainers = 0;
         public final List<String> superArsenal = new ArrayList<>();
         public final List<String> objectiveHand = new ArrayList<>();
         public final List<String> orderHand = new ArrayList<>();
@@ -613,6 +621,8 @@ public final class ReplayRecord {
             v.bluePlaced.put(building.code, moduleOf(spec)));
         v.arsenalHand.addAll(p.arsenalHand);
         v.arsenalInstalled.addAll(p.arsenalInstalled);
+        v.mandateArsenalCard = p.mandateArsenalCard;
+        v.mandateContainers = p.mandateContainers;
         v.superArsenal.addAll(p.superArsenalCards);
         v.objectiveHand.addAll(p.objectiveHand);
         v.orderHand.addAll(p.orderHand);
@@ -950,6 +960,12 @@ public final class ReplayRecord {
         }
         o.put("arsHand", p.arsenalHand);
         o.put("arsInst", p.arsenalInstalled);
+        if (p.mandateArsenalCard != null) {
+            o.put("mandCard", p.mandateArsenalCard);
+        }
+        if (p.mandateContainers != 0) {
+            o.put("mandCont", p.mandateContainers);
+        }
         o.put("superArs", p.superArsenal);
         o.put("objHand", p.objectiveHand);
         o.put("ordHand", p.orderHand);
@@ -1234,6 +1250,8 @@ public final class ReplayRecord {
         modulesFromMap(o, "bluePlaced", p.bluePlaced);
         p.arsenalHand.addAll(Json.strings(o, "arsHand"));
         p.arsenalInstalled.addAll(Json.strings(o, "arsInst"));
+        p.mandateArsenalCard = Json.s(o, "mandCard");
+        p.mandateContainers = Json.i(o, "mandCont");
         p.superArsenal.addAll(Json.strings(o, "superArs"));
         p.objectiveHand.addAll(Json.strings(o, "objHand"));
         p.orderHand.addAll(Json.strings(o, "ordHand"));

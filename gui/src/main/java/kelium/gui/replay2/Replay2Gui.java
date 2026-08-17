@@ -289,7 +289,7 @@ public final class Replay2Gui {
         bgSurface(stage);
         stage.add(field, "field");
         stage.add(scrolled(boards), "boards");
-        stage.add(scrolled(supers), "supers");
+        stage.add(supersWithOverlay(), "supers");
         stage.add(scrolled(results), "results");
 
         // ВКЛАДКИ СЦЕНЫ ВСЕГДА НА ВИДУ. Раньше планшеты и итоги открывались только
@@ -323,9 +323,11 @@ public final class Replay2Gui {
         new java.util.HashMap<>();
 
     private JPanel stageTabs() {
+        // Отступы чуть щедрее (просьба дизайнера 17.08.2026: «больше воздуха
+        // между разделами» — было 4/8/4/8, gapx 3).
         JPanel p = new JPanel(new net.miginfocom.swing.MigLayout(
-            "insets " + Theme.px(4) + " " + Theme.px(8) + " " + Theme.px(4) + " "
-                + Theme.px(8) + ", gapx " + Theme.px(3)));
+            "insets " + Theme.px(7) + " " + Theme.px(10) + " " + Theme.px(7) + " "
+                + Theme.px(10) + ", gapx " + Theme.px(6)));
         panelSurface(p);
         p.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()));
         javax.swing.ButtonGroup group = new javax.swing.ButtonGroup();
@@ -342,6 +344,60 @@ public final class Replay2Gui {
             p.add(b);
         }
         return p;
+    }
+
+    /**
+     * Карточка вкладки «Супер-задания» со своим оверлеем затемнения поверх —
+     * см. {@link #updateSupersAvailability()}. {@link javax.swing.OverlayLayout}
+     * укладывает оба ребёнка друг на друга; тот, что добавлен ПЕРВЫМ, рисуется
+     * ПОСЛЕДНИМ (Swing красит контейнер в обратном порядке компонентов) —
+     * поэтому оверлей добавлен раньше содержимого.
+     */
+    private JComponent supersWithOverlay() {
+        JPanel stack = new JPanel();
+        stack.setLayout(new javax.swing.OverlayLayout(stack));
+        supersOverlay = disabledOverlay(
+            "Дополнение «Супер задания» выключено",
+            "Включите тумблер «Супер задания» в разделе «Дополнения» на ленте "
+                + "настроек, чтобы увидеть эту вкладку.");
+        supersOverlay.setAlignmentX(0.5f);
+        supersOverlay.setAlignmentY(0.5f);
+        supersOverlay.setVisible(false);
+        JComponent content = scrolled(supers);
+        content.setAlignmentX(0.5f);
+        content.setAlignmentY(0.5f);
+        stack.add(supersOverlay);
+        stack.add(content);
+        return stack;
+    }
+
+    /** Полупрозрачное затемнение с центрированным сообщением — карта дополнения. */
+    private JPanel disabledOverlay(String title, String subtitle) {
+        JPanel scrim = new JPanel(new java.awt.GridBagLayout()) {
+            @Override protected void paintComponent(java.awt.Graphics g) {
+                java.awt.Color bg = Theme.panel();
+                g.setColor(new java.awt.Color(bg.getRed(), bg.getGreen(), bg.getBlue(), 235));
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        };
+        scrim.setOpaque(false);
+        JLabel t = new JLabel(title, javax.swing.SwingConstants.CENTER);
+        t.setFont(Theme.font(18, Font.BOLD));
+        t.setForeground(Theme.ink());
+        t.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+        JLabel s = new JLabel("<html><div style='width:340px;text-align:center'>"
+            + subtitle + "</div></html>", javax.swing.SwingConstants.CENTER);
+        s.setFont(Theme.body());
+        s.setForeground(Theme.ink2());
+        s.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+        JPanel box = new JPanel();
+        box.setOpaque(false);
+        box.setLayout(new javax.swing.BoxLayout(box, javax.swing.BoxLayout.Y_AXIS));
+        box.add(t);
+        box.add(javax.swing.Box.createVerticalStrut(Theme.px(8)));
+        box.add(s);
+        scrim.add(box);
+        return scrim;
     }
 
     private static JScrollPane scrolled(JComponent view) {
@@ -830,6 +886,11 @@ public final class Replay2Gui {
         if (only) {
             setDrawer(false);
             setup.setVisible(false);
+            // Б5 (замечание дизайнера 17.08.2026): «только сцена» сворачивает
+            // ленту настроек так же, как кнопка «свернуть настройки» — надпись
+            // на НЕЙ обязана обновиться тем же путём, иначе кнопка врёт, что
+            // лента ещё открыта, хотя её только что убрали.
+            setupButton.setText(setup.summary());
         }
         frame.getContentPane().revalidate();
         say(only ? "Только сцена: полосы игроков и лента убраны. F11 — вернуть."
@@ -1087,6 +1148,30 @@ public final class Replay2Gui {
             boards.setRules(null, null);
             supers.setContent(null);
             session.setContent(null);
+        }
+        updateSupersAvailability();
+    }
+
+    /** Оверлей вкладки «Супер-задания», когда это дополнение выключено. */
+    private JPanel supersOverlay;
+
+    /**
+     * Б1 (заказ дизайнера 17.08.2026): тумблер «Супер задания» гасит вкладку
+     * СРАЗУ, без отдельного пересчёта партии — вкладка недоступна для клика, а
+     * если человек уже на ней, поверх содержимого всплывает затемнение с
+     * объяснением. Зовётся из {@link #loadRules}, а тот зовётся и из
+     * {@link #preview()} (сразу по щелчку тумблера — превью пересобирается на
+     * каждое изменение настроек), и из конца {@link #startGame()}.
+     */
+    private void updateSupersAvailability() {
+        boolean on = kelium.gui.Expansions.on(
+            kelium.dataio.AppSettings.of("replay2"), kelium.gui.Expansions.SUPER_OBJECTIVES);
+        javax.swing.JToggleButton b = stageButtons.get("supers");
+        if (b != null) {
+            b.setEnabled(on);
+        }
+        if (supersOverlay != null) {
+            supersOverlay.setVisible(!on);
         }
     }
 

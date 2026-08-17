@@ -158,7 +158,7 @@ class MiningReachTest {
     }
 
     @Test
-    void unpoweredMinerWithMoneyPaysForEnergyAndDiggs() {
+    void unpoweredMinerDiggsOnlyWithTheEmergencyPowerCard() {
         GameState s = game(44L);
         String[] pair = veinAndNeighbour(s);
         assertTrue(pair != null);
@@ -167,7 +167,14 @@ class MiningReachTest {
         int coins = p.resources.coin();
 
         miner(s, p, pair[1], pair[0], false);
-        assertTrue(mine(s, p) > 0, "в Разработке энергию можно докупить монетами");
+        // ДОПЛАТЫ МОНЕТАМИ ЗА ЭНЕРГИЮ В ИГРЕ БОЛЬШЕ НЕТ (17.08.2026): незапитанный
+        // добытчик просто не работает, сколько бы монет ни лежало в запасе.
+        assertEquals(0, mine(s, p), "без энергии добытчик не копает");
+        assertEquals(coins, p.resources.coin(), "и монеты за это не списываются");
+
+        // Право на доплату возвращает ровно одна карта арсенала.
+        p.arsenalInstalled.add("b20");
+        assertTrue(mine(s, p) > 0, "с «Аварийным питанием» энергию можно докупить");
         assertTrue(p.resources.coin() < coins,
             "и монеты за это действительно списываются");
     }

@@ -62,7 +62,15 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
     // числа — та ширина и высота, при которых вёрстка заведомо целая; всё, что
     // меньше, панель отдаёт прокрутке, а не сжимает вёрстку до наложений.
     private static final int DESIGN_W = 1180;
-    private static final int DESIGN_H = 780;
+    // ВЫСОТА ПОДНЯТА С ЗАПАСОМ (17.08.2026): карточка супер-арсенала на вершине
+    // трека (cardH=128 + отступ) добавилась в paintScience ПОСЛЕ того, как эти
+    // 780 были подобраны, и rowH (площадь ÷ (шаги+1)) стал ужиматься до пола в
+    // 30px — строки шагов наезжали друг на друга. Дизайнер: «можно так не
+    // сжимать его, оставлять с запасом и просто убирать на прокрут скроллом» —
+    // поэтому запас не впритык под текущий контент, а заведомо больше: не
+    // хватит и этого — панель просто прокрутится (см. getScrollableTracks*),
+    // а не сожмёт строки снова.
+    private static final int DESIGN_H = 1040;
 
     public BoardsPanel() {
         setBackground(kelium.gui.replay2.Theme.bg());
@@ -262,15 +270,22 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         // стоят кубики игроков до первого шага (уточнение дизайнера 12.08.2026).
         // Полоса под треками (86) держит приз первого шага в ДВЕ строки и подпись
         // под ними: прежних 46 хватало на один мелкий ряд, а теперь их два крупных.
-        int rowH = Math.max(30, (h - (gridTop - y) - 72 - exchH) / (steps + 1));
+        // Пол поднят с 30 до 56 (17.08.2026): при 30 подпись шага, цена и звезда
+        // ПО физически не помещались друг под другом и наезжали. 56 — минимум,
+        // при котором три строки текста ещё читаются; меньше не сжимаем —
+        // не хватит места, значит панель ушла за пределы вершины дизайна, и
+        // сработает прокрутка (см. DESIGN_H).
+        // Пол поднят 56→64 (заказ дизайнера 17.08.2026): значки наград стали
+        // крупнее (badgeH ниже), строке нужно чуть больше высоты под них.
+        int rowH = Math.max(64, (h - (gridTop - y) - 72 - exchH) / (steps + 1));
 
         for (int t = 0; t < 3; t++) {
             int cx = x + 20 + t * colW;
             int cw = colW - 12;
+            int holder = peakHolder(TRACKS[t], steps);
             // ---- открытая карта супер-арсенала на вершине трека ----
             String saId = snap.superArsenalOffer.get(TRACKS[t]);
-            paintSuperArsenalCard(g, cx, top, cw, cardH, saId, TRACK_COLOR[t],
-                peakHolder(TRACKS[t], steps));
+            paintSuperArsenalCard(g, cx, top, cw, cardH, saId, TRACK_COLOR[t], holder);
 
             // ---- шаги сверху вниз: вершина (шаг steps) наверху ----
             for (int i = steps - 1; i >= 0; i--) {
@@ -283,15 +298,50 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                 g.setStroke(new BasicStroke(step == steps ? 2.4f : 1.2f));
                 g.drawRoundRect(cx, ry, cw, rowH - 6, 8, 8);
 
+                // ЗНАЧОК НАГРАДЫ ШАГА, СЛЕВА ОТ ТЕКСТА, НА ПОДЛОЖКЕ (ревью
+                // дизайнера 17.08.2026, п.1): начиная со ВТОРОГО шага — приз
+                // первого и так виден отдельно (плата — не награда, а приз
+                // шага 1 штучный ресурс и в отдельном значке не нуждается).
+                // Источник данных тот же, что у Actions.techStepReward.
+                int textX = cx + 12;
+                if (step >= 2) {
+                    // Крупнее (заказ дизайнера 17.08.2026): было 38.
+                    int badgeH = Math.min(46, rowH - 14);
+                    int badgeW = rewardBadgeWidth(badgeH, TRACKS[t], step, steps);
+                    int bx = cx + 10;
+                    int by = ry + (rowH - 6 - badgeH) / 2;
+                    boolean taken = step == steps && holder >= 0;
+                    // КОННЕКТОР К КАРТЕ СВЕРХУ (п.2 ревью): луч от значка до
+                    // карточки трека — фиолетовый, пока карта на вершине
+                    // свободна, серый — когда её уже забрали. Рисуется ДО
+                    // подложки, чтобы верх линии спрятался под неё аккуратно.
+                    if (step == steps && "super_arsenal_card".equals(peakRewardKind())
+                            && superArsenalOn()) {
+                        int lineX = bx + badgeW / 2;
+                        g.setColor(taken ? ink3() : ARSENAL_PURPLE);
+                        g.setStroke(new BasicStroke(2.2f));
+                        g.drawLine(lineX, top + cardH, lineX, by + badgeH / 2);
+                    }
+                    rewardIcon(g, bx, by, badgeW, badgeH, TRACKS[t], step, steps, taken);
+                    textX = bx + badgeW + 12;
+                }
                 g.setFont(bold(11));
                 g.setColor(ink());
-                g.drawString("шаг " + step + (step == steps ? " · вершина" : ""), cx + 10, ry + 22);
+                g.drawString("шаг " + step + (step == steps ? " · вершина" : ""), textX, ry + 22);
+                // ЦЕНА ШАГА — ОБЛОМКИ (ревью дизайнера 17.08.2026, п.3): подпись
+                // «N ТРФ» заменена на шестерёнку (тот же размер, что у звёзд
+                // ПО) — печатная цена по-прежнему в трофейных очках (движок
+                // принимает трофеи/обломки/келемий, см. Actions.payTrophy), но
+                // на столе её платят чаще всего именно обломками, и «шестерёнка»
+                // читается как «расходный ресурс», а не «карта победных очков».
+                gearIcon(g, textX + 8, ry + 40, 8.0);
                 g.setFont(plain(10));
                 g.setColor(ink2());
-                g.drawString(cost[i] + " ТРФ", cx + 10, ry + 44);
-                // ЗОЛОТАЯ ЗВЕЗДА С ПЛЮСОМ — сколько ПО даёт шаг (просьба
-                // дизайнера 12.08.2026): +1, +1, +2, +3 по шагам.
-                star(g, cx + 80, ry + 39, 11.0, vp[i]);
+                g.drawString(String.valueOf(cost[i]), textX + 19, ry + 44);
+                // ЛЕНТА ЗВЁЗД ПО (ревью дизайнера 17.08.2026, п.4): было «одна
+                // звезда с числом внутри», стало «плюс и N наложенных друг на
+                // друга звёзд подряд» — величина читается по счёту звёзд.
+                starRow(g, textX + 46, ry + 39, 8.0, vp[i]);
 
                 // ---- ЯЧЕЙКИ ШАГА: их число ограничено, часть открыта только на
                 // большом составе. В открытой ячейке стоит ОБЪЁМНЫЙ КУБИК цвета
@@ -386,7 +436,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             for (Object e : list) {
                 if (e instanceof Map<?, ?> m) {
                     if (pair > 0 && "trophy_to_coin".equals(String.valueOf(m.get("id")))) {
-                        out.add(new Object[]{"1 / 2", "@trophy", "трофея   →",
+                        out.add(new Object[]{"1 / 2", "@gear", "обломка   →",
                             "1 / " + (2 + pair), "@coin", "монеты"});
                     } else {
                         out.add(scienceParts(m));
@@ -408,15 +458,15 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             // которая идёт отдельной строкой ниже: там за два трофея дают три
             // монеты, а не две (замечание дизайнера 13.08.2026). Диапазон убран,
             // пара живёт своей строкой.
-            case "trophy_to_coin" -> new Object[]{first(m.get("give_trophy")), "@trophy",
-                "трофей   →", first(m.get("get_coin")), "@coin", "монета"};
-            case "move_module" -> new Object[]{give, "@trophy", "трофей   →", "@module",
+            case "trophy_to_coin" -> new Object[]{first(m.get("give_trophy")), "@gear",
+                "обломок   →", first(m.get("get_coin")), "@coin", "монета"};
+            case "move_module" -> new Object[]{give, "@gear", "обломка   →", "@module_pair",
                 "переставить свой модуль на планшете"};
-            case "draw_arsenal" -> new Object[]{give, "@trophy", "трофея   →", "@card",
+            case "draw_arsenal" -> new Object[]{give, "@gear", "обломка   →", "@card",
                 "взять 2 карты арсенала, оставить 1"};
-            case "gild_module" -> new Object[]{give, "@trophy", "трофея   →", "@module",
+            case "gild_module" -> new Object[]{give, "@gear", "обломка   →", "@module_pair",
                 "позолотить модуль"};
-            default -> new Object[]{give, "@trophy", "трофея   →", "обмен не описан"};
+            default -> new Object[]{give, "@gear", "обломка   →", "обмен не описан"};
         };
     }
 
@@ -587,6 +637,13 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                 g.fillRect(x + 4, y + d / 3, d - 8, 1);
                 g.fillRect(x + 4, y + d * 2 / 3, d - 8, 1);
             }
+            case "gear" -> gearIcon(g, x + d / 2, y + d / 2, d / 2.0);
+            // МОДУЛЬ НА ВЫБОР ИГРОКА (заказ дизайнера 17.08.2026): обмен даёт
+            // красный ИЛИ синий модуль — не конкретный цвет, значит и значок
+            // не может быть одним фиксированным кубиком. Показываем оба жетона
+            // сразу, теми же формами, что и на планшете науки: красный квадрат,
+            // синий прямоугольник.
+            case "module_pair" -> modulePairIcon(g, x + d / 2.0, y + d / 2.0, d);
             case "trophy" -> {
                 // щиток трофея — так он и выглядит на карте трофеев
                 java.awt.geom.Path2D p = new java.awt.geom.Path2D.Double();
@@ -628,8 +685,8 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         return o == null ? "?" : String.valueOf(o);
     }
 
-    /** Золотая звезда с числом победных очков внутри («+2»). */
-    private void star(Graphics2D g, int cx, int cy, double r, int vp) {
+    /** Форма одной пятиконечной звезды с центром в (cx, cy) и «радиусом» r. */
+    private static java.awt.geom.Path2D starShape(double cx, double cy, double r) {
         java.awt.geom.Path2D p = new java.awt.geom.Path2D.Double();
         for (int i = 0; i < 10; i++) {
             double rr = i % 2 == 0 ? r : r * 0.45;
@@ -643,17 +700,311 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             }
         }
         p.closePath();
-        g.setColor(new Color(0xF2, 0xC0, 0x2E));
-        g.fill(p);
-        g.setColor(new Color(0x8A, 0x63, 0x00));
-        g.setStroke(new BasicStroke(1.0f));
-        g.draw(p);
-        g.setFont(getFont().deriveFont(Font.BOLD, (float) (r * 1.15)));
-        // ЧИСЛО ПИШЕТСЯ НА БУМАГЕ ПЛАНШЕТА, а не на звезде: тёмно-коричневым по
-        // тёмной теме его было не видно вовсе (замечание дизайнера 14.08.2026).
+        return p;
+    }
+
+    /**
+     * ЛЕНТА ЗВЁЗД ПО (ревью дизайнера 17.08.2026, п.4): было «одна звезда с
+     * числом внутри», стало «плюс слева, затем {@code vp} звёзд подряд,
+     * наложенных друг на друга с отступом в половину своей ширины» — величина
+     * читается по счёту звёзд, а не по цифре.
+     */
+    private void starRow(Graphics2D g, int leftX, int cy, double r, int vp) {
         g.setColor(ink());
-        String tag = "+" + vp;
-        g.drawString(tag, cx + (int) r + 2, cy + (int) (r * 0.55));
+        g.setFont(getFont().deriveFont(Font.BOLD, (float) (r * 1.7)));
+        g.drawString("+", leftX, (int) (cy + r * 0.55));
+        int plusW = g.getFontMetrics().stringWidth("+");
+        double cx0 = leftX + plusW + r + 3;
+        double step = r;   // отступ между звёздами — половина их ширины (ширина ≈ 2r)
+        for (int k = 0; k < vp; k++) {
+            java.awt.geom.Path2D p = starShape(cx0 + k * step, cy, r);
+            g.setColor(new Color(0xF2, 0xC0, 0x2E));
+            g.fill(p);
+            g.setColor(new Color(0x8A, 0x63, 0x00));
+            g.setStroke(new BasicStroke(1.0f));
+            g.draw(p);
+        }
+    }
+
+    /**
+     * ШЕСТЕРЁНКА — значок цены шага в обломках (ревью дизайнера 17.08.2026,
+     * п.3): тёмно-серая заливка, толстая чёрная обводка, размер сопоставим со
+     * звездой ПО ({@code r} — тот же параметр, что у {@link #starRow}).
+     */
+    private void gearIcon(Graphics2D g, int cx, int cy, double r) {
+        int teeth = 8;
+        int pts = teeth * 2;
+        java.awt.geom.Path2D p = new java.awt.geom.Path2D.Double();
+        for (int i = 0; i < pts; i++) {
+            double rr = i % 2 == 0 ? r : r * 0.7;
+            double a = Math.toRadians(i * 360.0 / pts);
+            double px = cx + rr * Math.cos(a);
+            double py = cy + rr * Math.sin(a);
+            if (i == 0) {
+                p.moveTo(px, py);
+            } else {
+                p.lineTo(px, py);
+            }
+        }
+        p.closePath();
+        g.setColor(new Color(0x4A, 0x52, 0x52));
+        g.fill(p);
+        g.setColor(Color.BLACK);
+        g.setStroke(new BasicStroke(1.8f));
+        g.draw(p);
+    }
+
+    /**
+     * ФИОЛЕТОВЫЙ — цвет карты арсенала на планшете (заказ дизайнера
+     * 17.08.2026). Тот же оттенок, что у джокера приказов ({@code OrderStrip}):
+     * в игре пока нет отдельного «цвета арсенала», и не стоит заводить второй
+     * фиолетовый рядом с уже используемым.
+     */
+    private static final Color ARSENAL_PURPLE = new Color(0x7A, 0x5A, 0xA8);
+    private static final Color STORAGE_GRAY = new Color(0x9A, 0x9A, 0x9A);
+
+    /**
+     * ШИРИНА ПОДЛОЖКИ значка награды для этого шага — квадратная для модулей/
+     * позолоты, landscape (шире) для карты арсенала на вершине (заказ
+     * дизайнера 17.08.2026, п.2: «карта супер-арсенала не вызывает правильный
+     * отступ» — раньше рисунок карты вылезал за отведённое место шириной с
+     * квадратный значок, теперь место под неё считается ЗАРАНЕЕ и текст шага
+     * сдвигается ровно на эту ширину).
+     */
+    private int rewardBadgeWidth(int badgeSize, String track, int step, int steps) {
+        if (step == steps && "super_arsenal_card".equals(peakRewardKind())
+                && superArsenalOn()) {
+            return Math.round(badgeSize * 1.6f);
+        }
+        return badgeSize;
+    }
+
+    private static boolean superArsenalOn() {
+        return Expansions.on(
+            kelium.dataio.AppSettings.of("replay2"), Expansions.SUPER_ARSENAL);
+    }
+
+    /** Печатный вид награды вершины из тех же данных, что читает движок. */
+    @SuppressWarnings("unchecked")
+    private String peakRewardKind() {
+        if (content == null) {
+            return null;
+        }
+        try {
+            for (Map<String, Object> e : content.get("boards").entries) {
+                if ("tech_board".equals(e.get("kind")) && e.get("step_rewards") instanceof List<?> l
+                        && !l.isEmpty()) {
+                    return String.valueOf(l.get(l.size() - 1));
+                }
+            }
+        } catch (RuntimeException ex) {
+            // нет данных
+        }
+        return null;
+    }
+
+    /**
+     * ЗНАЧОК НАГРАДЫ ШАГА (заказ дизайнера 17.08.2026), НА СВОЕЙ ПОДЛОЖКЕ.
+     * {@code (bx, by)} — левый верхний угол подложки, {@code badgeW/badgeH} —
+     * её размер (см. {@link #rewardBadgeWidth}). Подложка — залитый цветом
+     * своего трека прямоугольник (п.1 ревью: значки терялись на нейтральном
+     * фоне строки без неё) — под все формы наград.
+     *
+     * <p>Формы жетонов модулей — печатные пропорции с планшета войск: красный
+     * модуль КВАДРАТ 1:1, синий ПРЯМОУГОЛЬНИК 1:2 (ширина к высоте) той же
+     * высоты, серый жетон хранилища КВАДРАТ 1:1 размером ×0.75 от красного —
+     * все три сильно скруглённые (но не до капсулы — п.1 ревью: синий был
+     * скруглён слишком сильно).
+     *
+     * <p>{@code step==steps} (вершина) рисуется ИНАЧЕ, чем шаги 2..steps-1:
+     * награда вершины — не модуль, а карта супер-арсенала (данные
+     * {@code tech.step_rewards[last] == "super_arsenal_card"}), а при
+     * выключенном дополнении «Супер-арсенал» вершина отдаёт тот же модуль,
+     * что и обычный шаг (или позолоту на зелёном треке) — см.
+     * {@link kelium.engine.Actions#topPrizeWithoutSuperArsenal}, здесь
+     * повторена та же логика ТОЛЬКО для рисунка, без побочных эффектов.
+     *
+     * <p>ВЗЯТАЯ карта (п.2 ревью): вместо треугольника — пунктирная серая
+     * обводка по периметру подложки, символ карты не рисуется вовсе — место
+     * пустует, потому что карта уже у игрока, а не потому что её ещё нет.
+     */
+    private void rewardIcon(Graphics2D g, int bx, int by, int badgeW, int badgeH,
+                            String track, int step, int steps, boolean taken) {
+        String kind = trackModuleKind(track);
+        int cx = bx + badgeW / 2;
+        int cy = by + badgeH / 2;
+        boolean peakCard = step == steps && "super_arsenal_card".equals(peakRewardKind());
+        Color plate = peakCard && !taken ? wash(ARSENAL_PURPLE) : wash(TRACK_COLOR[
+            "blue".equals(kind) ? 2 : 0]);
+        g.setColor(plate);
+        g.fillRoundRect(bx, by, badgeW, badgeH, 10, 10);
+
+        if (peakCard) {
+            if (superArsenalOn()) {
+                arsenalCardIcon(g, cx, cy, badgeH - 10, badgeW - 10, taken);
+                return;
+            }
+            if ("storage".equals(kind)) {
+                gildIcon(g, cx, cy, badgeH - 10);
+                return;
+            }
+        }
+        moduleIcon(g, cx, cy, badgeH - 10, kind);
+    }
+
+    /** Жетон модуля (или позолоты) по роду трека. */
+    private void moduleIcon(Graphics2D g, int cx, int cy, int h, String kind) {
+        if ("blue".equals(kind)) {
+            int hh = h;
+            // Крупнее (заказ дизайнера 17.08.2026): было h/2, синий терялся
+            // рядом с красным квадратом того же h.
+            int ww = Math.max(4, Math.round(h * 0.62f));
+            // Скругление УМЕРЕННОЕ (п.1 ревью: было arc=ww — полная капсула на
+            // узкой стороне; теперь доля от короткой стороны, форма читается
+            // как прямоугольник, а не таблетка).
+            int arc = Math.round(ww * 0.5f);
+            g.setColor(TRACK_COLOR[2]);
+            g.fillRoundRect(cx - ww / 2, cy - hh / 2, ww, hh, arc, arc);
+            moduleLabel(g, cx, cy, ww, "Сб");
+        } else if ("storage".equals(kind)) {
+            // Крупнее (заказ дизайнера 17.08.2026): было ×0.75 от красного.
+            int s = Math.round(h * 0.92f);
+            g.setColor(STORAGE_GRAY);
+            int arc = Math.round(s * 0.35f);
+            g.fillRoundRect(cx - s / 2, cy - s / 2, s, s, arc, arc);
+            moduleLabel(g, cx, cy, s, "Хр");
+        } else {
+            // "red" и любой незаданный род — квадратный модуль по умолчанию
+            int s = h;
+            int arc = Math.round(s * 0.4f);
+            g.setColor(TRACK_COLOR[0]);
+            g.fillRoundRect(cx - s / 2, cy - s / 2, s, s, arc, arc);
+            moduleLabel(g, cx, cy, s, "Ат");
+        }
+    }
+
+    /**
+     * ПОЗОЛОТА (уточнение дизайнера 17.08.2026): зелёный трек без супер-
+     * арсенала не выдаёт жетон хранилища — он даёт ПОЗОЛОТУ одного своего
+     * модуля, КРАСНОГО ИЛИ СИНЕГО на выбор (у серого жетона хранилища нет
+     * «улучшенной стороны», золотить в нём нечего). Значок: пара модулей
+     * (через {@link #modulePairIcon}) в золотом сиянии, и полукруглая стрелка
+     * над ними — знак «переверни на оборот».
+     */
+    private void gildIcon(Graphics2D g, int cx, int cy, int h) {
+        int glow = Math.round(h * 1.5f);
+        g.setColor(new Color(0xF2, 0xC0, 0x2E, 70));
+        g.fillOval(cx - glow / 2, cy - glow / 2, glow, glow);
+        modulePairIcon(g, cx, cy + h * 0.08, h * 0.8);
+        // СТРЕЛКА «ОБОРОТ»: полукруг с наконечником над парой модулей.
+        double ar = h * 0.95;
+        double acx = cx;
+        double acy = cy - h * 0.02;
+        g.setColor(new Color(0xB8, 0x86, 0x00));
+        g.setStroke(new BasicStroke(1.6f));
+        java.awt.geom.Arc2D arc = new java.awt.geom.Arc2D.Double(
+            acx - ar / 2, acy - ar / 2, ar, ar, 200, 220, java.awt.geom.Arc2D.OPEN);
+        g.draw(arc);
+        double endDeg = Math.toRadians(200);
+        double tipX = acx + Math.cos(endDeg) * ar / 2;
+        double tipY = acy - Math.sin(endDeg) * ar / 2;
+        double tanDeg = Math.toRadians(200 - 90);
+        double ux = Math.cos(tanDeg);
+        double uy = -Math.sin(tanDeg);
+        double aw = h * 0.14;
+        g.fillPolygon(
+            new int[] {(int) tipX, (int) (tipX - ux * aw - uy * aw * 0.6),
+                (int) (tipX - ux * aw + uy * aw * 0.6)},
+            new int[] {(int) tipY, (int) (tipY - uy * aw + ux * aw * 0.6),
+                (int) (tipY - uy * aw - ux * aw * 0.6)}, 3);
+    }
+
+    /**
+     * ПАРА «КРАСНЫЙ КВАДРАТ / СИНИЙ ПРЯМОУГОЛЬНИК» — модуль любого цвета на
+     * выбор игрока (заказ дизайнера 17.08.2026): обмен науки «переставить
+     * модуль» и «позолотить модуль» не привязаны к конкретному цвету, значит и
+     * значок не должен быть одним фиксированным кубиком.
+     */
+    private void modulePairIcon(Graphics2D g, double cx, double cy, double h) {
+        int mini = Math.max(4, (int) Math.round(h * 0.82));
+        int gap = Math.max(2, (int) Math.round(h * 0.18));
+        int rx = (int) Math.round(cx - gap / 2.0 - mini);
+        int ry = (int) Math.round(cy - mini / 2.0);
+        int arcR = Math.max(2, Math.round(mini * 0.35f));
+        g.setColor(TRACK_COLOR[0]);
+        g.fillRoundRect(rx, ry, mini, mini, arcR, arcR);
+        int bw = Math.max(3, Math.round(mini * 0.62f));
+        int bx = (int) Math.round(cx + gap / 2.0);
+        int by = (int) Math.round(cy - mini / 2.0);
+        int arcB = Math.max(2, Math.round(bw * 0.5f));
+        g.setColor(TRACK_COLOR[2]);
+        g.fillRoundRect(bx, by, bw, mini, arcB, arcB);
+    }
+
+    /**
+     * ПЕРВЫЕ ДВЕ БУКВЫ РОДА МОДУЛЯ, МЕЛКО ПО ЦЕНТРУ ЖЕТОНА (заказ дизайнера
+     * 17.08.2026): «Ат» — модуль атаки (красный), «Сб» — модуль сборки
+     * (синий), «Хр» — жетон хранилища (серый/позолота). {@code fitWidth} —
+     * самая узкая сторона значка, кегль подстраивается под неё, чтобы буквы не
+     * вылезали на синем узком модуле.
+     */
+    private void moduleLabel(Graphics2D g, int cx, int cy, int fitWidth, String label) {
+        g.setColor(Color.WHITE);
+        g.setFont(getFont().deriveFont(Font.BOLD, Math.max(7f, fitWidth * 0.42f)));
+        int tw = g.getFontMetrics().stringWidth(label);
+        g.drawString(label, cx - tw / 2.0f, cy + g.getFontMetrics().getAscent() * 0.36f);
+    }
+
+    /**
+     * КАРТА АРСЕНАЛА, ГОРИЗОНТАЛЬНО: фиолетовая обводка, фиолетовый треугольник
+     * по центру — тот же символ-глиф, что различает карты супер-арсенала
+     * ({@code Symbols.Marking}), здесь просто маркер «здесь карта», а не
+     * разметка конкретной карты (какая ляжет на вершину — решится позже, при
+     * подготовке партии). {@code taken} (п.2 ревью): карту уже забрал игрок —
+     * рисуем только пунктирную серую рамку, без заливки и без треугольника.
+     */
+    private void arsenalCardIcon(Graphics2D g, int cx, int cy, int hh, int ww, boolean taken) {
+        int x = cx - ww / 2;
+        int y = cy - hh / 2;
+        if (taken) {
+            g.setColor(ink3());
+            g.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_BUTT,
+                BasicStroke.JOIN_MITER, 10, new float[] {4f, 3f}, 0));
+            g.drawRoundRect(x, y, ww, hh, 6, 6);
+            return;
+        }
+        g.setColor(ARSENAL_PURPLE);
+        g.setStroke(new BasicStroke(1.6f));
+        g.drawRoundRect(x, y, ww, hh, 6, 6);
+        int tri = hh - 6;
+        int[] px = {cx, cx - tri / 2, cx + tri / 2};
+        int[] py = {cy - tri / 2, cy + tri / 2, cy + tri / 2};
+        g.setColor(ARSENAL_PURPLE);
+        g.fillPolygon(px, py, 3);
+    }
+
+    /** «modules» рода этого трека (red/blue/storage) — та же точка данных, что у движка. */
+    @SuppressWarnings("unchecked")
+    private String trackModuleKind(String track) {
+        if (content == null) {
+            return null;
+        }
+        try {
+            for (Map<String, Object> e : content.get("boards").entries) {
+                if (!"tech_board".equals(e.get("kind"))) {
+                    continue;
+                }
+                for (Object tObj : (List<Object>) e.get("tracks")) {
+                    Map<String, Object> t = (Map<String, Object>) tObj;
+                    if (track.equals(t.get("id"))) {
+                        return (String) t.get("modules");
+                    }
+                }
+            }
+        } catch (RuntimeException ex) {
+            // данных нет — считаем род неизвестным, рисуем красный по умолчанию
+        }
+        return null;
     }
 
     private void drawChip(Graphics2D g, int x, int y, int d, int seat) {

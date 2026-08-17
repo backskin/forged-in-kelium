@@ -266,7 +266,7 @@ public final class ArsenalAbilities {
         }
 
         @Override public void modify(RuleQuery q) {
-            if (q.hook() == Hook.UNIT_SPEED && q.subject() == UnitType.VEHICLE) {
+            if (q.hook() == Hook.UNIT_SPEED && q.unitType() == UnitType.VEHICLE) {
                 q.add(1);
             }
             if (q.hook() == Hook.TOKEN_HP && q.subject() instanceof UnitToken u

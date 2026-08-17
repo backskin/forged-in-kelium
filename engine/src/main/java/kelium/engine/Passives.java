@@ -34,7 +34,7 @@ public final class Passives {
         Set<String> out = new HashSet<>();
         PlayerState p = s.player(seat);
         var content = Ctx.cards(s, "arsenal");
-        for (String cid : p.arsenalInstalled) {
+        for (String cid : p.allInstalledArsenal()) {
             Map<String, Object> card;
             try {
                 card = content.byId(cid);
@@ -125,8 +125,15 @@ public final class Passives {
         return hasPassive(s, seat, "plants_plus1_energy") ? 1 : 0;
     }
 
-    /** Число доступных SPEC-действий за ход (2 при two_spec_actions, иначе 1). */
+    /**
+     * Число доступных SPEC-действий за ход: 3 при удержании sa9 «Параллельные
+     * штабы» ({@code three_spec_actions} — редакция 17.08.2026, было 2, дизайнер
+     * счёл «слабо»), 2 при {@code two_spec_actions} со стартового арсенала, иначе 1.
+     */
     public static int specActions(GameState s, int seat) {
+        if (superArsenalPassive(s, seat, "three_spec_actions")) {
+            return 3;
+        }
         return hasPassive(s, seat, "two_spec_actions") ? 2 : 1;
     }
 

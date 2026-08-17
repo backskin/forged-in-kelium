@@ -664,6 +664,11 @@ public final class Session {
             return "запись не загружена";
         }
         StringBuilder sb = new StringBuilder("Раунд ").append(f.snapshot.round);
+        // Заказ дизайнера 17.08.2026: после просчёта партии видно, сколько
+        // раундов она заняла ВСЕГО, а не только на каком раунде сейчас курсор.
+        if (record.rounds > 0) {
+            sb.append(" из ").append(record.rounds);
+        }
         if (f.snapshot.circle > 0) {
             sb.append(" · круг ").append(f.snapshot.circle);
         }

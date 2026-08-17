@@ -147,6 +147,14 @@ public final class FieldPainter {
     private static final String CONTAINER_EDGE = "#9A8455";
     private static final String CONTAINER_MARK = "#7A6636";
     private static final String DAMAGE_FILL = "#d32f2f";
+    /** Тёмная контрастная обводка кубика урона (просьба дизайнера 17.08.2026):
+     * тонкая белая, как раньше, терялась на светлом поле — кубик легко спутать
+     * с чем угодно красным на жетоне. */
+    private static final String DAMAGE_EDGE = "#3a0000";
+    /** Обводка красной цифры прочности с тонким белым контуром (п.5.1 ревью):
+     * раньше цифра была просто белой, теперь читается на любом фоне жетона. */
+    private static final String HP_NUMBER_FILL = "#d32f2f";
+    private static final String HP_NUMBER_OUTLINE = "#ffffffcc";
     /** Сердечки прочности нейтральных построек. */
     private static final String HEART_FILL = "#E03A3A";
     private static final String HEART_EDGE = "#7A1414";
@@ -539,8 +547,12 @@ public final class FieldPainter {
         double hx = spot[0] + ux * off;
         double hy = spot[1] + uy * off;
         heart(c, hx, hy, r, left > 0, readableAngle(labelAngle));
+        // Цифра прочности — КРАСНАЯ с тонкой белой обводкой (п.5.1 ревью
+        // дизайнера 17.08.2026), вместо просто белой: рядом с красным
+        // сердечком и красным кубиком урона белая цифра терялась в общем
+        // красно-белом пятне жетона.
         c.outlinedTextRotated(String.valueOf(left), hx + ux * r * 2.1,
-            hy + uy * r * 2.1, size * 0.15, WHITE, LABEL_OUTLINE,
+            hy + uy * r * 2.1, size * 0.15, HP_NUMBER_FILL, HP_NUMBER_OUTLINE,
             readableAngle(labelAngle));
     }
 
@@ -721,7 +733,17 @@ public final class FieldPainter {
         // СЕРДЕЧКО С ЧИСЛОМ вплотную к подписи: сколько прочности осталось. Мельче
         // нейтральных — здесь и без него хватает значков (просьба дизайнера).
         paintHealth(c, size, b, spot, labelAngle);
-        paintDamage(c, size, b.damage, spot[0], spot[1] - size * 0.24);
+        // Кубик урона садится НАД подписью, в осях самого жетона (п.5 ревью:
+        // раньше сдвиг был просто «на size*0.24 вверх по экрану» — на
+        // развёрнутом жетоне это уводило кубик мимо его печатной стороны).
+        {
+            double ra = readableAngle(labelAngle);
+            double rr = Math.toRadians(ra);
+            double px = Math.sin(rr);
+            double py = -Math.cos(rr);
+            double off = size * 0.30;
+            paintDamage(c, size, b.damage, spot[0] + px * off, spot[1] + py * off, ra);
+        }
         return spot;
     }
 
@@ -1289,7 +1311,7 @@ public final class FieldPainter {
             c.shape(sh, ax, ay, 0, size * 0.40 / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
                 tone(FieldGeometry.SEAT_TOKEN[u.owner % 4]),
                 FieldGeometry.SEAT_STROKE[u.owner % 4], TOKEN_STROKE);
-            paintDamage(c, size, u.damage, ax, ay - size * 0.20);
+            paintDamage(c, size, u.damage, ax, ay - size * 0.20, 0);
             airDrawn++;
         }
 
@@ -1334,6 +1356,7 @@ public final class FieldPainter {
             FieldGeometry.Shape sh = FieldGeometry.unitByCode(u.type);
             double[] pos;
             java.awt.image.BufferedImage tex = Textures.unit(u.type, u.owner);
+            double unitAngle;
             if (place != null) {
                 free.removeAll(place);
                 double face = FieldGeometry.meanEdgeAngle(place);
@@ -1347,7 +1370,8 @@ public final class FieldPainter {
                         tone(FieldGeometry.SEAT_TOKEN[u.owner % 4]),
                         FieldGeometry.SEAT_STROKE[u.owner % 4], TOKEN_STROKE);
                 }
-                paintUnitLetter(c, u, pos, w, face + 90);
+                unitAngle = face + 90;
+                paintUnitLetter(c, u, pos, w, unitAngle);
             } else {
                 pos = FieldGeometry.polar(cx, cy, size * 0.28,
                     60.0 * overflow - 30 + FieldGeometry.TILT);
@@ -1359,10 +1383,20 @@ public final class FieldPainter {
                         tone(FieldGeometry.SEAT_TOKEN[u.owner % 4]),
                         FieldGeometry.SEAT_STROKE[u.owner % 4], TOKEN_STROKE);
                 }
-                paintUnitLetter(c, u, pos, w, 0);
+                unitAngle = 0;
+                paintUnitLetter(c, u, pos, w, unitAngle);
                 overflow++;
             }
-            paintDamage(c, size, u.damage, pos[0], pos[1] - size * 0.20);
+            // Кубик урона — НАД буквой рода, в осях самого жетона (та же логика
+            // смещения, что у зданий выше — п.5 ревью дизайнера 17.08.2026).
+            {
+                double ra = readableAngle(unitAngle);
+                double rr = Math.toRadians(ra);
+                double px = Math.sin(rr);
+                double py = -Math.cos(rr);
+                double off = size * 0.30;
+                paintDamage(c, size, u.damage, pos[0] + px * off, pos[1] + py * off, ra);
+            }
         }
     }
 
@@ -1397,20 +1431,53 @@ public final class FieldPainter {
         c.circle(x, y, r, tone(FieldGeometry.SEAT_TOKEN[u.owner % 4]), WHITE, 1.4);
         c.text(unitLetter(u.type), x, y + r * 0.62, r * 1.5, true, WHITE);
         if (u.damage > 0) {
-            paintDamage(c, size, u.damage, x, y - r * 2.2);
+            paintDamage(c, size, u.damage, x, y - r * 2.2, 0);
         }
     }
 
+    /**
+     * КУБИК УРОНА (ревью дизайнера 17.08.2026, п.5). Тот же размер и та же
+     * объёмная форма, что у кубика энергии на жетоне ({@link #tokenCube}) —
+     * читаются одним взглядом как однородные «кубики», не два разных языка
+     * значков. Тёмная контрастная обводка вместо прежней тонкой белой — раньше
+     * терялась на светлом поле рядом с другими красными деталями жетона.
+     *
+     * <p>НЕ БОЛЕЕ ДВУХ кубиков разом: 1 урон — один кубик, 2 — два в ряд вдоль
+     * своей оси, 3+ — ОДИН кубик и слева от него число всего урона (не «третий
+     * кубик» и не число внутри кубика — кубик остаётся узнаваемой формой).
+     *
+     * <p>ВРАЩАЕТСЯ ВМЕСТЕ С ЖЕТОНОМ: {@code angleDeg} — тот же угол, что
+     * поворачивает подпись/букву этого же жетона, поэтому кубик остаётся на
+     * той же печатной стороне жетона при любом развороте, а не висит фиксированно
+     * над ним в экранных координатах (это и было прежним багом — курс UI 13.08).
+     * {@code (x, y)} — точка, где должен стоять центр кубика (или центр пары,
+     * если их два) в уже развёрнутых координатах поля; её считает вызывающий
+     * код так же, как он считает точку для сердечка прочности рядом.
+     */
     private static void paintDamage(FieldCanvas c, double size, int damage,
-                                    double x, double y) {
+                                    double x, double y, double angleDeg) {
         if (damage <= 0 || !showDamage) {
             return;
         }
-        double s = size * 0.085;
-        int n = Math.min(damage, 4);
-        double x0 = x - (n * (s + 1.2) - 1.2) / 2;
-        for (int d = 0; d < n; d++) {
-            c.roundRect(x0 + d * (s + 1.2), y, s, s, 0.8, DAMAGE_FILL, WHITE, 0.7);
+        double a = Math.toRadians(angleDeg);
+        double ux = Math.cos(a);
+        double uy = Math.sin(a);
+        double vx = -Math.sin(a);
+        double vy = Math.cos(a);
+        double s = size * ENERGY_SLOT;   // тот же калибр, что у кубика энергии
+        int shown = Math.min(damage, 2);
+        double step = s * 1.35;
+        double x0 = x - ux * (step * (shown - 1) / 2.0);
+        double y0 = y - uy * (step * (shown - 1) / 2.0);
+        for (int i = 0; i < shown; i++) {
+            tokenCube(c, x0 + ux * step * i, y0 + uy * step * i, s, ux, uy, vx, vy,
+                DAMAGE_FILL, DAMAGE_EDGE);
+        }
+        if (damage > 2) {
+            double tx = x0 - ux * s * 1.2;
+            double ty = y0 - uy * s * 1.2;
+            c.outlinedTextRotated(String.valueOf(damage), tx, ty, size * 0.16,
+                WHITE, LABEL_OUTLINE, readableAngle(angleDeg));
         }
     }
 

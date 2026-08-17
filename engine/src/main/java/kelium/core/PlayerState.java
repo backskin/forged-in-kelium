@@ -79,6 +79,37 @@ public final class PlayerState {
     public final List<String> startObjectiveOffer = new ArrayList<>();
     public int superObjectiveProgress = 0;
     public boolean superObjectiveComplete = false;
+
+    // ======================================================================
+    //  СУПЕРОРУЖИЕ (супер задания 3.0, решение дизайнера 17.08.2026)
+    // ======================================================================
+    /**
+     * СКОЛЬКО ЯЧЕЕК КАРТЫ СУПЕР ЗАДАНИЯ ЕЩЁ ЗАНЯТО. −1 — карта не вскрыта.
+     *
+     * <p>Карта вскрывается одним СПЕЦ-действием, и на неё сразу ложится всё
+     * требуемое: четыре ячейки, четыре взноса. Дальше игрок снимает содержимое
+     * по одной ячейке за СПЕЦ, не чаще раза за круг, — это и есть счётчик
+     * запуска. Снял последнюю — выиграл партию.
+     */
+    public int superCells = -1;
+    /** Жетон супероружия: uid, пока он существует (в запасе или на поле). */
+    public Integer superWeaponUid = null;
+    /**
+     * ГЕКС ЗДАНИЯ, ГДЕ ЖЕТОН СУПЕРОРУЖИЯ БЫЛ НАНЯТ. Снимать ячейки можно, только
+     * пока жетон стоит НЕ на нём: оружие должно выехать со стапеля, а не
+     * запускаться прямо из цеха.
+     */
+    public String superWeaponHiredHex = null;
+    /**
+     * Круг, в котором игрок последний раз снимал ячейку. Снятие разрешено не
+     * чаще раза за круг, поэтому четыре ячейки — это минимум четыре круга.
+     */
+    public int superLastLaunchCircle = -1;
+    /**
+     * ГЕКСЫ, С КОТОРЫХ УЖЕ ЗАПУСКАЛИ. Каждое снятие ячейки требует НОВОГО гекса:
+     * оружие обязано переезжать, а не стоять четыре круга на одном месте.
+     */
+    public final java.util.Set<String> superLaunchedFrom = new java.util.LinkedHashSet<>();
     /**
      * ПОБЕДНЫЕ ОЧКИ ЗА ПЕРВУЮ ЧАСТЬ супер задания (решение дизайнера 13.08.2026):
      * 2–5 очков по стоимости того, что сдано в лицо карты. Начисляются один раз, в
@@ -138,6 +169,34 @@ public final class PlayerState {
      * Защита должна работать ДО попадания, а не после.
      */
     public final java.util.Set<UnitType> shieldedKinds = java.util.EnumSet.noneOf(UnitType.class);
+
+    /**
+     * «МАНДАТ СОВЕТА» (супер-арсенал sa8): поверх карты есть место для ОДНОЙ
+     * карты арсенала либо до ДВУХ контейнеров. Она лежит здесь ТАК ЖЕ, как в
+     * обычной ячейке планшета, и работает по своим правилам — но за отдельный
+     * слот, вытесняя туда лишнюю карту не из обычных трёх.
+     */
+    public String mandateArsenalCard = null;
+    public int mandateContainers = 0;
+
+    /**
+     * ВСЕ УСТАНОВЛЕННЫЕ КАРТЫ АРСЕНАЛА: обычные три слота плюс карта под
+     * «Мандатом совета», если она там лежит. Карта под мандатом «работает по
+     * своим правилам» (текст sa8) — то есть ровно как обычная установленная
+     * карта, — поэтому всякая точка движка, что спрашивает «какие пассивки/
+     * символы/бонусы сейчас действуют у игрока», обязана видеть и её. Слотовое
+     * управление (лимит трёх, вытеснение) по-прежнему смотрит на
+     * {@link #arsenalInstalled} НАПРЯМУЮ — мандат отдельный слот, не четвёртый
+     * такой же.
+     */
+    public List<String> allInstalledArsenal() {
+        if (mandateArsenalCard == null) {
+            return arsenalInstalled;
+        }
+        List<String> out = new ArrayList<>(arsenalInstalled);
+        out.add(mandateArsenalCard);
+        return out;
+    }
 
     /**
      * КАРТА, ПОДЛОЖЕННАЯ ПОД ПЛАНШЕТ ВОЙСК ради СИМВОЛА супер задания
@@ -250,6 +309,11 @@ public final class PlayerState {
         p.startObjectiveOffer.addAll(startObjectiveOffer);
         p.superObjectiveProgress = superObjectiveProgress;
         p.superObjectiveComplete = superObjectiveComplete;
+        p.superCells = superCells;
+        p.superWeaponUid = superWeaponUid;
+        p.superWeaponHiredHex = superWeaponHiredHex;
+        p.superLastLaunchCircle = superLastLaunchCircle;
+        p.superLaunchedFrom.addAll(superLaunchedFrom);
         p.superFirstPartVp = superFirstPartVp;
         p.redModules = redModules;
         p.blueModules = blueModules;
@@ -275,6 +339,8 @@ public final class PlayerState {
         p.superPartProgress.putAll(superPartProgress);
         p.containers = containers;
         p.shieldedKinds.addAll(shieldedKinds);
+        p.mandateArsenalCard = mandateArsenalCard;
+        p.mandateContainers = mandateContainers;
         p.cuDestructionTokens = cuDestructionTokens;
         p.ownCuTokenAvailable = ownCuTokenAvailable;
         p.claimedSpawnTiles = claimedSpawnTiles;

@@ -91,14 +91,30 @@ public final class PngExport {
         }
     }
 
-    /** Что класть в картинку — управляется окном «Настройки экспорта». */
+    /**
+     * Что класть в картинку — управляется окном «Настройки экспорта».
+     *
+     * @param containers показывать ли контейнеры на поле (свой слой, гасится
+     *                   отдельно: печатнику они нужны, а на обзорной картинке
+     *                   раскладки часто мешают)
+     * @param hexGrid    рисовать ли тонкую гексовую сетку по ВСЕЙ площади кадра;
+     *                   имеет смысл только в {@link Layout#FUSION}, где обычных
+     *                   гексов не рисуют вовсе и поле иначе висит в пустоте
+     */
     public record Options(boolean generalLegend, boolean players, boolean mapStats,
-                          Layout layout) {
-        public static final Options ALL = new Options(true, true, true, Layout.SEPARATE);
+                          Layout layout, boolean containers, boolean hexGrid) {
+        public static final Options ALL =
+            new Options(true, true, true, Layout.SEPARATE, true, false);
 
         /** Совместимость со старым трёхпольным вызовом — раскладка «раздельно». */
         public Options(boolean generalLegend, boolean players, boolean mapStats) {
-            this(generalLegend, players, mapStats, Layout.SEPARATE);
+            this(generalLegend, players, mapStats, Layout.SEPARATE, true, false);
+        }
+
+        /** Совместимость с четырёхпольным вызовом: контейнеры видны, сетки нет. */
+        public Options(boolean generalLegend, boolean players, boolean mapStats,
+                       Layout layout) {
+            this(generalLegend, players, mapStats, layout, true, false);
         }
     }
 

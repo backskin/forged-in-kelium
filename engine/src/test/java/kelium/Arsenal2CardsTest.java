@@ -134,7 +134,7 @@ class Arsenal2CardsTest {
      * можно только когда приказ РЕАЛЬНО заблокирован — иначе карта сгорела бы зря.
      */
     @Test
-    void reserveHqStoresKeliumAndSpendsItOnlyWhenOrderIsBlocked() {
+    void reserveHqStoresKeliumAndBuysAnExtraOrderAction() {
         GameState s = game();
         install(s, 0, "b08");
         PlayerState p = s.player(0);
@@ -144,10 +144,9 @@ class Arsenal2CardsTest {
         Ability a = Abilities.byId("kelium_ignores_block");
         OptionSource src = (OptionSource) a;
 
-        // Блокировки нет: предлагается только «положить», но не «сжечь».
-        s.journal.of(0).orderBlocked = false;
+        // На карте пусто: единственный доступный шаг — положить келемий.
         List<kelium.core.Choice> opts = src.options(s, 0, OptionSource.Slot.SPEC);
-        assertEquals(1, opts.size(), "без блокировки должен быть ровно один вариант");
+        assertEquals(1, opts.size(), "с пустой картой должен быть ровно один вариант");
         assertTrue(opts.get(0).kind().endsWith(":put"));
 
         // Кладём келемий на карту: из запаса ушёл, на карте появился.
@@ -155,19 +154,18 @@ class Arsenal2CardsTest {
         assertEquals(keliumBefore - 1, p.resources.kelium(), "келемий не списан из запаса");
         assertEquals(1, p.arsenalCardKelium.getOrDefault("b08", 0), "келемий не лёг на карту");
 
-        // Блокировки по-прежнему нет — жечь нечего.
-        assertTrue(src.options(s, 0, OptionSource.Slot.SPEC).isEmpty(),
-            "без блокировки сжигать келемий предлагать нельзя");
+        // РЕДАКЦИЯ 17.08.2026: жечь можно В ЛЮБОМ ходу, а не только когда приказ
+        // заблокирован совпадением. Прежнее условие делало карту почти мёртвой:
+        // совпадение приказов — редкий случай, и келемий лежал на карте зря.
+        s.journal.of(0).orderBlocked = false;
+        List<kelium.core.Choice> ready = src.options(s, 0, OptionSource.Slot.SPEC);
+        assertEquals(1, ready.size(), "келемий на карте — значит его можно сжечь");
+        assertTrue(ready.get(0).kind().endsWith(":burn"));
 
-        // Приказ заблокирован — появляется «сжечь», и он даёт лишнее действие.
-        s.journal.of(0).orderBlocked = true;
-        List<kelium.core.Choice> blocked = src.options(s, 0, OptionSource.Slot.SPEC);
-        assertEquals(1, blocked.size());
-        assertTrue(blocked.get(0).kind().endsWith(":burn"));
-        assertTrue(src.perform(s, 0, blocked.get(0), null));
+        assertTrue(src.perform(s, 0, ready.get(0), null));
         assertEquals(0, p.arsenalCardKelium.getOrDefault("b08", 0), "келемий не сожжён");
         assertEquals(1, s.journal.of(0).takeBlockBypassGrants(),
-            "обход блокировки не выдал лишнего действия");
+            "сожжённый келемий обязан выдать одно лишнее основное действие");
         assertEquals(0, s.journal.of(0).takeBlockBypassGrants(),
             "разрешение обязано забираться ровно один раз");
     }

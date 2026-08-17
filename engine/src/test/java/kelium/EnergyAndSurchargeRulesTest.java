@@ -38,7 +38,7 @@ class EnergyAndSurchargeRulesTest {
     }
 
     @Test
-    void unpoweredBuildingWorksOnlyWhenPaidForInDevelopment() {
+    void unpoweredBuildingWorksOnlyWithTheEmergencyPowerCard() {
         GameState s = game();
         PlayerState p = s.player(0);
         p.resources.add(Resource.COIN, 99);
@@ -47,16 +47,25 @@ class EnergyAndSurchargeRulesTest {
         p.buildings.add(fac);
 
         assertFalse(fac.powered(), "завод только что поставлен — кубиков на нём нет");
+
+        // ОБЩЕГО ПРАВИЛА «закрой ячейку монетой» В ИГРЕ БОЛЬШЕ НЕТ (решение
+        // дизайнера 17.08.2026): энергия — главный дефицит, и выкупать его за
+        // деньги нельзя, иначе обесцениваются и Смена энергии, и планировка базы.
+        int coinsBefore = p.resources.coin();
+        assertFalse(kelium.engine.Power.usableForAction(
+                s, p, fac, new kelium.support.Fix.FirstChoiceAgent(0)),
+            "без карты незапитанное здание недоступно, сколько бы ни было денег");
+        assertEquals(coinsBefore, p.resources.coin(),
+            "и ни одной монеты за отказ списывать нельзя");
+
+        // Право на доплату даёт РОВНО ОДНА карта арсенала — «Аварийное питание».
+        p.arsenalInstalled.add("b20");
         Ruleset rs = kelium.dataio.Ctx.rules(s);
         int rate = rs.getInt("actions.empty_energy_slot_coin_cost", -1);
-        assertEquals(1, rate, "компенсация энергии монетами: 1 МОН за ячейку");
-
-        // Платим за ячейки — здание становится доступным ДЛЯ ЭТОГО действия,
-        // но кубик в ячейку НЕ кладётся: правило одноразовое.
-        int coinsBefore = p.resources.coin();
-        boolean usable = kelium.engine.Power.usableForAction(
-            s, p, fac, new kelium.support.Fix.FirstChoiceAgent(0));
-        assertTrue(usable, "с деньгами незапитанное здание должно стать доступным");
+        assertEquals(1, rate, "цена ячейки для карты: 1 МОН за ячейку");
+        assertTrue(kelium.engine.Power.usableForAction(
+                s, p, fac, new kelium.support.Fix.FirstChoiceAgent(0)),
+            "с картой «Аварийное питание» доплата снова разрешена");
         assertEquals(coinsBefore - fac.energySlots * rate, p.resources.coin(),
             "оплата обязана списать по " + rate + " МОН за каждую пустую ячейку");
         assertFalse(fac.powered(),

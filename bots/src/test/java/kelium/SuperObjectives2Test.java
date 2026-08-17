@@ -192,33 +192,47 @@ class SuperObjectives2Test {
     // ==================== символы ВКЛЮЧЕНЫ ====================
 
     /**
-     * Сет-коллекшн символов ВКЛЮЧЁН решением дизайнера 13.08.2026 (версия правил
-     * 1.7.0, отмена парковки из бэклога I1). Проверяем именно это: разметка
-     * подключена, требование символов поднято, и вторая часть супер задания
-     * зависит не только от рисунка на поле, но и от вскрытых символов.
+     * СИМВОЛ ТРЕБУЕТСЯ С ОТКРЫТОЙ КАРТЫ АРСЕНАЛА (супер задания 3.0). Набора из
+     * трёх символов под планшетом больше нет: карта требует ОДИН символ, и он
+     * должен быть напечатан на карте арсенала, которую игрок УЖЕ УСТАНОВИЛ.
+     *
+     * <p>Заодно ловится расхождение разметки с колодой: символы 1.0.0 ссылались
+     * на карты a01–a24, которых в игре нет, и модуль молча не работал вовсе.
      */
     @Test
-    void symbolSetCollectionIsOnAndGatesTheObjective() {
+    void символБерётсяСОткрытойКартыАрсенала() {
         GameState s = game(4, 15L);
         Symbols.Marking m = Symbols.of(s);
-        assertTrue(m.ofArsenal("a01") != null,
-            "разметка символов подключена версией контента symbols 1.0.0");
-        assertTrue(Boolean.TRUE.equals(kelium.dataio.Ctx.rules(s)
-                .get("super_objectives.require_symbols", Boolean.FALSE)),
-            "требование символов включено");
+        assertTrue(m.ofArsenal("b01") != null,
+            "разметка символов обязана знать карты ДЕЙСТВУЮЩЕЙ колоды арсенала");
 
         PlayerState p = s.player(0);
-        p.superObjective = "prizma";
-        assertFalse(Symbols.satisfied(s, p, Symbols.required(s, "prizma"), 0),
-            "без вскрытых символов задание не проходит");
+        p.superObjective = "prizma";        // требует ● круг
+        p.arsenalInstalled.clear();
+        assertFalse(kelium.engine.SuperWeapon.hasRequiredSymbol(s, p),
+            "без открытой карты с нужным символом вскрыть карту нельзя");
+
+        // Находим любую карту арсенала с нужной формой и «устанавливаем» её.
+        String need = String.valueOf(
+            ((java.util.Map<String, Object>) kelium.dataio.Ctx.cards(s, "super_objectives")
+                .byId("prizma")).get("requires_symbol"));
+        String withSymbol = null;
+        for (var e : m.arsenal().entrySet()) {
+            if (need.equals(e.getValue())) {
+                withSymbol = e.getKey();
+                break;
+            }
+        }
+        assertTrue(withSymbol != null, "в разметке нет ни одной карты с формой " + need);
+        p.arsenalInstalled.add(withSymbol);
+        assertTrue(kelium.engine.SuperWeapon.hasRequiredSymbol(s, p),
+            "открытая карта с нужным символом обязана открывать путь к вскрытию");
     }
 
     // ==================== партия целиком ====================
 
     @Test
     void gamesOnNewRulesetFinishAndUseTheNewMechanics() {
-        int tucks = 0;
-        int reveals = 0;
         int picks = 0;
         for (long seed = 40; seed < 46; seed++) {
             GameState s = game(4, seed);
@@ -227,25 +241,18 @@ class SuperObjectives2Test {
                 agents.add(Bots.create(Bots.CHARACTERS.get(seat % Bots.CHARACTERS.size()),
                     seat, new Random(seed * 31 + seat), 4));
             }
-            int[] counts = new int[3];
+            int[] counts = new int[1];
             Map<String, Object> res = GameEngine.playGame(s, agents, ev -> {
-                switch (String.valueOf(ev.get("type"))) {
-                    case "tuck" -> counts[0]++;
-                    case "symbol_reveal" -> counts[1]++;
-                    case "super_pick" -> counts[2]++;
-                    default -> { }
+                if ("super_pick".equals(String.valueOf(ev.get("type")))) {
+                    counts[0]++;
                 }
             });
             assertTrue(res.containsKey("winner"), "партия обязана доиграть (сид " + seed + ")");
-            tucks += counts[0];
-            reveals += counts[1];
-            picks += counts[2];
+            picks += counts[0];
         }
         assertTrue(picks >= 6 * 4 - 2, "выбор супер задания делают все игроки: " + picks);
-        // модуль символов включён (1.7.0) — карты уходят под планшет и вскрываются
-        assertTrue(tucks > 0, "модуль символов включён: карты уходят под планшет, tucks=" + tucks);
-        assertTrue(reveals > 0, "модуль символов включён: символы вскрываются, reveals=" + reveals);
-        assertTrue(reveals <= tucks, "вскрыть можно только подложенное: "
-            + reveals + " вскрытий при " + tucks + " подкладываниях");
+        // ПОДКЛАДЫВАНИЕ КАРТ ПОД ПЛАНШЕТ БОЛЬШЕ НЕ ПРОВЕРЯЕТСЯ: набора из трёх
+        // символов в супер заданиях 3.0 нет, карта требует ОДИН символ с уже
+        // открытого арсенала. Проверка этого требования — в тесте выше.
     }
 }

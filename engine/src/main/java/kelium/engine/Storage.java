@@ -83,13 +83,24 @@ public final class Storage {
         int freeCells = cells - occupied;
         int slotCards = 0;
         var lib = Ctx.cards(s, "arsenal");
-        for (String cid : p.arsenalInstalled) {
+        // allInstalledArsenal(): карта под мандатом (sa8) — тоже ОТКРЫТАЯ
+        // установленная карта, «container_slot» с неё считается наравне с
+        // обычными тремя слотами.
+        for (String cid : p.allInstalledArsenal()) {
             var card = lib.find(cid);
             if (card != null && Boolean.TRUE.equals(card.get("container_slot"))) {
                 slotCards++;
             }
         }
-        return Math.max(0, freeCells) * perFree + slotCards * onCard;
+        int base = Math.max(0, freeCells) * perFree + slotCards * onCard;
+        // «МАНДАТ СОВЕТА» (супер-арсенал sa8): МЕСТО ПОД МАНДАТОМ — до 2
+        // контейнеров, НА СВОЁМ отдельном месте, не в ячейках арсенала. Не
+        // флат-бонус за одно удержание карты: именно СТОЛЬКО, сколько игрок
+        // туда фактически отвёл (p.mandateContainers, 0/1/2 — см.
+        // GameEngine.mandateAllocateContainers), и не одновременно с картой
+        // арсенала в том же месте (взаимоисключение проверяется там же).
+        base += p.mandateContainers;
+        return base;
     }
 
     /** Добавить контейнеры с учётом вместимости ячеек; вернуть, сколько влезло. */
@@ -425,21 +436,36 @@ public final class Storage {
     }
 
     /**
-     * Принудительное сгорание излишка при возврате здания владельцу — БЕЗ
-     * участия игрока (в отличие от {@link #offerStorageDiscard}, которая всегда
-     * добровольна). Вызывается ПОСЛЕ того, как жетон добытчика/энергостанции
-     * вернулся на планшет владельца (Возврат конца раунда, или чужое действие
-     * Науки, потратившее трофей): если возврат здания «накрыл» ячейки склада, на
-     * которых в это время лежали кубики (набранные, пока склад был уже, из-за
-     * временного отсутствия этого здания), лишнее сгорает в общий запас.
+     * Сгорание излишка при возврате здания владельцу — жетон добытчика/
+     * энергостанции вернулся на планшет владельца, накрыв ранее открытые
+     * ячейки, на которых в это время лежали кубики (набранные, пока склад был
+     * шире, из-за временного отсутствия этого здания). Свободных ячеек, куда
+     * переставить лишнее, физически нет: закрывшаяся ячейка уже вычтена из
+     * {@link #totalMax}, так что «излишек» — это именно то, что нигде не
+     * помещается, а не то, что кто-то не переставил.
      *
-     * <p>Порядок сгорания (решение реализации, т. к. явного правила по
-     * приоритету нет): сперва типизированный излишек (келемий/боеприпас сверх
-     * СВОИХ K/A-пределов — эти кубики физически не влезают в чужой тип ячейки),
-     * затем остаток общего излишка — обломок → боеприпас → келемий (обломок
-     * сгорает первым как самый «неприкреплённый» к типу ячейки ресурс).
+     * <p>Различается только ЧЬИМ решением горит лишнее (уточнение дизайнера
+     * 17.08.2026, ответ на «внутри своего спец-действия игрок... может...
+     * попробовать вытащить их... в другие свободные ячейки»):
+     * <ul>
+     *   <li>{@code ownTurnChoice=true} — возврат случился ВНУТРИ хода этого
+     *   игрока, его собственным действием (снос Стройкой, оплата ячейки карты
+     *   супероружия своим зданием). Правило 4 разрешает игроку в свой ход
+     *   свободно перекладывать/выбрасывать содержимое склада — значит и здесь
+     *   он выбирает, ЧТО именно сгорит, а не движок фиксированным порядком.</li>
+     *   <li>{@code ownTurnChoice=false} — возврат случился НЕ в ход этого
+     *   игрока (Возврат конца раунда, чужое действие Науки, чужой СПЕЦ вроде
+     *   «Ядерного удара» по чужому гексу): игрок тут не действует, выбора нет,
+     *   горит фиксированным порядком.</li>
+     * </ul>
+     *
+     * <p>Типизированный излишек (келемий/боеприпас сверх СВОИХ K/A-пределов)
+     * горит без вариантов в обоих случаях: чужой тип ячейки эти кубики
+     * физически не примет. Выбор игрока касается только остатка ОБЩЕГО
+     * излишка, где типы взаимозаменяемы.
      */
-    public static void forceEvictOnBuildingReturn(kelium.core.GameState s, PlayerState player) {
+    public static void evictOnBuildingReturn(kelium.core.GameState s, PlayerState player,
+                                              boolean ownTurnChoice) {
         int keliumOver = player.resources.kelium() - keliumMax(s, player);
         if (keliumOver > 0) {
             player.resources.pay(Resource.KELIUM, keliumOver);
@@ -450,6 +476,9 @@ public final class Storage {
         }
         int totalOver = (player.resources.kelium() + player.resources.ammo()
             + player.resources.debris()) - totalMax(s, player);
+        if (totalOver > 0 && ownTurnChoice) {
+            totalOver = offerBurnChoice(s, player, totalOver);
+        }
         for (Resource r : new Resource[] {Resource.DEBRIS, Resource.AMMO, Resource.KELIUM}) {
             if (totalOver <= 0) {
                 break;
@@ -460,5 +489,51 @@ public final class Storage {
                 totalOver -= cut;
             }
         }
+    }
+
+    /** Старое имя — БЕЗ выбора игрока, всегда фиксированный порядок. */
+    public static void forceEvictOnBuildingReturn(kelium.core.GameState s, PlayerState player) {
+        evictOnBuildingReturn(s, player, false);
+    }
+
+    /**
+     * Даёт игроку самому выбрать, какие именно кубики из общего излишка сгорят
+     * (см. {@link #evictOnBuildingReturn}). Без агента (боты в режиме чтения,
+     * символьные прогоны) — молча пропускается, остаток дожигает вызывающий
+     * код фиксированным порядком, как раньше.
+     */
+    private static int offerBurnChoice(kelium.core.GameState s, PlayerState player, int needed) {
+        if (s == null || s.agents == null || player.seat >= s.agents.size()) {
+            return needed;
+        }
+        Agent agent = s.agents.get(player.seat);
+        if (agent == null) {
+            return needed;
+        }
+        for (int i = 0; i < 16 && needed > 0; i++) {
+            List<Choice> opts = new ArrayList<>();
+            if (player.resources.kelium() > 0) {
+                opts.add(new Choice("storage_burn_choice", Resource.KELIUM,
+                    "сжечь 1 келемий из хранилища (ячейка закрылась)"));
+            }
+            if (player.resources.ammo() > 0) {
+                opts.add(new Choice("storage_burn_choice", Resource.AMMO,
+                    "сжечь 1 боеприпас из хранилища (ячейка закрылась)"));
+            }
+            if (player.resources.debris() > 0) {
+                opts.add(new Choice("storage_burn_choice", Resource.DEBRIS,
+                    "сжечь 1 обломок из хранилища (ячейка закрылась)"));
+            }
+            if (opts.isEmpty()) {
+                return needed;
+            }
+            Choice pick = agent.choose(s, opts,
+                Map.of("kind", "storage_burn_choice", "needed", needed));
+            Resource r = pick != null && pick.payload() instanceof Resource res
+                ? res : (Resource) opts.get(0).payload();
+            player.resources.pay(r, 1);
+            needed--;
+        }
+        return needed;
     }
 }

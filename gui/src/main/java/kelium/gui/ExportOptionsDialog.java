@@ -36,6 +36,8 @@ public final class ExportOptionsDialog {
     private static final String KEY_PLAYERS = "export.players";
     private static final String KEY_STATS = "export.stats";
     private static final String KEY_LAYOUT = "export.layout";
+    private static final String KEY_CONTAINERS = "export.containers";
+    private static final String KEY_HEXGRID = "export.hexgrid";
 
     /** Что сейчас выбрано (используется при самом экспорте). */
     public static PngExport.Options current(AppSettings settings) {
@@ -50,7 +52,12 @@ public final class ExportOptionsDialog {
             settings.getBoolean(KEY_LEGEND, true),
             settings.getBoolean(KEY_PLAYERS, true),
             settings.getBoolean(KEY_STATS, true),
-            layout);
+            layout,
+            settings.getBoolean(KEY_CONTAINERS, true),
+            // Сетка имеет смысл только в слиянии — там обычных гексов нет вовсе.
+            // В остальных раскладках галочка недоступна, и читать её нельзя:
+            // включённая однажды, она иначе тянулась бы в чужие режимы.
+            layout == PngExport.Layout.FUSION && settings.getBoolean(KEY_HEXGRID, false));
     }
 
     public static void show(Window owner, AppSettings settings) {
@@ -82,6 +89,23 @@ public final class ExportOptionsDialog {
                 + "расстояние между стартами."));
 
         box.add(Box.createVerticalStrut(Theme.px(14)));
+        JLabel fieldHead = new JLabel("Что показывать на самом поле");
+        fieldHead.setFont(Theme.wideText(13));
+        fieldHead.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+        box.add(fieldHead);
+        box.add(Box.createVerticalStrut(Theme.px(6)));
+
+        box.add(checkbox(settings, KEY_CONTAINERS, "Контейнеры",
+            "Контейнеры — свой слой поверх всего. Печатнику они нужны, "
+                + "а на обзорной картинке раскладки часто мешают."));
+
+        JCheckBox grid = checkbox(settings, KEY_HEXGRID, "Показывать гексагональную сетку",
+            "Тонкая сетка по всей площади кадра, угасающая по мере удаления от поля. "
+                + "Имеет смысл только при слиянии: там обычных гексов не рисуют вовсе, "
+                + "и поле иначе висит в пустоте.");
+        box.add(grid);
+
+        box.add(Box.createVerticalStrut(Theme.px(14)));
         JLabel layoutHead = new JLabel("Как показать поле и сборку из блоков вместе");
         layoutHead.setFont(Theme.wideText(13));
         layoutHead.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
@@ -90,18 +114,26 @@ public final class ExportOptionsDialog {
 
         ButtonGroup group = new ButtonGroup();
         PngExport.Layout current = current(settings).layout();
+        // Сетка доступна ТОЛЬКО при слиянии — галочка гаснет вместе с выбором
+        // раскладки, а не молча ничего не делает.
+        grid.setEnabled(current == PngExport.Layout.FUSION);
         for (PngExport.Layout mode : PngExport.Layout.values()) {
             JRadioButton rb = new JRadioButton(mode.label, mode == current);
             rb.setFont(Theme.body());
             rb.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
-            rb.addActionListener(e -> settings.put(KEY_LAYOUT, mode.name()));
+            rb.addActionListener(e -> {
+                settings.put(KEY_LAYOUT, mode.name());
+                grid.setEnabled(mode == PngExport.Layout.FUSION);
+            });
             group.add(rb);
             box.add(rb);
         }
         JLabel fusionHint = new JLabel(
-            "<html><div style='width:340px'>Слияние — одна картинка: сама сборка блоков "
-                + "(приглушённые гексы, жирные границы, чёрные накладки) как главное "
-                + "изображение, а под ней — полная легенда и статистика раскладки.</div></html>");
+            "<html><div style='width:340px'>Слияние — одна картинка: блоки картона "
+                + "белым с тёмной обводкой как фон, а поверх них по слоям — тайлы "
+                + "зарождения, игроки, стартовые здания, запретные гексы и контейнеры. "
+                + "Обычных гексов и цвета блоков в слиянии нет: их роль играют сами "
+                + "блоки.</div></html>");
         fusionHint.setFont(Theme.note(11));
         fusionHint.setForeground(Theme.ink3());
         fusionHint.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);

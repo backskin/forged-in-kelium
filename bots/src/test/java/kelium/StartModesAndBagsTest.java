@@ -39,8 +39,12 @@ class StartModesAndBagsTest {
     private static GameState game(String mode, int players, long seed) {
         GameConfig cfg = GameConfig.buildCached(
             GameConfig.DEFAULT_RULESET, players, seed, null, null);
+        // ДОПОЛНЕНИЯ — ТРИ НЕЗАВИСИМЫХ ТУМБЛЕРА (17.08.2026). Прежний трёхзначный
+        // режим отменён: супер задания и начальные задания больше не исключают
+        // друг друга. Сцены теста задают тумблеры напрямую.
         if (mode != null) {
-            cfg.ruleset.override("super_objectives.mode", mode);
+            cfg.ruleset.override("expansions.super_objectives", "super".equals(mode));
+            cfg.ruleset.override("expansions.starting_objectives", "starters".equals(mode));
         }
         return Setup.buildGame(cfg);
     }
@@ -79,9 +83,30 @@ class StartModesAndBagsTest {
         }
     }
 
+    /**
+     * ОБА ДОПОЛНЕНИЯ РАЗОМ. Прежде это было невозможно: режим был один на три
+     * значения. Дизайнер отменил исключительность 17.08.2026 — «можно включать и
+     * то и другое в партию пускай», — и теперь игрок получает и предложение
+     * супер заданий, и предложение начальных.
+     */
+    @Test
+    void обаДополненияМогутБытьВключеныРазом() {
+        GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 25L, null, null);
+        cfg.ruleset.override("expansions.super_objectives", true);
+        cfg.ruleset.override("expansions.starting_objectives", true);
+        GameState s = Setup.buildGame(cfg);
+        for (PlayerState p : s.players) {
+            assertEquals(2, p.superObjectiveOffer.size(), "две карты супер задания");
+            assertEquals(2, p.startObjectiveOffer.size(), "и две начальные — одно другому не мешает");
+        }
+    }
+
     @Test
     void noneModeDealsNothing() {
-        GameState s = game("none", 4, 23L);
+        GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 23L, null, null);
+        cfg.ruleset.override("expansions.super_objectives", false);
+        cfg.ruleset.override("expansions.starting_objectives", false);
+        GameState s = Setup.buildGame(cfg);
         for (PlayerState p : s.players) {
             assertTrue(p.superObjectiveOffer.isEmpty(), "супер заданий нет");
             assertTrue(p.startObjectiveOffer.isEmpty(), "начальных заданий нет");

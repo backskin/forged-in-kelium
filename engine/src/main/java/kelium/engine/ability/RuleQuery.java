@@ -64,8 +64,44 @@ public final class RuleQuery {
         return seat;
     }
 
+    /**
+     * ТЕКУЩЕЕ значение правила — база плюс всё, что уже добавили способности до
+     * этой. Нужно тем картам, чьё условие смотрит на само число («здания с
+     * прочностью 1 получают 2»), а не только прибавляет к нему.
+     */
+    public double current() {
+        return value;
+    }
+
     public Hook hook() {
         return hook;
+    }
+
+    /**
+     * РОД ВОЙСК, О КОТОРОМ ИДЁТ РЕЧЬ, кем бы ни был subject.
+     *
+     * <p>Скорость спрашивается двумя способами: о РОДЕ (там, где конкретного
+     * жетона нет — оценка позиции, подсказки) и о ЖЕТОНЕ (Движение и манёвр,
+     * потому что часть карт смотрит на его гекс). Способности, которым важен
+     * только род, обязаны понимать оба случая — иначе карта работает в одном
+     * месте движка и молчит в другом. Ровно эта беда уже случалась с шестью
+     * пассивками, поэтому нормализация живёт здесь, а не в каждой карте.
+     *
+     * @return род войск либо null, если вопрос вообще не про войска
+     */
+    public kelium.core.UnitType unitType() {
+        if (subject instanceof kelium.core.UnitType t) {
+            return t;
+        }
+        if (subject instanceof kelium.core.UnitToken u) {
+            return u.type;
+        }
+        return null;
+    }
+
+    /** Жетон, о котором идёт речь, либо null (спрашивали про род вообще). */
+    public kelium.core.UnitToken unitToken() {
+        return subject instanceof kelium.core.UnitToken u ? u : null;
     }
 
     public Object subject() {

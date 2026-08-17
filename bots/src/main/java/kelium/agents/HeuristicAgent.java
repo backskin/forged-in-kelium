@@ -573,6 +573,15 @@ public class HeuristicAgent extends Agent {
         for (String a : Order.ORDER_ACTIONS.get(top)) {
             val += w.getOrDefault("action." + a, 1.0);
         }
+        // ИНДИКАТОРЫ ЗАДАНИЙ (заказ дизайнера 17.08.2026, продолжение пункта 3
+        // плана: «привести всё к тому, чтобы собирать войска под конкретную
+        // цель»). Раньше бот выбирал верх приказа только по своей общей пользе
+        // и не видел, что именно ЭТОТ верх открывает действия, которыми ПРЯМО
+        // СЕЙЧАС закрывается карта задания в руке — задания жглись куда чаще,
+        // чем выполнялись (см. javadoc ObjectiveHints). Бонус считает движок,
+        // а не бот: ObjectiveHints уже знает, каким действием закрывается
+        // разрыв каждой карты.
+        val += objectiveActionBonus(state, Order.ORDER_ACTIONS.get(top));
         int nUnits = me.unitsOnField().size();
         int nMil = 0;
         for (BuildingToken b : me.buildingsOnField()) {
@@ -640,6 +649,36 @@ public class HeuristicAgent extends Agent {
                 / Math.max(1, Order.ORDER_ACTIONS.get(bo).length);
         }
         return val;
+    }
+
+    /**
+     * НАСКОЛЬКО ВЕРХ ПРИКАЗА ПРИБЛИЖАЕТ ЗАДАНИЯ В РУКЕ. Спрашивает
+     * {@link kelium.engine.ObjectiveHints#forHand} с УЖЕ ОГРАНИЧЕННЫМ набором
+     * действий — теми двумя, что даёт этот конкретный верх — и суммирует
+     * ценность карт, у которых при таком ограничении нашёлся план (готовых
+     * учитывать не нужно: они не зависят от выбора действия, их и так закроет
+     * СПЕЦ). {@code actionsLeft=2}: столько действий у верха приказа всегда
+     * (см. {@link Order#ORDER_ACTIONS}), а точнее для оценки заранее не нужно —
+     * это прикидка «стоит ли вообще идти в эту сторону», а не гарантия плана.
+     *
+     * <p>Доля, а не полная цена: одна карта задания — не повод бросить всю
+     * остальную стратегию ради нужного действия, но при прочих равных верх,
+     * который её продвигает, должен перевешивать тот, что не продвигает ничего.
+     */
+    private double objectiveActionBonus(GameState state, String[] actions) {
+        PlayerState me = state.player(seat);
+        if (me.objectiveHand.isEmpty() || state.journal == null) {
+            return 0;
+        }
+        List<String> avail = List.of(actions);
+        double bonus = 0;
+        for (kelium.engine.ObjectiveHints.Hint h
+                : kelium.engine.ObjectiveHints.forHand(state, seat, state.journal, avail, 2)) {
+            if (h.reachable()) {
+                bonus += h.maxValue() * 0.25;
+            }
+        }
+        return bonus;
     }
 
     /**
@@ -1721,8 +1760,8 @@ public class HeuristicAgent extends Agent {
         return switch (o.kind()) {
             case "pass" -> 0.2;
             case "spec_super_deploy" -> 100.0;
-            case "spec_objective" -> 5.0;
-            case "spec_objective_burn" -> 1.5;   // сжечь верх — если низ недостижим/не приоритет
+            case "spec_objective" -> scoreObjectiveComplete(state, (String) o.payload());
+            case "spec_objective_burn" -> scoreObjectiveBurn(state, (String) o.payload());
             case "spec_super" -> 3.0;
             case "spec_arsenal_install" -> scoreArsenalInstall(state, (String) o.payload());
             case "spec_arsenal_burn" -> scoreArsenalBurn(state, (String) o.payload());
@@ -1746,6 +1785,42 @@ public class HeuristicAgent extends Agent {
             default -> kelium.engine.ability.Abilities.isAbilityChoice(o)
                 ? scoreAbilityOption(state, o) : 1.0;
         };
+    }
+
+    /**
+     * ВЫПОЛНИТЬ ЗАДАНИЕ (СПЕЦ уже готов — движок не предложил бы {@code
+     * spec_objective}, не будь оно {@link kelium.engine.ObjectiveHints.Hint#ready}).
+     * Раньше все ГОТОВЫЕ карты получали одну и ту же оценку 5.0, и если готово
+     * сразу несколько — какую сыграть решал ГСЧ, а не реальная цена награды.
+     */
+    private double scoreObjectiveComplete(GameState state, String cid) {
+        if (cid == null || state.journal == null) {
+            return 5.0;
+        }
+        kelium.engine.ObjectiveHints.Hint h =
+            kelium.engine.ObjectiveHints.forCard(state, seat, state.journal, cid, List.of(), 0);
+        return h == null ? 5.0 : 4.0 + h.maxValue() * 0.6;
+    }
+
+    /**
+     * СЖЕЧЬ ВЕРХ КАРТЫ ЗАДАНИЯ вместо выполнения низа. Заказ дизайнера
+     * 17.08.2026 (пункт 3 плана): движок теперь знает, ГОТОВА ли эта же карта
+     * ПРЯМО СЕЙЧАС ({@link kelium.engine.ObjectiveHints}) — и жечь готовую
+     * карту почти всегда расточительно: то же самое СПЕЦ-действие вместо утиля
+     * верха отдало бы полную награду низа. Замер каталога 1.6.0 без этой
+     * проверки: 8.25 сожжённых карт на 1.18 выполненных из 6.5 полученных —
+     * ровно симптом отсутствия этого сравнения.
+     */
+    private double scoreObjectiveBurn(GameState state, String cid) {
+        double base = 1.5;   // утиль верха — печатное значение не переоценивается заново
+        if (cid != null && state.journal != null) {
+            kelium.engine.ObjectiveHints.Hint h =
+                kelium.engine.ObjectiveHints.forCard(state, seat, state.journal, cid, List.of(), 0);
+            if (h != null && h.ready()) {
+                base -= h.maxValue() * 0.5;
+            }
+        }
+        return base;
     }
 
     /** Ценность варианта, пришедшего от способности, по её собственной подсказке. */

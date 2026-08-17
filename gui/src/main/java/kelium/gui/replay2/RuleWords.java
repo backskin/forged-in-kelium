@@ -40,6 +40,7 @@ public final class RuleWords {
             case "tech" -> "Наука";
             case "energy" -> "Энергия";
             case "return_step" -> "Конец раунда";
+            case "expansions" -> "Дополнения";
             case "super_objectives" -> "Супер-задания";
             case "modules" -> "Модули";
             case "content_versions" -> "Версии наборов карт";
@@ -103,6 +104,7 @@ public final class RuleWords {
             case "objectives" -> "задания";
             case "arsenal" -> "арсенал";
             case "super_arsenal" -> "супер-арсенал";
+            case "expansions" -> "дополнения";
             case "super_objectives" -> "супер-задания";
             case "containers" -> "контейнеры";
             case "market" -> "рынок";
@@ -334,6 +336,12 @@ public final class RuleWords {
                 "трофеи/обломки можно обменять на улучшение";
 
             // ---------- Супер-задания ----------
+            case "expansions.super_objectives" ->
+                "дополнение «Супер задания»: проекты, супероружие и победа по счётчику";
+            case "expansions.starting_objectives" ->
+                "дополнение «Начальные задания»: простые карты первого раунда";
+            case "expansions.super_arsenal" ->
+                "дополнение «Супер-арсенал»: карты на вершинах треков технологий";
             case "super_objectives.enabled" -> "супер-задания в игре";
             case "super_objectives.mode" -> "режим супер-заданий";
             case "super_objectives.deal" -> "сколько карт раздаётся игроку";

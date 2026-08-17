@@ -152,15 +152,33 @@ public final class CombatResolver {
      * модуль заменяет цель ВТР-строки выбором из двух; позолота — обе цели.
      */
     private List<AttackRow> attackRows(int seat, UnitToken unit) {
-        // СУПЕР-ВОЙСКО (карта супер-арсенала): собственные УНИВЕРСАЛЬНЫЕ атаки —
-        // по любому жетону ВОЙСК за 1 БП (выбор цели = три строки с ОБЩИМ ключом
-        // «super_any»: сработает не более одной за бой) и по ЗДАНИЯМ-ВЫШКАМ за 2.
+        // ЖЕТОН СУПЕРОРУЖИЯ НЕ АТАКУЕТ (супер задания 3.0). АТАКА — это когда
+        // игрок выбирает войско на гексе, смотрит таблицу атак своего планшета и
+        // тратит боеприпасы по её строкам. Супероружию эта таблица недоступна:
+        // ни в Бою, ни в ответном бою, ни эффектом карты. Пустой список строк —
+        // единственное честное место для этого правила: всё, что бьёт, спрашивает
+        // строки здесь.
+        if (SuperWeapon.isWeapon(state, unit)) {
+            return List.of();
+        }
+        // СУПЕР-ВОЙСКО (карта супер-арсенала): ДВЕ УНИВЕРСАЛЬНЫЕ АТАКИ, каждая
+        // за 1 боеприпас (редакция 17.08.2026 — атаки за 2 боеприпаса отменены
+        // везде). Универсальная значит «по любой цели»: все четыре категории, из
+        // них выбирается одна. Ключ строки общий внутри атаки, поэтому каждая
+        // атака срабатывает не больше раза за бой.
+        //
+        // ИСКЛЮЧЕНИЕ — ВЫШКА: у неё одна универсальная атака, зато её способность
+        // бьёт веером по нескольким соседним гексам сразу.
         if (unit.superUnit) {
             List<AttackRow> sup = new ArrayList<>();
-            sup.add(new AttackRow("super_any", 1, Target.INFANTRY));
-            sup.add(new AttackRow("super_any", 1, Target.VEHICLE));
-            sup.add(new AttackRow("super_any", 1, Target.AIRCRAFT));
-            sup.add(new AttackRow("super_bld", 2, Target.BUILDINGS_TOWERS));
+            int slots = unit.type == UnitType.TOWER ? 1 : 2;
+            for (int slot = 1; slot <= slots; slot++) {
+                String key = "super" + slot;
+                sup.add(new AttackRow(key, 1, Target.INFANTRY));
+                sup.add(new AttackRow(key, 1, Target.VEHICLE));
+                sup.add(new AttackRow(key, 1, Target.AIRCRAFT));
+                sup.add(new AttackRow(key, 1, Target.BUILDINGS_TOWERS));
+            }
             return sup;
         }
         var side = state.player(seat).board.troop;
@@ -649,6 +667,7 @@ public final class CombatResolver {
             // (цель боя — один гекс, так что «на том же гексе» выполняется).
             journal().of(attackerSeat).razedNeutralAndHitEnemySameBattle = true;
         }
+        evacuateShieldedEconomy(damagedOwners);
 
         // Шаг 6 / §4: ответный бой (один раз, не для самой ответки).
         if (didDamage && !isRetaliation && rs.getBool("actions.combat.retaliation_enabled", true)) {
@@ -669,6 +688,16 @@ public final class CombatResolver {
                 p.resources.add(Resource.AMMO, 1);
                 emit("type", "ability_reaction", "seat", attackerSeat,
                     "ability", "ammo_on_being_retaliated", "got_ammo", 1);
+            }
+            // «Ответный залп» 2.3 (редакция 17.08.2026): платит не за сам факт
+            // контратаки, а за ПОНЕСЁННУЮ ПОТЕРЮ — контратака должна была снять
+            // твой жетон. Прежняя редакция срабатывала и тогда, когда противник
+            // впустую расстрелял боеприпасы.
+            if (gotRetaliated && journal().of(attackerSeat).lostOwnThisTurn > 0
+                    && Passives.hasPassive(s, attackerSeat, "ammo_on_retaliation_kill")) {
+                p.resources.add(Resource.AMMO, 1);
+                emit("type", "ability_reaction", "seat", attackerSeat,
+                    "ability", "ammo_on_retaliation_kill", "got_ammo", 1);
             }
         }
         return didDamage;
@@ -732,8 +761,19 @@ public final class CombatResolver {
             cost -= 1;
         }
         cost += Passives.defenderAmmoSurcharge(state, defenderAt(target, attackerSeat), target);
-        // Супер-арсенал «Военная машина»: все атаки на 1 БП дешевле (минимум 1).
-        if (Passives.superArsenalPassive(state, attackerSeat, "all_attacks_minus1_ammo")) {
+        // Супер-арсенал sa7 «Военная машина» (редакция 17.08.2026): было
+        // «все атаки −1 БП» (imba, безусловная скидка на весь бой), дизайнер
+        // попросил заменить на «+1 боеприпас, годный ТОЛЬКО внутри действия
+        // Движения и ТОЛЬКО внутри действия Боя, не копится, не складывается
+        // на склад». Половина «Бой» — та же точка, что и у первой бесплатной
+        // атаки (firstAttackUsed): −1 БП ровно на ОДНУ, первую атаку боя, не
+        // суммируясь с собой между боями за ход. Половина «Движение» пока
+        // НЕИСПОЛЬЗУЕМА этим движком: у Движения сейчас нет ни одной операции,
+        // берущей плату боеприпасами (см. MOVEMENT_JUMP_OVER — бесплатный
+        // прыжок через тайл зарождения, без цены) — если такая цена появится,
+        // сюда нужно добавить симметричную скидку.
+        if (!firstAttackUsed[0]
+                && Passives.superArsenalPassive(state, attackerSeat, "free_ammo_for_move_and_combat")) {
             cost = Math.max(1, cost - 1);
         }
         // ТОЧКА ПРАВИЛ: цена атаки в боеприпасах. База — печатная строка со всеми
@@ -893,6 +933,45 @@ public final class CombatResolver {
      * ВЫСЕЛИТЬ войско из снесённого здания: укрытие держалось на здании, и с его
      * падением жетон становится обычной целью на своём гексе.
      */
+    /**
+     * «АВАРИЙНЫЕ ЩИТЫ» (арсенал 2.3): добытчик или энергостанция под щитом
+     * пережила попадание — и СРАЗУ ПОСЛЕ БОЯ уходит владельцу в запас.
+     *
+     * <p>Карта не спасает здание, а меняет ФОРМУ его потери. Без щита такое
+     * здание сносится с одного удара, идёт атакующему в трофеи и приносит ему
+     * очки; со щитом атакующий тратит боеприпас и не получает ничего, а
+     * владелец теряет постройку и место на поле. Это и есть та формулировка,
+     * которую просил дизайнер вместо прежнего безусловного «+1 всем зданиям».
+     *
+     * <p>Проверяется СРАЗУ ПОСЛЕ БОЯ, а не в Возврат: иначе раненое здание
+     * доживало бы до конца раунда и успевало отработать, то есть щит был бы
+     * чистой прибавкой.
+     */
+    private void evacuateShieldedEconomy(java.util.Set<Integer> owners) {
+        for (int owner : owners) {
+            if (owner < 0 || owner >= state.numPlayers()) {
+                continue;
+            }
+            if (!Passives.hasPassive(state, owner, "economy_plus1_hp_returns_on_damage")) {
+                continue;
+            }
+            PlayerState pl = state.player(owner);
+            for (BuildingToken b : new java.util.ArrayList<>(pl.buildingsOnField())) {
+                boolean economy = b.type == BuildingType.MINER
+                    || b.type == BuildingType.POWER_PLANT;
+                // ПЕЧАТНАЯ прочность 1 — щит покрывает только их; здание с
+                // прочностью 2 и выше держит удар само и никуда не уходит.
+                if (!economy || b.damage <= 0 || state.tokenStats.buildingHp(b.type, b.level) > 1) {
+                    continue;
+                }
+                Actions.returnOwnBuildingToReserve(state, pl, b);
+                emit("type", "ability_reaction", "seat", owner,
+                    "ability", "economy_plus1_hp_returns_on_damage",
+                    "returned_building", b.type.code);
+            }
+        }
+    }
+
     private void evictFromBuilding(BuildingToken destroyed) {
         for (UnitToken u : state.player(destroyed.owner).units) {
             if (u.inside() && u.insideBuildingUid == destroyed.uid) {
@@ -971,6 +1050,41 @@ public final class CombatResolver {
     }
 
     /**
+     * ОДИН УДАР по конкретной жертве, вне очереди обычного боя — публичный шов
+     * для карт, бьющих не по правилам «Боя» (супер-вышка sa4 «Цитадель»:
+     * залп по X разным соседним гексам за один СПЕЦ). Та же механика, что и
+     * внутри обычной атаки: жетон щита снимает попадание и уходит, иначе
+     * начисляется {@code combat_model.all_attacks_damage} урона, и жертва
+     * уничтожается (см. {@link #destroy}), если урон дошёл до эффективной
+     * прочности. Не списывает боеприпас и не проверяет дальность/строку атаки —
+     * это забота вызывающей способности.
+     *
+     * @return true, если жертва этим ударом уничтожена
+     */
+    public boolean hit(Token victim, int attackerSeat) {
+        GameState s = state;
+        if (victim instanceof UnitToken shielded) {
+            PlayerState owner0 = s.player(shielded.owner());
+            if (owner0.shieldedKinds.remove(shielded.type)) {
+                emit("type", "shield_absorbed", "seat", shielded.owner(),
+                    "kind", shielded.type.code, "attacker", attackerSeat);
+                return false;
+            }
+        }
+        int dmg = rs.getInt("combat_model.all_attacks_damage");
+        if (victim instanceof UnitToken vt) {
+            vt.damage += dmg;
+        } else {
+            ((BuildingToken) victim).damage += dmg;
+        }
+        boolean destroyed = damageOf(victim) >= Passives.effectiveHp(s, victim);
+        if (destroyed) {
+            destroy(victim, attackerSeat);
+        }
+        return destroyed;
+    }
+
+    /**
      * Уничтожить жертву: ЦУ обрабатывается отдельно, прочие переходят на
      * трофейное поле убийцы; владельцу зданий выдаётся компенсация контейнерами,
      * уничтожение энергостанции снимает выданную ею энергию; применяются пассивы
@@ -1012,6 +1126,11 @@ public final class CombatResolver {
         // в Возврат). Сам по себе очков не даёт — только если это включено в опыте
         // ключом economy.vp_per_kill.
         attacker.killsTotal++;
+        // СУПЕРОРУЖИЕ СНЕСЛИ: жетон возвращается на свою карту, счётчик запуска
+        // встаёт, пока владелец не наймёт его заново.
+        if (victim instanceof UnitToken vu && SuperWeapon.isWeapon(s, vu)) {
+            SuperWeapon.onWeaponDestroyed(s, s.player(vu.owner()));
+        }
 
         // ЖУРНАЛ ХОДА: что именно снесено. Раньше здесь заполнялся только счётчик
         // уничтожений, а поле destroyedTypes было ОБЪЯВЛЕНО И НИКОГДА НЕ

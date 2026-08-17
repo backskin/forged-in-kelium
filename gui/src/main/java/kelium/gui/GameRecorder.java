@@ -134,6 +134,9 @@ public final class GameRecorder {
                                     Long blockSeed, Consumer<String> note) {
         GameConfig cfg = GameConfig.buildCached(rulesetId, players, seed, null, null,
             scenarioId, cuFacing, scenarioFile);
+        // ДОПОЛНЕНИЯ: выбор игрока накладывается на свод ДО сборки партии —
+        // движок читает те же ключи expansions.*, что и тумблеры подготовки.
+        Expansions.applyTo(cfg.ruleset, kelium.dataio.AppSettings.of("replay2"));
         GameState state = Setup.buildGame(cfg, blockSeed);
         ReplayRecord rec = header(cfg, state, players, seed, seatIds, scenarioId, cuFacing);
         rec.scenarioFile = scenarioFile == null ? null : scenarioFile.toString();
@@ -176,6 +179,9 @@ public final class GameRecorder {
                                        Long blockSeed) {
         GameConfig cfg = GameConfig.buildCached(rulesetId, players, seed, null, null,
             scenarioId, cuFacing, scenarioFile);
+        // ДОПОЛНЕНИЯ: выбор игрока накладывается на свод ДО сборки партии —
+        // движок читает те же ключи expansions.*, что и тумблеры подготовки.
+        Expansions.applyTo(cfg.ruleset, kelium.dataio.AppSettings.of("replay2"));
         GameState state = Setup.buildGame(cfg, blockSeed);
         ReplayRecord rec = header(cfg, state, players, seed, seatIds, scenarioId, cuFacing);
         rec.scenarioFile = scenarioFile == null ? null : scenarioFile.toString();

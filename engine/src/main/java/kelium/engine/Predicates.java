@@ -1516,9 +1516,9 @@ public final class Predicates {
             PlayerState pl = s.player(seat);
             int need = intp(p, "count", 3);
             if (Boolean.TRUE.equals(p.get("all_face_down"))) {
-                return pl.arsenalInstalled.isEmpty() && pl.arsenalHand.size() >= need;
+                return pl.allInstalledArsenal().isEmpty() && pl.arsenalHand.size() >= need;
             }
-            return pl.arsenalHand.size() + pl.arsenalInstalled.size() >= need;
+            return pl.arsenalHand.size() + pl.allInstalledArsenal().size() >= need;
         });
 
         // o50/o53/o54/o55 «рисунки» 10.0. Дизайнер: считать надо не жетоны, а

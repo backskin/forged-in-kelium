@@ -131,7 +131,7 @@ public final class Symbols {
             }
         }
         if (Boolean.TRUE.equals(Ctx.rules(s).get("symbols.installed_arsenal_counts", Boolean.TRUE))) {
-            for (String cid : p.arsenalInstalled) {
+            for (String cid : p.allInstalledArsenal()) {
                 String form = m.ofArsenal(cid);
                 if (form != null) {
                     out.add(form);

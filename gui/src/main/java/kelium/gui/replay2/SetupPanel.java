@@ -71,6 +71,7 @@ public final class SetupPanel extends JPanel {
     private final JLabel[] seatCaption = new JLabel[4];
     private final SeatChip[] seatChip = new SeatChip[4];
     private final JButton playButton;
+    private final SpinnerIcon playSpinner;
     private JButton tableButton;
 
     /** Подсказка кнопки «игроки…»: что именно сейчас выбрано за столом. */
@@ -120,8 +121,10 @@ public final class SetupPanel extends JPanel {
         RibbonRow row1 = new RibbonRow();
         // Прозрачная: фон рисует сама панель настроек, и цвет получается один
         row1.setOpaque(false);
-        row1.setBorder(BorderFactory.createEmptyBorder(Theme.px(8), Theme.px(10),
-            Theme.px(4), Theme.px(10)));
+        // Отступы чуть щедрее (просьба дизайнера 17.08.2026: «больше воздуха,
+        // дыхания между разделами» — было 8/10/4/10).
+        row1.setBorder(BorderFactory.createEmptyBorder(Theme.px(11), Theme.px(14),
+            Theme.px(8), Theme.px(14)));
 
         players.setSelectedItem(4);
         players.setFont(Theme.body());
@@ -240,6 +243,8 @@ public final class SetupPanel extends JPanel {
             + "сравнение бессмысленным."));
         randomAll.addActionListener(e -> randomAll());
         row1.add(group("Состав", tableButton, randomAll));
+        row1.add(divider());
+        row1.add(expansionsGroup());
 
         // ГЛАВНАЯ КНОПКА: текст в две строки, значок крупный. Одной строкой она
         // раздувалась в ширину и прилипала к «другой сборке» — отсюда и отступ слева.
@@ -248,6 +253,9 @@ public final class SetupPanel extends JPanel {
         playButton.setFont(Theme.font(13, Font.BOLD));
         playButton.setIcon(TransportIcons.of("PLAY", Theme.px(22)));
         playButton.setIconTextGap(Theme.px(8));
+        // Б4 (заказ дизайнера 17.08.2026): пока партия считается, вместо
+        // статичной подписи «играю партию…» на кнопке крутится живой спиннер.
+        playSpinner = new SpinnerIcon(playButton, Theme.px(22), Theme.accent());
         playButton.setMargin(new java.awt.Insets(Theme.px(6), Theme.px(12),
             Theme.px(6), Theme.px(14)));
         // ОТСТУП СЛЕВА — пустой рамкой у собственного края панели. Кнопка живёт
@@ -391,7 +399,13 @@ public final class SetupPanel extends JPanel {
 
     public void setBusy(boolean busy) {
         playButton.setEnabled(!busy);
-        playButton.setText(busy ? "играю партию…" : "Сыграть и показать");
+        playButton.setText(busy ? "считаю партию…" : "<html><center>Сыграть<br>и показать</center></html>");
+        playButton.setIcon(busy ? playSpinner : TransportIcons.of("PLAY", Theme.px(22)));
+        if (busy) {
+            playSpinner.start();
+        } else {
+            playSpinner.stop();
+        }
         players.setEnabled(!busy);
         seed.setEnabled(!busy);
         ruleset.setEnabled(!busy);
@@ -546,6 +560,35 @@ public final class SetupPanel extends JPanel {
      * собственного предпочтительного размера — группа занимает РОВНО
      * столько, сколько нужно её содержимому, ни больше.
      */
+    /**
+     * РАЗДЕЛ «ДОПОЛНЕНИЯ» — три тумблера (просьба дизайнера 17.08.2026: «два
+     * таких красивых тумблера как с айфона», третий — супер-арсенал — того же
+     * рода переключатель и просится в тот же раздел).
+     *
+     * <p>Каждый тумблер пишет своё значение сразу в {@link AppSettings} по клику
+     * — как остальные настройки ленты, отдельной кнопки «применить» нет. При
+     * сборке партии {@link kelium.gui.Expansions#applyTo} читает эти же ключи и
+     * накладывает их на свод правил.
+     */
+    private JPanel expansionsGroup() {
+        kelium.dataio.AppSettings settings = kelium.dataio.AppSettings.of("replay2");
+        java.util.List<Component> toggles = new ArrayList<>();
+        for (String name : new String[]{
+                kelium.gui.Expansions.SUPER_OBJECTIVES,
+                kelium.gui.Expansions.STARTING_OBJECTIVES,
+                kelium.gui.Expansions.SUPER_ARSENAL}) {
+            Toggle t = new Toggle(kelium.gui.Expansions.title(name),
+                kelium.gui.Expansions.on(settings, name), kelium.gui.Expansions.tip(name));
+            t.onChange(value -> {
+                kelium.gui.Expansions.set(settings, name, value);
+                onPreview.run();
+                say.accept("Дополнения: " + kelium.gui.Expansions.summary(settings) + ".");
+            });
+            toggles.add(t);
+        }
+        return group("Дополнения", toggles.toArray(new Component[0]));
+    }
+
     private static JPanel group(String captionText, Component... parts) {
         JPanel g = new JPanel();
         g.setLayout(new BoxLayout(g, BoxLayout.Y_AXIS));
@@ -567,7 +610,7 @@ public final class SetupPanel extends JPanel {
                 fixWidth(jc, target);
             }
             g.add(c);
-            g.add(Box.createVerticalStrut(Theme.px(3)));
+            g.add(Box.createVerticalStrut(Theme.px(5)));
         }
         JLabel cap = Ui2.caption(captionText);
         cap.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -618,10 +661,14 @@ public final class SetupPanel extends JPanel {
             }
         };
         line.setOpaque(false);
-        Dimension d = new Dimension(Theme.px(9), Theme.px(64));
+        // Ширина поднята с 9 до 20 (просьба дизайнера 17.08.2026: «больше
+        // воздуха между разделами, они прям сильно плотно друг к другу») —
+        // сама линия по-прежнему 1px по центру, просто пустого поля вокруг
+        // неё вдвое больше.
+        Dimension d = new Dimension(Theme.px(20), Theme.px(64));
         line.setPreferredSize(d);
-        line.setMinimumSize(new Dimension(Theme.px(9), Theme.px(1)));
-        line.setMaximumSize(new Dimension(Theme.px(9), Integer.MAX_VALUE));
+        line.setMinimumSize(new Dimension(Theme.px(20), Theme.px(1)));
+        line.setMaximumSize(new Dimension(Theme.px(20), Integer.MAX_VALUE));
         return line;
     }
 

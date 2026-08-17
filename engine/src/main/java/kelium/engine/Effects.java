@@ -333,7 +333,7 @@ public final class Effects {
                 // 12.08.2026); Движение и манёвр скорость учитывали, а карты нет.
                 Integer airOverride = Passives.aircraftSpeedOverride(s, seat);
                 int speed = airOverride != null && u.type == kelium.core.UnitType.AIRCRAFT
-                    ? airOverride : kelium.engine.Speed.of(s, pl.seat, u.type);
+                    ? airOverride : kelium.engine.Speed.of(s, pl.seat, u);
                 if (speed <= 0) {
                     continue;
                 }

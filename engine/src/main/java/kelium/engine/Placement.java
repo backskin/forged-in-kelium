@@ -143,6 +143,24 @@ public final class Placement {
             }
         }
 
+        // «Вольная застройка» 2.3: строить БЕЗ примыкания стенкой можно только
+        // там, где уже стоят СВОИ ВОЙСКА (правило дизайнера 17.08.2026 — прежняя
+        // безусловная редакция была отвергнута как слишком сильная). Зона растёт
+        // не сама, а следом за армией: гекс надо сперва занять войском.
+        if (Passives.hasPassive(state, seat, "build_on_adjacent_with_own_units")) {
+            for (kelium.core.UnitToken u : p.unitsOnField()) {
+                if (u.hexId == null || ownHexes.contains(u.hexId)) {
+                    continue;
+                }
+                for (String nb : state.field.neighbors(u.hexId)) {
+                    if (ownHexes.contains(nb)) {
+                        result.add(u.hexId);
+                        break;
+                    }
+                }
+            }
+        }
+
         List<String> ok = new ArrayList<>();
         for (String hid : result) {
             Hex h = state.field.get(hid);
@@ -191,6 +209,34 @@ public final class Placement {
 
 
     /** Монотонный uid для вновь создаваемых жетонов. */
+    /**
+     * ЕСТЬ ЛИ НА ГЕКСЕ СВОБОДНАЯ ЯЧЕЙКА под жетон войска данного рода.
+     *
+     * <p>Публично, потому что найм бывает не только в действии Сборка: карты
+     * арсенала («найм за боеприпас», «замена наземного жетона») обязаны
+     * соблюдать ровно те же правила размещения, что и обычное действие, — иначе
+     * карта тихо обходит правило о двух смежных ячейках для техники.
+     */
+    public static boolean hasRoomOnHex(GameState state, PlayerState player,
+                                       String hexId, kelium.core.UnitType t) {
+        Hex h = state.field.get(hexId);
+        if (h == null) {
+            return false;
+        }
+        if (t == kelium.core.UnitType.AIRCRAFT) {
+            for (PlayerState pl : state.players) {
+                for (kelium.core.UnitToken u : pl.units) {
+                    if (u.type == kelium.core.UnitType.AIRCRAFT && hexId.equals(u.hexId)) {
+                        return false;   // воздушная ячейка занята
+                    }
+                }
+            }
+            return true;
+        }
+        int[] load = groundLoad(state, hexId, -1);
+        return h.fitsWithRepack(t == kelium.core.UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
+    }
+
     public static int nextUid(GameState state) {
         int m = 0;
         for (PlayerState p : state.players) {

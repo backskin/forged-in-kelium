@@ -54,7 +54,9 @@ public final class Actions {
     public static final String[] PRIZE_RANK_KEYS = {"first", "second", "third"};
 
     /** Какой род войск собирает каждое военное здание. */
-    static final Map<BuildingType, UnitType> ASSEMBLY_UNIT = new EnumMap<>(BuildingType.class);
+    /** Какой род войск производит каждое военное здание. Публично: это правило
+     * читают и карты арсенала (найм вне приказа Разработка). */
+    public static final Map<BuildingType, UnitType> ASSEMBLY_UNIT = new EnumMap<>(BuildingType.class);
 
 
     static {
@@ -100,6 +102,17 @@ public final class Actions {
     }
 
     /**
+     * Вернуть СВОЁ здание {@code b} в резерв (hexId=null) — БЕЗ выбора игрока
+     * при закрытии ячеек склада (см. {@link #returnOwnBuildingToReserve(GameState,
+     * PlayerState, BuildingToken, boolean)}). Оставлен для мест, где возврат не
+     * является собственным действием игрока в его ход.
+     */
+    public static void returnOwnBuildingToReserve(GameState state, PlayerState player,
+                                                   BuildingToken b) {
+        returnOwnBuildingToReserve(state, player, b, false);
+    }
+
+    /**
      * Вернуть СВОЁ здание {@code b} в резерв (hexId=null): войско внутри теряет
      * укрытие, стороны гекса освобождаются, энергия корректно снимается (чужие
      * кубики возвращаются их источникам, симметрично уничтожению в бою), урон
@@ -107,9 +120,16 @@ public final class Actions {
      * противника, оно остаётся жетоном владельца. Публичный шов нужен карте
      * арсенала «Аварийные щиты» (принудительный возврат раненых зданий в
      * Возврат) — та же операция, что и снос своего здания Стройкой.
+     *
+     * @param ownTurnChoice возврат случился ВНУТРИ хода {@code player}, его
+     *     собственным действием (снос Стройкой, оплата карты) — тогда при
+     *     закрытии ячеек склада игрок сам выбирает, что сгорит (см.
+     *     {@link Storage#evictOnBuildingReturn}). {@code false} — возврат
+     *     случился не в его ход (Возврат конца раунда, чужое действие), выбора
+     *     нет, горит фиксированным порядком.
      */
     public static void returnOwnBuildingToReserve(GameState state, PlayerState player,
-                                                   BuildingToken b) {
+                                                   BuildingToken b, boolean ownTurnChoice) {
         String hex = b.hexId;
         for (BuildingToken c : player.buildingsOnField()) {
             if (c.uid != b.uid) {
@@ -139,7 +159,7 @@ public final class Actions {
         // пока здание было на поле или в трофеях у другого игрока, сгорают без
         // права игрока их переставить. Не влияет на прочие типы зданий.
         if (b.type == BuildingType.MINER || b.type == BuildingType.POWER_PLANT) {
-            Storage.forceEvictOnBuildingReturn(state, player);
+            Storage.evictOnBuildingReturn(state, player, ownTurnChoice);
         }
     }
 
@@ -228,12 +248,24 @@ public final class Actions {
      */
     public static int mineFromMiner(GameState state, PlayerState player, BuildingToken b,
                                     String grid) {
+        int bonusK = player.techSteps.getOrDefault("middle", 0) >= 3 ? 1 : 0;
+        int yieldK = state.tokenStats.minerYield(b.level) + bonusK;
+        return mineFlatFromTile(state, player, grid, yieldK);
+    }
+
+    /**
+     * Добыть ФИКСИРОВАННОЕ число келемия с тайла зарождения на гексе
+     * {@code grid} — та же выработка/переворот тайла, что и у добытчика
+     * ({@link #mineFromMiner}), но без здания и без формулы уровня. Публичный
+     * шов нужен супер-технике sa2 «Раздор» (СПЕЦ: 1 келемий с примыкающего
+     * тайла, «добытчик для этого не нужен»).
+     */
+    public static int mineFlatFromTile(GameState state, PlayerState player, String grid,
+                                       int amount) {
         Ruleset rs = Ctx.rules(state);
         Hex gh = state.field.get(grid);
         kelium.core.SpawnTile tile = gh.spawnTile;
-        int bonusK = player.techSteps.getOrDefault("middle", 0) >= 3 ? 1 : 0;
-        int yieldK = state.tokenStats.minerYield(b.level) + bonusK;
-        int want = Math.min(yieldK, tile.kelium);
+        int want = Math.min(amount, tile.kelium);
         int added = Storage.addKeliumCapped(state, player, want);
         tile.kelium -= added;
         if (added > 0 && tile.kelium <= 0) {
@@ -575,34 +607,28 @@ public final class Actions {
                 PrintedContainers.onUnitPlaced(state, player, placeHex, u.type);
                 return true;
             }
-            // Прочие рода войск: на гекс своего здания, если есть место.
+            // НАЙМ ИДЁТ НА ГЕКС СО ЗДАНИЕМ, А НЕ ВНУТРЬ ЗДАНИЯ (правило дизайнера
+            // 17.08.2026). Прежде при нехватке места на гексе войско сажалось
+            // ГАРНИЗОНОМ внутрь здания прямо на найме — из-за этого укрытие
+            // получалось само собой, без единого решения игрока. Гарнизон
+            // остаётся, но входят в здание ТОЛЬКО Движением (§5.3): вход внутрь —
+            // это перемещение, и оно стоит хода.
+            //
+            // Единственное исключение из «на гекс своего здания» — вышка: она
+            // встаёт на гекс с ЛЮБЫМ своим зданием (см. ветку выше), потому что
+            // её производит ЦУ, а стоять она должна там, где нужна.
             if (hasRoomForUnit(player, from.hexId, u.type)) {
                 u.hexId = from.hexId;
+                // СУПЕРОРУЖИЕ ПОМНИТ СВОЙ СТАПЕЛЬ: с гекса найма счётчик запуска
+                // не снимается, оружие обязано выехать (супер задания 3.0).
+                if (SuperWeapon.isWeapon(state, u)) {
+                    SuperWeapon.onWeaponHired(player, from.hexId);
+                }
                 PrintedContainers.onUnitPlaced(state, player, from.hexId, u.type);
                 return true;
             }
-            // Места на гексе нет — пробуем ВНУТРЬ здания.
-            if (canHostInside(player, from)) {
-                u.hexId = from.hexId;
-                u.insideBuildingUid = from.uid;
-                return true;
-            }
+            // Места на гексе нет — жетон не нанимается и остаётся в запасе.
             return false;
-        }
-
-        /**
-         * Можно ли вставить войско внутрь здания {@code b}: в нём ещё никого нет и
-         * у игрока нет ДРУГОГО здания с войском внутри. Ограничение «одно войско и
-         * одно здание» — это и делает укрытие тактическим приёмом, а не общим
-         * свойством всех зданий.
-         */
-        private boolean canHostInside(PlayerState player, BuildingToken b) {
-            for (UnitToken u : player.units) {
-                if (u.inside()) {
-                    return false;   // у игрока уже есть здание с войском внутри
-                }
-            }
-            return b.alive() && b.hexId != null;
         }
 
         /** Есть ли на гексе место под юнит данного типа (ячейка по размеру). */
@@ -885,7 +911,7 @@ public final class Actions {
                 return ActionResult.fail("demolish: здание не найдено");
             }
             String hex = b.hexId;
-            returnOwnBuildingToReserve(state, player, b);
+            returnOwnBuildingToReserve(state, player, b, true);
             player.resources.add(Resource.COIN, refund);
             TurnJournal.TurnFacts f = journal(state).of(player.seat);
             f.buildOps += 1;
@@ -1466,7 +1492,7 @@ public final class Actions {
                 for (UnitToken u : player.unitsOnField()) {
                     // скорость спрашиваем в одном месте: карты и жетоны модулей
                     // вмешиваются через точку правил UNIT_SPEED (13.08.2026)
-                    int speed = Speed.of(s, player.seat, u.type);
+                    int speed = Speed.of(s, player.seat, u);
                     if (perUnitSteps.getOrDefault(u.uid, 0) >= speed) {
                         continue;
                     }
@@ -2226,6 +2252,23 @@ public final class Actions {
                     player.storageTokens.add(String.valueOf(pick.payload()));
                 }
             } else if ("super_arsenal_card".equals(reward)) {
+                // ВЕРШИНА ТРЕКА БЕЗ СУПЕР-АРСЕНАЛА (дополнение выключено, решение
+                // дизайнера 17.08.2026). Приз обязан остаться: вершина стоит 4
+                // трофея и приближает конец партии, пустой она быть не может.
+                //
+                // Каждый трек даёт ЕЩЁ ОДИН СВОЙ ЖЕТОН — то же, что он выдаёт на
+                // шагах 2 и 3, и никакого нового компонента в коробку не нужно:
+                //   красный трек  → красный модуль (атака);
+                //   синий трек    → синий модуль (сборка);
+                //   зелёный трек  → ПОЗОЛОТА одного своего модуля.
+                // Зелёный трек своих жетонов не производит (он про хранилище), и
+                // позолота — ровно то, что он и продаёт за 3 трофея вечным
+                // курсом. Десять монет здесь были бы вдвое слабее: 10 МОН это
+                // 2 ПО, а вершина стоит четырёх трофеев.
+                if (!kelium.engine.Setup.expansionOn(rs, "super_arsenal")) {
+                    topPrizeWithoutSuperArsenal(player, kind);
+                    return;
+                }
                 // Вершина трека: забрать выложенную В ОТКРЫТУЮ карту супер-арсенала
                 // этого трека (одна на трек за партию). Супер-войско сразу в запас.
                 String cid = state.superArsenalOffer.remove(track);
@@ -2240,6 +2283,40 @@ public final class Actions {
                         su.superUnit = true;
                         su.superCardId = cid;
                         player.units.add(su);   // в резерв; выйдет через Сборку/эффекты
+                    }
+                }
+            }
+        }
+
+        /**
+         * ПРИЗ ВЕРШИНЫ ТРЕКА, КОГДА СУПЕР-АРСЕНАЛ ВЫКЛЮЧЕН ДОПОЛНЕНИЕМ.
+         *
+         * <p>Приз обязан остаться: вершина стоит 4 трофея и приближает конец
+         * партии — пустой она быть не может. Каждый трек даёт ЕЩЁ ОДИН СВОЙ
+         * ЖЕТОН, то есть то же, что выдаёт на шагах 2 и 3, и нового компонента в
+         * коробку не нужно:
+         *
+         * <ul>
+         *   <li>красный трек → красный модуль (атака);</li>
+         *   <li>синий трек → синий модуль (сборка);</li>
+         *   <li>зелёный трек (хранилище) → ПОЗОЛОТА одного своего модуля.</li>
+         * </ul>
+         *
+         * <p>Зелёный трек своих жетонов не печатает, и позолота — ровно тот приз,
+         * который он и продаёт вечным курсом за 3 трофея. Десять монет здесь были
+         * бы вдвое слабее: 10 МОН это 2 ПО, а вершина стоит четырёх трофеев.
+         *
+         * @param kind род модулей трека из данных доски: red | blue | storage
+         */
+        private void topPrizeWithoutSuperArsenal(PlayerState player, String kind) {
+            switch (kind == null ? "storage" : kind) {
+                case "red" -> Modules.awardModule(state, player, "red");
+                case "blue" -> Modules.awardModule(state, player, "blue");
+                default -> {
+                    // ПОЗОЛОТА: улучшить один уже выданный жетон. Если золотить
+                    // нечего, приз пропадает — как и всякая недоступная награда.
+                    if (player.redModules + player.blueModules > player.goldModules) {
+                        player.goldModules += 1;
                     }
                 }
             }

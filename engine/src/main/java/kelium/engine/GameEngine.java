@@ -421,7 +421,10 @@ public final class GameEngine {
 
     private void payArsenalUpkeep(PlayerState p) {
         GameState s = state;
-        for (String cid : new ArrayList<>(p.arsenalInstalled)) {
+        // allInstalledArsenal(): карта под мандатом (sa8) платит содержание
+        // наравне с обычными тремя слотами — «работает по своим правилам»
+        // касается и обязательств, не только выгод.
+        for (String cid : new ArrayList<>(p.allInstalledArsenal())) {
             Map<String, Object> card;
             try {
                 card = Ctx.cards(s, "arsenal").find(cid);
@@ -437,7 +440,11 @@ public final class GameEngine {
                 p.resources.pay(kelium.core.Resource.COIN, 1);
                 emit(ev("type", "arsenal_upkeep", "seat", p.seat, "card", cid, "paid", 1));
             } else {
-                p.arsenalInstalled.remove(cid);
+                if (cid.equals(p.mandateArsenalCard)) {
+                    p.mandateArsenalCard = null;
+                } else {
+                    p.arsenalInstalled.remove(cid);
+                }
                 p.arsenalCardKelium.remove(cid);
                 for (BuildingToken b : p.buildingsOnField()) {
                     b.stripEnergyOf(Actions.ARSENAL_CARD_SOURCE_UID);
@@ -505,10 +512,6 @@ public final class GameEngine {
                 for (BuildingToken t : p.buildings) {
                     t.healOneDamage();
                 }
-            }
-            // Супер-арсенал «Келемиевый рудник»: +1 келемий каждое Обновление.
-            if (Passives.superArsenalPassive(s, p.seat, "kelium_income")) {
-                Storage.addKeliumCapped(state, p, 1);
             }
             // ТОЧКА ПРАВИЛ: доход в Обновление от карт арсенала (например
             // «энергостанции платят монетами за каждый кубик энергии»).
@@ -648,16 +651,50 @@ public final class GameEngine {
         PlayerState p = s.player(seat);
         Ruleset rs = rs();
         s.journal.startTurn(seat);
+        // «КЕЛЕМИЕВЫЙ РУДНИК» (супер-арсенал sa6, редакция 17.08.2026): +1 келемий
+        // В НАЧАЛЕ КАЖДОГО ХОДА, не раз в раунд — до вершины трека игрок
+        // добирается поздно, и награда за раунд к тому времени уже ничего не решает.
+        if (Passives.superArsenalPassive(s, seat, "kelium_income")) {
+            Storage.addKeliumCapped(s, p, 1);
+        }
+        Map<String, Object> card = orders().byId(cardId);
+        boolean isJoker = Boolean.TRUE.equals(card.get("joker"));
+
+        // «ШТАБНАЯ ДИРЕКТИВА» (sa5, редакция 17.08.2026): каждый, кто в ЭТОМ
+        // РАУНДЕ УЖЕ вскрыл тот же ВЕРХНИЙ приказ, что сейчас берёт держатель
+        // карты, отнимает у ТЕКУЩЕГО игрока одно СПЕЦ-действие. Проверяется
+        // здесь, а не когда сама sa5 разыгрывается: карта не разыгрывается вовсе,
+        // она удерживается на вершине трека и действует постоянно.
+        //
+        // ПОРЯДОК ЗНАЧИМ: если держатель sa5 ещё не ходил в этот раунд, штраф не
+        // сработает — topOrders хранит только УЖЕ сыгранные верхи. Это тот же
+        // порядок, каким считается совпадение приказов (coincidence_rule), и
+        // держатель карты просто оказывается в выгодном положении, если ходит
+        // раньше того, кого хочет наказать.
+        int specPenalty = 0;
+        if (!isJoker) {
+            Order myTop = Order.fromCode((String) card.get("top"));
+            for (var e : topOrders.entrySet()) {
+                if (e.getKey() != seat && e.getValue() == myTop
+                        && Passives.superArsenalPassive(s, e.getKey(), "ignore_coincidence")) {
+                    specPenalty++;
+                }
+            }
+        }
+
         // ТОЧКА ПРАВИЛ: сколько СПЕЦ-действий за ход. Карта арсенала может дать
-        // второе («два СПЕЦ, если не играл Безопасность»).
+        // второе («два СПЕЦ, если не играл Безопасность») или третье («Параллельные
+        // штабы»).
         int specLimit = (int) Math.round(kelium.engine.ability.RuleQuery
             .of(s, seat, kelium.engine.ability.Hook.ORDER_SPEC_COUNT)
             .base(Math.max(rs.getInt("actions.spec_per_turn"), Passives.specActions(s, seat)))
             .ask());
+        specLimit = Math.max(0, specLimit - specPenalty);
         TurnContext ctx = new TurnContext(seat, specLimit);
-
-        Map<String, Object> card = orders().byId(cardId);
-        boolean isJoker = Boolean.TRUE.equals(card.get("joker"));
+        if (specPenalty > 0) {
+            emit(ev("type", "spec_penalty", "seat", seat, "penalty", specPenalty,
+                "ability", "ignore_coincidence"));
+        }
 
         if (isJoker) {
             playActions(p, ctx, Actions.ALL_NAMES, 2, true);
@@ -711,16 +748,41 @@ public final class GameEngine {
                     : List.of(Order.ORDER_ACTIONS.get(bo)),
                 "maneuver", Boolean.TRUE.equals(card.get("maneuver"))));
 
+            // «Двойной протокол» / «Параллельный контур» (редакция 17.08.2026):
+            // одно действие ВЕРХНЕГО приказа можно обменять на ещё одно действие
+            // НИЖНЕГО. Это выбор игрока, а не автоматическая прибавка: прежняя
+            // редакция просто добавляла действие и была признана слишком сильной.
+            boolean tradeTopForBottom = false;
+            if (bottomOpen && maxA > 1
+                    && Passives.hasPassive(s, seat, "bottom_order_instead_of_top")) {
+                Choice trade = agents.get(seat).choose(s, List.of(
+                    new Choice("order_trade", Boolean.TRUE,
+                        "обменять действие верхнего приказа на второе действие нижнего"),
+                    new Choice("order_trade", Boolean.FALSE, "играть как обычно")),
+                    ev("kind", "order_trade", "top", top.code,
+                        "bottom", bo == null ? null : bo.code));
+                tradeTopForBottom = Boolean.TRUE.equals(trade.payload());
+                if (tradeTopForBottom) {
+                    maxA -= 1;
+                }
+            }
+
             playActions(p, ctx, names, maxA, false);
 
             if (bottomOpen) {
                 // ТОЧКА ПРАВИЛ: сколько действий даёт открытый нижний приказ.
                 // Карта арсенала «Двойной протокол»/«Параллельный контур» поднимает
                 // 1 до 2 — играешь два РАЗНЫХ действия этого приказа вместо одного.
-                int bottomA = (int) Math.round(kelium.engine.ability.RuleQuery
+                int bottomA = tradeTopForBottom ? 2 : 1;
+                bottomA = (int) Math.round(kelium.engine.ability.RuleQuery
                     .of(s, seat, kelium.engine.ability.Hook.ORDER_BOTTOM_ACTIONS)
-                    .base(1)
+                    .base(bottomA)
                     .ask());
+                // Обмен разрешает ПОВТОРИТЬ действие нижнего приказа: игрок уже
+                // заплатил за это действием верхнего.
+                if (tradeTopForBottom) {
+                    ctx.actionsPlayed.removeAll(List.of(Order.ORDER_ACTIONS.get(bo)));
+                }
                 playActions(p, ctx, List.of(Order.ORDER_ACTIONS.get(bo)), bottomA, false);
             }
             // Плашка манёвра: на картах maneuver:true — одно бесплатное
@@ -748,10 +810,15 @@ public final class GameEngine {
         // блокировки приказа за келемий). Предел нельзя посчитать заранее:
         // разрешение выдаётся СПЕЦ-действием между основными действиями.
         int extra = 0;
+        // Сколько ДОКУПЛЕННЫХ действий ещё не потрачено. Докупленное действие
+        // (келемий с «Резервного штаба») разрешает ПОВТОРИТЬ уже сыгранное в
+        // этот ход — редакция 17.08.2026: игрок платит победным очком, и
+        // запрещать ему повтор было бы двойной ценой.
+        int repeatable = 0;
         while (played < maxActions + extra && !s.finished) {
             List<String> candidates = new ArrayList<>();
             for (String nname : actionNames) {
-                if (!ctx.actionsPlayed.contains(nname)) {
+                if (repeatable > 0 || !ctx.actionsPlayed.contains(nname)) {
                     candidates.add(nname);
                 }
             }
@@ -777,13 +844,18 @@ public final class GameEngine {
             emit(ev("type", "action", "seat", p.seat, "action", actionName,
                 "ok", res.ok(), "detail", res.detail(), "telemetry", res.telemetry()));
             played += 1;
+            if (repeatable > 0) {
+                repeatable--;
+            }
             // Правило 2026-08-10: открытие контейнера = СПЕЦ-действие; при
             // выключенном правиле — по-старому свободное после каждого действия.
             if (!containersOpenIsSpec()) {
                 offerOpenContainer(p);
             }
             offerSpec(p, ctx);
-            extra += s.journal.of(p.seat).takeBlockBypassGrants();
+            int bought = s.journal.of(p.seat).takeBlockBypassGrants();
+            extra += bought;
+            repeatable += bought;
         }
         // B6: СПЕЦ — независимый ресурс хода. Пас по основному действию (или
         // пустой список кандидатов) НЕ отбирает СПЕЦ: игрок всё ещё может
@@ -810,7 +882,7 @@ public final class GameEngine {
         // Выбор жетона для манёвра (или отказ).
         List<Choice> pickOpts = new ArrayList<>();
         for (UnitToken u : p.unitsOnField()) {
-            int speed = Speed.of(s, p.seat, u.type);   // единая точка скорости
+            int speed = Speed.of(s, p.seat, u);   // единая точка скорости
             if (speed <= 0) {
                 continue;
             }
@@ -846,7 +918,7 @@ public final class GameEngine {
             return;
         }
         int speed = (airOverride != null && unit.type == UnitType.AIRCRAFT)
-            ? airOverride : Speed.of(s, p.seat, unit.type);
+            ? airOverride : Speed.of(s, p.seat, unit);
 
         // Шаги одним жетоном на его скорость.
         for (int step = 0; step < speed; step++) {
@@ -987,16 +1059,42 @@ public final class GameEngine {
             opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
             opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
         }
-        if (p.superObjective != null && !p.superObjectiveComplete && canContributeSuper(p)) {
-            opts.add(new Choice("spec_super", p.superObjective, "assemble " + p.superObjective));
+        // «МАНДАТ СОВЕТА» (супер-арсенал sa8): перекладка между обычной полкой
+        // и своим отдельным местом — свободная перестановка, не тратит ресурс,
+        // но идёт через СПЕЦ (как и все нетривиальные действия карт в этом
+        // движке), а не «когда угодно бесплатно»: designer's own budget lever.
+        if (p.superArsenalCards.contains("sa8")) {
+            boolean mandateEmpty = p.mandateArsenalCard == null && p.mandateContainers == 0;
+            if (mandateEmpty) {
+                for (String cid : p.arsenalInstalled) {
+                    opts.add(new Choice("spec_mandate_store", cid,
+                        "под Мандат совета: " + cid));
+                }
+            }
+            if (p.mandateArsenalCard != null && p.arsenalInstalled.size() < 3) {
+                opts.add(new Choice("spec_mandate_release", p.mandateArsenalCard,
+                    "вернуть " + p.mandateArsenalCard + " на обычную полку"));
+            }
+            if (p.mandateArsenalCard == null) {
+                for (int n = 0; n <= 2; n++) {
+                    if (n != p.mandateContainers) {
+                        opts.add(new Choice("spec_mandate_containers", n,
+                            "отвести под Мандатом " + n + " мест[а] под контейнеры"
+                                + " (сейчас " + p.mandateContainers + ")"));
+                    }
+                }
+            }
         }
-        if (p.superObjective != null && p.superObjectiveComplete && superDeployReady(p)) {
-            opts.add(new Choice("spec_super_deploy", p.superObjective, "DEPLOY " + p.superObjective));
+        // СУПЕР ЗАДАНИЯ 3.0 (17.08.2026): вскрытие карты одним СПЕЦ со всеми
+        // взносами разом, затем счётчик запуска — по ячейке за СПЕЦ, не чаще
+        // раза за круг. Сборки по частям и проверки рисунка больше нет.
+        if (SuperWeapon.canReveal(s, p)) {
+            opts.add(new Choice("spec_super_reveal", p.superObjective,
+                "ВСКРЫТЬ супер задание " + p.superObjective));
         }
-        // СУПЕР ЗАДАНИЯ 2.0: проверка рисунка и символов — своё СПЕЦ-действие.
-        if (p.superObjective != null && p.superObjectiveComplete && superCheckReady(p)) {
-            opts.add(new Choice("spec_super_check", p.superObjective,
-                "ПРОВЕРКА супер задания " + p.superObjective));
+        if (SuperWeapon.canLaunch(s, p)) {
+            opts.add(new Choice("spec_super_launch", p.superObjective,
+                "ЗАПУСК: снять ячейку супероружия (осталось " + p.superCells + ")"));
         }
         // Вскрыть ОДНУ карту под планшетом — СПЕЦ-действие. Правило «открой всех
         // одним СПЕЦ» отменено дизайнером 12.08.2026 (иконка спец-действия теперь
@@ -1019,7 +1117,8 @@ public final class GameEngine {
                     + p.arsenalHand.size() + " ars)"));
         }
         // E2: SPEC-пассивки УСТАНОВЛЕННЫХ карт арсенала — реальные опции СПЕЦ.
-        for (String cid : p.arsenalInstalled) {
+        // Карта под мандатом (sa8) — тоже установленная, её СПЕЦ доступен так же.
+        for (String cid : p.allInstalledArsenal()) {
             String passive = installedSpecPassive(cid);
             if (passive != null) {
                 opts.add(new Choice("spec_arsenal_use", cid, "SPEC " + passive + " (" + cid + ")"));
@@ -1052,10 +1151,12 @@ public final class GameEngine {
             case "spec_objective" -> Objectives.playObjective(s, p.seat, j, (String) ch.payload(), this::emit);
             case "spec_objective_burn" -> objectiveBurnTop(p, (String) ch.payload());
             case "spec_arsenal_burn" -> arsenalBurn(p, (String) ch.payload());
-            case "spec_arsenal_install" -> arsenalInstall(p, (String) ch.payload());
-            case "spec_super" -> contributeSuper(p);
-            case "spec_super_deploy" -> deploySuper(p);
-            case "spec_super_check" -> checkSuper(p);
+            case "spec_arsenal_install" -> arsenalInstall(p, (String) ch.payload(), agents.get(p.seat));
+            case "spec_mandate_store" -> mandateStoreCard(p, (String) ch.payload());
+            case "spec_mandate_release" -> mandateReleaseCard(p);
+            case "spec_mandate_containers" -> mandateAllocateContainers(p, (Integer) ch.payload());
+            case "spec_super_reveal" -> revealSuper(p);
+            case "spec_super_launch" -> launchSuper(p);
             case "spec_symbol_reveal" -> revealSymbol(p, (String) ch.payload());
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
@@ -1166,58 +1267,7 @@ public final class GameEngine {
             .get("containers_storage.open_is_spec", Boolean.FALSE));
     }
 
-    /**
-     * СУПЕР ЗАДАНИЯ 2.0 (12.08.2026): вторая часть выполнена, если на поле
-     * сложился РИСУНОК из конкретных объектов (непрерывная связка по ячейкам,
-     * {@link DeployPattern}) И под планшетом открыт НАБОР СИМВОЛОВ
-     * ({@link Symbols}). Проверка — своё СПЕЦ-действие с карты; по правилам оно
-     * же вскрывает последний символ, поэтому одному символу разрешено быть ещё
-     * закрытым (ruleset {@code super_objectives.check_reveals_last_symbol}).
-     */
-    private boolean superCheckReady(PlayerState p) {
-        GameState s = state;
-        Map<String, Object> card = Ctx.cards(s, "super_objectives").find(p.superObjective);
-        if (card == null || !(card.get("deploy") instanceof Map<?, ?> deploy)) {
-            return false;                  // карта старого формата 1.0.0
-        }
-        @SuppressWarnings("unchecked")
-        Map<String, Object> dep = (Map<String, Object>) deploy;
-        if (!DeployPattern.satisfied(s, p.seat, dep)) {
-            return false;
-        }
-        if (!Boolean.TRUE.equals(Ctx.rules(s).get("super_objectives.require_symbols", Boolean.TRUE))) {
-            return true;
-        }
-        int slack = Boolean.TRUE.equals(Ctx.rules(s)
-            .get("super_objectives.check_reveals_last_symbol", Boolean.FALSE)) ? 1 : 0;
-        return Symbols.satisfied(s, p, Symbols.required(s, p.superObjective), slack);
-    }
 
-    /** Проверка супер задания: вскрывает всё нужное под планшетом и побеждает. */
-    private void checkSuper(PlayerState p) {
-        GameState s = state;
-        // Проверка ОТКРЫВАЕТ карты: игрок обязан показать символы, а не просто
-        // заявить их. Открываем всё, что лежит закрытым и подходит по форме.
-        for (String need : Symbols.required(s, p.superObjective)) {
-            Symbols.Marking m = Symbols.of(s);
-            for (PlayerState.TuckedCard t : p.tucked) {
-                if (t.revealed) {
-                    continue;
-                }
-                String form = "container".equals(t.kind) ? m.ofContainer(t.cardId)
-                    : m.ofArsenal(t.cardId);
-                if (need.equals(form)) {
-                    t.revealed = true;
-                    emit(ev("type", "symbol_reveal", "seat", p.seat, "card", t.cardId,
-                        "symbol", form, "by", "check"));
-                    break;
-                }
-            }
-        }
-        emit(ev("type", "super_check", "seat", p.seat, "card", p.superObjective,
-            "symbols", Symbols.revealed(s, p)));
-        deploySuper(p);
-    }
 
     /**
      * ВЫБОР СУПЕР ЗАДАНИЯ на подготовке (правило 2.0, 12.08.2026): игроку
@@ -1345,31 +1395,7 @@ public final class GameEngine {
         }
     }
 
-    private boolean superDeployReady(PlayerState p) {
-        GameState s = state;
-        Map<String, Object> card = Ctx.cards(s, "super_objectives").byId(p.superObjective);
-        Object wpObj = card.get("win_pattern");
-        if (!(wpObj instanceof Map<?, ?> wp)) {
-            return false;
-        }
-        Object pid = ((Map<String, Object>) wp).get("id");
-        if (pid == null || !Predicates.isRegistered(pid.toString())) {
-            return false;
-        }
-        try {
-            return Predicates.check(pid.toString(), s, p.seat, s.journal, Map.of());
-        } catch (Predicates.PredicateError e) {
-            return false;
-        }
-    }
 
-    private void deploySuper(PlayerState p) {
-        GameState s = state;
-        s.finished = true;
-        s.winner = p.seat;
-        s.winCondition = "super_objective";
-        emit(ev("type", "super_deploy", "seat", p.seat, "card", p.superObjective, "win", true));
-    }
 
     @SuppressWarnings("unchecked")
     private void arsenalBurn(PlayerState p, String cid) {
@@ -1420,8 +1446,40 @@ public final class GameEngine {
     }
 
     private void arsenalInstall(PlayerState p, String cid) {
+        arsenalInstall(p, cid, null);
+    }
+
+    /**
+     * Установить карту арсенала. Слотов ВСЕГДА три (мандат sa8 — не четвёртый
+     * такой же, а отдельное место, см. {@link #mandateStoreCard}). Если три
+     * слота заняты и игрок держит sa8 с ПУСТЫМ мандатом (ни карты, ни
+     * контейнеров) — спрашивается, куда положить новую карту: в мандат (никто
+     * не вытесняется) или на обычную полку (вытеснится самая старая). Без
+     * этого выбора вытеснение — единственный исход, как и раньше.
+     */
+    private void arsenalInstall(PlayerState p, String cid, Agent agent) {
         GameState s = state;
         p.arsenalHand.remove(cid);
+        boolean mandateFree = p.superArsenalCards.contains("sa8")
+            && p.mandateArsenalCard == null && p.mandateContainers == 0;
+        if (p.arsenalInstalled.size() >= 3 && mandateFree) {
+            boolean toMandate = true;
+            if (agent != null) {
+                List<Choice> opts = List.of(
+                    new Choice("mandate_yes", cid,
+                        "положить под Мандат совета (никто не вытесняется)"),
+                    new Choice("mandate_no", cid,
+                        "на обычную полку (вытеснит " + p.arsenalInstalled.get(0) + ")"));
+                Choice pick = agent.choose(s, opts, Map.of("kind", "mandate_install", "card", cid));
+                toMandate = pick != null && "mandate_yes".equals(pick.kind());
+            }
+            if (toMandate) {
+                p.mandateArsenalCard = cid;
+                applyHpPassive(p, cid, +1);
+                emit(ev("type", "arsenal", "seat", p.seat, "card", cid, "mode", "install_mandate"));
+                return;
+            }
+        }
         if (p.arsenalInstalled.size() >= 3) {
             String dropped = p.arsenalInstalled.remove(0);
             applyHpPassive(p, dropped, -1);   // B7: снять бонус вытесненной карты
@@ -1430,6 +1488,51 @@ public final class GameEngine {
         p.arsenalInstalled.add(cid);
         applyHpPassive(p, cid, +1);           // B7: вшить бонус HP в жетоны
         emit(ev("type", "arsenal", "seat", p.seat, "card", cid, "mode", "install"));
+    }
+
+    /**
+     * СПЕЦ: переложить УЖЕ УСТАНОВЛЕННУЮ (обычную) карту под Мандат совета —
+     * освобождает её обычный слот, ничего не вытесняя и не сжигая; карта
+     * продолжает работать («работают по своим правилам»). Только если мандат
+     * пуст (ни карты, ни контейнеров) — sa8 держит РОВНО одно из двух.
+     */
+    private void mandateStoreCard(PlayerState p, String cid) {
+        if (!p.superArsenalCards.contains("sa8") || p.mandateArsenalCard != null
+                || p.mandateContainers > 0 || !p.arsenalInstalled.contains(cid)) {
+            return;
+        }
+        p.arsenalInstalled.remove(cid);
+        p.mandateArsenalCard = cid;
+        emit(ev("type", "arsenal", "seat", p.seat, "card", cid, "mode", "move_to_mandate"));
+    }
+
+    /**
+     * СПЕЦ: вернуть карту из-под Мандата на обычную полку — свободно, только
+     * если там есть место (иначе годится и на месте под мандатом: карта не
+     * теряет силу, просто игрок хочет освободить мандат под контейнеры).
+     */
+    private void mandateReleaseCard(PlayerState p) {
+        String cid = p.mandateArsenalCard;
+        if (cid == null || p.arsenalInstalled.size() >= 3) {
+            return;
+        }
+        p.mandateArsenalCard = null;
+        p.arsenalInstalled.add(cid);
+        emit(ev("type", "arsenal", "seat", p.seat, "card", cid, "mode", "move_from_mandate"));
+    }
+
+    /**
+     * СПЕЦ: отвести место под Мандатом под контейнеры (1 или 2) вместо карты,
+     * либо освободить его (0). Взаимоисключение с картой под мандатом —
+     * доступно, только пока там нет карты.
+     */
+    private void mandateAllocateContainers(PlayerState p, Integer n) {
+        if (n == null || n < 0 || n > 2 || !p.superArsenalCards.contains("sa8")
+                || p.mandateArsenalCard != null) {
+            return;
+        }
+        p.mandateContainers = n;
+        emit(ev("type", "arsenal", "seat", p.seat, "mode", "mandate_containers", "n", n));
     }
 
     /**
@@ -1460,167 +1563,39 @@ public final class GameEngine {
     }
 
     @SuppressWarnings("unchecked")
-    private boolean canContributeSuper(PlayerState p) {
-        GameState s = state;
-        Map<String, Object> card = Ctx.cards(s, "super_objectives").byId(p.superObjective);
-        Map<String, Object> assembly = card.get("assembly") instanceof Map<?, ?> a
-            ? (Map<String, Object>) a : Map.of();
-        List<Object> parts = assembly.get("parts") instanceof List<?> l ? (List<Object>) l : List.of();
-        // B5: доступна ли хоть одна часть С НЕДОБОРОМ по своей квоте.
-        for (Object po : parts) {
-            Map<String, Object> part = (Map<String, Object>) po;
-            String kind = (String) part.get("kind");
-            int amount = ((Number) part.get("amount")).intValue();
-            if (p.superPartProgress.getOrDefault(kind, 0) < amount
-                    && superPartAvailable(p, kind)) {
-                return true;
-            }
-        }
-        return false;
-    }
 
-    private boolean superPartAvailable(PlayerState p, String kind) {
-        GameState s = state;
-        if (kind.equals("kelium") || kind.equals("coin") || kind.equals("ammo") || kind.equals("debris")) {
-            return p.resources.get(kelium.core.Resource.fromCode(kind)) >= 1;
+
+    /**
+     * ВСКРЫТЬ СУПЕР ЗАДАНИЕ: выложить на карту всё, что требуют её ячейки,
+     * получить победные очки и жетон супероружия в запас (супер задания 3.0).
+     */
+    private void revealSuper(PlayerState p) {
+        int vp = SuperWeapon.reveal(state, p);
+        if (vp == 0 && p.superCells < 0) {
+            return;   // вскрыть не удалось — СПЕЦ не тратится впустую молча
         }
-        if (kind.equals("enemy_unit_token") || kind.equals("enemy_building_token")) {
-            boolean wantUnit = kind.equals("enemy_unit_token");
-            for (Token t : p.trophySpace) {
-                if ((t instanceof UnitToken) == wantUnit) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        if (kind.equals("own_miner_bordering_grid")) {
-            try {
-                return Predicates.check("powered_miners_bordering_grids", s, p.seat,
-                    s.journal, Map.of("count", 1));
-            } catch (Predicates.PredicateError e) {
-                return false;
-            }
-        }
-        if (kind.equals("own_building_adjacent_enemy")) {
-            try {
-                return Predicates.check("building_adjacent_to_enemy", s, p.seat,
-                    s.journal, Map.of());
-            } catch (Predicates.PredicateError e) {
-                return false;
-            }
-        }
-        if (kind.equals("own_unit_on_enemy_hex")) {
-            for (UnitToken u : p.unitsOnField()) {
-                for (PlayerState pl : s.players) {
-                    if (pl.seat == p.seat) {
-                        continue;
-                    }
-                    for (Token t : allOnField(pl)) {
-                        if (u.hexId.equals(t.hexId())) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-        return false;
+        emit(ev("type", "super_reveal", "seat", p.seat, "card", p.superObjective,
+            "vp", vp, "cells", p.superCells,
+            "weapon", p.superWeaponUid == null ? null : p.superWeaponUid));
     }
 
     /**
-     * B5+K6: вклад в супер-задание. Прогресс ведётся ПО ЧАСТЯМ (kind -> внесено,
-     * не больше amount каждой), ЧАСТЬ ВЫБИРАЕТ ИГРОК; позиционные части
-     * (свой добытчик у грядки и т.п.) требуют истинного предиката и не могут
-     * дать «бесплатный» прогресс сверх своей квоты.
+     * ЗАПУСК: снять содержимое одной ячейки карты. Снял последнюю — победа.
+     *
+     * <p>Победа наступает В СВОЙ ХОД и только в свой: снимает счётчик сам игрок,
+     * значит срок запуска соперники видят и считают заранее.
      */
-    @SuppressWarnings("unchecked")
-    private void contributeSuper(PlayerState p) {
-        GameState s = state;
-        Map<String, Object> card = Ctx.cards(s, "super_objectives").find(p.superObjective);
-        if (card == null) {
-            return;
+    private void launchSuper(PlayerState p) {
+        boolean won = SuperWeapon.launch(state, p);
+        emit(ev("type", "super_launch", "seat", p.seat, "card", p.superObjective,
+            "cells_left", p.superCells, "win", won));
+        if (won) {
+            state.finished = true;
+            state.winner = p.seat;
+            state.winCondition = "super_objective";
+            emit(ev("type", "game_end", "reason", "super_objective",
+                "winner", p.seat, "card", p.superObjective));
         }
-        Map<String, Object> assembly = card.get("assembly") instanceof Map<?, ?> a
-            ? (Map<String, Object>) a : Map.of();
-        List<Object> parts = assembly.get("parts") instanceof List<?> l ? (List<Object>) l : List.of();
-
-        // доступные для вклада части (есть недобор + выполнима оплата/условие)
-        List<Choice> opts = new ArrayList<>();
-        for (Object po : parts) {
-            Map<String, Object> part = (Map<String, Object>) po;
-            String kind = (String) part.get("kind");
-            int amount = ((Number) part.get("amount")).intValue();
-            int done = p.superPartProgress.getOrDefault(kind, 0);
-            if (done >= amount || !superPartAvailable(p, kind)) {
-                continue;
-            }
-            opts.add(new Choice("super_part", kind, kind + " " + done + "/" + amount));
-        }
-        if (opts.isEmpty()) {
-            return;
-        }
-        opts.add(new Choice("pass", null, "no contribution"));
-        Choice ch = agents.get(p.seat).choose(s, opts, ev("kind", "super_part"));
-        if (ch.payload() == null) {
-            return;
-        }
-        String kind = (String) ch.payload();
-        if (kind.equals("kelium") || kind.equals("coin") || kind.equals("ammo") || kind.equals("debris")) {
-            p.resources.pay(kelium.core.Resource.fromCode(kind), 1);
-        } else if (kind.equals("enemy_unit_token") || kind.equals("enemy_building_token")) {
-            boolean wantUnit = kind.equals("enemy_unit_token");
-            for (Token t : new ArrayList<>(p.trophySpace)) {
-                if ((t instanceof UnitToken) == wantUnit) {
-                    p.trophySpace.remove(t);   // вложен навсегда (из игры)
-                    break;
-                }
-            }
-        } else if (kind.equals("own_unit_on_enemy_hex")) {
-            outer:
-            for (UnitToken u : new ArrayList<>(p.unitsOnField())) {
-                for (PlayerState pl : s.players) {
-                    if (pl.seat == p.seat) {
-                        continue;
-                    }
-                    for (Token t : allOnField(pl)) {
-                        if (u.hexId.equals(t.hexId())) {
-                            p.units.remove(u);   // жертвуется
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-        // позиционные части (own_miner_bordering_grid, own_building_adjacent_enemy)
-        // не жертвуются — их «оплата» = истинный предикат (проверен выше)
-        p.superPartProgress.merge(kind, 1, Integer::sum);
-        p.superObjectiveProgress += 1;
-
-        boolean complete = true;
-        for (Object po : parts) {
-            Map<String, Object> part = (Map<String, Object>) po;
-            int need = ((Number) part.get("amount")).intValue();
-            if (p.superPartProgress.getOrDefault(String.valueOf(part.get("kind")), 0) < need) {
-                complete = false;
-                break;
-            }
-        }
-        // ПО ЗА ПЕРВУЮ ЧАСТЬ начисляются РОВНО ОДИН РАЗ — в момент, когда лицо
-        // карты собрано целиком. Величина напечатана на карте (2–5 по стоимости
-        // сдаваемого), а не выведена формулой: цена части — решение дизайнера.
-        int firstPartVp = 0;
-        if (complete && p.superFirstPartVp == 0) {
-            Map<String, Object> so = Ctx.cards(state, "super_objectives")
-                .find(p.superObjective);
-            if (so != null && so.get("first_part_vp") instanceof Number n) {
-                firstPartVp = n.intValue();
-                p.superFirstPartVp = firstPartVp;
-            }
-        }
-        p.superObjectiveComplete = complete;
-        emit(ev("type", "super_objective", "seat", p.seat, "card", p.superObjective,
-            "progress", p.superObjectiveProgress, "complete", p.superObjectiveComplete,
-            "first_part_vp", firstPartVp));
     }
 
     private static List<Token> allOnField(PlayerState pl) {

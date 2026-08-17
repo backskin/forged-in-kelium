@@ -67,7 +67,26 @@ public final class ArsenalPack implements CardRegistry.CardPack {
         out.add(new ArsenalCardBase("bs7"));   // Старатели
         out.add(new SiegeEngineerCard());      // bs8 Осадные инженеры — своя оценка
 
-        // ---- карты-цели: очки за комбинацию в конце партии (2.1.0) ----
+        // ---- НОВЫЕ КАРТЫ 2.3.0 (ревью дизайнера 17.08.2026) ----
+        // Четырнадцать карт: пять переделанных «имб» из старой колоды получили
+        // условие, остальные пришли из заметок, до колоды не дошедших.
+        out.add(new ArsenalCardBase("b17"));   // Тяжёлое крыло — авиация медленнее и живучее
+        out.add(new ArsenalCardBase("b18"));   // Укреплённые перекрытия — здания в 1 HP держат два удара
+        out.add(new ArsenalCardBase("b19"));   // Трофейный сейф — +2 ячейки только под обломки
+        out.add(new ArsenalCardBase("b20"));   // Аварийное питание — единственный источник доплаты за энергию
+        out.add(new ArsenalCardBase("b21"));   // Маркшейдер — разворот добытчика по ячейкам
+        out.add(new ArsenalCardBase("b22"));   // Параллельные штабы — два СПЕЦ без Безопасности
+        out.add(new ArsenalCardBase("b23"));   // Штабная коллегия — вторая копия
+        out.add(new ArsenalCardBase("b24"));   // Оперативный отдел — третья копия
+        out.add(new ArsenalCardBase("b25"));   // Второй контур — второй гекс Смены энергии даром
+        out.add(new ArsenalCardBase("b26"));   // Разгонная полоса — вторая копия «Лёгкого взлёта»
+        out.add(new ArsenalCardBase("b27"));   // Абордаж — чужой жетон в трофеи ценой пехоты
+        out.add(new ArsenalCardBase("b28"));   // Обмен пленными — выкуп своих разными ресурсами
+        out.add(new ArsenalCardBase("b29"));   // Десантные тропы — пехота через зарождения
+        out.add(new ArsenalCardBase("b30"));   // Келемиевый дождь — новый тайл ценой двух очков
+        out.add(new ArsenalCardBase("b31"));   // Ядерный удар — гекс становится запретным навсегда
+
+        // ---- карты-цели: очки за положение жетона в конце партии (2.3.0) ----
         for (String id : new String[]{"v01", "v02", "v03", "v04", "v05", "v06"}) {
             out.add(new GoalCard(id));
         }

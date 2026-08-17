@@ -661,6 +661,56 @@ public final class LayoutEditor {
         return new double[]{size, panX, panY};
     }
 
+    /**
+     * СЛИЯНИЕ — СОБРАТЬ КАДР ПОЛЯ ПО СЛОЯМ.
+     *
+     * <p>Порядок слоёв назначен дизайнером 17.08.2026 и повторяет порядок, в
+     * котором это кладут на стол:
+     *
+     * <ol>
+     *   <li><b>блоки поля</b> — белая заливка, тёмная обводка; ЦВЕТА БЛОКОВ НЕТ
+     *       (на слиянии он только мешает читать содержимое) и обычных гексов
+     *       тоже нет: их роль играют сами блоки;</li>
+     *   <li><b>гексовая сетка</b> — если включена; проходит по всей площади
+     *       кадра и гаснет по мере удаления от поля;</li>
+     *   <li><b>тайлы зарождения</b>;</li>
+     *   <li><b>игроки</b>;</li>
+     *   <li><b>стартовые здания</b> (нейтральные постройки раскладки);</li>
+     *   <li><b>тайлы запретных гексов</b> — и помеченные в раскладке, и чёрные
+     *       накладки сборки на ячейки блока, торчащие за край поля;</li>
+     *   <li><b>контейнеры</b> — если включены.</li>
+     * </ol>
+     *
+     * <p>Слоёв несколько, а геометрия ОДНА ({@link #sharedFit}): холсты разные,
+     * и без общего масштаба со сдвигом они разъехались бы на доли гекса.
+     */
+    private static java.awt.image.BufferedImage fuseLayers(int fw, int fh,
+                                                           PngExport.Options options) {
+        double[] fit = sharedFit(model, fw, fh);
+        java.awt.image.BufferedImage out =
+            assemblyTab.renderBlocksLayer(fw, fh, fit[0], fit[1], fit[2], true);
+        java.awt.Graphics2D g = out.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+            java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        if (options.hexGrid()) {
+            g.drawImage(canvas.renderHexGridLayer(fw, fh, fit[0], fit[1], fit[2]), 0, 0, null);
+        }
+        // Зарождения, игроки и стартовые здания — одним проходом: внутри метода
+        // они уже разложены по слоям в нужном порядке. Контейнеры выключены
+        // здесь: по порядку они идут ПОСЛЕ запретных гексов.
+        g.drawImage(canvas.renderContentOnly(fw, fh, fit[0], fit[1], fit[2], false),
+            0, 0, null);
+        g.drawImage(canvas.renderForbiddenLayer(fw, fh, fit[0], fit[1], fit[2]), 0, 0, null);
+        g.drawImage(assemblyTab.renderBlackOverlayLayer(fw, fh, fit[0], fit[1], fit[2]),
+            0, 0, null);
+        if (options.containers()) {
+            g.drawImage(canvas.renderContainersLayer(fw, fh, fit[0], fit[1], fit[2]),
+                0, 0, null);
+        }
+        g.dispose();
+        return out;
+    }
+
     private static PngExport.Content layoutContent() {
         return new PngExport.Content(layoutLegend(), playerBlocks(model), mapStats(model))
             .filtered(ExportOptionsDialog.current(settings));
@@ -689,24 +739,9 @@ public final class LayoutEditor {
 
         switch (options.layout()) {
             case FUSION -> {
-                // БЛОКИ — ФОН ПОЗАДИ ВСЕГО, ОБЫЧНЫЕ ГЕКСЫ НЕ РИСУЮТСЯ ВООБЩЕ
-                // (поправка дизайнера 14.08.2026, первая версия слияния делала
-                // наоборот — картинку сборки как главную, а раскладку прятала в
-                // легенду). Два холста, но ОДНА общая геометрия: без нее слой
-                // содержимого и слой блоков разъехались бы на доли гекса.
-                int fw = 1600;
-                int fh = 1100;
-                double[] fit = sharedFit(model, fw, fh);
-                java.awt.image.BufferedImage blocksLayer =
-                    assemblyTab.renderBlocksLayer(fw, fh, fit[0], fit[1], fit[2]);
-                java.awt.image.BufferedImage contentLayer =
-                    canvas.renderContentOnly(fw, fh, fit[0], fit[1], fit[2]);
-                java.awt.Graphics2D fg = blocksLayer.createGraphics();
-                fg.drawImage(contentLayer, 0, 0, null);
-                fg.dispose();
                 java.awt.image.BufferedImage fused = PngExport.compose(
                     "Раскладка «" + name + "» — слияние", layoutSubtitle(),
-                    blocksLayer, layoutContent());
+                    fuseLayers(1600, 1100, options), layoutContent());
                 PngExport.done(frame, PngExport.save(frame, name + "-слияние.png", fused));
             }
             case VERTICAL, HORIZONTAL -> {
@@ -866,21 +901,49 @@ public final class LayoutEditor {
     }
 
     /** Легенда обозначений раскладки — печатается ПОД полем. */
+    /**
+     * ОБЩАЯ ЛЕГЕНДА РАСКЛАДКИ — на языке игры, а не конструктора (правка
+     * дизайнера 17.08.2026).
+     *
+     * <p>Легенда объясняет, ЧТО ЭТО ЗНАЧИТ ЗА СТОЛОМ: не «зелёный шестиугольник»,
+     * а «тайл зарождения, к которому добытчик примыкает стенкой». Каждый образец
+     * назван термином свода — иначе легенда объясняет картинку сама себе.
+     *
+     * <p>МЕСТО КАЖДОГО ИГРОКА — отдельной строкой со своим цветом. Общего
+     * образца «старт игрока» больше нет: игроков за столом четверо, и на поле
+     * важно не то, что старт бывает, а чей он.
+     */
     private static java.util.List<PngExport.Item> layoutLegend() {
         java.util.List<PngExport.Item> out = new ArrayList<>();
-        out.add(PngExport.Item.hex(new Color(0xEFEDE4), "обычный гекс — можно строить и ходить"));
+        out.add(PngExport.Item.hex(new Color(0xEFEDE4),
+            "обычный гекс — здесь строят здания и ходят войска"));
         out.add(PngExport.Item.hex(Canvas.SPAWN_START,
-            "малое зарождение: лицо 3 келемия, оборот 2"));
+            "малое зарождение (S): 3 келемия на лице, 2 на обороте. Жетонов на "
+                + "тайле не бывает — добытчик к нему ПРИМЫКАЕТ стенкой"));
         out.add(PngExport.Item.hex(Canvas.SPAWN_NORMAL,
-            "большое зарождение: лицо 4 келемия, оборот 3"));
-        out.add(PngExport.Item.hex(new Color(0x3A3A3A), "запретный гекс (✕) — дыра в поле"));
-        // Старт игрока в общую легенду больше не идёт: у каждого игрока теперь
-        // своя цветная карточка в разделе «Игроки» (просьба дизайнера 14.08.2026).
+            "большое зарождение (K): 4 келемия на лице, 3 на обороте. Только его "
+                + "оборот даёт победное очко тому, кто его исчерпал"));
+        out.add(PngExport.Item.hex(Canvas.SPAWN_NORMAL,
+            "«×2» на тайле зарождения — два тайла стопкой: исчерпав верхний, "
+                + "открываешь нижний. «+1» / «−1» — правка келемия на лице"));
+        out.add(PngExport.Item.hex(new Color(0x3A3A3A),
+            "запретный гекс (✕) — непроходим ни для кого и никогда, строить нельзя"));
         out.add(PngExport.Item.square(Canvas.NEUTRAL_FILL,
-            "нейтральное здание на стенке гекса (малое — одна стенка, большое — две)"));
+            "нейтральное здание: закрывает стенку гекса с обеих сторон — через неё "
+                + "не пройти наземкой и не расширить зону стройки. Малое занимает "
+                + "одну стенку, большое две"));
         out.add(PngExport.Item.square(Canvas.CONTAINER_FILL,
-            "контейнер, напечатанный на гексе (две карточки — два контейнера)"));
-        out.add(PngExport.Item.hex(new Color(0xEFEDE4), "«×2» на тайле — двойная стопка"));
+            "печатный контейнер: накрой эту ячейку любым своим жетоном — возьми "
+                + "карту контейнера. Ячейка срабатывает один раз за партию. Две "
+                + "карточки на гексе — два контейнера"));
+        // МЕСТО КАЖДОГО ИГРОКА — своей строкой и своим цветом (правка дизайнера
+        // 17.08.2026). Строк ровно столько, сколько мест расставлено в раскладке.
+        java.util.List<Integer> seats = new ArrayList<>(startsOf(model).keySet());
+        java.util.Collections.sort(seats);
+        for (int seat : seats) {
+            out.add(PngExport.Item.seat(Canvas.SEAT[seat % 4], "P" + (seat + 1),
+                "место игрока " + (seat + 1) + " — здесь стоит его ЦУ в начале партии"));
+        }
         return out;
     }
 
@@ -1734,12 +1797,25 @@ public final class LayoutEditor {
             java.awt.image.BufferedImage img =
                 new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
             java.awt.Graphics2D g = img.createGraphics();
-            g.setColor(getBackground());
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+            // ФОН КАДРА ЧУТЬ ТЕМНЕЕ БУМАГИ (просьба дизайнера 17.08.2026): так
+            // поле читается как отдельный объект на листе, а белые гексы не
+            // сливаются с полями страницы. Фон холста (Theme.paper()) здесь не
+            // годится вовсе — в тёмной теме он чёрный.
+            g.setColor(ExportPaint.FIELD_BG);
             g.fillRect(0, 0, w, h);
             int savedW = getWidth();
             int savedH = getHeight();
+            // ФОН КОМПОНЕНТА ТОЖЕ ПОДМЕНЯЕТСЯ: paintComponent начинается с
+            // super.paintComponent, а тот заливает всё цветом холста (в тёмной
+            // теме — чёрным) и затирает уже положенную заливку кадра. Именно
+            // здесь и протекала тёмная тема в выгруженный PNG.
+            java.awt.Color savedBg = getBackground();
+            setBackground(ExportPaint.FIELD_BG);
             setSize(w, h);
-            paintComponent(g);
+            ExportPaint.with(() -> paintComponent(g));
+            setBackground(savedBg);
             setSize(savedW, savedH);
             g.dispose();
             size = savedSize;
@@ -1762,6 +1838,103 @@ public final class LayoutEditor {
         java.awt.image.BufferedImage renderContentOnly(int w, int h,
                                                         double fitSize, double fitPanX,
                                                         double fitPanY) {
+            return renderContentOnly(w, h, fitSize, fitPanX, fitPanY, true);
+        }
+
+        /**
+         * То же, но с явным выключателем слоя контейнеров (чекбокс в настройках
+         * экспорта). Слои рисуются в порядке, назначенном дизайнером 17.08.2026:
+         * тайлы зарождения, игроки, стартовые здания, потом контейнеры. Порядок
+         * общий для всей картинки, а не для каждого гекса по отдельности —
+         * иначе контейнер одного гекса ложился бы под тайл соседнего.
+         */
+        java.awt.image.BufferedImage renderContentOnly(int w, int h,
+                                                        double fitSize, double fitPanX,
+                                                        double fitPanY, boolean containers) {
+            double savedSize = size;
+            double savedX = panX;
+            double savedY = panY;
+            size = fitSize;
+            panX = fitPanX;
+            panY = fitPanY;
+            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g = img.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+            int savedW = getWidth();
+            int savedH = getHeight();
+            setSize(w, h);
+            ExportPaint.with(() -> drawContentLayers(g, containers));
+            setSize(savedW, savedH);
+            g.dispose();
+            size = savedSize;
+            panX = savedX;
+            panY = savedY;
+            return img;
+        }
+
+        /**
+         * СОДЕРЖИМОЕ ПОЛЯ ПО СЛОЯМ — порядок задан дизайнером и повторяет
+         * порядок, в котором это кладут на стол:
+         *
+         * <ol>
+         *   <li>тайлы зарождения — их выкладывают на собранное поле первыми;</li>
+         *   <li>игроки (стартовые гексы);</li>
+         *   <li>стартовые здания — в конструкторе это нейтральные постройки,
+         *       единственные здания, которые расставляет сама раскладка;</li>
+         *   <li>контейнеры — отдельным слоем и с отдельным выключателем.</li>
+         * </ol>
+         *
+         * <p>Слой блоков рисуется ДО этого метода (он фон), а тайлы запретных
+         * гексов — ПОСЛЕ: физически это картонка поверх всего.
+         *
+         * <p>ОБЫЧНЫЕ ГЕКСЫ ЗДЕСЬ НЕ РИСУЮТСЯ ВОВСЕ: в слиянии их роль играют
+         * блоки картона, и вторая сетка поверх первой только мешает.
+         */
+        private void drawContentLayers(java.awt.Graphics2D g, boolean containers) {
+            for (LHex hx : model.hexes.values()) {
+                if (hx.isSpawn()) {
+                    double[] c = center(hx.q, hx.r);
+                    drawSpawn(g, hx, c[0], c[1]);
+                }
+            }
+            for (LHex hx : model.hexes.values()) {
+                if ("player_start".equals(hx.content)) {
+                    double[] c = center(hx.q, hx.r);
+                    int seat = Math.max(0, hx.seat);
+                    g.setColor(SEAT[seat % 4]);
+                    double rr = size * 0.5;
+                    g.fillOval((int) (c[0] - rr), (int) (c[1] - rr),
+                        (int) (2 * rr), (int) (2 * rr));
+                    g.setColor(Color.WHITE);
+                    g.setFont(getFont().deriveFont(Font.BOLD, (float) (size * 0.40)));
+                    drawCentered(g, "P" + (seat + 1), c[0], c[1]);
+                }
+            }
+            for (LHex hx : model.hexes.values()) {
+                double[] c = center(hx.q, hx.r);
+                for (Neutral n : hx.neutrals) {
+                    drawNeutral(g, c[0], c[1], n);
+                }
+            }
+            if (containers) {
+                for (LHex hx : model.hexes.values()) {
+                    if (hx.containers > 0) {
+                        double[] c = center(hx.q, hx.r);
+                        drawContainers(g, hx, c[0], c[1]);
+                    }
+                }
+            }
+        }
+
+        /**
+         * КОНТЕЙНЕРЫ — САМЫЙ ВЕРХНИЙ СЛОЙ (порядок дизайнера 17.08.2026: шестым,
+         * после тайлов запретных гексов). На печатном поле это метка ячейки, и
+         * закрывать её не должно ничто. Гасится своим чекбоксом в настройках.
+         */
+        java.awt.image.BufferedImage renderContainersLayer(int w, int h, double fitSize,
+                                                            double fitPanX, double fitPanY) {
             double savedSize = size;
             double savedX = panX;
             double savedY = panY;
@@ -1777,13 +1950,149 @@ public final class LayoutEditor {
             int savedH = getHeight();
             setSize(w, h);
             for (LHex hx : model.hexes.values()) {
-                if (isPlainEmpty(hx)) {
+                if (hx.containers > 0) {
+                    double[] c = center(hx.q, hx.r);
+                    drawContainers(g, hx, c[0], c[1]);
+                }
+            }
+            setSize(savedW, savedH);
+            g.dispose();
+            size = savedSize;
+            panX = savedX;
+            panY = savedY;
+            return img;
+        }
+
+        /**
+         * ТАЙЛЫ ЗАПРЕТНЫХ ГЕКСОВ, отмеченные в самой раскладке, — отдельным слоем
+         * поверх содержимого. Чёрные накладки сборки (ячейки блока, торчащие за
+         * край поля) рисует вид сборки; здесь только то, что дизайнер пометил
+         * запретным сам.
+         */
+        java.awt.image.BufferedImage renderForbiddenLayer(int w, int h, double fitSize,
+                                                           double fitPanX, double fitPanY) {
+            double savedSize = size;
+            double savedX = panX;
+            double savedY = panY;
+            size = fitSize;
+            panX = fitPanX;
+            panY = fitPanY;
+            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g = img.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+            int savedW = getWidth();
+            int savedH = getHeight();
+            setSize(w, h);
+            for (LHex hx : model.hexes.values()) {
+                if (!"forbidden".equals(hx.content)) {
                     continue;
                 }
                 double[] c = center(hx.q, hx.r);
-                drawHexBody(g, hx, c[0], c[1]);
+                Polygon poly = hexPoly(c[0], c[1], size * 0.88);
+                g.setColor(ExportPaint.FORBIDDEN_FILL);
+                g.fillPolygon(poly);
+                g.setColor(new Color(0x5A6068));
+                g.setStroke(new BasicStroke(1.6f));
+                g.drawPolygon(poly);
+                g.setColor(new Color(0xE0E0E0));
+                g.setFont(getFont().deriveFont(Font.BOLD, (float) (size * 0.46)));
+                drawCentered(g, "\u2715", c[0], c[1]);
             }
             setSize(savedW, savedH);
+            g.dispose();
+            size = savedSize;
+            panX = savedX;
+            panY = savedY;
+            return img;
+        }
+
+        /**
+         * ТОНКАЯ ГЕКСОВАЯ СЕТКА ПО ВСЕЙ ПЛОЩАДИ КАДРА, угасающая по мере удаления
+         * от поля (просьба дизайнера 17.08.2026).
+         *
+         * <p>Зачем: в слиянии обычные гексы не рисуются вовсе, и поле висит в
+         * пустоте — непонятно, где кончается картон и начинается пустое место.
+         * Сетка показывает продолжение сетки поля и гаснет, не споря с ним.
+         *
+         * <p>Гексы, которые есть в раскладке, пропускаются: там уже нарисован
+         * блок картона, и обводить его второй раз незачем.
+         */
+        java.awt.image.BufferedImage renderHexGridLayer(int w, int h, double fitSize,
+                                                         double fitPanX, double fitPanY) {
+            double savedSize = size;
+            double savedX = panX;
+            double savedY = panY;
+            size = fitSize;
+            panX = fitPanX;
+            panY = fitPanY;
+            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g = img.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setStroke(new BasicStroke(1f));
+
+            // Насколько далеко от поля сетка гаснет полностью — в гексах.
+            final int fade = 5;
+            java.util.List<int[]> real = new java.util.ArrayList<>();
+            int minQ = Integer.MAX_VALUE;
+            int maxQ = Integer.MIN_VALUE;
+            int minR = Integer.MAX_VALUE;
+            int maxR = Integer.MIN_VALUE;
+            for (LHex hx : model.hexes.values()) {
+                real.add(new int[]{hx.q, hx.r});
+                minQ = Math.min(minQ, hx.q);
+                maxQ = Math.max(maxQ, hx.q);
+                minR = Math.min(minR, hx.r);
+                maxR = Math.max(maxR, hx.r);
+            }
+            if (real.isEmpty()) {
+                g.dispose();
+                size = savedSize;
+                panX = savedX;
+                panY = savedY;
+                return img;
+            }
+            // Перебираем с запасом: кадр шире поля, и сетка обязана дойти до краёв.
+            int span = (int) Math.ceil(Math.max(w, h) / Math.max(1.0, size)) + fade + 2;
+            java.util.Set<Long> occupied = new java.util.HashSet<>();
+            for (int[] qr : real) {
+                occupied.add(Model.key(qr[0], qr[1]));
+            }
+            for (int q = minQ - span; q <= maxQ + span; q++) {
+                for (int r = minR - span; r <= maxR + span; r++) {
+                    if (occupied.contains(Model.key(q, r))) {
+                        continue;   // здесь уже лежит блок картона
+                    }
+                    double[] c = center(q, r);
+                    if (c[0] < -size || c[0] > w + size || c[1] < -size || c[1] > h + size) {
+                        continue;   // за пределами кадра
+                    }
+                    int dist = Integer.MAX_VALUE;
+                    for (int[] qr : real) {
+                        dist = Math.min(dist, axialDist(q, r, qr[0], qr[1]));
+                        if (dist <= 1) {
+                            break;
+                        }
+                    }
+                    if (dist > fade) {
+                        continue;   // угасла совсем
+                    }
+                    // Гаснет ПО КВАДРАТУ, а не линейно: линейное угасание на глаз
+                    // читается как ровная сетка до самого края кадра.
+                    double t = 1.0 - (dist - 1) / (double) fade;
+                    int alpha = (int) Math.round(95.0 * t * t);
+                    if (alpha <= 2) {
+                        continue;
+                    }
+                    g.setColor(new Color(ExportPaint.GRID.getRed(),
+                        ExportPaint.GRID.getGreen(), ExportPaint.GRID.getBlue(),
+                        Math.min(255, Math.max(0, alpha))));
+                    g.drawPolygon(hexPoly(c[0], c[1], size * 0.99));
+                }
+            }
             g.dispose();
             size = savedSize;
             panX = savedX;
@@ -2178,7 +2487,7 @@ public final class LayoutEditor {
             // Кегль подписей на поле считается от РАЗМЕРА ГЕКСА, а не от масштаба
             // интерфейса: Theme.font() домножил бы его на масштаб второй раз.
             g.setFont(getFont().deriveFont((float) (size * 0.17)));
-            g.setColor(Theme.ink3());
+            g.setColor(ExportPaint.active() ? ExportPaint.LABEL : Theme.ink3());
             drawCentered(g, h.q + "," + h.r, cx, cy - size * 0.70);
         }
 
@@ -2324,6 +2633,15 @@ public final class LayoutEditor {
          * поле било бы белым листом посреди тёмного окна.
          */
         private Color baseFill(LHex h) {
+            // ЭКСПОРТ НИКОГДА НЕ БЫВАЕТ ТЁМНЫМ: картинка уходит в печать, и тема
+            // интерфейса к ней отношения не имеет (баг дизайнера 17.08.2026 —
+            // выгрузка темнела вместе с окном).
+            if (ExportPaint.active()) {
+                return switch (h.content) {
+                    case "forbidden" -> ExportPaint.FORBIDDEN_FILL;
+                    default -> ExportPaint.HEX_FILL;
+                };
+            }
             boolean dark = Theme.isDark();
             return switch (h.content) {
                 case "forbidden" -> dark ? new Color(0x0E1116) : new Color(0x4a4844);
@@ -2334,6 +2652,9 @@ public final class LayoutEditor {
 
         /** Обводка гекса — по теме, иначе на тёмном фоне её не видно. */
         private static Color hexEdge() {
+            if (ExportPaint.active()) {
+                return ExportPaint.HEX_EDGE;
+            }
             return Theme.isDark() ? new Color(0x79838F) : new Color(0x6d6a5e);
         }
 

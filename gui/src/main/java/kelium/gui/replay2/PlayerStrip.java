@@ -745,6 +745,12 @@ public final class PlayerStrip extends JComponent {
         if (!p.arsenalInstalled.isEmpty()) {
             sb.append("\nАрсенал установлен: ").append(cards(p.arsenalInstalled));
         }
+        if (p.mandateArsenalCard != null) {
+            sb.append("\nПод Мандатом совета (sa8): карта ").append(p.mandateArsenalCard);
+        } else if (p.mandateContainers > 0) {
+            sb.append("\nПод Мандатом совета (sa8): ").append(p.mandateContainers)
+              .append(" мест[а] под контейнеры");
+        }
         sb.append("\nОчки: ").append(describeVp(p));
         sb.append("\n\nЩелчок — подробный планшет игрока.");
         return Ui2.tip(sb.toString());
@@ -789,7 +795,12 @@ public final class PlayerStrip extends JComponent {
             case "units" -> "Сейчас: на поле " + u[0] + ", в запасе " + u[1] + ".";
             case "objectives" -> "Сейчас в руке: " + p.objectiveHand.size() + ".";
             case "arsenal" -> "Сейчас: в руке " + p.arsenalHand.size()
-                + ", установлено " + p.arsenalInstalled.size() + ".";
+                + ", установлено " + p.arsenalInstalled.size() + "."
+                + (p.mandateArsenalCard != null
+                    ? " Под Мандатом (sa8): " + p.mandateArsenalCard + "."
+                    : p.mandateContainers > 0
+                        ? " Под Мандатом (sa8): " + p.mandateContainers + " места под контейнеры."
+                        : "");
             case "orders" -> "Сейчас сыграно " + p.orderPlayed.size() + " из 4.";
             case "super" -> p.superComplete ? "Задание ЗАКРЫТО — потому значок золотой."
                 : "Продвижение: " + p.superProgress + ".";
