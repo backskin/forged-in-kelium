@@ -713,6 +713,15 @@ public final class DecksPanel extends JPanel {
             // --- РАЗДЕЛИТЕЛЬ ---
             if (c.get("requirement") != null || c.get("base_reward") != null) {
                 cy = черта(g, x + отступ, cy, шир);
+                // ПЛАТА КАРТЫ-ЖЕРТВЫ лежит отдельным полем, а не в параметрах
+                // предиката, поэтому без этой строки на карте оставалось «сдай
+                // плату, указанную на карте» — и на карте её как раз не было.
+                @SuppressWarnings("unchecked")
+                String плата = c.get("sacrifice") instanceof Map<?, ?> sm
+                    ? CardWords.жертва((Map<String, Object>) sm) : "";
+                if (!плата.isBlank()) {
+                    cy = раздел(g, x + отступ, cy, шир, "ПЛАТА", плата, мелкий, h);
+                }
                 cy = раздел(g, x + отступ, cy, шир, "ТРЕБОВАНИЕ",
                     условие(c.get("requirement")), мелкий, h);
                 cy = раздел(g, x + отступ, cy, шир, "НАГРАДА",

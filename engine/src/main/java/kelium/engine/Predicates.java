@@ -255,6 +255,81 @@ public final class Predicates {
             return !Boolean.TRUE.equals(p.get("lost_none")) || f.lostOwnThisTurn == 0;
         });
 
+        // ==================================================================
+        //  ТРИ ПРЕДИКАТА, КОТОРЫХ НЕ БЫЛО ВОВСЕ
+        // ==================================================================
+        //  Карты o41 «Ответный удар», o42 «Разорение» и o43 «Охота на сильного»
+        //  ссылались на предикаты, не зарегистрированные ни под каким именем. Отсев
+        //  на подготовке выбрасывает карты с нереализованным ЭФФЕКТОМ, но не с
+        //  нереализованным ТРЕБОВАНИЕМ, поэтому все три ЛЕЖАЛИ В КОЛОДЕ: игрок их
+        //  тянул и выполнить не мог никогда — только сжечь ради верха. Три военные
+        //  карты из двадцати были мёртвыми, и это не было видно ничем.
+        //
+        //  Сторож против повторения — DeadPredicateTest.
+
+        /** o41: в этот ход снесён чужой жетон ОТВЕТНЫМ боем; усиление — без потерь. */
+        reg("destroyed_in_retaliation", false, (s, seat, j, p) -> {
+            TurnJournal.TurnFacts f = j.of(seat);
+            if (f.destroyedInRetaliation < intp(p, "count", 1)) {
+                return false;
+            }
+            // Имя ключа взято из данных карты: там no_losses, а у старого
+            // однофамильца destroyed_in_retaliation_this_turn — lost_none.
+            return !Boolean.TRUE.equals(p.get("no_losses")) || f.lostOwnThisTurn == 0;
+        });
+
+        /**
+         * o42: в этот ход снесён ДОБЫТЧИК противника; усиление — он был запитан.
+         *
+         * <p>Только добытчик, без энергостанции: «запитанная энергостанция» не
+         * состояние игры, станция энергию производит, а не потребляет (правка
+         * дизайнера, см. комментарий в данных карты).
+         */
+        reg("destroyed_enemy_economy", false, (s, seat, j, p) -> {
+            TurnJournal.TurnFacts f = j.of(seat);
+            if (!f.destroyedTypes.contains("miner")) {
+                return false;
+            }
+            return !Boolean.TRUE.equals(p.get("powered")) || f.destroyedPoweredEconomy;
+        });
+
+        /**
+         * o43: снесён жетон игрока, у которого зданий на поле БОЛЬШЕ, чем у меня;
+         * усиление — снесённый жетон был зданием.
+         *
+         * <p>ПО ЗДАНИЯМ, А НЕ ПО ОЧКАМ. Карта переписана дизайнером именно за этим:
+         * «очки в середине партии никто не знает, а здания на поле пересчитываются
+         * глазами». Journal-поле destroyedLeaderBuilding считает лидера по очкам и
+         * потому здесь не годится.
+         */
+        reg("destroyed_stronger_player_token", false, (s, seat, j, p) -> {
+            TurnJournal.TurnFacts f = j.of(seat);
+            int мои = s.player(seat).buildingsOnField().size();
+            boolean нашёлся = false;
+            for (int owner : f.destroyedOwners) {
+                if (owner != seat && owner >= 0 && owner < s.numPlayers()
+                        && s.player(owner).buildingsOnField().size() > мои) {
+                    нашёлся = true;
+                    break;
+                }
+            }
+            if (!нашёлся) {
+                return false;
+            }
+            if (!Boolean.TRUE.equals(p.get("building"))) {
+                return true;
+            }
+            // Усиление: среди снесённого в этот ход было здание. Журнал не связывает
+            // вид жетона с его владельцем, поэтому это приближение в пользу игрока —
+            // и оно названо здесь, а не спрятано.
+            for (BuildingType bt : BuildingType.values()) {
+                if (f.destroyedTypes.contains(bt.name().toLowerCase(java.util.Locale.ROOT))) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
         reg("razed_and_rebuilt_same_hex_this_turn", false, (s, seat, j, p) -> {
             TurnJournal.TurnFacts f = j.of(seat);
             for (String h : f.razedOwnHexes) {
