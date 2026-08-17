@@ -31,6 +31,23 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
+        <!--
+          КАРТЫ НУЖНЫ ТЕСТАМ, И ЭТО НЕ УДОБСТВО, А ИСПРАВЛЕНИЕ ДЫРЫ. Карты
+          приходят движку через ServiceLoader, поэтому без этого модуля на
+          класспасе реестр карт ПУСТ: всякая карта, чьё условие живёт в коде
+          (checked_by: card), молча отвечает «не выполнено», и тест, который её
+          проверяет, проходит впустую. Ровно так и было: проверки заданий шли по
+          ветке предикатов, а код карт не исполнялся ни разу.
+
+          Область test: боты о картах по-прежнему ничего не знают, зависимость
+          нужна только тому, кто карты проверяет.
+        -->
+        <dependency>
+            <groupId>kelium</groupId>
+            <artifactId>kelium-cards</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

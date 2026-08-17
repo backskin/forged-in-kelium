@@ -1429,8 +1429,15 @@ public final class GameEngine {
 
     /**
      * Сжечь ВЕРХ карты задания — одноразовый утилизационный эффект вместо
-     * выполнения низа. Карта уходит в сброс. Эффект берётся из данных top
-     * (реестр {@link Effects}).
+     * выполнения низа. Карта уходит в сброс.
+     *
+     * <p>СНАЧАЛА СПРАШИВАЕТСЯ САМА КАРТА. У карт, живущих целиком в коде
+     * ({@link kelium.cards.objectives.ЗаданиеВКоде}), одноразовый эффект — их
+     * собственный метод {@code burn}, и никакой записи {@code effect} в каталоге
+     * у них нет: держать рядом вторую, декларативную копию поведения — это ровно
+     * тот разрыв между кодом и данными, из-за которого карты и переделаны.
+     * Карты, ещё не переехавшие в код, идут прежним путём — через реестр
+     * {@link Effects} по записи {@code top.effect}.
      */
     @SuppressWarnings("unchecked")
     private void objectiveBurnTop(PlayerState p, String cid) {
@@ -1439,11 +1446,16 @@ public final class GameEngine {
         Map<String, Object> top = card.get("top") instanceof Map<?, ?> t
             ? (Map<String, Object>) t : Map.of();
         Map<String, Object> got;
-        try {
-            got = Effects.apply((String) top.getOrDefault("effect", "noop"), s, p.seat,
-                (Map<String, Object>) top.getOrDefault("params", Map.of()));
-        } catch (Effects.EffectError e) {
+        kelium.engine.cards.ObjectiveCard код = kelium.engine.cards.CardRegistry.objective(cid);
+        if (код != null && код.burn(new kelium.engine.cards.EngineCardContext(s, p.seat))) {
             got = new HashMap<>();
+        } else {
+            try {
+                got = Effects.apply((String) top.getOrDefault("effect", "noop"), s, p.seat,
+                    (Map<String, Object>) top.getOrDefault("params", Map.of()));
+            } catch (Effects.EffectError e) {
+                got = new HashMap<>();
+            }
         }
         p.objectiveHand.remove(cid);
         s.decks.get("objectives").discard(cid);

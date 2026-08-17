@@ -93,21 +93,26 @@ public final class ObjectivePack implements CardRegistry.CardPack {
         out.add(new PredicateObjective("o54",
             "связать жетонами два противоположных гекса вокруг тайла зарождения"));
 
-        // ==================== НАЧАЛЬНЫЕ (8 карт) ====================
-        out.add(new GroupAcquisitions.FirstBuildings());      // n1 Основа
-        out.add(new GroupAcquisitions.FirstUnits());          // n2 Первый набор
-        out.add(new GroupAcquisitions.Stock("n3", Resource.AMMO));    // n3 Запасы
-        out.add(new GroupAcquisitions.FirstMarket());         // n4 Первый рынок
-        out.add(new GroupAcquisitions.FirstPower());          // n5 Подключение
-        out.add(new GroupAcquisitions.FirstStep());           // n6 Выход
-        out.add(new GroupAcquisitions.Stock("n7", Resource.KELIUM));  // n7 Жила
-        out.add(new GroupAcquisitions.FirstFind());           // n8 Находка
-        out.add(new PredicateObjective("n9", "шагнуть на любом треке технологий"));
-        out.add(new PredicateObjective("n10", "уничтожить любой жетон противника"));
-        out.add(new PredicateObjective("n11",
-            "сыграть карту приказа, нижний приказ которой вскрыт другим игроком"));
-        out.add(new PredicateObjective("n12",
-            "сыграть верхом тот же приказ, что и другой игрок"));
+        // ==================== НАЧАЛЬНЫЕ (12 карт) ====================
+        // ПЕРЕВЕДЕНЫ ЦЕЛИКОМ В КОД (заказ дизайнера 17.08.2026: «отойти от
+        // предикатов и yaml и перейти полностью на код с документацией»). Каждая
+        // карта — свой класс: печатное имя, пороги, награда, текст и одноразовый
+        // эффект объявлены в нём, а запись каталога ВЫГРУЖАЕТСЯ из класса. Прежде
+        // четыре из этих карт были пустыми обёртками над реестром предикатов, а
+        // имена в этом списке успели разойтись с каталогом: здесь стояло
+        // «n1 Основа», на карте печаталось «Подъём».
+        out.add(new НачальныеЗадания.Подъём());               // n1
+        out.add(new НачальныеЗадания.ПервыйБоец());           // n2
+        out.add(new НачальныеЗадания.Патроны());              // n3
+        out.add(new НачальныеЗадания.ПерваяСделка());         // n4
+        out.add(new НачальныеЗадания.Коммутация());           // n5
+        out.add(new НачальныеЗадания.Выход());                // n6
+        out.add(new НачальныеЗадания.Жила());                 // n7
+        out.add(new НачальныеЗадания.Находка());              // n8
+        out.add(new НачальныеЗадания.ПервыйШаг());            // n9
+        out.add(new НачальныеЗадания.ПервыйТрофей());         // n10
+        out.add(new НачальныеЗадания.ВторойЗаход());          // n11
+        out.add(new НачальныеЗадания.ВУнисон());              // n12
 
         return out;
     }

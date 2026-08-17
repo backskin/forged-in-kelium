@@ -7,17 +7,33 @@ import kelium.core.Resource;
 /**
  * РАЗДАЧА НАГРАД ПО ЗАПИСИ КАРТЫ.
  *
- * <p>Награда — это числа, а числа правит дизайнер, поэтому они остаются в YAML и
- * НЕ переезжают в код. Здесь общий разбор записи, чтобы каждой карте не
- * переписывать одно и то же:
+ * <p>НАЙДЕНО 17.08.2026: здесь была ВТОРАЯ, РАСХОДЯЩАЯСЯ система награды. Этот
+ * разбор читал ключи {@code reward} и {@code reward_enhanced}, а каталог и сам
+ * движок ({@code Objectives.grantBase}) писали и читали {@code base_reward} и
+ * {@code special_reward}. Ключей {@code reward} в каталоге не было ни у одной
+ * карты, поэтому всякая карта, полагавшаяся на этот общий разбор, выдавала РОВНО
+ * НИЧЕГО.
+ *
+ * <p>Почему это не всплыло раньше. В живой партии награду раздаёт движок своим
+ * путём, а этот метод зовёт только договорный тест карт — и тот молчал, потому
+ * что в модуле карт партия не поднимается, записи к картам не подключались и
+ * проверять было нечего. Два пустых механизма, подтверждавших друг друга.
+ * Вскрылось в тот момент, когда карты стали описывать себя сами и запись у них
+ * появилась всегда.
+ *
+ * <p>Теперь читаются ТЕ ЖЕ ключи, которыми награду раздаёт движок:
  *
  * <pre>
- *   reward:          {coin: 2, ammo: 1, vp: 1, trophy: 2, kelium: 1, debris: 1}
- *   reward_enhanced: {coin: 4, vp: 2}
+ *   base_reward:    {coin: 2, ammo: 1, debris: 1, kelium: 1, vp: 1}
+ *   special_reward: {coin: 4, vp: 2}
  * </pre>
  *
- * <p>Карта переопределяет {@link ObjectiveCard#reward} только если её награда
- * не выражается числами — например, «поставь войско из запаса».
+ * <p>Старые имена {@code reward} / {@code reward_enhanced} остаются запасным
+ * чтением: наборы карт неизменяемы, и старая версия каталога обязана работать
+ * без правки данных.
+ *
+ * <p>Карта переопределяет {@link ObjectiveCard#reward} только если её награда не
+ * выражается числами — например, «поставь войско из запаса».
  */
 public final class CardRewards {
 
@@ -26,12 +42,12 @@ public final class CardRewards {
 
     /** Выдать награду карты из её записи в данных. */
     public static void grantFromData(CardContext ctx, Card card, boolean enhanced) {
-        Object node = card.data().get(enhanced ? "reward_enhanced" : "reward");
+        Object node = узел(card, enhanced);
         // УСИЛЕННОЙ НАГРАДЫ МОЖЕТ НЕ БЫТЬ — тогда выдаём обычную, а не ничего.
         // Обратное («нет обычной») — ошибка данных, но падать из-за неё посреди
         // партии нельзя: карта просто не даст ничего, и это будет видно в отчёте.
         if (node == null && enhanced) {
-            node = card.data().get("reward");
+            node = узел(card, false);
         }
         if (!(node instanceof Map<?, ?> reward)) {
             return;
@@ -44,6 +60,13 @@ public final class CardRewards {
         if (reward.get("vp") instanceof Number vp && vp.intValue() != 0) {
             ctx.grantVp(vp.intValue(), "objective:" + card.id());
         }
+    }
+
+    /** Запись награды: сперва имена каталога, затем старые — для прежних версий. */
+    private static Object узел(Card card, boolean enhanced) {
+        Map<String, Object> d = card.data();
+        Object node = d.get(enhanced ? "special_reward" : "base_reward");
+        return node != null ? node : d.get(enhanced ? "reward_enhanced" : "reward");
     }
 
     private static void give(CardContext ctx, Map<?, ?> reward, String key, Resource r) {
