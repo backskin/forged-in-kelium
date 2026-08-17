@@ -52,6 +52,12 @@ public final class DevScenes {
         ALL.put("полный-стол", new Item(
             "живая партия на четверых, доигранная до пятого раунда",
             DevScenes::полныйСтол));
+        ALL.put("колоды", new Item(
+            "колода на исходе, толстый сброс, витрина арсенала — вкладка «Карты»",
+            DevScenes::колоды));
+        ALL.put("итоги", new Item(
+            "партия окончена военной победой — экран итогов",
+            DevScenes::итоги));
     }
 
     /** Имена всех сцен в порядке каталога. */
@@ -201,5 +207,38 @@ public final class DevScenes {
     private static Scene полныйСтол() {
         return Scene.played(4, 4242L, 5, List.of("hawk", "dove", "explorer", "warlord"))
             .title("живая партия, пятый раунд");
+    }
+
+    /**
+     * КРАЙНИЕ СОСТОЯНИЯ КОЛОД: колода на исходе (две карты), толстый сброс, витрина
+     * арсенала. В случайной партии такое сходится к концу и не всегда, а посмотреть
+     * на вкладку «Карты» надо именно в крайних положениях.
+     */
+    private static Scene колоды() {
+        Scene s = Scene.played(4, 4242L, 6, List.of("hawk", "dove", "explorer", "warlord"))
+            .title("колоды: одна на исходе, сброс толстый");
+        s.deckSize("objectives", 2);
+        s.deckSize("containers", 1);
+        // Витрину задаём явно: в партии там лежит что легло, а проверять надо, что
+        // обе карты рисуются и обе читаются.
+        var набор = s.cfg().content.get("arsenal");
+        if (набор != null && набор.entries.size() >= 2) {
+            s.arsenalDisplay(ид(набор.entries.get(0)), ид(набор.entries.get(1)));
+        }
+        s.containers(0, 4);
+        s.cuTokens(0, 1, true);
+        return s;
+    }
+
+    /** ЭКРАН ИТОГОВ: без флага окончания партии его нечем посмотреть. */
+    private static Scene итоги() {
+        return Scene.played(4, 4242L, 6, List.of("hawk", "dove", "explorer", "warlord"))
+            .title("итоги партии, военная победа")
+            .cuTokens(0, 1, true)
+            .finished(0, "cu");
+    }
+
+    private static String ид(Object запись) {
+        return запись instanceof java.util.Map<?, ?> m ? String.valueOf(m.get("id")) : null;
     }
 }

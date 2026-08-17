@@ -294,6 +294,134 @@ public final class Scene {
         return this;
     }
 
+    // ================== КОЛОДЫ И СБРОСЫ ==================
+
+    /**
+     * ЗАДАТЬ КОЛОДУ НАБОРА — карты в порядке СВЕРХУ ВНИЗ, как их видит человек.
+     *
+     * <p>Разворот в порядок движка делается здесь: {@code Deck.draw} снимает карту
+     * с КОНЦА списка, и если бы разворота не было, сцена показывала бы колоду вверх
+     * ногами относительно того, что вытянется следующим.
+     */
+    public Scene deck(String набор, String... сверхуВниз) {
+        kelium.core.Deck d = state.decks.get(набор);
+        if (d == null) {
+            return this;
+        }
+        d.drawPile.clear();
+        for (int i = сверхуВниз.length - 1; i >= 0; i--) {
+            d.drawPile.add(сверхуВниз[i]);
+        }
+        return this;
+    }
+
+    /** Задать СБРОС набора: карты сверху вниз, нулевая сброшена последней. */
+    public Scene discard(String набор, String... сверхуВниз) {
+        kelium.core.Deck d = state.decks.get(набор);
+        if (d == null) {
+            return this;
+        }
+        d.discardPile.clear();
+        for (int i = сверхуВниз.length - 1; i >= 0; i--) {
+            d.discardPile.add(сверхуВниз[i]);
+        }
+        return this;
+    }
+
+    /** Оставить в колоде только первые {@code сколько} карт — «колода на исходе». */
+    public Scene deckSize(String набор, int сколько) {
+        kelium.core.Deck d = state.decks.get(набор);
+        if (d == null) {
+            return this;
+        }
+        while (d.drawPile.size() > Math.max(0, сколько)) {
+            d.drawPile.remove(0);
+        }
+        return this;
+    }
+
+    /** Две открытые карты витрины арсенала (первая лежит слева). */
+    public Scene arsenalDisplay(String... ids) {
+        state.arsenalDisplay.clear();
+        state.arsenalDisplay.addAll(List.of(ids));
+        return this;
+    }
+
+    // ================== ПРИКАЗЫ, ТРОФЕИ, ЖЕТОНЫ ЦУ ==================
+
+    /** Рука приказов игрока (закрыта для соседей, но сцена ставит её как есть). */
+    public Scene orderHand(int seat, String... ids) {
+        PlayerState p = state.player(seat);
+        p.orderHand = new ArrayList<>(List.of(ids));
+        return this;
+    }
+
+    /** Разыгранные в этом раунде приказы — они лежат открыто. */
+    public Scene orderPlayed(int seat, String... ids) {
+        PlayerState p = state.player(seat);
+        p.orderPlayed.clear();
+        p.orderPlayed.addAll(List.of(ids));
+        return this;
+    }
+
+    /** Отложенный слепым сбросом приказ (рубашкой вверх) и цвет колоды. */
+    public Scene orders(int seat, String отложен, String цвет) {
+        PlayerState p = state.player(seat);
+        p.orderSetAside = отложен;
+        if (цвет != null) {
+            p.orderColor = цвет;
+        }
+        return this;
+    }
+
+    /**
+     * ТРОФЕИ НА ТРОФЕЙНОЙ КАРТЕ: чужие жетоны, перевёрнутые на трофейную сторону.
+     *
+     * <p>Берутся у названного соседа с поля, поэтому на карте оказываются жетоны
+     * его цвета — как за столом.
+     */
+    public Scene trophies(int seat, int уКого, int сколько) {
+        PlayerState мой = state.player(seat);
+        PlayerState чужой = state.player(уКого);
+        int взято = 0;
+        for (kelium.core.UnitToken u : new ArrayList<>(чужой.unitsOnField())) {
+            if (взято >= сколько) {
+                break;
+            }
+            u.setHexId(null);
+            мой.trophySpace.add(u);
+            взято++;
+        }
+        return this;
+    }
+
+    /** Карты контейнеров на руке — лежат закрытыми, публично только число. */
+    public Scene containers(int seat, int сколько) {
+        state.player(seat).containers = сколько;
+        return this;
+    }
+
+    /** Жетоны уничтожения ЦУ: сколько чужих собрано и на месте ли свой. */
+    public Scene cuTokens(int seat, int чужих, boolean свойНаМесте) {
+        PlayerState p = state.player(seat);
+        p.cuDestructionTokens = чужих;
+        p.ownCuTokenAvailable = свойНаМесте;
+        return this;
+    }
+
+    /**
+     * ПАРТИЯ ОКОНЧЕНА — нужно экрану итогов: без этого его нечем посмотреть.
+     *
+     * @param winner   место победителя ({@code null} — победителя нет)
+     * @param условие  чем закончилась: «vp», «cu», «super» и прочее из движка
+     */
+    public Scene finished(Integer winner, String условие) {
+        state.finished = true;
+        state.winner = winner;
+        state.winCondition = условие;
+        return this;
+    }
+
     // ================== РЫНОК И СУПЕР-ЗАДАНИЕ ==================
 
     /** Активная карта рынка (идентификатор из каталога). */

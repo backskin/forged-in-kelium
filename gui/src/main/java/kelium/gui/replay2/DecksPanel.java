@@ -74,6 +74,10 @@ public final class DecksPanel extends JPanel {
     private final JLabel подпись = new JLabel(" ");
     /** Прокрутка ряда стопок — её надо красить вместе с темой. */
     private JScrollPane рядПрокрутка;
+    /** Делитель «ряд стопок / содержимое»: его тянут мышью. */
+    private JSplitPane пополам;
+    /** Границу по умолчанию ставим один раз — дальше ею распоряжается человек. */
+    private boolean границаПоставлена;
 
     public DecksPanel() {
         super(new BorderLayout(0, 0));
@@ -129,8 +133,38 @@ public final class DecksPanel extends JPanel {
         рядПрокрутка.getHorizontalScrollBar().setUnitIncrement(24);
         this.рядПрокрутка = рядПрокрутка;
 
-        add(рядПрокрутка, BorderLayout.NORTH);
-        add(делитель, BorderLayout.CENTER);
+        // ПОЛЗУНОК ВЕРХ/НИЗ (просьба дизайнера). Ряд стопок и содержимое под ним
+        // делят высоту вкладки, и границу между ними тянут мышью: то стопки
+        // покрупнее, то карта побольше. Без этого ряд занимал сколько хотел, а
+        // карте оставалось сколько вышло — на невысоком окне ничего.
+        JSplitPane пополам = new JSplitPane(JSplitPane.VERTICAL_SPLIT, рядПрокрутка, делитель);
+        пополам.setResizeWeight(0.0);
+        пополам.setBorder(javax.swing.BorderFactory.createEmptyBorder());
+        пополам.setDividerSize(7);
+        пополам.setOneTouchExpandable(true);
+        this.пополам = пополам;
+
+        // ГРАНИЦА ПО УМОЛЧАНИЮ — И ТОЛЬКО ОДИН РАЗ. На невысоком окне ряд стопок
+        // забирал всю свою желаемую высоту, и карте оставалась полоска в сотню
+        // пикселей: в ней карту не разглядеть, а разглядывают именно её. Поэтому
+        // ряду отводится не больше трети вкладки.
+        //
+        // Ставим ровно однажды, при первом настоящем размере: дальше границу тянет
+        // человек, и его выбор обязан держаться, а не сбрасываться на каждом
+        // изменении размера окна.
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                if (границаПоставлена || пополам.getHeight() <= 0) {
+                    return;
+                }
+                границаПоставлена = true;
+                пополам.setDividerLocation(Math.min(рядПрокрутка.getPreferredSize().height,
+                    (int) (пополам.getHeight() * 0.34)));
+            }
+        });
+
+        add(пополам, BorderLayout.CENTER);
         applyTheme();
     }
 
@@ -512,24 +546,45 @@ public final class DecksPanel extends JPanel {
             g.setStroke(new BasicStroke(выбрана ? 2.6f : 1.4f));
             g.setColor(выбрана ? Theme.accent() : Theme.border());
             g.drawRoundRect(x, y, w, h, 10, 10);
-            g.setFont(Theme.font(9.5, Font.BOLD));
-            g.setColor(Theme.ink());
-            int занято = обёртка(g, имяКарты(набор, id), x + 5, y + 14, w - 10, 10, 2);
+            // НАЗВАНИЕ МЕЛКО СВЕРХУ, ЭФФЕКТ — КРУПНЕЕ И ГЛАВНЫМ (просьба дизайнера).
+            // На превью крупное имя не нужно: карту узнают по тому, ЧТО она делает.
+            // Размеры считаются от стопки, чтобы текст ехал вместе с ней.
+            double опора = Math.min(w, h);
+            double имяТ = Math.max(4.0, опора * 0.115);
+            double эффектТ = Math.max(4.5, опора * 0.135);
+            int поле = (int) Math.max(3, опора * 0.06);
             Map<String, Object> c = данные(набор, id);
+            g.setFont(Theme.font(имяТ, Font.PLAIN));
+            g.setColor(Theme.ink3());
+            int cy = y + поле + (int) имяТ;
+            g.drawString(обрезать(g, имяКарты(набор, id), w - поле * 2), x + поле, cy);
             if (c == null) {
                 return;
             }
-            Object часть = c.get("top") != null ? c.get("top") : c.get("a");
-            String что = метка(часть);
-            if (что.isBlank()) {
-                return;
-            }
             g.setColor(Theme.divider());
-            g.drawLine(x + 5, y + 16 + занято, x + w - 5, y + 16 + занято);
-            g.setFont(Theme.font(8.5, Font.PLAIN));
-            g.setColor(Theme.ink2());
-            int осталось = h - (занято + 26);
-            обёртка(g, что, x + 5, y + 26 + занято, w - 10, 9, Math.max(1, осталось / 9));
+            g.drawLine(x + поле, cy + 3, x + w - поле, cy + 3);
+            cy += (int) (имяТ * 0.6);
+            // ВЕРХНИЙ ЭФФЕКТ, затем основной — в том порядке, в каком они на карте.
+            String[] части = {
+                метка(c.get("top") != null ? c.get("top") : c.get("a")),
+                метка(c.get("bottom") != null ? c.get("bottom") : c.get("b")),
+            };
+            g.setFont(Theme.font(эффектТ, Font.BOLD));
+            g.setColor(Theme.ink());
+            int строка = (int) Math.max(5, эффектТ * 1.15);
+            for (String часть : части) {
+                if (часть == null || часть.isBlank()) {
+                    continue;
+                }
+                int осталось = (y + h - поле) - cy;
+                if (осталось < строка) {
+                    break;
+                }
+                cy += обёртка(g, часть, x + поле, cy + (int) эффектТ, w - поле * 2, строка,
+                    Math.max(1, осталось / строка)) + (int) (эффектТ * 0.4);
+                g.setFont(Theme.font(эффектТ * 0.9, Font.PLAIN));
+                g.setColor(Theme.ink2());
+            }
         }
 
         /** Верх сброса лицом вверх плюс сколько всего в сбросе. */
@@ -579,9 +634,9 @@ public final class DecksPanel extends JPanel {
             // пустоты: разделов на ней немного, а форму держать обязана. Ограничиваем
             // и ставим по центру — так она выглядит картой, а не полосой.
             int дw = Math.max(60, Math.min(getWidth() - поле * 2,
-                (int) Math.round(600 * Theme.effectiveScale())));
+                (int) Math.round(760 * Theme.effectiveScale())));
             int дh = Math.max(60, Math.min(getHeight() - поле * 2,
-                (int) Math.round(700 * Theme.effectiveScale())));
+                (int) Math.round(820 * Theme.effectiveScale())));
             int w = дw;
             int h = (int) Math.round(w / отн);
             if (h > дh) {
@@ -602,29 +657,46 @@ public final class DecksPanel extends JPanel {
             g.setStroke(new BasicStroke(1.8f));
             g.drawRoundRect(x, y, w, h, радиус, радиус);
 
+            // ВСЁ, ЧТО НА КАРТЕ, СЧИТАЕТСЯ ОТ ЕЁ РАЗМЕРА — и отступы, и шрифты.
+            // ПОРОГОВ СНИЗУ БОЛЬШЕ НЕТ, и это была настоящая поломка: у мелкого
+            // шрифта стоял пол 10.5, у заголовка 15, поэтому на узком окне карта
+            // ужималась до ногтя, а текст оставался прежним и лез за края. Размер
+            // текста обязан ехать вместе с размером карты.
+            //
+            // Опорная величина — СРЕДНЕЕ ГЕОМЕТРИЧЕСКОЕ сторон, а не меньшая из них.
+            // По меньшей стороне горизонтальная карта арсенала получала мелкий текст
+            // при большой ширине: высота у неё вдвое меньше, а места под строку —
+            // сколько угодно. Среднее считает обе стороны и ведёт себя одинаково
+            // разумно на вертикальной карте, на горизонтальной и на квадратной.
+            double опора = Math.sqrt((double) w * h);
             Map<String, Object> c = данные(выбранныйНабор, id);
-            int отступ = Math.max(12, w / 22);
-            int cy = y + отступ + (int) (h * 0.055);
+            int отступ = (int) Math.max(4, опора * 0.045);
             int шир = w - отступ * 2;
+            // ОСНОВНОЙ КЕГЕЛЬ КАРТЫ. 0.045 от опоры, а не 0.032: текст на карте
+            // читают, а не разглядывают, и мелкий он был именно на большой карте,
+            // где места вдоволь. Пол в 5 пунктов оставлен ради совсем сжатой карты —
+            // там лучше нечитаемо мелко, чем за краями.
+            double мелкийТ = Math.max(5.0, опора * 0.045);
+            int мелкий = (int) Math.round(мелкийТ);
+            int cy = y + отступ + (int) (мелкийТ * 1.1);
 
-            // --- ЗАГОЛОВОК ---
-            g.setFont(Theme.display(Math.max(15, Math.min(w * 0.055, h * 0.075))));
+            // --- НАЗВАНИЕ И ВИД, обе строки мелко и сверху (просьба дизайнера:
+            // на превью крупные названия не нужны, нужен эффект).
+            g.setFont(Theme.font(мелкийТ * 1.05, Font.BOLD));
             g.setColor(Theme.ink());
             g.drawString(обрезать(g, имяКарты(выбранныйНабор, id), шир), x + отступ, cy);
-            cy += (int) (h * 0.03);
-            g.setFont(Theme.font(10, Font.PLAIN));
+            cy += (int) (мелкийТ * 1.15);
+            g.setFont(Theme.font(Math.max(4.0, мелкийТ * 0.8), Font.PLAIN));
             g.setColor(Theme.ink3());
-            g.drawString(видКарты(c, id), x + отступ, cy);
-            cy += (int) (h * 0.035);
+            g.drawString(обрезать(g, видКарты(c, id), шир), x + отступ, cy);
+            cy += (int) (мелкийТ * 1.4);
 
             if (c == null) {
                 g.setColor(Theme.ink3());
-                g.setFont(Theme.font(11.5, Font.ITALIC));
-                g.drawString("Записи карты в каталоге нет.", x + отступ, cy + 14);
+                g.setFont(Theme.font(мелкийТ, Font.ITALIC));
+                g.drawString("Записи карты в каталоге нет.", x + отступ, cy);
                 return;
             }
-
-            int мелкий = (int) Math.max(10.5, Math.min(w * 0.026, h * 0.032));
             // --- ВЕРХ КАРТЫ (то, ради чего её сжигают / первый эффект) ---
             String верхИмя = "objectives".equals(выбранныйНабор) ? "ВЕРХ — СЖЕЧЬ"
                 : "arsenal".equals(выбранныйНабор) ? "ВЕРХ — УТИЛЬ" : "ВАРИАНТ А";
@@ -655,15 +727,17 @@ public final class DecksPanel extends JPanel {
                 }
             }
 
-            // --- ОПИСАНИЕ, курсивом, внизу ---
+            // --- ОПИСАНИЕ, курсивом, внизу — только если под него осталось место.
             Object оп = c.get("описание");
-            if (оп != null) {
+            int осталось = (y + h - отступ) - cy;
+            if (оп != null && осталось > мелкий * 3) {
                 cy = черта(g, x + отступ, cy, шир);
-                g.setFont(Theme.font(мелкий - 0.5, Font.ITALIC));
+                g.setFont(Theme.font(мелкийТ * 0.92, Font.ITALIC));
                 g.setColor(Theme.ink2());
-                int осталось = (y + h - отступ) - cy;
-                int строк = Math.max(1, осталось / (мелкий + 3));
-                обёртка(g, String.valueOf(оп), x + отступ, cy + мелкий, шир, мелкий + 3, строк);
+                осталось = (y + h - отступ) - cy;
+                int строка = мелкий + Math.max(1, мелкий / 4);
+                обёртка(g, String.valueOf(оп), x + отступ, cy + мелкий, шир, строка,
+                    Math.max(1, осталось / строка));
             }
         }
 
@@ -673,21 +747,21 @@ public final class DecksPanel extends JPanel {
             if (текст == null || текст.isBlank()) {
                 return y;
             }
-            g.setFont(Theme.font(мелкий - 1.5, Font.BOLD));
+            g.setFont(Theme.font(Math.max(4.0, мелкий * 0.82), Font.BOLD));
             g.setColor(Theme.accent());
             g.drawString(имя, x, y + мелкий);
             g.setFont(Theme.font(мелкий, Font.PLAIN));
             g.setColor(Theme.ink());
-            int строк = 3;
-            int занято = обёртка(g, текст, x, y + мелкий * 2 + 3, w, мелкий + 3, строк);
-            return y + мелкий + 3 + занято + (int) (h * 0.012);
+            int строка = мелкий + Math.max(1, мелкий / 4);
+            int занято = обёртка(g, текст, x, y + мелкий * 2 + 2, w, строка, 3);
+            return y + мелкий + 2 + занято + Math.max(2, мелкий / 3);
         }
 
         private int черта(Graphics2D g, int x, int y, int w) {
             g.setColor(Theme.divider());
             g.setStroke(new BasicStroke(1f));
-            g.drawLine(x, y + 4, x + w, y + 4);
-            return y + 12;
+            g.drawLine(x, y + 3, x + w, y + 3);
+            return y + 10;
         }
     }
 
@@ -804,12 +878,16 @@ public final class DecksPanel extends JPanel {
         for (String слово : слова) {
             String проба = строка.length() == 0 ? слово : строка + " " + слово;
             if (g.getFontMetrics().stringWidth(проба) > ширина && строка.length() > 0) {
+                // ПОСЛЕДНЯЯ РАЗРЕШЁННАЯ СТРОКА ЗАКАНЧИВАЕТСЯ МНОГОТОЧИЕМ. Без него
+                // текст обрывался на полуслове, и понять, что он продолжается,
+                // было нельзя — читатель считал, что это вся карта.
+                if (строк + 1 >= максСтрок) {
+                    g.drawString(обрезать(g, строка + " …", ширина), x, cy);
+                    return максСтрок * высотаСтроки;
+                }
                 g.drawString(строка.toString(), x, cy);
                 cy += высотаСтроки;
                 строк++;
-                if (строк >= максСтрок) {
-                    return строк * высотаСтроки;
-                }
                 строка = new StringBuilder(слово);
             } else {
                 строка = new StringBuilder(проба);
