@@ -46,18 +46,48 @@ public final class Genome {
      */
     public final ValueNet judge;
 
+    /**
+     * ЧЕЙ ЭТО ХАРАКТЕР ({@code hawk}, {@code dove}, …) — либо {@code null}.
+     *
+     * <p>Зачем геному знать своё имя. Характер задавался ТОЛЬКО стартовым
+     * перекосом весов, а дальше отбор мутировал их, ничего о характере не зная, —
+     * и стирал его. Ястреб на четверых доучился до агрессии 0.35 против 1.68 у
+     * голубя: характеры поменялись местами, и ни одно место в коде не могло этого
+     * заметить, потому что имени характера в геноме не было.
+     *
+     * <p>Теперь имя едет вместе с весами: мутация и скрещивание умеют вернуть
+     * характер на его сторону (см. {@link #withCharacterKept()}).
+     */
+    public final String profile;
+
     public Genome(Map<String, Double> weights) {
-        this(weights, null);
+        this(weights, null, null);
     }
 
     public Genome(Map<String, Double> weights, ValueNet judge) {
+        this(weights, judge, null);
+    }
+
+    public Genome(Map<String, Double> weights, ValueNet judge, String profile) {
         this.weights = new TreeMap<>(weights);
         this.judge = judge;
+        this.profile = profile;
+    }
+
+    /**
+     * Тот же геном, но ПОДПИСАННЫЙ именем характера — веса не меняются.
+     *
+     * <p>Нужно при чтении с диска: в файле лежат только числа, а имя характера
+     * известно из имени файла. Без подписи геном не смог бы защитить свой
+     * характер, потому что не знал бы, какой он.
+     */
+    public Genome named(String profileName) {
+        return new Genome(weights, judge, profileName);
     }
 
     /** Тот же геном, но с другим судьёй позиции ({@code null} — линейная оценка). */
     public Genome withJudge(ValueNet net) {
-        return new Genome(weights, net);
+        return new Genome(weights, net, profile);
     }
 
     /**
@@ -77,14 +107,14 @@ public final class Genome {
             String key = StateFeatures.weightKey(i);
             w.put(key, base.get(key));
         }
-        return new Genome(w, judge);
+        return new Genome(w, judge, profile);
     }
 
     /** Тот же геном с одной изменённой ручкой — для опытов и стендов. */
     public Genome with(String key, double value) {
         Map<String, Double> w = new LinkedHashMap<>(weights);
         w.put(key, value);
-        return new Genome(w, judge);
+        return new Genome(w, judge, profile);
     }
 
     /** Значение веса (или {@code fallback}, если ключа нет). */
@@ -92,6 +122,15 @@ public final class Genome {
         Double v = weights.get(key);
         return v != null ? v : fallback;
     }
+
+    /**
+     * ПЕЧАТНЫЕ ЗНАЧЕНИЯ ВЕСОВ — то, от чего считается коридор и защита характера.
+     *
+     * <p>Считаются один раз: {@link #defaults()} собирает карту заново на каждый
+     * вызов, а коридор спрашивается на каждый вес каждой мутации.
+     */
+    private static final Map<String, Double> DEFAULTS =
+        Map.copyOf(defaults().weights);
 
     /**
      * Стартовый геном («сбалансированный»). Значения совпадают по духу с
@@ -293,7 +332,9 @@ public final class Genome {
      */
     public Genome withProfile(String profile) {
         if (profile == null || profile.isEmpty() || "balanced".equals(profile)) {
-            return this;
+            // Уравновешенный — тоже характер, и подписать его надо: иначе защита
+            // характера не отличит «характера нет» от «характер стёрся».
+            return named(profile);
         }
         Map<String, Double> w = new LinkedHashMap<>(weights);
         java.util.function.BiConsumer<String, Double> mul =
@@ -384,13 +425,154 @@ public final class Genome {
             }
             default -> { }
         }
-        return new Genome(w, judge);
+        // ХАРАКТЕР ПОДПИСЫВАЕТСЯ ЗДЕСЬ (profile — параметр метода). Без подписи
+        // имя терялось сразу после перекоса, и обучение мутировало веса, не зная,
+        // чей это характер: ровно так характеры и стёрлись.
+        return new Genome(w, judge, profile);
+    }
+
+    // ======================================================================
+    //  КОРИДОР ВЕСА И ЗАЩИТА ХАРАКТЕРА
+    // ======================================================================
+    //  ЧТО СЛУЧИЛОСЬ. Мутация двигала вес шумом масштаба rate*|вес| и держала
+    //  только пол в нуле. Такой шаг РАСТЁТ вместе с весом, поэтому вес, который
+    //  случайно пошёл вверх, разгоняется, а ушедший в нуль там и остаётся: пола
+    //  он касается, а обратно его толкает только шум масштаба rate.
+    //
+    //  Результат на обученных линиях 3–4 игроков (замер 17.08.2026):
+    //    combat.kill_value  554.51 у исследователя и 416.00 у ястреба при
+    //                       печатной шестёрке — и 0.00 у воителя;
+    //    action.assembly    0.00–0.64 ПОЧТИ У ВСЕХ при печатных 6.5. Сборка —
+    //                       единственный способ сделать войско. Бот с нулём
+    //                       здесь не воюет не потому, что миролюбив, а потому,
+    //                       что ему нечем: армии у него нет;
+    //    aggression         0.35 у ЯСТРЕБА против 1.68 у ГОЛУБЯ. Характеры не
+    //                       просто стёрлись, а поменялись местами.
+    //  Линии на двоих при этом целы (ястреб 1.81/15.39, голубь 0.32/2.75) —
+    //  значит дело не в замысле характеров, а в том, что отбор их не удерживает.
+    //
+    //  ДВЕ МЕРЫ. Первая: у каждого веса есть КОРИДОР вокруг печатного значения —
+    //  отбор внутри него ищет свободно, но выйти за него не может. Вторая:
+    //  характер ЗАЩИЩЁН — ястреб обязан остаться агрессивнее уравновешенного, а
+    //  голубь миролюбивее, хотя насколько именно — решает отбор.
+
+    /**
+     * ВО СКОЛЬКО РАЗ ВЕС МОЖЕТ УЙТИ от печатного значения — по семьям весов.
+     *
+     * <p>Одного числа на все веса не хватает, и это выяснилось замером. С общим
+     * коридором в шесть раз {@code action.assembly} садился на свой пол 1.08, а
+     * {@code action.mining} стоял на 6.72: нулей больше нет, но выбор всё равно
+     * «копать, а не производить», то есть армии по-прежнему нет.
+     *
+     * <p>Дело в том, что {@code action.*} — это не сила, а ПОРЯДОК. Печатные
+     * 7.0 · 6.5 · 6.0 · 6.0 · 5.5 · 5.0 · 4.0 · 2.0 задают, чем занять ход, и
+     * если каждому из восьми разрешить разъехаться независимо, порядок становится
+     * случайным. Поэтому приоритетам действий коридор УЗКИЙ.
+     *
+     * <p>ПОЧЕМУ ИМЕННО 1.6, А НЕ 2. С коридором вдвое Стройка получала [3.5, 14],
+     * а Рынок [1, 4] — и они ПЕРЕКРЫВАЛИСЬ: отбор мог посадить Стройку на пол, а
+     * Рынок поднять на потолок, и Рынок снова обгонял производство. Поймано
+     * сторожем {@code GenomeBandsTest}, а не в игре. При 1.6 Стройка не опускается
+     * ниже 4.4, а Рынок не поднимается выше 3.2 — верхний приказ печатного порядка
+     * всегда остаётся выше нижнего. Внутри этого отбору по-прежнему есть где
+     * искать: полный размах каждого веса — два с половиной раза.
+     *
+     * <p>Смысл границы такой: отбор вправе сместить УПОР, но не вправе перевернуть
+     * замысел. Печатный порядок приказов — решение дизайнера, а не догадка.
+     *
+     * <p>Остальным весам широкий коридор не вреден: они масштабируют одну и ту же
+     * величину, а не соревнуются друг с другом за ход.
+     */
+    private static double bandOf(String key) {
+        if (key.startsWith("action.")) {
+            return 1.6;
+        }
+        if ("aggression".equals(key) || "military_build".equals(key)) {
+            return 3.0;
+        }
+        return 4.0;
+    }
+
+    /** Во сколько раз вес может уйти от печатного значения (общий случай). */
+    private static final double BAND = 4.0;
+
+    /**
+     * Какую долю задуманного перекоса характер обязан сохранить при любом отборе.
+     *
+     * <p>0.3 значит: ястреб, которому профиль поднимает агрессию в 1.8 раза,
+     * обязан остаться агрессивнее уравновешенного хотя бы на 0.3 от этого — то
+     * есть в 1.24 раза. Остальное отдано отбору: он может сделать ястреба и
+     * вдвое агрессивнее задуманного, и почти таким же, как уравновешенный, но не
+     * может превратить его в голубя.
+     */
+    private static final double CHARACTER_KEEP = 0.3;
+
+    /** Коридор для веса: {@code [печатное/BAND, печатное*BAND]}. */
+    private static double[] band(String key) {
+        Double d = DEFAULTS.get(key);
+        if (d == null || d == 0.0) {
+            // Признаки позиции (eval.*) печатного значения могут не иметь: у них
+            // коридор абсолютный и симметричный — знак им менять можно.
+            return new double[]{-BAND * 4, BAND * 4};
+        }
+        double k = bandOf(key);
+        double lo = d / k;
+        double hi = d * k;
+        return d > 0 ? new double[]{lo, hi} : new double[]{hi, lo};
+    }
+
+    /** Тот же геном, но каждый обучаемый вес загнан в свой коридор. */
+    public Genome inBands() {
+        Map<String, Double> w = new LinkedHashMap<>(weights);
+        for (String key : TUNABLE_KEYS) {
+            Double cur = w.get(key);
+            if (cur == null) {
+                continue;
+            }
+            double[] b = band(key);
+            w.put(key, Math.min(b[1], Math.max(b[0], cur)));
+        }
+        return new Genome(w, judge, profile);
+    }
+
+    /**
+     * Тот же геном, но ХАРАКТЕР ВОССТАНОВЛЕН: веса, которыми характер задаётся,
+     * возвращены на свою сторону от уравновешенного.
+     *
+     * <p>Не «выставить как в профиле» — это стёрло бы обучение целиком. Только
+     * подтянуть те веса, которые перешли на чужую сторону: ястребу поднять
+     * агрессию до минимально ястребиной, голубю опустить до максимально
+     * голубиной. Всё, что уже на своей стороне, не трогается вовсе.
+     */
+    public Genome withCharacterKept() {
+        if (profile == null || profile.isEmpty() || "balanced".equals(profile)) {
+            return this;
+        }
+        // Чего профиль хотел от печатного генома — то же самое умножение.
+        Genome intended = new Genome(DEFAULTS, null, null).withProfile(profile);
+        Map<String, Double> w = new LinkedHashMap<>(weights);
+        for (String key : TUNABLE_KEYS) {
+            Double base = DEFAULTS.get(key);
+            Double want = intended.weights.get(key);
+            if (base == null || want == null || base <= 0.0 || want.equals(base)) {
+                continue;       // профиль этот вес не трогает
+            }
+            double cur = w.getOrDefault(key, base);
+            // Порог: минимально допустимая для этого характера доля перекоса.
+            double edge = base + (want - base) * CHARACTER_KEEP;
+            if (want > base && cur < edge) {
+                w.put(key, edge);
+            } else if (want < base && cur > edge) {
+                w.put(key, edge);
+            }
+        }
+        return new Genome(w, judge, profile);
     }
 
     /**
      * Мутация: каждый обучаемый вес получает гауссов шум масштаба
-     * {@code rate * |вес|} (минимум {@code rate}). Значения не опускаются ниже 0
-     * (отрицательные приоритеты бессмысленны и ломают выбор).
+     * {@code rate * |вес|} (минимум {@code rate}), после чего вес загоняется в
+     * свой коридор, а характер восстанавливается на своей стороне.
      */
     public Genome mutate(Random rng, double rate) {
         Map<String, Double> w = new LinkedHashMap<>(weights);
@@ -400,7 +582,7 @@ public final class Genome {
             double next = cur + rng.nextGaussian() * scale;
             w.put(key, mustBeNonNegative(key) ? Math.max(0.0, next) : next);
         }
-        return new Genome(w, judge);
+        return new Genome(w, judge, profile).inBands().withCharacterKept();
     }
 
     /**
@@ -420,8 +602,11 @@ public final class Genome {
                 default -> (va + vb) / 2.0;
             });
         }
-        // Судью позиции наследуем от первого родителя — как и все необучаемые ключи.
-        return new Genome(w, a.judge);
+        // Судью позиции и ХАРАКТЕР наследуем от первого родителя — как и все
+        // необучаемые ключи. Коридор и защита характера применяются и здесь:
+        // скрещивание двух ушедших в разные стороны родителей само по себе
+        // способно дать потомка вне коридора.
+        return new Genome(w, a.judge, a.profile).inBands().withCharacterKept();
     }
 
     private double getOrDefaultLocal(String key) {

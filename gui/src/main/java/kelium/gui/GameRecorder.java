@@ -222,6 +222,23 @@ public final class GameRecorder {
             rec.seatLabels.add(botLabel(id));
             rec.sides.add(state.player(seat).board.troop.side);
         }
+        fillTableAndField(rec, cfg, state);
+        return rec;
+    }
+
+    /**
+     * НАЗВАНИЯ КАРТ И ГЕОМЕТРИЯ ПОЛЯ — то, без чего запись нельзя нарисовать.
+     *
+     * <p>Вынесено в отдельный публичный шов ради режима разработчика: он собирает
+     * состояние руками и обязан получить ту же шапку, что настоящая партия. Без
+     * геометрии {@link kelium.gui.FieldView} рисует пустоту, потому что список
+     * гексов у него берётся из шапки, а не из снимка, — и это правильно: гексы за
+     * партию не меняются, повторять их в каждом кадре незачем.
+     *
+     * <p>Вторая копия этого кода означала бы, что сцена рисуется не тем полем, что
+     * партия, и расхождение нашлось бы не сразу.
+     */
+    public static void fillTableAndField(ReplayRecord rec, GameConfig cfg, GameState state) {
         collectCardNames(cfg, rec);
         for (Hex h : state.field.hexes.values()) {
             int[] qr = FieldGeometry.parseQR(h.id);
@@ -232,7 +249,6 @@ public final class GameRecorder {
             hi.kind = h.kind.name();
             rec.hexes.add(hi);
         }
-        return rec;
     }
 
     /** Собрать агентов по местам и подключить к стратегам приёмник мыслей. */

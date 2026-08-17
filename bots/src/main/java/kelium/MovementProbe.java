@@ -208,7 +208,9 @@ public final class MovementProbe {
                 GameConfig.DEFAULT_RULESET, players, seed, null, null));
             List<Agent> agents = new ArrayList<>();
             for (int seat = 0; seat < players; seat++) {
-                String c = Bots.CHARACTERS.get((seat + g) % Bots.CHARACTERS.size());
+                // Только игроки: приборы (аксиома, жнец) обучены без очков в
+                // цели и за замерным столом искажают картину.
+                String c = Bots.PLAYERS.get((seat + g) % Bots.PLAYERS.size());
                 agents.add(new Watcher(
                     Bots.create(c, seat, new Random(seed * 131 + seat + 1), players)));
             }

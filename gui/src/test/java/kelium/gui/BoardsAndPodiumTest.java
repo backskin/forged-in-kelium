@@ -64,19 +64,32 @@ class BoardsAndPodiumTest {
         }
         assertTrue(onTracks > 0, "за партию кто-то шагнул по трекам");
 
-        // ЯЧЕЙКИ РЫНКА: за партию их хоть раз занимали, и владелец записан
+        // ЯЧЕЙКИ РЫНКА: владелец записан, и за несколько партий их хоть раз занимали.
+        //
+        // ПОЧЕМУ НЕСКОЛЬКО ПАРТИЙ, А НЕ ОДНА. Проверка сторожит запись — что в
+        // снимке лежит место владельца ячейки, — но само занятие ячейки событие
+        // вероятностное. На одной партии с одним сидом тест ловил не запись, а
+        // склонность ботов к Рынку: когда коридор весов вернул action.market с
+        // 24.89 к печатным двум, боты в этой конкретной партии до рынка не дошли,
+        // и сторож упал на месте, где ничего не сломалось.
         boolean seenOwner = false;
-        for (ReplayRecord.Frame f : rec.frames) {
-            for (int[] side : f.snapshot.marketCells) {
-                for (int seat : side) {
-                    assertTrue(seat >= -1 && seat < rec.players, "место или −1: " + seat);
-                    if (seat >= 0) {
-                        seenOwner = true;
+        for (int i = 0; i < 6 && !seenOwner; i++) {
+            ReplayRecord r = i == 0 ? rec : GameRecorder.play(GameConfig.DEFAULT_RULESET, 4,
+                909 + i, List.of("strat:hawk", "strat:dove", "strat:balanced",
+                    "strat:opportunist"), null);
+            for (ReplayRecord.Frame f : r.frames) {
+                for (int[] side : f.snapshot.marketCells) {
+                    for (int seat : side) {
+                        assertTrue(seat >= -1 && seat < r.players, "место или −1: " + seat);
+                        if (seat >= 0) {
+                            seenOwner = true;
+                        }
                     }
                 }
             }
         }
-        assertTrue(seenOwner, "боты хоть раз заняли ячейку предложения рынка кубиком");
+        assertTrue(seenOwner,
+            "ни в одной из шести партий боты не заняли ячейку предложения рынка");
     }
 
     /**

@@ -419,10 +419,14 @@ public final class BalanceProbe {
             Random r = new Random(seed * 131 + seat + 1);
             switch (spec) {
                 case "strategic" -> {
-                    // разные характеры за столом (непредсказуемость); 6 характеров
-                    // на 4 места — ротация по сиду, чтобы играли ВСЕ. С 12.08.2026
-                    // все шесть — обученные линии геномов, прошитых характеров нет.
-                    List<String> profs = kelium.agents.Bots.CHARACTERS;
+                    // разные характеры за столом (непредсказуемость); ротация по
+                    // сиду, чтобы играли ВСЕ. С 12.08.2026 все — обученные линии
+                    // геномов, прошитых характеров нет.
+                    //
+                    // ТОЛЬКО ИГРОКИ, БЕЗ ПРИБОРОВ: аксиома и жнец обучены без очков
+                    // в цели, и их присутствие за столом портит замер соседей — а
+                    // это балансовый стенд, замер тут единственный смысл.
+                    List<String> profs = kelium.agents.Bots.PLAYERS;
                     String prof = profs.get((seat + (int) Math.floorMod(seed, profs.size()))
                         % profs.size());
                     agents.add(kelium.agents.Bots.create(prof, seat, r, players));
