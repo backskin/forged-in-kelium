@@ -72,6 +72,8 @@ public final class DecksPanel extends JPanel {
     private final JList<String> список = new JList<>(модель);
     private final Лицо лицо = new Лицо();
     private final JLabel подпись = new JLabel(" ");
+    /** Прокрутка ряда стопок — её надо красить вместе с темой. */
+    private JScrollPane рядПрокрутка;
 
     public DecksPanel() {
         super(new BorderLayout(0, 0));
@@ -93,12 +95,41 @@ public final class DecksPanel extends JPanel {
         слева.add(подпись, BorderLayout.NORTH);
         слева.add(прокрутка, BorderLayout.CENTER);
 
+        // СПИСОК ПОСТОЯННОЙ ШИРИНЫ. Доля от окна тут не годится: на широком экране
+        // треть — это шестьсот пикселей под колонку имён, где хватает трёхсот. Весь
+        // прирост ширины отдаём карте: её и разглядывают.
+        слева.setPreferredSize(new Dimension(
+            (int) Math.round(330 * Theme.effectiveScale()), 10));
+        слева.setMinimumSize(new Dimension(
+            (int) Math.round(200 * Theme.effectiveScale()), 10));
         JSplitPane делитель = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, слева, лицо);
-        делитель.setResizeWeight(0.32);
+        делитель.setResizeWeight(0.0);
         делитель.setBorder(javax.swing.BorderFactory.createEmptyBorder());
         делитель.setDividerSize(6);
 
-        add(стопки, BorderLayout.NORTH);
+        // РЯД СТОПОК ПРОКРУЧИВАЕТСЯ ПО ГОРИЗОНТАЛИ (решение дизайнера): не влезло —
+        // прокрути. Ужимать стопки до неразличимости хуже: их форма и есть то,
+        // чем карты за столом различают.
+        JScrollPane рядПрокрутка = new JScrollPane(стопки,
+            JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED) {
+            @Override
+            public Dimension getPreferredSize() {
+                // МЕСТО ПОД ПОЛОСУ ПРОКРУТКИ ОТВОДИТСЯ ВСЕГДА. BorderLayout.NORTH
+                // даёт полосе ровно высоту содержимого, и когда полоса появлялась,
+                // её просто срезало: прокрутить было нечем, хотя ряд не влезал.
+                Dimension d = super.getPreferredSize();
+                int бар = getHorizontalScrollBar() == null ? 12
+                    : Math.max(12, getHorizontalScrollBar().getPreferredSize().height);
+                return new Dimension(d.width, стопки.getPreferredSize().height + бар + 2);
+            }
+        };
+        рядПрокрутка.setBorder(javax.swing.BorderFactory.createEmptyBorder());
+        рядПрокрутка.getViewport().setOpaque(false);
+        рядПрокрутка.setOpaque(false);
+        рядПрокрутка.getHorizontalScrollBar().setUnitIncrement(24);
+        this.рядПрокрутка = рядПрокрутка;
+
+        add(рядПрокрутка, BorderLayout.NORTH);
         add(делитель, BorderLayout.CENTER);
         applyTheme();
     }
@@ -112,6 +143,9 @@ public final class DecksPanel extends JPanel {
         подпись.setForeground(Theme.ink2());
         подпись.setFont(Theme.font(11.5, Font.BOLD));
         лицо.setBackground(Theme.bg());
+        if (рядПрокрутка != null) {
+            рядПрокрутка.getViewport().setBackground(Theme.panel());
+        }
         repaint();
     }
 
@@ -230,11 +264,31 @@ public final class DecksPanel extends JPanel {
     // ==================================================================
 
     /**
+     * ФОРМА КАРТЫ НАБОРА — отношение ширины к высоте, как у настоящей карты.
+     *
+     * <p>Печатные размеры: контейнер 34×34 мм — КВАДРАТ, карта арсенала 68×44 мм —
+     * ГОРИЗОНТАЛЬНАЯ (по ширине она равна двум контейнерам), задание —
+     * вертикальная карта обычного игрального формата.
+     *
+     * <p>Сперва я рисовал ВСЕ стопки одной вертикальной формой, и это была именно
+     * та неправильность, которую видно с первого взгляда: квадратный контейнер
+     * лежал вытянутым, а горизонтальный арсенал стоял стоймя. Форма стопки — это
+     * то, чем карты за столом и различают, «спутать их нельзя физически».
+     */
+    private static double форма(String набор) {
+        return switch (набор) {
+            case "arsenal" -> 68.0 / 44.0;
+            case "containers" -> 1.0;
+            default -> 63.0 / 88.0;
+        };
+    }
+
+    /**
      * Ряд стопок: по набору — колода, витрина (только у арсенала) и сброс.
      *
-     * <p>Высота фиксирована, ширина делится на три группы поровну: так при любом
-     * размере окна группы не наезжают друг на друга, а внутри группы стопки
-     * ужимаются вместе с ней.
+     * <p>Ряд САМ СЧИТАЕТ свою ширину по формам карт, а не делит окно на три
+     * равные части. Не влезло — {@link JScrollPane} даёт горизонтальную прокрутку
+     * (решение дизайнера): ужимать стопки до неразличимости хуже, чем прокрутить.
      */
     private final class Стопки extends JComponent {
 
@@ -259,9 +313,70 @@ public final class DecksPanel extends JPanel {
             });
         }
 
+        /**
+         * ВЫСОТА КАРТЫ В СТОПКЕ — от неё считается вся раскладка ряда.
+         *
+         * <p>СПЕРВА УЖИМАЕМСЯ, ПОТОМ ПРОКРУЧИВАЕМ. Если ряд не влезает в окно,
+         * карты уменьшаются — но не ниже предела, за которым название уже не
+         * прочитать. Дальше включается горизонтальная прокрутка. Порядок именно
+         * такой: прокрутка прячет половину стола, и платить ею стоит только когда
+         * ужиматься больше нельзя.
+         */
+        private int высотаКарты() {
+            double м = Theme.effectiveScale();
+            int хочу = (int) Math.round(96 * м);
+            int предел = (int) Math.round(68 * м);
+            int доступно = getParent() == null ? 0 : getParent().getWidth();
+            if (доступно <= 0) {
+                return хочу;
+            }
+            int нужно = ширинаРяда(хочу);
+            if (нужно <= доступно) {
+                return хочу;
+            }
+            // Ширина ряда линейна по высоте карты, поэтому нужный размер считается
+            // сразу, без подбора по шагам.
+            int подгон = (int) Math.floor(хочу * (доступно - 14.0) / нужно);
+            return Math.max(предел, Math.min(хочу, подгон));
+        }
+
+        /** Ширина всего ряда при такой высоте карты. */
+        private int ширинаРяда(int высота) {
+            int всего = 14;
+            for (String[] n : НАБОРЫ) {
+                int шир = (int) Math.round(высота * форма(n[0]));
+                int стопок = 2 + ("arsenal".equals(n[0]) && snap != null
+                    ? snap.arsenalDisplay.size() : 0);
+                всего += стопок * шир + (стопок - 1) * зазор() + межГруппами();
+            }
+            return всего;
+        }
+
+        private int зазор() {
+            return (int) Math.round(10 * Theme.effectiveScale());
+        }
+
+        /** Отступ группы от группы. */
+        private int межГруппами() {
+            return (int) Math.round(30 * Theme.effectiveScale());
+        }
+
+        /** Ширина одной группы: подпись, колода, витрина, сброс. */
+        private int ширинаГруппы(String набор) {
+            int выс = высотаКарты();
+            int шир = (int) Math.round(выс * форма(набор));
+            int стопок = 2 + ("arsenal".equals(набор) && snap != null
+                ? snap.arsenalDisplay.size() : 0);
+            return стопок * шир + (стопок - 1) * зазор();
+        }
+
         @Override
         public Dimension getPreferredSize() {
-            return new Dimension(600, (int) Math.round(190 * Theme.effectiveScale()));
+            int выс = высотаКарты();
+            // Высота: подпись сверху, карта, подпись снизу.
+            int h = (int) Math.round(24 * Theme.effectiveScale())
+                + выс + (int) Math.round(26 * Theme.effectiveScale());
+            return new Dimension(ширинаРяда(выс), h);
         }
 
         @Override
@@ -284,41 +399,34 @@ public final class DecksPanel extends JPanel {
                 g.dispose();
                 return;
             }
-            int групп = НАБОРЫ.length;
-            int шагГруппы = w / групп;
-            for (int i = 0; i < групп; i++) {
-                нарисоватьГруппу(g, НАБОРЫ[i][0], НАБОРЫ[i][1],
-                    i * шагГруппы, 0, шагГруппы, h);
+            int x = 14;
+            for (String[] n : НАБОРЫ) {
+                нарисоватьГруппу(g, n[0], n[1], x, 0);
+                x += ширинаГруппы(n[0]) + межГруппами();
             }
             g.dispose();
         }
 
-        private void нарисоватьГруппу(Graphics2D g, String набор, String имя,
-                                      int x, int y, int w, int h) {
+        private void нарисоватьГруппу(Graphics2D g, String набор, String имя, int x, int y) {
+            int выс = высотаКарты();
+            int шир = (int) Math.round(выс * форма(набор));
+            int cy = y + (int) Math.round(24 * Theme.effectiveScale());
+
             g.setFont(Theme.font(11, Font.BOLD));
             g.setColor(Theme.ink2());
-            g.drawString(имя, x + 14, y + 20);
+            g.drawString(имя, x, cy - (int) Math.round(8 * Theme.effectiveScale()));
 
             ReplayRecord.DeckState d = snap.decks.get(набор);
             int вКолоде = d == null ? 0 : d.draw.size();
             int вСбросе = d == null ? 0 : d.discard.size();
-            boolean арсенал = "arsenal".equals(набор);
-            List<String> витрина = арсенал ? snap.arsenalDisplay : List.of();
+            List<String> витрина = "arsenal".equals(набор) ? snap.arsenalDisplay : List.of();
 
-            // Ширины: колода, витрина (0 или 2 карты), сброс. Считаем по числу
-            // стопок, чтобы у арсенала карты были уже, а не вылезали за группу.
-            int стопок = 2 + витрина.size();
-            int зазор = Math.max(6, w / 40);
-            int шир = Math.max(28, (w - 28 - зазор * (стопок - 1)) / стопок);
-            int выс = Math.min(h - 46, (int) Math.round(шир * 1.35));
-            int cx = x + 14;
-            int cy = y + 30;
-
+            int cx = x;
             рубашка(g, cx, cy, шир, выс, вКолоде, "колода", набор, false);
-            cx += шир + зазор;
+            cx += шир + зазор();
             for (String id : витрина) {
                 лицом(g, cx, cy, шир, выс, id, "витрина", набор);
-                cx += шир + зазор;
+                cx += шир + зазор();
             }
             String верхСброса = вСбросе > 0 ? d.discard.get(0) : null;
             if (верхСброса != null) {
@@ -382,26 +490,23 @@ public final class DecksPanel extends JPanel {
             g.drawString(подпись, x, y + h + 14);
         }
 
-        /** Открытая карта: название и метка. */
+        /** Открытая карта: мини-лицо — название и что она делает. */
         private void лицом(Graphics2D g, int x, int y, int w, int h, String id, String подпись,
                            String набор) {
-            g.setColor(Theme.paper());
-            g.fillRoundRect(x, y, w, h, 10, 10);
-            g.setColor(Theme.border());
-            g.setStroke(new BasicStroke(1.4f));
-            g.drawRoundRect(x, y, w, h, 10, 10);
-            g.setFont(Theme.font(9.5, Font.BOLD));
-            g.setColor(Theme.ink());
-            обёртка(g, имяКарты(набор, id), x + 5, y + 15, w - 10, 11, 4);
+            миниЛицо(g, x, y, w, h, id, набор, false);
             g.setFont(Theme.font(10, Font.PLAIN));
             g.setColor(Theme.ink3());
             g.drawString(подпись, x, y + h + 14);
         }
 
-        /** Верх сброса лицом вверх плюс сколько всего в сбросе. */
-        private void лицомСЧислом(Graphics2D g, int x, int y, int w, int h, String id,
-                                  String подпись, int всего, String набор) {
-            boolean выбрана = набор.equals(выбранныйНабор) && выбранСброс;
+        /**
+         * МИНИ-ЛИЦО ОТКРЫТОЙ КАРТЫ: название и первая строка того, что она делает.
+         *
+         * <p>Пустой прямоугольник с именем в углу не говорил ничего: чтобы понять,
+         * что лежит в витрине или что сбросили последним, приходилось щёлкать.
+         */
+        private void миниЛицо(Graphics2D g, int x, int y, int w, int h, String id,
+                              String набор, boolean выбрана) {
             g.setColor(Theme.paper());
             g.fillRoundRect(x, y, w, h, 10, 10);
             g.setStroke(new BasicStroke(выбрана ? 2.6f : 1.4f));
@@ -409,7 +514,29 @@ public final class DecksPanel extends JPanel {
             g.drawRoundRect(x, y, w, h, 10, 10);
             g.setFont(Theme.font(9.5, Font.BOLD));
             g.setColor(Theme.ink());
-            обёртка(g, имяКарты(набор, id), x + 5, y + 15, w - 10, 11, 4);
+            int занято = обёртка(g, имяКарты(набор, id), x + 5, y + 14, w - 10, 10, 2);
+            Map<String, Object> c = данные(набор, id);
+            if (c == null) {
+                return;
+            }
+            Object часть = c.get("top") != null ? c.get("top") : c.get("a");
+            String что = метка(часть);
+            if (что.isBlank()) {
+                return;
+            }
+            g.setColor(Theme.divider());
+            g.drawLine(x + 5, y + 16 + занято, x + w - 5, y + 16 + занято);
+            g.setFont(Theme.font(8.5, Font.PLAIN));
+            g.setColor(Theme.ink2());
+            int осталось = h - (занято + 26);
+            обёртка(g, что, x + 5, y + 26 + занято, w - 10, 9, Math.max(1, осталось / 9));
+        }
+
+        /** Верх сброса лицом вверх плюс сколько всего в сбросе. */
+        private void лицомСЧислом(Graphics2D g, int x, int y, int w, int h, String id,
+                                  String подпись, int всего, String набор) {
+            boolean выбрана = набор.equals(выбранныйНабор) && выбранСброс;
+            миниЛицо(g, x, y, w, h, id, набор, выбрана);
             g.setFont(Theme.font(10, Font.PLAIN));
             g.setColor(Theme.ink3());
             g.drawString(подпись + " · " + всего, x, y + h + 14);
@@ -445,23 +572,24 @@ public final class DecksPanel extends JPanel {
                 g.dispose();
                 return;
             }
-            // Соотношение сторон по набору.
-            double отн = switch (выбранныйНабор) {
-                case "arsenal" -> 68.0 / 44.0;      // горизонтальная
-                case "containers" -> 1.0;           // квадрат
-                default -> 63.0 / 88.0;             // вертикальная
-            };
+            // Форма карты — та же, что у стопки: одно место на всю панель.
+            double отн = форма(выбранныйНабор);
             int поле = 24;
-            int дw = Math.max(60, getWidth() - поле * 2);
-            int дh = Math.max(60, getHeight() - поле * 2);
+            // ПОТОЛОК РАЗМЕРА. Растянутая на всю панель карта оставляла внизу ладонь
+            // пустоты: разделов на ней немного, а форму держать обязана. Ограничиваем
+            // и ставим по центру — так она выглядит картой, а не полосой.
+            int дw = Math.max(60, Math.min(getWidth() - поле * 2,
+                (int) Math.round(600 * Theme.effectiveScale())));
+            int дh = Math.max(60, Math.min(getHeight() - поле * 2,
+                (int) Math.round(700 * Theme.effectiveScale())));
             int w = дw;
             int h = (int) Math.round(w / отн);
             if (h > дh) {
                 h = дh;
                 w = (int) Math.round(h * отн);
             }
-            int x = поле + (дw - w) / 2;
-            int y = поле + (дh - h) / 2;
+            int x = (getWidth() - w) / 2;
+            int y = поле + Math.max(0, (getHeight() - поле * 2 - h) / 2);
             карта(g, x, y, w, h, id);
             g.dispose();
         }
