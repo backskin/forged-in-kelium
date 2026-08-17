@@ -113,8 +113,20 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
         if (жертва != null) {
             out.put("sacrifice", жертва);
         }
+        if (отсев() != null) {
+            out.put("cull", отсев());
+        }
         out.put("описание", л.описание());
         return out;
+    }
+
+    /**
+     * ОТСЕВ ПО ЧИСЛУ ИГРОКОВ: {@code "[4]"} — карту не раздают на четырёх, потому
+     * что там она даётся слишком легко (соседей больше, чужих жетонов рядом
+     * больше). {@code null} — карта играет при любом числе игроков.
+     */
+    protected String отсев() {
+        return null;
     }
 
     /**
@@ -157,11 +169,52 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
     }
 
     /**
-     * Сжигание карты ради одноразового эффекта. Большинству заданий верх выдаёт
-     * добро или бесплатное действие — это и есть общий случай.
+     * Сжигание карты ради одноразового эффекта. Каждая карта объявляет свой верх
+     * своим кодом — записи {@code effect} в каталоге у переехавших карт нет.
      */
     @Override
     public boolean burn(CardContext ctx) {
         return false;
+    }
+
+    // ==================================================================
+    //  ВЕРХ КАРТЫ — короткие имена для того, что печатается на картах
+    // ==================================================================
+
+    protected static boolean свободноеДвижение(CardContext ctx) {
+        ctx.freeAction("movement");
+        return true;
+    }
+
+    protected static boolean свободныйБой(CardContext ctx) {
+        ctx.freeAction("combat");
+        return true;
+    }
+
+    protected static boolean свободнаяНаука(CardContext ctx) {
+        ctx.freeAction("science");
+        return true;
+    }
+
+    protected static boolean свободныйМаркет(CardContext ctx) {
+        ctx.freeAction("market");
+        return true;
+    }
+
+    protected static boolean свободнаяДобыча(CardContext ctx) {
+        ctx.freeAction("mining");
+        return true;
+    }
+
+    /** Сборка с пределом: без предела верх был сильнее выполненного задания. */
+    protected static boolean свободнаяСборка(CardContext ctx, int зданий) {
+        ctx.freeAction("assembly", Map.of("buildings", зданий));
+        return true;
+    }
+
+    /** Стройка с пределом по числу строительных операций. */
+    protected static boolean свободнаяСтройка(CardContext ctx, int операций) {
+        ctx.freeAction("build", Map.of("ops", операций));
+        return true;
     }
 }

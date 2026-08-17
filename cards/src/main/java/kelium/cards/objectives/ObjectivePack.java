@@ -38,28 +38,32 @@ public final class ObjectivePack implements CardRegistry.CardPack {
         // Половина колоды платит за конфликт (заказ дизайнера 15.08.2026).
         // До каталога 1.7.0 таких карт было шесть из 54 — каталог платил
         // игроку за то, чтобы НЕ воевать.
-        out.add(new GroupDevelopment.Strongpoint());          // o03 Опорный пункт
-        out.add(new GroupDevelopment.Ambush());               // o07 Засада
-        out.add(new GroupInfrastructure.ForwardNode());       // o11 Передовой узел
-        out.add(new GroupInfrastructure.FieldConstruction()); // o12 Стройка в поле
-        out.add(new GroupInfrastructure.Encirclement());      // o14 Круговая порука
-        out.add(new GroupInfrastructure.NewGround());         // o17 Ход на новостройку
-        out.add(new GroupOperation.FirstBlood());             // o21 Первая кровь
-        out.add(new GroupOperation.Mopping());                // o22 Зачистка
-        out.add(new GroupOperation.Spread());                 // o23 Растяжка
-        out.add(new GroupOperation.Siege());                  // o25 Осада
-        out.add(new GroupOperation.Raid());                   // o26 Наскок
-        out.add(new GroupOperation.OnEnemyGround());          // o27 На чужой земле
-        out.add(new GroupOperation.Pincers());                // o28 Клещи
-        out.add(new GroupOperation.DeepRaid());               // o29 Дальний рейд
-        out.add(new GroupOperation.AirSupremacy());           // o31 Воздушное превосходство
-        out.add(new GroupNewWar.Riposte());                   // o41 Ответный удар
-        out.add(new GroupNewWar.Devastation());               // o42 Разорение
-        out.add(new GroupNewWar.StrongerHunt());              // o43 Охота на сильного
-        out.add(new PredicateObjective("o45",
-            "в этот ход нанести урон двум разным зданиям противника"));
-        out.add(new PredicateObjective("o46",
-            "набрать в трофеи жетоны трёх разных видов"));
+        // ПЕРЕВЕДЕНЫ ЦЕЛИКОМ В КОД. Девятнадцать карт из двадцати: у каждой свой
+        // класс, своё лицо (имя, пороги, награда, печатный текст), свой код
+        // условия, усиления и одноразового эффекта. Ни чтения YAML, ни ссылок на
+        // реестр предикатов. Прежде две из них были пустыми обёртками, а имена в
+        // этом списке успели разойтись с каталогом: стояло «o11 Передовой узел»,
+        // на карте печаталось «Передовая база».
+        out.add(new ЗаданияВойныI.ОпорныйПункт());            // o03
+        out.add(new ЗаданияВойныI.Засада());                  // o07
+        out.add(new ЗаданияВойныI.ПередоваяБаза());           // o11
+        out.add(new ЗаданияВойныI.НаглаяСтройка());           // o12
+        out.add(new ЗаданияВойныI.ОсадныйЛагерь());           // o14
+        out.add(new ЗаданияВойныI.ШтабНаПередовой());         // o17
+        out.add(new ЗаданияВойныI.ПерваяКровь());             // o21
+        out.add(new GroupOperation.Mopping());                // o22 Зачистка — карта-жертва
+        out.add(new ЗаданияВойныI.Подранки());                // o23
+        out.add(new ЗаданияВойныI.Осада());                   // o25
+        out.add(new ЗаданияВойныI.Пристрелка());              // o45
+        out.add(new ЗаданияВойныII.Блицкриг());               // o26
+        out.add(new ЗаданияВойныII.НаЧужомДворе());           // o27
+        out.add(new ЗаданияВойныII.Клещи());                  // o28
+        out.add(new ЗаданияВойныII.ПустойДвор());             // o29
+        out.add(new ЗаданияВойныII.ГосподствоВНебе());        // o31
+        out.add(new ЗаданияВойныII.ОтветныйУдар());           // o41
+        out.add(new ЗаданияВойныII.Разорение());              // o42
+        out.add(new ЗаданияВойныII.ОхотаНаСильного());        // o43
+        out.add(new ЗаданияВойныII.ТрофейныйОбоз());          // o46
 
         // ============ ЭКОНОМИКА, НАУКА, РИСУНКИ (20 карт) ============
         out.add(new GroupDevelopment.FullSalvo());            // o01 Полный залп

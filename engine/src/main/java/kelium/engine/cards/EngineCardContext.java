@@ -159,6 +159,125 @@ public final class EngineCardContext implements CardContext {
         kelium.engine.Effects.apply("free_action", state, seat, Map.of("action", action));
     }
 
+    // ВОПРОСЫ ПРО ПОЛЕ. Один обход на всех: прежде каждый такой перебор жил
+    // отдельной строкой в реестре предикатов, и карта до него не доставала.
+
+    @Override public java.util.List<kelium.core.Token> enemyTokensOn(String hexId) {
+        java.util.List<kelium.core.Token> out = new java.util.ArrayList<>();
+        for (kelium.core.PlayerState pl : state.players) {
+            if (pl.seat == seat) {
+                continue;
+            }
+            for (kelium.core.UnitToken u : pl.unitsOnField()) {
+                if (hexId.equals(u.hexId)) {
+                    out.add(u);
+                }
+            }
+            for (kelium.core.BuildingToken b : pl.buildingsOnField()) {
+                if (hexId.equals(b.hexId)) {
+                    out.add(b);
+                }
+            }
+        }
+        return out;
+    }
+
+    @Override public java.util.List<kelium.core.Token> enemyBuildingsOn(String hexId) {
+        java.util.List<kelium.core.Token> out = new java.util.ArrayList<>();
+        for (kelium.core.PlayerState pl : state.players) {
+            if (pl.seat == seat) {
+                continue;
+            }
+            for (kelium.core.BuildingToken b : pl.buildingsOnField()) {
+                if (hexId.equals(b.hexId)) {
+                    out.add(b);
+                }
+            }
+        }
+        return out;
+    }
+
+    @Override public boolean adjacentToEnemy(String hexId) {
+        for (String nb : state.field.neighbors(hexId)) {
+            if (!enemyTokensOn(nb).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override public java.util.Set<String> myBuildingHexes() {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (kelium.core.BuildingToken b : state.player(seat).buildingsOnField()) {
+            out.add(b.hexId);
+        }
+        return out;
+    }
+
+    @Override public java.util.Set<String> cuHexesOf(int who) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (kelium.core.BuildingToken b : state.player(who).buildingsOnField()) {
+            if (b.type == kelium.core.BuildingType.COMMAND_CENTER) {
+                out.add(b.hexId);
+            }
+        }
+        return out;
+    }
+
+    @Override public java.util.Collection<String> neighbors(String hexId) {
+        return state.field.neighbors(hexId);
+    }
+
+    @Override public java.util.Collection<String> allHexes() {
+        return state.field.hexes.keySet();
+    }
+
+    @Override public boolean passable(String hexId) {
+        return kelium.engine.Movement.passable(state, hexId);
+    }
+
+    @Override public Integer distance(String from, java.util.Collection<String> targets) {
+        return kelium.engine.Movement.distance(state, from, targets);
+    }
+
+    @Override public void freeAction(String action, Map<String, Object> limits) {
+        Map<String, Object> p = new java.util.HashMap<>(limits == null ? Map.of() : limits);
+        p.put("action", action);
+        kelium.engine.Effects.apply("free_action", state, seat, p);
+    }
+
+    // ОДНОРАЗОВЫЕ ЭФФЕКТЫ ВЕРХА. Каждый — правило игры, уже реализованное в
+    // Effects; здесь только типизированный вход для карт, живущих в коде, чтобы
+    // им не приходилось описывать свой верх строкой в каталоге. Второй
+    // реализации нет ни у одного: правило остаётся в одном месте.
+
+    @Override public boolean shield(java.util.List<String> kinds) {
+        return !kelium.engine.Effects.apply("shield", state, seat,
+            Map.of("types", kinds == null ? java.util.List.of() : kinds)).isEmpty();
+    }
+
+    @Override public boolean speedBoost() {
+        return !kelium.engine.Effects.apply("speed_boost", state, seat, Map.of()).isEmpty();
+    }
+
+    @Override public boolean landing(int count) {
+        return !kelium.engine.Effects.apply("landing", state, seat,
+            Map.of("count", count)).isEmpty();
+    }
+
+    @Override public boolean energyOrModules() {
+        return !kelium.engine.Effects.apply("energy_or_modules", state, seat, Map.of()).isEmpty();
+    }
+
+    @Override public boolean convert(Resource from, Resource to, int amount) {
+        return !kelium.engine.Effects.apply("convert", state, seat,
+            Map.of("from", from.code, "to", to.code, "amount", amount)).isEmpty();
+    }
+
+    @Override public boolean healHex() {
+        return !kelium.engine.Effects.apply("heal_hex", state, seat, Map.of()).isEmpty();
+    }
+
     @Override public void grantVp(int amount, String source) {
         if (amount == 0) {
             return;

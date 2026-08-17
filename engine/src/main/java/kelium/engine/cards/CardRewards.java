@@ -40,18 +40,33 @@ public final class CardRewards {
     private CardRewards() {
     }
 
-    /** Выдать награду карты из её записи в данных. */
+    /**
+     * Выдать награду карты из её записи в данных.
+     *
+     * <p>УСИЛЕННАЯ НАГРАДА — ДОБАВКА, А НЕ ЗАМЕНА. Второе расхождение того же
+     * корня, что и имена ключей: этот разбор выдавал при усилении ТОЛЬКО
+     * усиленную часть, а движок в живой партии всегда платит базовую и добавляет
+     * особую сверху. Карта o12 обещает 4 монеты и жетон модуля: по старому разбору
+     * игрок за усиленное выполнение получал жетон и НИ ОДНОЙ монеты — то есть
+     * усиление наказывало.
+     */
     public static void grantFromData(CardContext ctx, Card card, boolean enhanced) {
-        Object node = узел(card, enhanced);
-        // УСИЛЕННОЙ НАГРАДЫ МОЖЕТ НЕ БЫТЬ — тогда выдаём обычную, а не ничего.
-        // Обратное («нет обычной») — ошибка данных, но падать из-за неё посреди
-        // партии нельзя: карта просто не даст ничего, и это будет видно в отчёте.
-        if (node == null && enhanced) {
-            node = узел(card, false);
+        Object base = узел(card, false);
+        if (base instanceof Map<?, ?> b) {
+            выдать(ctx, card, b);
         }
-        if (!(node instanceof Map<?, ?> reward)) {
+        if (!enhanced) {
             return;
         }
+        Object node = узел(card, true);
+        // Усиленной части может не быть вовсе — тогда добавлять нечего, а базовая
+        // уже выдана выше. Прежде здесь выдавалась базовая ВТОРОЙ раз.
+        if (node instanceof Map<?, ?> special) {
+            выдать(ctx, card, special);
+        }
+    }
+
+    private static void выдать(CardContext ctx, Card card, Map<?, ?> reward) {
         give(ctx, reward, "coin", Resource.COIN);
         give(ctx, reward, "kelium", Resource.KELIUM);
         give(ctx, reward, "ammo", Resource.AMMO);

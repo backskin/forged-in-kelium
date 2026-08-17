@@ -128,6 +128,116 @@ public final class TestCardContext implements CardContext {
         log.add(Map.of("free_action", action));
     }
 
+    // ОДНОРАЗОВЫЕ ЭФФЕКТЫ ВЕРХА И ВОПРОСЫ ПРО ПОЛЕ. Двойник их только ЗАПИСЫВАЕТ:
+    // правила живут в движке, а здесь проверяется, что карта дёрнула нужный
+    // эффект с нужными пределами.
+
+    @Override public void freeAction(String action, Map<String, Object> limits) {
+        Map<String, Object> row = new HashMap<>(limits == null ? Map.of() : limits);
+        row.put("free_action", action);
+        log.add(row);
+    }
+
+    @Override public boolean shield(List<String> kinds) {
+        log.add(Map.of("shield", kinds));
+        return true;
+    }
+
+    @Override public boolean speedBoost() {
+        log.add(Map.of("speed_boost", true));
+        return true;
+    }
+
+    @Override public boolean landing(int count) {
+        log.add(Map.of("landing", count));
+        return true;
+    }
+
+    @Override public boolean energyOrModules() {
+        log.add(Map.of("energy_or_modules", true));
+        return true;
+    }
+
+    @Override public boolean convert(Resource from, Resource to, int amount) {
+        log.add(Map.of("convert", from.code + "->" + to.code, "amount", amount));
+        return true;
+    }
+
+    @Override public boolean healHex() {
+        log.add(Map.of("heal_hex", true));
+        return true;
+    }
+
+    @Override public List<Token> enemyTokensOn(String hexId) {
+        List<Token> out = new java.util.ArrayList<>();
+        for (Token t : enemyTokensOnField()) {
+            if (hexId != null && hexId.equals(хексОм(t))) {
+                out.add(t);
+            }
+        }
+        return out;
+    }
+
+    @Override public List<Token> enemyBuildingsOn(String hexId) {
+        List<Token> out = new java.util.ArrayList<>();
+        for (Token t : enemyTokensOn(hexId)) {
+            if (t instanceof BuildingToken) {
+                out.add(t);
+            }
+        }
+        return out;
+    }
+
+    @Override public boolean adjacentToEnemy(String hexId) {
+        for (String nb : neighbors(hexId)) {
+            if (!enemyTokensOn(nb).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override public java.util.Set<String> myBuildingHexes() {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (BuildingToken b : me().buildingsOnField()) {
+            out.add(b.hexId);
+        }
+        return out;
+    }
+
+    @Override public java.util.Set<String> cuHexesOf(int who) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (BuildingToken b : state().player(who).buildingsOnField()) {
+            if (b.type == kelium.core.BuildingType.COMMAND_CENTER) {
+                out.add(b.hexId);
+            }
+        }
+        return out;
+    }
+
+    @Override public java.util.Collection<String> neighbors(String hexId) {
+        return state().field.neighbors(hexId);
+    }
+
+    @Override public java.util.Collection<String> allHexes() {
+        return state().field.hexes.keySet();
+    }
+
+    @Override public boolean passable(String hexId) {
+        return kelium.engine.Movement.passable(state(), hexId);
+    }
+
+    @Override public Integer distance(String from, java.util.Collection<String> targets) {
+        return kelium.engine.Movement.distance(state(), from, targets);
+    }
+
+    private static String хексОм(Token t) {
+        if (t instanceof UnitToken u) {
+            return u.hexId;
+        }
+        return t instanceof BuildingToken b ? b.hexId : null;
+    }
+
     @Override public void grantVp(int amount, String source) {
         vp += amount;
         vpSource = source;
