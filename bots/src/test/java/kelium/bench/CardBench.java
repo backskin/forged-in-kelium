@@ -264,6 +264,112 @@ public final class CardBench {
     private BuildingToken последнееЗдание;
     private UnitToken последнееВойско;
 
+    /** Положить в трофейное место игрока жетон войска противника. */
+    public CardBench трофейВойско(int seat, int чей, UnitType type) {
+        PlayerState жертва = s.player(чей);
+        UnitToken u = s.tokenStats.makeUnit(type, чей, ++uid, жертва.unitsOfKind(type));
+        s.player(seat).trophySpace.add(u);
+        return this;
+    }
+
+    /** Положить в трофейное место игрока здание противника. */
+    public CardBench трофейЗдание(int seat, int чей, BuildingType type) {
+        BuildingToken b = s.tokenStats.makeBuilding(type, чей, ++uid,
+            type == BuildingType.MINER || type == BuildingType.POWER_PLANT ? 1 : null);
+        s.player(seat).trophySpace.add(b);
+        return this;
+    }
+
+    /** Контейнеры на руках у игрока — ровно {@code n}. */
+    public CardBench контейнеры(int seat, int n) {
+        s.player(seat).containers = n;
+        return this;
+    }
+
+    /** Поставить игрока на шаг {@code step} названного трека технологий. */
+    public CardBench техШаг(int seat, String track, int step) {
+        s.player(seat).techSteps.put(track, step);
+        return this;
+    }
+
+
+    // ==================================================================
+    //  ЗАДАНИЯ: СПРОС УСЛОВИЯ НА ЗАМОРОЖЕННОМ СОСТОЯНИИ
+    // ==================================================================
+
+    /**
+     * Журнал хода. Нужен спросам условия: требования-происшествия читают его, и
+     * без журнала спрос упал бы на пустой ссылке.
+     */
+    public kelium.core.TurnJournal журнал() {
+        if (s.journal == null) {
+            s.journal = new kelium.core.TurnJournal(s.numPlayers());
+        }
+        return s.journal;
+    }
+
+    /**
+     * ВЫПОЛНЕНО ЛИ БАЗОВОЕ ТРЕБОВАНИЕ ЗАДАНИЯ ПРЯМО СЕЙЧАС.
+     *
+     * <p>Главный спрос для карт заданий, и по той же причине, по которой у
+     * арсенала им стал {@code доступноПрименение}: состояние заморожено. «За
+     * партию задание разу не выполнилось» ничего не доказывает — бот мог просто
+     * не дойти до нужной расстановки. Здесь тест ставит расстановку сам и
+     * спрашивает движок, видит ли он условие выполненным.
+     *
+     * <p>Спрос идёт через {@link kelium.engine.Objectives#playableObjectives},
+     * то есть тем же путём, которым задание играет живой игрок: сюда входит и
+     * проверка оплаты жертвы, и карты, чьё условие живёт в коде
+     * ({@code checked_by: card}).
+     */
+    public boolean готово(int seat, String id) {
+        return kelium.engine.Objectives.playableObjectives(s, seat, журнал()).contains(id);
+    }
+
+    /**
+     * Выполнено ли ещё и УСИЛЕННОЕ требование — на том же замороженном столе.
+     *
+     * <p>ОТДЕЛЬНО ПРОВЕРЯЕТСЯ, ЧТО УСИЛЕНИЕ У КАРТЫ ВООБЩЕ ЕСТЬ. Индикатор движка
+     * намеренно отвечает «усиление достигнуто» карте без усиления: боту он этим
+     * говорит «ждать нечего, потолок уже взят», и для решения бота это верно.
+     * Но для проверки карты такой ответ означал бы, что у начального задания есть
+     * усиление, — а его нет ни у одного. Различие держится здесь, чтобы не
+     * ломать смысл индикатора.
+     */
+    public boolean усилено(int seat, String id) {
+        var набор = cfg.content.get("objectives");
+        if (набор != null) {
+            try {
+                if (набор.byId(id).get("enhanced") == null) {
+                    return false;
+                }
+            } catch (RuntimeException e) {
+                return false;
+            }
+        }
+        var h = подсказка(seat, id);
+        return h != null && h.enhancedReady();
+    }
+
+    /** Индикаторы карты: ГОТОВО, УСИЛЕНО, ДОСТИЖИМО и планы. */
+    public kelium.engine.ObjectiveHints.Hint подсказка(int seat, String id) {
+        return kelium.engine.ObjectiveHints.forCard(s, seat, журнал(), id,
+            List.of("build", "assembly", "combat", "movement", "mining", "science", "market"),
+            2);
+    }
+
+    /** Инструкции, которыми движок предлагает закрыть карту в этот ход. */
+    public List<String> планы(int seat, String id) {
+        var h = подсказка(seat, id);
+        List<String> out = new ArrayList<>();
+        if (h != null) {
+            for (var pl : h.plans()) {
+                out.add(pl.summary());
+            }
+        }
+        return out;
+    }
+
     /** Само состояние — когда стенду не хватает готовой ручки. */
     public GameState состояние() {
         return s;
@@ -542,6 +648,49 @@ public final class CardBench {
             }
         }
         return false;
+    }
+
+    /**
+     * ЧТО ДВИЖОК ВЫДАЛ ЗА ВЫПОЛНЕННОЕ ЗАДАНИЕ — базовая и усиленная часть.
+     *
+     * <p>ПОЧЕМУ НЕ ПО КОШЕЛЬКУ. Проверять награду по остатку ресурсов нельзя: до
+     * конца раунда игрок успевает её потратить, и тест падает на исправной карте.
+     * Это та же ловушка, на которой у меня уже упал арсенал, только с другого
+     * конца. Награда проверяется по тому, что движок объявил в момент выдачи.
+     *
+     * @return {@code {base: {...}, special: {...}}} или пустая карта, если задание
+     *         за прогон не выполнялось
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> награда(String id) {
+        for (Map<String, Object> e : события) {
+            if ("objective".equals(String.valueOf(e.get("type")))
+                    && id.equals(String.valueOf(e.get("card")))
+                    && e.get("granted") instanceof Map<?, ?> g) {
+                return (Map<String, Object>) g;
+            }
+        }
+        return Map.of();
+    }
+
+    /** Сколько единиц названного добра выдала базовая часть награды. */
+    @SuppressWarnings("unchecked")
+    public int наградаБазовая(String id, String что) {
+        Object base = награда(id).get("base");
+        if (base instanceof Map<?, ?> m && ((Map<String, Object>) m).get(что) instanceof Number n) {
+            return n.intValue();
+        }
+        return 0;
+    }
+
+    /** Сколько единиц названного добра выдала усиленная часть награды. */
+    @SuppressWarnings("unchecked")
+    public int наградаУсиленная(String id, String что) {
+        Object sp = награда(id).get("special");
+        if (sp instanceof Map<?, ?> m && ((Map<String, Object>) m).get(что) instanceof Number n) {
+            return n.intValue();
+        }
+        return 0;
     }
 
     /** Все события — когда нужно посмотреть глазами, что происходило. */
