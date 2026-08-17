@@ -180,6 +180,46 @@ public final class GameRecorder {
     }
 
     /**
+     * То же, что {@link #play}, но со СВОИМ списком агентов вместо ботов по
+     * справочнику — вызывающий код (hot-seat, сетевой сервер) сам решает, кто
+     * сидит на каждом месте: {@link kelium.core.InteractiveAgent} для живого
+     * игрока, {@code Bots.create(...)} для бота. Запись пишется ТЕМ ЖЕ кодом
+     * ({@code header}/{@code Recorder}/{@code ReplayText}), что и симуляции —
+     * заказ на цифровую версию (§3, п.6) требует одинакового формата журнала
+     * независимо от режима партии.
+     *
+     * @param seatLabels подписи мест для шапки записи (например {@code "human"}
+     *                   для живого игрока, имя характера — для бота); длина
+     *                   должна совпадать с {@code agents.size()}.
+     */
+    public static ReplayRecord playWithAgents(GameConfig cfg, GameState state,
+                                               List<Agent> agents, List<String> seatLabels,
+                                               long seed, Consumer<String> note) {
+        ReplayRecord rec = header(cfg, state, state.numPlayers(), seed, seatLabels,
+            cfg.scenarioId, cfg.cuFacing);
+
+        List<ReplayRecord.Thought> pending = new ArrayList<>();
+        for (Agent a : agents) {
+            if (a instanceof StrategicAgent sa) {
+                sa.withThoughts((seat, txt) -> pending.add(new ReplayRecord.Thought(seat, txt)));
+            }
+        }
+
+        ReplayText text = new ReplayText(cfg, rec);
+        Recorder rc = new Recorder(state, rec, text, pending);
+        Map<String, Object> result = GameEngine.playGame(state, agents, rc);
+
+        rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
+        rec.condition = String.valueOf(result.get("condition"));
+        rec.rounds = result.get("rounds") instanceof Number n ? n.intValue() : state.round;
+        if (note != null) {
+            note.accept("Партия сыграна: шагов " + rec.frames.size()
+                + ", раундов " + rec.rounds + ".");
+        }
+        return rec;
+    }
+
+    /**
      * ПОДГОТОВКА без прогона: собрать состояние партии и вернуть запись из
      * одного кадра — стартовую расстановку. Нужна проигрывателю, чтобы поле
      * перерисовывалось СРАЗУ при смене числа игроков, раскладки или поворота ЦУ,
