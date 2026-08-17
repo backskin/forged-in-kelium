@@ -896,6 +896,19 @@ public final class Effects {
             }
             got.put("stolen_coin", take);
         }
+        // take_objectives: жетон отбирается ВМЕСТЕ СО ВСЕЙ РУКОЙ ЗАДАНИЙ прежнего
+        // первого игрока (правило дизайнера 17.08.2026). Штаб корпуса забирает не
+        // только очерёдность, но и бумаги — потому предложение и стоит взять: до
+        // этого «Приоритет» давал чистую позицию и не выбирался ни разу за 511
+        // раундов замера, проигрывая заданиям напротив со счётом 0:316.
+        if (Boolean.TRUE.equals(p.get("take_objectives"))
+                && was != seat && was < s.numPlayers()) {
+            PlayerState victim = s.player(was);
+            List<String> taken = new ArrayList<>(victim.objectiveHand);
+            victim.objectiveHand.clear();
+            s.player(seat).objectiveHand.addAll(taken);
+            got.put("taken_objectives", taken.size());
+        }
         return got;
     }
 
@@ -976,19 +989,23 @@ public final class Effects {
         Agent agent = agentFor(s, seat);
         List<Choice> opts = new ArrayList<>();
         for (var e : s.field.hexes.entrySet()) {
-            List<Integer> free = e.getValue().freeSideIndices();
-            if (free.isEmpty()) {
-                continue;
-            }
-            // Один сектор — на любой свободный. Два — только на два СОСЕДНИХ:
-            // здание на две доли занимает соседние доли, врозь оно не стоит.
-            for (Integer i : free) {
+            kelium.core.Hex h = e.getValue();
+            // ГДЕ УГОДНО, В ТОМ ЧИСЛЕ ПОВЕРХ ЧУЖОГО (правило дизайнера
+            // 17.08.2026). Годятся и свободные секторы, и занятые ЧУЖИМИ
+            // зданиями: подрядчик приходит и застраивает участок, а стоявшее
+            // там чужое здание возвращается владельцу в запас. Свои секторы и
+            // секторы под нейтралами не трогаются — своё не сносим, а нейтрал
+            // поверх нейтрала не ставится.
+            for (int i = 0; i < 6; i++) {
+                if (!sectorTakeable(s, h, i, seat)) {
+                    continue;
+                }
                 Map<String, Object> one = new HashMap<>();
                 one.put("hex", e.getKey());
                 one.put("sectors", List.of(i));
                 opts.add(new Choice("neutral", one, "нейтрал 1 сектор @" + e.getKey() + "/" + i));
                 int next = (i + 1) % 6;
-                if (free.contains(next)) {
+                if (sectorTakeable(s, h, next, seat)) {
                     Map<String, Object> two = new HashMap<>();
                     two.put("hex", e.getKey());
                     two.put("sectors", List.of(i, next));
@@ -1009,24 +1026,76 @@ public final class Effects {
         String hex = String.valueOf(spec.get("hex"));
         @SuppressWarnings("unchecked")
         List<Integer> sectors = (List<Integer>) spec.get("sectors");
+        kelium.core.Hex h = s.field.get(hex);
+
+        // ЧУЖОЕ ОСВОБОЖДАЕТ МЕСТО: здание уходит владельцу в ЗАПАС, а не в
+        // трофеи и не в металлолом. Его можно отстроить заново, заплатив за
+        // стройку — карта отбирает позицию, а не жетон.
+        int ousted = 0;
+        java.util.Set<Integer> toOust = new java.util.LinkedHashSet<>();
+        for (Integer i : sectors) {
+            Integer tokenUid = h.sideOwner[i];
+            if (tokenUid != null && tokenUid >= 0) {
+                toOust.add(tokenUid);   // в секторе стоит чьё-то здание
+            }
+        }
+        for (int tokenUid : toOust) {
+            for (PlayerState any : s.players) {
+                if (any.seat == seat) {
+                    continue;           // своё не сносим
+                }
+                for (kelium.core.BuildingToken b : new ArrayList<>(any.buildingsOnField())) {
+                    if (b.uid == tokenUid) {
+                        Actions.returnOwnBuildingToReserve(s, any, b, false);
+                        ousted++;
+                    }
+                }
+            }
+        }
         // Отрицательные uid — соглашение движка для нейтралов (см. Scenario):
         // они не принадлежат никому и не пересекаются с жетонами игроков.
-        kelium.core.Hex h = s.field.get(hex);
         int uid = -1000 - h.neutrals.size() - s.round;
         h.neutrals.add(new kelium.core.Hex.NeutralBuilding(uid, false, List.copyOf(sectors)));
         for (Integer i : sectors) {
             h.sideOwner[i] = -1;   // сектор занят нейтралом
         }
-        return Map.of("built", 1, "hex", hex, "sectors", sectors.size());
+        return Map.of("built", 1, "hex", hex, "sectors", sectors.size(), "ousted", ousted);
+    }
+
+    /**
+     * МОЖНО ЛИ ЗАСТРОИТЬ этот сектор нейтралом «Восстановления».
+     *
+     * <p>Да, если он свободен либо занят ЧУЖИМ зданием. Нет, если там своё
+     * здание (себя не сносим) или уже стоит нейтрал (стенка поверх стенки
+     * ничего не добавляет).
+     */
+    private static boolean sectorTakeable(GameState s, kelium.core.Hex h, int i, int seat) {
+        Integer tokenUid = h.sideOwner[i];
+        if (tokenUid == null) {
+            return true;            // сектор пуст
+        }
+        if (tokenUid < 0) {
+            return false;           // там нейтрал: стенка поверх стенки ничего не даёт
+        }
+        // В СЕКТОРЕ ЧЬЁ-ТО ЗДАНИЕ. Своё — нельзя, чужое — можно.
+        for (kelium.core.BuildingToken b : s.player(seat).buildingsOnField()) {
+            if (b.uid == tokenUid) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
      * ЭВАКУАЦИЯ — карта рынка «Гражданский подряд», правое предложение.
      *
-     * <p>Игрок переносит ЛЮБОЕ ЧИСЛО своих жетонов — зданий и войск в любом
-     * сочетании — на один гекс, к которому примыкает любое его здание (то есть
-     * на любой гекс, доступный ему для стройки). Перед переносом с ВСЕХ жетонов
-     * на выбранном гексе снимается весь урон.
+     * <p>ПОРЯДОК ТАКОЙ (правило дизайнера 17.08.2026). Игрок выбирает СВОЙ гекс —
+     * тот, где стоят его жетоны, — и снимает с них весь урон. А затем ОБЯЗАН
+     * увести с этого гекса ВСЕ свои жетоны на другой гекс, доступный ему для
+     * стройки. Буквально эвакуация: подлечились и ушли, а место осталось пустым.
+     *
+     * <p>Выбора «кого забрать» нет: уходят все. Остаться может только тот, кому
+     * на новом гексе физически не хватило места.
      *
      * <p>ЭТО НЕ СТРОЙКА И НЕ ДВИЖЕНИЕ, А ТЕЛЕПОРТ (правило дизайнера
      * 17.08.2026). Ни одно правило перемещения здесь не действует: не платится
@@ -1045,38 +1114,63 @@ public final class Effects {
     static Map<String, Object> evacuate(GameState s, int seat, Map<String, Object> p) {
         PlayerState pl = s.player(seat);
         Agent agent = agentFor(s, seat);
-        List<String> zone = new ArrayList<>(Actions.buildableHexes(s, seat));
-        if (zone.isEmpty()) {
+
+        // 1. ОТКУДА УХОДИМ: свой гекс, где стоят свои жетоны. Гекс без своих
+        // жетонов эвакуировать нечего — такого выбора в меню нет.
+        java.util.Set<String> mine = new java.util.LinkedHashSet<>();
+        for (kelium.core.BuildingToken b : pl.buildingsOnField()) {
+            mine.add(b.hexId);
+        }
+        for (kelium.core.UnitToken u : pl.unitsOnField()) {
+            mine.add(u.hexId);
+        }
+        if (mine.isEmpty()) {
             return Map.of("moved", 0);
         }
-        List<Choice> where = new ArrayList<>();
-        for (String hid : zone) {
-            where.add(new Choice("evac_hex", hid, "эвакуация на " + hid));
-        }
-        Choice pickHex = agent != null
-            ? agent.choose(s, where, Map.of("kind", "evacuate_hex"))
-            : where.get(0);
-        String target = pickHex != null && pickHex.payload() != null
-            ? String.valueOf(pickHex.payload()) : zone.get(0);
-
-        // СНАЧАЛА ЛЕЧЕНИЕ: карта снимает урон со всех жетонов на выбранном гексе,
-        // и это происходит ДО переноса — лечится тот, кто там уже стоял.
-        int healed = 0;
-        for (PlayerState any : s.players) {
-            for (kelium.core.Token t : damagedTokens(any)) {
-                if (target.equals(t.hexId())) {
-                    healed += damageOf(t);
-                    setDamage(t, 0);
+        // 2. КУДА УХОДИМ: любой гекс своей зоны стройки, кроме покидаемого.
+        // Уходить некуда — эвакуации нет: карта требует именно УВЕСТИ.
+        java.util.Set<String> zone = new java.util.LinkedHashSet<>(
+            Actions.buildableHexes(s, seat));
+        List<Choice> pairs = new ArrayList<>();
+        for (String from : mine) {
+            for (String to : zone) {
+                if (to.equals(from)) {
+                    continue;
                 }
+                Map<String, Object> spec = new HashMap<>();
+                spec.put("from", from);
+                spec.put("to", to);
+                pairs.add(new Choice("evacuate", spec, "эвакуация " + from + " -> " + to));
+            }
+        }
+        if (pairs.isEmpty()) {
+            return Map.of("moved", 0);
+        }
+        Choice pick = agent != null
+            ? agent.choose(s, pairs, Map.of("kind", "evacuate"))
+            : pairs.get(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> spec = (Map<String, Object>)
+            (pick != null && pick.payload() != null ? pick.payload() : pairs.get(0).payload());
+        String from = String.valueOf(spec.get("from"));
+        String target = String.valueOf(spec.get("to"));
+
+        // 3. ЛЕЧЕНИЕ — на покидаемом гексе и только своим жетонам: они и есть те,
+        // кого эвакуируют. Происходит ДО переноса.
+        int healed = 0;
+        for (kelium.core.Token t : damagedTokens(pl)) {
+            if (from.equals(t.hexId())) {
+                healed += damageOf(t);
+                setDamage(t, 0);
             }
         }
 
-        // ЗДАНИЯ ИДУТ ПЕРВЫМИ, и это не мелочь: здание занимает жёсткие секторы,
-        // войско — мягкие. Набей гекс сперва пехотой — зданию уже не встать, и
-        // «любая комбинация» на деле сведётся к одним войскам.
+        // 4. УХОДЯТ ВСЕ. Выбора «кого забрать» нет — карта требует увести гекс
+        // целиком. Здания идут первыми, и это не мелочь: здание занимает жёсткие
+        // секторы, войско — мягкие. Пусти вперёд пехоту — зданию уже не встать.
         int movedBuildings = 0;
         for (kelium.core.BuildingToken b : new ArrayList<>(pl.buildingsOnField())) {
-            if (target.equals(b.hexId)) {
+            if (!from.equals(b.hexId)) {
                 continue;
             }
             int fp = Actions.buildingFootprint(b.type);
@@ -1085,20 +1179,10 @@ public final class Effects {
             if (sides == null) {
                 continue;               // физически не влезло — остаётся на месте
             }
-            List<Choice> opts = List.of(
-                new Choice("evac", b.uid, "вывезти " + b.type.code + " на " + target),
-                new Choice("stay", null, "оставить " + b.type.code));
-            Choice pick = agent != null
-                ? agent.choose(s, opts, Map.of("kind", "evacuate_building"))
-                : opts.get(0);
-            if (pick == null || pick.payload() == null) {
-                continue;
-            }
             // Войско, стоявшее ВНУТРИ здания, с ним не телепортируется: остаётся
             // на прежнем гексе и теряет укрытие — как при обычном переносе.
             Actions.evictFromBuilding(pl, b);
-            String fromHex = b.hexId;
-            s.field.get(fromHex).freeSidesByToken(b.uid);
+            s.field.get(from).freeSidesByToken(b.uid);
             b.hexId = target;
             s.field.get(target).occupySides(b.uid, sides);
             // ЖЁЛТЫЙ СЕКТОР действует и после телепорта: это печатное свойство
@@ -1107,10 +1191,9 @@ public final class Effects {
             PrintedContainers.onBuildingPlaced(s, pl, b);
             movedBuildings++;
         }
-
         int movedUnits = 0;
         for (kelium.core.UnitToken u : new ArrayList<>(pl.unitsOnField())) {
-            if (target.equals(u.hexId)) {
+            if (!from.equals(u.hexId)) {
                 continue;
             }
             // ЕДИНСТВЕННАЯ ПРОВЕРКА — место. Правила проходимости не спрашиваются:
@@ -1118,19 +1201,9 @@ public final class Effects {
             if (!Actions.roomForUnit(s, target, u.type)) {
                 continue;
             }
-            List<Choice> opts = List.of(
-                new Choice("evac", u.uid, "вывести " + u.type.code + " на " + target),
-                new Choice("stay", null, "оставить " + u.type.code));
-            Choice pick = agent != null
-                ? agent.choose(s, opts, Map.of("kind", "evacuate_unit"))
-                : opts.get(0);
-            if (pick == null || pick.payload() == null) {
-                continue;
-            }
-            String wasAt = u.hexId;
             boolean wasInside = u.inside();
             u.setHexId(target);
-            PrintedContainers.onUnitMoved(s, pl, wasAt, u.hexId, u.type, wasInside);
+            PrintedContainers.onUnitMoved(s, pl, from, target, u.type, wasInside);
             movedUnits++;
         }
         Map<String, Object> got = new HashMap<>();
@@ -1138,6 +1211,7 @@ public final class Effects {
         got.put("moved_buildings", movedBuildings);
         got.put("moved_units", movedUnits);
         got.put("healed", healed);
+        got.put("from", from);
         got.put("hex", target);
         return got;
     }

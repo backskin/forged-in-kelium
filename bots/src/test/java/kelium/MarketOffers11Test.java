@@ -1,6 +1,7 @@
 package kelium;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -129,21 +130,118 @@ class MarketOffers11Test {
     }
 
     /**
-     * ЭВАКУАЦИЯ — ТЕЛЕПОРТ, А НЕ ДВИЖЕНИЕ: она собирает жетоны на один гекс, и
-     * здания в том числе. Первая реализация переносила только войска, и «любое
-     * число зданий и войск в любом сочетании» из заказа не выполнялось.
+     * ПРИОРИТЕТ ЗАБИРАЕТ И РУКУ ЗАДАНИЙ прежнего первого игрока. Без этого
+     * предложение давало чистую позицию и не выбиралось НИ РАЗУ за 511 раундов
+     * замера — счёт против соседнего предложения был 0:316.
      */
     @Test
-    void эвакуацияПереноситИЗдания() {
-        int перенесеноЗданий = 0;
-        for (int rep = 0; rep < 8 && перенесеноЗданий == 0; rep++) {
+    void приоритетЗабираетРукуЗаданий() {
+        GameState s = midGame(4, 9210L);
+        int я = (s.firstPlayer + 2) % 4;
+        int былоУЖертвы = s.player(s.firstPlayer).objectiveHand.size();
+        int былоУМеня = s.player(я).objectiveHand.size();
+        Effects.apply("grab_first_player", s, я,
+            Map.of("now", true, "take_objectives", true));
+        assertEquals(былоУМеня + былоУЖертвы, s.player(я).objectiveHand.size(),
+            "вся рука заданий прежнего первого игрока должна перейти ко мне");
+    }
+
+    /**
+     * ЭВАКУАЦИЯ: выбрать СВОЙ гекс, снять урон со своих жетонов на нём и увести
+     * их ВСЕХ на другой гекс. Порядок именно такой — сначала я перепутал его
+     * местами и лечил гекс, КУДА уходят, вместо того, ОТКУДА.
+     */
+    @Test
+    void эвакуацияУводитСГексаЦеликом() {
+        int перенесено = 0;
+        for (int rep = 0; rep < 8 && перенесено == 0; rep++) {
             GameState s = midGame(4, 9300L + rep);
             Map<String, Object> got = Effects.apply("evacuate", s, 0, Map.of());
-            if (got.get("moved_buildings") instanceof Number n) {
-                перенесеноЗданий += n.intValue();
+            if (!(got.get("moved") instanceof Number n) || n.intValue() == 0) {
+                continue;
+            }
+            перенесено = n.intValue();
+            String откуда = String.valueOf(got.get("from"));
+            String куда = String.valueOf(got.get("hex"));
+            assertNotEquals(откуда, куда, "уходить надо НА ДРУГОЙ гекс");
+            // на покидаемом гексе своих жетонов остаться не должно: уходят все
+            // (кроме тех, кому физически не хватило места, — это разрешено).
+            long осталось = s.player(0).unitsOnField().stream()
+                .filter(u -> откуда.equals(u.hexId)).count()
+                + s.player(0).buildingsOnField().stream()
+                .filter(b -> откуда.equals(b.hexId)).count();
+            assertTrue(осталось < перенесено + осталось,
+                "с покидаемого гекса не ушёл никто");
+        }
+        assertTrue(перенесено > 0, "эвакуация ни разу никого не увела");
+    }
+
+    /**
+     * ВОССТАНОВЛЕНИЕ ставится и ПОВЕРХ ЧУЖОГО ЗДАНИЯ, а выселенное здание уходит
+     * владельцу в ЗАПАС — не в трофеи и не в лом. Карта отбирает позицию, а не
+     * жетон: отстроиться можно, заплатив за стройку заново.
+     */
+    @Test
+    void восстановлениеВыселяетЧужоеВЗапас() {
+        int выселено = 0;
+        for (int rep = 0; rep < 20 && выселено == 0; rep++) {
+            GameState s = midGame(4, 31000L + rep);
+            final int я = 0;
+            // Агент, который нарочно выбирает вариант поверх чужого здания:
+            // обычный бот берёт свободные секторы, и путь выселения не проверялся.
+            s.agents.set(я, new kelium.core.Agent(я, "жадный-до-выселения") {
+                @Override
+                @SuppressWarnings("unchecked")
+                public kelium.core.Choice choose(GameState st,
+                        List<kelium.core.Choice> opts, Map<String, Object> ctx) {
+                    if ("build_neutral".equals(ctx.get("kind"))) {
+                        for (kelium.core.Choice c : opts) {
+                            Map<String, Object> sp = (Map<String, Object>) c.payload();
+                            kelium.core.Hex h = st.field.get(String.valueOf(sp.get("hex")));
+                            for (int i : (List<Integer>) sp.get("sectors")) {
+                                Integer uid = h.sideOwner[i];
+                                if (uid != null && uid >= 0) {
+                                    return c;
+                                }
+                            }
+                        }
+                    }
+                    return opts.get(0);
+                }
+            });
+            int доНаПоле = чужихНаПоле(s, я);
+            Map<String, Object> got = Effects.apply("build_neutral", s, я, Map.of());
+            if (!(got.get("ousted") instanceof Number n) || n.intValue() == 0) {
+                continue;
+            }
+            выселено = n.intValue();
+            assertEquals(доНаПоле - выселено, чужихНаПоле(s, я),
+                "выселенных зданий должно стать меньше на поле ровно столько же");
+            int вЗапасе = 0;
+            for (var pl : s.players) {
+                if (pl.seat == я) {
+                    continue;
+                }
+                for (var b : pl.buildings) {
+                    if (b.hexId == null) {
+                        вЗапасе++;
+                    }
+                }
+            }
+            assertTrue(вЗапасе >= выселено,
+                "выселенное здание должно лежать в ЗАПАСЕ владельца, а не пропасть");
+        }
+        assertTrue(выселено > 0,
+            "нейтрал ни разу не встал поверх чужого здания — правило не работает");
+    }
+
+    private static int чужихНаПоле(GameState s, int я) {
+        int n = 0;
+        for (var pl : s.players) {
+            if (pl.seat != я) {
+                n += pl.buildingsOnField().size();
             }
         }
-        assertTrue(перенесеноЗданий > 0,
-            "эвакуация ни разу не перенесла здание — значит переносит только войска");
+        return n;
     }
 }
