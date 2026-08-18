@@ -60,6 +60,17 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Инференс сети, обученной PyTorch-пайплайном в training/ (18.08.2026):
+          .onnx-файл читает ValueNetOnnx.java, обучение и экспорт — на Python,
+          Java лишь исполняет уже обученный граф. Веса приложения не тянут за
+          собой ни Python, ни torch — только этот один рантайм.
+        -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.20.0</version>
+        </dependency>
     </dependencies>
 
     <build>
