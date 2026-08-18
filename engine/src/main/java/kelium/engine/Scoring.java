@@ -36,11 +36,6 @@ public final class Scoring {
         Map<String, Object> econ = rs.economy();
 
         int coinsPerVp = asInt(econ.get("coins_per_vp"));
-        // Ключ рулсета остаётся "trophy_per_vp" ради обратной совместимости со
-        // всеми старыми файлами rulesets/*.yaml (переименование ресурса не
-        // трогает YAML-ключи конфига — это внутренний идентификатор, игрок его
-        // не видит; человекочитаемая подпись переименована в RuleWords).
-        int debrisPerVp = asInt(econ.get("trophy_per_vp"));
         int perBuilding = asInt(econ.get("buildings_per_vp"));
         int perUnit = asInt(econ.get("units_per_vp"));
         // Келемий: 1 ПО за каждые kelium_per_vp куба (по умолчанию 2). Совместимость
@@ -60,12 +55,32 @@ public final class Scoring {
         }
         breakdown.put("kelium", keliumVp);
         breakdown.put("coins", p.resources.coin() / coinsPerVp);
-        // ПРАВИЛО (уточнение 2026-08-15): подсчёт очков идёт ТОЛЬКО в момент
-        // истинного конца партии — а тогда Возврат жетонов не делается (см.
-        // GameEngine.returnStep(gameEnding=true)), и трофеи, ещё лежащие у
-        // игрока НЕСДАННЫМИ, считаются по ПОЛНОЙ печатной ценности наравне с
-        // обломками (не флат-1, как при обычной мидгейм-конвертации в Возврат).
-        breakdown.put("debris", (p.resources.debris() + p.trophySpacePoints()) / debrisPerVp);
+        // ОБЛОМКИ И НЕСДАННЫЕ ТРОФЕИ СЧИТАЮТСЯ ОДНИМ ИЗ ДВУХ КУРСОВ, НЕ ОБОИМИ
+        // СРАЗУ. Найден и исправлен 18.08.2026: economy.debris_storage_vp_per_unit
+        // задумывался как АЛЬТЕРНАТИВНЫЙ вариант курса trophy_per_vp («отсутствует/0
+        // в обычном рулсете, тогда эта ветка не влияет ни на что» — так было
+        // написано в комментарии), но реализован был как ДОБАВКА поверх старого
+        // курса, а не замена. В действующих сводах 1.8.0-1.13.0 оба ключа стояли
+        // одновременно (trophy_per_vp: 3, debris_storage_vp_per_unit: 1.0), и
+        // обломок стоил 1/3 + 1.0 = 1.333 ПО вместо задуманного одного курса —
+        // почти вчетверо дороже. Теперь как у kelium_per_vp чуть выше: НАЛИЧИЕ
+        // ключа debris_storage_vp_per_unit ПОЛНОСТЬЮ ЗАМЕНЯЕТ курс trophy_per_vp,
+        // а не складывается с ним. Старые своды без этого ключа (архив, версии
+        // до 1.7.1) продолжают считать по trophy_per_vp, как и раньше.
+        //
+        // Подсчёт очков идёт ТОЛЬКО в момент истинного конца партии — а тогда
+        // Возврат жетонов не делается (см. GameEngine.returnStep(gameEnding=true)),
+        // и трофеи, ещё лежащие у игрока НЕСДАННЫМИ, считаются по ПОЛНОЙ печатной
+        // ценности наравне с обломками (не флат-1, как при мидгейм-конвертации).
+        int debrisPool = p.resources.debris() + p.trophySpacePoints();
+        int debrisVp;
+        if (econ.containsKey("debris_storage_vp_per_unit")) {
+            debrisVp = (int) Math.floor(debrisPool
+                * ((Number) econ.get("debris_storage_vp_per_unit")).doubleValue());
+        } else {
+            debrisVp = debrisPool / asInt(econ.get("trophy_per_vp"));
+        }
+        breakdown.put("debris", debrisVp);
         breakdown.put("buildings_on_field", p.buildingsOnField().size() / perBuilding);
         breakdown.put("units_on_field", p.unitsOnField().size() / perUnit);
 
@@ -170,23 +185,13 @@ public final class Scoring {
         for (int v : breakdown.values()) {
             total += v;
         }
-        // ВАРИАНТ ПРАВИЛ (2026-08-15): ПО за КАЖДЫЙ обломок в хранилище, по
-        // ДРОБНОЙ ставке economy.debris_storage_vp_per_unit (например 0.5) —
-        // отсутствует/0 в обычном рулсете, тогда эта ветка не влияет ни на что.
-        // Округление вниз — ТОЛЬКО на итоговой сумме партии, не на этом
-        // источнике отдельно: остальные компоненты уже целые (int), поэтому
-        // достаточно один раз сложить их с дробным вкладом и один раз floor().
-        double debrisStorageVpPerUnit = ((Number) rs.get("economy.debris_storage_vp_per_unit", 0))
-            .doubleValue();
-        // Как и выше (см. правило про несданные трофеи на конец партии) — этот
-        // источник тоже смотрит на полную ценность несданных трофеев, не только
-        // на уже сконвертированные обломки в хранилище.
-        double debrisStorageVpRaw = (p.resources.debris() + p.trophySpacePoints())
-            * debrisStorageVpPerUnit;
-        if (debrisStorageVpRaw != 0) {
-            breakdown.put("debris_storage_vp", (int) Math.floor(debrisStorageVpRaw));
-            total = (int) Math.floor(total + debrisStorageVpRaw);
-        }
+        // ВТОРАЯ ВЕТКА УДАЛЕНА 18.08.2026 — это и была ДВОЙНАЯ УЧЁТКА. Курс
+        // economy.debris_storage_vp_per_unit теперь применяется РОВНО ОДИН РАЗ,
+        // выше, в строке "debris" breakdown'а (либо он, либо старый trophy_per_vp
+        // — не оба сразу). Раньше здесь начислялась ЕЩЁ ОДНА, отдельная порция
+        // очков по той же паре (debris + trophySpacePoints) с тем же курсом —
+        // при trophy_per_vp:3 и debris_storage_vp_per_unit:1.0 (действующий свод)
+        // обломок стоил 1/3 + 1.0 = 1.333 ПО вместо одного курса.
         // ТОЧКА ПРАВИЛ: правка УЖЕ СУЩЕСТВУЮЩЕГО итога («улучшить существующий
         // критерий»). Спрашивается после суммы, поэтому карта видит полный счёт.
         total = kelium.engine.ability.RuleQuery

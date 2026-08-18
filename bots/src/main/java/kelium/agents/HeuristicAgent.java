@@ -1523,14 +1523,16 @@ public class HeuristicAgent extends Agent {
                 yield per > 0 ? 1.0 / per : 0.0;
             }
             case DEBRIS -> {
-                double cost = 0.0;
-                if (econ.containsKey("trophy_per_vp")) {
-                    int per = ((Number) econ.get("trophy_per_vp")).intValue();
-                    cost += per > 0 ? 1.0 / per : 0.0;
+                // ЛИБО-ЛИБО, КАК В Scoring.scorePlayer — не оба курса сразу.
+                // Найдено и исправлено 18.08.2026 вместе с тем же дублированием
+                // в самом подсчёте очков: бот складывал 1/trophy_per_vp И
+                // debris_storage_vp_per_unit, оценивая обломок в 1.333 ПО вместо
+                // одного курса (0.333 или 0.5, смотря какой ключ считается).
+                if (econ.containsKey("debris_storage_vp_per_unit")) {
+                    yield ((Number) econ.get("debris_storage_vp_per_unit")).doubleValue();
                 }
-                cost += ((Number) Ctx.rules(state)
-                    .get("economy.debris_storage_vp_per_unit", 0)).doubleValue();
-                yield cost;
+                int per = ((Number) econ.getOrDefault("trophy_per_vp", 0)).intValue();
+                yield per > 0 ? 1.0 / per : 0.0;
             }
             // Боеприпас не даёт очков напрямую, но нужен для боя/лишних ходов —
             // небольшая утилитарная цена вместо нуля, чтобы не выбрасывался

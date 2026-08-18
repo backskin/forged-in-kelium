@@ -48,12 +48,18 @@ public final class StrategyDiversity {
     private StrategyDiversity() {
     }
 
-    /** Источники очков движка (см. {@code Scoring.scorePlayer}). */
+    /**
+     * Источники очков движка (см. {@code Scoring.scorePlayer}).
+     *
+     * <p>{@code debris_storage_vp} убран 18.08.2026 вместе с баг-фиксом двойного
+     * учёта обломка в Scoring: это была вторая, добавочная строка поверх
+     * {@code debris}, а не отдельный источник, — движок её больше не выставляет.
+     */
     private static final List<String> VP_SOURCES = List.of(
         "kelium", "coins", "debris", "buildings_on_field", "units_on_field", "tech",
         "gold_modules", "spawn_tiles", "cu_tokens", "kills", "war_track",
         "objective_card_vp", "super_arsenal", "super_first_part", "arsenal_vp",
-        "level4_stars", "debris_storage_vp");
+        "level4_stars");
 
     /** Человеческие подписи источников очков — для таблиц. */
     private static final Map<String, String> VP_LABEL = Map.ofEntries(
@@ -72,8 +78,7 @@ public final class StrategyDiversity {
         Map.entry("super_arsenal", "супер-арсенал"),
         Map.entry("super_first_part", "1-я часть супер-задания"),
         Map.entry("arsenal_vp", "очки от карт арсенала"),
-        Map.entry("level4_stars", "звёзды склада 4-го уровня"),
-        Map.entry("debris_storage_vp", "обломки в хранилище"));
+        Map.entry("level4_stars", "звёзды склада 4-го уровня"));
 
     public static void main(String[] args) throws Exception {
         PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8);

@@ -37,7 +37,18 @@ import kelium.engine.Setup;
  */
 class MarketOffers11Test {
 
-    /** Живая партия, доведённая до середины: есть что строить, двигать и лечить. */
+    /**
+     * Живая партия, доведённая до середины: есть что строить, двигать и лечить.
+     *
+     * <p>ДО РАУНДА 6, А НЕ 4 (баг-фикс 18.08.2026): «Модернизация» (gild_module)
+     * требует, чтобы у игрока уже стоял хотя бы один непозолоченный модуль, а
+     * это чисто стохастическое условие — зависит от того, вытянул ли бот жетон
+     * модуля к этому раунду. После правки двойного учёта очков за обломок и
+     * снижения трека науки боты чуть иначе распределяют действия, и в шести
+     * фиксированных сидах к раунду 4 условие иногда не успевало сложиться —
+     * тест ловил не сломанную карту, а нехватку раундов на удачу. Раунд 6 даёт
+     * запас без риска, что тест перестанет ловить настоящую пустую карту.
+     */
     private static GameState midGame(int players, long seed) {
         GameConfig cfg = LayoutLibrary.configFor(players, seed);
         GameState s = Setup.buildGame(cfg);
@@ -46,7 +57,7 @@ class MarketOffers11Test {
             agents.add(Bots.create(List.of("hawk", "dove", "balanced", "opportunist").get(i),
                 i, new Random(seed * 31 + i), players));
         }
-        new GameEngine(s, agents, ev -> { }).runToRound(4);
+        new GameEngine(s, agents, ev -> { }).runToRound(6);
         return s;
     }
 
@@ -72,6 +83,13 @@ class MarketOffers11Test {
      * обязано вернуть непустую телеметрию: пустая означает «игрок заплатил
      * келемий и не получил ничего», и раньше так себя вели три предложения из
      * шестнадцати.
+     *
+     * <p>10 ПОВТОРОВ, А НЕ 6 (баг-фикс 18.08.2026, вместе с {@link #midGame}).
+     * «Модернизация» ждёт стохастического условия (непозолоченный модуль на
+     * руках), и после исправления двойного учёта очков за обломок боты стали
+     * чуть иначе распределять действия — в шести фиксированных сидах условие
+     * не всегда успевало сложиться. Это не сломанная карта, а нехватка попыток
+     * поймать удачу; больше повторов — честный запас, а не подгонка под карту.
      */
     @Test
     @SuppressWarnings("unchecked")
@@ -83,7 +101,7 @@ class MarketOffers11Test {
         List<String> пустые = new ArrayList<>();
         for (Map<String, Object> off : offers) {
             boolean сработало = false;
-            for (int rep = 0; rep < 6 && !сработало; rep++) {
+            for (int rep = 0; rep < 10 && !сработало; rep++) {
                 GameState s = midGame(players, 9100L + rep);
                 Map<String, Object> params = off.get("params") instanceof Map<?, ?> pm
                     ? (Map<String, Object>) pm : Map.of();

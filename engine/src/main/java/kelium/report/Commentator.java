@@ -233,7 +233,6 @@ public final class Commentator implements Consumer<Map<String, Object>> {
             case "kelium" -> "запас келемия";
             case "coins" -> "монеты";
             case "debris" -> "обломки";
-            case "debris_storage_vp" -> "обломки в хранилище";
             case "buildings_on_field" -> "сеть зданий";
             case "units_on_field" -> "армия на поле";
             case "tech" -> "треки науки";
@@ -245,6 +244,8 @@ public final class Commentator implements Consumer<Map<String, Object>> {
             case "super_arsenal" -> "карты супер-арсенала";
             case "war_track" -> "военный трек";
             case "kills" -> "уничтожения";
+            case "objective_card_vp" -> "прямые очки от заданий";
+            case "arsenal_vp" -> "очки от карт арсенала";
             default -> s;
         };
     }

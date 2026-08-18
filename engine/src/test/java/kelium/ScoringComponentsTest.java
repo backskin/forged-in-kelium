@@ -1,6 +1,7 @@
 package kelium;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -165,25 +166,45 @@ class ScoringComponentsTest {
         assertEquals(base + 3, vp(s, 0, "gold_modules"));
     }
 
-    /** Обломки конвертируются по курсу, остаток не считается. */
+    /**
+     * Обломки конвертируются РОВНО ОДНИМ курсом, остаток не считается.
+     *
+     * <p>ЛИБО-ЛИБО, НЕ ОБА СРАЗУ (баг-фикс 18.08.2026). Действующий свод задаёт
+     * оба ключа: {@code trophy_per_vp} (целочисленный, устаревший запасной путь)
+     * и {@code debris_storage_vp_per_unit} (дробный, действующий). Раньше они
+     * СКЛАДЫВАЛИСЬ — обломок стоил 1/3 + 1.0 = 1.333 ПО вместо одного курса, что
+     * и обнаружил дизайнер по замеру партий («как будто 1.33 ПО за 1 обломок»).
+     * Тест читает АКТИВНЫЙ курс тем же способом, что и {@link Scoring}, и
+     * проверяет остаток на нём — а не на устаревшем trophy_per_vp, который при
+     * наличии дробного ключа движком уже не читается.
+     */
     @Test
     void debrisConvertsAtTheRate() {
         GameState s = Fix.game();
         PlayerState p = s.player(0);
-        int per = ((Number) ((kelium.dataio.GameConfig) s.config).ruleset
-            .economy().get("trophy_per_vp")).intValue();
-        p.resources.add(Resource.DEBRIS, per * 2 + (per > 1 ? 1 : 0));
-        assertEquals(2 + (per > 1 ? 0 : 1), vp(s, 0, "debris"),
+        var econ = ((kelium.dataio.GameConfig) s.config).ruleset.economy();
+        assertTrue(econ.containsKey("debris_storage_vp_per_unit"),
+            "тест проверяет действующий курс — в своде должен быть дробный ключ");
+        double rate = ((Number) econ.get("debris_storage_vp_per_unit")).doubleValue();
+        // 5 кубиков по ставке 0.5 = 2.5 -> пол 2, остаток не считается.
+        p.resources.add(Resource.DEBRIS, 5);
+        assertEquals((int) Math.floor(5 * rate), vp(s, 0, "debris"),
             "остаток сверх полного курса очков не даёт");
     }
 
     /**
-     * ВАРИАНТ ПРАВИЛ 2026-08-15 (1.7.1-debris-vp): келемий в хранилище не даёт
-     * ПО вообще, а обломки дают по ДРОБНОЙ ставке — округление вниз только на
-     * итоговой сумме партии, не на самом источнике.
+     * ЕДИНЫЙ КУРС ЗАМЕНЯЕТ, А НЕ СКЛАДЫВАЕТСЯ С УСТАРЕВШИМ.
+     *
+     * <p>Свод "1.7.1-debris-vp" держит ОБА ключа сразу (trophy_per_vp: 3,
+     * debris_storage_vp_per_unit: 1.0) — именно на такой записи и жил баг
+     * двойного учёта. До баг-фикса 18.08.2026 три обломка стоили 1 (от
+     * trophy_per_vp) + 3 (от debris_storage_vp_per_unit) = 4 очка в отдельной
+     * строке "debris_storage_vp" ПОВЕРХ строки "debris". Теперь строка одна:
+     * "debris", посчитанная ТОЛЬКО по дробному курсу, — три обломка стоят
+     * ровно 3 очка, а второй строки в разбивке больше нет вовсе.
      */
     @Test
-    void debrisVpVariantZeroesKeliumAndFloorsOnlyTheTotal() {
+    void debrisVpVariantZeroesKeliumAndUsesOnlyFractionalRate() {
         GameState s = Setup.buildGame(
             kelium.dataio.GameConfig.buildCached("1.7.1-debris-vp", 4, 1L, null, null));
         List<Agent> agents = new ArrayList<>();
@@ -196,14 +217,14 @@ class ScoringComponentsTest {
         p.resources.setKelium(50);
         assertEquals(0, vp(s, 0, "kelium"), "вариант: келемий в хранилище очков не даёт");
 
-        // 3 обломка по ставке 1.0 = 3.0 очка ровно — компонент и общий вклад совпадают.
         p.resources.add(Resource.DEBRIS, 3);
         Map<String, Integer> breakdown = Scoring.scorePlayer(s, 0);
-        assertEquals(3, breakdown.getOrDefault("debris_storage_vp", 0),
-            "3 обломка по ставке 1.0 — ровно 3 очка");
+        assertEquals(3, breakdown.getOrDefault("debris", 0),
+            "3 обломка по дробному курсу 1.0 — ровно 3 очка, без двойного учёта");
+        assertFalse(breakdown.containsKey("debris_storage_vp"),
+            "отдельной добавочной строки поверх \"debris\" быть не должно — "
+                + "это и была двойная учётка");
 
-        // Половинная ставка: дробная часть НЕ теряется по дороге — участвует
-        // в округлении только итоговой суммы партии.
         int totalBefore = breakdown.get("total");
         p.resources.add(Resource.DEBRIS, 1);   // теперь 4 обломка
         int totalAfter4 = Scoring.scorePlayer(s, 0).get("total");
