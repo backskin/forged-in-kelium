@@ -59,6 +59,29 @@ public final class SuperWeapon {
         return card != null && card.get("cells") instanceof List<?> l ? l.size() : 0;
     }
 
+    /**
+     * ПРОГРЕСС супер-задания, 0..1 — баг-фикс 18.08.2026. Заменяет мёртвое
+     * {@code PlayerState.superObjectiveProgress}: то поле объявлено и
+     * инициализировано нулём, но НИ РАЗУ не присваивается ни в этом классе,
+     * ни в {@code GameEngine} — три места в ботах ({@link
+     * kelium.agents.StateFeatures}, {@code Fitness}, {@code Lookahead}, модуль
+     * bots) читали константный ноль всю партию, то есть у ботов не было
+     * вообще никакого сигнала о том, насколько близко супероружие к запуску.
+     *
+     * <p>0 — карта ещё не вскрыта (жетона супероружия нет); 1.0 — счётчик
+     * запуска погашен полностью (следующая жертва арсенала — победа).
+     */
+    public static double progress(GameState s, PlayerState p) {
+        if (p.superObjective == null || p.superWeaponUid == null) {
+            return 0.0;
+        }
+        int total = cellCount(s, p.superObjective);
+        if (total <= 0) {
+            return 1.0;
+        }
+        return 1.0 - Math.max(0, p.superCells) / (double) total;
+    }
+
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> cells(GameState s, String cardId) {
         Map<String, Object> card = Ctx.cards(s, "super_objectives").find(cardId);

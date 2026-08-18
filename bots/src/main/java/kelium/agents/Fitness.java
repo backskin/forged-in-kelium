@@ -13,6 +13,7 @@ import kelium.engine.GameEngine;
 import kelium.engine.LayoutLibrary;
 import kelium.engine.Scoring;
 import kelium.engine.Setup;
+import kelium.engine.SuperWeapon;
 
 /**
  * FITNESS — что именно считается «играть хорошо». Один расчёт на все обучатели.
@@ -587,7 +588,12 @@ public final class Fitness {
         }
 
         if (goal == Goal.СУПЕРОРУЖИЕ) {
-            fitness += 3.0 * s.player(seat).superObjectiveProgress
+            // Баг-фикс 18.08.2026: superObjectiveProgress был мёртвым полем
+            // (см. SuperWeapon.progress) — эта линия росла вслепую. Заодно:
+            // superObjectiveComplete взводится при ВСКРЫТИИ карты (см.
+            // SuperWeapon.reveal), не при запуске/победе — имя вводит в
+            // заблуждение, но флаг рабочий, не мёртвый.
+            fitness += 20.0 * SuperWeapon.progress(s, s.player(seat))
                 + (s.player(seat).superObjectiveComplete ? 30.0 : 0.0);
         }
 

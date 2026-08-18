@@ -273,7 +273,11 @@ public final class Lookahead {
         h = mix(h, p.objectiveHand.size());
         h = mix(h, p.arsenalHand.size());
         h = mix(h, p.arsenalInstalled.size());
-        h = mix(h, p.superObjectiveProgress);
+        // Баг-фикс 18.08.2026: superObjectiveProgress мёртвое поле (всегда 0,
+        // см. SuperWeapon.progress) — хэш не отличал состояния по прогрессу
+        // супероружия вовсе. superCells — то же самое, но живое: -1 не
+        // вскрыто, дальше считает вниз до 0 при запуске.
+        h = mix(h, p.superCells);
         h = mix(h, p.cuDestructionTokens);
         h = mix(h, p.cuKills);
         h = mix(h, p.flippedStartTiles + p.flippedNormalTiles);

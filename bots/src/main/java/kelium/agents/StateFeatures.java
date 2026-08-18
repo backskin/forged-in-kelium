@@ -74,10 +74,16 @@ public final class StateFeatures {
         "rival_threat",            // насколько опасен самый опасный соперник
         "rival_exposure");         // насколько Я САМ сейчас на мушке у стола
 
-    /** Масштабы для нормировки (нейросети нужен вход около [0..1]). */
+    /**
+     * Масштабы для нормировки (нейросети нужен вход около [0..1]).
+     *
+     * <p>super_progress (индекс 19) масштаб 1, а не 5 — баг-фикс 18.08.2026:
+     * прежний масштаб 5 предполагал старую механику по частям (0..5), которой
+     * в коде уже нет; новый {@link SuperWeapon#progress} возвращает 0..1.
+     */
     public static final double[] SCALES = {
         12, 10, 15, 8, 8, 10, 3, 12, 6, 3, 4, 5, 3, 2, 10, 6,
-        12, 3, 3, 5, 3, 4, 2, 4, 6, 6, 4, 20, 8,
+        12, 3, 3, 1, 3, 4, 2, 4, 6, 6, 4, 20, 8,
         1, 3, 1.5, 1.5
     };
 
@@ -196,7 +202,7 @@ public final class StateFeatures {
         f[16] = techSteps;
         f[17] = peaks;
         f[18] = me.objectiveHand.size();
-        f[19] = me.superObjectiveProgress;
+        f[19] = kelium.engine.SuperWeapon.progress(s, me);
         f[20] = me.arsenalInstalled.size();
         f[21] = me.containers;
         f[22] = me.cuDestructionTokens;
