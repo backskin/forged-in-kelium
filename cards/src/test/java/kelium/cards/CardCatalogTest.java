@@ -53,6 +53,7 @@ class CardCatalogTest {
         CardRegistry.bindAll("objectives", entries("objectives"));
         CardRegistry.bindAll("arsenal", entries("arsenal"));
         CardRegistry.bindAll("containers", entries("containers"));
+        CardRegistry.bindAll("market", entries("market"));
     }
 
     @Test
@@ -91,7 +92,7 @@ class CardCatalogTest {
         // его размер с одним набором данных нельзя: подключили арсенал — и
         // проверка заданий начала врать.
         int inData = entries("objectives").size() + entries("arsenal").size()
-            + entries("containers").size();
+            + entries("containers").size() + entries("market").size();
         assertEquals(inData, CardRegistry.all().size(),
             "число карт в коде и в данных разошлось: в данных " + inData
                 + ", в коде " + CardRegistry.all().size());
