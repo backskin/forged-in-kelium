@@ -57,3 +57,7 @@ desktop.ini
 
 # Выгрузки публичного вида — черновые, пересоздаются любой командой
 reports/observe/
+
+# Обучающие партии для PyTorch-пайплайна (training/) — гигабайты JSONL,
+# пересоздаются TrainingDataExport по зерну, в git не нужны.
+data/training/

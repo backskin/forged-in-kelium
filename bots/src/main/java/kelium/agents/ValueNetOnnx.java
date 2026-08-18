@@ -32,6 +32,24 @@ public final class ValueNetOnnx implements AutoCloseable {
     /** Тот же масштаб, что MARGIN_SCALE в training/kelium_ml/dataset.py. */
     private static final float MARGIN_SCALE = 15.0f;
 
+    /**
+     * Действующая сеть на процесс — ТОТ ЖЕ переключатель, что у {@link ValueNet}
+     * ({@code null} = выключена, ничего не меняется по умолчанию). Судья
+     * позиции в {@link StrategicAgent#evaluate} проверяет геном → {@link
+     * ValueNet#active()} → эту сеть → линейную сумму, в этом порядке.
+     */
+    private static volatile ValueNetOnnx active = null;
+
+    /** Действующая ONNX-сеть оценки (или null — она не участвует). */
+    public static ValueNetOnnx active() {
+        return active;
+    }
+
+    /** Включить ONNX-сеть оценки для всего процесса ({@code null} — выключить). */
+    public static void use(ValueNetOnnx net) {
+        active = net;
+    }
+
     private final OrtEnvironment env;
     private final OrtSession session;
 

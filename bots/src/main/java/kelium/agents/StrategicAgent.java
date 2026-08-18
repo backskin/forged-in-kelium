@@ -1514,6 +1514,13 @@ public class StrategicAgent extends HeuristicAgent {
      * <p>Если подключена обученная {@link ValueNet}, она ЗАМЕНЯЕТ линейную сумму:
      * сеть учится нелинейным связям («келемий без места в хранилище бесполезен»),
      * которые линейной суммой не выражаются вовсе.
+     *
+     * <p>{@link ValueNetOnnx} (PyTorch-пайплайн, 18.08.2026) — ЗАПАСНОЙ ВАРИАНТ
+     * ПОСЛЕ {@link ValueNet}, а не вместо неё: у ValueNet вход — веса генома
+     * ({@link StateFeatures}, обучается вместе с самим геномом отбором),
+     * у ValueNetOnnx — общий на процесс граф от {@link PublicView}, который
+     * учится отдельно, на Python. Обе выключены по умолчанию (оба {@code
+     * active()} — {@code null}), поведение без явного включения не меняется.
      */
     public static double evaluate(GameState state, int seat, Genome genome) {
         // Судья позиции берётся СНАЧАЛА из генома самого бота: так за одним столом
@@ -1523,6 +1530,10 @@ public class StrategicAgent extends HeuristicAgent {
             : ValueNet.active();
         if (net != null) {
             return net.value(state, seat);
+        }
+        ValueNetOnnx onnx = ValueNetOnnx.active();
+        if (onnx != null) {
+            return onnx.value(state, seat);
         }
         return linearEvaluate(state, seat, genome);
     }
