@@ -423,6 +423,73 @@ public final class Genome {
                 mul.accept("action.science", 0.6);
                 mul.accept("eval.margin", 1.6);
             }
+            // СЕМЬ НОВЫХ ХАРАКТЕРОВ (заказ дизайнера 18.08.2026) — каждый со своей
+            // целью в Fitness.Goal; здесь только СТАРТОВЫЙ перекос популяции,
+            // дальше веса дотягивает отбор под саму цель линии.
+            case "specialist" -> {
+                // СПЕЦИАЛИСТ: не «какой-то один» род войск заранее — отбор сам
+                // найдёт, во что выгоднее упереться (см. Fitness.Goal.СПЕЦИАЛИСТ,
+                // награда за САМУЮ БОЛЬШУЮ однородную группу на поле). Здесь только
+                // общий перекос в сторону «строить и держать войско», а не воевать.
+                mul.accept("action.assembly", 1.8);
+                mul.accept("assemble.strike_unit", 1.5);
+                mul.accept("plan.value.army", 1.7);
+                mul.accept("action.combat", 1.1);
+            }
+            case "arsenal" -> {
+                // АРСЕНАЛ: рывок через рынок и энергообмен — оттуда приходят карты
+                // арсенала и то, чем их запитывают.
+                mul.accept("action.market", 1.8);
+                mul.accept("action.energy_swap", 1.3);
+                mul.accept("plan.value.economy", 1.3);
+            }
+            case "quester" -> {
+                // ЗАДАЧНИК: как можно больше ВЫПОЛНЕННЫХ заданий (см.
+                // Fitness.Goal.ЗАДАЧНИК) — оттуда и опора на добычу с рынком:
+                // многие задания просят и то, и другое.
+                mul.accept("plan.value.objective", 1.9);
+                mul.accept("action.mining", 1.2);
+                mul.accept("action.market", 1.2);
+            }
+            case "berserker" -> {
+                // ГРОМИЛА: тупее и напористее ВОИТЕЛЯ — без его тяги к
+                // разнообразию родов, просто максимум боевых действий.
+                mul.accept("aggression", 2.4);
+                mul.accept("action.combat", 2.0);
+                mul.accept("action.movement", 1.7);
+                mul.accept("combat.kill_value", 1.5);
+                mul.accept("combat.building_bonus", 1.5);
+                mul.accept("action.science", 0.5);
+                mul.accept("action.market", 0.5);
+                mul.accept("action.mining", 0.6);
+            }
+            case "scientist" -> {
+                // УЧЁНЫЙ: наука раньше и дороже всего остального (в отличие от
+                // АКСИОМЫ — тут можно закапываться в один трек, это разрешено).
+                mul.accept("action.science", 2.0);
+                mul.accept("plan.value.tech", 2.0);
+                mul.accept("action.mining", 1.3);
+                mul.accept("action.combat", 0.5);
+                mul.accept("aggression", 0.4);
+            }
+            case "superweapon" -> {
+                // СУПЕРОРУЖИЕ: рывок к супер-заданию — рынок и энергообмен чаще
+                // всего и открывают его условия (см. Fitness.Goal.СУПЕРОРУЖИЕ).
+                mul.accept("action.market", 1.3);
+                mul.accept("action.mining", 1.2);
+                mul.accept("action.energy_swap", 1.2);
+                mul.accept("plan.value.objective", 1.3);
+            }
+            case "cuhunter" -> {
+                // ОХОТНИК: цель одна — чужое ЦУ. Техника и авиация бьют по нему
+                // мимо стен, поэтому их производство важнее общей агрессии.
+                mul.accept("combat.cu_bonus", 2.2);
+                mul.accept("combat.kill_value", 1.6);
+                mul.accept("action.combat", 1.8);
+                mul.accept("assemble.strike_unit", 1.6);
+                mul.accept("action.movement", 1.5);
+                mul.accept("build.strike_building", 1.6);
+            }
             default -> { }
         }
         // ХАРАКТЕР ПОДПИСЫВАЕТСЯ ЗДЕСЬ (profile — параметр метода). Без подписи

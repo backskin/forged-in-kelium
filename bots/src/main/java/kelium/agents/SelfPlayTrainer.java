@@ -114,6 +114,17 @@ public final class SelfPlayTrainer {
             // Без указания линия учится первой ступени.
             return Fitness.Goal.ЖНЕЦ;
         }
+        // СЕМЬ НОВЫХ ХАРАКТЕРОВ (заказ дизайнера 18.08.2026) — см. Fitness.Goal.
+        switch (character) {
+            case "specialist": return Fitness.Goal.СПЕЦИАЛИСТ;
+            case "arsenal": return Fitness.Goal.АРСЕНАЛ;
+            case "quester": return Fitness.Goal.ЗАДАЧНИК;
+            case "berserker": return Fitness.Goal.ГРОМИЛА;
+            case "scientist": return Fitness.Goal.УЧЁНЫЙ;
+            case "superweapon": return Fitness.Goal.СУПЕРОРУЖИЕ;
+            case "cuhunter": return Fitness.Goal.ОХОТНИК;
+            default: break;
+        }
         return Fitness.Goal.ПОБЕДА;
     }
 

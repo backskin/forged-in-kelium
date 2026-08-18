@@ -76,6 +76,20 @@ public final class BotCatalog {
                 + "которым меряют потолок войны в игре"),
         new Entry("trained:chaos", "Обученный · вредитель",
             "Душит чужую экономику, на свои очки плевать"),
+        new Entry("trained:specialist", "Обученный · специалист",
+            "Упирается в один род войск и держит его в количестве, а не вразнобой"),
+        new Entry("trained:arsenal", "Обученный · арсенальщик",
+            "Живёт рынком: не просто подбирает карты арсенала, а строит на них игру"),
+        new Entry("trained:quester", "Обученный · задачник",
+            "Машина по выполнению заданий — берёт каждое, до которого дотягивается"),
+        new Entry("trained:berserker", "Обученный · громила",
+            "Бьёт всех и как можно чаще, без затей воителя с разнообразием родов"),
+        new Entry("trained:scientist", "Обученный · учёный",
+            "Наука раньше и дороже всего остального, ради победы, а не заповеди"),
+        new Entry("trained:superweapon", "Обученный · оружейник",
+            "Рвётся к супер-заданию и старается его запустить"),
+        new Entry("trained:cuhunter", "Обученный · охотник",
+            "Цель одна — чужое ЦУ: техника и авиация бьют по нему мимо стен"),
         new Entry("human", "Как человек",
             "Смотрит не все варианты, ошибается тем сильнее, чем ближе оценки, "
                 + "помнит обиды и держится замысла пару раундов"),
@@ -114,7 +128,9 @@ public final class BotCatalog {
         }
         return switch (id) {
             case "explorer", "chaos", "hawk", "dove", "opportunist", "balanced",
-                 "warlord", "axiom", "reaper" ->
+                 "warlord", "axiom", "reaper",
+                 "specialist", "arsenal", "quester", "berserker", "scientist",
+                 "superweapon", "cuhunter" ->
                 "trained:" + id;
             case "neural", "onnx", "default", "strategic" -> "trained:balanced";
             case "heuristic" -> "simple:balanced";
