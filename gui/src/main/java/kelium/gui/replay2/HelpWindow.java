@@ -177,6 +177,12 @@ public final class HelpWindow {
         tree.setShowsRootHandles(true);
         tree.setFont(Theme.body());
         tree.setRowHeight(Theme.px(22));
+        // ТЕМА ПРИ ПЕРВОМ ПОСТРОЕНИИ (баг-фикс 18.08.2026). Фон дерева стоял
+        // только в restyle() — который срабатывает при переключении темы уже
+        // открытого окна. При ПЕРВОМ открытии restyle() не вызывается никогда,
+        // и дерево оставалось со светлым фоном по умолчанию от L&F, пока
+        // статья рядом уже была тёмной: половина окна светлая, половина тёмная.
+        tree.setBackground(Theme.panel());
         tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
         tree.addTreeSelectionListener(e -> showSelected());
 

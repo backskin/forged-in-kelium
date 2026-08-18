@@ -214,6 +214,10 @@ public final class Drawer extends JPanel {
         logTree.setShowsRootHandles(true);
         logTree.setFont(Theme.body());
         logTree.setRowHeight(Theme.px(20));
+        // ТОТ ЖЕ БАГ, ЧТО В HelpWindow (18.08.2026): фон JTree по умолчанию —
+        // светлый от L&F, и без явной установки он не совпадает с тёмной темой
+        // за пределами занятых строк (пустое место внизу дерева, вьюпорт скролла).
+        logTree.setBackground(Theme.panel());
         logTree.setCellRenderer(new LogRenderer());
         logTree.getSelectionModel().setSelectionMode(
             javax.swing.tree.TreeSelectionModel.SINGLE_TREE_SELECTION);
