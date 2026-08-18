@@ -52,7 +52,38 @@ public final class ContentLibrary {
             String version = e.getValue().toString();
             sets.put(ctype, ContentSet.load(ctype, version, dataRoot));
         }
+        bindCardsInCode(sets);
         return new ContentLibrary(sets);
+    }
+
+    /**
+     * ЕДИНСТВЕННОЕ МЕСТО, ГДЕ КАТАЛОГ СВЯЗЫВАЕТСЯ С КОДОМ КАРТ (заказ дизайнера
+     * 18.08.2026: «и внешний справочник, и справочник внутри реплэя должны брать
+     * описания сразу с классов»).
+     *
+     * <p>НАЙДЕНО ПРИ ЭТОЙ ПРАВКЕ: {@code kelium.engine.cards.CardRegistry.bindAll}
+     * вызывался только из {@code Setup.buildGame} — то есть только когда партия
+     * реально поднимается. Внешний справочник ({@code HelpApp}) и внутренний
+     * справочник без открытой партии строят {@link ContentLibrary} НАПРЯМУЮ, этот
+     * путь минуя, — и потому читали каталог как ДО переезда карт в код: сырой
+     * YAML, а не то, что выгружает класс. Для мигрировавших карт это пока не
+     * расходилось (текст скопирован в код дословно), но было бы ровно тем же
+     * классом ошибки, что чинился всю сессию, — стоило один раз поправить
+     * класс-карту и забыть про YAML, и оба справочника показали бы устаревший
+     * текст молча.
+     *
+     * <p>Теперь bindAll вызывается ЗДЕСЬ, в единственной точке, откуда контент
+     * загружается для чего угодно — партии, внешнего и внутреннего справочника.
+     * Прежние явные вызовы в {@code Setup.buildGame} стали избыточны и убраны.
+     */
+    private static void bindCardsInCode(Map<String, ContentSet> sets) {
+        for (String type : java.util.List.of("objectives", "arsenal", "containers",
+                "market", "super_objectives", "super_arsenal")) {
+            ContentSet cs = sets.get(type);
+            if (cs != null) {
+                kelium.engine.cards.CardRegistry.bindAll(type, cs.entries);
+            }
+        }
     }
 
     /** Краткая сводка по каждому типу контента: версия и число записей. */

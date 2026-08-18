@@ -378,11 +378,11 @@ public final class Setup {
         int n = config.numPlayers;
 
         // ПРИВЯЗАТЬ ДАННЫЕ К КАРТАМ-ОБЪЕКТАМ (заказ дизайнера 15.08.2026, модуль
-        // cards). До этой строки CardRegistry.bindAll не вызывался НИГДЕ, кроме
-        // тестов: карта-объект существовала, но играла на пустых данных — её
-        // пороги брались из запасных значений в коде, а не из YAML партии. Без
-        // привязки Objective.progress()/needed() нельзя было спросить осмысленно
-        // ни разу за всю живую партию.
+        // cards). ГЛАВНАЯ ТОЧКА ПРИВЯЗКИ ТЕПЕРЬ — {@code ContentLibrary.forRuleset}
+        // (18.08.2026): она же используется внешним и внутренним справочником,
+        // так что оба видят класс-версию, а не сырой YAML. Вызовы здесь оставлены
+        // как страховка — bindAll идемпотентен на одном и том же списке записей,
+        // повторный вызов ничего не портит.
         kelium.engine.cards.CardRegistry.bindAll("objectives", content.get("objectives").entries);
         kelium.engine.cards.CardRegistry.bindAll("arsenal", content.get("arsenal").entries);
         kelium.engine.cards.CardRegistry.bindAll("containers", content.get("containers").entries);
