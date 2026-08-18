@@ -86,6 +86,11 @@ public final class ЗаданияВойныII {
         public boolean burn(CardContext ctx) {
             return свободныйБой(ctx);
         }
+
+        @Override
+        protected String действие() {
+            return "combat";
+        }
     }
 
     /**
@@ -153,6 +158,11 @@ public final class ЗаданияВойныII {
         @Override
         public boolean burn(CardContext ctx) {
             return свободнаяСборка(ctx, 2);
+        }
+
+        @Override
+        protected String действие() {
+            return "movement";
         }
     }
 
@@ -236,6 +246,11 @@ public final class ЗаданияВойныII {
         public boolean burn(CardContext ctx) {
             return свободноеДвижение(ctx);
         }
+
+        @Override
+        protected String действие() {
+            return "movement";
+        }
     }
 
     /**
@@ -304,6 +319,11 @@ public final class ЗаданияВойныII {
         public boolean burn(CardContext ctx) {
             return свободнаяСборка(ctx, 2);
         }
+
+        @Override
+        protected String действие() {
+            return "movement";
+        }
     }
 
     /** o31 «Господство в небе» — своя авиация на гексе с жетонами противника. */
@@ -359,6 +379,11 @@ public final class ЗаданияВойныII {
         @Override
         public boolean burn(CardContext ctx) {
             return ctx.speedBoost();
+        }
+
+        @Override
+        protected String действие() {
+            return "movement";
         }
     }
 
@@ -436,6 +461,11 @@ public final class ЗаданияВойныII {
             ctx.gain(Resource.AMMO, 2);
             return true;
         }
+
+        @Override
+        protected String действие() {
+            return "combat";
+        }
     }
 
     /**
@@ -510,6 +540,11 @@ public final class ЗаданияВойныII {
             ctx.gain(Resource.COIN, 2);
             return true;
         }
+
+        @Override
+        protected String действие() {
+            return "combat";
+        }
     }
 
     /**
@@ -575,6 +610,11 @@ public final class ЗаданияВойныII {
         public boolean burn(CardContext ctx) {
             return свободныйБой(ctx);
         }
+
+        @Override
+        protected String действие() {
+            return "combat";
+        }
     }
 
     /** o46 «Трофейный обоз» — жетоны трёх разных видов в трофеях. */
@@ -634,6 +674,11 @@ public final class ЗаданияВойныII {
         @Override
         public boolean burn(CardContext ctx) {
             return свободнаяНаука(ctx);
+        }
+
+        @Override
+        protected String действие() {
+            return "combat";
         }
     }
 }

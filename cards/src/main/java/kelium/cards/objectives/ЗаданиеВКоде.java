@@ -98,7 +98,8 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
         out.put("checked_by", "card");
         out.put("requirement", Map.of("условие", л.условие()));
         if (л.усиление() != null) {
-            out.put("enhanced", Map.of("условие", л.усиление()));
+            Map<String, Object> уж = усиленнаяЖертваВЗаписи();
+            out.put("enhanced", уж != null ? уж : Map.of("условие", л.усиление()));
         }
         if (!л.награда().пусто()) {
             out.put("base_reward", л.награда().выгрузить());
@@ -135,6 +136,22 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
      * сдавать.
      */
     protected Map<String, Object> жертваВЗаписи() {
+        return null;
+    }
+
+    /**
+     * ДОПЛАТА ЗА УСИЛЕННУЮ ЖЕРТВУ — {@code {predicate: "sacrifice_enhanced",
+     * params: {resource, amount}}}.
+     *
+     * <p>ЕДИНСТВЕННОЕ МЕСТО, ГДЕ ПЕРЕЕХАВШАЯ КАРТА ВСЁ ЕЩЁ ДЕРЖИТ ДЕКЛАРАТИВНУЮ
+     * ЗАПИСЬ, А НЕ СВОЙ КОД. Доплата разницы до усиленной суммы — общий протокол
+     * движка ({@code Objectives.playObjective}), а не поведение конкретной
+     * карты: движок сам проверяет запас и сам списывает разницу в момент
+     * розыгрыша. Прогонять это через {@code satisfiedEnhanced} нельзя — это
+     * запрос без побочного эффекта, а списание требует побочного эффекта, и
+     * дублировать протокол оплаты в каждой карте-жертве незачем.
+     */
+    protected Map<String, Object> усиленнаяЖертваВЗаписи() {
         return null;
     }
 
@@ -175,6 +192,22 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
     @Override
     public boolean burn(CardContext ctx) {
         return false;
+    }
+
+    @Override
+    public final String suggestedAction(CardContext ctx) {
+        return действие();
+    }
+
+    /**
+     * Действие, которым обычно закрывается условие ЭТОЙ карты — короткое имя
+     * действия ({@code build}/{@code assembly}/{@code mining}/{@code combat}/
+     * {@code movement}/{@code energy_swap}/{@code science}/{@code market}), не
+     * зависящее от состояния партии. {@code null} по умолчанию: карта не
+     * привязана к одному действию, пока подкласс не скажет иначе.
+     */
+    protected String действие() {
+        return null;
     }
 
     // ==================================================================

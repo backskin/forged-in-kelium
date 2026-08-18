@@ -527,11 +527,21 @@ public final class Plan {
             if (!(card.get("requirement") instanceof Map<?, ?> req)) {
                 continue;
             }
-            Object pid = ((Map<String, Object>) req).get("predicate");
-            if (pid == null) {
-                continue;
+            // КАРТА, ЖИВУЩАЯ В КОДЕ, СПРАШИВАЕТСЯ НАПРЯМУЮ. Раньше действие
+            // угадывалось по подстроке в имени предиката (actionFor) — угадывание
+            // читало requirement.predicate из данных. Карта в коде этого поля
+            // больше не пишет (условие — код, а не строка), и угадывание молча
+            // переставало работать для каждой переехавшей карты. Теперь спрашиваем
+            // саму карту, а угадывание по подстроке остаётся запасным путём для
+            // карт, ещё не переехавших в код.
+            kelium.engine.cards.ObjectiveCard oc = kelium.engine.cards.CardRegistry.objective(cid);
+            String action = oc != null
+                ? oc.suggestedAction(new kelium.engine.cards.EngineCardContext(s, seat))
+                : null;
+            if (action == null) {
+                Object pid = ((Map<String, Object>) req).get("predicate");
+                action = pid == null ? null : actionFor(pid.toString());
             }
-            String action = actionFor(pid.toString());
             if (action == null) {
                 continue;
             }
@@ -548,7 +558,7 @@ public final class Plan {
                 bestCid = cid;
                 bestAction = action;
                 bestWhat = "требование задания «" + cardName(content, cid)
-                    + "» (" + pid + ") ещё не выполнено";
+                    + "» ещё не выполнено";
             }
         }
         if (bestCid == null) {

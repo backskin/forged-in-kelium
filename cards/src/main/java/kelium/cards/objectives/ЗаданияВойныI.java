@@ -108,6 +108,11 @@ public final class ЗаданияВойныI {
         public boolean burn(CardContext ctx) {
             return свободноеДвижение(ctx);
         }
+
+        @Override
+        protected String действие() {
+            return "assembly";
+        }
     }
 
     /**
@@ -186,6 +191,11 @@ public final class ЗаданияВойныI {
         public boolean burn(CardContext ctx) {
             return свободныйБой(ctx);
         }
+
+        @Override
+        protected String действие() {
+            return "movement";
+        }
     }
 
     /** o11 «Передовая база» — стройка на гексе, соседнем с войсками противника. */
@@ -250,6 +260,11 @@ public final class ЗаданияВойныI {
         public boolean burn(CardContext ctx) {
             return свободноеДвижение(ctx);
         }
+
+        @Override
+        protected String действие() {
+            return "build";
+        }
     }
 
     /**
@@ -311,6 +326,11 @@ public final class ЗаданияВойныI {
         @Override
         public boolean burn(CardContext ctx) {
             return ctx.shield(List.of("infantry", "vehicle"));
+        }
+
+        @Override
+        protected String действие() {
+            return "build";
         }
     }
 
@@ -383,6 +403,11 @@ public final class ЗаданияВойныI {
         @Override
         public boolean burn(CardContext ctx) {
             return ctx.shield(List.of("vehicle", "aircraft"));
+        }
+
+        @Override
+        protected String действие() {
+            return "build";
         }
     }
 
@@ -465,6 +490,11 @@ public final class ЗаданияВойныI {
         public boolean burn(CardContext ctx) {
             return свободнаяСборка(ctx, 1);
         }
+
+        @Override
+        protected String действие() {
+            return "build";
+        }
     }
 
     /**
@@ -516,6 +546,11 @@ public final class ЗаданияВойныI {
         @Override
         public boolean burn(CardContext ctx) {
             return свободнаяСборка(ctx, 2);
+        }
+
+        @Override
+        protected String действие() {
+            return "combat";
         }
     }
 
@@ -572,6 +607,11 @@ public final class ЗаданияВойныI {
         public boolean burn(CardContext ctx) {
             return ctx.speedBoost();
         }
+
+        @Override
+        protected String действие() {
+            return "combat";
+        }
     }
 
     /** o45 «Пристрелка» — урон двум разным ЗДАНИЯМ противника за ход. */
@@ -617,6 +657,11 @@ public final class ЗаданияВойныI {
         @Override
         public boolean burn(CardContext ctx) {
             return ctx.shield(List.of("infantry", "aircraft"));
+        }
+
+        @Override
+        protected String действие() {
+            return "combat";
         }
     }
 
@@ -673,6 +718,11 @@ public final class ЗаданияВойныI {
         @Override
         public boolean burn(CardContext ctx) {
             return свободнаяСборка(ctx, 1);
+        }
+
+        @Override
+        protected String действие() {
+            return "combat";
         }
     }
 }

@@ -231,6 +231,33 @@ public final class TestCardContext implements CardContext {
         return kelium.engine.Movement.distance(state(), from, targets);
     }
 
+    @Override public int largestWallChain(boolean militaryOnly) {
+        java.util.Set<kelium.core.BuildingType> mil = java.util.Set.of(
+            kelium.core.BuildingType.BARRACKS, kelium.core.BuildingType.FACTORY,
+            kelium.core.BuildingType.AIRBASE);
+        java.util.List<BuildingToken> pool = new java.util.ArrayList<>();
+        for (BuildingToken b : me().buildingsOnField()) {
+            if (!militaryOnly || mil.contains(b.type)) {
+                pool.add(b);
+            }
+        }
+        return kelium.engine.Chains.largestWallChain(state(), pool);
+    }
+
+    @Override public boolean chooseNonAdjacent(java.util.List<String> pool, int need) {
+        return kelium.engine.Chains.chooseNonAdjacent(state(), pool, 0,
+            new java.util.ArrayList<>(), need);
+    }
+
+    @Override public boolean hasSpawnTile(String hexId) {
+        return state().field.get(hexId).hasSpawnTile();
+    }
+
+    @Override public boolean spawnTileIsStart(String hexId) {
+        var h = state().field.get(hexId);
+        return h.spawnTile != null && h.spawnTile.isStart;
+    }
+
     private static String хексОм(Token t) {
         if (t instanceof UnitToken u) {
             return u.hexId;
