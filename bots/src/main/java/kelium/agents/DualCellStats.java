@@ -16,7 +16,6 @@ import java.util.TreeMap;
 import kelium.core.Agent;
 import kelium.core.GameState;
 import kelium.dataio.GameConfig;
-import kelium.dataio.Locations;
 import kelium.engine.GameEngine;
 import kelium.engine.LayoutLibrary;
 import kelium.engine.Scoring;
@@ -64,7 +63,13 @@ public final class DualCellStats {
         }
 
         LayoutLibrary.setRulesetOverride("1.15.0");
-        Locations.setBotMemory(Path.of(botMemory));
+        // System-свойство, а НЕ Locations.setBotMemory(...): тот метод пишет в
+        // постоянные Preferences (реестр Windows) и переживает выход из
+        // процесса — баг-фикс 18.08.2026, найден по испорченному замеру
+        // BaselineCheck (тот незаметно унаследовал папку genomes-boi2 от
+        // более раннего запуска этого инструмента). Системное свойство живёт
+        // только текущий процесс.
+        System.setProperty("kelium.botmemory", botMemory);
 
         List<String> pool = new ArrayList<>();
         for (BotCatalog.Entry e : BotCatalog.ALL) {
@@ -76,11 +81,13 @@ public final class DualCellStats {
         Map<String, Long> rowCounts = new TreeMap<>();
         Map<String, Long> unitRowCounts = new TreeMap<>();
         Map<String, SideTally> bySide = new TreeMap<>();
+        Map<String, Long> vpSourceSums = new TreeMap<>();
         long totalHits = 0;
         long totalRounds = 0;
         long totalGames = 0;
         long gamesWithAnyHit = 0;
         long towerFreeHits = 0;
+        long totalSeats = 0;
 
         for (int g = 0; g < games; g++) {
             long gameSeed = seed * 1_000_003L + g;
@@ -121,13 +128,20 @@ public final class DualCellStats {
             Integer winner = res.get("winner") instanceof Number n ? n.intValue() : null;
             for (int seat = 0; seat < players; seat++) {
                 String side = s.player(seat).board.troop.side;
-                int vp = Scoring.scorePlayer(s, seat).getOrDefault("total", 0);
+                Map<String, Integer> breakdown = Scoring.scorePlayer(s, seat);
+                int vp = breakdown.getOrDefault("total", 0);
                 SideTally t = bySide.computeIfAbsent(side, k -> new SideTally());
                 t.games++;
                 t.vpSum += vp;
                 if (winner != null && winner == seat) {
                     t.wins++;
                 }
+                for (var src : breakdown.entrySet()) {
+                    if (!"total".equals(src.getKey())) {
+                        vpSourceSums.merge(src.getKey(), (long) src.getValue(), Long::sum);
+                    }
+                }
+                totalSeats++;
             }
 
             if ((g + 1) % 200 == 0) {
@@ -162,6 +176,13 @@ public final class DualCellStats {
         md.append("| Род.строка | Попаданий |\n|---|---|\n");
         for (var e : unitRowCounts.entrySet()) {
             md.append("| ").append(e.getKey()).append(" | ").append(e.getValue()).append(" |\n");
+        }
+
+        md.append("\n## Источники победных очков (в среднем на место за партию)\n\n");
+        md.append("| Источник | Средние ПО |\n|---|---|\n");
+        for (var e : vpSourceSums.entrySet()) {
+            md.append(String.format(Locale.ROOT, "| %s | %.2f |%n",
+                e.getKey(), (double) e.getValue() / Math.max(1, totalSeats)));
         }
 
         md.append("\n## По стороне планшета войск\n\n");
