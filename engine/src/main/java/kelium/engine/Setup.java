@@ -387,6 +387,10 @@ public final class Setup {
         kelium.engine.cards.CardRegistry.bindAll("arsenal", content.get("arsenal").entries);
         kelium.engine.cards.CardRegistry.bindAll("containers", content.get("containers").entries);
         kelium.engine.cards.CardRegistry.bindAll("market", content.get("market").entries);
+        kelium.engine.cards.CardRegistry.bindAll("super_objectives",
+            content.get("super_objectives").entries);
+        kelium.engine.cards.CardRegistry.bindAll("super_arsenal",
+            content.get("super_arsenal").entries);
 
         List<Map<String, Object>> boardsEntries = content.get("boards").entries;
         // Запись о жетонах — печатная, если опыт не подменил её копией с правками
