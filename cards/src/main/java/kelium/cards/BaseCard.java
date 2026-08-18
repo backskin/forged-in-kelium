@@ -27,17 +27,17 @@ public abstract class BaseCard implements Card {
     }
 
     @Override
-    public final String name() {
+    public String name() {
         return String.valueOf(data.getOrDefault("name", id));
     }
 
     @Override
-    public final Map<String, Object> data() {
+    public Map<String, Object> data() {
         return data;
     }
 
     @Override
-    public final void bind(Map<String, Object> entry) {
+    public void bind(Map<String, Object> entry) {
         this.data = entry == null ? new LinkedHashMap<>() : entry;
     }
 
