@@ -1,14 +1,18 @@
 package kelium.gui;
 
+import java.awt.BorderLayout;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import javax.swing.ButtonGroup;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JToggleButton;
+import javax.swing.JToolBar;
 import javax.swing.SwingUtilities;
 
 import org.yaml.snakeyaml.Yaml;
@@ -18,16 +22,16 @@ import kelium.gui.replay2.Theme;
 
 /**
  * KeliumBuilder — НОВЫЙ конструктор раскладок (заказ дизайнера 18.08.2026),
- * первый срез миграции {@link LayoutEditor} на движок рендера
- * {@link BuilderScene} (тот же {@code FieldGeometry}/{@code Theme}, что у
- * разбора партии — не отдельный ад-хок рисовальщик, как у старого
- * {@code LayoutEditor.Canvas}).
+ * миграция {@link LayoutEditor} на движок рендера {@link BuilderScene} (тот
+ * же {@code FieldGeometry}/{@code Theme}, что у разбора партии — не
+ * отдельный ад-хок рисовальщик, как у старого {@code LayoutEditor.Canvas}).
  *
- * <p>ЭТОТ СРЕЗ: открыть готовый сценарий и показать его новым рендером —
- * только просмотр, редактирование ещё не перенесено. {@link LayoutEditor}
- * не тронут ни строкой и остаётся рабочим инструментом параллельно, пока
- * сюда не переедут инструменты редактирования, ghost-сетка и PNG-экспорт
- * (следующие срезы по трёхфазному плану миграции).
+ * <p>СРЕЗ 2 (первый был только просмотром): базовое редактирование —
+ * добавление/удаление гексов по сетке призраков, старты игроков, малое и
+ * большое зарождение, запретный гекс. {@link LayoutEditor} не тронут ни
+ * строкой и остаётся рабочим инструментом параллельно, пока сюда не
+ * переедут отделка (правка келемия, контейнеры, нейтралы, стопки) и
+ * PNG-экспорт (следующие срезы).
  */
 public final class KeliumBuilder {
 
@@ -37,25 +41,52 @@ public final class KeliumBuilder {
     public static void main(String[] args) {
         Theme.apply(true);
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("KeliumBuilder — новый конструктор (превью рендера)");
+            JFrame frame = new JFrame("KeliumBuilder — новый конструктор");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.setSize(1200, 900);
 
-            Model model = new Model();
             Path scenarioFile = args.length > 0 ? Path.of(args[0]) : null;
-            if (scenarioFile != null && Files.isReadable(scenarioFile)) {
-                model = loadFirstScenario(scenarioFile, frame);
-            }
+            boolean hasScenario = scenarioFile != null && Files.isReadable(scenarioFile);
+            Model model = hasScenario ? loadFirstScenario(scenarioFile, frame) : new Model();
 
             BuilderScene scene = new BuilderScene(model);
             scene.setPan(0, 0);
-            frame.add(new JLabel("  Гексов: " + model.hexes.size()
-                + (scenarioFile != null ? "  ·  " + scenarioFile.getFileName() : "  ·  пустое поле")),
-                java.awt.BorderLayout.NORTH);
-            frame.add(scene, java.awt.BorderLayout.CENTER);
+
+            JLabel status = new JLabel();
+            Runnable refreshStatus = () -> status.setText("  Гексов: " + model.hexes.size()
+                + "  ·  игроков: " + model.players()
+                + (hasScenario ? "  ·  " + scenarioFile.getFileName() : "  ·  пустое поле"));
+            refreshStatus.run();
+            scene.onChange(refreshStatus);
+
+            frame.add(buildToolbar(scene), BorderLayout.WEST);
+            frame.add(status, BorderLayout.NORTH);
+            frame.add(scene, BorderLayout.CENTER);
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
         });
+    }
+
+    private static JToolBar buildToolbar(BuilderScene scene) {
+        JToolBar bar = new JToolBar(JToolBar.VERTICAL);
+        bar.setFloatable(false);
+        ButtonGroup group = new ButtonGroup();
+        addTool(bar, group, "⬡ Гекс", BuilderScene.Tool.ADD_REMOVE, scene, true);
+        addTool(bar, group, "🚩 Старт игрока", BuilderScene.Tool.PLAYER_START, scene, false);
+        addTool(bar, group, "🟢 Малое зарождение", BuilderScene.Tool.SPAWN_SMALL, scene, false);
+        addTool(bar, group, "🟩 Большое зарождение", BuilderScene.Tool.SPAWN_BIG, scene, false);
+        addTool(bar, group, "⛔ Запретный гекс", BuilderScene.Tool.FORBIDDEN, scene, false);
+        addTool(bar, group, "🧽 Очистить гекс", BuilderScene.Tool.CLEAR, scene, false);
+        return bar;
+    }
+
+    private static void addTool(JToolBar bar, ButtonGroup group, String label,
+                                BuilderScene.Tool tool, BuilderScene scene, boolean selected) {
+        JToggleButton btn = new JToggleButton(label, selected);
+        btn.setHorizontalAlignment(JToggleButton.LEFT);
+        btn.addActionListener(e -> scene.setTool(tool));
+        group.add(btn);
+        bar.add(btn);
     }
 
     @SuppressWarnings("unchecked")
