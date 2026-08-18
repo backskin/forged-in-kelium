@@ -946,8 +946,7 @@ public class StrategicAgent extends HeuristicAgent {
                 if (!src.equals(u.hexId)) {
                     continue;
                 }
-                Target[] ua = state.player(seat).board.troop.attacks(u.type);
-                if (ua != null && (ua[0] == Target.BUILDINGS_TOWERS || ua[1] == Target.BUILDINGS_TOWERS)) {
+                if (hitsBuildings(state, seat, u.type)) {
                     strikers++;
                 }
             }
@@ -1159,12 +1158,27 @@ public class StrategicAgent extends HeuristicAgent {
         return false;
     }
 
+    /**
+     * Бьёт ли этот род войск здания/вышки по печатной таблице планшета этого
+     * места — эвристика «стоит ли вести юнита к чужому зданию», не настоящий
+     * бой (модули и цену не учитывает, только печатную таблицу).
+     *
+     * <p>БОЙ 2.0 ({@link kelium.core.TroopSide#dualCell()}): универсальная
+     * ячейка есть у каждого рода и достаёт здания всегда — печатной таблицы
+     * тут не хватает, чтобы честно ответить «нет».
+     */
+    private static boolean hitsBuildings(GameState state, int seat, UnitType type) {
+        var side = state.player(seat).board.troop;
+        if (side.dualCell()) {
+            return true;
+        }
+        Target[] atk = side.attacks(type);
+        return atk != null && (atk[0] == Target.BUILDINGS_TOWERS || atk[1] == Target.BUILDINGS_TOWERS);
+    }
+
     private String siegeCuHex(GameState state, WorldView wv, UnitToken mover) {
         // мувер должен уметь бить здания (техника/авиация/вышка)
-        Target[] atk = state.player(seat).board.troop.attacks(mover.type);
-        boolean canHitBld = atk != null
-            && (atk[0] == Target.BUILDINGS_TOWERS || atk[1] == Target.BUILDINGS_TOWERS);
-        if (!canHitBld) {
+        if (!hitsBuildings(state, seat, mover.type)) {
             return null;
         }
         String best = null;
@@ -1178,10 +1192,7 @@ public class StrategicAgent extends HeuristicAgent {
             // достижимо ли хоть от одного моего юнита, способного бить здания
             Integer dist = null;
             for (UnitToken u : state.player(seat).unitsOnField()) {
-                Target[] ua = state.player(seat).board.troop.attacks(u.type);
-                boolean uHitsBld = ua != null
-                    && (ua[0] == Target.BUILDINGS_TOWERS || ua[1] == Target.BUILDINGS_TOWERS);
-                if (!uHitsBld) {
+                if (!hitsBuildings(state, seat, u.type)) {
                     continue;
                 }
                 Integer d = wv.bfsDistanceTo(u.hexId, adj);
@@ -1227,10 +1238,7 @@ public class StrategicAgent extends HeuristicAgent {
         if (cu != null) {
             return cu;
         }
-        Target[] atk = state.player(seat).board.troop.attacks(mover.type);
-        boolean canHitBld = atk != null
-            && (atk[0] == Target.BUILDINGS_TOWERS || atk[1] == Target.BUILDINGS_TOWERS);
-        if (!canHitBld) {
+        if (!hitsBuildings(state, seat, mover.type)) {
             return null;
         }
         Rivalry riv = new Rivalry(state, seat);
@@ -1244,10 +1252,7 @@ public class StrategicAgent extends HeuristicAgent {
             java.util.Set<String> adj = new java.util.HashSet<>(state.field.neighbors(b.hexId));
             Integer dist = null;
             for (UnitToken u : state.player(seat).unitsOnField()) {
-                Target[] ua = state.player(seat).board.troop.attacks(u.type);
-                boolean uHitsBld = ua != null
-                    && (ua[0] == Target.BUILDINGS_TOWERS || ua[1] == Target.BUILDINGS_TOWERS);
-                if (!uHitsBld) {
+                if (!hitsBuildings(state, seat, u.type)) {
                     continue;
                 }
                 Integer d = wv.bfsDistanceTo(u.hexId, adj);

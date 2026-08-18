@@ -131,12 +131,43 @@ public final class LayoutLibrary {
     }
 
     /**
+     * ПЕРЕКЛЮЧАТЕЛЬ РУЛСЕТА ДЛЯ ОБУЧЕНИЯ И ЗАМЕРОВ (заказ дизайнера 18.08.2026,
+     * прогон «Боя 2.0»). {@code null} — как всегда, {@link
+     * kelium.dataio.GameConfig#DEFAULT_RULESET}.
+     *
+     * <p>Единый choke point: {@link Fitness#play}, {@link Arena}, {@link
+     * SelfPlayTrainer} и {@link TrainingDataExport} — все берут раскладку через
+     * {@link #configFor(int, long)}, поэтому один тумблер здесь переключает
+     * весь конвейер обучения и статистики на другой набор правил, ничего не
+     * трогая в этих четырёх местах. Тот же паттерн, что {@code Bots.search}
+     * и {@code ValueNet.active()} — явный и по умолчанию выключен.
+     */
+    private static volatile String rulesetOverride =
+        blankToNull(System.getProperty("kelium.ruleset", ""));
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s;
+    }
+
+    /** Задать рулсет для всего процесса ({@code null} — вернуть DEFAULT_RULESET). */
+    public static void setRulesetOverride(String rulesetId) {
+        rulesetOverride = rulesetId;
+    }
+
+    /** Действующий переключатель ({@code null}, если не задан явно). */
+    public static String rulesetOverride() {
+        return rulesetOverride;
+    }
+
+    /**
      * Настройка партии с раскладкой ИЗ НАБОРА, выбранной по сиду. Один и тот же
      * сид всегда даёт одно и то же поле — иначе замеры нельзя повторить.
      */
     public static kelium.dataio.GameConfig configFor(int players, long seed) {
+        String rulesetId = rulesetOverride != null
+            ? rulesetOverride : kelium.dataio.GameConfig.DEFAULT_RULESET;
         kelium.dataio.GameConfig base = kelium.dataio.GameConfig.buildCached(
-            kelium.dataio.GameConfig.DEFAULT_RULESET, players, seed, null, null);
+            rulesetId, players, seed, null, null);
         return configFor(base, players, seed);
     }
 

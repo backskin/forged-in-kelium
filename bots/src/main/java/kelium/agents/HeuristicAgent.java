@@ -369,6 +369,11 @@ public class HeuristicAgent extends Agent {
     /** Категории целей, которые юнит МОЖЕТ бить: ОСН + ВТР (с учётом красного модуля). */
     protected java.util.Set<kelium.core.Target> attackCategories(GameState state, UnitToken u) {
         java.util.Set<kelium.core.Target> cats = new java.util.HashSet<>();
+        if (state.player(seat).board.troop.dualCell()) {
+            // БОЙ 2.0: универсальная ячейка достаёт любую категорию всегда.
+            cats.addAll(java.util.List.of(kelium.core.Target.values()));
+            return cats;
+        }
         kelium.core.Target[] rows = state.player(seat).board.troop.attacks(u.type);
         if (rows == null) {
             return cats;

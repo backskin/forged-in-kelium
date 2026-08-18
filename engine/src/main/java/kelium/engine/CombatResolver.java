@@ -182,6 +182,9 @@ public final class CombatResolver {
             return sup;
         }
         var side = state.player(seat).board.troop;
+        if (side.dualCell()) {
+            return dualCellAttackRows(seat, side, unit);
+        }
         Target[] pair = side.attacks(unit.type);
         if (pair == null) {
             return List.of();
@@ -241,6 +244,71 @@ public final class CombatResolver {
     }
 
     /**
+     * БОЙ 2.0 (заказ дизайнера 18.08.2026, {@code boards.2.0.0.yaml}): вместо
+     * печатной пары целей — универсальная ячейка (любая из четырёх целей, не
+     * прокачивается) плюс специализированная (одна печатная цель, апгрейд
+     * красным модулем).
+     *
+     * <p>УНИВЕРСАЛЬНАЯ строка сделана ровно тем же приёмом, что и у
+     * супер-войска чуть выше ({@code sup1}/{@code sup2}): один общий ключ
+     * строки на все четыре цели — строка используется не больше раза за бой,
+     * а конкретная цель выбирается уже при розыгрыше.
+     *
+     * <p>СПЕЦИАЛИЗИРОВАННАЯ строка у ВЫШКИ бесплатна (0 боеприпасов) — так
+     * решил дизайнер именно для этой ячейки в этой версии правил; на
+     * универсальную ячейку это не распространяется, вышка платит за неё как
+     * все.
+     */
+    private List<AttackRow> dualCellAttackRows(int seat, kelium.core.TroopSide side,
+                                                UnitToken unit) {
+        List<AttackRow> rows = new ArrayList<>();
+        int universalCost = rs.getInt("actions.combat.universal_ammo_cost");
+        for (Target t : Target.values()) {
+            rows.add(new AttackRow("universal", universalCost, t));
+        }
+
+        Target base = side.specializedTarget(unit.type);
+        if (base == null) {
+            return rows;
+        }
+        int specCost = unit.type == UnitType.TOWER ? 0
+            : rs.getInt("actions.combat.secondary_row_ammo_cost");
+
+        Map<String, Object> mod = Modules.redModuleOn(state.player(seat), unit.type);
+        Object rawTargets = mod == null ? null : mod.get("targets");
+        String[] tcodes = rawTargets instanceof String[] arr ? arr : null;
+        Target t0 = null;
+        Target t1 = null;
+        if (tcodes != null && tcodes.length >= 1) {
+            try {
+                t0 = Target.fromCode(tcodes[0]);
+                t1 = tcodes.length >= 2 ? Target.fromCode(tcodes[1]) : null;
+            } catch (IllegalArgumentException notYetSupported) {
+                t0 = null;   // код цели существует в данных, но Target его не знает
+            }
+        }
+        if (mod == null || t0 == null) {
+            rows.add(new AttackRow("specialized", specCost, base));
+        } else {
+            int modCost = mod.get("ammo") instanceof Number n ? n.intValue() : specCost;
+            if (t1 == null) {
+                rows.add(new AttackRow("specialized", modCost, t0));
+            } else if (Boolean.TRUE.equals(mod.get("gold"))) {
+                // ЗОЛОТО В БОЮ 2.0: ОДНА цена на ОБЕ цели суммарно (заказ
+                // дизайнера) — первая стоит modCost, вторая идёт бесплатно.
+                // В старой системе (не dual_cell) золото оплачивало каждую
+                // цель отдельно — здесь это НАМЕРЕННО дешевле.
+                rows.add(new AttackRow("specialized_gold_a", modCost, t0));
+                rows.add(new AttackRow("specialized_gold_b", 0, t1));
+            } else {
+                rows.add(new AttackRow("specialized", modCost, t0));
+                rows.add(new AttackRow("specialized", modCost, t1));
+            }
+        }
+        return rows;
+    }
+
+    /**
      * КАКИЕ КАТЕГОРИИ ЦЕЛЕЙ этот жетон вообще способен поражать прямо сейчас —
      * с учётом красного модуля и супер-войска, а не только печатной пары на
      * планшете.
@@ -271,7 +339,14 @@ public final class CombatResolver {
         if (state.combat instanceof CombatResolver cr) {
             return cr.canHit(seat, unit, enemy);
         }
-        Target[] pair = state.player(seat).board.troop.attacks(unit.type);
+        kelium.core.TroopSide side = state.player(seat).board.troop;
+        if (side.dualCell()) {
+            // БОЙ 2.0: универсальная ячейка достаёт любую категорию всегда —
+            // этой печатной таблицы для dual_cell сторон вообще не хватает,
+            // чтобы честно ответить «нет».
+            return true;
+        }
+        Target[] pair = side.attacks(unit.type);
         if (pair == null) {
             return false;
         }

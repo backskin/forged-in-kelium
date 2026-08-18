@@ -53,6 +53,31 @@ public final class TroopSide {
         return ((Number) prices.get(building)).intValue();
     }
 
+    /**
+     * БОЙ 2.0 (заказ дизайнера 18.08.2026): у стороны вместо печатной пары
+     * целей — универсальная ячейка (любая цель, задаётся ценой ruleset'а, не
+     * этим файлом) плюс одна специализированная печатная цель на род войск.
+     * Флаг живёт на самой стороне, чтобы старые доски (boards.1.0.x) работали
+     * ровно как раньше — см. {@link #attacks} и {@code CombatResolver}.
+     */
+    public boolean dualCell() {
+        return Boolean.TRUE.equals(raw.get("dual_cell"));
+    }
+
+    /**
+     * ОДНА печатная цель специализированной ячейки (только для {@link
+     * #dualCell()} сторон — {@code attacks:} там хранит скаляр, не пару).
+     */
+    @SuppressWarnings("unchecked")
+    public Target specializedTarget(UnitType unit) {
+        Map<String, Object> tbl = (Map<String, Object>) raw.get("attacks");
+        if (tbl == null) {
+            return null;
+        }
+        Object row = tbl.get(unit.code);
+        return row == null ? null : Target.fromCode(row.toString());
+    }
+
     /** Цели (основная, вторичная) для юнита, если полная таблица атак задана; иначе null. */
     @SuppressWarnings("unchecked")
     public Target[] attacks(UnitType unit) {

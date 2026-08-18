@@ -88,6 +88,9 @@ public final class WorldView {
             }
         }
         // такого рода на поле сейчас нет — судим по печатной таблице
+        if (me.board.troop.dualCell()) {
+            return true;   // БОЙ 2.0: универсальная ячейка достаёт любую цель
+        }
         Target[] pair = me.board.troop.attacks(myUnit);
         if (pair == null) {
             return false;
