@@ -385,6 +385,7 @@ public final class Setup {
         // ни разу за всю живую партию.
         kelium.engine.cards.CardRegistry.bindAll("objectives", content.get("objectives").entries);
         kelium.engine.cards.CardRegistry.bindAll("arsenal", content.get("arsenal").entries);
+        kelium.engine.cards.CardRegistry.bindAll("containers", content.get("containers").entries);
 
         List<Map<String, Object>> boardsEntries = content.get("boards").entries;
         // Запись о жетонах — печатная, если опыт не подменил её копией с правками
@@ -600,6 +601,34 @@ public final class Setup {
                 if (!dropped.isEmpty()) {
                     System.err.println("[SETUP] " + ctype
                         + ": изъято по выключенному дополнению — " + dropped);
+                    ids = kept;
+                }
+            }
+
+            // СПОРНЫЕ КАРТЫ (backlog E12/E13/E14). НАЙДЕНО 18.08.2026: признак
+            // contested в данных карты и переключатели contested_cards.*_enabled
+            // в правилах существовали годами, но НИКТО и НИКОГДА их не
+            // сопоставлял — контейнеры c26 «Резервный генератор» (energy_
+            // without_source) и c28 «Шифровка» (effect_survives_round) играли
+            // ВСЕГДА, хотя по умолчанию оба переключателя стоят false. Тот же
+            // класс ошибки, что и с needs_expansion: заготовленный выключатель
+            // без единого провода к нему.
+            {
+                List<String> kept = new ArrayList<>();
+                List<String> dropped = new ArrayList<>();
+                for (String id : ids) {
+                    Map<String, Object> card = content.get(ctype).find(id);
+                    Object contested = card == null ? null : card.get("contested");
+                    if (contested != null && !Boolean.TRUE.equals(
+                            ruleset.get("contested_cards." + contested + "_enabled", Boolean.FALSE))) {
+                        dropped.add(id + " (спорная карта «" + contested + "» выключена)");
+                    } else {
+                        kept.add(id);
+                    }
+                }
+                if (!dropped.isEmpty()) {
+                    System.err.println("[SETUP] " + ctype
+                        + ": изъято как спорная карта с выключенным правилом — " + dropped);
                     ids = kept;
                 }
             }

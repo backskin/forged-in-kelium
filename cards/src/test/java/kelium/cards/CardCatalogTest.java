@@ -48,10 +48,11 @@ class CardCatalogTest {
                 + String.join(", ", CardRegistry.missing()));
     }
 
-    /** Связать ОБА семейства: иначе половина карт останется без данных. */
+    /** Связать ВСЕ переехавшие семейства: иначе часть карт останется без данных. */
     private static void bindAll() {
         CardRegistry.bindAll("objectives", entries("objectives"));
         CardRegistry.bindAll("arsenal", entries("arsenal"));
+        CardRegistry.bindAll("containers", entries("containers"));
     }
 
     @Test
@@ -89,7 +90,8 @@ class CardCatalogTest {
         // СЧИТАЕМ ПО СЕМЕЙСТВАМ. Реестр общий на все карты, поэтому сравнивать
         // его размер с одним набором данных нельзя: подключили арсенал — и
         // проверка заданий начала врать.
-        int inData = entries("objectives").size() + entries("arsenal").size();
+        int inData = entries("objectives").size() + entries("arsenal").size()
+            + entries("containers").size();
         assertEquals(inData, CardRegistry.all().size(),
             "число карт в коде и в данных разошлось: в данных " + inData
                 + ", в коде " + CardRegistry.all().size());
