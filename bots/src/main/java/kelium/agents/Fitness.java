@@ -324,6 +324,7 @@ public final class Fitness {
                         c.merge("objectives_enhanced", 1, Integer::sum);
                     }
                 }
+                case "objective_burn" -> c.merge("objectives_burned", 1, Integer::sum);
                 case "container" -> c.merge("containers", 1, Integer::sum);
                 case "action" -> {
                     String a = String.valueOf(ev.get("action"));
@@ -558,8 +559,15 @@ public final class Fitness {
             // разницы между «взял задание» и «взял ещё немного очков» и не
             // толкал линию к специализации. Подняты в разы, чтобы задания
             // реально стали ГЛАВНОЙ целью линии, а не мелкой добавкой.
+            //
+            // ШТРАФ ЗА СЖИГАНИЕ (18.08.2026, вторая правка): замер по всему
+            // столу — 8.03 задания в руки за партию (снабжения хватило бы на
+            // цель 5-8!), но сжигают в 8.5 раз чаще, чем выполняют (11.01
+            // против 1.29). Одного поощрения выполнения мало, пока сжигание
+            // остаётся бесплатным для этой линии — прямой штраф необходим.
             fitness += 10.0 * c.getOrDefault("objectives", 0)
-                + 16.0 * c.getOrDefault("objectives_enhanced", 0);
+                + 16.0 * c.getOrDefault("objectives_enhanced", 0)
+                - 6.0 * c.getOrDefault("objectives_burned", 0);
         }
 
         if (goal == Goal.ГРОМИЛА) {
