@@ -46,6 +46,24 @@ public final class Setup {
     private static final java.util.Set<String> REPORTED_CULLS =
         java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+    /**
+     * ЛЮБОЕ ДИАГНОСТИЧЕСКОЕ СООБЩЕНИЕ [SETUP] — РАЗ НА ПРОЦЕСС, А НЕ НА
+     * ПАРТИЮ (баг-фикс 18.08.2026). Найдено на самоигре: сообщение про
+     * спорные карты печаталось на КАЖДУЮ партию — на self-play в сотни тысяч
+     * партий это тонны одинаковых строк, в которых полезный сигнал (обновление
+     * чемпиона, итог этапа) физически не найти. Сообщение неизменно, пока не
+     * поменяется ruleset/контент, поэтому дедуп по тексту сообщения — не по
+     * какому-то отдельному ключу.
+     */
+    private static final java.util.Set<String> ANNOUNCED_ONCE =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private static void logOnce(String message) {
+        if (ANNOUNCED_ONCE.add(message)) {
+            System.err.println(message);
+        }
+    }
+
     public static final int[] START_COINS = {5, 5, 5, 5};
     public static final int START_KELIUM = 1;
     public static final int START_AMMO = 1;
@@ -337,7 +355,7 @@ public final class Setup {
         }
         // B8: заглушка больше НЕ тихая — партия на кольце вместо реального поля
         // это другая игра; сигналим громко в stderr.
-        System.err.println("[SETUP] ВНИМАНИЕ: сценарий " + n + "p v" + version
+        logOnce("[SETUP] ВНИМАНИЕ: сценарий " + n + "p v" + version
             + " не загружен (" + problem + ") — играем на КОЛЬЦЕ-ЗАГЛУШКЕ!");
         Field field = buildRingField(n);
         Map<Integer, String> starts = new HashMap<>();
@@ -604,7 +622,7 @@ public final class Setup {
                     }
                 }
                 if (!dropped.isEmpty()) {
-                    System.err.println("[SETUP] " + ctype
+                    logOnce("[SETUP] " + ctype
                         + ": изъято по выключенному дополнению — " + dropped);
                     ids = kept;
                 }
@@ -632,7 +650,7 @@ public final class Setup {
                     }
                 }
                 if (!dropped.isEmpty()) {
-                    System.err.println("[SETUP] " + ctype
+                    logOnce("[SETUP] " + ctype
                         + ": изъято как спорная карта с выключенным правилом — " + dropped);
                     ids = kept;
                 }
@@ -649,7 +667,7 @@ public final class Setup {
                     }
                 }
                 if (kept.size() != ids.size()) {
-                    System.err.println("[SETUP] режим супер заданий: изъято начальных заданий "
+                    logOnce("[SETUP] режим супер заданий: изъято начальных заданий "
                         + (ids.size() - kept.size()));
                 }
                 ids = kept;
@@ -734,7 +752,7 @@ public final class Setup {
             s.redBag.addAll(ModuleSets.buildBag(lib, lib.redSets(), redBagId, n, rng));
             s.blueBag.addAll(ModuleSets.buildBag(lib, lib.blueSets(), blueBagId, n, rng));
             if (s.redBag.isEmpty() && s.blueBag.isEmpty()) {
-                System.err.println("[SETUP] ВНИМАНИЕ: мешки модулей включены, но пусты "
+                logOnce("[SETUP] ВНИМАНИЕ: мешки модулей включены, но пусты "
                     + "(наборы " + redBagId + "/" + blueBagId + " не найдены) — "
                     + "модули не будут выдаваться!");
             }
@@ -745,7 +763,7 @@ public final class Setup {
         // делает.
         int laidTokens = TokenContainers.layoutAtSetup(s);
         if (laidTokens > 0) {
-            System.err.println("[SETUP] режим ЖЕТОНОВ контейнеров: разложено "
+            logOnce("[SETUP] режим ЖЕТОНОВ контейнеров: разложено "
                 + laidTokens + " жетонов по пустым гексам");
         }
 

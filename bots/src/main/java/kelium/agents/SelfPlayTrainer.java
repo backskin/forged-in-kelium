@@ -202,11 +202,34 @@ public final class SelfPlayTrainer {
                             double shaping, Fitness.Goal goal, double cardFloodRate) {
         double sum = 0.0;
         for (int i = 0; i < gamesPerGenome; i++) {
-            sum += Fitness.play(players, baseSeed + i, i % players, g, rivals, shaping,
-                brain, goal, cardFloodRate).fitness();
-            gamesPlayed.incrementAndGet();
+            int seat = i % players;
+            Fitness.Result r = Fitness.play(players, baseSeed + i, seat, g, rivals, shaping,
+                brain, goal, cardFloodRate);
+            sum += r.fitness();
+            long n = gamesPlayed.incrementAndGet();
+            logGame(n, players, seat, g, rivals, r);
         }
         return sum / gamesPerGenome;
+    }
+
+    /**
+     * СТРОКА НА КАЖДУЮ ПАРТИЮ (заказ дизайнера 18.08.2026 — «хочу видеть номер
+     * партии в итерации, состав игроков и итог по очкам»). Печатает НАПРЯМУЮ
+     * в {@code System.out}, МИМО {@link #log} (StringBuilder не потокобезопасен,
+     * а {@code evaluate} вызывается из пула на до 14 потоках разом — раньше
+     * {@code say()} звали только из главного потока между этапами, и общий
+     * буфер этого не заметил бы, случись гонка). Сохранённый лог этапа
+     * ({@code reports/balance/самоигра.log}) остаётся компактной сводкой по
+     * этапам, а не сотнями тысяч строк на партию.
+     */
+    private static void logGame(long n, int players, int seat, Genome g,
+                                List<Genome> rivals, Fitness.Result r) {
+        String rivalNames = rivals.stream().map(x -> x.profile).distinct()
+            .collect(java.util.stream.Collectors.joining(","));
+        System.out.printf(Locale.ROOT,
+            "[партия %d] %dp место=%d характер=%-12s против=[%s] -> ПО=%d %-9s fitness=%.1f%n",
+            n, players, seat, g.profile, rivalNames, r.vp(),
+            r.win() ? "ПОБЕДА" : "проигрыш", r.fitness());
     }
 
     /**
@@ -220,9 +243,12 @@ public final class SelfPlayTrainer {
         double sum = 0.0;
         int games = Math.max(32, 3 * gamesPerGenome);
         for (int i = 0; i < games; i++) {
-            sum += Fitness.play(players, 555_000_000L + i, i % players, g, rivals, 0.0,
-                brain, goal).fitness();
-            gamesPlayed.incrementAndGet();
+            int seat = i % players;
+            Fitness.Result r = Fitness.play(players, 555_000_000L + i, seat, g, rivals, 0.0,
+                brain, goal);
+            sum += r.fitness();
+            long n = gamesPlayed.incrementAndGet();
+            logGame(n, players, seat, g, rivals, r);
         }
         return sum / games;
     }
