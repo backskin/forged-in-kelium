@@ -1,0 +1,450 @@
+package kelium.gui;
+
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.Ellipse2D;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+import javax.swing.BorderFactory;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.SwingConstants;
+
+import kelium.gui.replay2.Theme;
+import kelium.report.FieldGeometry;
+
+/**
+ * КАТАЛОГ ФИЗИЧЕСКИХ БЛОКОВ ПОЛЯ — вкладка Конструктора для пролистывания
+ * всех сторон всех блоков (заказ дизайнера 18.08.2026).
+ *
+ * <p>ЗАЧЕМ. Блоки — печатный картон: 5 малых (по 5 гексов) и 5 больших (по 6),
+ * каждый двусторонний, итого 20 сторон на размер. Разные версии набора
+ * (data/blocks/blocks.*.yaml) фиксируют разное покрытие ячеек контейнера и
+ * жёлтой (энергетической) ячейки — прежде увидеть это можно было только читая
+ * YAML цифрами. Здесь то же самое видно глазами: жёлтая ячейка подсвечена
+ * жёлтым кружком на нужной стороне гекса, ячейка контейнера — коричневым.
+ *
+ * <p>ВЕРСИИ — ПРЕДЗАГОТОВЛЕННЫЕ ФАЙЛЫ, НЕ ГЕНЕРАЦИЯ НА ЛЕТУ. Ровно как в игре:
+ * набор блоков — это физический картон, и версия набора — это конкретный файл
+ * {@code blocks.<id>.yaml}, а не параметр, который что-то досчитывает в
+ * момент показа. Список версий и подпись каждой (сколько контейнеров, сколько
+ * жёлтых ячеек) читаются из самих файлов, а не вписаны в код руками — новая
+ * версия попадает в список сама, как только лежит в папке.
+ *
+ * <p>УСТРОЙСТВО ЭКРАНА: сверху — выбор версии (один на оба размера сразу, как
+ * и в данных: один файл версии описывает и малые, и большие блоки разом),
+ * снизу — окно поровну поделено на два скролла: слева все стороны малых
+ * блоков, справа — больших. Прокрутка только горизонтальная, элементы сначала
+ * уменьшаются, потом начинают скроллиться — тот же приём, что в «Картах».
+ */
+public final class BlockCatalogPanel extends JPanel {
+
+    /** Один гекс блока: осевые координаты и печатные ячейки. */
+    private record HexRec(int q, int r, int container, int energy) {
+    }
+
+    /** Одна сторона блока (лицо А или Б) — список гексов. */
+    private record Face(String blockId, String kind, String faceName, List<HexRec> hexes) {
+    }
+
+    /** Загруженная версия набора: id файла + все стороны, разложенные по размеру. */
+    private record Version(String id, List<Face> small, List<Face> big) {
+        int containersOnSmall() {
+            return small.isEmpty() ? 0
+                : (int) small.get(0).hexes.stream().filter(h -> h.container >= 0).count();
+        }
+
+        int hexesOnSmall() {
+            return small.isEmpty() ? 0 : small.get(0).hexes.size();
+        }
+
+        int containersOnBig() {
+            return big.isEmpty() ? 0
+                : (int) big.get(0).hexes.stream().filter(h -> h.container >= 0).count();
+        }
+
+        int hexesOnBig() {
+            return big.isEmpty() ? 0 : big.get(0).hexes.size();
+        }
+
+        int energyOnSmall() {
+            return small.isEmpty() ? 0
+                : (int) small.get(0).hexes.stream().filter(h -> h.energy >= 0).count();
+        }
+
+        int energyOnBig() {
+            return big.isEmpty() ? 0
+                : (int) big.get(0).hexes.stream().filter(h -> h.energy >= 0).count();
+        }
+
+        /** Подпись «сколько контейнеров» — общая для набора обоих размеров. */
+        String подписьКонтейнеров() {
+            return containersOnSmall() + "/" + hexesOnSmall() + " и "
+                + containersOnBig() + "/" + hexesOnBig();
+        }
+
+        /** Подпись «сколько энергии» — общая для набора обоих размеров. */
+        String подписьЭнергии() {
+            int es = energyOnSmall();
+            int eb = energyOnBig();
+            if (es == 0 && eb == 0) {
+                return "нет жёлтых ячеек";
+            }
+            return es + "/" + hexesOnSmall() + " и " + eb + "/" + hexesOnBig();
+        }
+    }
+
+    private final Map<String, Version> versions = new TreeMap<>();
+    /**
+     * ВЫБОР ПО КОМБИНАЦИИ ПАРАМЕТРОВ, А НЕ ПО ОДНОМУ СПИСКУ ВЕРСИЙ (заказ
+     * дизайнера 18.08.2026). Версия набора блоков и так задаётся ДВУМЯ
+     * независимо тюнящимися вещами — сколько контейнеров и сколько жёлтых
+     * ячеек, — и выбирать по внутреннему id файла неудобно: чтобы найти нужное
+     * сочетание, пришлось бы помнить, какая версия что содержит. Здесь два
+     * списка, оба посчитаны из самих данных, а не вписаны в код руками; третий
+     * список — сами версии, которые попали под выбранное сочетание (обычно
+     * одна, но если версий с одинаковым сочетанием несколько — видно все).
+     */
+    private final JComboBox<String> контейнерыПикер = new JComboBox<>();
+    private final JComboBox<String> энергияПикер = new JComboBox<>();
+    private final JComboBox<String> совпаденияПикер = new JComboBox<>();
+    private final JLabel пусто = new JLabel(
+        "Нет набора блоков с таким сочетанием контейнеров и энергии.");
+    private final Галерея малые = new Галерея();
+    private final Галерея большие = new Галерея();
+    private boolean обновляюсь;
+
+    public BlockCatalogPanel(Path dataRoot) {
+        super(new java.awt.BorderLayout());
+        загрузитьВсеВерсии(dataRoot);
+
+        JPanel top = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
+        top.add(new JLabel("Контейнеры:"));
+        top.add(контейнерыПикер);
+        top.add(new JLabel("Энергия:"));
+        top.add(энергияПикер);
+        top.add(new JLabel("Версия:"));
+        top.add(совпаденияПикер);
+        add(top, java.awt.BorderLayout.NORTH);
+
+        JPanel малыеБлок = обёртка("Малые блоки (5 гексов) — 10 сторон", малые);
+        JPanel большиеБлок = обёртка("Большие блоки (6 гексов) — 10 сторон", большие);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, малыеБлок, большиеБлок);
+        split.setResizeWeight(0.5);
+        split.setContinuousLayout(true);
+        add(split, java.awt.BorderLayout.CENTER);
+
+        // РАЗЛИЧНЫЕ ЗНАЧЕНИЯ ОБОИХ ПАРАМЕТРОВ — по факту встречающиеся в
+        // данных, без дублей, в порядке появления версий (от старой к новой).
+        for (Version v : versions.values()) {
+            добавитьЕслиНет(контейнерыПикер, v.подписьКонтейнеров());
+            добавитьЕслиНет(энергияПикер, v.подписьЭнергии());
+        }
+        контейнерыПикер.addActionListener(e -> обновитьСовпадения());
+        энергияПикер.addActionListener(e -> обновитьСовпадения());
+        совпаденияПикер.addActionListener(e -> обновитьПоказ());
+        if (контейнерыПикер.getItemCount() > 0) {
+            контейнерыПикер.setSelectedIndex(контейнерыПикер.getItemCount() - 1);
+        }
+        if (энергияПикер.getItemCount() > 0) {
+            энергияПикер.setSelectedIndex(энергияПикер.getItemCount() - 1);
+        }
+        обновитьСовпадения();
+    }
+
+    private static void добавитьЕслиНет(JComboBox<String> box, String item) {
+        for (int i = 0; i < box.getItemCount(); i++) {
+            if (box.getItemAt(i).equals(item)) {
+                return;
+            }
+        }
+        box.addItem(item);
+    }
+
+    private static JPanel обёртка(String заголовок, JComponent содержимое) {
+        JPanel p = new JPanel(new java.awt.BorderLayout());
+        JLabel h = new JLabel(заголовок, SwingConstants.CENTER);
+        h.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
+        p.add(h, java.awt.BorderLayout.NORTH);
+        p.add(содержимое, java.awt.BorderLayout.CENTER);
+        return p;
+    }
+
+    /**
+     * Пересчитать список версий, подходящих под выбранное сочетание
+     * контейнеров и энергии, — и сразу показать первую из них.
+     */
+    private void обновитьСовпадения() {
+        if (обновляюсь) {
+            return;
+        }
+        обновляюсь = true;
+        String контейнеры = (String) контейнерыПикер.getSelectedItem();
+        String энергия = (String) энергияПикер.getSelectedItem();
+        совпаденияПикер.removeAllItems();
+        for (Version v : versions.values()) {
+            if (v.подписьКонтейнеров().equals(контейнеры) && v.подписьЭнергии().equals(энергия)) {
+                совпаденияПикер.addItem(v.id());
+            }
+        }
+        обновляюсь = false;
+        обновитьПоказ();
+    }
+
+    private void обновитьПоказ() {
+        String id = (String) совпаденияПикер.getSelectedItem();
+        Version v = id == null ? null : versions.get(id);
+        remove(пусто);
+        if (v == null) {
+            малые.показать(List.of());
+            большие.показать(List.of());
+            add(пусто, java.awt.BorderLayout.SOUTH);
+        } else {
+            малые.показать(v.small);
+            большие.показать(v.big);
+        }
+        revalidate();
+        repaint();
+    }
+
+    // ==================================================================
+    //  ЗАГРУЗКА ДАННЫХ
+    // ==================================================================
+
+    @SuppressWarnings("unchecked")
+    private void загрузитьВсеВерсии(Path dataRoot) {
+        Path dir = dataRoot.resolve("blocks");
+        if (!Files.isDirectory(dir)) {
+            return;
+        }
+        try (var stream = Files.list(dir)) {
+            for (Path f : stream.filter(p -> p.getFileName().toString().startsWith("blocks.")
+                    && p.getFileName().toString().endsWith(".yaml")).sorted().toList()) {
+                Map<String, Object> doc;
+                try (var in = Files.newInputStream(f)) {
+                    doc = new org.yaml.snakeyaml.Yaml().load(in);
+                } catch (IOException e) {
+                    continue;
+                }
+                if (doc == null || !(doc.get("blocks") instanceof List<?> blockList)) {
+                    continue;
+                }
+                String id = doc.get("meta") instanceof Map<?, ?> meta
+                    && meta.get("id") != null ? String.valueOf(meta.get("id"))
+                    : f.getFileName().toString();
+                List<Face> small = new ArrayList<>();
+                List<Face> big = new ArrayList<>();
+                for (Object bo : blockList) {
+                    Map<String, Object> b = (Map<String, Object>) bo;
+                    String bid = String.valueOf(b.get("id"));
+                    String kind = String.valueOf(b.get("kind"));
+                    Map<String, Object> faces = (Map<String, Object>) b.get("faces");
+                    for (String faceName : new String[]{"A", "B"}) {
+                        if (!(faces.get(faceName) instanceof List<?> hexList)) {
+                            continue;
+                        }
+                        List<HexRec> recs = new ArrayList<>();
+                        for (Object ho : hexList) {
+                            Map<String, Object> h = (Map<String, Object>) ho;
+                            recs.add(new HexRec(
+                                num(h.get("q")), num(h.get("r")),
+                                num(h.get("cell")), num(h.getOrDefault("energy", -1))));
+                        }
+                        Face face = new Face(bid, kind, faceName, recs);
+                        ("small".equals(kind) ? small : big).add(face);
+                    }
+                }
+                versions.put(id, new Version(id, small, big));
+            }
+        } catch (IOException e) {
+            // нет папки данных — каталог просто останется пустым
+        }
+    }
+
+    private static int num(Object o) {
+        return o instanceof Number n ? n.intValue() : -1;
+    }
+
+    // ==================================================================
+    //  ГАЛЕРЕЯ: ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА СТОРОН ОДНОГО РАЗМЕРА
+    // ==================================================================
+
+    /** Прокручиваемый ряд карточек-блоков — тот же приём, что в «Картах». */
+    private static final class Галерея extends JScrollPane {
+        private final Ряд ряд = new Ряд();
+
+        Галерея() {
+            super(null, VERTICAL_SCROLLBAR_NEVER, HORIZONTAL_SCROLLBAR_AS_NEEDED);
+            setViewportView(ряд);
+            getHorizontalScrollBar().setUnitIncrement(24);
+            getViewport().setBackground(Color.WHITE);
+        }
+
+        void показать(List<Face> faces) {
+            ряд.faces = faces;
+            ряд.revalidate();
+            ряд.repaint();
+        }
+    }
+
+    /** Сам ряд карточек — рисует все стороны блоков одна за одной. */
+    private static final class Ряд extends JComponent {
+        private List<Face> faces = List.of();
+        private static final int CARD_W = 260;
+        private static final int CARD_H = 230;
+        private static final int GAP = 14;
+
+        @Override
+        public Dimension getPreferredSize() {
+            int w = faces.isEmpty() ? CARD_W
+                : faces.size() * (CARD_W + GAP) + GAP;
+            return new Dimension(w, CARD_H);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g0) {
+            Graphics2D g = (Graphics2D) g0.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, getWidth(), getHeight());
+            int x = GAP;
+            for (Face f : faces) {
+                рисоватьКарточку(g, x, 0, CARD_W, CARD_H, f);
+                x += CARD_W + GAP;
+            }
+            g.dispose();
+        }
+
+        private void рисоватьКарточку(Graphics2D g, int x, int y, int w, int h, Face f) {
+            g.setColor(new Color(0xF7F7F9));
+            g.fillRoundRect(x, y, w, h, 14, 14);
+            g.setColor(new Color(0xC9CDD2));
+            g.drawRoundRect(x, y, w - 1, h - 1, 14, 14);
+
+            String подпись = f.blockId + " · " + f.faceName
+                + (("small".equals(f.kind)) ? " · малый" : " · большой");
+            g.setFont(getFont().deriveFont(Font.BOLD, 13f));
+            g.setColor(new Color(0x333333));
+            g.drawString(подпись, x + 10, y + 20);
+
+            рисоватьБлок(g, f, x + w / 2, y + h / 2 + 8, 25);
+        }
+
+        /**
+         * Сам блок: под каждым гексом — лёгкая заливка шести наземных секторов и
+         * небесного (очень бледным, только чтобы дать глазу структуру гекса), а
+         * поверх — ячейка энергии и ячейка контейнера цветами {@link Theme}, теми
+         * же, какими они закрашены на планшетах и на поле в проигрывателе.
+         */
+        private void рисоватьБлок(Graphics2D g, Face f, int cx0, int cy0, double size) {
+            for (HexRec hx : f.hexes()) {
+                double[] c = FieldGeometry.hexCenter(hx.q(), hx.r(), size);
+                double cx = cx0 + c[0];
+                double cy = cy0 + c[1];
+
+                рисоватьСекторы(g, cx, cy, size);
+
+                java.awt.Polygon poly = new java.awt.Polygon();
+                for (int k = 0; k < 6; k++) {
+                    double a = Math.toRadians(60 * k - 90 + FieldGeometry.TILT);
+                    poly.addPoint((int) Math.round(cx + size * Math.cos(a)),
+                        (int) Math.round(cy + size * Math.sin(a)));
+                }
+                g.setStroke(new BasicStroke(1.4f));
+                g.setColor(new Color(0x8A8F98));
+                g.drawPolygon(poly);
+
+                double apothem = FieldGeometry.apothem(size);
+                if (hx.energy() >= 0 && hx.energy() < 6) {
+                    рисоватьМетку(g, cx, cy, apothem, hx.energy(), Theme.energy(), true, size);
+                }
+                if (hx.container() == 6) {
+                    // ВОЗДУШНАЯ ячейка контейнера — в центре гекса, там же, где
+                    // воздушный сектор.
+                    рисоватьМеткуВЦентре(g, cx, cy, Theme.container(), size);
+                } else if (hx.container() >= 0) {
+                    рисоватьМетку(g, cx, cy, apothem, hx.container(), Theme.container(), false, size);
+                }
+            }
+        }
+
+        /**
+         * Очень лёгкая заливка шести наземных секторов гекса и небесного сектора
+         * в центре — только структура, без спора с маркерами ячеек.
+         */
+        private void рисоватьСекторы(Graphics2D g, double cx, double cy, double size) {
+            Color наземный = new Color(0, 0, 0, 12);
+            Color небесный = new Color(30, 110, 200, 22);
+            for (int k = 0; k < 6; k++) {
+                double a1 = Math.toRadians(60 * k - 90 + FieldGeometry.TILT);
+                double a2 = Math.toRadians(60 * (k + 1) - 90 + FieldGeometry.TILT);
+                java.awt.Polygon sector = new java.awt.Polygon();
+                sector.addPoint((int) cx, (int) cy);
+                sector.addPoint((int) Math.round(cx + size * Math.cos(a1)),
+                    (int) Math.round(cy + size * Math.sin(a1)));
+                sector.addPoint((int) Math.round(cx + size * Math.cos(a2)),
+                    (int) Math.round(cy + size * Math.sin(a2)));
+                g.setColor(наземный);
+                g.fillPolygon(sector);
+            }
+            double air = size * FieldGeometry.AIR_CELL_R;
+            g.setColor(небесный);
+            g.fill(new Ellipse2D.Double(cx - air, cy - air, air * 2, air * 2));
+        }
+
+        /** Маркер ячейки на стороне гекса: кружок энергии или ромб контейнера. */
+        private void рисоватьМетку(Graphics2D g, double cx, double cy, double apothem,
+                                   int side, Color color, boolean круг, double size) {
+            double a = Math.toRadians(FieldGeometry.edgeAngle(side));
+            double px = cx + apothem * 0.6 * Math.cos(a);
+            double py = cy + apothem * 0.6 * Math.sin(a);
+            double r = size * 0.24;
+            g.setColor(color);
+            if (круг) {
+                g.fill(new Ellipse2D.Double(px - r, py - r, r * 2, r * 2));
+            } else {
+                java.awt.Polygon ромб = new java.awt.Polygon();
+                ромб.addPoint((int) px, (int) (py - r));
+                ромб.addPoint((int) (px + r), (int) py);
+                ромб.addPoint((int) px, (int) (py + r));
+                ромб.addPoint((int) (px - r), (int) py);
+                g.fillPolygon(ромб);
+            }
+            g.setColor(new Color(0, 0, 0, 90));
+            g.setStroke(new BasicStroke(1f));
+            if (круг) {
+                g.draw(new Ellipse2D.Double(px - r, py - r, r * 2, r * 2));
+            }
+        }
+
+        /** Контейнер в воздушной ячейке — ромб в центре гекса, там же, где авиация. */
+        private void рисоватьМеткуВЦентре(Graphics2D g, double cx, double cy, Color color,
+                                          double size) {
+            double r = size * 0.24;
+            g.setColor(color);
+            java.awt.Polygon ромб = new java.awt.Polygon();
+            ромб.addPoint((int) cx, (int) (cy - r));
+            ромб.addPoint((int) (cx + r), (int) cy);
+            ромб.addPoint((int) cx, (int) (cy + r));
+            ромб.addPoint((int) (cx - r), (int) cy);
+            g.fillPolygon(ромб);
+        }
+    }
+}

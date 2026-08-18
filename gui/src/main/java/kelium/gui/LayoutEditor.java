@@ -394,12 +394,16 @@ public final class LayoutEditor {
         editorTab.add(split, BorderLayout.CENTER);
 
         assemblyTab = new AssemblyWindow(model);
+        BlockCatalogPanel catalogTab = new BlockCatalogPanel(
+            kelium.dataio.GameConfig.resolveDataRoot(null));
 
         tabs = new javax.swing.JTabbedPane();
         tabs.addTab("Конструктор", editorTab);
         tabs.addTab("Сборка из блоков", assemblyTab);
+        tabs.addTab("Каталог блоков", catalogTab);
         tabs.setToolTipTextAt(0, "Рисование поля: гексы, тайлы, старты, нейтралы");
         tabs.setToolTipTextAt(1, "Как сложить это поле из физических блоков картона");
+        tabs.setToolTipTextAt(2, "Все стороны всех блоков по версиям набора — контейнеры и жёлтые ячейки");
         // при переходе на вкладку сборки поле могло измениться — пересчитываем
         tabs.addChangeListener(e -> {
             if (tabs.getSelectedIndex() == 1) {
