@@ -3,6 +3,7 @@
 #   dist\KeliumRunner.exe      — прогоны симуляций
 #   dist\KeliumReplay2.exe     — разбор партии
 #   dist\KeliumHelp.exe        — СПРАВОЧНИК отдельно (правила и все карты)
+#   dist\KeliumBuilder.exe     — НОВЫЙ конструктор (рядом со старым, не вместо)
 #   (проигрыватель 1.0 заархивирован 13.08.2026 — см. archive/replay-1.0/)
 # Внутрь каждого зашито всё приложение вместе с урезанной Java-средой.
 # Запуск: powershell -ExecutionPolicy Bypass -File make-exe.ps1
@@ -171,13 +172,24 @@ $helpProps += "java-options=-Dkelium.data=`"$dataPath`""
 $helpProps += "win-console=false"
 $helpProps | Out-File -Encoding ascii target\help-launcher.properties
 
+# НОВЫЙ КОНСТРУКТОР (KeliumBuilder) — отдельным exe РЯДОМ со старым, а не
+# вместо него (заказ дизайнера 18.08.2026). Пока в новом нет всего, что есть в
+# старом (сборка из блоков, журнал проверок, нейтралы, PNG-экспорт), подменять
+# рабочий инструмент нельзя: дизайнеру нужно чем-то работать сегодня.
+$builderProps = @()
+$builderProps += "main-class=kelium.gui.KeliumBuilder"
+$builderProps += "java-options=-Dkelium.data=`"$dataPath`""
+$builderProps += "win-console=false"
+$builderProps | Out-File -Encoding ascii target\builder-launcher.properties
+
 if (Test-Path dist\app) { Remove-Item -Recurse -Force dist\app }
 New-Item -ItemType Directory -Force dist | Out-Null
 jpackage --type app-image --name Kelium --input target\pkgin --runtime-image target\runtime-slim `
   --main-jar kelium-gui-0.1.0.jar --main-class kelium.gui.LayoutEditor `
   --add-launcher KeliumRunner=target\runner-launcher.properties `
   --add-launcher KeliumReplay2=target\replay2-launcher.properties `
-  --add-launcher KeliumHelp=target\help-launcher.properties --dest dist\app
+  --add-launcher KeliumHelp=target\help-launcher.properties `
+  --add-launcher KeliumBuilder=target\builder-launcher.properties --dest dist\app
 
 # jpackage режет --java-options по пробелам в пути, поэтому секцию [JavaOptions]
 # главного лончера собираем сами (у add-launcher она берётся из properties и цела).
@@ -229,7 +241,10 @@ foreach ($app in @(
         @{ Name = "KeliumConstructor"; Target = "Kelium.exe"; Icon = "constructor" },
         @{ Name = "KeliumRunner"; Target = "KeliumRunner.exe"; Icon = "runner" },
         @{ Name = "KeliumReplay2"; Target = "KeliumReplay2.exe"; Icon = "replay2" },
-        @{ Name = "KeliumHelp"; Target = "KeliumHelp.exe"; Icon = "help" })) {
+        @{ Name = "KeliumHelp"; Target = "KeliumHelp.exe"; Icon = "help" },
+        # Иконка та же, что у старого конструктора: это тот же инструмент, и
+        # своей картинки под новый дизайнер пока не рисовал.
+        @{ Name = "KeliumBuilder"; Target = "KeliumBuilder.exe"; Icon = "constructor" })) {
     $src = "target\stub_$($app.Name).cs"
     $stub.Replace("@VERSION@", $hash).Replace("@TARGET@", $app.Target) |
         Out-File -Encoding UTF8 $src
@@ -247,7 +262,8 @@ foreach ($app in @(
 }
 
 Write-Output "6/6 проверка…"
-foreach ($n in @("KeliumConstructor", "KeliumRunner", "KeliumReplay2", "KeliumHelp")) {
+foreach ($n in @("KeliumConstructor", "KeliumRunner", "KeliumReplay2", "KeliumHelp",
+                 "KeliumBuilder")) {
     $f = Get-Item "dist\$n.exe"
     "   {0} — {1:N1} МБ" -f $f.Name, ($f.Length / 1MB) | Write-Output
 }
@@ -258,6 +274,7 @@ Write-Output "  dist\KeliumConstructor.exe  — конструктор раск�
 Write-Output "  dist\KeliumRunner.exe       — прогоны симуляций"
 Write-Output "  dist\KeliumReplay2.exe      — разбор партии"
 Write-Output "  dist\KeliumHelp.exe         — справочник: правила и все карты"
+Write-Output "  dist\KeliumBuilder.exe      — новый конструктор (в работе, рядом со старым)"
 Write-Output ""
 Write-Output "Файлы самодостаточны: Java внутри, при первом запуске распаковываются"
 Write-Output "в %TEMP%\Kelium-$hash (дальше стартуют сразу). Отчёты и логи пишутся"

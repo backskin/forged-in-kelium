@@ -75,23 +75,32 @@ public final class KeliumBuilder {
         JToolBar bar = new JToolBar(JToolBar.VERTICAL);
         bar.setFloatable(false);
         ButtonGroup group = new ButtonGroup();
-        addTool(bar, group, "⬡ Гекс", BuilderScene.Tool.ADD_REMOVE, scene, true);
-        addTool(bar, group, "🚩 Старт игрока", BuilderScene.Tool.PLAYER_START, scene, false);
-        addTool(bar, group, "🟢 Малое зарождение", BuilderScene.Tool.SPAWN_SMALL, scene, false);
-        addTool(bar, group, "🟩 Большое зарождение", BuilderScene.Tool.SPAWN_BIG, scene, false);
-        addTool(bar, group, "🔂 Стопка ×2", BuilderScene.Tool.STACK, scene, false);
-        addTool(bar, group, "💎 Келемий ±", BuilderScene.Tool.KELIUM_DELTA, scene, false);
-        addTool(bar, group, "📦 Контейнер", BuilderScene.Tool.CONTAINER, scene, false);
-        addTool(bar, group, "⛔ Запретный гекс", BuilderScene.Tool.FORBIDDEN, scene, false);
-        addTool(bar, group, "🧽 Очистить гекс", BuilderScene.Tool.CLEAR, scene, false);
+        // ИКОНКИ РИСУЕТ ToolIcons, А НЕ ЭМОДЗИ В ТЕКСТЕ. Проверка собранного exe
+        // 19.08.2026 показала ровно то, о чём предупреждает {@code LayoutEditor.Tool}:
+        // Swing выводит эмодзи пустыми квадратами, и вся палитра выглядела как
+        // список «☒ Гекс», «☒ Старт игрока». Старый конструктор именно поэтому
+        // держит рисованные иконки — берём те же, по именам его инструментов.
+        addTool(bar, group, "Гекс", "ADD", BuilderScene.Tool.ADD_REMOVE, scene, true);
+        addTool(bar, group, "Старт игрока", "PLAYER", BuilderScene.Tool.PLAYER_START, scene, false);
+        addTool(bar, group, "Малое зарождение", "SPAWN_START",
+            BuilderScene.Tool.SPAWN_SMALL, scene, false);
+        addTool(bar, group, "Большое зарождение", "KELIUM",
+            BuilderScene.Tool.SPAWN_BIG, scene, false);
+        addTool(bar, group, "Стопка ×2", "STACK", BuilderScene.Tool.STACK, scene, false);
+        addTool(bar, group, "Келемий ±", "KELIUM_DELTA",
+            BuilderScene.Tool.KELIUM_DELTA, scene, false);
+        addTool(bar, group, "Контейнер", "CONTAINER", BuilderScene.Tool.CONTAINER, scene, false);
+        addTool(bar, group, "Запретный гекс", "FORBIDDEN",
+            BuilderScene.Tool.FORBIDDEN, scene, false);
+        addTool(bar, group, "Очистить гекс", "CLEAR_HEX", BuilderScene.Tool.CLEAR, scene, false);
 
         bar.addSeparator();
-        JButton undo = new JButton("↶ Отменить");
+        JButton undo = new JButton("Отменить");
         undo.setHorizontalAlignment(JButton.LEFT);
         undo.addActionListener(e -> scene.undo());
         bar.add(undo);
 
-        JButton save = new JButton("💾 Сохранить…");
+        JButton save = new JButton("Сохранить…");
         save.setHorizontalAlignment(JButton.LEFT);
         save.addActionListener(e -> saveLayout(frame, model));
         bar.add(save);
@@ -138,10 +147,11 @@ public final class KeliumBuilder {
             + FieldFile.DOT_EXT;
     }
 
-    private static void addTool(JToolBar bar, ButtonGroup group, String label,
+    private static void addTool(JToolBar bar, ButtonGroup group, String label, String icon,
                                 BuilderScene.Tool tool, BuilderScene scene, boolean selected) {
-        JToggleButton btn = new JToggleButton(label, selected);
+        JToggleButton btn = new JToggleButton(label, ToolIcons.of(icon), selected);
         btn.setHorizontalAlignment(JToggleButton.LEFT);
+        btn.setIconTextGap(8);
         btn.addActionListener(e -> scene.setTool(tool));
         group.add(btn);
         bar.add(btn);
