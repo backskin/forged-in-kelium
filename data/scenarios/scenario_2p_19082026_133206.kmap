@@ -1,0 +1,36 @@
+version: editor
+scenarios:
+- id: scenario_2p_19082026_133206
+  players: 2
+  _made_with: LayoutEditor
+  hexes:
+  - q: 0
+    r: 0
+  - q: 1
+    r: 0
+  - q: 1
+    r: -1
+  - q: 0
+    r: -1
+    content: kelium_tile
+  - q: 0
+    r: 1
+    content: kelium_tile
+  - q: 2
+    r: -1
+    content: player_start
+    seat: 1
+  - q: -1
+    r: 1
+  - q: -1
+    r: 0
+  - q: -2
+    r: 1
+    content: player_start
+    seat: 0
+  - q: 1
+    r: 1
+  - q: -1
+    r: 2
+  - q: -2
+    r: 2

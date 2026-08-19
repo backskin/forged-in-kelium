@@ -170,7 +170,7 @@ public final class Scenario {
     public static Map<String, Object> loadScenario(int numPlayers, String version, Path dataRoot,
                                                    Long variantSeed) {
         Path path = dataRoot.resolve("scenarios")
-            .resolve("scenario_" + numPlayers + "p." + version + ".yaml");
+            .resolve("scenario_" + numPlayers + "p." + version + ".kmap");
         if (!Files.exists(path)) {
             throw new ScenarioError("файл сценария не найден: " + path);
         }
@@ -195,7 +195,7 @@ public final class Scenario {
     public static List<Map<String, Object>> loadAllVariants(int numPlayers, String version,
                                                             Path dataRoot) {
         return loadVariantsFromFile(dataRoot.resolve("scenarios")
-            .resolve("scenario_" + numPlayers + "p." + version + ".yaml"));
+            .resolve("scenario_" + numPlayers + "p." + version + ".kmap"));
     }
 
     /**

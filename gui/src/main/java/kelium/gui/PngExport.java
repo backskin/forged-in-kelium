@@ -515,14 +515,35 @@ public final class PngExport {
         }
     }
 
-    /** Сообщить об удачном сохранении (одинаково для обеих вкладок). */
+    /**
+     * Сообщить об удачном сохранении (одинаково для обеих вкладок). Кнопка
+     * «Открыть картинку» (просьба дизайнера 19.08.2026) — сразу посмотреть
+     * результат, не разыскивая файл руками в проводнике.
+     */
     public static void done(Component parent, Path path) {
         if (path == null) {
             return;
         }
-        JOptionPane.showMessageDialog(parent,
+        String open = "Открыть картинку";
+        Object[] options = {open, "ОК"};
+        int choice = JOptionPane.showOptionDialog(parent,
             Ui.text("Картинка сохранена:\n" + path.toAbsolutePath(), 460),
-            "Готово", JOptionPane.INFORMATION_MESSAGE);
+            "Готово", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE,
+            null, options, options[1]);
+        if (choice == 0) {
+            openInViewer(parent, path);
+        }
+    }
+
+    /** Открыть картинку системным просмотрщиком; молча пожаловаться, если не вышло. */
+    private static void openInViewer(Component parent, Path path) {
+        try {
+            java.awt.Desktop.getDesktop().open(path.toFile());
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(parent,
+                Ui.text("Не удалось открыть картинку.\n\n" + e.getMessage(), 420),
+                "Ошибка", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     /**
@@ -563,9 +584,16 @@ public final class PngExport {
         if (paths == null) {
             return;
         }
-        JOptionPane.showMessageDialog(parent,
+        String open = "Открыть обе";
+        Object[] options = {open, "ОК"};
+        int choice = JOptionPane.showOptionDialog(parent,
             Ui.text("Картинки сохранены:\n" + paths[0].toAbsolutePath()
                 + "\n" + paths[1].toAbsolutePath(), 460),
-            "Готово", JOptionPane.INFORMATION_MESSAGE);
+            "Готово", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE,
+            null, options, options[1]);
+        if (choice == 0) {
+            openInViewer(parent, paths[0]);
+            openInViewer(parent, paths[1]);
+        }
     }
 }

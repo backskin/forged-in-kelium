@@ -86,6 +86,12 @@ public final class Effects {
             case "market_card_from_discard" -> marketCardFromDiscard(s, seat, p);
             case "swap_order_card" -> swapOrderCard(s, seat, p);
             case "noop" -> Map.of("noop", p.getOrDefault("note", "unimplemented"));
+            // ПУСТОЙ КОНТЕЙНЕР (заказ дизайнера 18.08.2026, контейнеры 4.0) —
+            // НАМЕРЕННО ничего не даёт, это не заглушка недоделки. Отдельно от
+            // "noop": тот считается НЕреализованным и карты с ним отсеиваются
+            // из колод на сетапе (см. isImplemented ниже и Setup) — "пустой
+            // контейнер" реализован полностью, просто эффект действительно пуст.
+            case "empty" -> Map.of();
             // E1: неизвестный эффект — ГРОМКАЯ ошибка, не тихий noop; карты с
             // такими эффектами отсеиваются из колод на сетапе (см. Setup).
             default -> throw new EffectError("нереализованный эффект: " + eid);
@@ -110,7 +116,8 @@ public final class Effects {
                  // выбор «энергия или модули», конверсия и четыре арсенальных.
                  "shield", "landing", "speed_boost", "energy_or_modules", "convert",
                  "discard_enemy_arsenal", "unlimited_spec",
-                 "market_card_from_discard", "swap_order_card" -> true;
+                 "market_card_from_discard", "swap_order_card",
+                 "empty" -> true;   // пустой контейнер (18.08.2026) — реализован, не заглушка
             default -> false;   // включая "noop" — карта-заглушка не должна попасть в колоду
         };
     }

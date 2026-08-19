@@ -791,14 +791,24 @@ public final class LayoutEditor {
             }
             int bestSeat = -1;
             int bestDist = Integer.MAX_VALUE;
+            // РАВНОЕ РАССТОЯНИЕ — НИЧЬЁ, а не автоматически меньшему месту
+            // (баг-фикс 19.08.2026, найден дизайнером на зеркальном поле: тай-
+            // брейк "e.getKey() < bestSeat" отдавал КАЖДЫЙ келемий на равном
+            // расстоянии месту 1, и отчёт врал "8 у Игрока 1, 0 у Игрока 2" на
+            // полностью симметричной раскладке). Если тайла ближе всех — двое,
+            // им обоим этот тайл не в плюс, а в ничью: не считаем его никому.
+            boolean tie = false;
             for (var e : starts.entrySet()) {
                 int d = axialDist(h.q, h.r, e.getValue().q, e.getValue().r);
-                if (d < bestDist || (d == bestDist && e.getKey() < bestSeat)) {
+                if (d < bestDist) {
                     bestDist = d;
                     bestSeat = e.getKey();
+                    tie = false;
+                } else if (d == bestDist) {
+                    tie = true;
                 }
             }
-            if (bestSeat >= 0) {
+            if (bestSeat >= 0 && !tie) {
                 kelium.merge(bestSeat, h.faceKelium() * h.stack, Integer::sum);
             }
         }
@@ -816,7 +826,7 @@ public final class LayoutEditor {
             }
             out.add(new PngExport.PlayerBlock(Canvas.SEAT[seat % 4], "Игрок " + (seat + 1),
                 List.of("келемий поблизости: " + kelium.getOrDefault(seat, 0),
-                    "обычных соседей у старта: " + neighbors)));
+                    "обычных соседних гексов у старта: " + neighbors)));
         }
         return out;
     }
@@ -1563,14 +1573,19 @@ public final class LayoutEditor {
     }
 
     /**
-     * СЛУЧАЙНОЕ ИМЯ для нового проекта: {@code scenario_<N>p_<ддммгггг>_<6 цифр>}
+     * СЛУЧАЙНОЕ ИМЯ для нового проекта: {@code scenario_<N>p_<гггг-мм-дд>_<6 цифр>}
      * — дата и случайный отпечаток через подчёркивание (просьба дизайнера
      * 14.08.2026). Отпечаток спасает от совпадения имён при сохранении
      * нескольких черновиков в один день; дата помогает найти файл потом руками.
+     *
+     * <p>ПОРЯДОК ДАТЫ — год-месяц-день (баг-фикс 19.08.2026, было день-месяц-
+     * год): только так сортировка файлов по имени совпадает с хронологией,
+     * иначе "19082026" (19 августа) видимо сортировался БЫ раньше "01092026"
+     * (1 сентября), хотя по факту позже.
      */
     private static String randomNewFileName() {
         String date = java.time.LocalDate.now()
-            .format(java.time.format.DateTimeFormatter.ofPattern("ddMMyyyy"));
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         int suffix = new java.util.Random().nextInt(1_000_000);
         return "scenario_" + Math.max(2, model.players()) + "p_" + date
             + "_" + String.format("%06d", suffix) + FieldFile.DOT_EXT;
@@ -1794,8 +1809,16 @@ public final class LayoutEditor {
             Tool savedTool = tool;
             tool = Tool.CLEAR_HEX;   // не режим размещения — призраков не будет
             double[] b = unitBounds();
-            size = Math.max(18, Math.min(110,
+            // ДВА ПРОХОДА: сперва грубая оценка size с прежним отступом, чтобы
+            // было от чего посчитать ЗАПАС ПОД УГАСАЮЩУЮ СЕТКУ (просьба
+            // дизайнера 19.08.2026) — несколько колец гексов снаружи поля, а
+            // не декоративные 30 пикселей. Запас зависит от размера гекса,
+            // поэтому без первого прохода его не из чего вывести.
+            double sizeGuess = Math.max(18, Math.min(110,
                 Math.min((w - 60) / (b[2] - b[0]), (h - 60) / (b[3] - b[1]))));
+            double margin = sizeGuess * 3.4;
+            size = Math.max(18, Math.min(110,
+                Math.min((w - 2 * margin) / (b[2] - b[0]), (h - 2 * margin) / (b[3] - b[1]))));
             panX = w / 2.0 - size * (b[0] + b[2]) / 2;
             panY = h / 2.0 - size * (b[1] + b[3]) / 2;
             java.awt.image.BufferedImage img =
@@ -1819,6 +1842,11 @@ public final class LayoutEditor {
             setBackground(ExportPaint.FIELD_BG);
             setSize(w, h);
             ExportPaint.with(() -> paintComponent(g));
+            // СЕТКА — ПОСЛЕ paintComponent, не до: тот начинается с
+            // super.paintComponent, который перезаливает ВЕСЬ фон компонента и
+            // стёр бы сетку, нарисуй мы её раньше (баг-фикс 19.08.2026, метод
+            // рисует только по пустым клеткам — сами гексы поля не трогает).
+            drawAmbientGrid(g, b);
             setBackground(savedBg);
             setSize(savedW, savedH);
             g.dispose();
@@ -1827,6 +1855,78 @@ public final class LayoutEditor {
             panY = savedY;
             tool = savedTool;
             return img;
+        }
+
+        /**
+         * ЛЁГКАЯ ГЕКС-СЕТКА ВОКРУГ ПОЛЯ, ГАСНУЩАЯ С РАССТОЯНИЕМ (просьба
+         * дизайнера 19.08.2026): поле читается как остров на листе, а не
+         * обрезок на пустом фоне. Только в экспорт — сетка призраков для
+         * добавления гексов в интерактивном режиме уже занята той же ролью,
+         * вторая поверх нее была бы лишней (см. javadoc {@link #render}).
+         *
+         * @param unitBounds {@code {minX, minY, maxX, maxY}} поля в единицах
+         *                   радиуса гекса — тот же прямоугольник, что и у
+         *                   {@link #unitBounds()}, чтобы сетка стартовала
+         *                   ровно от края поля, а не от произвольной точки.
+         */
+        private void drawAmbientGrid(Graphics2D g, double[] unitBounds) {
+            if (model.hexes.isEmpty()) {
+                return;
+            }
+            List<LHex> present = new ArrayList<>(model.hexes.values());
+            int fadeRings = 5;
+            // ДИАПАЗОН — по осевым q/r самих гексов поля, а не по unitBounds:
+            // unitBounds — декартов прямоугольник в единицах радиуса гекса
+            // (пиксельное пространство), его границы нельзя подставлять
+            // напрямую как q/r — оси не совпадают (баг-фикс 19.08.2026).
+            int qLo = Integer.MAX_VALUE;
+            int qHi = Integer.MIN_VALUE;
+            int rLo = Integer.MAX_VALUE;
+            int rHi = Integer.MIN_VALUE;
+            for (LHex hx : present) {
+                qLo = Math.min(qLo, hx.q);
+                qHi = Math.max(qHi, hx.q);
+                rLo = Math.min(rLo, hx.r);
+                rHi = Math.max(rHi, hx.r);
+            }
+            qLo -= fadeRings + 1;
+            qHi += fadeRings + 1;
+            rLo -= fadeRings + 1;
+            rHi += fadeRings + 1;
+            g.setStroke(new java.awt.BasicStroke(1f));
+            Color ink = ExportPaint.HEX_EDGE;
+            for (int q = qLo; q <= qHi; q++) {
+                for (int r = rLo; r <= rHi; r++) {
+                    if (model.get(q, r) != null) {
+                        continue;   // сами гексы поля рисует paintComponent поверх
+                    }
+                    int dist = Integer.MAX_VALUE;
+                    for (LHex hx : present) {
+                        dist = Math.min(dist, axialDist(q, r, hx.q, hx.r));
+                        if (dist <= 1) {
+                            break;
+                        }
+                    }
+                    if (dist > fadeRings) {
+                        continue;
+                    }
+                    double alpha = 0.20 * (1.0 - (double) dist / (fadeRings + 1));
+                    if (alpha <= 0.01) {
+                        continue;
+                    }
+                    double[] c = center(q, r);
+                    double[][] corners = kelium.report.FieldGeometry.hexCorners(c[0], c[1], size * 0.96);
+                    java.awt.geom.Path2D.Double path = new java.awt.geom.Path2D.Double();
+                    path.moveTo(corners[0][0], corners[0][1]);
+                    for (int i = 1; i < corners.length; i++) {
+                        path.lineTo(corners[i][0], corners[i][1]);
+                    }
+                    path.closePath();
+                    g.setColor(new Color(ink.getRed(), ink.getGreen(), ink.getBlue(),
+                        (int) Math.round(alpha * 255)));
+                    g.draw(path);
+                }
+            }
         }
 
         /**
@@ -2985,7 +3085,7 @@ public final class LayoutEditor {
                     + " обычных соседних гексов (нужно ≥2: иначе негде разворачиваться)"));
             } else if (neighbors < 4) {
                 out.add(new Issue(1, "У старта " + who + " всего " + neighbors
-                    + " соседей — тесновато"));
+                    + " соседних гексов — тесновато"));
             }
         }
 

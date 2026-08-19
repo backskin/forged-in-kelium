@@ -39,7 +39,8 @@ import kelium.report.FieldGeometry;
 final class BuilderScene extends JPanel {
 
     /** Инструменты этого среза — подмножество набора LayoutEditor.Tool. */
-    enum Tool { ADD_REMOVE, PLAYER_START, SPAWN_SMALL, SPAWN_BIG, FORBIDDEN, CLEAR }
+    enum Tool { ADD_REMOVE, PLAYER_START, SPAWN_SMALL, SPAWN_BIG, FORBIDDEN, CLEAR,
+        STACK, KELIUM_DELTA, CONTAINER }
 
     private final Model model;
     private double size = FieldGeometry.DEFAULT_SIZE;
@@ -50,6 +51,52 @@ final class BuilderScene extends JPanel {
     private int lastMy;
     private Runnable onChange = () -> { };
 
+    /**
+     * ОТМЕНА — снимки модели целиком (просто и надёжно на её размере: поле
+     * редко больше пары сотен гексов). Снимок кладётся ДО правки, а не после,
+     * поэтому «Отменить» всегда возвращает к состоянию непосредственно перед
+     * последним кликом.
+     */
+    private final java.util.Deque<Map<Long, LHex>> undoStack = new java.util.ArrayDeque<>();
+    private static final int UNDO_LIMIT = 200;
+
+    private static LHex copyOf(LHex h) {
+        LHex c = new LHex(h.q, h.r);
+        c.content = h.content;
+        c.seat = h.seat;
+        c.stack = h.stack;
+        c.keliumDelta = h.keliumDelta;
+        c.containers = h.containers;
+        for (LayoutEditor.Neutral n : h.neutrals) {
+            c.neutrals.add(new LayoutEditor.Neutral(n.big, n.corner));
+        }
+        return c;
+    }
+
+    private void pushUndoSnapshot() {
+        Map<Long, LHex> snap = new java.util.LinkedHashMap<>();
+        for (var e : model.hexes.entrySet()) {
+            snap.put(e.getKey(), copyOf(e.getValue()));
+        }
+        undoStack.push(snap);
+        while (undoStack.size() > UNDO_LIMIT) {
+            undoStack.removeLast();
+        }
+    }
+
+    /** Откатить последнюю правку. Возвращает false, если отменять нечего. */
+    boolean undo() {
+        if (undoStack.isEmpty()) {
+            return false;
+        }
+        Map<Long, LHex> snap = undoStack.pop();
+        model.hexes.clear();
+        model.hexes.putAll(snap);
+        onChange.run();
+        repaint();
+        return true;
+    }
+
     BuilderScene(Model model) {
         this.model = model;
         setBackground(Theme.paper());
@@ -59,7 +106,14 @@ final class BuilderScene extends JPanel {
                 lastMx = e.getX();
                 lastMy = e.getY();
                 if (SwingUtilities.isLeftMouseButton(e)) {
-                    click(e.getX(), e.getY());
+                    click(e.getX(), e.getY(), false);
+                } else if (SwingUtilities.isRightMouseButton(e)
+                        && (tool == Tool.KELIUM_DELTA || tool == Tool.CONTAINER)) {
+                    // ПКМ = «в обратную сторону», но ТОЛЬКО у счётных
+                    // инструментов: правая кнопка вообще-то панорамирует, и
+                    // отдавать ей правку на всех инструментах значило бы
+                    // менять поле при каждой попытке подвинуть вид.
+                    click(e.getX(), e.getY(), true);
                 }
             }
 
@@ -125,49 +179,111 @@ final class BuilderScene extends JPanel {
         return ghosts;
     }
 
-    private void click(int sx, int sy) {
+    private void click(int sx, int sy, boolean secondary) {
         int[] qr = hexUnderScreen(sx, sy);
         int q = qr[0];
         int r = qr[1];
         LHex existing = model.get(q, r);
 
+        pushUndoSnapshot();
+        boolean changed;
         if (tool == Tool.ADD_REMOVE) {
             if (existing == null) {
-                if (ghostHexes().contains(Model.key(q, r))) {
+                changed = ghostHexes().contains(Model.key(q, r));
+                if (changed) {
                     model.hexes.put(Model.key(q, r), new LHex(q, r));
                 }
             } else {
-                model.hexes.remove(Model.key(q, r));
+                // ПОСЛЕДНИЙ ГЕКС НЕ УБИРАЕМ: пустой модели не к чему клеить
+                // сетку призраков (та же защита, что в LayoutEditor).
+                changed = model.hexes.size() > 1;
+                if (changed) {
+                    model.hexes.remove(Model.key(q, r));
+                }
             }
-        } else if (existing != null) {
-            applyTool(existing);
+        } else {
+            changed = existing != null && applyTool(existing, secondary);
+        }
+        if (!changed) {
+            undoStack.pop();   // ничего не поменяли — не засоряем историю
+            return;
         }
         onChange.run();
         repaint();
     }
 
-    private void applyTool(LHex h) {
+    /** Применить инструмент к гексу. Возвращает false, если правка не состоялась. */
+    private boolean applyTool(LHex h, boolean secondary) {
         switch (tool) {
             case PLAYER_START -> {
                 if ("player_start".equals(h.content)) {
                     h.content = "normal";
                     h.seat = -1;
                     renumberSeats();
-                } else if (model.players() < LayoutEditor.MAX_SEATS) {
+                } else {
+                    if (model.players() >= LayoutEditor.MAX_SEATS) {
+                        return false;
+                    }
                     h.content = "player_start";
                     h.seat = model.players();
+                    h.stack = 1;
+                    h.keliumDelta = 0;
                 }
             }
             case SPAWN_SMALL -> h.content = "spawn_start".equals(h.content) ? "normal" : "spawn_start";
             case SPAWN_BIG -> h.content = "kelium_tile".equals(h.content) ? "normal" : "kelium_tile";
-            case FORBIDDEN -> h.content = "forbidden".equals(h.content) ? "normal" : "forbidden";
+            case FORBIDDEN -> {
+                if ("forbidden".equals(h.content)) {
+                    h.content = "normal";
+                } else {
+                    h.content = "forbidden";
+                    h.seat = -1;
+                    h.stack = 1;
+                    h.keliumDelta = 0;
+                    h.containers = 0;
+                    h.neutrals.clear();
+                }
+            }
             case CLEAR -> {
                 h.content = "normal";
                 h.seat = -1;
+                h.stack = 1;
+                h.keliumDelta = 0;
+                h.containers = 0;
                 h.neutrals.clear();
             }
-            default -> { }
+            // СТОПКА бывает только у тайлов зарождения: удвоенный тайл
+            // вырабатывается дважды, а удваивать нечего на обычном гексе.
+            case STACK -> {
+                if (!h.isSpawn()) {
+                    return false;
+                }
+                h.stack = h.stack >= 2 ? 1 : 2;
+            }
+            // ПРАВКА КЕЛЕМИЯ — ЛКМ +1, ПКМ −1, предел ±4 (как в LayoutEditor).
+            case KELIUM_DELTA -> {
+                if (!h.isSpawn()) {
+                    return false;
+                }
+                int nv = h.keliumDelta + (secondary ? -1 : 1);
+                if (nv < -4 || nv > 4) {
+                    return false;
+                }
+                h.keliumDelta = nv;
+            }
+            // КОНТЕЙНЕРЫ — по кругу 0 → 1 → 2 → 0, ПКМ в обратную сторону.
+            // На запретном гексе контейнеру не на чем стоять: он вне поля.
+            case CONTAINER -> {
+                if ("forbidden".equals(h.content)) {
+                    return false;
+                }
+                h.containers = Math.floorMod(h.containers + (secondary ? -1 : 1), 3);
+            }
+            default -> {
+                return false;
+            }
         }
+        return true;
     }
 
     /** Старты игроков нумеруются подряд от 0 — как в LayoutEditor.Tool.PLAYER. */
@@ -239,7 +355,8 @@ final class BuilderScene extends JPanel {
                 ? new Color(0xA5D6A7) : new Color(0x2E7D32));
             g2.fill(path);
             g2.setColor(Color.WHITE);
-            g2.drawString(String.valueOf(h.faceKelium()), (float) cx - 4, (float) cy + 4);
+            String face = h.faceKelium() + (h.stack >= 2 ? " ×2" : "");
+            g2.drawString(face, (float) (cx - size * 0.28), (float) cy + 4);
         }
 
         // ВОЗДУШНАЯ ЯЧЕЙКА — поверх всего, как и в разборе партии.
@@ -247,10 +364,13 @@ final class BuilderScene extends JPanel {
         g2.setColor(Color.decode(FieldGeometry.AIR_CELL_STROKE));
         g2.draw(new java.awt.geom.Ellipse2D.Double(cx - airR, cy - airR, airR * 2, airR * 2));
 
-        if (h.containers > 0) {
+        // Контейнеров бывает два — рисуем оба, иначе «один» и «два» на глаз
+        // неотличимы и инструмент нечем проверить.
+        for (int i = 0; i < h.containers; i++) {
             g2.setColor(Theme.container());
-            double r = size * 0.16;
-            g2.fillOval((int) (cx - r), (int) (cy + size * 0.35 - r), (int) (r * 2), (int) (r * 2));
+            double r = size * 0.14;
+            double ox = cx + (h.containers == 2 ? (i == 0 ? -r * 1.2 : r * 1.2) : 0);
+            g2.fillOval((int) (ox - r), (int) (cy + size * 0.35 - r), (int) (r * 2), (int) (r * 2));
         }
 
         if ("player_start".equals(h.content) && h.seat >= 0 && h.seat < FieldGeometry.SEAT_FILL.length) {

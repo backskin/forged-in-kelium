@@ -77,7 +77,13 @@ public final class ContentLibrary {
      * Прежние явные вызовы в {@code Setup.buildGame} стали избыточны и убраны.
      */
     private static void bindCardsInCode(Map<String, ContentSet> sets) {
-        for (String type : java.util.List.of("objectives", "arsenal", "containers",
+        // "containers" ИСКЛЮЧЕНЫ 18.08.2026 (заказ дизайнера): контейнеры
+        // возвращены к чистым данным (containers.4.0.0.yaml и новее) — без
+        // выбора стороны, только один печатаемый ресурс/пара. Код-класс
+        // остаётся в дереве (ContainerPack и т.д.), но больше не подключён
+        // сюда и не перетирает YAML; если понадобится вернуть — просто
+        // дописать "containers" обратно в этот список.
+        for (String type : java.util.List.of("objectives", "arsenal",
                 "market", "super_objectives", "super_arsenal")) {
             ContentSet cs = sets.get(type);
             if (cs != null) {

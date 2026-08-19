@@ -237,6 +237,10 @@ public final class RuleWords {
                 "боеприпасов за выстрел из первого ряда";
             case "actions.combat.secondary_row_ammo_cost" ->
                 "боеприпасов за выстрел из второго ряда";
+            // БОЙ 2.0 (ruleset 1.15.0, черновой): цена универсальной ячейки —
+            // любая цель, есть у каждого рода войск на досках с dual_cell.
+            case "actions.combat.universal_ammo_cost" ->
+                "боеприпасов за универсальную атаку (любая цель)";
             case "actions.combat.open_battle_surcharge_ammo" ->
                 "надбавка боеприпасами за начало боя";
             case "actions.combat.retaliation_enabled" -> "ответный удар разрешён";
