@@ -625,15 +625,35 @@ public class StrategicAgent extends HeuristicAgent {
                 return 0.0;
             }
             case "build_hex" -> {
-                // куда ставим — решает цель: под добычу только впритык к жиле
-                if (plan.goal != Plan.Goal.KELIUM || !(o.payload() instanceof String hid)) {
+                if (!(o.payload() instanceof String hid)) {
                     return 0.0;
                 }
                 String bt = ctx != null ? String.valueOf(ctx.get("btype")) : "";
-                if (!"miner".equals(bt)) {
+                // НАВЕДЕНИЕ ПО ЗАДАНИЯМ — независимо от цели плана: карта в руке
+                // может требовать стройки на определённом гексе при любой
+                // стратегии, и терять эту наводку только потому, что бот сейчас
+                // идёт за келемием, незачем (замер 19.08.2026: до этого выбор
+                // гекса вообще не смотрел на задания, и «В ЭТОТ ХОД построй
+                // так, чтобы…» закрывалось лишь случайно).
+                double bonus = kelium.engine.ObjectiveTargeting.gainFromBuild(
+                    s, seat, hid, "command_center".equals(bt))
+                    * k * wget("objective.pursuit") * 12.0;
+                // Под добычу — только впритык к жиле, это по-прежнему жёстко.
+                if (plan.goal == Plan.Goal.KELIUM && "miner".equals(bt)) {
+                    bonus += Plan.touchesLiveTile(s, hid, Plan.liveTileHexes(s))
+                        ? k * 6.0 : -k * 4.0;
+                }
+                return bonus;
+            }
+            case "assemble" -> {
+                // ЧТО НАНИМАТЬ — тоже цель внутри действия: часть заданий
+                // требует род войск или их разнообразие за один ход.
+                kelium.core.UnitType made = assembleUnit(s, o);
+                if (made == null) {
                     return 0.0;
                 }
-                return Plan.touchesLiveTile(s, hid, Plan.liveTileHexes(s)) ? k * 6.0 : -k * 4.0;
+                return kelium.engine.ObjectiveTargeting.gainFromProduce(s, seat, made.code)
+                    * k * wget("objective.pursuit") * 12.0;
             }
             case "energy_place" -> {
                 // ГЛАВНАЯ точка, где цепочка рвалась: кубик кладём в то здание,

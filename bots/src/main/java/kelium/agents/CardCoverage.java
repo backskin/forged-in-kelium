@@ -187,6 +187,13 @@ public final class CardCoverage {
         section(md, "Задания", allObjectives, objectives, true);
         section(md, "Арсенал", allArsenal, arsenal, false);
 
+        // СРАБАТЫВАЕТ ЛИ НАВЕДЕНИЕ — в отчёт и в консоль: без этой строки нельзя
+        // отличить «наводка не нашла лучшего выбора» от «нашла и проиграла
+        // жадной оценке», а лечится это по-разному.
+        String targeting = kelium.engine.ObjectiveTargeting.countersLine();
+        System.out.println(targeting);
+        md.append("Наведение внутри действия: ").append(targeting).append("\n\n");
+
         Files.createDirectories(out.getParent());
         Files.writeString(out, md.toString(), StandardCharsets.UTF_8);
         System.out.println("отчёт: " + out.toAbsolutePath());

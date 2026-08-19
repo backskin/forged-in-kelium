@@ -1264,8 +1264,21 @@ public class HeuristicAgent extends Agent {
         return value;
     }
 
-    /** Какое войско выйдет из этого здания при Сборке (null — это выход БПР). */
+    /**
+     * Род войск, который даст этот выход Сборки, или null — для НАВЕДЕНИЯ по
+     * заданиям в {@code StrategicAgent.planBonus}: часть карт требует
+     * определённый род или их разнообразие за один ход, и без разбора выхода
+     * такую наводку не построить. Разбор уже был, но приватным.
+     */
     @SuppressWarnings("unchecked")
+    protected UnitType assembleUnit(GameState state, Choice o) {
+        if (o == null || !(o.payload() instanceof Map)) {
+            return null;
+        }
+        return producedUnit(state, (Map<String, Object>) o.payload());
+    }
+
+    /** Какое войско выйдет из этого здания при Сборке (null — это выход БПР). */
     private UnitType producedUnit(GameState state, Map<String, Object> pl) {
         if (!"unit".equals(pl.get("kind")) || !(pl.get("building") instanceof Number n)) {
             return null;
@@ -1835,6 +1848,35 @@ public class HeuristicAgent extends Agent {
                 kelium.engine.ObjectiveHints.forCard(state, seat, state.journal, cid, List.of(), 0);
             if (h != null && h.ready()) {
                 base -= h.maxValue() * 0.5;
+            }
+            // НЕ ЖЕЧЬ КАРТУ, КОТОРАЯ ПОЧТИ ГОТОВА (19.08.2026).
+            //
+            // Найдено замером после трёх неудачных попыток поднять выполнение
+            // заданий наведением. Числа сказали, где настоящее узкое место: на
+            // партию приходится ~33 сожжения против ~4 выполнений, а 47%
+            // запросов наведения уходят в «рука пуста или всё готово». То есть
+            // карты сгорали БЫСТРЕЕ, чем по ним можно было навестись, и любое
+            // улучшение наводки было бесполезно — наводиться было не на что.
+            //
+            // Прежняя проверка смотрела только на «готово ПРЯМО СЕЙЧАС», а это
+            // редкое событие. Карта, пройденная на две трети, для неё выглядела
+            // ровно как непочатая — и уходила в костёр за 1.5 утиля.
+            if (h != null && !h.ready()) {
+                kelium.engine.cards.ObjectiveCard oc =
+                    kelium.engine.cards.CardRegistry.objective(cid);
+                if (oc != null) {
+                    double progress;
+                    try {
+                        progress = oc.progress(
+                            new kelium.engine.cards.EngineCardContext(state, seat));
+                    } catch (RuntimeException e) {
+                        progress = 0.0;   // карта считает своим кодом; сломанная не мешает
+                    }
+                    if (progress > 0 && !Double.isNaN(progress)) {
+                        base -= Math.min(1.0, progress) * h.maxValue()
+                            * 0.5 * wget("objective.pursuit");
+                    }
+                }
             }
         }
         return base;
