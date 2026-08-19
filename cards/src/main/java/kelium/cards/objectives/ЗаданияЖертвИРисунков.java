@@ -74,6 +74,15 @@ public final class ЗаданияЖертвИРисунков {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            // У КАРТЫ-ЖЕРТВЫ satisfied() ВСЕГДА ВЕРНО: условия на поле у неё нет,
+            // платится она сдачей ресурса. Поэтому близость по умолчанию давала
+            // 1.0 даже при нуле контейнеров — то есть врала: сдать нечем, и карта
+            // неиграбельна. Настоящая близость здесь — насколько собрана жертва.
+            return доля(ctx.me().containers, 2);
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return ctx.me().containers >= 2 ? ""
                 : "накопить ещё " + (2 - ctx.me().containers) + " контейнер для сдачи";
@@ -148,6 +157,14 @@ public final class ЗаданияЖертвИРисунков {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            // Та же поправка, что у «Отгрузки»: карта-жертва без ресурса на сдачу
+            // неиграбельна, и близость должна считаться по собранной жертве.
+            // Считаются ГЕКСЫ, а не войска: требование просит с РАЗНЫХ гексов.
+            return доля(гексыВне(ctx).size(), 2);
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             int есть = гексыВне(ctx).size();
             return есть >= 2 ? ""
@@ -219,6 +236,31 @@ public final class ЗаданияЖертвИРисунков {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // Нужно именно чужое ЗДАНИЕ в трофеях. Трофейные ВОЙСКА к цели не
+            // приближают — сдать их эта карта не позволяет, — поэтому близость
+            // мерим по самому побитому чужому зданию в пределах выстрела, ровно
+            // как «Осада»: путь к цели у карт один и тот же.
+            if (ctx.have(kelium.core.Resource.AMMO) < 1) {
+                return 0.0;
+            }
+            double лучшая = 0.0;
+            for (var u : ctx.me().unitsOnField()) {
+                for (String гекс : ctx.attackReach(u)) {
+                    for (var t : ctx.enemyBuildingsOn(гекс)) {
+                        if (t instanceof kelium.core.BuildingToken b && b.hp > 0) {
+                            лучшая = Math.max(лучшая, 1.0 / b.hp);
+                        }
+                    }
+                }
+            }
+            return готовность(лучшая);
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "взять здание противника в трофеи";
         }
@@ -267,6 +309,55 @@ public final class ЗаданияЖертвИРисунков {
             return Shapes.chainConnects(ctx.state(), ctx.seat(), Map.of(
                 "what", "unit:any", "anchors", "own_miner_hexes", "anchor_count", 2,
                 "forbid_kinds", List.of("tower")));
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // ТРЕБОВАНИЕ-РИСУНОК СОБИРАЕТСЯ В ДВА ЭТАПА, и они очень разной цены.
+            // Сперва нужны ДВЕ ОПОРЫ — гексы со своими добытчиками; пока их нет,
+            // карта ждёт Стройки, и это далеко. Когда опоры есть, остаётся
+            // перекрыть разрыв войсками, и вот это уже близко.
+            java.util.Set<String> опоры = new java.util.LinkedHashSet<>();
+            for (var b : ctx.me().buildingsOnField()) {
+                if (b.type == kelium.core.BuildingType.MINER) {
+                    опоры.add(b.hexId);
+                }
+            }
+            if (опоры.size() < 2) {
+                // Половина шкалы готовности отдана этапу опор: один добытчик —
+                // это заметно, но до рисунка ещё стройка.
+                return 0.5 * готовность(доля(опоры.size(), 2));
+            }
+            // Чтобы связать два гекса на расстоянии d, между ними нужно d-1
+            // жетонов. Считаем самую дешёвую пару опор и сколько подвижных войск
+            // на неё уже есть — это и есть остаток работы Движением.
+            int нужно = Integer.MAX_VALUE;
+            java.util.List<String> список = java.util.List.copyOf(опоры);
+            for (int i = 0; i < список.size(); i++) {
+                for (int j = i + 1; j < список.size(); j++) {
+                    Integer d = ctx.distance(список.get(i),
+                        java.util.List.of(список.get(j)));
+                    if (d != null) {
+                        нужно = Math.min(нужно, Math.max(0, d - 1));
+                    }
+                }
+            }
+            if (нужно == Integer.MAX_VALUE) {
+                return 0.5 * готовность(1.0);
+            }
+            if (нужно == 0) {
+                return готовность(1.0);   // опоры уже рядом — рисунок в одном шаге
+            }
+            int подвижных = 0;
+            for (var u : ctx.me().unitsOnField()) {
+                if (u.type != UnitType.TOWER) {
+                    подвижных++;
+                }
+            }
+            return готовность(доля(подвижных, нужно));
         }
 
         @Override
@@ -321,6 +412,21 @@ public final class ЗаданияЖертвИРисунков {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // РИСУНОК ИЗ ЗДАНИЙ. Прямую из трёх гексов держат минимум три
+            // здания, поэтому близость мерим по их числу: с двумя зданиями до
+            // узла одна стройка, с одним — две. Само расположение здесь не
+            // считаем: проверять прямизну по всем тройкам гексов дороже, чем
+            // стоит подсказка, а число зданий — верхняя граница возможного и
+            // никогда не обещает больше, чем есть.
+            int зданий = ctx.me().buildingsOnField().size();
+            return готовность(доля(зданий, 3));
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "связать зданиями три гекса, лежащих по прямой";
         }
@@ -369,6 +475,42 @@ public final class ЗаданияЖертвИРисунков {
             return Shapes.chainConnects(ctx.state(), ctx.seat(), Map.of(
                 "what", "any", "anchors", "opposite_around_spawn", "anchor_count", 2,
                 "require_unit_kinds", List.of("infantry", "vehicle", "aircraft", "tower")));
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // ЗАСЛОН СЧИТАЕТСЯ ОТ ТАЙЛА ЗАРОЖДЕНИЯ, а не от жетонов вообще:
+            // требование говорит про два противоположных гекса ВОКРУГ одного
+            // тайла, и без тайла на поле карта невыполнима в принципе. Поэтому
+            // ищем лучший тайл — тот, вокруг которого у меня уже больше всего
+            // своих жетонов, — и мерим близость по его окружению. Годится любой
+            // жетон, а не только войско: карта так и написана («твои жетоны»).
+            java.util.Set<String> мои = new java.util.LinkedHashSet<>();
+            for (var t : ctx.myTokensOnField()) {
+                мои.add(t.hexId());
+            }
+            if (мои.isEmpty()) {
+                return 0.0;
+            }
+            double лучшая = 0.0;
+            for (var hex : ctx.state().field.hexes.values()) {
+                if (hex.spawnTile == null) {
+                    continue;
+                }
+                int своих = 0;
+                for (String рядом : ctx.neighbors(hex.id)) {
+                    if (мои.contains(рядом)) {
+                        своих++;
+                    }
+                }
+                // Замкнуть противоположные гексы вокруг тайла — это цепочка из
+                // трёх соседних клеток по одной из дуг; по ней и считаем.
+                лучшая = Math.max(лучшая, доля(своих, 3));
+            }
+            return готовность(лучшая);
         }
 
         @Override

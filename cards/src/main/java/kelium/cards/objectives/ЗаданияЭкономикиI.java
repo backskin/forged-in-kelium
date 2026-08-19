@@ -1,6 +1,8 @@
 package kelium.cards.objectives;
 
 import kelium.cards.Награда;
+import kelium.core.BuildingToken;
+import kelium.core.BuildingType;
 import kelium.core.Resource;
 import kelium.engine.cards.CardContext;
 
@@ -55,6 +57,21 @@ public final class ЗаданияЭкономикиI {
             }
             var типы = ход(ctx).assemblyAmmoBuildingTypes;
             return типы.contains("factory") || типы.contains("airbase");
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            var ф = ход(ctx);
+            // ХОД УЖЕ ИСПОРЧЕН: требование запрещает войска, и после первого же
+            // нанятого войска карта в этот ход невыполнима. Честный ноль, иначе
+            // бот тянулся бы к цели, которой в этом ходу уже нет.
+            if (ф.assemblyChoseUnits > 0) {
+                return 0.0;
+            }
+            if (ф.assemblyAmmoBuildingTypes.size() >= 1) {
+                return доля(ф.assemblyAmmoBuildingTypes.size(), 2);   // одно здание — половина
+            }
+            return готовность(доля(готовыхКСборке(ctx.me()), 2));
         }
 
         @Override
@@ -263,6 +280,36 @@ public final class ЗаданияЭкономикиI {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // РЫВОК ВОЗМОЖЕН, ТОЛЬКО ЕСЛИ ЖИЛА ПОЧТИ ВЫЧЕРПАНА. Требование —
+            // забрать ПОСЛЕДНИЙ келемий, поэтому полная жила у добытчика к цели
+            // не приближает: близость даёт лишь нестартовая жила с единственным
+            // оставшимся кубиком, до которой добытчик уже дотягивается.
+            // Досягаемость спрашивается у движка (minerAdjacentGridWithKelium),
+            // а не переписывается здесь: правило про свои стенки и стороны
+            // гекса живёт в одном месте.
+            for (BuildingToken b : ctx.me().buildingsOnField()) {
+                if (b.type != BuildingType.MINER || !b.powered()) {
+                    continue;
+                }
+                String гекс = kelium.engine.Actions
+                    .minerAdjacentGridWithKelium(ctx.state(), b);
+                if (гекс == null) {
+                    continue;
+                }
+                var h = ctx.state().field.get(гекс);
+                if (h != null && h.spawnTile != null && !h.spawnTile.isStart
+                        && h.spawnTile.kelium == 1) {
+                    return готовность(true);
+                }
+            }
+            return 0.0;
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? ""
                 : "забрать последний келемий с нестартового тайла зарождения";
@@ -311,6 +358,29 @@ public final class ЗаданияЭкономикиI {
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
             return satisfied(ctx) && ход(ctx).keliumMined == 0;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // Близость даёт только добытчик, который ДОСТАЁТ до открытой ячейки
+            // печатного контейнера. Проверку спрашиваем у движка той же
+            // функцией, которой он строит сам выбор в Добыче, — иначе карта
+            // считала бы близость по своему представлению о правиле и разошлась
+            // бы с ним при первой же правке контейнеров.
+            if (!kelium.engine.PrintedContainers.miningBranchOn(ctx.state())) {
+                return 0.0;
+            }
+            for (BuildingToken b : ctx.me().buildingsOnField()) {
+                if (b.type == BuildingType.MINER && b.powered()
+                        && kelium.engine.PrintedContainers
+                            .minableContainerHex(ctx.state(), b) != null) {
+                    return готовность(true);
+                }
+            }
+            return 0.0;
         }
 
         @Override

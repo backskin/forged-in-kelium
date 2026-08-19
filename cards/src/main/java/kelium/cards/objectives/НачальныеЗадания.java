@@ -2,6 +2,7 @@ package kelium.cards.objectives;
 
 import kelium.cards.Награда;
 import kelium.core.BuildingToken;
+import kelium.core.BuildingType;
 import kelium.core.PlayerState;
 import kelium.core.Resource;
 import kelium.core.UnitToken;
@@ -128,6 +129,22 @@ public final class НачальныеЗадания {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // Нанимать войско, кроме вышки, есть чем — значит рывок в одном
+            // действии Сборки. Вышку даёт само ЦУ, поэтому оно не считается.
+            for (BuildingToken b : ctx.me().buildingsOnField()) {
+                if (b.type == BuildingType.BARRACKS || b.type == BuildingType.FACTORY
+                        || b.type == BuildingType.AIRBASE) {
+                    return готовность(true);
+                }
+            }
+            return 0.0;
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "нанять войско, кроме вышки";
         }
@@ -186,6 +203,13 @@ public final class НачальныеЗадания {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            // Предложение карты сделок оплачивается монетами: без денег рывка не
+            // будет, с деньгами он в одном действии Маркета.
+            return satisfied(ctx) ? 1.0 : готовность(ctx.have(Resource.COIN) >= 1);
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "оплатить предложение карты сделок на рынке";
         }
@@ -216,6 +240,26 @@ public final class НачальныеЗадания {
                 }
             }
             return false;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            // ЗДЕСЬ БЛИЗОСТЬ НАСТОЯЩАЯ, а не готовность средств: требование
+            // распадается на два состояния поля, и второе видно отдельно.
+            // Здание вне гекса ЦУ уже стоит — половина; осталось перекинуть
+            // на него энергию Сменой энергии.
+            PlayerState p = ctx.me();
+            var цу = гексыЦУ(p);
+            boolean естьВне = false;
+            for (BuildingToken b : p.buildingsOnField()) {
+                if (!цу.contains(b.hexId)) {
+                    if (b.powered()) {
+                        return 1.0;
+                    }
+                    естьВне = true;
+                }
+            }
+            return естьВне ? 0.5 : 0.0;
         }
 
         @Override
@@ -253,6 +297,25 @@ public final class НачальныеЗадания {
                 }
             }
             return false;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            // САМЫЙ ЧЕСТНЫЙ ГРАДИЕНТ ИЗ ВСЕХ НАЧАЛЬНЫХ: требование мерится
+            // расстоянием, поэтому близость — это буквально пройденный путь.
+            // Войско в одном гексе от ЦУ — половина дела, и бот это видит.
+            var цу = гексыЦУ(ctx.me());
+            if (цу.isEmpty()) {
+                return 0.0;
+            }
+            int лучшее = 0;
+            for (UnitToken u : ctx.me().unitsOnField()) {
+                Integer d = kelium.engine.Movement.distance(ctx.state(), u.hexId, цу);
+                if (d != null) {
+                    лучшее = Math.max(лучшее, d);
+                }
+            }
+            return доля(лучшее, 2);
         }
 
         @Override
@@ -351,6 +414,13 @@ public final class НачальныеЗадания {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            // Шаг по треку берут действием Наука за келемий: есть чем платить —
+            // рывок в одном действии.
+            return satisfied(ctx) ? 1.0 : готовность(ctx.have(Resource.KELIUM) >= 1);
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "шагнуть на любом треке технологий";
         }
@@ -374,6 +444,26 @@ public final class НачальныеЗадания {
         @Override
         public boolean satisfied(CardContext ctx) {
             return !ctx.me().trophySpace.isEmpty();
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            // Трофей берут только с боя: близость — это возможность выстрелить
+            // прямо сейчас (есть чем и есть в кого), а не запас войск вообще.
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            if (ctx.have(Resource.AMMO) < 1) {
+                return 0.0;
+            }
+            for (UnitToken u : ctx.me().unitsOnField()) {
+                for (String гекс : ctx.attackReach(u)) {
+                    if (!ctx.enemyTokensOn(гекс).isEmpty()) {
+                        return готовность(true);
+                    }
+                }
+            }
+            return 0.0;
         }
 
         @Override
@@ -401,6 +491,12 @@ public final class НачальныеЗадания {
         public boolean satisfied(CardContext ctx) {
             return ход(ctx).lowerOrderOpen;
         }
+
+        // БЛИЗОСТЬ ЗДЕСЬ НАМЕРЕННО НЕ СЧИТАЕТСЯ, и это не недоделка. Нижний
+        // приказ открывается от СОВПАДЕНИЯ приказов за столом, то есть от чужого
+        // выбора: подготовиться к этому нечем, средств для рывка не существует.
+        // Выдать здесь любую дробь значило бы соврать боту, что он к чему-то
+        // приблизился, — и увести его от карт, где приблизиться правда можно.
 
         @Override
         public String needed(CardContext ctx) {
@@ -433,6 +529,11 @@ public final class НачальныеЗадания {
         public boolean satisfied(CardContext ctx) {
             return ход(ctx).orderBlocked;
         }
+
+        // БЛИЗОСТЬ НЕ СЧИТАЕТСЯ ПО ТОЙ ЖЕ ПРИЧИНЕ, ЧТО У n11: совпадение приказа
+        // целиком в руках соперников. Больше того, здесь карта платит за
+        // ПОТЕРЮ — совпавший приказ не срабатывает, — так что «приближаться» к
+        // ней сознательно бот и не должен.
 
         @Override
         public String needed(CardContext ctx) {

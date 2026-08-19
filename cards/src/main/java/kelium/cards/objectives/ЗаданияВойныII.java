@@ -310,6 +310,28 @@ public final class ЗаданияВойныII {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            // ДВЕ ЧАСТИ: снаружи не меньше трёх И внутри ни одного. Берём худшую
+            // из двух долей — иначе пять войск снаружи при одном забытом во
+            // дворе выглядели бы как «готово», хотя карта не выполнена.
+            var свои = ctx.myBuildingHexes();
+            int внутри = 0;
+            int снаружи = 0;
+            for (UnitToken u : ctx.me().unitsOnField()) {
+                if (свои.contains(u.hexId)) {
+                    внутри++;
+                } else {
+                    снаружи++;
+                }
+            }
+            double поВыходу = доля(снаружи, 3);
+            // Каждое войско, оставшееся во дворе, — отдельная недоделка; при
+            // одном лишнем близость половинится, при трёх падает почти в ноль.
+            double поДвору = внутри == 0 ? 1.0 : доля(1, 1 + внутри);
+            return Math.min(поВыходу, поДвору);
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? ""
                 : "вывести три войска с гексов своих зданий, не оставив там ни одного";
@@ -369,6 +391,38 @@ public final class ЗаданияВойныII {
                 }
             }
             return false;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // ТРЕБОВАНИЕ РАСПАДАЕТСЯ НА ДВА: сперва иметь авиацию вообще, потом
+            // довести её до чужого гекса. Без авиации близость честный ноль —
+            // тут нечего доводить, нужен найм. С авиацией мерим путь до
+            // ближайшего чужого жетона: это ровно то, что осталось пролететь.
+            java.util.Set<String> чужие = new java.util.LinkedHashSet<>();
+            for (Token t : ctx.enemyTokensOnField()) {
+                чужие.add(t.hexId());
+            }
+            if (чужие.isEmpty()) {
+                return 0.0;
+            }
+            Integer лучшее = null;
+            for (UnitToken u : ctx.me().unitsOnField()) {
+                if (u.type != UnitType.AIRCRAFT) {
+                    continue;
+                }
+                Integer d = ctx.distance(u.hexId, чужие);
+                if (d != null && (лучшее == null || d < лучшее)) {
+                    лучшее = d;
+                }
+            }
+            if (лучшее == null) {
+                return 0.0;   // авиации нет — карта ждёт Сборки, а не Движения
+            }
+            return готовность(доля(5 - Math.min(5, лучшее), 5));
         }
 
         @Override
@@ -598,6 +652,32 @@ public final class ЗаданияВойныII {
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
             return сбилСильного(ctx) && ход(ctx).destroyedLeaderBuilding;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // ГОДНАЯ ЦЕЛЬ ЕСТЬ ИЛИ ЕЁ НЕТ: жетон именно того игрока, у кого
+            // зданий больше моего, и именно в пределах выстрела. Без такой цели
+            // близость честный ноль — карта ждёт не Боя, а роста соперника или
+            // подхода войск. Проверка повторяет условие карты, но глядя вперёд.
+            if (ctx.have(Resource.AMMO) < 1) {
+                return 0.0;
+            }
+            int моих = зданий(ctx, ctx.seat());
+            for (UnitToken u : ctx.me().unitsOnField()) {
+                for (String гекс : ctx.attackReach(u)) {
+                    for (Token t : ctx.enemyTokensOn(гекс)) {
+                        if (t.owner() != ctx.seat() && t.owner() >= 0
+                                && зданий(ctx, t.owner()) > моих) {
+                            return готовность(true);
+                        }
+                    }
+                }
+            }
+            return 0.0;
         }
 
         @Override

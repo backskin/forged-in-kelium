@@ -169,6 +169,18 @@ public final class ЗаданияЭкономикиIII {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            // Близость — по САМОМУ ПРОДВИНУТОМУ треку: требование говорит «хотя бы
+            // на одном», поэтому дальний трек и есть мера, а сумма по всем врала
+            // бы (три трека на первом шаге — это не «полтора второго шага»).
+            int лучший = 0;
+            for (int v : ctx.me().techSteps.values()) {
+                лучший = Math.max(лучший, v);
+            }
+            return доля(лучший, 2);
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "дойти до второго шага хотя бы на одном треке";
         }
@@ -261,6 +273,20 @@ public final class ЗаданияЭкономикиIII {
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
             return satisfied(ctx) && ctx.have(Resource.KELIUM) == 0;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            // ТРЕБОВАНИЕ НАИЗНАНКУ: приближает не накопление, а трата. Поэтому
+            // близость считается от ОСТАТКА — чем меньше на руках, тем ближе.
+            // Одна обнулённая половина уже половина дела, а мерить остаток надо
+            // с потолком: разница между 9 и 12 монетами для карты одинаково
+            // далека, и без потолка градиент растворился бы в богатстве.
+            int монеты = ctx.have(Resource.COIN);
+            int бпр = ctx.have(Resource.AMMO);
+            double доляМонет = 1.0 - доля(монеты, 4);
+            double доляБпр = 1.0 - доля(бпр, 4);
+            return (доляМонет + доляБпр) / 2.0;
         }
 
         @Override

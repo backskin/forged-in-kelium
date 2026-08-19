@@ -58,6 +58,20 @@ public final class ЗаданияЭкономикиII {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // ГРАДИЕНТ ПО НАБРАННОМУ НЕСОСЕДСТВУ, а не по числу операций: две
+            // стройки на соседних гексах к цели не приближают вовсе, и карта
+            // обязана это различать. Считаем, какой самый большой попарно
+            // несоседний набор уже собран — той же проверкой движка, которой
+            // считается выполнение.
+            var гексы = гексыОпераций(ctx);
+            return ctx.chooseNonAdjacent(гексы, 1) ? доля(1, 2) : 0.0;
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? ""
                 : "выполнить стройку ещё на одном гексе, не соседнем с уже занятыми";
@@ -166,6 +180,28 @@ public final class ЗаданияЭкономикиII {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            // ТРЕБОВАНИЕ ИЗ ДВУХ ЧАСТЕЙ — число зданий и запитанность ВСЕХ, —
+            // поэтому близость считается по обеим и берётся худшая: три здания
+            // с одним погашенным ближе к цели, чем два запитанных, но пока не
+            // цель. Незапитанные считаем поимённо: это ровно то, что осталось
+            // сделать Сменой энергии.
+            var зд = ctx.me().buildingsOnField();
+            if (зд.isEmpty()) {
+                return 0.0;
+            }
+            int погашенных = 0;
+            for (var b : зд) {
+                if (!b.powered()) {
+                    погашенных++;
+                }
+            }
+            double поЧислу = доля(зд.size(), 3);
+            double поЭнергии = доля(зд.size() - погашенных, зд.size());
+            return Math.min(поЧислу, поЭнергии);
+        }
+
+        @Override
         public boolean satisfied(CardContext ctx) {
             return всеЗапитаны(ctx, 3);
         }
@@ -228,6 +264,13 @@ public final class ЗаданияЭкономикиII {
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
             return ctx.largestWallChain(false) >= 3;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            // Длина цепочки — сама себе градиент: одно военное здание со стенкой
+            // это половина требования, и бот видит, что достраивать.
+            return доля(ctx.largestWallChain(true), 2);
         }
 
         @Override
@@ -294,6 +337,30 @@ public final class ЗаданияЭкономикиII {
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
             return источниковСОдним(ctx, true) >= 3;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            // ДВА УСЛОВИЯ РАЗОМ: источников хотя бы два И на КАЖДОМ ровно один
+            // простой кубик. Считаем по обеим частям и берём худшую — иначе
+            // четыре источника с неверными кубиками выглядели бы как «почти
+            // готово», хотя до цели там дальше, чем от двух правильных.
+            int источников = 0;
+            int верных = 0;
+            for (var b : ctx.me().buildingsOnField()) {
+                if (b.type != BuildingType.POWER_PLANT
+                        && b.type != BuildingType.COMMAND_CENTER) {
+                    continue;
+                }
+                источников++;
+                if (b.energyIdle == 1) {
+                    верных++;
+                }
+            }
+            if (источников == 0) {
+                return 0.0;
+            }
+            return Math.min(доля(источников, 2), доля(верных, источников));
         }
 
         @Override

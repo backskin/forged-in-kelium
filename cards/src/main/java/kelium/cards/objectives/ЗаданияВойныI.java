@@ -251,6 +251,26 @@ public final class ЗаданияВойныI {
         }
 
         @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // Рывок возможен, только если в зоне стройки ЕСТЬ гекс рядом с чужим
+            // войском. Проверка повторяет условие карты, но смотрит в будущее:
+            // не «где я построил», а «где я МОГУ построить».
+            return готовность(естьГексПодСтройку(ctx, hid -> {
+                for (String рядом : ctx.neighbors(hid)) {
+                    for (Token t : ctx.enemyTokensOn(рядом)) {
+                        if (t instanceof UnitToken) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }));
+        }
+
+        @Override
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? ""
                 : "построить здание на гексе рядом с войсками противника";
@@ -315,6 +335,23 @@ public final class ЗаданияВойныI {
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
             return строилСреди(ctx, 2);
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // То же, что у «Передовой базы», но гекс нужен НЕ рядом, а тот
+            // самый — где чужое войско и стоит.
+            return готовность(естьГексПодСтройку(ctx, hid -> {
+                for (Token t : ctx.enemyTokensOn(hid)) {
+                    if (t instanceof UnitToken) {
+                        return true;
+                    }
+                }
+                return false;
+            }));
         }
 
         @Override
@@ -479,6 +516,38 @@ public final class ЗаданияВойныI {
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
             return поставилБлизко(ctx, true);
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // ГРАДИЕНТ ПО ПРОЙДЕННОМУ ПУТИ, а не «да/нет». Требование мерится
+            // расстоянием от своего ЦУ до чужого, и это редкий случай, когда
+            // близость карты буквально есть близость на поле: чем ЦУ ближе, тем
+            // меньше остаётся довезти. Порог требования 2 гекса; отсчёт ведём от
+            // шести, дальше этого разница для карты уже неразличима.
+            var чужие = чужиеЦУ(ctx);
+            if (чужие.isEmpty()) {
+                return 0.0;
+            }
+            Integer лучшее = null;
+            for (String своё : ctx.cuHexesOf(ctx.seat())) {
+                Integer d = ctx.distance(своё, чужие);
+                if (d != null && (лучшее == null || d < лучшее)) {
+                    лучшее = d;
+                }
+            }
+            if (лучшее == null) {
+                return 0.0;
+            }
+            // Уже стоит близко, но ЦУ в этот ход не двигали — рывок в одно
+            // перемещение, поэтому готовность, а не выполнение.
+            if (лучшее <= 2) {
+                return готовность(true);
+            }
+            return готовность(доля(6 - лучшее, 6 - 2));
         }
 
         @Override
@@ -708,6 +777,35 @@ public final class ЗаданияВойныI {
                 }
             }
             return false;
+        }
+
+        @Override
+        public double progress(CardContext ctx) {
+            if (satisfied(ctx)) {
+                return 1.0;
+            }
+            // Близость — по САМОМУ ПОБИТОМУ чужому зданию в пределах досягаемости:
+            // здание с одной оставшейся прочностью это почти трофей, целое —
+            // почти ничего. Недосягаемые здания не считаем вовсе: до них у бота
+            // нет хода, и близость по ним была бы обманом.
+            if (ctx.have(kelium.core.Resource.AMMO) < 1) {
+                return 0.0;
+            }
+            // МЕРА — ОСТАТОК ПРОЧНОСТИ, а не доля от полной: полной прочности
+            // здания жетон не помнит (бонусы правил её меняют), и выдумывать
+            // максимум значило бы считать близость по неверной шкале. Остаток
+            // же говорит ровно то, что нужно: 1 прочность — почти трофей.
+            double лучшая = 0.0;
+            for (UnitToken u : ctx.me().unitsOnField()) {
+                for (String гекс : ctx.attackReach(u)) {
+                    for (Token t : ctx.enemyBuildingsOn(гекс)) {
+                        if (t instanceof BuildingToken b && b.hp > 0) {
+                            лучшая = Math.max(лучшая, 1.0 / b.hp);
+                        }
+                    }
+                }
+            }
+            return готовность(лучшая);
         }
 
         @Override
