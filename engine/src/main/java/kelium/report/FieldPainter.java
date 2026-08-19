@@ -1522,28 +1522,14 @@ public final class FieldPainter {
                                         double cx, double cy) {
         double stroke = TOKEN_STROKE * 0.55;
         String mark = dark ? ENERGY_CELL_MARK_DARK : ENERGY_CELL_MARK;
-        double ang = FieldGeometry.edgeAngle(cell);
-        // ОТСТУП ОТ ГРАНИЦ ЯЧЕЙКИ. Впритык к кромке гекса на трапецию налезали
-        // краями соседние здания, и разметка читалась грязно (замечание
-        // дизайнера 16.08.2026). Поджимаем со всех сторон: снаружи по радиусу,
-        // с боков — сводя лучи к середине ячейки.
-        double margin = size * 0.07;
-        double side = 30 - 4;
-        double outer = size - stroke / 2 - margin;
-        // Внутреннее основание — ЗА кромкой воздушной ячейки, с видимым зазором.
-        // Ровно по её радиусу основание пряталось под самой воздушной ячейкой, и
-        // трапеция читалась треугольником до центра.
-        double inner = size * (FieldGeometry.AIR_CELL_R + 0.10) + stroke / 2;
-        double[] o1 = FieldGeometry.polar(cx, cy, outer, ang - side);
-        double[] o2 = FieldGeometry.polar(cx, cy, outer, ang + side);
-        // Внутренние углы держим на тех же лучах, что и внешние: иначе боковые
-        // стороны трапеции не совпадут с границами между соседними ячейками.
-        double[] i1 = FieldGeometry.polar(cx, cy, inner, ang - side);
-        double[] i2 = FieldGeometry.polar(cx, cy, inner, ang + side);
-        c.polygon(new double[][]{i1, o1, o2, i2}, "none", mark, stroke);
+        // ФОРМУ ДАЁТ ГЕОМЕТРИЯ, А НЕ ЭТОТ МЕТОД (перенесено 19.08.2026): ту же
+        // трапецию рисует каталог блоков в конструкторе, и пока каждый считал её
+        // сам, формы разъехались — в каталоге энергозона выродилась в круг.
+        c.polygon(FieldGeometry.energyCellOutline(cx, cy, size, cell, stroke),
+            "none", mark, stroke);
 
         // Молния — в середине трапеции, там же, где у здания стоит подпись.
-        double[] spot = FieldGeometry.polar(cx, cy, size * 0.62, ang);
+        double[] spot = FieldGeometry.energyCellSpot(cx, cy, size, cell);
         paintBolt(c, spot[0], spot[1], size * 0.24, mark);
     }
 
@@ -1572,18 +1558,10 @@ public final class FieldPainter {
             x = cx + size * 0.62 * Math.cos(ang);
             y = cy + size * 0.62 * Math.sin(ang);
         }
-        // оси ячейки: u — наружу по нормали стороны, v — вдоль стороны
-        double ux = Math.cos(ang);
-        double uy = Math.sin(ang);
-        double vx = -uy;
-        double vy = ux;
-        double h = s / 2;
-        double[][] quad = {
-            {x + (-h) * ux + (-h) * vx, y + (-h) * uy + (-h) * vy},
-            {x + (h) * ux + (-h) * vx,  y + (h) * uy + (-h) * vy},
-            {x + (h) * ux + (h) * vx,   y + (h) * uy + (h) * vy},
-            {x + (-h) * ux + (h) * vx,  y + (-h) * uy + (h) * vy}
-        };
+        // ФОРМУ (квадрат, повёрнутый по стороне) СЧИТАЕТ ГЕОМЕТРИЯ — тот же
+        // квадрат нужен каталогу блоков, и держать вычисление в двух местах уже
+        // однажды привело к расхождению (см. energyCellOutline).
+        double[][] quad = FieldGeometry.containerCellQuad(cx, cy, size, cell, s);
         java.awt.image.BufferedImage tex = Textures.field("container");
         if (tex != null) {
             // Ячейка квадратная и повёрнута по своей стороне гекса — картинка

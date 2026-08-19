@@ -2094,12 +2094,12 @@ public final class LayoutEditor {
                     continue;
                 }
                 double[] c = center(hx.q, hx.r);
-                Polygon poly = hexPoly(c[0], c[1], size * 0.88);
+                var poly = roundedTile(c[0], c[1], size * 0.88);
                 g.setColor(ExportPaint.FORBIDDEN_FILL);
-                g.fillPolygon(poly);
+                g.fill(poly);
                 g.setColor(new Color(0x5A6068));
                 g.setStroke(new BasicStroke(1.6f));
-                g.drawPolygon(poly);
+                g.draw(poly);
                 g.setColor(new Color(0xE0E0E0));
                 g.setFont(getFont().deriveFont(Font.BOLD, (float) (size * 0.46)));
                 drawCentered(g, "\u2715", c[0], c[1]);
@@ -2625,6 +2625,17 @@ public final class LayoutEditor {
                     drawCentered(g, "P" + (seat + 1), cx, cy);
                 }
                 case "forbidden" -> {
+                    // ЗАПРЕТНЫЙ ГЕКС — ОТДЕЛЬНАЯ ПЕЧАТНАЯ ДЕТАЛЬ, а не просто
+                    // другая заливка клетки: на столе это картонка, положенная
+                    // поверх поля. Поэтому рисуем её вставленным тайлом со
+                    // скруглёнными углами — так же, как в выгрузке картинки, и
+                    // так же, как выглядят тайлы зарождения.
+                    var tile = roundedTile(cx, cy, size * 0.88);
+                    g.setColor(baseFill(h).darker());
+                    g.fill(tile);
+                    g.setColor(new Color(0x5A6068));
+                    g.setStroke(new BasicStroke(1.6f));
+                    g.draw(tile);
                     g.setColor(new Color(0xE0E0E0));
                     g.setFont(getFont().deriveFont(Font.BOLD, (float) (size * 0.46)));
                     drawCentered(g, "✕", cx, cy);
@@ -2648,19 +2659,19 @@ public final class LayoutEditor {
             boolean start = "spawn_start".equals(h.content);
             // двойной тайл — вторая «карточка» видна из-под первой
             if (h.stack >= 2) {
-                Polygon back = hexPoly(cx + size * 0.09, cy + size * 0.09, size * 0.80);
+                var back = roundedTile(cx + size * 0.09, cy + size * 0.09, size * 0.80);
                 g.setColor(start ? SPAWN_START.darker() : SPAWN_NORMAL.darker());
-                g.fillPolygon(back);
+                g.fill(back);
                 g.setColor(new Color(0x24501f));
                 g.setStroke(new BasicStroke(1.6f));
-                g.drawPolygon(back);
+                g.draw(back);
             }
-            Polygon tile = hexPoly(cx, cy, size * 0.80);
+            var tile = roundedTile(cx, cy, size * 0.80);
             g.setColor(start ? SPAWN_START : SPAWN_NORMAL);
-            g.fillPolygon(tile);
+            g.fill(tile);
             g.setColor(new Color(0x1B5E20));
             g.setStroke(new BasicStroke(2f));
-            g.drawPolygon(tile);
+            g.draw(tile);
 
             g.setColor(start ? new Color(0x1B5E20) : Color.WHITE);
             g.setFont(getFont().deriveFont(Font.BOLD, (float) (size * 0.50)));
@@ -2760,6 +2771,23 @@ public final class LayoutEditor {
                 return ExportPaint.HEX_EDGE;
             }
             return Theme.isDark() ? new Color(0x79838F) : new Color(0x6d6a5e);
+        }
+
+        /**
+         * ПЕЧАТНАЯ ДЕТАЛЬ СО СКРУГЛЁННЫМИ УГЛАМИ — тайлы зарождения и запретные
+         * гексы (просьба дизайнера 19.08.2026). Настоящая картонка режется с
+         * закруглением, и острый угол выдаёт чертёж вместо детали. Скругление
+         * считает {@link kelium.report.FieldGeometry#roundedHexPath} — то же
+         * самое, что рисует разбор партии, чтобы вид не разъезжался между
+         * приложениями.
+         *
+         * <p>САМА СЕТКА ПОЛЯ остаётся острой ({@link #hexPoly}): гексы поля —
+         * это разметка блока, а не отдельная вырезанная деталь, и скруглять их
+         * значило бы оставить между ними зазоры, которых на картоне нет.
+         */
+        private java.awt.geom.Path2D.Double roundedTile(double cx, double cy, double s) {
+            return kelium.report.FieldGeometry.roundedHexPath(cx, cy, s,
+                kelium.report.FieldGeometry.TILE_ROUND);
         }
 
         private Polygon hexPoly(double cx, double cy, double s) {

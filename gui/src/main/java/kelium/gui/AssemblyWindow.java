@@ -631,11 +631,17 @@ public final class AssemblyWindow extends JPanel {
         private void drawBlackOverlays(Graphics2D g) {
             for (Cell c : result.blacks()) {
                 double[] xy = center(c.q(), c.r());
+                // ОТДЕЛЬНАЯ ПЕЧАТНАЯ НАКЛАДКА — со скруглёнными углами, как тайлы
+                // зарождения и запретные гексы в конструкторе (просьба дизайнера
+                // 19.08.2026). Скругление считает FieldGeometry, чтобы во всех
+                // трёх приложениях оно было одно и то же.
+                var tile = kelium.report.FieldGeometry.roundedHexPath(xy[0], xy[1],
+                    size * 0.82, kelium.report.FieldGeometry.TILE_ROUND);
                 g.setColor(new Color(0x14171A));
-                g.fillPolygon(hexPoly(xy[0], xy[1], size * 0.82));
+                g.fill(tile);
                 g.setColor(new Color(0x5A6068));
                 g.setStroke(new BasicStroke(1.6f));
-                g.drawPolygon(hexPoly(xy[0], xy[1], size * 0.82));
+                g.draw(tile);
             }
         }
 

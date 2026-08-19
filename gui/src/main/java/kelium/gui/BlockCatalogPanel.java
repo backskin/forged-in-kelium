@@ -8,7 +8,6 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.geom.Ellipse2D;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -404,47 +403,63 @@ public final class BlockCatalogPanel extends JPanel {
                 g.setColor(наземный);
                 g.fillPolygon(sector);
             }
-            double air = size * FieldGeometry.AIR_CELL_R;
+            // ВОЗДУШНЫЙ СЕКТОР — ГЕКСАГОНАЛЬНЫЙ, а не круглый (замечание
+            // дизайнера 19.08.2026). Рисовальщик поля рисует его именно
+            // шестиугольником по AIR_CELL_R, и круг здесь был отсебятиной.
             g.setColor(небесный);
-            g.fill(new Ellipse2D.Double(cx - air, cy - air, air * 2, air * 2));
+            g.fill(FieldGeometry.path(FieldGeometry.hexCorners(cx, cy,
+                size * FieldGeometry.AIR_CELL_R)));
         }
 
-        /** Маркер ячейки на стороне гекса: кружок энергии или ромб контейнера. */
+        /**
+         * МАРКЕР ЯЧЕЙКИ НА СТОРОНЕ ГЕКСА — ровно тот же, что на поле.
+         *
+         * <p>ПЕРЕПИСАНО 19.08.2026 по замечанию дизайнера: энергозона рисовалась
+         * кругом, а контейнер — ромбом по осям экрана, и ни то, ни другое не
+         * совпадало с полем. На поле энергоячейка — это ОБВОДКА ТРАПЕЦИИ по
+         * границам ячейки с молнией посередине, а контейнер — КВАДРАТ, повёрнутый
+         * по своей стороне гекса. Обе фигуры теперь берутся из
+         * {@link FieldGeometry}, там же, откуда их берёт рисовальщик поля, — иначе
+         * они снова разъедутся при первой же правке.
+         */
         private void рисоватьМетку(Graphics2D g, double cx, double cy, double apothem,
-                                   int side, Color color, boolean круг, double size) {
-            double a = Math.toRadians(FieldGeometry.edgeAngle(side));
-            double px = cx + apothem * 0.6 * Math.cos(a);
-            double py = cy + apothem * 0.6 * Math.sin(a);
-            double r = size * 0.24;
+                                   int side, Color color, boolean энергия, double size) {
+            if (энергия) {
+                float stroke = (float) Math.max(1.2, size * 0.055);
+                g.setColor(color);
+                g.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND));
+                g.draw(FieldGeometry.path(
+                    FieldGeometry.energyCellOutline(cx, cy, size, side, stroke)));
+                double[] spot = FieldGeometry.energyCellSpot(cx, cy, size, side);
+                g.fill(FieldGeometry.path(
+                    FieldGeometry.boltPolygon(spot[0], spot[1], size * 0.24)));
+                return;
+            }
+            var quad = FieldGeometry.path(
+                FieldGeometry.containerCellQuad(cx, cy, size, side, size * 0.24));
             g.setColor(color);
-            if (круг) {
-                g.fill(new Ellipse2D.Double(px - r, py - r, r * 2, r * 2));
-            } else {
-                java.awt.Polygon ромб = new java.awt.Polygon();
-                ромб.addPoint((int) px, (int) (py - r));
-                ромб.addPoint((int) (px + r), (int) py);
-                ромб.addPoint((int) px, (int) (py + r));
-                ромб.addPoint((int) (px - r), (int) py);
-                g.fillPolygon(ромб);
-            }
-            g.setColor(new Color(0, 0, 0, 90));
-            g.setStroke(new BasicStroke(1f));
-            if (круг) {
-                g.draw(new Ellipse2D.Double(px - r, py - r, r * 2, r * 2));
-            }
+            g.fill(quad);
+            g.setColor(new Color(0, 0, 0, 110));
+            g.setStroke(new BasicStroke(1.2f));
+            g.draw(quad);
         }
 
-        /** Контейнер в воздушной ячейке — ромб в центре гекса, там же, где авиация. */
+        /**
+         * Контейнер в ВОЗДУШНОЙ ячейке — в центре гекса, там же, где авиация.
+         * Форма та же, что у ячеек на сторонах (квадрат), только без поворота:
+         * воздушная ячейка ничьей стороне не принадлежит. Фигуру, как и там,
+         * даёт {@link FieldGeometry} — ячейка 6 у неё и означает воздушную.
+         */
         private void рисоватьМеткуВЦентре(Graphics2D g, double cx, double cy, Color color,
                                           double size) {
-            double r = size * 0.24;
+            var quad = FieldGeometry.path(
+                FieldGeometry.containerCellQuad(cx, cy, size, 6, size * 0.24));
             g.setColor(color);
-            java.awt.Polygon ромб = new java.awt.Polygon();
-            ромб.addPoint((int) cx, (int) (cy - r));
-            ромб.addPoint((int) (cx + r), (int) cy);
-            ромб.addPoint((int) cx, (int) (cy + r));
-            ромб.addPoint((int) (cx - r), (int) cy);
-            g.fillPolygon(ромб);
+            g.fill(quad);
+            g.setColor(new Color(0, 0, 0, 110));
+            g.setStroke(new BasicStroke(1.2f));
+            g.draw(quad);
         }
     }
 }
