@@ -360,15 +360,14 @@ public final class BlockCatalogPanel extends JPanel {
 
                 рисоватьСекторы(g, cx, cy, size);
 
-                java.awt.Polygon poly = new java.awt.Polygon();
-                for (int k = 0; k < 6; k++) {
-                    double a = Math.toRadians(60 * k - 90 + FieldGeometry.TILT);
-                    poly.addPoint((int) Math.round(cx + size * Math.cos(a)),
-                        (int) Math.round(cy + size * Math.sin(a)));
-                }
+                // КОНТУР ГЕКСА — СО СКРУГЛЁННЫМИ УГЛАМИ и той же функцией
+                // геометрии, что у поля (решение дизайнера 19.08.2026). Свой
+                // цикл по шести углам убран: он и был причиной, по которой
+                // каталог жил своей формой отдельно от поля.
                 g.setStroke(new BasicStroke(1.4f));
                 g.setColor(new Color(0x8A8F98));
-                g.drawPolygon(poly);
+                g.draw(FieldGeometry.path(
+                    FieldGeometry.roundedHexPoints(cx, cy, size)));
 
                 double apothem = FieldGeometry.apothem(size);
                 if (hx.energy() >= 0 && hx.energy() < 6) {

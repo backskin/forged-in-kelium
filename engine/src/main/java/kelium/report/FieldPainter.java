@@ -207,14 +207,16 @@ public final class FieldPainter {
         if (hexTex != null) {
             drawHexTexture(c, hexTex, cx, cy, size, 0);
         } else {
-            c.polygon(FieldGeometry.hexCorners(cx, cy, size),
+            // СЕТКА ПОЛЯ СО СКРУГЛЁННЫМИ УГЛАМИ (решение дизайнера 19.08.2026):
+            // клетка читается как картонная деталь, а не как чертёжная ячейка.
+            c.polygon(FieldGeometry.roundedHexPoints(cx, cy, size),
                 forbidden ? (dark ? FORBIDDEN_FILL_DARK : FORBIDDEN_FILL) : hexFill(),
                 hexStroke(), 1.5);
         }
         if (showOwnership && !forbidden && st != null && st.ownerTint >= 0) {
             // Гекс со своим зданием — заметнее, гекс зоны стройки — еле-еле.
             c.alpha(st.ownerBuilt ? 0.30 : 0.13);
-            c.polygon(FieldGeometry.hexCorners(cx, cy, size),
+            c.polygon(FieldGeometry.roundedHexPoints(cx, cy, size),
                 FieldGeometry.SEAT_FILL[st.ownerTint % 4], null, 0);
             c.alpha(1);
         }

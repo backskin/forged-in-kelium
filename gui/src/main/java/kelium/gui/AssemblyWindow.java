@@ -520,6 +520,16 @@ public final class AssemblyWindow extends JPanel {
             return img;
         }
 
+        /**
+         * КЛЕТКА БЛОКА СО СКРУГЛЁННЫМИ УГЛАМИ (решение дизайнера 19.08.2026) —
+         * та же фигура, что рисует конструктор и разбор партии: скругление
+         * считает FieldGeometry, чтобы во всех приложениях оно было одно.
+         */
+        private java.awt.geom.Path2D.Double roundedCell(double cx, double cy, double s) {
+            return kelium.report.FieldGeometry.roundedHexPath(cx, cy, s,
+                kelium.report.FieldGeometry.TILE_ROUND);
+        }
+
         private Polygon hexPoly(double cx, double cy, double s) {
             Polygon p = new Polygon();
             for (int k = 0; k < 6; k++) {
@@ -593,14 +603,14 @@ public final class AssemblyWindow extends JPanel {
                 g.setColor(monochrome ? ExportPaint.HEX_FILL : palette[i % palette.length]);
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
-                    g.fillPolygon(hexPoly(xy[0], xy[1], size * 0.99));
+                    g.fill(roundedCell(xy[0], xy[1], size * 0.99));
                 }
                 // тонкие внутренние швы между гексами одного блока
                 g.setColor(new Color(0x00000022, true));
                 g.setStroke(new BasicStroke(1f));
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
-                    g.drawPolygon(hexPoly(xy[0], xy[1], size * 0.99));
+                    g.draw(roundedCell(xy[0], xy[1], size * 0.99));
                 }
                 // внешний контур блока
                 g.setColor(monochrome ? ExportPaint.HEX_EDGE : new Color(0x1F2933));
@@ -649,16 +659,16 @@ public final class AssemblyWindow extends JPanel {
         private void drawMuted(Graphics2D g, boolean strong) {
             for (LHex h : model.hexes.values()) {
                 double[] xy = center(h.q, h.r);
-                Polygon poly = hexPoly(xy[0], xy[1], size * 0.99);
+                var poly = roundedCell(xy[0], xy[1], size * 0.99);
                 boolean forbidden = "forbidden".equals(h.content);
                 g.setColor(forbidden ? new Color(0xE4E4E4) : new Color(0xFFFFFF));
-                g.fillPolygon(poly);
+                g.fill(poly);
                 g.setColor(strong ? new Color(0x9AA0A6) : new Color(0xD8D8D4));
                 g.setStroke(forbidden
                     ? new BasicStroke(1.4f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND,
                         0, new float[]{4, 4}, 0)
                     : new BasicStroke(1.2f));
-                g.drawPolygon(poly);
+                g.draw(poly);
             }
             if (strong) {
                 drawContentGhost(g);

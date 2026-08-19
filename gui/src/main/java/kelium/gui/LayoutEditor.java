@@ -2194,7 +2194,7 @@ public final class LayoutEditor {
                     g.setColor(new Color(ExportPaint.GRID.getRed(),
                         ExportPaint.GRID.getGreen(), ExportPaint.GRID.getBlue(),
                         Math.min(255, Math.max(0, alpha))));
-                    g.drawPolygon(hexPoly(c[0], c[1], size * 0.99));
+                    g.draw(roundedTile(c[0], c[1], size * 0.99));
                 }
             }
             g.dispose();
@@ -2576,7 +2576,7 @@ public final class LayoutEditor {
                 g.setColor(Theme.ink3());
                 for (long k : ghostKeys()) {
                     double[] c = center((int) (k >> 32), (int) k);
-                    g.draw(hexPoly(c[0], c[1], size * 0.94));
+                    g.draw(roundedTile(c[0], c[1], size * 0.94));
                 }
             }
 
@@ -2606,12 +2606,16 @@ public final class LayoutEditor {
          * всё, что на нём стоит.
          */
         private void drawHexBody(Graphics2D g, LHex h, double cx, double cy) {
-            Polygon poly = hexPoly(cx, cy, size);
+            // СЕТКА ПОЛЯ ТОЖЕ СО СКРУГЛЁННЫМИ УГЛАМИ (решение дизайнера
+            // 19.08.2026). Между соседними клетками из-за этого появляется
+            // узкий просвет — так и должно быть: на печатном поле гексы тоже
+            // сходятся не остриём в остриё.
+            var poly = roundedTile(cx, cy, size);
             g.setColor(baseFill(h));
-            g.fillPolygon(poly);
+            g.fill(poly);
             g.setStroke(new BasicStroke(2f));
             g.setColor(hexEdge());
-            g.drawPolygon(poly);
+            g.draw(poly);
 
             switch (h.content) {
                 case "kelium_tile", "spawn_start" -> drawSpawn(g, h, cx, cy);

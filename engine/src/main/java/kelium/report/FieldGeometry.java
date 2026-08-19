@@ -502,6 +502,56 @@ public final class FieldGeometry {
         };
     }
 
+    /**
+     * СКРУГЛЁННЫЙ ГЕКС ТОЧКАМИ — тот же контур, что даёт {@link #roundedHexPath},
+     * но выложенный многоугольником.
+     *
+     * <p>ЗАЧЕМ ВТОРАЯ ФОРМА ТОЙ ЖЕ ФИГУРЫ. Рисовальщик картинок работает через
+     * {@link FieldCanvas#polygon}, который принимает только точки: кривую в него
+     * не передать, а завести ради скругления новый метод пришлось бы сразу в двух
+     * его воплощениях — и в Swing, и в SVG. Дуги считаются по ТЕМ ЖЕ квадратичным
+     * кривым, что и в {@link #roundedHexPath}, поэтому обе формы совпадают на
+     * глаз, и вид не разъезжается между экраном и выгрузкой.
+     *
+     * @param round доля ребра под скругление; 0 — обычные шесть точек
+     * @param seg   на сколько отрезков дробится дуга каждого угла
+     */
+    public static double[][] roundedHexPoints(double cx, double cy, double r,
+                                              double round, int seg) {
+        double[][] p = hexCorners(cx, cy, r);
+        if (round <= 0 || seg < 1) {
+            return p;
+        }
+        double k = Math.min(0.5, round);
+        List<double[]> out = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            double[] prev = p[(i + 5) % 6];
+            double[] cur = p[i];
+            double[] next = p[(i + 1) % 6];
+            double ax = cur[0] + (prev[0] - cur[0]) * k;
+            double ay = cur[1] + (prev[1] - cur[1]) * k;
+            double bx = cur[0] + (next[0] - cur[0]) * k;
+            double by = cur[1] + (next[1] - cur[1]) * k;
+            out.add(new double[]{ax, ay});
+            for (int s = 1; s < seg; s++) {
+                double t = (double) s / seg;
+                double u = 1 - t;
+                // квадратичная кривая с опорой в самом углу — та же, что в path
+                out.add(new double[]{
+                    u * u * ax + 2 * u * t * cur[0] + t * t * bx,
+                    u * u * ay + 2 * u * t * cur[1] + t * t * by
+                });
+            }
+            out.add(new double[]{bx, by});
+        }
+        return out.toArray(new double[0][]);
+    }
+
+    /** Скруглённый гекс точками с настройками по умолчанию ({@link #TILE_ROUND}). */
+    public static double[][] roundedHexPoints(double cx, double cy, double r) {
+        return roundedHexPoints(cx, cy, r, TILE_ROUND, 4);
+    }
+
     /** Собрать замкнутый путь по точкам — для рисовальщиков на Graphics2D. */
     public static Path2D.Double path(double[][] pts) {
         Path2D.Double p = new Path2D.Double();

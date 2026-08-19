@@ -945,15 +945,13 @@ public final class SceneField extends JComponent {
             BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
     }
 
+    /**
+     * ГЕКС СО СКРУГЛЁННЫМИ УГЛАМИ (решение дизайнера 19.08.2026) — единственная
+     * точка, где сцена строит форму гекса, поэтому скругление получают сразу все
+     * её вызовы: сетка поля, подсветки, зона стройки, выделение.
+     */
     private static Path2D hexPath(double cx, double cy, double r) {
-        Path2D p = new Path2D.Double();
-        double[][] pts = FieldGeometry.hexCorners(cx, cy, r);
-        p.moveTo(pts[0][0], pts[0][1]);
-        for (int i = 1; i < 6; i++) {
-            p.lineTo(pts[i][0], pts[i][1]);
-        }
-        p.closePath();
-        return p;
+        return FieldGeometry.roundedHexPath(cx, cy, r, FieldGeometry.TILE_ROUND);
     }
 
     private static List<String> wrap(Graphics2D g, String text, int width, int maxLines) {
