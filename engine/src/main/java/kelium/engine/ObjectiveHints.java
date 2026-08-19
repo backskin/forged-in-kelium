@@ -253,11 +253,82 @@ public final class ObjectiveHints {
     private record Gap(int missing, List<String> actions, String text) {
     }
 
+    /**
+     * ПЛАН ДЛЯ КАРТЫ, ЧЬЁ УСЛОВИЕ В КОДЕ. Карта называет действие сама
+     * ({@code suggestedAction}) и сама говорит, чего не хватает
+     * ({@code needed}) — планировщику остаётся проверить, что это действие
+     * игроку в этом ходу вообще доступно.
+     *
+     * <p>План всегда в ОДИН шаг: карта не сообщает, сколько единиц осталось
+     * добрать, а выдумывать это число значило бы врать боту. Один шаг — это
+     * честное «сыграй вот это действие в сторону вот этого требования»; если
+     * одного мало, индикатор загорится снова на следующем действии.
+     *
+     * <p>Усиленный план отдельным пунктом не выводится: код-карта отвечает про
+     * усиление только «да/нет» ({@code satisfiedEnhanced}), а действие у базы и
+     * усиления одно и то же — второй такой же план был бы дубликатом.
+     */
+    private static List<Plan> planFromCodeCard(GameState s, int seat,
+                                               Map<String, Object> card,
+                                               java.util.Collection<String> available,
+                                               int actionsLeft) {
+        Object idObj = card.get("id");
+        if (idObj == null || actionsLeft < 1) {
+            return List.of();
+        }
+        kelium.engine.cards.ObjectiveCard oc =
+            kelium.engine.cards.CardRegistry.objective(String.valueOf(idObj));
+        if (oc == null) {
+            return List.of();
+        }
+        kelium.engine.cards.CardContext ctx =
+            new kelium.engine.cards.EngineCardContext(s, seat);
+        String action;
+        String what;
+        try {
+            action = oc.suggestedAction(ctx);
+            what = oc.needed(ctx);
+        } catch (RuntimeException e) {
+            // Условие карты считает произвольный код; сломанная карта не должна
+            // ронять подсказки по ВСЕЙ руке — она просто остаётся без плана.
+            return List.of();
+        }
+        if (action == null || action.isBlank()) {
+            return List.of();
+        }
+        if (available != null && !available.contains(action)) {
+            return List.of();
+        }
+        String text = what == null || what.isBlank() ? "приблизиться к условию карты" : what;
+        return List.of(new Plan(List.of(new Step(action, text)), false,
+            "сыграй " + action + ": " + text));
+    }
+
     @SuppressWarnings("unchecked")
     private static List<Plan> planFor(GameState s, int seat, TurnJournal j,
                                       Map<String, Object> card,
                                       java.util.Collection<String> available, int actionsLeft) {
         List<Plan> out = new ArrayList<>();
+        // КАРТЫ, ЧЬЁ УСЛОВИЕ ЖИВЁТ В КОДЕ, — отдельной ветвью и ПЕРВЫМИ.
+        //
+        // НАЙДЕНО ЗАМЕРОМ 19.08.2026 (CardCoverage, 300 партий): планировщик был
+        // мёртв для ВСЕГО каталога. Он разбирает requirement.predicate, а
+        // переехавшая в код карта этого поля не пишет вовсе — в её requirement
+        // остался только человеческий текст. Значит gap() возвращал null для
+        // всех 52 заданий, reachable не загорался НИ РАЗУ, и индикатор
+        // «ДОСТИЖИМО + инструкция», заказанный ровно чтобы боты перестали жечь
+        // карты, не работал с самого переезда карт в код. Отсюда и замер: на
+        // руки приходит 250 карт, выполняется 5–90, остальное в костёр.
+        //
+        // Карта в коде уже умеет отвечать на оба нужных вопроса сама:
+        // suggestedAction() — каким действием к ней приближаться, needed() —
+        // чего не хватает. Этого достаточно для плана в один шаг; считать
+        // «сколько именно единиц не хватает» здесь нечем и не нужно — цена
+        // ошибки в числе шагов ниже, чем цена отсутствия плана вообще.
+        if ("card".equals(card.get("checked_by"))) {
+            out.addAll(planFromCodeCard(s, seat, card, available, actionsLeft));
+            return out;
+        }
         Gap gap = gap(s, seat, j, card);
         if (gap == null || gap.missing <= 0 || gap.actions.isEmpty()) {
             return out;

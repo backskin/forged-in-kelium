@@ -2738,7 +2738,14 @@ public final class Actions {
                 // вовсе. Теперь рядом с планшетом науки лежат ДВЕ ОТКРЫТЫЕ
                 // карты: игрок берёт одну, место немедленно пополняется с верха
                 // колоды.
-                takeFromArsenalDisplay(state, player, agent);
+                // КАКУЮ ИМЕННО КАРТУ ВЗЯЛИ — в имя обмена: иначе на вопрос
+                // «каждая ли карта арсенала вообще попадает в игру» ответить
+                // нечем, а он балансовый (взятие с витрины было единственным
+                // путём получения карты, не оставлявшим следа в событиях).
+                String tookArsenal = takeFromArsenalDisplay(state, player, agent);
+                if (tookArsenal != null) {
+                    return id + ":" + tookArsenal;
+                }
             } else if ("gild".equals(id)) {
                 player.goldModules += 1;
             } else if ("move_module".equals(id)) {
@@ -2759,12 +2766,12 @@ public final class Actions {
      * ничего. Это законный конец колоды, а не ошибка: карты кончились так же, как
      * кончились бы за столом.
      */
-    static void takeFromArsenalDisplay(GameState state, PlayerState player, Agent agent) {
+    static String takeFromArsenalDisplay(GameState state, PlayerState player, Agent agent) {
         if (state.arsenalDisplay.isEmpty()) {
             kelium.engine.Setup.refillArsenalDisplay(state);
         }
         if (state.arsenalDisplay.isEmpty()) {
-            return;
+            return null;
         }
         List<Choice> opts = new ArrayList<>();
         for (String cid : state.arsenalDisplay) {
@@ -2779,5 +2786,6 @@ public final class Actions {
         state.arsenalDisplay.remove(taken);
         player.arsenalHand.add(taken);
         kelium.engine.Setup.refillArsenalDisplay(state);
+        return taken;
     }
 }

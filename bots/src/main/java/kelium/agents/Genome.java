@@ -273,6 +273,15 @@ public final class Genome {
         w.put("eval.objectives_actionable", 1.5);      // несколько карт на подходе — держать план
         w.put("eval.rival_threat", -1.0);              // опасный соперник — это плохая позиция
         w.put("eval.rival_exposure", -1.5);            // самому стоять под прицелом — тоже плохо
+        // СИЛА ПРЕСЛЕДОВАНИЯ ЗАДАНИЙ (19.08.2026). Насколько верх приказа,
+        // продвигающий карту в руке, перевешивает прочие соображения при
+        // вскрытии. Прежде тут стояло вкомпилированное 0.25, и замер показал,
+        // почему это мало: карты почти никогда не доходят до состояния
+        // «готово» — их не преследуют, а потом жгут (300 партий: 1075
+        // выполнено против 9710 сожжённых). Правильное число отдано отбору:
+        // слишком большое превращает бота в раба карт и роняет экономику,
+        // слишком малое возвращает костёр.
+        w.put("objective.pursuit", 0.25);
         return new Genome(w);
     }
 
@@ -298,7 +307,7 @@ public final class Genome {
             // насколько ценить чужие будущие потери и насколько бояться быть
             // первым — решает обучение, а не заранее выставленное число.
             "rivalry.pick_target", "rivalry.future_loss", "rivalry.exposure_fear",
-            "move.mass_up"));
+            "move.mass_up", "objective.pursuit"));
         // По одному гену на каждый признак позиции — оценочная функция целиком
         // отдана отбору.
         for (int i = 0; i < StateFeatures.DIM; i++) {
@@ -317,7 +326,10 @@ public final class Genome {
             || key.startsWith("combat.") || key.startsWith("build.")
             || key.startsWith("assemble.") || key.startsWith("plan.")
             || key.startsWith("search.")
-            || "aggression".equals(key) || "military_build".equals(key);
+            || "aggression".equals(key) || "military_build".equals(key)
+            // Отрицательное преследование заданий означало бы «нарочно
+            // отворачиваться от карт в руке» — это не стратегия, а поломка.
+            || "objective.pursuit".equals(key);
     }
 
     /**

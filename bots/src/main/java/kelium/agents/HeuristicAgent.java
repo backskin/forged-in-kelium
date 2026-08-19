@@ -109,6 +109,16 @@ public class HeuristicAgent extends Agent {
         return w.getOrDefault(k, 1.0);
     }
 
+    /**
+     * Переставить один вес уже созданному боту — для ЗАМЕРОВ, а не для игры:
+     * инструменты перебора (см. {@code PursuitSweep}) сажают за стол один и тот
+     * же состав с разным значением одного веса, иначе перебор сравнивал бы
+     * заодно и разные характеры.
+     */
+    public void setWeight(String key, double value) {
+        w.put(key, value);
+    }
+
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
         String kind = context != null ? String.valueOf(context.getOrDefault("kind", "")) : "";
@@ -680,7 +690,7 @@ public class HeuristicAgent extends Agent {
         for (kelium.engine.ObjectiveHints.Hint h
                 : kelium.engine.ObjectiveHints.forHand(state, seat, state.journal, avail, 2)) {
             if (h.reachable()) {
-                bonus += h.maxValue() * 0.25;
+                bonus += h.maxValue() * wget("objective.pursuit");
             }
         }
         return bonus;
