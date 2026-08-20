@@ -351,7 +351,7 @@ objectives:
     enhanced:    {predicate: assembly_all_chose_ammo, params: {count: 2, include_types: [factory, airbase]}}
     base_reward: {coin: 2, ammo: 2}
     special_reward: {objective_card: 1}
-    top: {effect: landing, params: {count: 2}, label: "ДЕСАНТ: размести до 2 войск разных родов"}
+    top: {effect: landing, params: {count: 2}, label: "ДЕСАНТ: размести до 2 войск разных родов в своей зоне стройки"}
     описание: "В ЭТОТ ХОД действием Сборка произведи боеприпасы не меньше чем двумя своими зданиями и не произведи ни одного войска. Награда: 2 монеты и 2 боеприпаса. Если среди этих зданий есть завод или авиабаза, условие усилено: карта задания. Ход без единого нового войска — цена полного залпа."
 
   - id: o02
