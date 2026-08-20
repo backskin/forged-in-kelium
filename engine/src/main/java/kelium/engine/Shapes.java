@@ -601,15 +601,64 @@ public final class Shapes {
         for (Hex start : s.field.hexes.values()) {
             for (int entry = 0; entry < 6; entry++) {
                 for (int dir = -1; dir <= 1; dir += 2) {
-                    best = Math.max(best, walkBand(s, mine, start, entry, dir));
+                    best = Math.max(best, walkBand(s, mine, start, entry, dir, null));
                 }
             }
         }
         return best;
     }
 
-    /** Пройти полосу от гекса {@code hex} со входом {@code entry}; вернуть длину. */
-    private static int walkBand(GameState s, Set<Node> mine, Hex hex, int entry, int dir) {
+    /**
+     * ЕСТЬ ЛИ ПРЯМАЯ ПОЛОСА нужной длины, В КОТОРОЙ УЧАСТВУЮТ нужные рода войск.
+     *
+     * <p>Усиления карт-фигур просят не «есть ли у меня пехота вообще», а «пехота
+     * СТОИТ В ЭТОЙ ФИГУРЕ» (заказ дизайнера 19.08.2026: «принимают участие
+     * жетоны пехоты и техники»). Поэтому рода проверяются по гексам ИМЕННО той
+     * полосы, что дотянулась до нужной длины, а не по всему полю: иначе карта
+     * выполнялась бы случайной пехотой в другом углу.
+     *
+     * @param minHexes    сколько половин должна накрыть полоса
+     * @param needKinds   коды родов войск, которые обязаны стоять на полосе
+     */
+    public static boolean straightBand(GameState s, int seat, int minHexes,
+                                       Set<String> needKinds) {
+        Set<Node> mine = ownNodes(s, seat);
+        if (mine.isEmpty()) {
+            return false;
+        }
+        for (Hex start : s.field.hexes.values()) {
+            for (int entry = 0; entry < 6; entry++) {
+                for (int dir = -1; dir <= 1; dir += 2) {
+                    java.util.Set<String> onBand = new java.util.LinkedHashSet<>();
+                    int len = walkBand(s, mine, start, entry, dir, onBand);
+                    if (len < minHexes) {
+                        continue;
+                    }
+                    if (needKinds == null || needKinds.isEmpty()) {
+                        return true;
+                    }
+                    java.util.Set<String> kinds = new java.util.HashSet<>();
+                    for (UnitToken u : s.player(seat).unitsOnField()) {
+                        if (onBand.contains(u.hexId)) {
+                            kinds.add(u.type.code);
+                        }
+                    }
+                    if (kinds.containsAll(needKinds)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Пройти полосу от гекса {@code hex} со входом {@code entry}; вернуть длину.
+     *
+     * @param bandHexes куда сложить пройденные гексы (может быть null)
+     */
+    private static int walkBand(GameState s, Set<Node> mine, Hex hex, int entry, int dir,
+                                java.util.Set<String> bandHexes) {
         int length = 0;
         java.util.Set<String> visited = new java.util.HashSet<>();
         Hex cur = hex;
@@ -622,6 +671,9 @@ public final class Shapes {
                 }
             }
             length++;
+            if (bandHexes != null) {
+                bandHexes.add(cur.id);
+            }
             // ВЫХОД — через две стороны от входа: только так половина остаётся
             // прямым коридором, а не поворотом внутри гекса.
             int exit = Math.floorMod(in + dir * 2, 6);
