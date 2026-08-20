@@ -181,11 +181,18 @@ public final class BoardSheet extends JComponent {
         int rightX = pad + leftW + colGap;
         int rightW = getWidth() - pad - rightX;
 
+        // ПЛАНШЕТ ВОЙСК — ОТДЕЛЬНЫМ РЯДОМ НА ВСЮ ШИРИНУ (макет дизайнера
+        // 20.08.2026). В правой колонке ему было тесно: четыре столбца по роду
+        // войск получались шириной в 80 точек, и в них не влезали ни названия
+        // («центр управления»), ни строки атак — текст обрезался краем. На
+        // печатном планшете эти четыре столбца тоже идут во всю ширину, так что
+        // так и правильнее по сути, а не только по месту.
+        y = paintTroops(g, f, p, pad, y, getWidth() - pad * 2) + px(12);
+
         int yLeft = paintBuildings(g, f, p, pad, y, leftW);
         yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW);
 
-        int yRight = paintTroops(g, f, p, rightX, y, rightW);
-        yRight = paintModulesAndCards(g, p, rightX, yRight + px(10), rightW);
+        int yRight = paintModulesAndCards(g, p, rightX, y, rightW);
         int cardH = px(180);
         int cardW = px(150);
         yRight += px(6);
@@ -759,76 +766,286 @@ public final class BoardSheet extends JComponent {
         return y + side + px(8);
     }
 
-    /** Планшет войск: сколько какого рода на поле и сколько ждёт в запасе. */
+    /**
+     * ПЛАНШЕТ ВОЙСК — СТОЛБЕЦ НА КАЖДЫЙ РОД, как на печатном планшете (макет
+     * дизайнера 20.08.2026).
+     *
+     * <p>ЗАЧЕМ ПЕРЕРИСОВАН. Прежде здесь были четыре строки со счётчиком запаса
+     * — и всё. Ни кто по кому бьёт, ни скорости, ни цены здания: чтобы понять
+     * ход бота, приходилось держать планшет в голове или лезть в справочник
+     * (просьба дизайнера: «хочется видеть инфографику, кто по кому атакует, и
+     * где какие жетоны стоят, чтобы легче считывать статы войск»).
+     *
+     * <p>ЧТО В СТОЛБЦЕ, сверху вниз — в том же порядке, что на планшете:
+     * <ol>
+     *   <li>здание, которое этот род производит: имя, ячейки энергии, цена;</li>
+     *   <li>род войск: имя, прочность, скорость;</li>
+     *   <li>ТАБЛИЦА АТАК: по кому бьёт основным ударом и по кому вторичным;
+     *       на вторичный ряд ложится красный модуль, поэтому его место
+     *       нарисовано рядом;</li>
+     *   <li>жетоны: сколько на поле и сколько в запасе.</li>
+     * </ol>
+     *
+     * <p>ПЕЧАТНЫЕ ЧИСЛА БЕРУТСЯ ИЗ СТОРОНЫ ПЛАНШЕТА ЭТОГО ИГРОКА, а не из
+     * общих настроек: стороны разные, и у соседа те же роды бьют по-другому.
+     * Читает их {@link kelium.core.TroopSide} — тот же класс, которым правила
+     * пользуется движок, чтобы вид и игра не разошлись.
+     */
     private int paintTroops(Graphics2D g, ReplayRecord.Frame f, ReplayRecord.Player p,
                             int x, int y, int w) {
-        caption(g, "ВОЙСКА", x, y);
-        y += px(14);
-        // ВСЕ ЧЕТЫРЕ ВИДА ВОЙСК ПОКАЗЫВАЕМ ВСЕГДА, и запас берём ПЕЧАТНЫЙ — из
-        // записи. Раньше строки собирались только по жетонам, которые успели
-        // появиться в партии, а предел выводился как «сколько их всего у игрока»
-        // — отсюда и разнобой «0 из 1» у одного и «2 из 2» у другого, хотя в
-        // личном запасе у каждого по 4 жетона каждого вида (ошибка, найдена
-        // 13.08.2026; в движке предел по виду тоже не проверялся).
+        caption(g, "ПЛАНШЕТ ВОЙСК · сторона " + (p.side == null ? "?" : p.side), x, y);
+        y += px(16);
+
+        String[] types = {"infantry", "vehicle", "aircraft", "tower"};
+        String[] makers = {"barracks", "factory", "airbase", "command_center"};
+
+        // Сколько жетонов рода на поле и сколько всего у игрока.
         Map<String, int[]> byType = new LinkedHashMap<>();
-        for (String type : new String[]{"infantry", "vehicle", "aircraft", "tower"}) {
+        for (String type : types) {
             byType.put(type, new int[2]);
         }
         for (ReplayRecord.Tok t : f.snapshot.tokens) {
             if (t.building || t.owner != p.seat || !t.alive) {
                 continue;
             }
-            int[] pair = byType.computeIfAbsent(t.type, k -> new int[2]);
+            int[] pair = byType.get(t.type);
+            if (pair == null) {
+                continue;
+            }
             if (t.hexId != null) {
                 pair[0]++;
             } else {
                 pair[1]++;
             }
         }
-        int row = px(30);
-        for (Map.Entry<String, int[]> e : byType.entrySet()) {
-            int onField = e.getValue()[0];
-            int all = Math.max(session.record().unitStockOf(e.getKey()),
-                onField + e.getValue()[1]);
-            // в запасе — всё, что не стоит на поле: и созданные жетоны, и ещё не
-            // тронутые из личного запаса
-            int reserve = all - onField;
-            g.setFont(font(12, Font.PLAIN));
-            g.setColor(Theme.ink());
-            g.drawString(Names.unit(e.getKey()), x, y + px(12));
-            // стопка: закрашенные — в запасе, пустые — уже на поле
-            int dot = px(9);
-            int dx = x + px(104);
-            for (int i = 0; i < all && i < 12; i++) {
-                boolean inReserve = i < reserve;
-                g.setColor(inReserve ? Theme.seat(p.seat) : Theme.alpha(Theme.ink3(), 0.5));
-                g.fill(new Ellipse2D.Double(dx + i * (dot + px(3)), y + px(4),
-                    dot, dot));
-            }
-            g.setFont(mono(11, Font.BOLD));
-            g.setColor(Theme.ink2());
-            g.drawString("в запасе " + reserve + " из " + all,
-                x + px(104) + 12 * (dot + px(3)) + px(8), y + px(12));
-            // МЕСТО ПОД КРАСНЫЙ МОДУЛЬ — У РОДА, А НЕ У ЗДАНИЯ: красный ложится
-            // на вторичный ряд атаки рода войск. Место есть у каждого рода
-            // всегда, пустое показано штрихом.
-            int side = px(26);
-            int mx = x + px(64);
-            int my = y - px(2);
-            ReplayRecord.Module rm = p.redPlaced.get(e.getKey());
-            ModuleSlot.paint(g, rm, ModuleSlot.red(), mx, my, side);
-            moduleSpots.put(new Rectangle(mx, my, side, side),
-                new ModuleSpot(rm, true, Names.unit(e.getKey())));
-            y += row;
+
+        kelium.core.TroopSide troop = troopSide(p);
+        int gap = px(6);
+        int colW = (w - gap * 3) / 4;
+        int colH = px(150);
+        for (int i = 0; i < types.length; i++) {
+            paintTroopColumn(g, p, types[i], makers[i], troop,
+                byType.get(types[i]), x + i * (colW + gap), y, colW, colH);
         }
-        if (byType.isEmpty()) {
+        return y + colH + px(6);
+    }
+
+    /**
+     * Сторона планшета войск этого игрока — или null, если правила не загружены.
+     *
+     * <p>Собирается тем же кодом, что и в партии ({@link
+     * kelium.core.PlayerBoard#fromContent}): второй разбор той же таблицы рано
+     * или поздно разошёлся бы с движком.
+     */
+    private kelium.core.TroopSide troopSide(ReplayRecord.Player p) {
+        try {
+            var entries = session.content().get("boards").entries;
+            return kelium.core.PlayerBoard.fromContent(entries,
+                p.side == null || p.side.isBlank() ? "A" : p.side, "A").troop;
+        } catch (RuntimeException e) {
+            // Запись открыта без правил — покажем то, что знаем из самой записи.
+            return null;
+        }
+    }
+
+    /** Один столбец планшета: здание, род, таблица атак, жетоны. */
+    private void paintTroopColumn(Graphics2D g, ReplayRecord.Player p, String type,
+                                  String maker, kelium.core.TroopSide troop,
+                                  int[] counts, int x, int y, int w, int h) {
+        java.awt.Shape box = new RoundRectangle2D.Double(x, y, w, h,
+            Theme.R_OVERLAY, Theme.R_OVERLAY);
+        g.setColor(Theme.tile());
+        g.fill(box);
+        g.setColor(Theme.border());
+        g.setStroke(new BasicStroke(1f));
+        g.draw(box);
+
+        int pad = px(6);
+        int ty = y + px(13);
+
+        // ---------- здание-производитель ----------
+        g.setFont(font(9, Font.PLAIN));
+        g.setColor(Theme.ink3());
+        g.drawString(Names.building(maker), x + pad, ty);
+        ty += px(11);
+        // ЯЧЕЙКИ ЭНЕРГИИ — точками: столько кубиков здание просит, чтобы работать.
+        int slots = buildingSlots(maker);
+        int dot = px(6);
+        for (int i = 0; i < slots; i++) {
+            g.setColor(Theme.energy());
+            g.fill(new RoundRectangle2D.Double(x + pad + i * (dot + px(2)), ty - px(5),
+                dot, dot, px(2), px(2)));
+        }
+        // ЦЕНЫ ЕСТЬ НЕ У ВСЕХ ЗДАНИЙ: центр управления не строят — он стоит с
+        // начала партии, и против него на планшете цены не напечатано. Раньше
+        // код спрашивал её у всех четырёх столбцов и падал на четвёртом.
+        {
+            int price = buildingPrice(troop, maker);
+            g.setFont(mono(9, Font.BOLD));
+            g.setColor(Theme.ink2());
+            g.drawString(price < 0 ? "не строится" : price + " мон",
+                x + pad + slots * (dot + px(2)) + px(4), ty);
+        }
+        ty += px(12);
+
+        // ---------- род войск ----------
+        g.setFont(font(12, Font.BOLD));
+        g.setColor(Theme.ink());
+        g.drawString(Names.unit(type), x + pad, ty);
+        ty += px(13);
+        g.setFont(mono(9, Font.PLAIN));
+        g.setColor(Theme.ink2());
+        // ПРОЧНОСТЬ РЯДОМ СО СКОРОСТЬЮ: без неё по планшету нельзя понять, чем
+        // кончится обстрел, а именно за этим в него и смотрят.
+        int hp = unitHp(type);
+        String stat = (hp < 0 ? "" : "прочность " + hp + " · ")
+            + "скорость " + (troop == null ? "?"
+            : String.valueOf(troop.speed(kelium.core.UnitType.fromCode(type))));
+        g.drawString(stat, x + pad, ty);
+        ty += px(13);
+
+        // ---------- таблица атак ----------
+        g.setFont(font(9, Font.PLAIN));
+        g.setColor(Theme.ink3());
+        g.drawString("бьёт по", x + pad, ty);
+        ty += px(11);
+        if (troop == null) {
             g.setFont(Theme.italic());
             g.setColor(Theme.ink3());
-            g.drawString("войск нет", x, y + px(12));
-            y += row;
+            g.drawString("правила не загружены", x + pad, ty);
+        } else {
+            // ДВЕ СИСТЕМЫ БОЯ ЖИВУТ ОДНОВРЕМЕННО, и планшет обязан показывать ту,
+            // по которой играли ИМЕННО ЭТУ партию:
+            //   планшеты 1.0.x — печатная ПАРА целей (основной ряд и вторичный);
+            //   планшеты 2.0.0 («Бой 2.0», dual_cell) — универсальная ячейка
+            //     (любая цель, дороже) плюс ОДНА печатная специализированная.
+            // Показывать пару там, где её нет, значит соврать про партию.
+            kelium.core.UnitType ut = kelium.core.UnitType.fromCode(type);
+            String[] labels;
+            kelium.core.Target[] at;
+            if (troop.dualCell()) {
+                labels = new String[]{"любая", "печатная"};
+                at = new kelium.core.Target[]{null, troop.specializedTarget(ut)};
+            } else {
+                labels = new String[]{"основной", "вторичный"};
+                kelium.core.Target[] pair = troop.attacks(ut);
+                at = pair == null ? new kelium.core.Target[]{null, null} : pair;
+            }
+            for (int r = 0; r < 2; r++) {
+                g.setFont(mono(8, Font.PLAIN));
+                g.setColor(Theme.ink3());
+                g.drawString(labels[r], x + pad, ty);
+                g.setFont(font(10, Font.BOLD));
+                boolean any = troop.dualCell() && r == 0;
+                g.setColor(at[r] == null && !any ? Theme.ink3() : Theme.ink());
+                // ЦЕЛЬ ПРИЖАТА К ПРАВОМУ КРАЮ СТОЛБЦА, а не отступом от подписи:
+                // подписи разной длины, и от фиксированного отступа «вторичный»
+                // налезал на название цели.
+                String val = any ? "по любым" : at[r] == null ? "нет" : targetName(at[r]);
+                g.drawString(val, x + w - pad - g.getFontMetrics().stringWidth(val), ty);
+                ty += px(13);
+            }
         }
-        return y;
+
+        // ---------- красный модуль: он ложится на вторичный ряд ----------
+        int side = px(22);
+        int mx = x + w - side - pad;
+        int my = y + h - side - px(26);
+        ReplayRecord.Module rm = p.redPlaced.get(type);
+        ModuleSlot.paint(g, rm, ModuleSlot.red(), mx, my, side);
+        moduleSpots.put(new Rectangle(mx, my, side, side),
+            new ModuleSpot(rm, true, Names.unit(type)));
+        // ПОДПИСЬ У ГНЕЗДА: пустой квадрат сам по себе ничего не говорит, а
+        // положенный сюда жетон меняет строку атаки выше.
+        g.setFont(mono(8, Font.PLAIN));
+        g.setColor(Theme.ink3());
+        g.drawString("красный модуль", x + pad, my + side / 2 + px(3));
+
+        // ---------- жетоны: на поле и в запасе ----------
+        int onField = counts[0];
+        int all = Math.max(session.record().unitStockOf(type), onField + counts[1]);
+        int reserve = all - onField;
+        int by = y + h - px(10);
+        g.setFont(mono(9, Font.BOLD));
+        g.setColor(Theme.ink2());
+        g.drawString("на поле " + onField + " · запас " + reserve, x + pad, by);
+        int pd = px(7);
+        int px0 = x + pad;
+        int py = by - px(14);
+        for (int i = 0; i < all && i < 8; i++) {
+            // Закрашенный — стоит на поле, пустой — ждёт в запасе. Так видно
+            // «где какие жетоны стоят» без пересчёта поля глазами.
+            boolean placed = i < onField;
+            g.setColor(placed ? Theme.seat(p.seat) : Theme.alpha(Theme.ink3(), 0.45));
+            g.fill(new Ellipse2D.Double(px0 + i * (pd + px(2)), py, pd, pd));
+        }
     }
+
+    /**
+     * Цена стройки здания на этой стороне, или −1, если её нет.
+     *
+     * <p>Отсутствие цены — не ошибка данных: центр управления стоит у игрока с
+     * начала партии и не строится вовсе.
+     */
+    private static int buildingPrice(kelium.core.TroopSide troop, String building) {
+        if (troop == null) {
+            return -1;
+        }
+        try {
+            return troop.buildingPrice(building);
+        } catch (RuntimeException notPrinted) {
+            return -1;
+        }
+    }
+
+    /** Название цели атаки словами игрока. */
+    private static String targetName(kelium.core.Target t) {
+        return switch (t) {
+            case INFANTRY -> "пехоте";
+            case VEHICLE -> "технике";
+            case AIRCRAFT -> "авиации";
+            case BUILDINGS_TOWERS -> "зданиям";
+        };
+    }
+
+    /** Сколько ячеек энергии просит здание — из правил, иначе 0. */
+    private int buildingSlots(String building) {
+        try {
+            var entries = session.content().get("boards").entries;
+            for (var e : entries) {
+                Object bs = e.get("buildings");
+                if (bs instanceof Map<?, ?> m && m.get(building) instanceof Map<?, ?> b
+                        && b.get("energy_slots") instanceof Number n) {
+                    return n.intValue();
+                }
+            }
+        } catch (RuntimeException e) {
+            return 0;
+        }
+        return 0;
+    }
+
+    /**
+     * Прочность жетона рода войск — из правил, или −1, если правил нет.
+     *
+     * <p>Живёт не в стороне планшета, а в общей таблице жетонов: прочность у
+     * всех сторон одна и та же, меняется только то, что напечатано на планшете.
+     */
+    private int unitHp(String type) {
+        try {
+            for (var e : session.content().get("boards").entries) {
+                Object us = e.get("units");
+                if (us instanceof Map<?, ?> m && m.get(type) instanceof Map<?, ?> u
+                        && u.get("hp") instanceof Number n) {
+                    return n.intValue();
+                }
+            }
+        } catch (RuntimeException noRules) {
+            return -1;
+        }
+        return -1;
+    }
+
 
     /**
      * МОДУЛИ В ЗАПАСЕ И КАРТЫ. Поставленные жетоны здесь НЕ показываются: они
