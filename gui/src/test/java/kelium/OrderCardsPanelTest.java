@@ -1,5 +1,6 @@
 package kelium;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -171,5 +172,62 @@ class OrderCardsPanelTest {
         ImageIO.write(fanImg, "png", dir.resolve("panel-fan.png").toFile());
         assertTrue(painted(fanImg) > W * H / 4,
             "панель с полной рукой почти ничего не нарисовала");
+    }
+
+    /**
+     * ВЕЕР НЕ ВЫЛЕЗАЕТ ЗА ГРАНИЦЫ ПАНЕЛИ — по бокам и снизу.
+     *
+     * <p>ПОЧЕМУ ЭТО ПРОВЕРЯЕТСЯ ЗАМЕРОМ, А НЕ ГЛАЗОМ. Компонент обрезает всё,
+     * что нарисовано за его границами, поэтому в самом окне вылезший веер
+     * выглядит просто обрубленной картой — по снимку окна не отличить «так
+     * задумано» от «вылезло». Здесь панель рисуется В БОЛЬШУЮ картинку со
+     * сдвигом, без обрезки: что окажется в полях — то в окне и потерялось бы.
+     * Вверх выходить МОЖНО: запас над подложкой оставлен нарочно, карты руки
+     * заходят за её кромку.
+     */
+    @Test
+    void веерНеВыходитЗаГраницыПанели() {
+        ReplayRecord rec = GameRecorder.play(GameConfig.DEFAULT_RULESET, 4, 4242,
+            List.of("strat:hawk", "strat:dove", "explorer", "chaos"), null);
+        int[] big = frameWithBiggestHand(rec);
+        assertTrue(big[2] >= 3, "в записи не нашлось руки из трёх и более карт");
+
+        Session session = new Session();
+        session.setRecord(rec);
+        session.seek(big[0]);
+        OrderCardsPanel panel = new OrderCardsPanel(session, big[1]);
+        panel.setSize(W, H);
+
+        int m = 90;                       // поля вокруг панели — «зона утечки»
+        BufferedImage img = new BufferedImage(W + m * 2, H + m * 2,
+            BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        Color bg = new Color(0x30, 0x80, 0x30);
+        g.setColor(bg);
+        g.fillRect(0, 0, img.getWidth(), img.getHeight());
+        g.translate(m, m);
+        panel.paint(g);
+        g.dispose();
+
+        int left = 0;
+        int right = 0;
+        int below = 0;
+        for (int y = 0; y < img.getHeight(); y++) {
+            for (int x = 0; x < img.getWidth(); x++) {
+                if (img.getRGB(x, y) == bg.getRGB()) {
+                    continue;
+                }
+                if (x < m) {
+                    left++;
+                } else if (x >= m + W) {
+                    right++;
+                } else if (y >= m + H) {
+                    below++;
+                }
+            }
+        }
+        assertEquals(0, left, "панель рисует левее своего края — в окне это срежется");
+        assertEquals(0, right, "панель рисует правее своего края — в окне это срежется");
+        assertEquals(0, below, "панель рисует ниже своего края — в окне это срежется");
     }
 }

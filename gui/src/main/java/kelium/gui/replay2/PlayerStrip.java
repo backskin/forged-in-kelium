@@ -224,9 +224,28 @@ public final class PlayerStrip extends JComponent {
         String bot = (seat + 1) + " · " + (seat < session.record().seatLabels.size()
             ? session.record().seatLabels.get(seat) : "бот");
         java.awt.Font chipFont = f(12, java.awt.Font.BOLD);
-        // место оставляем и под очки справа, и под кнопку личной зоны рядом
-        int chipW = Math.min(w - Theme.px(180),
-            SeatChip.widthFor(g, bot, chipFont));
+        // СКОЛЬКО МЕСТА ОСТАЁТСЯ ПЛАШКЕ — СЧИТАЕТСЯ, А НЕ УГАДЫВАЕТСЯ. Прежде под
+        // всё правое хозяйство закладывалось 180 точек «на глаз», и у игрока с
+        // длинным именем («4 · Просчёт вперёд · ровный») кнопки уезжали вправо и
+        // затирали победные очки: у одних мест число было обрезано, у других его
+        // не было видно вовсе. Теперь запас складывается из настоящих ширин:
+        // двух кнопок, зазоров и блока очков.
+        g.setFont(num(26));
+        int vpWidth = g.getFontMetrics().stringWidth(String.valueOf(vp));
+        g.setFont(f(11, java.awt.Font.PLAIN));
+        int boardFull = g.getFontMetrics().stringWidth(BOARD_LABEL) + Theme.px(22);
+        int ordersFull = g.getFontMetrics().stringWidth(ORDERS_LABEL) + Theme.px(22);
+        int vpLeft = w - pad - Theme.px(26) - vpWidth - Theme.px(10);
+        // ПРИ СОВСЕМ УЗКОЙ ПОЛОСЕ КНОПКИ ОСТАЮТСЯ ЗНАЧКАМИ. Кнопку без подписи
+        // ещё можно узнать по значку и подсказке, а затёртое число очков —
+        // ничем; полоса всё равно попросит себе ширину через getMinimumSize.
+        int minChip = Theme.px(56);
+        boolean wideEnough = x + minChip + Theme.px(8) + boardFull
+            + Theme.px(6) + ordersFull <= vpLeft;
+        int buttons = wideEnough ? boardFull + ordersFull : Theme.px(22) * 2;
+        int chipRoom = Math.max(minChip,
+            vpLeft - x - Theme.px(8) - buttons - Theme.px(6));
+        int chipW = Math.min(chipRoom, SeatChip.widthFor(g, bot, chipFont));
         String shown = bot;
         while (shown.length() > 4
                 && SeatChip.widthFor(g, shown, chipFont) > chipW) {
@@ -276,7 +295,7 @@ public final class PlayerStrip extends JComponent {
         boardX = x + chipW + Theme.px(8);
         boardY = y;
         g.setFont(f(11, java.awt.Font.PLAIN));
-        boardW = g.getFontMetrics().stringWidth(BOARD_LABEL) + Theme.px(22);
+        boardW = wideEnough ? boardFull : Theme.px(22);
         Rectangle bb = boardButton();
         boolean overBoard = "board".equals(hot);
         g.setColor(overBoard ? Theme.hover() : Theme.tile());
@@ -293,16 +312,18 @@ public final class PlayerStrip extends JComponent {
             int ly = bb.y + Theme.px(6) + i * Theme.px(3);
             g.drawLine(ix, ly, ix + Theme.px(8) - i, ly);
         }
-        g.setColor(overBoard ? Theme.ink() : Theme.ink2());
-        g.drawString(BOARD_LABEL, bb.x + Theme.px(17),
-            bb.y + bb.height / 2 + Theme.px(4));
+        if (wideEnough) {
+            g.setColor(overBoard ? Theme.ink() : Theme.ink2());
+            g.drawString(BOARD_LABEL, bb.x + Theme.px(17),
+                bb.y + bb.height / 2 + Theme.px(4));
+        }
 
         // ---- КНОПКА «ПРИКАЗЫ» — вторая дверь в хозяйство игрока: выдвигает
         // панель с его картами приказов поверх поля. Раскрытая панель отмечается
         // на самой кнопке, иначе при четырёх игроках не понять, чья открыта.
         ordersX = bb.x + bb.width + Theme.px(6);
         ordersY = y;
-        ordersW = g.getFontMetrics().stringWidth(ORDERS_LABEL) + Theme.px(22);
+        ordersW = wideEnough ? ordersFull : Theme.px(22);
         Rectangle ob = ordersButton();
         boolean overOrders = "orders".equals(hot);
         g.setColor(ordersOpen ? Theme.seatWash(seat, 0.35)
@@ -320,11 +341,17 @@ public final class PlayerStrip extends JComponent {
             g.drawLine(ox + i * Theme.px(3), ob.y + Theme.px(11) - i,
                 ox + i * Theme.px(3) + Theme.px(2), ob.y + Theme.px(5) - i);
         }
-        g.setColor(ordersOpen || overOrders ? Theme.ink() : Theme.ink2());
-        g.drawString(ORDERS_LABEL, ob.x + Theme.px(17),
-            ob.y + ob.height / 2 + Theme.px(4));
+        if (wideEnough) {
+            g.setColor(ordersOpen || overOrders ? Theme.ink() : Theme.ink2());
+            g.drawString(ORDERS_LABEL, ob.x + Theme.px(17),
+                ob.y + ob.height / 2 + Theme.px(4));
+        }
         // ЗАПОМНИТЬ, СКОЛЬКО РЯД ЗАНЯЛ: плюс место под победные очки справа.
-        int rowRight = ob.x + ob.width + Theme.px(46);
+        // Считается по ПОЛНЫМ кнопкам: полоса просит ту ширину, при которой
+        // подписи снова влезут, а не ту, при которой она сейчас обходится
+        // значками.
+        int rowRight = ob.x + (wideEnough ? ob.width
+            : boardFull - boardW + ordersFull) + Theme.px(46);
         if (rowRight != topRowRight) {
             topRowRight = rowRight;
             revalidate();   // минимум изменился — раскладке надо об этом знать
