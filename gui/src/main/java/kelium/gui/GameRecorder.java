@@ -65,10 +65,18 @@ public final class GameRecorder {
         }
     }
 
-    /** Кого можно посадить на место — из справочника. */
+    /**
+     * Кого можно посадить на место — ТОЛЬКО ИГРАЮЩИЕ НА ПОБЕДУ.
+     *
+     * <p>Приборы (жнец, аксиома, воитель, исследователь, ищейка, случайный,
+     * простой) в выбор не попадают: их учили не победе, и за столом они делают
+     * ходы, осмысленные лишь для замера (решение дизайнера 20.08.2026). Создать
+     * их по имени по-прежнему можно — этим и живут инструменты замера, которые
+     * читают полный BotCatalog.ALL.
+     */
     public static List<SeatOption> seatOptions(int players) {
         List<SeatOption> out = new ArrayList<>();
-        for (var e : kelium.agents.BotCatalog.ALL) {
+        for (var e : kelium.agents.BotCatalog.players()) {
             out.add(new SeatOption(e.id(), e.label(), e.tip()));
         }
         return out;
@@ -77,7 +85,7 @@ public final class GameRecorder {
     /** Кого можно посадить на место (состав не зависит от числа игроков). */
     public static final List<SeatOption> SEAT_OPTIONS = seatOptions(4);
 
-        /** Запомнить в записи, какие дополнения были включены. */
+    /** Запомнить в записи, какие дополнения были включены. */
     private static void rememberExpansions(ReplayRecord rec) {
         var settings = kelium.dataio.AppSettings.of("replay2");
         for (String name : Expansions.ALL) {
