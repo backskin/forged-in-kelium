@@ -393,6 +393,52 @@ public final class Shapes {
                 }
                 combinations(edge, count, out);
             }
+            case "start_spawn_adjacent" -> {
+                // ГЕКСЫ, ПРИМЫКАЮЩИЕ К СТАРТОВЫМ ЗАРОЖДЕНИЯМ (заказ дизайнера
+                // 19.08.2026). Именно к СТАРТОВЫМ, а не к любым: стартовые стоят
+                // у баз игроков, и фигура через них — это дорога между чужими
+                // дворами, а не случайная связка в середине поля.
+                java.util.LinkedHashSet<String> near = new java.util.LinkedHashSet<>();
+                for (Hex h : s.field.hexes.values()) {
+                    if (h.spawnTile == null || !h.spawnTile.isStart) {
+                        continue;
+                    }
+                    for (int side = 0; side < 6; side++) {
+                        String nb = h.neighborBySide[side];
+                        if (nb != null) {
+                            near.add(nb);
+                        }
+                    }
+                }
+                combinations(new ArrayList<>(near), count, out);
+            }
+            case "own_and_enemy_building" -> {
+                // ОДНО ИЗ СВОИХ ЗДАНИЙ И ЗДАНИЕ ПРОТИВНИКА (заказ дизайнера
+                // 19.08.2026). Опора здесь не список одинаковых гексов, а ПАРА
+                // из двух разных множеств, поэтому перебираются пары «свой гекс
+                // × чужой гекс», а не сочетания из общего списка: сочетание
+                // могло бы дать две свои базы и требование стало бы другим.
+                List<String> mine = new ArrayList<>();
+                for (BuildingToken b : s.player(seat).buildingsOnField()) {
+                    mine.add(b.hexId);
+                }
+                List<String> theirs = new ArrayList<>();
+                for (PlayerState other : s.players) {
+                    if (other.seat == seat) {
+                        continue;
+                    }
+                    for (BuildingToken b : other.buildingsOnField()) {
+                        theirs.add(b.hexId);
+                    }
+                }
+                for (String a : mine) {
+                    for (String b : theirs) {
+                        if (!a.equals(b)) {
+                            out.add(new java.util.LinkedHashSet<>(List.of(a, b)));
+                        }
+                    }
+                }
+            }
             default -> { }
         }
         return out;
@@ -447,12 +493,31 @@ public final class Shapes {
         Set<String> needTypes = codes(p.get("require_types"));
         int needCount = p.get("require_count") instanceof Number n ? n.intValue() : 1;
 
+        // ДЛИНА ФИГУРЫ — сколько гексов она охватывает (заказ дизайнера
+        // 19.08.2026: «длина которого не менее 4», усиление «не менее 6»).
+        // Меряется в ГЕКСАХ, а не в ячейках: за столом игрок считает клетки
+        // поля, а не половинки гексов, и правило должно совпадать с тем, что он
+        // видит.
+        if (p.get("min_hexes") instanceof Number mh && hexes.size() < mh.intValue()) {
+            return false;
+        }
+
         Set<String> unitKinds = new HashSet<>();
         Map<String, Integer> buildingTypes = new HashMap<>();
+        int unitsInside = 0;
         for (UnitToken u : pl.unitsOnField()) {
             if (hexes.contains(u.hexId)) {
                 unitKinds.add(u.type.code);
+                unitsInside++;
             }
+        }
+        // СКОЛЬКО ЖЕТОНОВ ВОЙСК УЧАСТВУЕТ (заказ дизайнера 19.08.2026: усиление
+        // «в соседстве принимает участие не менее 3 жетонов войск»). Считаются
+        // жетоны, а не рода: три пехоты — это три жетона, и требование про
+        // количество, а не про разнообразие (для разнообразия есть
+        // require_unit_kinds).
+        if (p.get("min_units") instanceof Number mu && unitsInside < mu.intValue()) {
+            return false;
         }
         for (BuildingToken b : pl.buildingsOnField()) {
             if (hexes.contains(b.hexId)) {
@@ -483,6 +548,105 @@ public final class Shapes {
             }
         }
         return out;
+    }
+
+    /**
+     * ПОЛОСА ИЗ ШЕСТИ ЯЧЕЕК НА ДВУХ ГЕКСАХ ВДОЛЬ ПРЯМОЙ (рисунок дизайнера
+     * 19.08.2026): три смежные ячейки на одном гексе плюс три смежные на
+     * соседнем, и переход между половинами идёт через ОБЩЕЕ РЕБРО этих гексов.
+     *
+     * <p>ПОЧЕМУ ЭТО НЕ ПАРАМЕТР К {@link #chainConnects}. Тот работает на уровне
+     * ГЕКСОВ: он ищет связную группу и проверяет, накрыла ли она опорные гексы.
+     * Здесь же важна точность до ЯЧЕЙКИ — какие именно стороны гекса заняты и в
+     * каком порядке они идут, — поэтому требование считается своим кодом.
+     *
+     * <p>КАК ЗАДАНА ПРЯМИЗНА. У гекса A сторона {@code dA} смотрит на гекс B, у
+     * B сторона {@code dB} — на A; только эти две ячейки и примыкают через общее
+     * ребро (см. {@link #neighbours}). Полоса прямая, если на A три ячейки идут
+     * подряд и ЗАКАНЧИВАЮТСЯ на {@code dA}, а на B — НАЧИНАЮТСЯ с {@code dB} и
+     * продолжают вращение в ту же сторону. Обе стороны вращения проверяются, то
+     * есть фигура распознаётся в любом повороте — но не в отражении, как и
+     * просил дизайнер.
+     *
+     * @return true, если хотя бы одна такая полоса целиком занята жетонами игрока
+     */
+    public static boolean straightSixCells(GameState s, int seat) {
+        return longestStraightBand(s, seat) >= 2;
+    }
+
+    /**
+     * САМАЯ ДЛИННАЯ ПРЯМАЯ ПОЛОСА игрока, в ГЕКСАХ (каждый даёт три ячейки).
+     *
+     * <p>ОБЩЕЕ ОПРЕДЕЛЕНИЕ ПРЯМОЙ (заказ дизайнера 19.08.2026: «они проходят
+     * через половины гексов и продолжаются на следующих через общую грань»).
+     * Полоса — это цепочка ПОЛОВИН: в каждом гексе заняты три ячейки подряд,
+     * полоса входит в гекс одной ячейкой и выходит той, что лежит ЧЕРЕЗ ДВЕ
+     * стороны от входа в ту же сторону вращения; этой же стороной выбирается
+     * следующий гекс, а в нём вход — ячейка, смотрящая назад. Направление
+     * вращения по всей полосе одно: именно это и делает её прямой, а не
+     * извивающейся.
+     *
+     * <p>Оба направления вращения проверяются, поэтому фигура распознаётся в
+     * ЛЮБОМ повороте, но НЕ в отражении — как и просил дизайнер для карт-фигур.
+     *
+     * @return сколько гексов подряд накрыто половинами; 0, если нет ни одной
+     *         полной половины
+     */
+    public static int longestStraightBand(GameState s, int seat) {
+        Set<Node> mine = ownNodes(s, seat);
+        if (mine.isEmpty()) {
+            return 0;
+        }
+        int best = 0;
+        for (Hex start : s.field.hexes.values()) {
+            for (int entry = 0; entry < 6; entry++) {
+                for (int dir = -1; dir <= 1; dir += 2) {
+                    best = Math.max(best, walkBand(s, mine, start, entry, dir));
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Пройти полосу от гекса {@code hex} со входом {@code entry}; вернуть длину. */
+    private static int walkBand(GameState s, Set<Node> mine, Hex hex, int entry, int dir) {
+        int length = 0;
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        Hex cur = hex;
+        int in = entry;
+        while (cur != null && visited.add(cur.id)) {
+            // ПОЛОВИНА ГЕКСА — три ячейки подряд от входа в сторону вращения.
+            for (int i = 0; i < 3; i++) {
+                if (!mine.contains(new Node(cur.id, Math.floorMod(in + dir * i, 6)))) {
+                    return length;
+                }
+            }
+            length++;
+            // ВЫХОД — через две стороны от входа: только так половина остаётся
+            // прямым коридором, а не поворотом внутри гекса.
+            int exit = Math.floorMod(in + dir * 2, 6);
+            String nextId = cur.neighborBySide[exit];
+            if (nextId == null) {
+                return length;
+            }
+            Hex next = s.field.hexes.get(nextId);
+            if (next == null) {
+                return length;
+            }
+            Integer back = null;
+            for (int k = 0; k < 6; k++) {
+                if (cur.id.equals(next.neighborBySide[k])) {
+                    back = k;
+                    break;
+                }
+            }
+            if (back == null) {
+                return length;
+            }
+            cur = next;
+            in = back;
+        }
+        return length;
     }
 
     /**
