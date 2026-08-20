@@ -52,9 +52,18 @@ public final class ModuleSets {
                               String effect) {
     }
 
-    /** Набор жетонов: {@code R1}, {@code C} и т. п. */
-    public record ModuleSet(String id, String name, boolean proposal, int ammo,
-                            List<ModuleToken> tokens) {
+    /**
+     * Набор жетонов: {@code R1}, {@code C} и т. п.
+     *
+     * @param fixed набор УЖЕ полный сам по себе (например, R30 — все шесть пар
+     *              целей по два жетона): в мешок кладётся РОВНО он, без копий
+     *              на каждого игрока. Раньше мешок всегда масштабировался по
+     *              числу игроков (наследие модели, где комплект был личным);
+     *              решение дизайнера 20.08.2026 — раз мешок общий, а не
+     *              раздаётся по игрокам, полные наборы множить незачем.
+     */
+    public record ModuleSet(String id, String name, boolean proposal, boolean fixed,
+                            int ammo, List<ModuleToken> tokens) {
     }
 
     /** Всё, что прочитано из файла модулей. */
@@ -118,7 +127,8 @@ public final class ModuleSets {
             }
             ModuleSet set = new ModuleSet(String.valueOf(m.get("id")),
                 String.valueOf(m.getOrDefault("name", m.get("id"))),
-                Boolean.TRUE.equals(m.get("proposal")), setAmmo, tokens);
+                Boolean.TRUE.equals(m.get("proposal")), Boolean.TRUE.equals(m.get("fixed")),
+                setAmmo, tokens);
             out.put(set.id(), set);
         }
         return out;
@@ -162,10 +172,16 @@ public final class ModuleSets {
     }
 
     /**
-     * Собрать мешок: по ПОЛНОМУ набору на каждого игрока. Один набор — это 4
-     * жетона, значит 8/12/16 жетонов на 2/3/4 игроков (числа дизайнера). Если
-     * мешок собран из ДВУХ наборов, жетонов будет вдвое больше — так и задумано
-     * («смешать R1 и R2»), но состав тогда шире, чем 8/12/16.
+     * Собрать мешок. По умолчанию — по ПОЛНОМУ набору на каждого игрока: один
+     * набор — 4 жетона, значит 8/12/16 жетонов на 2/3/4 игроков (числа
+     * дизайнера, наследие модели, где комплект был личным). Если мешок собран
+     * из ДВУХ наборов, жетонов будет вдвое больше — так и задумано («смешать
+     * R1 и R2»), но состав тогда шире, чем 8/12/16.
+     *
+     * <p>Набор с {@link ModuleSet#fixed()} — исключение: кладётся РОВНО он,
+     * без копий на игрока (решение дизайнера 20.08.2026 — R30/C30 уже полные
+     * сами по себе, и раз мешок общий, а не раздаётся по игрокам, множить его
+     * незачем).
      */
     public static List<String> buildBag(Library lib, Map<String, ModuleSet> sets,
                                         String bagId, int players, Random rng) {
@@ -177,7 +193,8 @@ public final class ModuleSets {
             if (set == null || set.proposal()) {
                 continue;                 // предложения в мешок не кладём
             }
-            for (int copy = 0; copy < players; copy++) {
+            int copies = set.fixed() ? 1 : players;
+            for (int copy = 0; copy < copies; copy++) {
                 for (ModuleToken t : set.tokens()) {
                     bag.add(t.id());
                 }
