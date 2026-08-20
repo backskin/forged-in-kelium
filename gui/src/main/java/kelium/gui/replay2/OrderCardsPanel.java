@@ -62,8 +62,15 @@ public final class OrderCardsPanel extends JComponent {
 
     private static final long serialVersionUID = 1L;
 
-    /** Пропорции карты приказа — те же, что у таблицы приказов. */
-    private static final double CARD_RATIO = 184.0 / 132.0;
+    /**
+     * ПРОПОРЦИИ КАРТЫ. Шире, чем печатная карта приказа (184/132), СОЗНАТЕЛЬНО:
+     * подписи идут ГОРИЗОНТАЛЬНО (требование дизайнера 20.08.2026 — «тупо что
+     * на картах всё написано вертикально, поверни нормально горизонтально»), а
+     * названия приказов длинные («ИНФРАСТРУКТУРА», «ПРИОБРЕТЕНИЕ»). На узкой
+     * карте горизонтальный текст пришлось бы либо резать, либо мельчить до
+     * нечитаемого — поэтому карта здесь не копия печатной, а её читаемый вид.
+     */
+    private static final double CARD_RATIO = 1.24;
     /** Наклон между соседними картами веера, градусы. */
     private static final double FAN_STEP_DEG = 16;
     /** Максимальный разворот крайней карты веера, градусы. */
@@ -484,40 +491,75 @@ public final class OrderCardsPanel extends JComponent {
         g.draw(new java.awt.geom.Line2D.Double(x + Theme.px(3), split,
             x + w - Theme.px(3), split));
 
-        // ПОДПИСИ ВДОЛЬ КАРТЫ. Карта узкая, поперёк не влезает даже сокращённое
-        // название, поэтому текст повёрнут и читается снизу вверх, как корешок.
-        drawAlong(g, top == null ? "?" : Names.order(top), x, y, w, split - y,
+        // ПОДПИСИ ГОРИЗОНТАЛЬНО — верх карты и низ карты, каждый в своей половине.
+        drawAcross(g, top == null ? "?" : Names.order(top), x, y, w, split - y,
             active ? Font.BOLD : Font.PLAIN, active ? 11 : 10, Theme.ink());
-        drawAlong(g, bottom == null ? "—" : Names.order(bottom), x, split, w,
+        drawAcross(g, bottom == null ? "нет" : Names.order(bottom), x, split, w,
             y + h - split, Font.PLAIN, 9, Theme.ink3());
 
         hits.add(new Hit(g.getTransform().createTransformedShape(card), tip));
     }
 
-    /** Надпись вдоль карты в отведённой ей части (читается снизу вверх). */
-    private void drawAlong(Graphics2D g, String text, double x, double top,
-                           double w, double h, int style, int size, Color ink) {
-        AffineTransform saved = g.getTransform();
-        g.translate(x + w / 2.0, top + h - Theme.px(4));
-        g.rotate(-Math.PI / 2);
+    /**
+     * НАДПИСЬ ГОРИЗОНТАЛЬНО, в отведённой половине карты.
+     *
+     * <p>Раньше текст был повёрнут на 90 градусов и читался снизу вверх, как
+     * корешок книги: так он влезал на узкую карту, но читать панель приходилось,
+     * наклоняя голову (замечание дизайнера 20.08.2026). Теперь карта шире, а
+     * длинное название переносится по слогам на две строки — резать его
+     * многоточием на видном месте хуже, чем перенести.
+     */
+    private void drawAcross(Graphics2D g, String text, double x, double top,
+                            double w, double h, int style, int size, Color ink) {
         g.setFont(Theme.font(size, style));
         g.setColor(ink);
         var fm = g.getFontMetrics();
-        int maxW = (int) (h - Theme.px(8));
-        // ОБРЕЗКА С МНОГОТОЧИЕМ. Без него «ПРИОБРЕТЕНИЕ» превращалось в
-        // «ПРИОБРЕТЕН» и читалось как другое слово: обрезку надо показывать, а
-        // не прятать. Полное название всегда есть в подсказке.
-        String shown = text;
-        if (fm.stringWidth(shown) > maxW) {
-            String tail = "…";
-            while (shown.length() > 1
-                    && fm.stringWidth(shown + tail) > maxW) {
-                shown = shown.substring(0, shown.length() - 1);
-            }
-            shown = shown + tail;
+        int maxW = (int) (w - Theme.px(8));
+        java.util.List<String> lines = split(fm, text, maxW, 2);
+        double lineH = fm.getHeight() * 0.92;
+        double startY = top + (h - lines.size() * lineH) / 2 + fm.getAscent() * 0.92;
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            g.drawString(line, (float) (x + (w - fm.stringWidth(line)) / 2),
+                (float) (startY + i * lineH));
         }
-        g.drawString(shown, 0, (float) (fm.getAscent() / 2.0 - Theme.px(1)));
-        g.setTransform(saved);
+    }
+
+    /**
+     * Разбить название на строки под ширину карты.
+     *
+     * <p>Приказы — ОДНО слово, поэтому переносить по пробелам нечего: рвём по
+     * буквам с дефисом, как переносят в книге. Если и так не влезает — последняя
+     * строка кончается многоточием, чтобы обрезка была видна.
+     */
+    private static java.util.List<String> split(java.awt.FontMetrics fm, String text,
+                                                int maxW, int maxLines) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        String rest = text == null ? "" : text;
+        while (!rest.isEmpty() && out.size() < maxLines) {
+            if (fm.stringWidth(rest) <= maxW) {
+                out.add(rest);
+                return out;
+            }
+            if (out.size() == maxLines - 1) {
+                String cut = rest;
+                while (cut.length() > 1 && fm.stringWidth(cut + "…") > maxW) {
+                    cut = cut.substring(0, cut.length() - 1);
+                }
+                out.add(cut + "…");
+                return out;
+            }
+            int take = rest.length();
+            while (take > 1 && fm.stringWidth(rest.substring(0, take) + "-") > maxW) {
+                take--;
+            }
+            out.add(rest.substring(0, take) + "-");
+            rest = rest.substring(take);
+        }
+        if (out.isEmpty()) {
+            out.add(rest);
+        }
+        return out;
     }
 
     // ==================================================================

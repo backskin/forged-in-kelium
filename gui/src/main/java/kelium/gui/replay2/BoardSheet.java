@@ -968,7 +968,7 @@ public final class BoardSheet extends JComponent {
         return x + g.getFontMetrics().stringWidth(text) + px(14);
     }
 
-    /** Отложенный слепым сбросом приказ — рубашкой вверх, как он и лежит. */
+    /** Отложенный приказ — рубашкой вверх, как он и лежит на столе. */
     private void paintSetAside(Graphics2D g, ReplayRecord.Player p, int x, int y,
                                int w, int h) {
         caption(g, "ОТЛОЖЕННЫЙ ПРИКАЗ", x, y);
@@ -998,9 +998,24 @@ public final class BoardSheet extends JComponent {
         // КАРТА ПОПОЛАМ: сверху верхний приказ, снизу нижний — как она и напечатана.
         // Одной строкой пара приказов не помещалась и вылезала за край карты
         // (замечание дизайнера 13.08.2026).
+        // БЕЗОПАСНОСТЬ РИСУЕТСЯ ОДНИМ БЛОКОМ. У джокера нет верха и низа, и
+        // подписи «верхний/нижний» на нём — выдумка (замечание дизайнера
+        // 20.08.2026: «верх низ у безопасности почему-то»).
+        int topY = top + px(26);
+        if (isJoker(p.orderSetAside)) {
+            g.setFont(font(9, Font.PLAIN));
+            g.setColor(Theme.alpha(Color.WHITE, 0.65));
+            g.drawString("приказ", x + px(10), topY + px(13));
+            g.setFont(font(12, Font.BOLD));
+            g.setColor(Color.WHITE);
+            g.drawString("БЕЗОПАСНОСТЬ", x + px(10), topY + px(30));
+            g.setFont(font(9, Font.PLAIN));
+            g.setColor(Theme.alpha(Color.WHITE, 0.65));
+            g.drawString("половин нет", x + px(10), topY + px(46));
+            return;
+        }
         String[] pair = setAsidePair(p.orderSetAside);
         int half = (h - px(26)) / 2;
-        int topY = top + px(26);
         g.setColor(Theme.alpha(Color.WHITE, 0.35));
         g.drawLine(x + px(8), topY + half, x + w - px(8), topY + half);
         drawOrderHalf(g, "верхний", pair[0], x, topY, w, half);
@@ -1017,7 +1032,7 @@ public final class BoardSheet extends JComponent {
         g.setColor(Color.WHITE);
         // длинные названия («ИНФРАСТРУКТУРА») переносим, а не режем краем карты
         int ty = y + px(28);
-        for (String line : wrapWords(g, order == null ? "не вскрыт" : order,
+        for (String line : wrapWords(g, order == null ? "нет" : order,
                 w - px(20), 2)) {
             g.drawString(line, x + px(10), ty);
             ty += px(14);
@@ -1047,18 +1062,56 @@ public final class BoardSheet extends JComponent {
         return out;
     }
 
-    /** Верхний и нижний приказы отложенной карты (любой может быть null). */
+    /**
+     * ПРИКАЗЫ ОТЛОЖЕННОЙ КАРТЫ — ИЗ КАТАЛОГА, А НЕ ИЗ РАЗЫГРАННОГО.
+     *
+     * <p>БАГ-ФИКС 20.08.2026 (дизайнер: «сущий ад с указанием сброшенного
+     * приказа… какой-то статус „не вскрыт“ — что это вообще значит для
+     * сброшенной под трофеи карты?»).
+     *
+     * <p>Прежде приказы искались среди УЖЕ РАЗЫГРАННЫХ карт партии: если та же
+     * карта где-то вскрывалась, её приказы брались оттуда, а если нет — панель
+     * писала «не вскрыт». То есть надпись означала не состояние карты, а «я не
+     * нашёл» — и вводила в заблуждение вдвойне: отложенная карта в этом раунде
+     * не вскрывается вовсе, у неё нет и не может быть такого состояния.
+     *
+     * <p>Приказы — свойство САМОЙ КАРТЫ, они напечатаны на ней. Поэтому берём их
+     * из каталога приказов: тогда они известны всегда, а «не вскрыт» исчезает.
+     *
+     * @return {@code {верх, низ}}; низа может не быть. Для карты БЕЗОПАСНОСТЬ
+     *         (джокер) возвращается {@code {null, null}} — у неё нет половин, и
+     *         рисовать их нельзя.
+     */
     private String[] setAsidePair(String cardId) {
-        if (cardId != null) {
-            for (ReplayRecord.OrderPlay op : session.record().orderPlays) {
-                if (cardId.equals(op.card)) {
-                    return new String[]{Names.order(op.top),
-                        op.bottom == null || op.bottom.isBlank() ? null
-                            : Names.order(op.bottom)};
-                }
-            }
+        if (cardId == null) {
+            return new String[]{null, null};
         }
-        return new String[]{null, null};
+        try {
+            java.util.Map<String, Object> c =
+                session.content().get("orders").byId(cardId);
+            if (Boolean.TRUE.equals(c.get("joker"))) {
+                return new String[]{null, null};
+            }
+            Object bottom = c.get("bottom");
+            return new String[]{Names.order(String.valueOf(c.get("top"))),
+                bottom == null ? null : Names.order(String.valueOf(bottom))};
+        } catch (RuntimeException e) {
+            // Каталог недоступен (запись открыта без правил) — так и скажем.
+            return new String[]{null, null};
+        }
+    }
+
+    /** Карта БЕЗОПАСНОСТЬ (джокер): у неё нет половин. */
+    private boolean isJoker(String cardId) {
+        if (cardId == null) {
+            return false;
+        }
+        try {
+            return Boolean.TRUE.equals(
+                session.content().get("orders").byId(cardId).get("joker"));
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /**

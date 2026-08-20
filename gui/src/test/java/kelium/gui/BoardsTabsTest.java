@@ -20,6 +20,33 @@ import kelium.report.ReplayRecord;
  */
 class BoardsTabsTest {
 
+    /**
+     * ДОПОЛНЕНИЯ ЗАДАЮТСЯ ЯВНО, А НЕ БЕРУТСЯ ИЗ НАСТРОЕК ПРИЛОЖЕНИЯ.
+     *
+     * <p>БАГ-ФИКС 20.08.2026. Тест проверяет супер-задания, а {@code
+     * GameRecorder.play} накладывает дополнения из ПОСТОЯННЫХ настроек
+     * приложения ({@code %APPDATA%\Kelium\kelium.cfg}). Стоило дизайнеру
+     * выключить тумблер «Супер задания» в окне подготовки — и тест начал падать
+     * на машине, где код не менялся вовсе.
+     *
+     * <p>Тест не имеет права зависеть от того, что человек нажал в интерфейсе,
+     * поэтому нужные дополнения включаются здесь принудительно. Прежнее
+     * состояние возвращается после партии: настройки общие с приложением, и
+     * портить их тестом нельзя.
+     */
+    private static ReplayRecord gameWithSupers() {
+        var settings = kelium.dataio.AppSettings.of("replay2");
+        boolean was = kelium.gui.Expansions.on(settings,
+            kelium.gui.Expansions.SUPER_OBJECTIVES);
+        kelium.gui.Expansions.set(settings, kelium.gui.Expansions.SUPER_OBJECTIVES, true);
+        try {
+            return game();
+        } finally {
+            kelium.gui.Expansions.set(settings,
+                kelium.gui.Expansions.SUPER_OBJECTIVES, was);
+        }
+    }
+
     private static ReplayRecord game() {
         return GameRecorder.play(GameConfig.DEFAULT_RULESET, 4, 4242,
             List.of("strat:hawk", "strat:dove", "strat:balanced", "strat:opportunist"), null);
@@ -27,7 +54,7 @@ class BoardsTabsTest {
 
     @Test
     void recordCarriesSuperArsenalOfferAndPartProgress() {
-        ReplayRecord rec = game();
+        ReplayRecord rec = gameWithSupers();
         ReplayRecord.Snapshot first = rec.frames.get(0).snapshot;
         assertTrue(first.superArsenalOffer.size() == 3,
             "с подготовки на каждый трек выложена карта супер-арсенала, а есть "
