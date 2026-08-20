@@ -208,27 +208,34 @@ class AbilityFrameworkTest {
     @Test
     void oneAttackSpecComesFromTheCardAndReallyStrikes() {
         CoreAbilities.install();
-        GameState s = game();
-        java.util.List<kelium.core.Agent> agents = new java.util.ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            agents.add(kelium.agents.Bots.create("hawk", i, new java.util.Random(i), 4));
-        }
-        // Довести партию до середины: на пустом поле бить некого, проверять нечего.
-        // Играем раунд за раундом, пока у кого-нибудь не появится цель — момент
-        // зависит от состава колоды, привязываться к номеру раунда нельзя.
-        var engine = new kelium.engine.GameEngine(s, agents, null);
         var slot = kelium.engine.ability.OptionSource.Slot.SPEC;
+        // ПРЕДУСЛОВИЕ ИЩЕТСЯ ПО НЕСКОЛЬКИМ ПАРТИЯМ, А НЕ В ОДНОЙ (правка
+        // 19.08.2026). Тесту нужна позиция, где вообще есть кого бить, и момент
+        // её появления зависит от состава колоды: стоило добавить в каталог
+        // восемь заданий на соседство, и на прежнем сиде цель к восьмому раунду
+        // не появилась — тест упал, хотя проверяемая способность не менялась.
+        // Одна партия для такого предусловия — это привязка к случайности.
+        GameState s = null;
         int seat = -1;
-        for (int round = 3; round <= 8 && seat < 0 && !s.finished; round++) {
-            engine.runToRound(round);
+        for (long seedShift = 0; seedShift < 6 && seat < 0; seedShift++) {
+            s = Setup.buildGame(GameConfig.buildCached(
+                GameConfig.DEFAULT_RULESET, 4, 4242L + seedShift * 101L, null, null));
+            java.util.List<kelium.core.Agent> agents = new java.util.ArrayList<>();
             for (int i = 0; i < 4; i++) {
-                if (((kelium.engine.CombatResolver) s.combat).anyAttackPossible(i)) {
-                    seat = i;
-                    break;
+                agents.add(kelium.agents.Bots.create("hawk", i, new java.util.Random(i), 4));
+            }
+            var engine = new kelium.engine.GameEngine(s, agents, null);
+            for (int round = 3; round <= 10 && seat < 0 && !s.finished; round++) {
+                engine.runToRound(round);
+                for (int i = 0; i < 4; i++) {
+                    if (((kelium.engine.CombatResolver) s.combat).anyAttackPossible(i)) {
+                        seat = i;
+                        break;
+                    }
                 }
             }
         }
-        assertTrue(seat >= 0, "к середине партии хоть у кого-то должна быть цель");
+        assertTrue(seat >= 0, "ни в одной из шести партий не нашлось позиции с целью");
 
         assertTrue(Abilities.options(s, seat, slot).isEmpty(),
             "без установленной карты нового спец-действия в меню нет");
