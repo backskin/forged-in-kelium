@@ -503,6 +503,105 @@ public final class FieldGeometry {
     }
 
     /**
+     * КАКИЕ СТОРОНЫ СХОДЯТСЯ В УГЛУ {@code k} — пара номеров сторон (0..5).
+     *
+     * <p>Выведено из того, что угол {@code k} лежит под {@code 60k - 90 + TILT},
+     * а сторона {@code s} — под {@code -60s + TILT}: в угол смотрят ровно те две
+     * стороны, чьи направления отстоят от него на ±30°.
+     */
+    public static int[] sidesAtCorner(int k) {
+        return new int[]{Math.floorMod(2 - k, 6), Math.floorMod(1 - k, 6)};
+    }
+
+    /**
+     * ГЕКС, СКРУГЛЁННЫЙ ТОЛЬКО ПО ВНЕШНЕМУ КОНТУРУ ПОЛЯ.
+     *
+     * <p>ЗАЧЕМ ИМЕННО ТАК (правка дизайнера 19.08.2026). Скругление КАЖДОГО угла
+     * каждого гекса даёт дырки: два соседних гекса сходятся стыком, и если оба
+     * срезали общий угол, между ними появляется просвет, которого на картоне
+     * нет. Поэтому угол скругляется ТОЛЬКО когда он и правда внешний — то есть
+     * когда ни с одной из двух сходящихся в нём сторон соседа нет. Стыки внутри
+     * поля остаются острыми и сходятся вплотную, а мягким становится ровно
+     * контур поля целиком.
+     *
+     * @param neighbor {@code neighbor[s] == true}, если с стороны {@code s} есть
+     *                 соседний гекс поля; длина 6
+     */
+    public static Path2D.Double outlineRoundedHexPath(double cx, double cy, double r,
+                                                      double round, boolean[] neighbor) {
+        double[][] p = hexCorners(cx, cy, r);
+        Path2D.Double path = new Path2D.Double();
+        double k = Math.min(0.5, Math.max(0, round));
+        boolean started = false;
+        for (int i = 0; i < 6; i++) {
+            int[] sides = sidesAtCorner(i);
+            boolean outer = k > 0 && neighbor != null
+                && !neighbor[sides[0]] && !neighbor[sides[1]];
+            double[] cur = p[i];
+            if (!outer) {
+                if (!started) {
+                    path.moveTo(cur[0], cur[1]);
+                    started = true;
+                } else {
+                    path.lineTo(cur[0], cur[1]);
+                }
+                continue;
+            }
+            double[] prev = p[(i + 5) % 6];
+            double[] next = p[(i + 1) % 6];
+            double ax = cur[0] + (prev[0] - cur[0]) * k;
+            double ay = cur[1] + (prev[1] - cur[1]) * k;
+            double bx = cur[0] + (next[0] - cur[0]) * k;
+            double by = cur[1] + (next[1] - cur[1]) * k;
+            if (!started) {
+                path.moveTo(ax, ay);
+                started = true;
+            } else {
+                path.lineTo(ax, ay);
+            }
+            path.quadTo(cur[0], cur[1], bx, by);
+        }
+        path.closePath();
+        return path;
+    }
+
+    /** То же точками — для {@link FieldCanvas#polygon}, который кривых не умеет. */
+    public static double[][] outlineRoundedHexPoints(double cx, double cy, double r,
+                                                     double round, boolean[] neighbor,
+                                                     int seg) {
+        double[][] p = hexCorners(cx, cy, r);
+        double k = Math.min(0.5, Math.max(0, round));
+        List<double[]> out = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            int[] sides = sidesAtCorner(i);
+            boolean outer = k > 0 && neighbor != null
+                && !neighbor[sides[0]] && !neighbor[sides[1]];
+            double[] cur = p[i];
+            if (!outer) {
+                out.add(new double[]{cur[0], cur[1]});
+                continue;
+            }
+            double[] prev = p[(i + 5) % 6];
+            double[] next = p[(i + 1) % 6];
+            double ax = cur[0] + (prev[0] - cur[0]) * k;
+            double ay = cur[1] + (prev[1] - cur[1]) * k;
+            double bx = cur[0] + (next[0] - cur[0]) * k;
+            double by = cur[1] + (next[1] - cur[1]) * k;
+            out.add(new double[]{ax, ay});
+            for (int s = 1; s < Math.max(1, seg); s++) {
+                double t = (double) s / seg;
+                double u = 1 - t;
+                out.add(new double[]{
+                    u * u * ax + 2 * u * t * cur[0] + t * t * bx,
+                    u * u * ay + 2 * u * t * cur[1] + t * t * by
+                });
+            }
+            out.add(new double[]{bx, by});
+        }
+        return out.toArray(new double[0][]);
+    }
+
+    /**
      * СКРУГЛЁННЫЙ ГЕКС ТОЧКАМИ — тот же контур, что даёт {@link #roundedHexPath},
      * но выложенный многоугольником.
      *

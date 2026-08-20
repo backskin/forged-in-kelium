@@ -184,11 +184,25 @@ public final class FieldPainter {
                 byHex.computeIfAbsent(t.hexId, k -> new ArrayList<>()).add(t);
             }
         }
+        // КТО С КЕМ СОСЕДИТ — нужно для скругления ТОЛЬКО внешнего контура поля
+        // (правка дизайнера 19.08.2026). Считается один раз на всё поле, а не в
+        // каждом гексе: иначе на каждую клетку шёл бы проход по всему списку.
+        java.util.Set<Long> занято = new java.util.HashSet<>();
+        for (ReplayRecord.HexInfo hi : hexes) {
+            занято.add((((long) hi.q) << 32) ^ (hi.r & 0xffffffffL));
+        }
         for (ReplayRecord.HexInfo hi : hexes) {
             double[] centre = FieldGeometry.hexCenter(hi.q, hi.r, size);
+            boolean[] nb = new boolean[6];
+            for (int s = 0; s < 6; s++) {
+                int[] d = kelium.core.Field.AXIAL_DIRS[s];
+                int nq = hi.q + d[0];
+                int nr = hi.r + d[1];
+                nb[s] = занято.contains((((long) nq) << 32) ^ (nr & 0xffffffffL));
+            }
             paintHex(c, size, hi, states.get(hi.id),
                 byHex.getOrDefault(hi.id, List.of()),
-                centre[0] + ox, centre[1] + oy, showIds);
+                centre[0] + ox, centre[1] + oy, showIds, nb);
         }
     }
 
@@ -199,6 +213,23 @@ public final class FieldPainter {
     public static void paintHex(FieldCanvas c, double size, ReplayRecord.HexInfo hi,
                                 ReplayRecord.HexState st, List<ReplayRecord.Tok> tokens,
                                 double cx, double cy, boolean showIds) {
+        // БЕЗ СВЕДЕНИЙ О СОСЕДЯХ — БЕЗ СКРУГЛЕНИЙ. Скруглять «на всякий случай»
+        // здесь нельзя: у гекса в середине поля срезанный угол даёт дырку на
+        // стыке с соседом (правка дизайнера 19.08.2026).
+        paintHex(c, size, hi, st, tokens, cx, cy, showIds, null);
+    }
+
+    /**
+     * То же, но со знанием СОСЕДЕЙ — тогда внешний контур поля скругляется, а
+     * стыки внутри остаются острыми и сходятся вплотную.
+     *
+     * @param neighbor {@code neighbor[s]} — есть ли гекс с стороны {@code s};
+     *                 null — рисовать острым шестиугольником
+     */
+    public static void paintHex(FieldCanvas c, double size, ReplayRecord.HexInfo hi,
+                                ReplayRecord.HexState st, List<ReplayRecord.Tok> tokens,
+                                double cx, double cy, boolean showIds,
+                                boolean[] neighbor) {
         boolean forbidden = "FORBIDDEN".equals(hi.kind);
 
         // 1. сам гекс + слабая подкраска «чей он»
@@ -207,16 +238,19 @@ public final class FieldPainter {
         if (hexTex != null) {
             drawHexTexture(c, hexTex, cx, cy, size, 0);
         } else {
-            // СЕТКА ПОЛЯ СО СКРУГЛЁННЫМИ УГЛАМИ (решение дизайнера 19.08.2026):
-            // клетка читается как картонная деталь, а не как чертёжная ячейка.
-            c.polygon(FieldGeometry.roundedHexPoints(cx, cy, size),
+            // СКРУГЛЯЕТСЯ ТОЛЬКО ВНЕШНИЙ КОНТУР ПОЛЯ (правка дизайнера
+            // 19.08.2026): у гекса внутри поля срезанный угол давал дырку на
+            // стыке с соседом.
+            c.polygon(FieldGeometry.outlineRoundedHexPoints(cx, cy, size,
+                    FieldGeometry.TILE_ROUND, neighbor, 4),
                 forbidden ? (dark ? FORBIDDEN_FILL_DARK : FORBIDDEN_FILL) : hexFill(),
                 hexStroke(), 1.5);
         }
         if (showOwnership && !forbidden && st != null && st.ownerTint >= 0) {
             // Гекс со своим зданием — заметнее, гекс зоны стройки — еле-еле.
             c.alpha(st.ownerBuilt ? 0.30 : 0.13);
-            c.polygon(FieldGeometry.roundedHexPoints(cx, cy, size),
+            c.polygon(FieldGeometry.outlineRoundedHexPoints(cx, cy, size,
+                    FieldGeometry.TILE_ROUND, neighbor, 4),
                 FieldGeometry.SEAT_FILL[st.ownerTint % 4], null, 0);
             c.alpha(1);
         }

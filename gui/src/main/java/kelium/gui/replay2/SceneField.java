@@ -946,12 +946,23 @@ public final class SceneField extends JComponent {
     }
 
     /**
-     * ГЕКС СО СКРУГЛЁННЫМИ УГЛАМИ (решение дизайнера 19.08.2026) — единственная
-     * точка, где сцена строит форму гекса, поэтому скругление получают сразу все
-     * её вызовы: сетка поля, подсветки, зона стройки, выделение.
+     * ГЕКС ОСТРЫМИ УГЛАМИ — и это осознанно (правка дизайнера 19.08.2026).
+     *
+     * <p>Здесь строятся ПОДСВЕТКИ и обводки: зона стройки, выделение, тепловая
+     * карта, шлейфы движения. Они обязаны ложиться ровно по краям клетки, а саму
+     * сетку рисует {@code FieldPainter}, скругляя только внешний контур поля.
+     * Скругли обводку — и она перестала бы совпадать с клеткой, которую
+     * обводит, а внутри поля ещё и разошлась бы со стыками соседей.
      */
     private static Path2D hexPath(double cx, double cy, double r) {
-        return FieldGeometry.roundedHexPath(cx, cy, r, FieldGeometry.TILE_ROUND);
+        Path2D p = new Path2D.Double();
+        double[][] pts = FieldGeometry.hexCorners(cx, cy, r);
+        p.moveTo(pts[0][0], pts[0][1]);
+        for (int i = 1; i < 6; i++) {
+            p.lineTo(pts[i][0], pts[i][1]);
+        }
+        p.closePath();
+        return p;
     }
 
     private static List<String> wrap(Graphics2D g, String text, int width, int maxLines) {

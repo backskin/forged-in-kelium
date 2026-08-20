@@ -2194,7 +2194,10 @@ public final class LayoutEditor {
                     g.setColor(new Color(ExportPaint.GRID.getRed(),
                         ExportPaint.GRID.getGreen(), ExportPaint.GRID.getBlue(),
                         Math.min(255, Math.max(0, alpha))));
-                    g.draw(roundedTile(c[0], c[1], size * 0.99));
+                    // ФОНОВАЯ УГАСАЮЩАЯ СЕТКА — БЕЗ СКРУГЛЕНИЙ (решение дизайнера
+                    // 19.08.2026): это не детали поля, а разметка листа за ним,
+                    // и мягкие углы там только сбивают с толку.
+                    g.drawPolygon(hexPoly(c[0], c[1], size * 0.99));
                 }
             }
             g.dispose();
@@ -2576,7 +2579,11 @@ public final class LayoutEditor {
                 g.setColor(Theme.ink3());
                 for (long k : ghostKeys()) {
                     double[] c = center((int) (k >> 32), (int) k);
-                    g.draw(roundedTile(c[0], c[1], size * 0.94));
+                    // ПРИЗРАЧНАЯ СЕТКА — БЕЗ СКРУГЛЕНИЙ (решение дизайнера
+                    // 19.08.2026): это не деталь поля, а подсказка «сюда можно
+                    // приклеить гекс», и мягкие углы делали её похожей на уже
+                    // положенный тайл.
+                    g.draw(hexPoly(c[0], c[1], size * 0.94));
                 }
             }
 
@@ -2606,11 +2613,12 @@ public final class LayoutEditor {
          * всё, что на нём стоит.
          */
         private void drawHexBody(Graphics2D g, LHex h, double cx, double cy) {
-            // СЕТКА ПОЛЯ ТОЖЕ СО СКРУГЛЁННЫМИ УГЛАМИ (решение дизайнера
-            // 19.08.2026). Между соседними клетками из-за этого появляется
-            // узкий просвет — так и должно быть: на печатном поле гексы тоже
-            // сходятся не остриём в остриё.
-            var poly = roundedTile(cx, cy, size);
+            // СКРУГЛЯЕТСЯ ТОЛЬКО ВНЕШНИЙ КОНТУР ПОЛЯ (правка дизайнера
+            // 19.08.2026). Скругление каждого угла каждого гекса давало ДЫРКИ:
+            // два соседних гекса сходятся стыком, и когда оба срезали общий
+            // угол, между ними появлялся просвет, которого на картоне нет.
+            // Теперь угол скругляется лишь там, где соседа и правда нет.
+            var poly = outlineTile(h, cx, cy, size);
             g.setColor(baseFill(h));
             g.fill(poly);
             g.setStroke(new BasicStroke(2f));
@@ -2792,6 +2800,22 @@ public final class LayoutEditor {
         private java.awt.geom.Path2D.Double roundedTile(double cx, double cy, double s) {
             return kelium.report.FieldGeometry.roundedHexPath(cx, cy, s,
                 kelium.report.FieldGeometry.TILE_ROUND);
+        }
+
+        /**
+         * КЛЕТКА ПОЛЯ, СКРУГЛЁННАЯ ТОЛЬКО ПО ВНЕШНЕМУ КОНТУРУ. Соседи берутся из
+         * модели: угол мягкий лишь там, где с обеих сходящихся в нём сторон
+         * гекса нет. Так поле остаётся сплошным — стыки внутри сходятся
+         * вплотную, — а мягким выглядит контур целиком.
+         */
+        private java.awt.geom.Path2D.Double outlineTile(LHex h, double cx, double cy, double s) {
+            boolean[] nb = new boolean[6];
+            for (int side = 0; side < 6; side++) {
+                int[] d = DIRS[side];
+                nb[side] = model.get(h.q + d[0], h.r + d[1]) != null;
+            }
+            return kelium.report.FieldGeometry.outlineRoundedHexPath(cx, cy, s,
+                kelium.report.FieldGeometry.TILE_ROUND, nb);
         }
 
         private Polygon hexPoly(double cx, double cy, double s) {

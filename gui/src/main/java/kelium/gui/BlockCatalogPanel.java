@@ -353,6 +353,13 @@ public final class BlockCatalogPanel extends JPanel {
          * же, какими они закрашены на планшетах и на поле в проигрывателе.
          */
         private void рисоватьБлок(Graphics2D g, Face f, int cx0, int cy0, double size) {
+            // ЧТО ВХОДИТ В ЭТУ КАРТОНКУ — нужно, чтобы скруглить контур блока и
+            // НЕ скруглять швы между его гексами: срезанные общие углы давали
+            // дырки на стыках (правка дизайнера 19.08.2026).
+            java.util.Set<Long> свои = new java.util.HashSet<>();
+            for (HexRec h : f.hexes()) {
+                свои.add((((long) h.q()) << 32) ^ (h.r() & 0xffffffffL));
+            }
             for (HexRec hx : f.hexes()) {
                 double[] c = FieldGeometry.hexCenter(hx.q(), hx.r(), size);
                 double cx = cx0 + c[0];
@@ -364,10 +371,16 @@ public final class BlockCatalogPanel extends JPanel {
                 // геометрии, что у поля (решение дизайнера 19.08.2026). Свой
                 // цикл по шести углам убран: он и был причиной, по которой
                 // каталог жил своей формой отдельно от поля.
+                boolean[] nb = new boolean[6];
+                for (int side = 0; side < 6; side++) {
+                    int[] d = kelium.core.Field.AXIAL_DIRS[side];
+                    nb[side] = свои.contains(
+                        (((long) (hx.q() + d[0])) << 32) ^ ((hx.r() + d[1]) & 0xffffffffL));
+                }
                 g.setStroke(new BasicStroke(1.4f));
                 g.setColor(new Color(0x8A8F98));
-                g.draw(FieldGeometry.path(
-                    FieldGeometry.roundedHexPoints(cx, cy, size)));
+                g.draw(FieldGeometry.outlineRoundedHexPath(cx, cy, size,
+                    FieldGeometry.TILE_ROUND, nb));
 
                 double apothem = FieldGeometry.apothem(size);
                 if (hx.energy() >= 0 && hx.energy() < 6) {

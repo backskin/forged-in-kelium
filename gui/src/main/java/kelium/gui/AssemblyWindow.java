@@ -521,13 +521,25 @@ public final class AssemblyWindow extends JPanel {
         }
 
         /**
-         * КЛЕТКА БЛОКА СО СКРУГЛЁННЫМИ УГЛАМИ (решение дизайнера 19.08.2026) —
-         * та же фигура, что рисует конструктор и разбор партии: скругление
-         * считает FieldGeometry, чтобы во всех приложениях оно было одно.
+         * КЛЕТКА, СКРУГЛЁННАЯ ТОЛЬКО ПО ВНЕШНЕМУ КОНТУРУ НАБОРА (правка
+         * дизайнера 19.08.2026). Скругление каждого угла давало ДЫРКИ на стыках
+         * соседних клеток, которых на картоне нет.
+         *
+         * <p>Для блока «набор» — это сам блок: физически он одна картонка, и
+         * мягким должен быть его край, а не швы между его гексами. Для контуров
+         * нарисованного поля набор — всё поле.
+         *
+         * @param набор какие клетки принадлежат той же детали
          */
-        private java.awt.geom.Path2D.Double roundedCell(double cx, double cy, double s) {
-            return kelium.report.FieldGeometry.roundedHexPath(cx, cy, s,
-                kelium.report.FieldGeometry.TILE_ROUND);
+        private java.awt.geom.Path2D.Double roundedCell(double cx, double cy, double s,
+                                                        Cell self, Set<Cell> набор) {
+            boolean[] nb = new boolean[6];
+            for (int side = 0; side < 6; side++) {
+                int[] d = kelium.core.Field.AXIAL_DIRS[side];
+                nb[side] = набор.contains(new Cell(self.q() + d[0], self.r() + d[1]));
+            }
+            return kelium.report.FieldGeometry.outlineRoundedHexPath(cx, cy, s,
+                kelium.report.FieldGeometry.TILE_ROUND, nb);
         }
 
         private Polygon hexPoly(double cx, double cy, double s) {
@@ -603,14 +615,14 @@ public final class AssemblyWindow extends JPanel {
                 g.setColor(monochrome ? ExportPaint.HEX_FILL : palette[i % palette.length]);
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
-                    g.fill(roundedCell(xy[0], xy[1], size * 0.99));
+                    g.fill(roundedCell(xy[0], xy[1], size * 0.99, c, own));
                 }
                 // тонкие внутренние швы между гексами одного блока
                 g.setColor(new Color(0x00000022, true));
                 g.setStroke(new BasicStroke(1f));
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
-                    g.draw(roundedCell(xy[0], xy[1], size * 0.99));
+                    g.draw(roundedCell(xy[0], xy[1], size * 0.99, c, own));
                 }
                 // внешний контур блока
                 g.setColor(monochrome ? ExportPaint.HEX_EDGE : new Color(0x1F2933));
@@ -657,9 +669,16 @@ public final class AssemblyWindow extends JPanel {
 
         /** Контуры нарисованного поля: игровые светло, запретные пунктиром. */
         private void drawMuted(Graphics2D g, boolean strong) {
+            // НАБОР ЗДЕСЬ — ВСЁ ПОЛЕ: мягким должен быть контур поля целиком, а
+            // швы между его клетками остаются острыми и сходятся вплотную.
+            Set<Cell> поле = new HashSet<>();
+            for (LHex h : model.hexes.values()) {
+                поле.add(new Cell(h.q, h.r));
+            }
             for (LHex h : model.hexes.values()) {
                 double[] xy = center(h.q, h.r);
-                var poly = roundedCell(xy[0], xy[1], size * 0.99);
+                var poly = roundedCell(xy[0], xy[1], size * 0.99,
+                    new Cell(h.q, h.r), поле);
                 boolean forbidden = "forbidden".equals(h.content);
                 g.setColor(forbidden ? new Color(0xE4E4E4) : new Color(0xFFFFFF));
                 g.fill(poly);
