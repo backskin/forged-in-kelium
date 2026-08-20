@@ -61,3 +61,6 @@ reports/observe/
 # Обучающие партии для PyTorch-пайплайна (training/) — гигабайты JSONL,
 # пересоздаются TrainingDataExport по зерну, в git не нужны.
 data/training/
+
+# Временные файлы блокировки Word/Excel (появляются, пока документ открыт)
+~$*
