@@ -576,7 +576,13 @@ public final class BoardSheet extends JComponent {
     private void paintBuildingName(Graphics2D g, Slot s, int x, int y, int cell) {
         g.setFont(font(8, Font.PLAIN));
         g.setColor(Theme.ink3());
-        String full = kelium.gui.GameRecorder.buildingName(s.type(), s.level());
+        // ПОД ПЛИТКОЙ — ТОЛЬКО ТО, ЧЕГО НЕТ ВЫШЕ. Род здания уже сказан дважды:
+        // заголовком группы («ЭНЕРГОСТАНЦИИ») и подписью на самой плитке
+        // («Эн-4»), и третий раз он не влезал — строка обрезалась на
+        // «энергостан…». Поэтому у зданий с уровнями остаётся уровень, а полное
+        // имя живёт в подсказке под курсором.
+        String full = s.level() != null && s.level() > 0 ? "уровень " + s.level()
+            : kelium.gui.GameRecorder.buildingName(s.type(), s.level());
         int ty = y;
         for (String line : wrapWords(g, full, cell, 3)) {
             g.drawString(clipText(g, line, cell), x, ty);
@@ -691,7 +697,13 @@ public final class BoardSheet extends JComponent {
         cy += cell + px(10);
         g.setFont(font(11, Font.PLAIN));
         g.setColor(Theme.ink2());
-        g.drawString("занято " + (p.kelium + p.ammo + p.debris) + " из " + p.storeCap
+        // ПЕРЕПОЛНЕНИЕ НАЗЫВАЕТСЯ СЛОВАМИ. Склад умеет сжиматься: здание вернулось
+        // на планшет и накрыло ячейки, на которых лежали кубики. Само «занято 13
+        // из 11» читается как ошибка вида, поэтому причина написана рядом.
+        int busy = p.kelium + p.ammo + p.debris;
+        g.setColor(busy > p.storeCap ? Theme.bad() : Theme.ink2());
+        g.drawString("занято " + busy + " из " + p.storeCap
+            + (busy > p.storeCap ? " — сверх места, ячейки закрылись" : "")
             + "  ·  келемий ≤ " + p.keliumCap + ", боеприпасы ≤ " + p.ammoCap
             + ", обломки в любую ячейку", x, cy + px(10));
         cy += px(16);
@@ -703,7 +715,10 @@ public final class BoardSheet extends JComponent {
                 Theme.debris());
         }
         g.setColor(Theme.ink2());
-        g.drawString("обломки " + p.debris + " из " + p.debrisCap,
+        // ПРЕДЕЛ НЕ БЫВАЕТ ОТРИЦАТЕЛЬНЫМ: когда склад переполнен, места под
+        // обломки просто нет — так и написано, а не «из −2».
+        g.drawString("обломки " + p.debris
+                + (p.debrisCap < 0 ? " — места нет" : " из " + p.debrisCap),
             x + px(9) + Math.min(dn, 12) * px(20) + px(6), cy + px(13));
         cy += px(24);
         cy = paintStorageTokens(g, p, x, cy);
@@ -862,6 +877,19 @@ public final class BoardSheet extends JComponent {
 
         int pad = px(6);
         int ty = y + px(13);
+        // ПОДСКАЗКА НА ВЕСЬ СТОЛБЕЦ: на экране остаются только числа, а что такое
+        // «вторичный ряд» и почему у вышки он бесплатный — знание разовое.
+        cellZones.put(new Rectangle(x, y, w, h),
+            Names.unit(type).toUpperCase(java.util.Locale.ROOT) + "\n\nПроизводит "
+            + Names.building(maker) + ". Точки слева от цены — ячейки энергии: "
+            + "столько кубиков здание просит, чтобы работать.\n\n"
+            + (troop == null ? "Правила не загружены — таблица атак недоступна."
+                : troop.dualCell()
+                    ? "Бой 2.0: универсальная ячейка бьёт по любой цели, но дороже "
+                        + "боеприпасами; печатная — только по своей цели и дешевле."
+                    : "Основной ряд дешевле боеприпасами, вторичный дороже. Красный "
+                        + "модуль кладётся на вторичный ряд и меняет его цель.")
+            + "\n\nКружки внизу: закрашенные — жетоны на поле, пустые — в запасе.");
 
         // ---------- здание-производитель ----------
         g.setFont(font(9, Font.PLAIN));
@@ -975,9 +1003,20 @@ public final class BoardSheet extends JComponent {
         for (int i = 0; i < all && i < 8; i++) {
             // Закрашенный — стоит на поле, пустой — ждёт в запасе. Так видно
             // «где какие жетоны стоят» без пересчёта поля глазами.
+            // РАЗНИЦА НЕ ТОЛЬКО В ЦВЕТЕ: на поле — залитый кружок цвета места, в
+            // запасе — пустой контур. Одного цвета мало: он читается хуже в
+            // обесцвеченном виде и не различается при дальтонизме.
             boolean placed = i < onField;
-            g.setColor(placed ? Theme.seat(p.seat) : Theme.alpha(Theme.ink3(), 0.45));
-            g.fill(new Ellipse2D.Double(px0 + i * (pd + px(2)), py, pd, pd));
+            Ellipse2D.Double dotShape =
+                new Ellipse2D.Double(px0 + i * (pd + px(2)), py, pd, pd);
+            if (placed) {
+                g.setColor(Theme.seat(p.seat));
+                g.fill(dotShape);
+            } else {
+                g.setColor(Theme.ink3());
+                g.setStroke(new BasicStroke(1f));
+                g.draw(dotShape);
+            }
         }
     }
 
@@ -1076,49 +1115,83 @@ public final class BoardSheet extends JComponent {
         // бывает много. Поэтому здесь только «сколько чего», а щелчок открывает
         // читалку с разворотом карты (просьба дизайнера 13.08.2026).
         deckSpots.clear();
+        // КНОПКИ ИДУТ РЯДОМ, ПОКА ВЛЕЗАЮТ, дальше — новой строкой. Ширина кнопки
+        // зависит от подписи и от числа карт, поэтому в один ряд они помещаются
+        // не всегда: кнопка «арсенал установлен» уезжала за правый край листа и
+        // обрезалась краем компонента.
+        int rowH = px(28);
         int bx = x;
-        bx = deckButton(g, bx, y, "задания", p.objectiveHand.size(), "objectives",
-            p.objectiveHand);
-        bx = deckButton(g, bx, y, "арсенал в руке", p.arsenalHand.size(), "arsenal",
-            p.arsenalHand);
-        bx = deckButton(g, bx, y, "арсенал установлен", p.arsenalInstalled.size(),
-            "arsenal", p.arsenalInstalled);
-        if (p.superObjective != null) {
-            // СУПЕР-ЗАДАНИЕ: подпись говорит, на какой ПОЛОВИНЕ игрок стоит.
-            // Прежде кнопка называлась просто «супер-задание» и по ней нельзя
-            // было понять, вскрыта карта или нет, — а с версии 3.0 это два
-            // совершенно разных состояния: до вскрытия карта в руке, после
-            // вскрытия на ней ЯЧЕЙКИ СО СИМВОЛАМИ и счётчик запуска.
-            String label = p.superCells < 0
-                ? "супер-задание (1-я часть)"
-                : "супероружие: ячеек " + p.superCells;
-            bx = deckButton(g, bx, y, label, 1, "super_objectives",
-                java.util.List.of(p.superObjective));
-            if (p.superCells > 0) {
-                bx = superCounter(g, bx, y, p);
+        int by = y;
+        for (Object[] btn : deckButtons(p)) {
+            String label = (String) btn[0];
+            int count = (Integer) btn[1];
+            int need = deckButtonWidth(g, label, count);
+            if (bx > x && bx + need > x + w) {
+                bx = x;
+                by += rowH;
             }
+            @SuppressWarnings("unchecked")
+            java.util.List<String> ids = (java.util.List<String>) btn[3];
+            bx = deckButton(g, bx, by, label, count, (String) btn[2], ids);
         }
+        if (p.superObjective != null && p.superCells > 0) {
+            int need = px(90);
+            if (bx > x && bx + need > x + w) {
+                bx = x;
+                by += rowH;
+            }
+            bx = superCounter(g, bx, by, p);
+        }
+
         // КОНТЕЙНЕРЫ — только числом, и это честно: движок хранит их СЧЁТОМ, без
         // имён карт, поэтому читать в них нечего.
-        // СТРОКА ПЕРЕНОСИТСЯ: она идёт ПОСЛЕ кнопок стопок, и на узком планшете
-        // остатка ширины ей не хватало — хвост уезжал за правый край (замечание
-        // дизайнера 13.08.2026). Не влезает рядом — уходит на строку ниже.
         g.setFont(font(11, Font.PLAIN));
         g.setColor(Theme.ink3());
-        String tail = "контейнеров на руках " + p.containers
-            + " — какие именно, запись не хранит";
-        int room = x + w - bx - px(8);
+        String tail = "контейнеров на руках " + p.containers;
         int tx = bx + px(4);
-        int tyy = y + px(16);
-        if (g.getFontMetrics().stringWidth(tail) > room) {
+        int tyy = by + px(16);
+        if (g.getFontMetrics().stringWidth(tail) > x + w - tx) {
             tx = x;
-            tyy = y + px(38);
+            tyy = by + px(38);
         }
-        for (String s : wrapWords(g, tail, x + w - tx, 2)) {
-            g.drawString(s, tx, tyy);
-            tyy += px(13);
+        g.drawString(tail, tx, tyy);
+        // ПОЧЕМУ ИХ НЕЛЬЗЯ ОТКРЫТЬ — в подсказке, а не на экране: при каждом
+        // взгляде это знание не нужно, а место занимает и сбивает ритм строки.
+        cellZones.put(new Rectangle(tx, tyy - px(12),
+                g.getFontMetrics().stringWidth(tail), px(16)),
+            "КОНТЕЙНЕРЫ НА РУКАХ\n\nСколько карт контейнеров игрок держит. Какие "
+            + "именно — запись не хранит: движок ведёт их счётом, имя карты "
+            + "появляется только в момент вскрытия.");
+        return Math.max(by + px(34), tyy + px(6));
+    }
+
+    /**
+     * Стопки карт этого игрока: подпись, счёт, набор для читалки.
+     *
+     * <p>Списком, а не четырьмя вызовами подряд: ряд переносится по ширине, и
+     * перенос считается ОДНИМ правилом на все кнопки, а не повторяется у каждой.
+     */
+    private java.util.List<Object[]> deckButtons(ReplayRecord.Player p) {
+        java.util.List<Object[]> out = new ArrayList<>();
+        out.add(new Object[]{"задания", p.objectiveHand.size(), "objectives", p.objectiveHand});
+        out.add(new Object[]{"арсенал в руке", p.arsenalHand.size(), "arsenal", p.arsenalHand});
+        out.add(new Object[]{"арсенал установлен", p.arsenalInstalled.size(), "arsenal",
+            p.arsenalInstalled});
+        if (p.superObjective != null) {
+            // ПОДПИСЬ ГОВОРИТ, НА КАКОЙ ПОЛОВИНЕ ИГРОК СТОИТ: до вскрытия это
+            // карта в руке, после — планшет супероружия с ячейками и счётчиком.
+            out.add(new Object[]{
+                p.superCells < 0 ? "супер-задание (1-я часть)"
+                    : "супероружие: ячеек " + p.superCells,
+                1, "super_objectives", java.util.List.of(p.superObjective)});
         }
-        return Math.max(y + px(34), tyy);
+        return out;
+    }
+
+    /** Ширина кнопки-стопки вместе с отступом до следующей. */
+    private int deckButtonWidth(Graphics2D g, String label, int count) {
+        g.setFont(font(11, Font.PLAIN));
+        return g.getFontMetrics().stringWidth(label + " " + count) + px(18) + px(6);
     }
 
     /** Стопка карт: что это, сколько, и куда ведёт щелчок. */
@@ -1397,7 +1470,11 @@ public final class BoardSheet extends JComponent {
         }
         g.setFont(font(11, Font.BOLD));
         g.setColor(Theme.ink2());
-        g.drawString("в возврат: " + p.trophyTokens + " ОБЛ", x + w - px(90),
+        // ПРИЖАТО К ПРАВОМУ КРАЮ КАРТЫ ПО ФАКТИЧЕСКОЙ ШИРИНЕ ТЕКСТА, а не по
+        // отступу «на глаз»: от фиксированных 90 точек строка вылезала за край
+        // карты и обрезалась на «в возврат: 0 ОБЛ…».
+        String back = "в возврат: " + p.trophyTokens + " ОБЛ";
+        g.drawString(back, x + w - px(12) - g.getFontMetrics().stringWidth(back),
             by + px(11));
         if (n == 0) {
             g.setFont(Theme.italic());
