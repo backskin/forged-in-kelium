@@ -252,11 +252,11 @@ public final class NarrativeLog {
         }
     }
 
-    /** Слепой сброс под трофеи — какую карту каждый отложил взакрытую. */
+    /** Отложенный приказ под трофеи — какую карту каждый убрал рубашкой вверх. */
     public void blindDiscard(Map<Integer, String> setAside) {
         if (md) {
             line("");
-            line("**🃏 Слепой сброс под трофеи** (карта уходит рубашкой вверх, не разыгрывается):");
+            line("**🃏 Отложенный приказ под трофеи** (рубашкой вверх, не разыгрывается; тайна для остальных, но не для себя):");
             for (int seat = 0; seat < state.numPlayers(); seat++) {
                 String cid = setAside.get(seat);
                 line("- " + who(seat) + ": отложил " + (cid != null ? cardName(cid) : "—"));

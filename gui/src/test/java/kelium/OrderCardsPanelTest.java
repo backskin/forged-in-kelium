@@ -37,7 +37,7 @@ class OrderCardsPanelTest {
     // Replay2Gui.orderPanelHeight(). Проверять на другом размере
     // бессмысленно — раскладка карт от него и зависит.
     private static final int W = 470;
-    private static final int H = 158;
+    private static final int H = 196;
 
     /** Кадр, где у игрока уже есть и разыгранные карты, и карты в руке. */
     private static int frameWithBoth(ReplayRecord rec, int seat) {
@@ -52,6 +52,33 @@ class OrderCardsPanelTest {
             }
         }
         return -1;
+    }
+
+    /**
+     * Кадр с САМОЙ БОЛЬШОЙ РУКОЙ — на нём и проверяется веер.
+     *
+     * <p>Дизайнер просил именно веер, а на двух картах он почти не виден: нужен
+     * снимок при полной руке, иначе «веер есть» проверить нечем.
+     */
+    private static int[] frameWithBiggestHand(ReplayRecord rec) {
+        int bestFrame = -1;
+        int bestSeat = -1;
+        int best = 0;
+        for (int i = 0; i < rec.frames.size(); i++) {
+            ReplayRecord.Frame f = rec.frames.get(i);
+            if (f.snapshot == null) {
+                continue;
+            }
+            for (int s = 0; s < f.snapshot.players.size(); s++) {
+                int n = f.snapshot.players.get(s).orderHand.size();
+                if (n > best) {
+                    best = n;
+                    bestFrame = i;
+                    bestSeat = s;
+                }
+            }
+        }
+        return new int[]{bestFrame, bestSeat, best};
     }
 
     private static BufferedImage paint(OrderCardsPanel panel) {
@@ -132,5 +159,17 @@ class OrderCardsPanelTest {
         Path dir = Path.of("target", "order-cards");
         Files.createDirectories(dir);
         ImageIO.write(open, "png", dir.resolve("panel-open.png").toFile());
+
+        // ВЕЕР ПРИ ПОЛНОЙ РУКЕ — отдельный снимок и отдельная проверка: на двух
+        // картах веера почти не видно, и без этого случая «веер есть» нечем
+        // подтвердить.
+        int[] big = frameWithBiggestHand(rec);
+        assertTrue(big[2] >= 3, "в записи не нашлось руки из трёх и более карт");
+        session.seek(big[0]);
+        OrderCardsPanel fan = new OrderCardsPanel(session, big[1]);
+        BufferedImage fanImg = paint(fan);
+        ImageIO.write(fanImg, "png", dir.resolve("panel-fan.png").toFile());
+        assertTrue(painted(fanImg) > W * H / 4,
+            "панель с полной рукой почти ничего не нарисовала");
     }
 }

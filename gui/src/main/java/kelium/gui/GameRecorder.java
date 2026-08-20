@@ -674,9 +674,9 @@ public final class GameRecorder {
                 case "blind_discard": {
                     Object sa = ev.get("set_aside");
                     if (!(sa instanceof Map<?, ?> m) || m.isEmpty()) {
-                        return "Слепой сброс: откладывать нечего";
+                        return "Отложенные приказы: откладывать нечего";
                     }
-                    StringBuilder sb = new StringBuilder("Слепой сброс: ");
+                    StringBuilder sb = new StringBuilder("Отложенные приказы: ");
                     Map<Integer, String> sorted = new TreeMap<>((Map<Integer, String>) sa);
                     boolean first = true;
                     for (Map.Entry<Integer, String> e : sorted.entrySet()) {

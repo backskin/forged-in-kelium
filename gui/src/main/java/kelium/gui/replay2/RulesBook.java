@@ -41,7 +41,7 @@ final class RulesBook {
         HelpBook.Section round = node(root, "rg-round", "Раунд и круги",
             () -> round(book));
         node(round, "rg-refresh", "Обновление", () -> refresh(book));
-        node(round, "rg-discard", "Слепой сброс приказа", () -> discard(book));
+        node(round, "rg-discard", "Отложенный приказ", () -> discard(book));
         node(round, "rg-circles", "Круг: все вскрывают приказ", () -> circles(book));
         node(round, "rg-coincidence", "Правило совпадения", () -> coincidence(book));
         node(round, "rg-return", "Возврат", () -> returnStep(book));
@@ -272,8 +272,8 @@ final class RulesBook {
         h.table2("Раунд по шагам", List.of(
             new String[]{"1 · Обновление", "первый игрок обновляет поле, все "
                 + "перекладывают модули (в первом раунде шаг пропускается)"},
-            new String[]{"2 · Слепой сброс", "одна карта приказа уходит под трофеи, не "
-                + "глядя"},
+            new String[]{"2 · Отложенный приказ", "одна карта приказа уходит рубашкой "
+                + "вверх под трофеи — тайна для ОСТАЛЬНЫХ, но не для себя"},
             new String[]{"3…" + (2 + numberOr(book, "rounds.circles_per_round", 4))
                 + " · Круги", "все одновременно вскрывают приказ и играют действия"},
             new String[]{"последний · Возврат", "карты в руку, трофеи и жетоны по местам, "

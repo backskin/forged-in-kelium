@@ -69,6 +69,11 @@ public final class OrderCardsPanel extends JComponent {
     /** Максимальный разворот крайней карты веера, градусы. */
     private static final double FAN_MAX_DEG = 46;
     /**
+     * Какую долю ширины панели веер имеет право занять. Больше — и он полезет на
+     * место текущей карты, которое стоит по центру.
+     */
+    private static final double FAN_ROOM = 0.44;
+    /**
      * Какую долю высоты компонента занимает ПОДЛОЖКА. Остальное сверху — запас,
      * в который карты законно выступают за её кромку.
      */
@@ -245,11 +250,19 @@ public final class OrderCardsPanel extends JComponent {
 
         Color deck = deckColour(p);
         // РАЗМЕР КАРТЫ С ЗАПАСОМ НА ПОВОРОТ. Карта выступает за кромку подложки,
-        // но должна остаться внутри компонента: повёрнутая карта веера занимает
-        // больше места по высоте, чем прямая, и без запаса её верхний угол
-        // обрубался краем (найдено снимком 20.08.2026).
-        double headroom = h * 0.12;
-        double cardH = Math.min(backH * 1.30, h - 2 * pad - headroom);
+        // но обязана остаться внутри компонента: у повёрнутой карты веера
+        // ДАЛЬНИЙ ВЕРХНИЙ УГОЛ поднимается выше её собственного верха примерно на
+        // полширины, умноженную на синус наклона, — и первые две сборки этот
+        // угол срезали краем (найдено снимками 20.08.2026).
+        //
+        // Запас берётся от FAN_MAX_DEG, а не от текущего числа карт: карта в руке
+        // появляется и уходит на ходу, и размер не должен от этого прыгать.
+        // КАРТА ЗАМЕТНО ВЫШЕ ПОДЛОЖКИ (просьба дизайнера 20.08.2026: «карты
+        // могут выезжать и быть даже выше краями, чем края своей панели»).
+        // Потолок держит один запас сверху: рисование обрезается границей
+        // КОМПОНЕНТА, и карта, выросшая до самого края, потеряла бы там угол.
+        // Разворот веера в этот запас не лезет — он ограничен отдельно (FAN_ROOM).
+        double cardH = Math.min(backH * 1.46, (h - 2 * pad) * 0.92);
         double cardW = cardH / CARD_RATIO;
         double cardTop = h - pad - cardH;
 
@@ -337,13 +350,26 @@ public final class OrderCardsPanel extends JComponent {
         List<String> hand = p.orderHand;
         int n = hand.size();
         if (n > 0) {
-            double step = n <= 1 ? 0 : Math.min(FAN_STEP_DEG, FAN_MAX_DEG * 2.0 / (n - 1));
+            double radius = h + cardH * 0.42 - cardTop;
+            // ВЕЕР НЕ ДОЛЖЕН ЗАЛЕЗАТЬ НА МЕСТО ТЕКУЩЕЙ КАРТЫ (найдено снимком
+            // полной руки 20.08.2026: при шести картах веер доходил до 281-го
+            // столбца из 470, то есть накрывал центр). Ограничение считается, а
+            // не подбирается на глаз: веер занимает
+            //     pad + cardW + 2 * lean,   где lean = radius * sin(разворот),
+            // значит из отведённой ему доли ширины прямо следует предельный
+            // разворот. Так веер сам поджимается, когда карт много, вместо того
+            // чтобы вылезать.
+            double room = w * FAN_ROOM - pad - cardW;
+            double maxLean = Math.max(0, room / 2.0);
+            double capDeg = Math.toDegrees(Math.asin(
+                Math.max(0, Math.min(1, maxLean / Math.max(1, radius)))));
+            double halfSpread = Math.min(FAN_MAX_DEG, capDeg);
+            double step = n <= 1 ? 0
+                : Math.min(FAN_STEP_DEG, halfSpread * 2.0 / (n - 1));
             double first = -step * (n - 1) / 2.0;
             double maxAngle = Math.toRadians(Math.max(Math.abs(first),
                 Math.abs(first + step * (n - 1))));
-            // МЕСТО ПОД РАЗВОРОТ: поворот вокруг точки ниже панели уводит верх
-            // карты в сторону, и без запаса крайняя карта уезжала бы за край.
-            double lean = (h + cardH * 0.42 - cardTop) * Math.sin(maxAngle);
+            double lean = radius * Math.sin(maxAngle);
             double pivotX = pad + cardW / 2.0 + lean;
             for (int i = 0; i < n; i++) {
                 String[] orders = handOrders(hand.get(i));
@@ -477,10 +503,18 @@ public final class OrderCardsPanel extends JComponent {
         g.setFont(Theme.font(size, style));
         g.setColor(ink);
         var fm = g.getFontMetrics();
-        String shown = text;
         int maxW = (int) (h - Theme.px(8));
-        while (shown.length() > 1 && fm.stringWidth(shown) > maxW) {
-            shown = shown.substring(0, shown.length() - 1);
+        // ОБРЕЗКА С МНОГОТОЧИЕМ. Без него «ПРИОБРЕТЕНИЕ» превращалось в
+        // «ПРИОБРЕТЕН» и читалось как другое слово: обрезку надо показывать, а
+        // не прятать. Полное название всегда есть в подсказке.
+        String shown = text;
+        if (fm.stringWidth(shown) > maxW) {
+            String tail = "…";
+            while (shown.length() > 1
+                    && fm.stringWidth(shown + tail) > maxW) {
+                shown = shown.substring(0, shown.length() - 1);
+            }
+            shown = shown + tail;
         }
         g.drawString(shown, 0, (float) (fm.getAscent() / 2.0 - Theme.px(1)));
         g.setTransform(saved);

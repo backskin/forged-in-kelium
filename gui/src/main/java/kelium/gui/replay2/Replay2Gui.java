@@ -515,7 +515,7 @@ public final class Replay2Gui {
      * компонента — без этого запаса выступающая часть просто обрубалась бы.
      */
     private static int orderPanelHeight() {
-        return Theme.px(158);
+        return Theme.px(196);
     }
 
     /**
