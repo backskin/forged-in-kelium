@@ -39,7 +39,8 @@ public final class Expansions {
      */
     public static final String MARKET_CARDS = "market_cards";
 
-    private static final String[] ALL =
+    /** Все дополнения — нужно и записи партии, чтобы сохранить их состояние. */
+    public static final String[] ALL =
         {SUPER_OBJECTIVES, STARTING_OBJECTIVES, SUPER_ARSENAL, MARKET_CARDS};
 
     /** Человеческое имя дополнения — для тумблера и для журнала. */

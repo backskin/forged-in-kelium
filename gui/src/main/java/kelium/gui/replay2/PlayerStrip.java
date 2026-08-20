@@ -126,7 +126,19 @@ public final class PlayerStrip extends JComponent {
 
     @Override
     public Dimension getMinimumSize() {
-        return new Dimension(Theme.px(180), Theme.px(Theme.H_STRIP_TIGHT));
+        // МИНИМУМ — ПО ФАКТИЧЕСКОМУ ВЕРХНЕМУ РЯДУ, а не по круглому числу
+        // (баг-фикс 20.08.2026, дизайнер: «слишком сильно скукоживается панель
+        // игроков, всё наезжает и уже потом начинает прокручиваться»).
+        //
+        // Раньше здесь стояло 180 пикселей. Пока в ряду были только плашка
+        // игрока и одна кнопка, этого хватало; с приходом второй кнопки
+        // («Приказы») ряд стал шире минимума, и при сжатии окна кнопки лезли
+        // друг на друга — прокрутка включалась ПОЗЖЕ, чем начиналась порча.
+        // Теперь минимум знает, сколько ряд занял на самом деле: сжатие
+        // останавливается ровно там, где ряд ещё цел.
+        int need = topRowRight > 0 ? topRowRight + Theme.px(14) : Theme.px(180);
+        return new Dimension(Math.max(Theme.px(180), need),
+            Theme.px(Theme.H_STRIP_TIGHT));
     }
 
     // ==================== показатели ====================
@@ -311,6 +323,12 @@ public final class PlayerStrip extends JComponent {
         g.setColor(ordersOpen || overOrders ? Theme.ink() : Theme.ink2());
         g.drawString(ORDERS_LABEL, ob.x + Theme.px(17),
             ob.y + ob.height / 2 + Theme.px(4));
+        // ЗАПОМНИТЬ, СКОЛЬКО РЯД ЗАНЯЛ: плюс место под победные очки справа.
+        int rowRight = ob.x + ob.width + Theme.px(46);
+        if (rowRight != topRowRight) {
+            topRowRight = rowRight;
+            revalidate();   // минимум изменился — раскладке надо об этом знать
+        }
 
         // ---- РАСКЛАД ИГРОКА строкой под именем: колода приказов и стороны его
         // двух планшетов (просьба дизайнера 14.08.2026). Это не украшение: колода
@@ -981,6 +999,11 @@ public final class PlayerStrip extends JComponent {
     private int ordersX = -1;
     private int ordersY;
     private int ordersW;
+    /**
+     * Правый край верхнего ряда после последней отрисовки — от него считается
+     * минимальная ширина полосы (см. {@link #getMinimumSize}).
+     */
+    private int topRowRight;
     /** Место кнопки считается при отрисовке: оно зависит от ширины плашки игрока. */
     private int boardX = -1;
     private int boardY;

@@ -77,6 +77,14 @@ public final class GameRecorder {
     /** Кого можно посадить на место (состав не зависит от числа игроков). */
     public static final List<SeatOption> SEAT_OPTIONS = seatOptions(4);
 
+        /** Запомнить в записи, какие дополнения были включены. */
+    private static void rememberExpansions(ReplayRecord rec) {
+        var settings = kelium.dataio.AppSettings.of("replay2");
+        for (String name : Expansions.ALL) {
+            rec.expansions.put(name, Expansions.on(settings, name));
+        }
+    }
+
     /** Человеческое название бота по имени. */
     public static String botLabel(String id) {
         return kelium.agents.BotCatalog.label(id);
@@ -140,6 +148,10 @@ public final class GameRecorder {
         GameState state = Setup.buildGame(cfg, blockSeed);
         ReplayRecord rec = header(cfg, state, players, seed, seatIds, scenarioId, cuFacing);
         rec.scenarioFile = scenarioFile == null ? null : scenarioFile.toString();
+        // СОСТОЯНИЕ ДОПОЛНЕНИЙ — В ЗАПИСЬ (20.08.2026). Тот же сид и свод при
+        // других тумблерах дают ДРУГУЮ партию, поэтому без этого запись нельзя
+        // было повторить, а по логу — понять, что её породило.
+        rememberExpansions(rec);
 
         List<ReplayRecord.Thought> pending = new ArrayList<>();
         List<Agent> agents = buildAgents(state, seed, rec.seatIds,
@@ -185,6 +197,10 @@ public final class GameRecorder {
         GameState state = Setup.buildGame(cfg, blockSeed);
         ReplayRecord rec = header(cfg, state, players, seed, seatIds, scenarioId, cuFacing);
         rec.scenarioFile = scenarioFile == null ? null : scenarioFile.toString();
+        // СОСТОЯНИЕ ДОПОЛНЕНИЙ — В ЗАПИСЬ (20.08.2026). Тот же сид и свод при
+        // других тумблерах дают ДРУГУЮ партию, поэтому без этого запись нельзя
+        // было повторить, а по логу — понять, что её породило.
+        rememberExpansions(rec);
         ReplayRecord.Frame f = new ReplayRecord.Frame();
         f.type = "setup_preview";
         f.log = "РАССТАНОВКА — " + players + " игроков, поле "
@@ -622,7 +638,8 @@ public final class GameRecorder {
             return op;
         }
 
-        private String order(String cid) {
+
+    private String order(String cid) {
             try {
                 Map<String, Object> c = cfg.content.get("orders").byId(cid);
                 if (Boolean.TRUE.equals(c.get("joker"))) {

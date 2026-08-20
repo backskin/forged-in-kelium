@@ -249,21 +249,140 @@ public final class Shapes {
             return false;
         }
         int needAnchors = p.get("anchor_count") instanceof Number n ? n.intValue() : 2;
-        List<Set<String>> anchorSets = anchorSets(s, seat,
-            String.valueOf(p.getOrDefault("anchors", "own_miner_hexes")), needAnchors);
+        String kind = String.valueOf(p.getOrDefault("anchors", "own_miner_hexes"));
         for (Set<String> group : groups) {
-            boolean hit = false;
-            for (Set<String> anchors : anchorSets) {
-                if (group.containsAll(anchors)) {
-                    hit = true;
-                    break;
-                }
-            }
-            if (hit && groupSatisfiesExtras(s, seat, group, p)) {
+            if (anchorsHit(s, seat, kind, needAnchors, group)
+                    && groupSatisfiesExtras(s, seat, group, p)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * НАКРЫВАЕТ ЛИ ГРУППА НУЖНЫЕ ОПОРЫ — СЧЁТОМ, А НЕ ПЕРЕБОРОМ НАБОРОВ.
+     *
+     * <p>БАГ-ФИКС 20.08.2026 (дизайнер: «бесконечная анимация „считаю партию“»).
+     * Прежде опоры разворачивались во ВСЕ СОЧЕТАНИЯ нужного размера, и группа
+     * сверялась с каждым. Для «двух гексов у края поля» это ещё терпимо, но у
+     * новой карты o61 требуется ТРИ края: на поле их около тридцати, значит
+     * C(30,3) — четыре тысячи наборов. А спрашивают это не раз в ход, а на КАЖДЫЙ
+     * рассматриваемый выбор бота (наведение по заданиям зовёт progress у каждой
+     * карты руки дважды), то есть миллионы проверок за партию — расчёт вставал
+     * насмерть.
+     *
+     * <p>Перебор был не нужен: «группа накрывает хотя бы один набор из k опор»
+     * равносильно «в группе есть хотя бы k опорных гексов». Считаем — и получаем
+     * тот же ответ за один проход по группе.
+     *
+     * <p>Два вида опор считать простым числом НЕЛЬЗЯ, и они разобраны отдельно:
+     * у «своё здание и чужое» опоры берутся из ДВУХ разных множеств (две своих
+     * базы не годятся), а «прямая» и «вокруг зарождения» — это не количество, а
+     * взаимное расположение.
+     */
+    private static boolean anchorsHit(GameState s, int seat, String kind, int need,
+                                      Set<String> group) {
+        switch (kind) {
+            case "own_miner_hexes" -> {
+                Set<String> mine = new java.util.LinkedHashSet<>(minerHexes(s, seat));
+                mine.retainAll(group);
+                return mine.size() >= need;
+            }
+            case "field_edge_cells" -> {
+                int n = 0;
+                for (String id : group) {
+                    Hex h = s.field.hexes.get(id);
+                    if (h == null) {
+                        continue;
+                    }
+                    for (int side = 0; side < 6; side++) {
+                        if (h.neighborBySide[side] == null) {
+                            n++;
+                            break;
+                        }
+                    }
+                    if (n >= need) {
+                        return true;
+                    }
+                }
+                return n >= need;
+            }
+            case "start_spawn_adjacent" -> {
+                Set<String> near = new java.util.LinkedHashSet<>();
+                for (Hex h : s.field.hexes.values()) {
+                    if (h.spawnTile == null || !h.spawnTile.isStart) {
+                        continue;
+                    }
+                    for (int side = 0; side < 6; side++) {
+                        String nb = h.neighborBySide[side];
+                        if (nb != null) {
+                            near.add(nb);
+                        }
+                    }
+                }
+                near.retainAll(group);
+                return near.size() >= need;
+            }
+            case "own_and_enemy_building" -> {
+                boolean mine = false;
+                boolean theirs = false;
+                for (BuildingToken b : s.player(seat).buildingsOnField()) {
+                    mine |= group.contains(b.hexId);
+                }
+                for (PlayerState other : s.players) {
+                    if (other.seat == seat) {
+                        continue;
+                    }
+                    for (BuildingToken b : other.buildingsOnField()) {
+                        theirs |= group.contains(b.hexId);
+                    }
+                }
+                return mine && theirs;
+            }
+            case "straight_line" -> {
+                // РАСПОЛОЖЕНИЕ, А НЕ КОЛИЧЕСТВО: ищем прямую из need гексов,
+                // целиком лежащую в группе. Перебор идёт по гексам ГРУППЫ, а не
+                // по всему полю, поэтому он мал.
+                for (String id : group) {
+                    Hex h = s.field.hexes.get(id);
+                    if (h == null) {
+                        continue;
+                    }
+                    for (int dir = 0; dir < 6; dir++) {
+                        int len = 0;
+                        Hex at = h;
+                        while (at != null && group.contains(at.id) && len < need) {
+                            len++;
+                            String nb = at.neighborBySide[dir];
+                            at = nb == null ? null : s.field.get(nb);
+                        }
+                        if (len >= need) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            case "opposite_around_spawn" -> {
+                for (Hex h : s.field.hexes.values()) {
+                    if (!h.hasSpawnTile()) {
+                        continue;
+                    }
+                    for (int dir = 0; dir < 3; dir++) {
+                        String a = h.neighborBySide[dir];
+                        String b = h.neighborBySide[(dir + 3) % 6];
+                        if (a != null && b != null
+                                && group.contains(a) && group.contains(b)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            default -> {
+                return false;
+            }
+        }
     }
 
     /** Узлы игрока, отфильтрованные по {@code what} с карты. */

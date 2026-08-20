@@ -2,6 +2,7 @@ package kelium.gui.replay2;
 
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -13,6 +14,7 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.JComponent;
 import javax.swing.ToolTipManager;
@@ -21,33 +23,40 @@ import kelium.report.ReplayRecord;
 
 /**
  * КАРТЫ ПРИКАЗОВ ИГРОКА — панель, выезжающая из-под его полосы (заказ дизайнера
- * 19.08.2026).
+ * 19–20.08.2026).
  *
- * <p>ЧТО ПОКАЗЫВАЕТ, в порядке слева направо, ровно как это лежит на столе:
+ * <p>ЧТО ПОКАЗЫВАЕТ, СЛЕВА НАПРАВО — в том же порядке, в каком карта и живёт
+ * (решение дизайнера 20.08.2026):
  * <ul>
- *   <li><b>слева</b> — СТОПКА уже разыгранных карт, лицом вверх, со сдвигом,
- *       чтобы читалась глубина стопки;</li>
- *   <li><b>по центру</b> — карта ЭТОГО круга, крупнее и с рамкой: она сейчас
- *       и работает;</li>
- *   <li><b>справа</b> — то, что осталось В РУКЕ, веером: одна карта стоит
- *       прямо, несколько разворачиваются вокруг общей точки ниже панели, как
- *       держат карты в руке.</li>
+ *   <li><b>слева</b> — РУКА веером: одна карта стоит прямо, несколько
+ *       разворачиваются вокруг общей точки ниже панели, как держат карты;</li>
+ *   <li><b>по центру</b> — карта ЭТОГО круга, крупнее и в рамке; когда круг
+ *       ещё не начался, здесь пустое место с пунктирной рамкой, а не провал;</li>
+ *   <li><b>справа</b> — СБРОС: отыгранные карты стопкой, в порядке кругов.</li>
  * </ul>
  *
- * <p>ПОЧЕМУ ВЕЕР СЧИТАЕТСЯ ВОКРУГ ТОЧКИ НИЖЕ ПАНЕЛИ, а не вокруг центра карты:
- * иначе карты расходятся «звёздочкой» и наезжают друг на друга низом. Ось
- * вращения у настоящей руки — в кисти, то есть ниже карт, и от этого веер
- * раскрывается вверх, а корешки остаются рядом.
+ * <p>КАРТЫ ЕЗДЯТ, А НЕ ПЕРЕПРЫГИВАЮТ. Место каждой карты считается в раскладку
+ * «номер карты → место», и панель помнит ПРЕДЫДУЩУЮ раскладку: при смене кадра
+ * карта плавно идёт со своего старого места на новое — из руки в центр, когда её
+ * разыграли, и из центра в сброс, когда круг кончился. Направление движения
+ * совпадает с чтением, слева направо, поэтому глаз успевает за картой.
+ *
+ * <p>КАРТЫ ВЫХОДЯТ ЗА ВЕРХНЮЮ КРОМКУ ПОДЛОЖКИ — так и задумано (просьба
+ * дизайнера 20.08.2026). Подложка занимает лишь нижнюю часть компонента, а карты
+ * рисуются выше её края. Поэтому сам компонент делается ВЫШЕ подложки: Swing
+ * обрезает рисование по границам компонента, и без запаса сверху карты обрубались
+ * бы ровно там, где должны выступать.
+ *
+ * <p>ЦВЕТ КАРТ — ЦВЕТ КОЛОДЫ ИГРОКА ({@code orderColor}), а не общий серый: у
+ * каждого своя колода приказов, это главная асимметрия партии, и когда открыты
+ * четыре панели сразу, цвет — единственный быстрый способ не спутать, чьи карты
+ * перед тобой.
  *
  * <p>Панель НЕ ХРАНИТ СОСТОЯНИЕ ПАРТИИ: всё берётся из кадра записи в момент
- * рисования ({@code snapshot.players.get(seat)} — там лежат {@code orderPlayed},
- * {@code orderHand} и {@code orderSetAside}), а карта круга — из
- * {@code record.orderPlays}. Значит панель верна на любом кадре, включая
- * промотку назад, и не может разойтись с полосой игрока.
- *
- * <p>{@link #setOpen(double)} — доля выезда от 0 до 1; ею анимируют появление.
- * Само движение и место панели задаёт тот, кто её вставил: панель только
- * рисует себя и умеет сказать, какая карта под курсором.
+ * рисования. Разыгранные и текущая — из {@code record.orderPlays} (только там
+ * есть действия приказов, совпадение и открытие низа), рука — из
+ * {@code snapshot.players.get(seat).orderHand}, а приказы карты, ещё лежащей в
+ * руке, спрашиваются у каталога приказов.
  */
 public final class OrderCardsPanel extends JComponent {
 
@@ -56,13 +65,41 @@ public final class OrderCardsPanel extends JComponent {
     /** Пропорции карты приказа — те же, что у таблицы приказов. */
     private static final double CARD_RATIO = 184.0 / 132.0;
     /** Наклон между соседними картами веера, градусы. */
-    private static final double FAN_STEP_DEG = 11;
+    private static final double FAN_STEP_DEG = 16;
     /** Максимальный разворот крайней карты веера, градусы. */
-    private static final double FAN_MAX_DEG = 34;
+    private static final double FAN_MAX_DEG = 46;
+    /**
+     * Какую долю высоты компонента занимает ПОДЛОЖКА. Остальное сверху — запас,
+     * в который карты законно выступают за её кромку.
+     */
+    private static final double BACK_FRACTION = 0.72;
 
     private final Session session;
     private int seat;
     private double open = 1.0;
+
+    /**
+     * ПЕРЕХОД МЕЖДУ РАСКЛАДКАМИ. {@code from} — где карты были, {@code to} — где
+     * должны стоять, {@code t} — насколько переход прошёл (0..1). Пока t < 1,
+     * каждая карта рисуется между своими двумя местами.
+     */
+    private Map<String, Slot> from = Map.of();
+    private Map<String, Slot> to = Map.of();
+    private double t = 1;
+    private javax.swing.Timer move;
+    /** По какому состоянию посчитана {@code to} — чтобы не пересчитывать зря. */
+    private String stamp = "";
+    /**
+     * ИДЁТ ЛИ ВОСПРОИЗВЕДЕНИЕ. Панель не знает про пульт и не должна знать —
+     * ей достаточно ответа «да/нет», который подставляет окно. Нужно, чтобы
+     * анимировать только на плее: при шаге по кадрам руками движение мешает.
+     */
+    private java.util.function.BooleanSupplier playing;
+
+    /** Место одной карты: где, какого размера, под каким углом и что за карта. */
+    private record Slot(double x, double y, double w, double h, double angle,
+                        boolean active, String top, String bottom, String tip) {
+    }
 
     /** Что нарисовано и где — для подсказок под курсором. */
     private final List<Hit> hits = new ArrayList<>();
@@ -96,9 +133,14 @@ public final class OrderCardsPanel extends JComponent {
         return open;
     }
 
+    /** Откуда узнавать, идёт ли воспроизведение (см. {@link #playing}). */
+    public void setPlayingSource(java.util.function.BooleanSupplier source) {
+        this.playing = source;
+    }
+
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(Theme.px(320), Theme.px(96));
+        return new Dimension(Theme.px(320), Theme.px(132));
     }
 
     // ==================================================================
@@ -114,29 +156,52 @@ public final class OrderCardsPanel extends JComponent {
     }
 
     /**
-     * Карта ЭТОГО круга: последняя вскрытая на текущем кадре.
+     * ВСЁ ВСКРЫТОЕ ЗА ЭТОТ РАУНД, ПО ПОРЯДКУ КРУГОВ.
      *
-     * <p>Берётся из {@code orderPlays}, а не из руки: только там видно, какая
-     * карта уже вскрыта, а какая ещё лежит рубашкой вверх — по самой руке этого
-     * не понять.
+     * <p>Берётся из {@code orderPlays}, а не из {@code orderPlayed}: в списке
+     * игрока лежат только коды карт, а здесь есть и действия приказов, и
+     * совпадение, и открытие низа — то, ради чего дизайнер и просил показывать
+     * состояние. Порядок кругов заодно даёт правильную последовательность стопки.
      */
-    private ReplayRecord.OrderPlay current() {
+    private List<ReplayRecord.OrderPlay> revealed() {
+        List<ReplayRecord.OrderPlay> out = new ArrayList<>();
         ReplayRecord rec = session.record();
         ReplayRecord.Frame f = session.frame();
         if (rec == null || f == null) {
-            return null;
+            return out;
         }
         int idx = session.cursor();
-        ReplayRecord.OrderPlay best = null;
         for (ReplayRecord.OrderPlay op : rec.orderPlays) {
-            if (op.seat != seat || op.round != f.round || op.revealFrame > idx) {
-                continue;
-            }
-            if (best == null || op.circle > best.circle) {
-                best = op;
+            if (op.seat == seat && op.round == f.round && op.revealFrame <= idx) {
+                out.add(op);
             }
         }
-        return best;
+        out.sort((a, b) -> Integer.compare(a.circle, b.circle));
+        return out;
+    }
+
+    /** Приказы карты, ещё лежащей в руке: {@code {верх, низ}} или null. */
+    private String[] handOrders(String cardId) {
+        try {
+            Map<String, Object> c = session.content().get("orders").byId(cardId);
+            if (Boolean.TRUE.equals(c.get("joker"))) {
+                return new String[]{"joker", null};
+            }
+            Object bottom = c.get("bottom");
+            return new String[]{String.valueOf(c.get("top")),
+                bottom == null ? null : String.valueOf(bottom)};
+        } catch (RuntimeException e) {
+            // Каталог приказов может быть недоступен (запись открыта без правил).
+            // Это не повод падать: покажем карту без приказов.
+            return null;
+        }
+    }
+
+    private Color deckColour(ReplayRecord.Player p) {
+        if (p.orderColor == null || p.orderColor.isBlank()) {
+            return Theme.tile();
+        }
+        return Names.orderDeckColour(p.orderColor);
     }
 
     // ==================================================================
@@ -149,6 +214,10 @@ public final class OrderCardsPanel extends JComponent {
         if (open <= 0.001) {
             return;
         }
+        ReplayRecord.Player p = me();
+        if (p == null) {
+            return;
+        }
         Graphics2D g = (Graphics2D) g0.create();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
@@ -156,26 +225,17 @@ public final class OrderCardsPanel extends JComponent {
         int w = getWidth();
         int h = getHeight();
         double pad = Theme.px(6);
+        double backTop = h * (1 - BACK_FRACTION);
+        double backH = h - backTop;
 
-        ReplayRecord.Player p = me();
-        if (p == null) {
-            g.dispose();
-            return;
-        }
-
-        // ВЫЕЗД ЦЕЛИКОМ, ВМЕСТЕ С ПОДЛОЖКОЙ. Сдвиг ставится ДО подложки, иначе
-        // фон панели возникал бы скачком в полный размер, а карты подъезжали
-        // внутри него — это читалось бы не как «выехала панель», а как «мигнул
-        // прямоугольник». Сдвиг на полную высоту: при open = 0 всё содержимое
-        // уходит ниже своей же нижней кромки и обрезается, то есть панель
-        // буквально прячется под полосу игрока.
+        // ВЫЕЗД ЦЕЛИКОМ, ВМЕСТЕ С ПОДЛОЖКОЙ: сдвиг ставится ДО неё, иначе фон
+        // возникал бы скачком в полный размер, а карты подъезжали внутри него —
+        // это читалось бы не как «выехала панель», а как «мигнул прямоугольник».
         g.translate(0, (1 - open) * h);
-        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
-            (float) Math.min(1.0, 0.35 + 0.65 * open)));
+        float slide = (float) Math.min(1.0, 0.35 + 0.65 * open);
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, slide));
 
-        // ПОДЛОЖКА. Панель перекрывает поле, поэтому она обязана быть плотной —
-        // сквозь полупрозрачную читались бы гексы, и карты стали бы неразборчивы.
-        Shape back = new RoundRectangle2D.Double(0, 0, w - 1, h - 1,
+        Shape back = new RoundRectangle2D.Double(0, backTop, w - 1, backH - 1,
             Theme.px(10), Theme.px(10));
         g.setColor(Theme.panel());
         g.fill(back);
@@ -183,116 +243,312 @@ public final class OrderCardsPanel extends JComponent {
         g.setStroke(new BasicStroke(1f));
         g.draw(back);
 
-        double cardH = h - 2 * pad;
+        Color deck = deckColour(p);
+        // РАЗМЕР КАРТЫ С ЗАПАСОМ НА ПОВОРОТ. Карта выступает за кромку подложки,
+        // но должна остаться внутри компонента: повёрнутая карта веера занимает
+        // больше места по высоте, чем прямая, и без запаса её верхний угол
+        // обрубался краем (найдено снимком 20.08.2026).
+        double headroom = h * 0.12;
+        double cardH = Math.min(backH * 1.30, h - 2 * pad - headroom);
         double cardW = cardH / CARD_RATIO;
+        double cardTop = h - pad - cardH;
 
-        // ---------- слева: стопка разыгранных ----------
-        double x = pad;
-        List<String> played = new ArrayList<>(p.orderPlayed);
-        ReplayRecord.OrderPlay cur = current();
-        // Карта круга не должна попасть и в стопку: на столе она лежит отдельно,
-        // перед игроком, а не поверх отыгранных.
-        if (cur != null && !played.isEmpty() && played.get(played.size() - 1).equals(cur.card)) {
-            played.remove(played.size() - 1);
-        }
-        double stackStep = Theme.px(11);
-        for (int i = 0; i < played.size(); i++) {
-            double cx = x + i * stackStep;
-            drawCard(g, cx, pad, cardW, cardH, played.get(i), false, 0,
-                "Разыграно: " + Names.order(played.get(i)));
-        }
-        double stackW = played.isEmpty() ? 0 : cardW + (played.size() - 1) * stackStep;
+        Map<String, Slot> want = layout(p, w, h, cardTop, cardW, cardH, pad);
+        syncTransition(want);
 
-        // ---------- по центру: карта этого круга ----------
-        double centreX = Math.max(x + stackW + Theme.px(10), (w - cardW) / 2.0);
-        if (cur != null) {
-            StringBuilder tip = new StringBuilder();
-            tip.append("Круг ").append(cur.circle).append(" · ").append(Names.order(cur.top));
-            if (cur.coincided) {
-                tip.append("\nПриказ СОВПАЛ — верх не сработал");
+        // ПУСТОЕ МЕСТО ПОД ТЕКУЩУЮ КАРТУ. Круг может быть ещё не начат — тогда в
+        // центре карты нет, и без метки панель выглядела бы поломанной.
+        boolean anyActive = false;
+        for (Slot s : want.values()) {
+            anyActive |= s.active();
+        }
+        if (!anyActive) {
+            Shape hole = new RoundRectangle2D.Double((w - cardW) / 2.0, cardTop,
+                cardW, cardH, Theme.px(6), Theme.px(6));
+            g.setColor(Theme.alpha(Theme.ink3(), 0.55));
+            g.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT,
+                BasicStroke.JOIN_ROUND, 0, new float[]{5, 5}, 0));
+            g.draw(hole);
+        }
+
+        // КАРТЫ РИСУЮТСЯ МЕЖДУ ДВУМЯ РАСКЛАДКАМИ. Карта, которой в новой
+        // раскладке нет, гаснет на месте, новая — проявляется: так уход в сброс и
+        // приход новой карты видны, а не случаются мгновенно.
+        java.util.LinkedHashSet<String> ids = new java.util.LinkedHashSet<>(from.keySet());
+        ids.addAll(to.keySet());
+        List<String> order = new ArrayList<>(ids);
+        // Активная — последней, чтобы легла поверх веера и стопки.
+        order.sort((a, b) -> Boolean.compare(isActive(a), isActive(b)));
+        for (String id : order) {
+            Slot a = from.get(id);
+            Slot b = to.get(id);
+            if (a == null && b == null) {
+                continue;
             }
-            if (cur.bottom != null && cur.bottomOpen) {
-                tip.append("\nСнизу: ").append(Names.order(cur.bottom));
+            Slot at = (a != null && b != null) ? lerp(a, b, t) : (b != null ? b : a);
+            double fade = a == null ? t : (b == null ? 1 - t : 1);
+            java.awt.Composite savedComp = g.getComposite();
+            if (fade < 1) {
+                g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
+                    (float) Math.max(0, Math.min(1, fade)) * slide));
             }
-            drawCard(g, centreX, pad - Theme.px(3), cardW, cardH + Theme.px(6),
-                cur.top, true, 0, tip.toString());
-        }
-
-        // ---------- справа: рука веером ----------
-        List<String> hand = p.orderHand;
-        if (!hand.isEmpty()) {
-            int n = hand.size();
-            double step = n <= 1 ? 0 : Math.min(FAN_STEP_DEG, FAN_MAX_DEG * 2 / (n - 1));
-            double first = -step * (n - 1) / 2.0;
-            // ОСЬ ВРАЩЕНИЯ НИЖЕ ПАНЕЛИ — как кисть руки, держащей карты.
-            double pivotY = h + cardH * 0.55;
-            // МЕСТО ПОД РАЗВОРОТ. Поворот вокруг точки НИЖЕ панели уводит верх
-            // карты в сторону тем сильнее, чем дальше ось: при первой сборке
-            // крайняя карта веера уезжала за правый край панели и обрезалась.
-            // Считаем этот вылет и отступаем на него от края.
-            double maxAngle = Math.toRadians(Math.max(Math.abs(first), Math.abs(first + step * (n - 1))));
-            double lean = (pivotY - pad) * Math.sin(maxAngle);
-            double pivotX = w - pad - cardW / 2.0 - lean;
-            for (int i = 0; i < n; i++) {
-                double angle = first + step * i;
-                AffineTransform saved = g.getTransform();
-                g.rotate(Math.toRadians(angle), pivotX, pivotY);
-                drawCard(g, pivotX - cardW / 2.0, pad, cardW, cardH,
-                    hand.get(i), false, angle, "В руке: " + Names.order(hand.get(i)));
-                g.setTransform(saved);
+            AffineTransform savedTr = g.getTransform();
+            if (Math.abs(at.angle()) > 0.01) {
+                g.rotate(Math.toRadians(at.angle()),
+                    at.x() + at.w() / 2.0, h + at.h() * 0.42);
             }
-        }
-
-        // ---------- отложенная карта ----------
-        if (p.orderSetAside != null && !p.orderSetAside.isBlank()) {
-            g.setFont(Theme.font(10, Font.PLAIN));
-            g.setColor(Theme.ink3());
-            g.drawString("отложена: " + Names.order(p.orderSetAside),
-                (float) pad, (float) (h - Theme.px(3)));
+            drawCard(g, at.x(), at.y(), at.w(), at.h(), deck, at.active(),
+                at.top(), at.bottom(), at.tip());
+            g.setTransform(savedTr);
+            g.setComposite(savedComp);
         }
         g.dispose();
     }
 
+    private boolean isActive(String id) {
+        Slot s = to.get(id);
+        return s != null && s.active();
+    }
+
+    /** Промежуточное место карты; сглаживание, чтобы движение не было рывком. */
+    private static Slot lerp(Slot a, Slot b, double t) {
+        double k = t * t * (3 - 2 * t);
+        return new Slot(a.x() + (b.x() - a.x()) * k, a.y() + (b.y() - a.y()) * k,
+            a.w() + (b.w() - a.w()) * k, a.h() + (b.h() - a.h()) * k,
+            a.angle() + (b.angle() - a.angle()) * k,
+            b.active(), b.top(), b.bottom(), b.tip());
+    }
+
     /**
-     * Одна карта приказа: подложка, рамка, название.
+     * РАСКЛАДКА: где какая карта стоит при текущем кадре.
      *
-     * <p>Область для подсказки запоминается В ЭКРАННЫХ координатах — с учётом
-     * поворота веера. Иначе подсказка у наклонённой карты ловилась бы по
-     * невернутому прямоугольнику и срабатывала бы не там, где карта нарисована.
+     * <p>Слева направо — рука, текущая, сброс (решение дизайнера 20.08.2026): так
+     * карта едет в ту же сторону, в какую читают, и движение «из руки в центр, из
+     * центра в сброс» понятно без объяснений.
+     */
+    private Map<String, Slot> layout(ReplayRecord.Player p, int w, int h,
+                                     double cardTop, double cardW, double cardH,
+                                     double pad) {
+        Map<String, Slot> out = new java.util.LinkedHashMap<>();
+        List<ReplayRecord.OrderPlay> seen = revealed();
+        ReplayRecord.OrderPlay cur = seen.isEmpty() ? null : seen.get(seen.size() - 1);
+
+        // ---------- слева: рука веером ----------
+        List<String> hand = p.orderHand;
+        int n = hand.size();
+        if (n > 0) {
+            double step = n <= 1 ? 0 : Math.min(FAN_STEP_DEG, FAN_MAX_DEG * 2.0 / (n - 1));
+            double first = -step * (n - 1) / 2.0;
+            double maxAngle = Math.toRadians(Math.max(Math.abs(first),
+                Math.abs(first + step * (n - 1))));
+            // МЕСТО ПОД РАЗВОРОТ: поворот вокруг точки ниже панели уводит верх
+            // карты в сторону, и без запаса крайняя карта уезжала бы за край.
+            double lean = (h + cardH * 0.42 - cardTop) * Math.sin(maxAngle);
+            double pivotX = pad + cardW / 2.0 + lean;
+            for (int i = 0; i < n; i++) {
+                String[] orders = handOrders(hand.get(i));
+                out.put(hand.get(i), new Slot(pivotX - cardW / 2.0, cardTop, cardW, cardH,
+                    first + step * i, false,
+                    orders == null ? null : orders[0],
+                    orders == null ? null : orders[1],
+                    tipForHand(orders)));
+            }
+        }
+
+        // ---------- по центру: карта этого круга ----------
+        if (cur != null) {
+            out.put(cur.card, new Slot((w - cardW) / 2.0, cardTop - Theme.px(6),
+                cardW, cardH + Theme.px(6), 0, true, cur.top, cur.bottom,
+                tipFor(cur, "Круг " + cur.circle + " — играется сейчас")));
+        }
+
+        // ---------- справа: сброс стопкой, в порядке кругов ----------
+        int done = Math.max(0, seen.size() - 1);
+        double stackStep = Theme.px(13);
+        double right = w - pad - cardW;
+        for (int i = 0; i < done; i++) {
+            ReplayRecord.OrderPlay op = seen.get(i);
+            // Первая сыгранная — дальше всех вправо, последняя ближе к центру:
+            // стопка растёт в ту же сторону, куда карты и уходят.
+            double x = right - (done - 1 - i) * stackStep;
+            out.put(op.card, new Slot(x, cardTop, cardW, cardH, 0, false,
+                op.top, op.bottom, tipFor(op, "Сброс, круг " + op.circle)));
+        }
+        return out;
+    }
+
+    /**
+     * Заметить смену состояния и завести переход.
+     *
+     * <p>АНИМАЦИЯ ТОЛЬКО НА ВОСПРОИЗВЕДЕНИИ (решение дизайнера 20.08.2026). Когда
+     * разбор стоит и человек шагает по кадрам руками, движение только мешает: шаг
+     * должен показывать состояние сразу, а не догонять его полсекунды.
+     */
+    private void syncTransition(Map<String, Slot> want) {
+        StringBuilder mark = new StringBuilder();
+        for (Map.Entry<String, Slot> e : want.entrySet()) {
+            mark.append(e.getKey()).append(':').append(e.getValue().active())
+                .append(',').append(Math.round(e.getValue().x()))
+                .append(',').append(Math.round(e.getValue().angle())).append(';');
+        }
+        String now = mark.toString();
+        if (now.equals(stamp)) {
+            to = want;
+            return;
+        }
+        stamp = now;
+        if (playing == null || !playing.getAsBoolean()) {
+            from = want;
+            to = want;
+            t = 1;
+            return;
+        }
+        // Отсчёт с ТЕКУЩЕГО нарисованного положения, а не с прошлой цели: иначе
+        // карта, застигнутая на полпути, прыгнула бы назад и поехала заново.
+        Map<String, Slot> mid = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Slot> e : to.entrySet()) {
+            Slot a = from.get(e.getKey());
+            mid.put(e.getKey(), a == null ? e.getValue() : lerp(a, e.getValue(), t));
+        }
+        from = mid;
+        to = want;
+        t = 0;
+        if (move == null) {
+            move = new javax.swing.Timer(16, e -> {
+                t = Math.min(1, t + 0.09);
+                if (t >= 1) {
+                    from = to;
+                    ((javax.swing.Timer) e.getSource()).stop();
+                }
+                repaint();
+            });
+        }
+        move.restart();
+    }
+
+
+    /**
+     * Одна карта приказа: подложка цвета колоды, рамка и ДВА приказа — верхний и
+     * нижний (просьба дизайнера 20.08.2026).
+     *
+     * <p>ДВА ЗАЛИВА, А НЕ ОДИН ПОЛУПРОЗРАЧНЫЙ. Сперва плотный цвет панели, потом
+     * поверх — оттенок колоды. Одной полупрозрачной заливкой цвета колоды карта
+     * стала бы просвечивать, а карты ВЫСТУПАЮТ за кромку подложки — сквозь них
+     * читались бы гексы поля, и ни цвет, ни подписи разобрать было бы нельзя.
+     *
+     * <p>Верх и низ разделены чертой и подписаны разным весом: верхний приказ
+     * играется всегда, нижний — только когда открылся, и путать их нельзя.
      */
     private void drawCard(Graphics2D g, double x, double y, double w, double h,
-                          String code, boolean active, double angleDeg, String tip) {
+                          Color deck, boolean active, String top, String bottom,
+                          String tip) {
         Shape card = new RoundRectangle2D.Double(x, y, w, h, Theme.px(6), Theme.px(6));
-        g.setColor(active ? Theme.paper() : Theme.tile());
+        g.setColor(Theme.panel());
         g.fill(card);
-        g.setColor(active ? Theme.accent() : Theme.border());
-        g.setStroke(new BasicStroke(active ? 2f : 1f));
+        g.setColor(Theme.alpha(deck, active ? 0.42 : 0.24));
+        g.fill(card);
+        g.setColor(active ? Theme.accent() : Theme.alpha(deck, 0.85));
+        g.setStroke(new BasicStroke(active ? 2.2f : 1.2f));
         g.draw(card);
 
-        // НАЗВАНИЕ ВДОЛЬ КАРТЫ. Карта узкая, поперёк текст не влезает даже
-        // сокращённым, поэтому подпись повёрнута на 90 градусов — читается
-        // снизу вверх, как на корешке книги.
-        String name = Names.order(code);
-        g.setFont(Theme.font(active ? 11 : 10, active ? Font.BOLD : Font.PLAIN));
+        // ЧЕРТА МЕЖДУ ВЕРХОМ И НИЗОМ — там же, где она на печатной карте.
+        double split = y + h * 0.56;
+        g.setColor(Theme.alpha(deck, 0.7));
+        g.setStroke(new BasicStroke(1f));
+        g.draw(new java.awt.geom.Line2D.Double(x + Theme.px(3), split,
+            x + w - Theme.px(3), split));
+
+        // ПОДПИСИ ВДОЛЬ КАРТЫ. Карта узкая, поперёк не влезает даже сокращённое
+        // название, поэтому текст повёрнут и читается снизу вверх, как корешок.
+        drawAlong(g, top == null ? "?" : Names.order(top), x, y, w, split - y,
+            active ? Font.BOLD : Font.PLAIN, active ? 11 : 10, Theme.ink());
+        drawAlong(g, bottom == null ? "—" : Names.order(bottom), x, split, w,
+            y + h - split, Font.PLAIN, 9, Theme.ink3());
+
+        hits.add(new Hit(g.getTransform().createTransformedShape(card), tip));
+    }
+
+    /** Надпись вдоль карты в отведённой ей части (читается снизу вверх). */
+    private void drawAlong(Graphics2D g, String text, double x, double top,
+                           double w, double h, int style, int size, Color ink) {
         AffineTransform saved = g.getTransform();
-        g.translate(x + w / 2.0, y + h - Theme.px(6));
+        g.translate(x + w / 2.0, top + h - Theme.px(4));
         g.rotate(-Math.PI / 2);
-        g.setColor(active ? Theme.ink() : Theme.ink2());
+        g.setFont(Theme.font(size, style));
+        g.setColor(ink);
         var fm = g.getFontMetrics();
-        String shown = name;
-        int maxW = (int) (h - Theme.px(12));
+        String shown = text;
+        int maxW = (int) (h - Theme.px(8));
         while (shown.length() > 1 && fm.stringWidth(shown) > maxW) {
             shown = shown.substring(0, shown.length() - 1);
         }
         g.drawString(shown, 0, (float) (fm.getAscent() / 2.0 - Theme.px(1)));
         g.setTransform(saved);
-
-        hits.add(new Hit(g.getTransform().createTransformedShape(card), tip));
     }
 
     // ==================================================================
-    //  ПОДСКАЗКИ
+    //  ПОДСКАЗКИ — С ДЕЙСТВИЯМИ И СОСТОЯНИЕМ
     // ==================================================================
+
+    /**
+     * Подсказка вскрытой карты: что за приказы, какие у них действия и в каком
+     * карта состоянии — заблокирован ли верх и можно ли играть низ.
+     *
+     * <p>Именно СОСТОЯНИЕ дизайнер и просил показывать: по самой карте не понять,
+     * сработал ли верхний приказ, — он молча пропадает, если такой же приказ
+     * вскрыл кто-то ещё за столом.
+     */
+    private String tipFor(ReplayRecord.OrderPlay op, String head) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<b>").append(head).append("</b>");
+        sb.append("<br>Верх: <b>").append(Names.order(op.top)).append("</b>");
+        if (!op.topActions.isEmpty()) {
+            sb.append(" — ").append(actions(op.topActions));
+        }
+        if (op.coincided) {
+            sb.append("<br><b>ВЕРХ ЗАБЛОКИРОВАН</b>: тот же приказ вскрыл кто-то ещё");
+        } else {
+            sb.append("<br>верх сработал, действий разрешено ").append(op.topAllowed);
+        }
+        if (op.bottom != null) {
+            sb.append("<br>Низ: ").append(Names.order(op.bottom));
+            if (!op.bottomActions.isEmpty()) {
+                sb.append(" — ").append(actions(op.bottomActions));
+            }
+            sb.append(op.bottomOpen ? "<br>низ ОТКРЫТ — его можно играть"
+                : "<br>низ закрыт");
+        } else {
+            sb.append("<br>нижнего приказа у карты нет");
+        }
+        if (op.maneuver) {
+            sb.append("<br>карта-манёвр");
+        }
+        return sb.toString();
+    }
+
+    /** Подсказка карты в руке: приказы известны, состояния ещё нет. */
+    private String tipForHand(String[] orders) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<b>В руке</b>");
+        if (orders == null) {
+            sb.append("<br>приказы неизвестны: каталог приказов недоступен");
+            return sb.toString();
+        }
+        sb.append("<br>Верх: <b>").append(Names.order(orders[0])).append("</b>");
+        sb.append(orders[1] == null ? "<br>нижнего приказа у карты нет"
+            : "<br>Низ: " + Names.order(orders[1]));
+        sb.append("<br><i>ещё не вскрыта: сработает ли верх, зависит от того, не "
+            + "вскроет ли тот же приказ кто-то ещё</i>");
+        return sb.toString();
+    }
+
+    private static String actions(List<String> codes) {
+        List<String> out = new ArrayList<>();
+        for (String c : codes) {
+            out.add(Names.action(c));
+        }
+        return String.join(", ", out);
+    }
 
     @Override
     public String getToolTipText(MouseEvent e) {
@@ -300,7 +556,7 @@ public final class OrderCardsPanel extends JComponent {
         // друг друга, и под курсором должна оказаться та, что лежит СВЕРХУ.
         for (int i = hits.size() - 1; i >= 0; i--) {
             if (hits.get(i).area().contains(e.getX(), e.getY())) {
-                return "<html>" + hits.get(i).tip().replace("\n", "<br>") + "</html>";
+                return "<html><div style='width:280px'>" + hits.get(i).tip() + "</div></html>";
             }
         }
         return null;
@@ -308,8 +564,8 @@ public final class OrderCardsPanel extends JComponent {
 
     @Override
     public java.awt.Point getToolTipLocation(MouseEvent e) {
-        // Подсказка чуть в стороне от курсора: иначе она накрывает ту самую
-        // карту, о которой рассказывает.
-        return new java.awt.Point(e.getX() + Theme.px(12), e.getY() - Theme.px(8));
+        // Подсказка в стороне от курсора: иначе она накрывает ту самую карту, о
+        // которой рассказывает.
+        return new java.awt.Point(e.getX() + Theme.px(14), e.getY() - Theme.px(10));
     }
 }

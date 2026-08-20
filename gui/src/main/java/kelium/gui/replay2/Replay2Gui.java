@@ -507,9 +507,15 @@ public final class Replay2Gui {
     //  ПАНЕЛИ КАРТ ПРИКАЗОВ
     // ==================================================================
 
-    /** Высота выезжающей панели: хватает на карту приказа с подписью. */
+    /**
+     * Высота выезжающей панели.
+     *
+     * <p>ВЫШЕ, ЧЕМ ПОДЛОЖКА: карты законно выступают за её верхнюю кромку
+     * (просьба дизайнера 20.08.2026), а Swing обрезает рисование по границам
+     * компонента — без этого запаса выступающая часть просто обрубалась бы.
+     */
     private static int orderPanelHeight() {
-        return Theme.px(112);
+        return Theme.px(158);
     }
 
     /**
@@ -527,6 +533,10 @@ public final class Replay2Gui {
         if (opening && orderPanels[seat] == null) {
             OrderCardsPanel panel = new OrderCardsPanel(session, seat);
             panel.setOpen(0);
+            // Анимация переездов карт — только когда разбор ИДЁТ. При шаге по
+            // кадрам руками движение мешает: шаг должен показывать состояние
+            // сразу (решение дизайнера 20.08.2026).
+            panel.setPlayingSource(transport::isPlaying);
             orderPanels[seat] = panel;
             // PALETTE_LAYER — выше поля, но НИЖЕ всплывающих подсказок и меню:
             // панель не должна перекрывать собственную подсказку.
@@ -629,6 +639,10 @@ public final class Replay2Gui {
         JMenu file = new JMenu("Файл");
         file.add(item("Открыть запись…", "control O", this::openRecord));
         file.add(item("Сохранить запись…", "control S", this::saveRecord));
+        // ПОЛНЫЙ ЛОГ ОДНИМ ФАЙЛОМ — для разбора багов (заказ дизайнера
+        // 20.08.2026). Отдельно от «Сохранить запись»: запись открывают, а лог
+        // читают и вставляют в переписку.
+        file.add(item("Выгрузить полный лог партии…", "control L", this::saveFullLog));
         file.addSeparator();
         file.add(item("Сохранить картинку поля (2000 точек)…", null, this::savePng));
         file.add(item("Переиграть эту партию заново", null, this::startGame));
@@ -1271,6 +1285,46 @@ public final class Replay2Gui {
                 }
             }
         }.execute();
+    }
+
+    /**
+     * ВЫГРУЗИТЬ ПОЛНЫЙ ЛОГ ПАРТИИ одним текстовым файлом.
+     *
+     * <p>Сверху все настройки, которыми партия задана (свод, сид, боты, стороны
+     * планшетов, повороты ЦУ, состояние каждого дополнения), ниже — журнал по
+     * шагам с теми же номерами, что в пульте. Так сообщение «баг на шаге 833»
+     * указывает ровно на строку файла, и партию можно повторить.
+     */
+    private void saveFullLog() {
+        ReplayRecord rec = session.record();
+        if (rec == null || rec.frames.isEmpty()) {
+            JOptionPane.showMessageDialog(frame,
+                Ui2.tip("Партия ещё не сыграна и не открыта — выгружать нечего."),
+                "Полный лог", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        Path start = defaultDir().resolve(FullLog.defaultName(rec));
+        Path chosen = PathDialog.choose(frame, "Выгрузить полный лог партии",
+            start, true, "txt");
+        if (chosen == null) {
+            return;
+        }
+        try {
+            FullLog.save(rec, chosen);
+            say("Полный лог выгружен: " + chosen + " (шагов " + rec.frames.size() + ").");
+            JOptionPane.showMessageDialog(frame,
+                Ui2.tip("Лог партии сохранён." + System.lineSeparator()
+                    + System.lineSeparator() + chosen + System.lineSeparator()
+                    + System.lineSeparator()
+                    + "В нём все настройки партии и журнал по шагам с теми же "
+                    + "номерами, что в пульте."),
+                "Полный лог", JOptionPane.INFORMATION_MESSAGE);
+        } catch (java.io.IOException e) {
+            JOptionPane.showMessageDialog(frame,
+                Ui2.tip("Не удалось записать лог." + System.lineSeparator()
+                    + System.lineSeparator() + e.getMessage()),
+                "Ошибка", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     /** Правила и карточные наборы той версии, в которой сыграна партия. */

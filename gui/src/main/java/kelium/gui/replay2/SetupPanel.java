@@ -587,7 +587,25 @@ public final class SetupPanel extends JPanel {
             });
             toggles.add(t);
         }
-        return group("Дополнения", toggles.toArray(new Component[0]));
+        // ДВА В РЯД, А НЕ ЧЕТЫРЕ СТОЛБИКОМ (просьба дизайнера 20.08.2026).
+        // Тумблеры узкие, и четыре строки растягивали ленту настройки вниз без
+        // всякой нужды: два ряда по два занимают вдвое меньше высоты, а читаются
+        // так же — пары стоят рядом, а не вперемешку.
+        java.util.List<Component> rows = new ArrayList<>();
+        for (int i = 0; i < toggles.size(); i += 2) {
+            JPanel row = new JPanel();
+            row.setOpaque(false);
+            row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
+            row.setAlignmentX(Component.LEFT_ALIGNMENT);
+            row.add(toggles.get(i));
+            if (i + 1 < toggles.size()) {
+                row.add(Box.createHorizontalStrut(Theme.px(10)));
+                row.add(toggles.get(i + 1));
+            }
+            row.add(Box.createHorizontalGlue());
+            rows.add(row);
+        }
+        return group("Дополнения", rows.toArray(new Component[0]));
     }
 
     private static JPanel group(String captionText, Component... parts) {

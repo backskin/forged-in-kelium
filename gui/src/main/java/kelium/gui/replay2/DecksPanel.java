@@ -329,6 +329,20 @@ public final class DecksPanel extends JPanel {
         /** Куда попадает щелчок: прямоугольник → (набор, сброс?). */
         private final Map<Rectangle, String[]> зоны = new LinkedHashMap<>();
 
+        /**
+         * ЗАПОМНИТЬ ЗОНУ ЩЕЛЧКА ТАМ ЖЕ, ГДЕ СТОПКА НАРИСОВАНА.
+         *
+         * <p>БАГ-ФИКС 20.08.2026 (дизайнер: «не могу нажать, не переключаются
+         * карты»). Карта зон только ОЧИЩАЛАСЬ на каждой перерисовке и никогда не
+         * заполнялась: обработчик щелчка честно перебирал пустой список, и раздел
+         * «Карты» не отвечал на нажатия вовсе. Зона теперь пишется в тех же
+         * методах, что рисуют стопку, — так она не может разойтись с картинкой.
+         */
+        private void зона(int x, int y, int w, int h, String набор, boolean сброс) {
+            зоны.put(new Rectangle(x, y, w, h),
+                new String[]{набор, сброс ? "1" : "0"});
+        }
+
         Стопки() {
             setOpaque(false);
             addMouseListener(new MouseAdapter() {
@@ -473,6 +487,7 @@ public final class DecksPanel extends JPanel {
         /** Стопка рубашкой вверх с числом карт. */
         private void рубашка(Graphics2D g, int x, int y, int w, int h, int сколько,
                              String подпись, String набор, boolean пунктир) {
+            зона(x, y, w, h, набор, подпись.startsWith("сброс"));
             boolean выбрана = набор.equals(выбранныйНабор)
                 && ("сброс пуст".equals(подпись) == выбранСброс);
             g.setColor(пунктир ? Theme.bg() : Theme.tile());
@@ -590,6 +605,7 @@ public final class DecksPanel extends JPanel {
         /** Верх сброса лицом вверх плюс сколько всего в сбросе. */
         private void лицомСЧислом(Graphics2D g, int x, int y, int w, int h, String id,
                                   String подпись, int всего, String набор) {
+            зона(x, y, w, h, набор, true);
             boolean выбрана = набор.equals(выбранныйНабор) && выбранСброс;
             миниЛицо(g, x, y, w, h, id, набор, выбрана);
             g.setFont(Theme.font(10, Font.PLAIN));

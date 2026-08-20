@@ -348,8 +348,8 @@ public final class FieldPainter {
                 drawHexTexture(c, tex, cx + size * 0.07, cy + size * 0.07,
                     size * SPAWN_R, 0);
             } else {
-                c.polygon(FieldGeometry.hexCorners(cx + size * 0.07, cy + size * 0.07,
-                        size * SPAWN_R),
+                c.polygon(FieldGeometry.roundedHexPoints(cx + size * 0.07,
+                        cy + size * 0.07, size * SPAWN_R),
                     tone(start ? SPAWN_UNDER_START : SPAWN_UNDER_NORMAL), SPAWN_UNDER_EDGE, 1.4);
             }
         }
@@ -358,7 +358,11 @@ public final class FieldPainter {
             paintSpawnText(c, size, sp, cx, cy);
             return;                     // штриховку и заливку заменяет сама картинка
         }
-        c.polygon(FieldGeometry.hexCorners(cx, cy, size * SPAWN_R),
+        // ТАЙЛ ЗАРОЖДЕНИЯ — СО СКРУГЛЁННЫМИ УГЛАМИ (просьба дизайнера
+        // 20.08.2026). Это отдельная картонка, лежащая на поле, а не клетка
+        // сетки: скругляется целиком и ни с чем не стыкуется, поэтому дырок,
+        // из-за которых сетку скругляют лишь по контуру, здесь не бывает.
+        c.polygon(FieldGeometry.roundedHexPoints(cx, cy, size * SPAWN_R),
             tone(start ? SPAWN_START : SPAWN_NORMAL), SPAWN_EDGE, 2.0);
         if (sp.flipped) {
             // ВЫРАБОТАН НАПОЛОВИНУ: тайл перевёрнут на оборот. Помечаем его
@@ -456,7 +460,9 @@ public final class FieldPainter {
         // считали по хорде ВПИСАННОЙ окружности — у углов жетона штриховка не
         // доходила до края, и это бросалось в глаза (замечание дизайнера
         // 13.08.2026). Правильный приём один: рисуем с запасом и обрезаем формой.
-        double[][] hex = FieldGeometry.hexCorners(cx, cy, size * SPAWN_R);
+        // ОБРЕЗКА ПО ТОЙ ЖЕ ФОРМЕ, что и сам тайл: у скруглённого тайла полосы,
+        // обрезанные острым шестиугольником, вылезали бы за его углы.
+        double[][] hex = FieldGeometry.roundedHexPoints(cx, cy, size * SPAWN_R);
         double r = size * SPAWN_R;
         double step = size * 0.20;              // шаг между полосами
         double half = size * 0.035;             // полуширина полосы

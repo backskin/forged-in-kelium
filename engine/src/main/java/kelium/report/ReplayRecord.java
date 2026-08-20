@@ -57,6 +57,16 @@ public final class ReplayRecord {
     public String scenarioFile;
     /** Стартовый поворот ЦУ по местам (сторона 0..5); пусто — автоподбор. */
     public final List<Integer> cuFacing = new ArrayList<>();
+    /**
+     * ВКЛЮЧЁННЫЕ ДОПОЛНЕНИЯ на момент партии: {@code expansions.<имя> → вкл}.
+     *
+     * <p>Добавлено 20.08.2026. Дополнения накладываются на свод ДО сборки партии
+     * ({@code Expansions.applyTo}), но в запись не попадали — и по такой записи
+     * партию было НЕ ПОВТОРИТЬ: тот же сид и свод при других тумблерах дают
+     * другую игру. Для разбора багов это главное: дизайнер присылает лог, а из
+     * лога должно быть видно всё, что партию породило.
+     */
+    public final Map<String, Boolean> expansions = new LinkedHashMap<>();
     public Integer winner;
     public String condition = "";
     public int rounds;
@@ -792,6 +802,7 @@ public final class ReplayRecord {
         m.put("players", players);
         m.put("seed", seed);
         m.put("seatIds", seatIds);
+        m.put("expansions", expansions);
         m.put("seatLabels", seatLabels);
         m.put("sides", sides);
         m.put("scenarioId", scenarioId);
@@ -1079,6 +1090,12 @@ public final class ReplayRecord {
         Object sd = m.get("seed");
         r.seed = sd instanceof Number n ? n.longValue() : 0L;
         r.seatIds.addAll(Json.strings(m, "seatIds"));
+        if (m.get("expansions") instanceof Map<?, ?> ex) {
+            for (Map.Entry<?, ?> e : ex.entrySet()) {
+                r.expansions.put(String.valueOf(e.getKey()),
+                    Boolean.TRUE.equals(e.getValue()) || "true".equals(String.valueOf(e.getValue())));
+            }
+        }
         r.seatLabels.addAll(Json.strings(m, "seatLabels"));
         r.sides.addAll(Json.strings(m, "sides"));
         r.scenarioId = Json.s(m, "scenarioId");

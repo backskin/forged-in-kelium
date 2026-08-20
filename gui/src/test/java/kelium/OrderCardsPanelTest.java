@@ -33,8 +33,11 @@ import kelium.report.ReplayRecord;
  */
 class OrderCardsPanelTest {
 
-    private static final int W = 420;
-    private static final int H = 130;
+    // РАЗМЕР КАК В ОКНЕ: панель шириной полосы игрока и высотой
+    // Replay2Gui.orderPanelHeight(). Проверять на другом размере
+    // бессмысленно — раскладка карт от него и зависит.
+    private static final int W = 470;
+    private static final int H = 158;
 
     /** Кадр, где у игрока уже есть и разыгранные карты, и карты в руке. */
     private static int frameWithBoth(ReplayRecord rec, int seat) {
