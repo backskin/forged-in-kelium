@@ -178,7 +178,14 @@ public final class Storage {
         int u = 2, k = 0, a = 0;
         java.util.Set<Integer> minerLevels = new java.util.HashSet<>();
         java.util.Set<Integer> plantLevels = new java.util.HashSet<>();
-        for (BuildingToken b : player.buildingsOnField()) {
+        // ЖЕТОН НА ГЕКСЕ — ЗНАЧИТ НЕ НА ПЛАНШЕТЕ ХРАНИЛИЩА, а только лежащий на
+        // планшете накрывает свои ячейки. Поэтому здесь спрашивается «стоит ли на
+        // гексе», а не «жив ли»: здание, у которого прочность уже кончилась, но
+        // жетон ещё не уехал в трофеи, физически со планшета не убран.
+        for (BuildingToken b : player.buildings) {
+            if (b.hexId == null) {
+                continue;
+            }
             if (b.type == BuildingType.MINER) {
                 minerLevels.add(b.level);
             } else if (b.type == BuildingType.POWER_PLANT) {
@@ -364,6 +371,22 @@ public final class Storage {
         int add = Math.min(amount, room);
         player.resources.add(Resource.KELIUM, add);
         return add;
+    }
+
+    /**
+     * Сколько кубиков этого типа ещё поместится на складе.
+     *
+     * <p>Нужно тем, кто ДОЛЖЕН узнать про место ДО того, как что-то сделает:
+     * способность, забирающая кубик у противника, не может забрать больше, чем
+     * готова принять твоя собственная полка.
+     */
+    public static int roomFor(kelium.core.GameState s, PlayerState player, Resource what) {
+        return switch (what) {
+            case KELIUM -> keliumRoom(s, player);
+            case AMMO -> ammoRoom(s, player);
+            case DEBRIS -> debrisRoom(s, player);
+            default -> Integer.MAX_VALUE;      // монеты и очки склад не занимают
+        };
     }
 
     private static int keliumRoom(kelium.core.GameState s, PlayerState player) {

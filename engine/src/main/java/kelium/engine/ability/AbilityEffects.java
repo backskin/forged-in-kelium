@@ -33,8 +33,11 @@ public final class AbilityEffects {
     /** Выдать ресурс в пределах вместимости склада; вернуть фактически выданное. */
     public static int gain(GameState s, PlayerState p, Resource what, int amount) {
         return switch (what) {
-            case KELIUM -> kelium.engine.Storage.addKeliumCapped(p, amount);
-            case AMMO -> kelium.engine.Storage.addAmmoCapped(p, amount);
+            // С ПАРТИЕЙ В РУКАХ: без неё предел считается по одному планшету и
+            // не видит ни ячеек от способностей арсенала, ни того, что здание
+            // лежит трофеем у другого игрока и своих ячеек пока не накрывает.
+            case KELIUM -> kelium.engine.Storage.addKeliumCapped(s, p, amount);
+            case AMMO -> kelium.engine.Storage.addAmmoCapped(s, p, amount);
             default -> {
                 p.resources.add(what, amount);
                 yield amount;

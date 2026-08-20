@@ -686,9 +686,14 @@ public final class ReplayRecord {
                 break;      // сторона планшета без такой раскладки — не беда
             }
         }
-        v.keliumCap = Storage.keliumMax(p);
-        v.ammoCap = Storage.ammoMax(p);
-        v.storeCap = Storage.totalMax(p);
+        // ПРЕДЕЛЫ СКЛАДА СЧИТАЮТСЯ С ПАРТИЕЙ В РУКАХ, как их считает движок:
+        // способности арсенала добавляют ячейки, и без них запись показывала
+        // меньший склад, чем игра разрешала. В проигрывателе это выглядело как
+        // «занято 13 из 11», а предел обломков (он-то считался правильно, через
+        // partию) уходил в минус: «обломки 0 из −2».
+        v.keliumCap = Storage.keliumMax(s, p);
+        v.ammoCap = Storage.ammoMax(s, p);
+        v.storeCap = Storage.totalMax(s, p);
         v.tech.putAll(new TreeMap<>(p.techSteps));
         v.redModules = p.redModules;
         v.blueModules = p.blueModules;

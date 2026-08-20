@@ -346,10 +346,16 @@ public final class Arsenal2Abilities {
             PlayerState me = state.player(seat);
             var enemy = state.player(owner).resources;
             List<Choice> opts = new ArrayList<>();
-            if (enemy.canPay(Resource.AMMO, 1)) {
+            // ПРЕДЛАГАЕТСЯ ТОЛЬКО ТО, ЧТО ЕСТЬ У ПРОТИВНИКА И ВЛЕЗЕТ НА СВОЙ СКЛАД.
+            // Награбленный кубик — такой же кубик в ячейке: если ячеек нет, его
+            // некуда положить. Прямая запись в счётчик переполняла склад (в
+            // проигрывателе это читалось как «занято 12 из 11»).
+            if (enemy.canPay(Resource.AMMO, 1)
+                    && Storage.roomFor(state, me, Resource.AMMO) > 0) {
                 opts.add(new Choice("loot", Resource.AMMO, "боеприпас"));
             }
-            if (enemy.canPay(Resource.KELIUM, 1)) {
+            if (enemy.canPay(Resource.KELIUM, 1)
+                    && Storage.roomFor(state, me, Resource.KELIUM) > 0) {
                 opts.add(new Choice("loot", Resource.KELIUM, "келемий"));
             }
             if (opts.isEmpty()) {
@@ -358,8 +364,13 @@ public final class Arsenal2Abilities {
             Choice pick = agent == null ? opts.get(0)
                 : agent.choose(state, opts, java.util.Map.of("kind", "loot"));
             Resource r = (Resource) pick.payload();
-            enemy.pay(r, 1);
-            me.resources.add(r, 1);
+            int got = r == Resource.AMMO
+                ? Storage.addAmmoCapped(state, me, 1)
+                : Storage.addKeliumCapped(state, me, 1);
+            if (got == 0) {
+                return false;
+            }
+            enemy.pay(r, got);
             return true;
         }
 

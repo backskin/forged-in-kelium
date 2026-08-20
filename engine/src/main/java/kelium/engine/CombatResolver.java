@@ -760,9 +760,12 @@ public final class CombatResolver {
             // Бой — 1 боеприпас. Реакция вне реестра способностей (ON_EVENT там
             // не диспетчеризуется никем) — прямая проверка, как у легаси-пассивок.
             if (gotRetaliated && Passives.hasPassive(s, attackerSeat, "ammo_on_being_retaliated")) {
-                p.resources.add(Resource.AMMO, 1);
+                // ЧЕРЕЗ СКЛАД, А НЕ МИМО НЕГО: боеприпас — кубик в ячейке, и если
+                // ячейки кончились, он не помещается. Прямое пополнение счётчика
+                // переполняло склад (в проигрывателе — «занято 13 из 11»).
+                int got = Storage.addAmmoCapped(s, p, 1);
                 emit("type", "ability_reaction", "seat", attackerSeat,
-                    "ability", "ammo_on_being_retaliated", "got_ammo", 1);
+                    "ability", "ammo_on_being_retaliated", "got_ammo", got);
             }
             // «Ответный залп» 2.3 (редакция 17.08.2026): платит не за сам факт
             // контратаки, а за ПОНЕСЁННУЮ ПОТЕРЮ — контратака должна была снять
@@ -770,9 +773,9 @@ public final class CombatResolver {
             // впустую расстрелял боеприпасы.
             if (gotRetaliated && journal().of(attackerSeat).lostOwnThisTurn > 0
                     && Passives.hasPassive(s, attackerSeat, "ammo_on_retaliation_kill")) {
-                p.resources.add(Resource.AMMO, 1);
+                int got = Storage.addAmmoCapped(s, p, 1);
                 emit("type", "ability_reaction", "seat", attackerSeat,
-                    "ability", "ammo_on_retaliation_kill", "got_ammo", 1);
+                    "ability", "ammo_on_retaliation_kill", "got_ammo", got);
             }
         }
         return didDamage;
@@ -1265,7 +1268,9 @@ public final class CombatResolver {
 
         int bonusAmmo = Passives.ammoOnKill(s, attackerSeat);
         if (bonusAmmo > 0) {
-            attacker.resources.add(Resource.AMMO, bonusAmmo);
+            // Тоже через склад: у боеприпаса есть предел, и награда за снос его
+            // не отменяет — лишний кубик просто некуда положить.
+            Storage.addAmmoCapped(s, attacker, bonusAmmo);
         }
         int bonusTrophy = Passives.bonusTrophyOnKill(s, attackerSeat);
         if (bonusTrophy > 0) {
