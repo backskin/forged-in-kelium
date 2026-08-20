@@ -80,6 +80,10 @@ public final class OrderCardsPanel extends JComponent {
      * место текущей карты, которое стоит по центру.
      */
     private static final double FAN_ROOM = 0.44;
+    /** Разворот, ради которого стоит уменьшить карту: меньше — уже не веер. */
+    private static final double FAN_MIN_DEG = 14;
+    /** До какой доли можно уменьшать карту, чтобы подписи остались читаемыми. */
+    private static final double CARD_MIN_SCALE = 0.6;
     /**
      * Какую долю высоты компонента занимает ПОДЛОЖКА. Остальное сверху — запас,
      * в который карты законно выступают за её кромку.
@@ -339,6 +343,43 @@ public final class OrderCardsPanel extends JComponent {
             b.active(), b.top(), b.bottom(), b.tip());
     }
 
+    /** Наклон крайней карты веера — на сколько её середина уходит в сторону. */
+    private static double fanLean(int n, double step, double radius) {
+        double first = -step * (n - 1) / 2.0;
+        double maxAngle = Math.toRadians(Math.max(Math.abs(first),
+            Math.abs(first + step * (n - 1))));
+        return radius * Math.sin(maxAngle);
+    }
+
+    /**
+     * Улягутся ли карты веера в отведённую им долю ширины при таком развороте.
+     *
+     * <p>Считается по НАСТОЯЩЕМУ габариту повёрнутого прямоугольника вокруг той
+     * же точки вращения, что и при рисовании: только так учитываются собственные
+     * углы карты, которые при повороте уходят дальше её середины.
+     */
+    private static boolean fanFits(int n, double halfSpread, double radius, double cardW,
+                                   double cardH, double cardTop, int h, double pad,
+                                   double limit) {
+        double step = n <= 1 ? 0 : Math.min(FAN_STEP_DEG, halfSpread * 2.0 / (n - 1));
+        double first = -step * (n - 1) / 2.0;
+        // Та же точка, что и при раскладке: середина карты стоит на отступе плюс
+        // половина ширины плюс наклон крайней карты.
+        double x = pad + cardW / 2.0 + fanLean(n, step, radius);
+        double minX = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            java.awt.geom.AffineTransform tr = java.awt.geom.AffineTransform
+                .getRotateInstance(Math.toRadians(first + step * i), x, h + cardH * 0.42);
+            java.awt.geom.Rectangle2D box = tr.createTransformedShape(
+                new java.awt.geom.Rectangle2D.Double(x - cardW / 2.0, cardTop, cardW, cardH))
+                .getBounds2D();
+            minX = Math.min(minX, box.getMinX());
+            maxX = Math.max(maxX, box.getMaxX());
+        }
+        return minX >= 0 && maxX <= limit;
+    }
+
     /**
      * РАСКЛАДКА: где какая карта стоит при текущем кадре.
      *
@@ -356,31 +397,55 @@ public final class OrderCardsPanel extends JComponent {
         // ---------- слева: рука веером ----------
         List<String> hand = p.orderHand;
         int n = hand.size();
+
+        // РАЗМЕР КАРТЫ ПОДЧИНЁН ВЕЕРУ, А НЕ НАОБОРОТ. Веер — не украшение: по нему
+        // видно, сколько приказов ещё на руках. Карта в полную высоту панели своей
+        // шириной съедает всё отведённое вееру место, и от веера остаётся ровная
+        // стопка. Поэтому карта уменьшается ровно настолько, чтобы веер из
+        // ТЕКУЩЕГО числа карт развернулся хотя бы на FAN_MIN_DEG, и не мельче
+        // CARD_MIN_SCALE — иначе подписи станут нечитаемыми.
+        double bottom = cardTop + cardH;
+        for (double scale = 1.0; scale > CARD_MIN_SCALE; scale -= 0.04) {
+            double tryW = cardW * scale;
+            double tryH = cardH * scale;
+            double tryTop = bottom - tryH;
+            if (n <= 1 || fanFits(n, FAN_MIN_DEG, h + tryH * 0.42 - tryTop,
+                    tryW, tryH, tryTop, h, pad, w * FAN_ROOM)) {
+                cardW = tryW;
+                cardH = tryH;
+                cardTop = tryTop;
+                break;
+            }
+        }
+
         if (n > 0) {
             double radius = h + cardH * 0.42 - cardTop;
-            // ВЕЕР НЕ ДОЛЖЕН ЗАЛЕЗАТЬ НА МЕСТО ТЕКУЩЕЙ КАРТЫ (найдено снимком
-            // полной руки 20.08.2026: при шести картах веер доходил до 281-го
-            // столбца из 470, то есть накрывал центр). Ограничение считается, а
-            // не подбирается на глаз: веер занимает
-            //     pad + cardW + 2 * lean,   где lean = radius * sin(разворот),
-            // значит из отведённой ему доли ширины прямо следует предельный
-            // разворот. Так веер сам поджимается, когда карт много, вместо того
-            // чтобы вылезать.
-            double room = w * FAN_ROOM - pad - cardW;
-            double maxLean = Math.max(0, room / 2.0);
-            double capDeg = Math.toDegrees(Math.asin(
-                Math.max(0, Math.min(1, maxLean / Math.max(1, radius)))));
-            double halfSpread = Math.min(FAN_MAX_DEG, capDeg);
+            // РАЗВОРОТ ПОДБИРАЕТСЯ ПО ФАКТИЧЕСКИМ ГРАНИЦАМ ПОВЁРНУТОЙ КАРТЫ.
+            // Формула «наклон центра = radius·sin(угол)» считала смещение
+            // середины карты и не знала про её собственные углы: при полной руке
+            // веер вылезал за ЛЕВЫЙ край панели (там его срезает компонент) и
+            // одновременно накрывал место текущей карты. Поэтому здесь честный
+            // подбор: строим раскладку, меряем её габарит и уменьшаем разворот,
+            // пока веер не уляжется в отведённую ему долю ширины.
+            double limit = w * FAN_ROOM;
+            double halfSpread = FAN_MAX_DEG;
+            while (halfSpread > 0
+                    && !fanFits(n, halfSpread, radius, cardW, cardH, cardTop, h, pad, limit)) {
+                halfSpread -= 2;
+            }
+            halfSpread = Math.max(0, halfSpread);
             double step = n <= 1 ? 0
                 : Math.min(FAN_STEP_DEG, halfSpread * 2.0 / (n - 1));
             double first = -step * (n - 1) / 2.0;
-            double maxAngle = Math.toRadians(Math.max(Math.abs(first),
-                Math.abs(first + step * (n - 1))));
-            double lean = radius * Math.sin(maxAngle);
+            double lean = fanLean(n, step, radius);
             double pivotX = pad + cardW / 2.0 + lean;
             for (int i = 0; i < n; i++) {
                 String[] orders = handOrders(hand.get(i));
-                out.put(hand.get(i), new Slot(pivotX - cardW / 2.0, cardTop, cardW, cardH,
+                // РУКА СТОИТ ВЫШЕ ПОДЛОЖКИ И ЗАХОДИТ ЗА ЕЁ КРОМКУ: так видно, что
+                // это карты в руке, а не выложенные на стол. Запас сверху у
+                // компонента для этого и оставлен, обрезки не будет.
+                out.put(hand.get(i), new Slot(pivotX - cardW / 2.0, cardTop - Theme.px(10),
+                    cardW, cardH,
                     first + step * i, false,
                     orders == null ? null : orders[0],
                     orders == null ? null : orders[1],
