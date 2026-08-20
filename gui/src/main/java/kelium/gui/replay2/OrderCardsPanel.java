@@ -155,10 +155,26 @@ public final class OrderCardsPanel extends JComponent {
 
         int w = getWidth();
         int h = getHeight();
+        double pad = Theme.px(6);
+
+        ReplayRecord.Player p = me();
+        if (p == null) {
+            g.dispose();
+            return;
+        }
+
+        // ВЫЕЗД ЦЕЛИКОМ, ВМЕСТЕ С ПОДЛОЖКОЙ. Сдвиг ставится ДО подложки, иначе
+        // фон панели возникал бы скачком в полный размер, а карты подъезжали
+        // внутри него — это читалось бы не как «выехала панель», а как «мигнул
+        // прямоугольник». Сдвиг на полную высоту: при open = 0 всё содержимое
+        // уходит ниже своей же нижней кромки и обрезается, то есть панель
+        // буквально прячется под полосу игрока.
+        g.translate(0, (1 - open) * h);
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
+            (float) Math.min(1.0, 0.35 + 0.65 * open)));
 
         // ПОДЛОЖКА. Панель перекрывает поле, поэтому она обязана быть плотной —
         // сквозь полупрозрачную читались бы гексы, и карты стали бы неразборчивы.
-        double pad = Theme.px(6);
         Shape back = new RoundRectangle2D.Double(0, 0, w - 1, h - 1,
             Theme.px(10), Theme.px(10));
         g.setColor(Theme.panel());
@@ -167,18 +183,8 @@ public final class OrderCardsPanel extends JComponent {
         g.setStroke(new BasicStroke(1f));
         g.draw(back);
 
-        ReplayRecord.Player p = me();
-        if (p == null) {
-            g.dispose();
-            return;
-        }
-
         double cardH = h - 2 * pad;
         double cardW = cardH / CARD_RATIO;
-        // ПОЛОСА ВЫЕЗДА: пока панель не раскрыта, содержимое подъезжает снизу
-        // вместе с ней, а не появляется скачком в готовом виде.
-        g.translate(0, (1 - open) * h * 0.35);
-        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) open));
 
         // ---------- слева: стопка разыгранных ----------
         double x = pad;

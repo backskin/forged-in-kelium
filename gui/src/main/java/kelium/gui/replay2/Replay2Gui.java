@@ -74,6 +74,24 @@ public final class Replay2Gui {
     private JPanel stripsRow;
     private JScrollPane stripsScroll;
     private final PlayerStrip[] strips = new PlayerStrip[4];
+
+    // ==================== панели карт приказов ====================
+    /**
+     * ВЫЕЗЖАЮЩИЕ ПАНЕЛИ КАРТ ПРИКАЗОВ (заказ дизайнера 19.08.2026): у каждого
+     * игрока своя, открытых может быть сколько угодно разом.
+     *
+     * <p>ЖИВУТ В СЛОЁНОЙ ПАНЕЛИ ОКНА, а не в раскладке. Панель обязана
+     * ПЕРЕКРЫВАТЬ поле, а поле лежит выше полос в обычной раскладке — вставь
+     * панель туда, и она либо подвинет поле, либо окажется под ним. Слоёная
+     * панель — единственное место, откуда можно лечь поверх, ничего не сдвинув.
+     *
+     * <p>Раз панель вне раскладки, её место приходится держать вручную: полосы
+     * ездят в горизонтальной прокрутке, и панель должна ездить вместе со своей.
+     */
+    private final OrderCardsPanel[] orderPanels = new OrderCardsPanel[4];
+    private final double[] orderOpen = new double[4];
+    private final double[] orderTarget = new double[4];
+    private javax.swing.Timer orderAnim;
     private final JLabel context = new JLabel();
     private final JLabel thought = new JLabel();
     private final JLabel status = new JLabel();
@@ -141,6 +159,14 @@ public final class Replay2Gui {
         frame.add(centre(), BorderLayout.CENTER);
         frame.add(bottom(), BorderLayout.SOUTH);
         frame.setJMenuBar(menuBar());
+
+        // ПАНЕЛИ ПРИКАЗОВ ЛЕЖАТ ВНЕ РАСКЛАДКИ, поэтому про изменение размера
+        // окна им надо сообщать самим: раскладка Swing их не пересчитает.
+        frame.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentResized(java.awt.event.ComponentEvent e) {
+                layoutOrderPanels();
+            }
+        });
 
         field.setOnHexClick(id -> {
             if (id != null) {
@@ -426,6 +452,7 @@ public final class Replay2Gui {
         for (int i = 0; i < 4; i++) {
             strips[i] = new PlayerStrip(session, i);
             strips[i].setOnTile(this::onTile);
+            strips[i].setOnOrders(this::toggleOrders);
             stripsRow.add(strips[i]);
         }
         // ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА ВМЕСТО ОБРЕЗАНИЯ. У полосы игрока есть свой
@@ -451,6 +478,11 @@ public final class Replay2Gui {
         // ею было нельзя, окно просто не давало себя сузить до её появления.
         // Свой минимум разрывает эту связь: ряд внутри остаётся какой есть и
         // уезжает в прокрутку, а окно сжимается дальше.
+        // ПАНЕЛИ ЕЗДЯТ ЗА СВОЕЙ ПОЛОСОЙ. Полосы уезжают в горизонтальную
+        // прокрутку, а панели лежат в слоёной панели окна и о прокрутке сами
+        // не узнают — без этой подписки открытая панель осталась бы висеть на
+        // прежнем месте, над чужой полосой.
+        stripsScroll.getViewport().addChangeListener(e -> layoutOrderPanels());
         stripsScroll.setMinimumSize(new Dimension(Theme.px(120),
             Theme.px(Theme.H_STRIP_TIGHT) + Theme.px(14)));
         p.add(stripsScroll, BorderLayout.NORTH);
@@ -471,6 +503,103 @@ public final class Replay2Gui {
     }
 
     /** Щелчок по плитке показателя или по полосе игрока. */
+    // ==================================================================
+    //  ПАНЕЛИ КАРТ ПРИКАЗОВ
+    // ==================================================================
+
+    /** Высота выезжающей панели: хватает на карту приказа с подписью. */
+    private static int orderPanelHeight() {
+        return Theme.px(112);
+    }
+
+    /**
+     * Открыть или закрыть панель приказов игрока.
+     *
+     * <p>Открытых панелей может быть сколько угодно одновременно — дизайнер
+     * просил именно так, чтобы можно было сравнить руки двух игроков.
+     */
+    private void toggleOrders(int seat) {
+        if (seat < 0 || seat >= orderPanels.length) {
+            return;
+        }
+        boolean opening = orderTarget[seat] < 0.5;
+        orderTarget[seat] = opening ? 1 : 0;
+        if (opening && orderPanels[seat] == null) {
+            OrderCardsPanel panel = new OrderCardsPanel(session, seat);
+            panel.setOpen(0);
+            orderPanels[seat] = panel;
+            // PALETTE_LAYER — выше поля, но НИЖЕ всплывающих подсказок и меню:
+            // панель не должна перекрывать собственную подсказку.
+            frame.getLayeredPane().add(panel, javax.swing.JLayeredPane.PALETTE_LAYER);
+        }
+        strips[seat].setOrdersOpen(opening);
+        layoutOrderPanels();
+        startOrderAnimation();
+    }
+
+    /**
+     * ПЛАВНЫЙ ВЫЕЗД. Один таймер на все панели: их может быть четыре, и четыре
+     * независимых таймера дёргали бы перерисовку вразнобой.
+     */
+    private void startOrderAnimation() {
+        if (orderAnim != null && orderAnim.isRunning()) {
+            return;
+        }
+        orderAnim = new javax.swing.Timer(16, e -> {
+            boolean moving = false;
+            for (int i = 0; i < orderPanels.length; i++) {
+                if (orderPanels[i] == null) {
+                    continue;
+                }
+                double d = orderTarget[i] - orderOpen[i];
+                if (Math.abs(d) < 0.02) {
+                    orderOpen[i] = orderTarget[i];
+                } else {
+                    // Шаг ПРОПОРЦИОНАЛЕН остатку: движение начинается быстро и
+                    // мягко тормозит у края, как выезжает ящик.
+                    orderOpen[i] += d * 0.22;
+                    moving = true;
+                }
+                orderPanels[i].setOpen(orderOpen[i]);
+                // ЗАКРЫТУЮ ПАНЕЛЬ УБИРАЕМ ИЗ СЛОЯ. Оставленная невидимая панель
+                // продолжала бы ловить курсор и мешать щелчкам по полю.
+                if (orderOpen[i] <= 0.001 && orderTarget[i] == 0) {
+                    frame.getLayeredPane().remove(orderPanels[i]);
+                    orderPanels[i] = null;
+                    frame.getLayeredPane().repaint();
+                }
+            }
+            layoutOrderPanels();
+            if (!moving) {
+                ((javax.swing.Timer) e.getSource()).stop();
+            }
+        });
+        orderAnim.start();
+    }
+
+    /**
+     * Поставить каждую открытую панель НАД её полосой игрока.
+     *
+     * <p>Ширина берётся у полосы, а не задаётся своя: панель должна выглядеть
+     * продолжением полосы, а полосы сжимаются и разъезжаются вместе с окном.
+     * Место считается через {@code convertRectangle}, потому что полоса лежит
+     * внутри прокрутки, а панель — в слоёной панели окна: у них разные системы
+     * координат, и складывать их вручную значило бы повторять раскладку Swing.
+     */
+    private void layoutOrderPanels() {
+        for (int i = 0; i < orderPanels.length; i++) {
+            OrderCardsPanel panel = orderPanels[i];
+            if (panel == null || strips[i] == null || !strips[i].isShowing()) {
+                continue;
+            }
+            java.awt.Rectangle r = javax.swing.SwingUtilities.convertRectangle(
+                strips[i].getParent(), strips[i].getBounds(), frame.getLayeredPane());
+            int h = orderPanelHeight();
+            panel.setBounds(r.x, r.y - h, r.width, h);
+        }
+        frame.getLayeredPane().repaint();
+    }
+
     private void onTile(int seat, String metric) {
         if (metric == null) {
             drawer.showPlayer(seat);

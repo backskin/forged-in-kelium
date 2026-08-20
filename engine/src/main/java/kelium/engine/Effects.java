@@ -491,14 +491,32 @@ public final class Effects {
         int count = p.containsKey("count") ? asInt(p.get("count")) : 2;
         java.util.Set<UnitType> used = java.util.EnumSet.noneOf(UnitType.class);
         int placed = 0;
+        // ТОЛЬКО СВОЯ ЗОНА СТРОЙКИ (решение дизайнера 20.08.2026).
+        //
+        // БЫЛО: перебирались ВСЕ гексы поля, и десант ставил два жетона куда
+        // угодно — включая гекс рядом с чужим ЦУ. На карте при этом написано
+        // просто «размести», без места, поэтому за столом никто и не догадался
+        // бы, что так можно. Это ломало всю пространственную логику игры: зона
+        // стройки растёт от своих стенок, движение идёт шагами и стоит приказа,
+        // добытчик достаёт только до примыкающей жилы — везде дотянуться надо
+        // заслужить, и только здесь два жетона появлялись из воздуха в любой
+        // точке стола, без приказа Движения.
+        //
+        // Зона стройки взята потому, что это УЖЕ существующее понятие «куда я
+        // имею право что-то ставить»: игрок его знает, видит на поле и ему не
+        // надо объяснять новое правило.
+        java.util.Set<String> zone =
+            new java.util.LinkedHashSet<>(Actions.buildableHexes(s, seat));
         while (placed < count) {
             List<Choice> opts = new ArrayList<>();
             for (UnitType ut : UnitType.values()) {
                 if (used.contains(ut) || pl.unitsOfKind(ut) >= s.tokenStats.unitStock(ut)) {
                     continue;
                 }
-                for (Hex h : s.field.hexes.values()) {
-                    if (!Movement.passable(s, h.id) || !roomForLanding(s, h.id, ut)) {
+                for (String hid : zone) {
+                    Hex h = s.field.hexes.get(hid);
+                    if (h == null || !Movement.passable(s, h.id)
+                            || !roomForLanding(s, h.id, ut)) {
                         continue;
                     }
                     Map<String, Object> mp = new HashMap<>();

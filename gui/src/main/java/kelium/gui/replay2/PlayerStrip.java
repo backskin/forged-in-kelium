@@ -51,6 +51,8 @@ public final class PlayerStrip extends JComponent {
     private final int seat;
     /** Куда сообщать «показали на плитку»: место и ключ показателя. */
     private BiConsumer<Integer, String> onTile = (s, k) -> { };
+    private java.util.function.IntConsumer onOrders = s -> { };
+    private boolean ordersOpen;
     private final Map<String, Rectangle> tileBounds = new LinkedHashMap<>();
     private String hot;
 
@@ -66,7 +68,9 @@ public final class PlayerStrip extends JComponent {
             @Override
             public void mouseMoved(java.awt.event.MouseEvent e) {
                 String was = hot;
-                hot = boardButton().contains(e.getPoint()) ? "board" : keyAt(e.getPoint());
+                hot = boardButton().contains(e.getPoint()) ? "board"
+                    : ordersButton().contains(e.getPoint()) ? "orders"
+                    : keyAt(e.getPoint());
                 setCursor(hot == null ? Cursor.getDefaultCursor()
                     : Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 if (was != hot) {
@@ -90,10 +94,25 @@ public final class PlayerStrip extends JComponent {
                         javax.swing.SwingUtilities.getWindowAncestor(PlayerStrip.this));
                     return;
                 }
+                if (ordersButton().contains(e.getPoint())) {
+                    onOrders.accept(seat);
+                    return;
+                }
                 String key = keyAt(e.getPoint());
                 onTile.accept(seat, key);       // null = щёлкнули по полосе целиком
             }
         });
+    }
+
+    /** Кому сообщать, что игрок просит показать свои карты приказов. */
+    public void setOnOrders(java.util.function.IntConsumer listener) {
+        this.onOrders = listener;
+    }
+
+    /** Показана ли сейчас панель приказов — от этого зависит вид кнопки. */
+    public void setOrdersOpen(boolean open) {
+        this.ordersOpen = open;
+        repaint();
     }
 
     public void setOnTile(BiConsumer<Integer, String> listener) {
@@ -265,6 +284,33 @@ public final class PlayerStrip extends JComponent {
         g.setColor(overBoard ? Theme.ink() : Theme.ink2());
         g.drawString(BOARD_LABEL, bb.x + Theme.px(17),
             bb.y + bb.height / 2 + Theme.px(4));
+
+        // ---- КНОПКА «ПРИКАЗЫ» — вторая дверь в хозяйство игрока: выдвигает
+        // панель с его картами приказов поверх поля. Раскрытая панель отмечается
+        // на самой кнопке, иначе при четырёх игроках не понять, чья открыта.
+        ordersX = bb.x + bb.width + Theme.px(6);
+        ordersY = y;
+        ordersW = g.getFontMetrics().stringWidth(ORDERS_LABEL) + Theme.px(22);
+        Rectangle ob = ordersButton();
+        boolean overOrders = "orders".equals(hot);
+        g.setColor(ordersOpen ? Theme.seatWash(seat, 0.35)
+            : overOrders ? Theme.hover() : Theme.tile());
+        g.fill(new RoundRectangle2D.Double(ob.x, ob.y, ob.width, ob.height,
+            Theme.R_TILE, Theme.R_TILE));
+        g.setColor(ordersOpen || overOrders ? Theme.accent() : Theme.border());
+        g.setStroke(new BasicStroke(1f));
+        g.draw(new RoundRectangle2D.Double(ob.x, ob.y, ob.width, ob.height,
+            Theme.R_TILE, Theme.R_TILE));
+        // значок: три карты веером
+        int ox = ob.x + Theme.px(5);
+        g.setColor(Theme.ink3());
+        for (int i = 0; i < 3; i++) {
+            g.drawLine(ox + i * Theme.px(3), ob.y + Theme.px(11) - i,
+                ox + i * Theme.px(3) + Theme.px(2), ob.y + Theme.px(5) - i);
+        }
+        g.setColor(ordersOpen || overOrders ? Theme.ink() : Theme.ink2());
+        g.drawString(ORDERS_LABEL, ob.x + Theme.px(17),
+            ob.y + ob.height / 2 + Theme.px(4));
 
         // ---- РАСКЛАД ИГРОКА строкой под именем: колода приказов и стороны его
         // двух планшетов (просьба дизайнера 14.08.2026). Это не украшение: колода
@@ -925,6 +971,16 @@ public final class PlayerStrip extends JComponent {
     /** Кнопка «планшет» в правом верхнем углу полосы. */
     /** Подпись на кнопке личной зоны — она же в подсказке. */
     private static final String BOARD_LABEL = "Личная зона";
+    /**
+     * КНОПКА «ПРИКАЗЫ» — открывает выезжающую панель с картами приказов игрока
+     * (заказ дизайнера 19.08.2026). Стоит рядом с «Личной зоной», потому что это
+     * такая же дверь в хозяйство игрока, только та открывает окно, а эта —
+     * панель поверх поля.
+     */
+    private static final String ORDERS_LABEL = "Приказы";
+    private int ordersX = -1;
+    private int ordersY;
+    private int ordersW;
     /** Место кнопки считается при отрисовке: оно зависит от ширины плашки игрока. */
     private int boardX = -1;
     private int boardY;
@@ -935,6 +991,14 @@ public final class PlayerStrip extends JComponent {
             return new Rectangle(-100, -100, 0, 0);   // ещё не рисовали
         }
         return new Rectangle(boardX, boardY, boardW, Theme.px(18));
+    }
+
+    /** Кнопка «Приказы» — рядом с «Личной зоной». */
+    private Rectangle ordersButton() {
+        if (ordersX < 0) {
+            return new Rectangle(-100, -100, 0, 0);
+        }
+        return new Rectangle(ordersX, ordersY, ordersW, Theme.px(18));
     }
 
     /** Ключ плитки под точкой (или null, если щёлкнули мимо плиток). */
