@@ -437,7 +437,8 @@ public final class HelpBook {
             "tech.step_capacity",
             "tech.step_cost_trophy",
             "tech.step_vp_cumulative",
-            "tech.science_one_step_per_track_per_action"));
+            "tech.science_one_step_per_track_per_action",
+            "tech.tracks_per_action"));
         h.p("Что даёт каждый трек: " + trackGives() + ".");
         h.h("Призы и супер-арсенал");
         h.table2("Приз за первый шаг", rows(

@@ -85,6 +85,15 @@ public final class Effects {
             case "unlimited_spec" -> unlimitedSpec(s, seat, p);
             case "market_card_from_discard" -> marketCardFromDiscard(s, seat, p);
             case "swap_order_card" -> swapOrderCard(s, seat, p);
+            // === УТИЛЬ 3.0 (заказ дизайнера 21.08.2026) ===
+            case "gain_per" -> gainPer(s, seat, p);
+            case "steal_resource" -> stealResource(s, seat, p);
+            case "steal_arsenal_card" -> stealArsenalCard(s, seat, p);
+            case "move_building_free" -> moveBuildingFree(s, seat, p);
+            case "refresh_arsenal_row" -> refreshArsenalRow(s, seat, p);
+            case "gild_module" -> gildModule(s, seat, p);
+            case "combo" -> combo(s, seat, p);
+            case "exchange_table" -> exchangeTable(s, seat, p);
             case "noop" -> Map.of("noop", p.getOrDefault("note", "unimplemented"));
             // ПУСТОЙ КОНТЕЙНЕР (заказ дизайнера 18.08.2026, контейнеры 4.0) —
             // НАМЕРЕННО ничего не даёт, это не заглушка недоделки. Отдельно от
@@ -117,6 +126,12 @@ public final class Effects {
                  "shield", "landing", "speed_boost", "energy_or_modules", "convert",
                  "discard_enemy_arsenal", "unlimited_spec",
                  "market_card_from_discard", "swap_order_card",
+                 // ШЕСТЬ ЭФФЕКТОВ УТИЛЯ 3.0 (21.08.2026): плата за положение на
+                 // поле, две кражи, бесплатная перестройка, обновление витрины и
+                 // золочение жетона модуля.
+                 "gain_per", "steal_resource", "steal_arsenal_card",
+                 "move_building_free", "refresh_arsenal_row", "gild_module",
+                 "combo", "exchange_table",
                  "empty" -> true;   // пустой контейнер (18.08.2026) — реализован, не заглушка
             default -> false;   // включая "noop" — карта-заглушка не должна попасть в колоду
         };
@@ -212,7 +227,7 @@ public final class Effects {
             if (ag != null) {
                 Choice pick = ag.choose(s, List.of(
                     new Choice("module_bag", "red", "жетон АТАКИ из красного мешка"),
-                    new Choice("module_bag", "blue", "жетон СБОРКИ из синего мешка")),
+                    new Choice("module_bag", "blue", "жетон СНАРЯЖЕНИЯ из синего мешка")),
                     Map.of("kind", "module_bag"));
                 if (pick != null && pick.payload() != null) {
                     colour = String.valueOf(pick.payload());
@@ -362,6 +377,35 @@ public final class Effects {
                 ctx.noSurcharge.add(String.valueOf(k));
             }
         }
+        // НАДБАВКИ УТИЛЯ 3.0 — «выполни действие ВОТ ТАК» (21.08.2026). Каждая
+        // живёт ровно это разрешение действия: см. TurnContext.
+        if (p.get("discount_coin") instanceof Number dn) {
+            ctx.buildDiscountCoins = dn.intValue();
+        }
+        if (Boolean.TRUE.equals(p.get("free_build"))) {
+            ctx.buildFree = true;
+        }
+        if (p.get("free_moves") instanceof Number fm) {
+            ctx.freeBuildingMoves = fm.intValue();
+        }
+        if (Boolean.TRUE.equals(p.get("moves_only"))) {
+            ctx.buildMovesOnly = true;
+        }
+        if (p.get("free_units") instanceof Number fu) {
+            ctx.freeExtraMoves = fu.intValue();
+        }
+        if (Boolean.TRUE.equals(p.get("both_halves"))) {
+            ctx.marketBothOffers = true;
+        }
+        if (p.get("dual_output") instanceof Number du) {
+            ctx.assemblyDualOutput = du.intValue();
+        }
+        if (p.get("free_miner_moves") instanceof Number mm) {
+            ctx.freeMinerMoves = mm.intValue();
+        }
+        if (Boolean.TRUE.equals(p.get("debris_to_coin"))) {
+            ctx.scienceDebrisToCoin = true;
+        }
         var res = Actions.create(name, s).perform(s.player(seat), ctx, agent);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
             tj.onAction(seat, name, res.telemetry());
@@ -378,6 +422,16 @@ public final class Effects {
         Agent agent = agentFor(s, seat);
         int steps = p.containsKey("hexes") ? asInt(p.get("hexes")) : 1;
         int moved = 0;
+        // ПЛАТА ЗА ПЕРЕБРОСКУ ({@code pay_ammo}, 21.08.2026). Карта, которая
+        // двигает войска за боеприпас, берёт плату ОДИН РАЗ и ВПЕРЁД: не хватило
+        // — карта не срабатывает вовсе, и это честнее, чем взять плату и
+        // подвинуть половину.
+        if (p.get("pay_ammo") instanceof Number pa && pa.intValue() > 0) {
+            if (!pl.resources.canPay(Resource.AMMO, pa.intValue())) {
+                return Map.of("moved", 0, "reason", "нет боеприпаса на переброску");
+            }
+            pl.resources.pay(Resource.AMMO, pa.intValue());
+        }
         for (int step = 0; step < steps; step++) {
             List<Choice> opts = new ArrayList<>();
             for (UnitToken u : pl.unitsOnField()) {
@@ -461,6 +515,17 @@ public final class Effects {
         if (offer.isEmpty()) {
             offer = List.of(UnitType.INFANTRY, UnitType.VEHICLE);
         }
+        // ЩИТ НА ПАРУ РОДОВ (21.08.2026): {@code all: true} накрывает ОБА
+        // названных рода, а не даёт выбрать один из двух. Шесть карт закрывают
+        // все шесть пар из четырёх родов.
+        if (Boolean.TRUE.equals(p.get("all"))) {
+            List<String> covered = new ArrayList<>();
+            for (UnitType t : offer) {
+                pl.shieldedKinds.add(t);
+                covered.add(t.code);
+            }
+            return Map.of("shield", String.join("+", covered));
+        }
         UnitType pick = offer.get(0);
         Agent ag = agentFor(s, seat);
         if (ag != null && offer.size() > 1) {
@@ -507,6 +572,38 @@ public final class Effects {
         // надо объяснять новое правило.
         java.util.Set<String> zone =
             new java.util.LinkedHashSet<>(Actions.buildableHexes(s, seat));
+        // ДЕСАНТ АРСЕНАЛА (21.08.2026, решение дизайнера): {@code where:
+        // any_free_hex} — высадка на ЛЮБОЙ гекс, где нет чужих войск, а не только
+        // в свою зону стройки.
+        //
+        // ЭТО СОЗНАТЕЛЬНОЕ ОСЛАБЛЕНИЕ ОГРАНИЧЕНИЯ, введённого 20.08.2026 (см.
+        // ниже) — и не для всех карт, а только там, где так напечатано: у
+        // заданий десант остаётся в своей зоне стройки. Оговорка «без чужих
+        // войск» и есть цена: высадиться прямо на противника нельзя, значит
+        // десант не заменяет бой, а открывает второй фронт.
+        if ("any_free_hex".equals(String.valueOf(p.get("where")))) {
+            zone = new java.util.LinkedHashSet<>();
+            for (Hex h : s.field.hexes.values()) {
+                if (!Movement.passable(s, h.id) || h.hasSpawnTile()) {
+                    continue;
+                }
+                boolean enemyThere = false;
+                for (PlayerState o : s.players) {
+                    if (o.seat == seat) {
+                        continue;
+                    }
+                    for (UnitToken u : o.unitsOnField()) {
+                        if (h.id.equals(u.hexId)) {
+                            enemyThere = true;
+                            break;
+                        }
+                    }
+                }
+                if (!enemyThere) {
+                    zone.add(h.id);
+                }
+            }
+        }
         while (placed < count) {
             List<Choice> opts = new ArrayList<>();
             for (UnitType ut : UnitType.values()) {
@@ -637,6 +734,38 @@ public final class Effects {
     static Map<String, Object> convert(GameState s, int seat, Map<String, Object> p) {
         PlayerState pl = s.player(seat);
         int amount = p.containsKey("amount") ? asInt(p.get("amount")) : 1;
+        // ОБМЕН ПО ВЫБОРУ ИГРОКА ({@code any: true}, 21.08.2026): что на что —
+        // решает он, а не карта. Предлагаются только выполнимые пары: платить
+        // надо тем, что есть, а получать то, для чего есть место на складе.
+        if (Boolean.TRUE.equals(p.get("any"))) {
+            Resource[] all = {Resource.COIN, Resource.AMMO, Resource.KELIUM, Resource.DEBRIS};
+            List<Choice> opts = new ArrayList<>();
+            for (Resource from : all) {
+                if (!pl.resources.canPay(from, amount)) {
+                    continue;
+                }
+                for (Resource to : all) {
+                    if (to == from || Storage.roomFor(s, pl, to) < amount) {
+                        continue;
+                    }
+                    opts.add(new Choice("convert_any", new Resource[]{from, to},
+                        amount + " " + from.code + " -> " + amount + " " + to.code));
+                }
+            }
+            if (opts.isEmpty()) {
+                return Map.of("converted", 0, "reason", "менять нечего или некуда");
+            }
+            Agent ag = agentFor(s, seat);
+            Choice pick = ag == null ? opts.get(0)
+                : ag.choose(s, opts, Map.of("kind", "convert_any"));
+            Resource[] pair = pick != null && pick.payload() instanceof Resource[] pr
+                ? pr : (Resource[]) opts.get(0).payload();
+            Map<String, Object> fixed = new HashMap<>(p);
+            fixed.remove("any");
+            fixed.put("from", pair[0].code);
+            fixed.put("to", pair[1].code);
+            return convert(s, seat, fixed);
+        }
         Resource from;
         Resource to;
         try {
@@ -682,6 +811,329 @@ public final class Effects {
         String card = victim.arsenalHand.remove(victim.arsenalHand.size() - 1);
         s.decks.get("arsenal").discard(card);
         return Map.of("discarded", 1, "from_seat", victim.seat, "card", card);
+    }
+
+    // ======================================================================
+    //  УТИЛЬ 3.0 (заказ дизайнера 21.08.2026)
+    // ======================================================================
+
+    /**
+     * СОСТАВНОЙ ЭФФЕКТ — несколько эффектов по порядку, как напечатано на карте.
+     *
+     * <p>Нужен утилю вида «в действие Добыча бесплатно перестрой добытчик»: на
+     * карте это ОДНА строка, но в правилах — два разных дела, и у каждого свой
+     * готовый и проверенный эффект. Порядок в списке — порядок исполнения;
+     * подготовка (перестройка, выдача ресурса) идёт до действия, потому что на
+     * картах так и написано: «в начале этого действия».
+     *
+     * <p>Список пуст или не список — эффект ничего не делает и об этом сообщает:
+     * молча возвращать «сработало» опаснее, чем показать пустую карту.
+     */
+    static Map<String, Object> combo(GameState s, int seat, Map<String, Object> p) {
+        Object raw = p.get("steps");
+        if (!(raw instanceof List<?> steps) || steps.isEmpty()) {
+            return Map.of("combo", 0, "reason", "шаги не заданы");
+        }
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (Object step : steps) {
+            if (!(step instanceof Map<?, ?> m)) {
+                continue;
+            }
+            String eid = String.valueOf(m.get("effect"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> sp = m.get("params") instanceof Map<?, ?> pm
+                ? (Map<String, Object>) pm : Map.of();
+            try {
+                results.add(apply(eid, s, seat, sp));
+            } catch (EffectError broken) {
+                results.add(Map.of("failed", eid));
+            }
+        }
+        return Map.of("combo", results.size(), "steps", results);
+    }
+
+    /**
+     * ОБМЕН ПО ПЕЧАТНОЙ ТАБЛИЦЕ — «1 обломок на 2 монеты ИЛИ 2 обломка на 5».
+     *
+     * <p>Отличие от {@link #convert}: там курс один и линейный, а на картах
+     * встречается ЛЕСТНИЦА, где второй обмен выгоднее первого. Строку выбирает
+     * игрок; предлагаются только те, что он может оплатить и куда есть место.
+     *
+     * <p>Таблица в данных: {@code table: [[1, 2], [2, 5]]} — «сколько отдать,
+     * сколько получить».
+     */
+    static Map<String, Object> exchangeTable(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        Resource from;
+        Resource to;
+        try {
+            from = Resource.fromCode(String.valueOf(p.getOrDefault("from", "debris")));
+            to = Resource.fromCode(String.valueOf(p.getOrDefault("to", "coin")));
+        } catch (RuntimeException e) {
+            return Map.of("exchanged", 0);
+        }
+        if (!(p.get("table") instanceof List<?> rows) || rows.isEmpty()) {
+            return Map.of("exchanged", 0, "reason", "таблица не задана");
+        }
+        List<Choice> opts = new ArrayList<>();
+        for (Object row : rows) {
+            if (!(row instanceof List<?> pair) || pair.size() < 2) {
+                continue;
+            }
+            int give = asInt(pair.get(0));
+            int get = asInt(pair.get(1));
+            if (!pl.resources.canPay(from, give) || Storage.roomFor(s, pl, to) < get) {
+                continue;
+            }
+            opts.add(new Choice("exchange_row", new int[]{give, get},
+                give + " " + from.code + " -> " + get + " " + to.code));
+        }
+        if (opts.isEmpty()) {
+            return Map.of("exchanged", 0, "reason", "нечего или некуда менять");
+        }
+        opts.add(new Choice("pass", null, "не менять"));
+        Agent ag = agentFor(s, seat);
+        Choice pick = ag == null ? opts.get(0)
+            : ag.choose(s, opts, Map.of("kind", "exchange_table"));
+        if (pick == null || pick.payload() == null) {
+            return Map.of("exchanged", 0, "reason", "игрок отказался");
+        }
+        int[] deal = (int[]) pick.payload();
+        pl.resources.pay(from, deal[0]);
+        int got = switch (to) {
+            case AMMO -> Storage.addAmmoCapped(s, pl, deal[1]);
+            case KELIUM -> Storage.addKeliumCapped(s, pl, deal[1]);
+            case DEBRIS -> Storage.addDebrisCapped(s, pl, deal[1]);
+            default -> {
+                pl.resources.add(to, deal[1]);
+                yield deal[1];
+            }
+        };
+        return Map.of("exchanged", deal[0], "got", got,
+            "from", from.code, "to", to.code);
+    }
+
+    /**
+     * ПЛАТА ЗА ПОЛОЖЕНИЕ НА ПОЛЕ — «по N за каждое …».
+     *
+     * <p>Отличие от обычного {@code gain}: сумма не напечатана, а СЧИТАЕТСЯ по
+     * столу. Это делает утиль неравноценным для разных игроков в разный момент
+     * партии — сильным у того, кто уже развернулся, и слабым у того, кто только
+     * начал. Именно поэтому у каждой такой карты есть ПОТОЛОК: без него
+     * развернувшийся игрок получал бы утилем больше, чем стоит целое действие.
+     *
+     * <p>Что считается — ключ {@code per}:
+     * <ul>
+     *   <li>{@code own_unit_on_field} — свои жетоны войск на поле («Зарплата»);
+     *   <li>{@code own_military_building} — казармы, заводы, авиабазы и ЦУ на
+     *       поле («Боезапас»);
+     *   <li>{@code own_economy_building} — добытчики и энергостанции на поле.
+     * </ul>
+     * Остальные ключи — ресурс и его количество за штуку, как у {@code gain},
+     * плюс {@code max} — потолок выдачи в штуках ресурса.
+     */
+    static Map<String, Object> gainPer(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        String per = String.valueOf(p.getOrDefault("per", "own_unit_on_field"));
+        int count = switch (per) {
+            case "own_military_building" -> countBuildings(pl, true);
+            case "own_economy_building" -> countBuildings(pl, false);
+            default -> pl.unitsOnField().size();
+        };
+        Map<String, Object> got = new HashMap<>();
+        got.put("per", per);
+        got.put("counted", count);
+        int max = p.containsKey("max") ? asInt(p.get("max")) : Integer.MAX_VALUE;
+        for (String key : new String[]{"coin", "ammo", "kelium", "debris"}) {
+            if (!p.containsKey(key)) {
+                continue;
+            }
+            int total = Math.min(max, asInt(p.get(key)) * count);
+            Map<String, Object> one = new HashMap<>();
+            one.put(key, total);
+            got.putAll(gain(s, seat, one));
+        }
+        return got;
+    }
+
+    /** Сколько своих зданий на поле: военные (с ЦУ) или хозяйственные. */
+    private static int countBuildings(PlayerState pl, boolean military) {
+        int n = 0;
+        for (BuildingToken b : pl.buildingsOnField()) {
+            boolean isMil = b.type == BuildingType.BARRACKS
+                || b.type == BuildingType.FACTORY
+                || b.type == BuildingType.AIRBASE
+                || b.type == BuildingType.COMMAND_CENTER;
+            if (isMil == military) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * ЗАБРАТЬ РЕСУРС У ПРОТИВНИКА — до {@code max} штук у ОДНОГО игрока.
+     *
+     * <p>Жертву выбирает сам игрок: у кого забрать — решение, а не автоматика
+     * («у самого богатого» лишало бы карту смысла как хода против лидера).
+     *
+     * <p>Забирается только то, что влезет на СВОЙ склад: кубик — это кубик в
+     * ячейке, и если ячеек нет, забирать некуда (тот же порядок, что у
+     * «Мародёрки»).
+     */
+    static Map<String, Object> stealResource(GameState s, int seat, Map<String, Object> p) {
+        PlayerState me = s.player(seat);
+        Resource what;
+        try {
+            what = Resource.fromCode(String.valueOf(p.getOrDefault("resource", "kelium")));
+        } catch (RuntimeException e) {
+            return Map.of("stolen", 0);
+        }
+        int want = p.containsKey("max") ? asInt(p.get("max")) : 1;
+        want = Math.min(want, Storage.roomFor(s, me, what));
+        if (want <= 0) {
+            return Map.of("stolen", 0, "reason", "склад полон");
+        }
+        List<Choice> opts = new ArrayList<>();
+        for (PlayerState o : s.players) {
+            if (o.seat == seat || !o.resources.canPay(what, 1)) {
+                continue;
+            }
+            opts.add(new Choice("steal_from", o.seat,
+                "забрать у места " + (o.seat + 1) + " (есть " + o.resources.get(what) + ")"));
+        }
+        if (opts.isEmpty()) {
+            return Map.of("stolen", 0, "reason", "ни у кого нет");
+        }
+        Agent ag = agentFor(s, seat);
+        Choice pick = ag == null ? opts.get(0)
+            : ag.choose(s, opts, Map.of("kind", "steal_resource"));
+        int victim = pick != null && pick.payload() instanceof Integer v
+            ? v : (Integer) opts.get(0).payload();
+        PlayerState from = s.player(victim);
+        int took = Math.min(want, from.resources.get(what));
+        from.resources.pay(what, took);
+        int got = switch (what) {
+            case KELIUM -> Storage.addKeliumCapped(s, me, took);
+            case AMMO -> Storage.addAmmoCapped(s, me, took);
+            case DEBRIS -> Storage.addDebrisCapped(s, me, took);
+            default -> {
+                me.resources.add(what, took);
+                yield took;
+            }
+        };
+        return Map.of("stolen", got, "resource", what.code, "from_seat", victim);
+    }
+
+    /**
+     * КРАЖА ТЕХНОЛОГИЙ — забрать карту арсенала СЕБЕ В РУКУ.
+     *
+     * <p>Не то же, что {@code discard_enemy_arsenal}: там карта уходила в сброс,
+     * то есть терял только противник. Здесь карта меняет владельца — противник
+     * теряет ровно то, что получаешь ты.
+     *
+     * <p>Берётся ЗАКРЫТАЯ карта из руки, а не установленная: установленную с
+     * планшета не вынешь, она уже работает, и её изъятие меняло бы обстановку
+     * задним числом. Какая именно карта достанется — не выбирается: она лежит
+     * рубашкой вверх.
+     */
+    static Map<String, Object> stealArsenalCard(GameState s, int seat, Map<String, Object> p) {
+        List<Choice> opts = new ArrayList<>();
+        for (PlayerState o : s.players) {
+            if (o.seat == seat || o.arsenalHand.isEmpty()) {
+                continue;
+            }
+            opts.add(new Choice("steal_arsenal", o.seat,
+                "забрать карту у места " + (o.seat + 1)
+                    + " (в руке " + o.arsenalHand.size() + ")"));
+        }
+        if (opts.isEmpty()) {
+            return Map.of("stolen", 0, "reason", "ни у кого нет карт в руке");
+        }
+        Agent ag = agentFor(s, seat);
+        Choice pick = ag == null ? opts.get(0)
+            : ag.choose(s, opts, Map.of("kind", "steal_arsenal"));
+        int victim = pick != null && pick.payload() instanceof Integer v
+            ? v : (Integer) opts.get(0).payload();
+        PlayerState from = s.player(victim);
+        String card = from.arsenalHand.remove(s.rng.nextInt(from.arsenalHand.size()));
+        s.player(seat).arsenalHand.add(card);
+        return Map.of("stolen", 1, "from_seat", victim, "card", card);
+    }
+
+    /**
+     * ПЕРЕСТРОЙКА — перенести своё здание с поля бесплатно.
+     *
+     * <p>Обычный перенос стоит монету и идёт внутри действия Стройки; здесь он
+     * не стоит ничего и приказа не требует. Куда можно ставить — та же зона
+     * стройки, что и всегда: карта даёт бесплатность, а не новое право.
+     */
+    static Map<String, Object> moveBuildingFree(GameState s, int seat, Map<String, Object> p) {
+        int count = p.containsKey("count") ? asInt(p.get("count")) : 1;
+        // ЧЕРЕЗ САМО ДЕЙСТВИЕ СТРОЙКИ, а не своей копией размещения. Правил у
+        // постановки жетона много (зона, стороны гекса, печатный контейнер,
+        // выселение войска из переносимого здания, лимит переносов ЦУ), они уже
+        // написаны и проверены в BuildAction; вторая реализация неизбежно
+        // разошлась бы с первой. Карта даёт лишь ДВА послабления: перенос ничего
+        // не стоит и других операций в этом действии нет.
+        Map<String, Object> params = new HashMap<>(p);
+        params.put("action", "build");
+        params.put("ops", count);
+        params.put("free_moves", count);
+        params.put("moves_only", true);
+        Map<String, Object> got = new HashMap<>(freeAction(s, seat, params));
+        got.put("moved_buildings", got.getOrDefault("ran", false));
+        return got;
+    }
+
+    /**
+     * ОБНОВИТЬ РЯД АРСЕНАЛА — сбросить открытые карты витрины и выложить новые.
+     *
+     * <p>Ход против выбора соперника: витрина общая, и обновляет её тот, кому не
+     * нравится, что там лежит. Своей карты это не даёт — только меняет то, из
+     * чего будут выбирать все, включая тебя.
+     */
+    static Map<String, Object> refreshArsenalRow(GameState s, int seat, Map<String, Object> p) {
+        var deck = s.decks.get("arsenal");
+        if (deck == null) {
+            return Map.of("refreshed", 0);
+        }
+        int n = s.arsenalDisplay.size();
+        for (String cid : new ArrayList<>(s.arsenalDisplay)) {
+            deck.discard(cid);
+        }
+        s.arsenalDisplay.clear();
+        kelium.engine.Setup.refillArsenalDisplay(s);
+        return Map.of("refreshed", n, "now", new ArrayList<>(s.arsenalDisplay));
+    }
+
+    /**
+     * УЛУЧШИТЬ ЖЕТОН МОДУЛЯ — сделать один разложенный жетон ЗОЛОТЫМ за плату.
+     *
+     * <p>Золотой режим — это то же самое место на планшете, но работающее сильнее
+     * (у красных — выстрел по каждой цели пары, у синих — прибавка к выходу
+     * Сборки). Улучшать нечего, если разложенных жетонов нет: карта тогда не
+     * срабатывает и плата не берётся.
+     */
+    static Map<String, Object> gildModule(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        int placed = pl.redPlacements.size() + pl.bluePlacements.size();
+        if (pl.goldModules >= placed) {
+            return Map.of("gilded", 0, "reason", "все разложенные жетоны уже золотые");
+        }
+        Resource pay;
+        try {
+            pay = Resource.fromCode(String.valueOf(p.getOrDefault("pay", "kelium")));
+        } catch (RuntimeException e) {
+            pay = Resource.KELIUM;
+        }
+        int price = p.containsKey("price") ? asInt(p.get("price")) : 1;
+        if (!pl.resources.canPay(pay, price)) {
+            return Map.of("gilded", 0, "reason", "нечем заплатить");
+        }
+        pl.resources.pay(pay, price);
+        pl.goldModules++;
+        return Map.of("gilded", 1, "paid", pay.code + ":" + price);
     }
 
     /**

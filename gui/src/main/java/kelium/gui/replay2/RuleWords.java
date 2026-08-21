@@ -329,6 +329,8 @@ public final class RuleWords {
             case "tech.science_exchanges" -> "постоянные обмены научного отдела";
             case "tech.science_one_step_per_track_per_action" ->
                 "за одно действие — не больше шага на трек";
+            case "tech.tracks_per_action" ->
+                "сколько РАЗНЫХ треков берёт одно действие Науки";
             case "tech.pair_bonus_coin" -> "монет за парный обмен науки";
 
             // ---------- Конец раунда ----------

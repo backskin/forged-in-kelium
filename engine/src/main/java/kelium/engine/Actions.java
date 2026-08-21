@@ -331,8 +331,17 @@ public final class Actions {
                 }
                 // Разработка: незапитанный добытчик можно включить монетами
                 // на ЭТО действие (см. effectivelyPowered).
+                //
+                // НАДБАВКА УТИЛЯ «ещё одним добытчиком» (21.08.2026): столько
+                // добытчиков работают в эту Добычу БЕЗ энергии. Все запитанные
+                // работают и так — «ещё один» может значить только этот, иначе
+                // прибавка была бы пустой.
                 if (!effectivelyPowered(s, player, b, agent, paid)) {
-                    continue;
+                    if (ctx.freeMinerMoves > 0) {
+                        ctx.freeMinerMoves--;
+                    } else {
+                        continue;
+                    }
                 }
                 String grid = adjacentGridWithKelium(b);
                 // G1 (свод §2: «Пропустить здание можно») — добытчик можно
@@ -477,6 +486,16 @@ public final class Actions {
                 }
                 opts.add(new Choice("assemble", Map.of("kind", "ammo", "building", b.uid),
                     b.type.code + "->ammo"));
+                // «И НАНИМАЕТ, И ГОТОВИТ» (утиль «Двойная смена», 21.08.2026):
+                // столько зданий за эту Сборку выдают ОБА выхода сразу, а не один
+                // из двух. Отдельный вариант выбора, а не молчаливая прибавка:
+                // выбор остаётся за игроком, и в журнале видно, что он взял.
+                boolean dualLeft = ctx.assemblyDualOutput > 0;
+                if (dualLeft && roomForUnit) {
+                    opts.add(new Choice("assemble",
+                        Map.of("kind", "both", "building", b.uid),
+                        b.type.code + "->" + unitType.code + " И ammo"));
+                }
                 opts.add(new Choice("pass", null, "skip " + b.type.code));
                 Choice pick = agent.choose(state, opts,
                     Map.of("kind", "assemble", "building_type", b.type.code));
@@ -490,6 +509,17 @@ public final class Actions {
                 // для боеприпасов и войск по отдельности).
                 int nOut = "ammo".equals(payload.get("kind")) ? ammoOut : unitsOut;
                 TurnJournal.TurnFacts jf = journal(state).of(player.seat);
+                // ОБА ВЫХОДА СРАЗУ: боеприпас выдаётся здесь же, а войско —
+                // обычной ветвью ниже (её код длинный, и дублировать его значило
+                // бы развести две правды о найме).
+                if ("both".equals(payload.get("kind"))) {
+                    ctx.assemblyDualOutput--;
+                    jf.assemblyAmmoBuildingTypes.add(b.type.code);
+                    ammoMade += Storage.addAmmoCapped(state, player, ammoOut);
+                    payload = new java.util.HashMap<>(payload);
+                    payload.put("kind", "unit");
+                    nOut = unitsOut;
+                }
                 if ("ammo".equals(payload.get("kind"))) {
                     jf.assemblyAmmoBuildingTypes.add(b.type.code);
                     ammoMade += Storage.addAmmoCapped(state, player, nOut);
@@ -788,8 +818,15 @@ public final class Actions {
             // третье здание ставятся по печатной цене, без надбавки.
             int surcharge = ctx.noSurcharge.contains("build_place")
                 ? 0 : ctx.nextOpSurcharge("build_place", schedule);
-            List<Map<String, Object>> menu = buildable(player, surcharge);
-            List<Map<String, Object>> moveMenu = movable(player);
+            // СКИДКА И БЕСПЛАТНОСТЬ ОТ УТИЛЯ (21.08.2026) идут ЧЕРЕЗ ТУ ЖЕ
+            // надбавку, которой считается удорожание: цена постройки в одном
+            // месте, и складывать её из двух источников порознь значило бы
+            // разойтись с ним рано или поздно. Отрицательная «надбавка» и есть
+            // скидка; ниже нуля цена не падает — это проверяет buildable.
+            surcharge -= Math.max(0, ctx.buildDiscountCoins);
+            List<Map<String, Object>> menu = ctx.buildMovesOnly
+                ? new ArrayList<>() : buildable(player, surcharge, ctx.buildFree);
+            List<Map<String, Object>> moveMenu = movable(player, ctx);
             if (menu.isEmpty() && moveMenu.isEmpty()) {
                 return null;
             }
@@ -1045,13 +1082,17 @@ public final class Actions {
             return all;
         }
 
-        private List<Map<String, Object>> movable(PlayerState player) {
+        private List<Map<String, Object>> movable(PlayerState player, TurnContext ctx) {
             List<Map<String, Object>> out = new ArrayList<>();
             int coin = player.resources.coin();
+            // ПЕРЕНОС ЗА СЧЁТ УТИЛЯ («Перестройка», 21.08.2026): столько первых
+            // переносов в этом действии не стоят ничего. Даром, а не дешевле:
+            // на карте так и написано — «бесплатно».
+            boolean freeMove = ctx != null && ctx.freeBuildingMoves > 0;
             boolean cuMovedThisTurn = cuAlreadyMoved(player);
             for (BuildingToken b : player.buildingsOnField()) {
                 boolean isCu = b.type == BuildingType.COMMAND_CENTER;
-                int cost = moveCost(player, b);
+                int cost = freeMove ? 0 : moveCost(player, b);
                 if (isCu && cuMovedThisTurn) {
                     continue;   // ЦУ уже переносили в этот ход
                 }
@@ -1170,6 +1211,12 @@ public final class Actions {
             }
             Choice hpick = agent.choose(state, hopts, Map.of("kind", "move_hex", "btype", b.type.code));
             String targetHex = (String) hpick.payload();
+            // БЕСПЛАТНЫЙ ПЕРЕНОС ТРАТИТСЯ: карта даёт их столько, сколько
+            // напечатано, и следующий перенос в этом же действии снова платный.
+            if (ctx.freeBuildingMoves > 0) {
+                ctx.freeBuildingMoves--;
+                cost = 0;
+            }
             if (cost > 0) {
                 player.resources.pay(Resource.COIN, cost);
             }
@@ -1234,6 +1281,29 @@ public final class Actions {
             tel.put("from", fromHex);
             tel.put("to", targetHex);
             return ActionResult.ok("moved " + b.type.code + " " + fromHex + " -> " + targetHex, tel);
+        }
+
+        /**
+         * То же меню стройки, но с послаблениями утиля (21.08.2026).
+         *
+         * <p>{@code free} — «построй здание бесплатно»: цена не платится вовсе,
+         * поэтому и по карману проходит ЛЮБОЕ здание, даже когда монет нет. Это
+         * сделано отрицательной надбавкой, а не отдельной веткой: цена здания
+         * считается в одном месте, и вторая ветка неизбежно разошлась бы с ним.
+         *
+         * <p>Отрицательная цена в меню невозможна: скидка опускает её только до
+         * нуля — «постройка не может доплачивать».
+         */
+        private List<Map<String, Object>> buildable(PlayerState player, int surcharge,
+                                                     boolean free) {
+            List<Map<String, Object>> out = buildable(player, free ? -999 : surcharge);
+            for (Map<String, Object> m : out) {
+                int c = ((Number) m.get("cost")).intValue();
+                int fixed = free ? 0 : Math.max(0, c);
+                m.put("cost", fixed);
+                m.put("label", m.get("label") + " (" + fixed + " мон)");
+            }
+            return out;
         }
 
         private List<Map<String, Object>> buildable(PlayerState player, int surcharge) {
@@ -2103,7 +2173,11 @@ public final class Actions {
                 }
                 // ---- предложение КАРТЫ: только один раз за действие ----
                 String active = s.marketActive;
-                if (!cardOfferUsed && active != null) {
+                // ОБЕ ПОЛОВИНЫ КАРТЫ РЫНКА (утиль «Двойная сделка», 21.08.2026):
+                // обычное правило — не больше ОДНОГО предложения с карты за
+                // действие; надбавка утиля снимает именно это ограничение, а
+                // ячейки предложения по-прежнему расходуются.
+                if ((!cardOfferUsed || ctx.marketBothOffers) && active != null) {
                     Map<String, Object> card = cfg.content.get("market").find(active);
                     if (card != null) {
                         for (String side : new String[]{"left", "right"}) {
@@ -2113,6 +2187,14 @@ public final class Actions {
                             // 3–4 игроках. Все ячейки заняты — предложение
                             // недоступно, как и за столом.
                             if (freeMarketCell(s, side) < 0) {
+                                continue;
+                            }
+                            // КАЖДАЯ ПОЛОВИНА — ПО ОДНОМУ РАЗУ. «Обе половины»
+                            // значит левую и правую, а не одну и ту же дважды:
+                            // на четверых у предложения две ячейки, и без этой
+                            // проверки карта позволяла бы взять одно и то же
+                            // предложение два раза.
+                            if (offerSides.contains(side)) {
                                 continue;
                             }
                             if (card.get(side) instanceof Map<?, ?> off) {
@@ -2333,14 +2415,18 @@ public final class Actions {
             List<Integer> costs = rs.getIntList("tech.step_cost_trophy");
             var tech = state.tech;
             List<Integer> caps = rs.stepCapacity(state.numPlayers());
-            // K2: ТРЕК ВЫБИРАЕТ ИГРОК; за одно действие можно шагнуть на КАЖДОМ
-            // треке (по одному шагу на трек — СВОД §5: «разные жетоны в одно
-            // действие можно разложить по разным трекам»).
+            // ТРЕК ВЫБИРАЕТ ИГРОК, а сколько РАЗНЫХ треков он успеет за одно
+            // действие — правило свода. Ключ tech.tracks_per_action: 1 значит
+            // «одно действие Науки — один трек» (решение дизайнера 21.08.2026
+            // ради баланса: за одно действие нельзя разложить трофеи сразу по
+            // всем трекам). Ключа нет — работает как раньше, по одному шагу на
+            // каждом треке, поэтому старые своды читаются без правок.
+            int tracksAllowed = rs.getInt("tech.tracks_per_action", tech.tracks.size());
             java.util.Set<String> steppedTracks = new java.util.HashSet<>();
             int stepsMade = 0;
             int spentTotal = 0;
             StringBuilder detail = new StringBuilder();
-            while (true) {
+            while (steppedTracks.size() < tracksAllowed) {
                 int pool = player.trophySpacePoints() + player.resources.debris();
                 List<Choice> opts = new ArrayList<>();
                 for (String track : tech.tracks) {
