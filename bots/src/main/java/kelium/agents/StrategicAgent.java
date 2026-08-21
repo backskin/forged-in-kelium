@@ -769,11 +769,21 @@ public class StrategicAgent extends HeuristicAgent {
                 refreshed = p;
             }
         }
+        Plan kept;
         if (refreshed == null) {
-            return best;                      // прежняя цель мертва — новый курс
+            kept = best;                      // прежняя цель мертва — новый курс
+        } else {
+            double commit = Math.max(1.0, genome.get("plan.commit", 1.25));
+            kept = bestScore > refreshed.score(genome) * commit ? best : refreshed;
         }
-        double commit = Math.max(1.0, genome.get("plan.commit", 1.25));
-        return bestScore > refreshed.score(genome) * commit ? best : refreshed;
+        // СЧЁТ ЦЕЛЕЙ ИДЁТ ИМЕННО ЗДЕСЬ. Plan.best вызывается один раз за партию
+        // на игрока (первый план), а дальше курс держит этот пересмотр — счётчики
+        // на Plan.best показывали 1% и отвечали не на тот вопрос.
+        Plan.ВЫБОРОВ.incrementAndGet();
+        if (kept != null && kept.goal == Plan.Goal.OBJECTIVE) {
+            Plan.ВЫБРАНО_ЗАДАНИЕ.incrementAndGet();
+        }
+        return kept;
     }
 
     private static String finalAction(Plan p) {

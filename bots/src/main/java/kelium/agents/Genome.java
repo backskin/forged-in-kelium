@@ -510,6 +510,64 @@ public final class Genome {
                 mul.accept("action.movement", 1.5);
                 mul.accept("build.strike_building", 1.6);
             }
+            // ==================================================================
+            //  СОСТАВ 4.0 (заказ дизайнера 21.08.2026): ЧЕТЫРЕ ХАРАКТЕРА
+            // ==================================================================
+            //  Прежние пятнадцать линий были в основном ПРИБОРАМИ — каждая мерила
+            //  свою величину (жатву, заповеди, однородность войска). Играющих
+            //  по-разному характеров среди них немного, а стол вмещает четверых.
+            //  Эти четыре — именно ИГРОКИ: каждый идёт к победе своей дорогой, и
+            //  дороги не пересекаются. Сложность игрока задаётся отдельно, глубиной
+            //  просчёта (см. Bots.Level), а не другим геномом: один характер — одна
+            //  линия обучения, четыре уровня умения.
+            case "builder" -> {
+                // ЗОДЧИЙ — мирная дорога: задания и наука. Воюет только когда
+                // тронули. Это самый простой характер для понимания: он делает
+                // то, что просят карты, и растёт по трекам.
+                mul.accept("plan.value.objective", 1.9);
+                mul.accept("action.science", 1.6);
+                mul.accept("action.mining", 1.4);
+                mul.accept("action.build", 1.4);
+                mul.accept("eval.tech_steps", 1.4);
+                mul.accept("aggression", 0.5);
+                mul.accept("action.combat", 0.6);
+            }
+            case "supplier" -> {
+                // СНАБЖЕНЕЦ — дорога через хозяйство: рынок, арсенал, обмены.
+                // Превращает деньги и келемий в карты, а карты — в положение.
+                mul.accept("action.market", 1.9);
+                mul.accept("action.energy_swap", 1.4);
+                mul.accept("plan.value.economy", 1.5);
+                mul.accept("eval.kelium", 1.4);
+                mul.accept("eval.arsenal_installed", 1.6);
+                mul.accept("action.combat", 0.9);
+            }
+            case "stalker" -> {
+                // ЛОВЧИЙ — дорога через чужие ошибки: бьёт лидера, ходит за ЦУ,
+                // добивает ослабленное. Своего плана почти не имеет — играет от
+                // соперника, поэтому ему особенно нужен просчёт.
+                mul.accept("combat.hit_leader", 2.0);
+                mul.accept("combat.building_bonus", 1.7);
+                mul.accept("combat.cu_bonus", 1.8);
+                mul.accept("eval.margin", 1.7);
+                mul.accept("action.movement", 1.4);
+                mul.accept("aggression", 1.2);
+            }
+            case "punisher" -> {
+                // КАРАТЕЛЬ — прямая дорога: армия и уничтожение. В отличие от
+                // прежнего громилы ему нужна не «драка вообще», а СНОС: войска
+                // нанимаются под удар, движение ведёт к цели, наука и рынок
+                // берутся ровно настолько, насколько кормят войну.
+                mul.accept("aggression", 2.0);
+                mul.accept("action.combat", 1.9);
+                mul.accept("action.assembly", 1.7);
+                mul.accept("action.movement", 1.6);
+                mul.accept("combat.kill_value", 1.6);
+                mul.accept("combat.building_bonus", 1.6);
+                mul.accept("assemble.strike_unit", 1.7);
+                mul.accept("build.strike_building", 1.5);
+                mul.accept("action.science", 0.7);
+            }
             default -> { }
         }
         // ХАРАКТЕР ПОДПИСЫВАЕТСЯ ЗДЕСЬ (profile — параметр метода). Без подписи

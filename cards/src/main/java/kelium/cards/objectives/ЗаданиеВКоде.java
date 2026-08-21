@@ -241,15 +241,15 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
     }
 
     /**
-     * СКОЛЬКО ЗАПИТАННЫХ ЗДАНИЙ ГОТОВЫ РАБОТАТЬ В СБОРКЕ. Нужно картам, чей
-     * рывок делается Сборкой: без запитанного здания нужного рода такой рывок
+     * СКОЛЬКО ЗАПИТАННЫХ ЗДАНИЙ ГОТОВЫ РАБОТАТЬ В СНАРЯЖЕНИИ. Нужно картам, чей
+     * рывок делается Снаряжением: без запитанного здания нужного рода такой рывок
      * невозможен, и близость у карты честный ноль.
      *
      * <p>Список родов берётся из {@link kelium.engine.Actions#ASSEMBLY_UNIT} —
      * ЕДИНОГО источника правды движка, а не переписывается здесь заново: стоит
-     * добавить в игру здание, умеющее Сборку, и карта учтёт его сама.
+     * добавить в игру здание, умеющее Снаряжение, и карта учтёт его сама.
      */
-    protected static int готовыхКСборке(PlayerState p) {
+    protected static int готовыхКСнаряжению(PlayerState p) {
         int n = 0;
         for (BuildingToken b : p.buildingsOnField()) {
             if (kelium.engine.Actions.ASSEMBLY_UNIT.containsKey(b.type) && b.powered()) {
@@ -270,6 +270,19 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
 
     @Override
     public final String suggestedAction(CardContext ctx) {
+        return действие(ctx);
+    }
+
+    /**
+     * То же, что {@link #действие()}, но С ОБСТАНОВКОЙ В РУКАХ.
+     *
+     * <p>Почти всем картам обстановка не нужна: условие «имей три здания»
+     * закрывается Стройкой всегда. Но бывает условие наизнанку — «останься без
+     * монет и боеприпасов» (o40 «Ва-банк»): там подсказывать надо то действие,
+     * которое тратит ТО, ЧЕГО БОЛЬШЕ ОСТАЛОСЬ. Такие карты переопределяют этот
+     * метод, остальные — короткий {@link #действие()}.
+     */
+    protected String действие(CardContext ctx) {
         return действие();
     }
 
@@ -314,7 +327,7 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
     }
 
     /** Сборка с пределом: без предела верх был сильнее выполненного задания. */
-    protected static boolean свободнаяСборка(CardContext ctx, int зданий) {
+    protected static boolean свободноеСнаряжение(CardContext ctx, int зданий) {
         ctx.freeAction("assembly", Map.of("buildings", зданий));
         return true;
     }

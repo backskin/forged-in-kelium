@@ -517,6 +517,7 @@ public final class Plan {
         String bestCid = null;
         String bestAction = null;
         String bestWhat = null;
+        double bestValue = -1;
         for (String cid : me.objectiveHand) {
             Map<String, Object> card;
             try {
@@ -554,7 +555,24 @@ public final class Plan {
                     + cardName(content, cid) + "»";
                 break;
             }
-            if (bestCid == null) {
+            // ВЫБИРАЕТСЯ ЛУЧШАЯ КАРТА, А НЕ ПЕРВАЯ ПОДВЕРНУВШАЯСЯ (21.08.2026).
+            //
+            // Прежде перебор останавливался на первой карте, у которой нашлось
+            // подсказанное действие, — то есть цель хода определял ПОРЯДОК КАРТ В
+            // РУКЕ. Ни цена карты, ни то, насколько она близка к выполнению, в
+            // расчёт не входили, и бот с равным усердием шёл к карте на 4 очка,
+            // до которой три хода, и к карте на 12 очков, которой не хватало
+            // одного шага.
+            //
+            // Считается ожидаемая польза: цена карты, умноженная на близость.
+            // Близость берётся у самой карты (progress: 0 — «ничего не начато»,
+            // 1 — «требование выполнено»); дно 0.35 стоит потому, что карта, к
+            // которой ещё не подступались, тоже чего-то стоит — иначе бот
+            // навсегда цеплялся бы за начатое и не менял бы цель, даже когда рядом
+            // лежит вдвое дороже.
+            double value = objectiveValue(s, seat, cid, oc, card);
+            if (value > bestValue) {
+                bestValue = value;
                 bestCid = cid;
                 bestAction = action;
                 bestWhat = "требование задания «" + cardName(content, cid)
@@ -567,7 +585,80 @@ public final class Plan {
         List<Step> steps = new ArrayList<>();
         steps.add(new Step(bestWhat, false, bestAction, null, null));
         steps.add(Step.of("сдать задание (СПЕЦ)", false, null));
-        return new Plan(Goal.OBJECTIVE, steps, g.get("plan.value.objective", 8.0));
+        // ЦЕНА ПЛАНА ЗАВИСИТ ОТ КАРТЫ, А НЕ ТОЛЬКО ОТ ГЕНОМА (21.08.2026).
+        //
+        // Прежде здесь стояло ровно plan.value.objective — одно число на все
+        // задания. Из-за этого выбор цели хода не различал карту на 12 очков,
+        // которой не хватает одного шага, и карту на 4 очка, до которой три хода:
+        // обе весили одинаково, и «пойти за заданием» либо всегда проигрывало
+        // науке с добычей, либо всегда выигрывало — в зависимости от одного гена.
+        // Замер это и показал: правка выбора КАРТЫ внутри плана не дала ничего,
+        // потому что дальше плану всё равно выставлялась плоская цена.
+        //
+        // Делитель 6 — ориентир «обычная карта» (награда с усилением у
+        // большинства карт 4–9 по прейскуранту ObjectiveHints). Коридор 0.4–2.0
+        // держит цель в игре: слабая карта не отменяет погоню совсем, сильная не
+        // затмевает всё остальное.
+        double scale = Math.max(0.4, Math.min(2.0, bestValue / 6.0));
+        ЦЕЛЬ_ЗАДАНИЕ.incrementAndGet();
+        return new Plan(Goal.OBJECTIVE, steps,
+            g.get("plan.value.objective", 8.0) * scale);
+    }
+
+    // ======================================================================
+    //  СЧЁТЧИКИ ДЛЯ ЗАМЕРА (не влияют на игру)
+    // ======================================================================
+    //  Правку поведения ботов нельзя оценить по одному числу «выполнено заданий»:
+    //  она может не сработать вовсе — например, цель просто не выбирается. Эти
+    //  счётчики отвечают на вопрос «дошло ли дело до этой ветки», и без них
+    //  предыдущая правка выглядела бы просто бесполезной, хотя она и не
+    //  запускалась.
+
+    /** Сколько раз строился план «выполнить задание». */
+    public static final java.util.concurrent.atomic.AtomicLong ЦЕЛЬ_ЗАДАНИЕ =
+        new java.util.concurrent.atomic.AtomicLong();
+
+    /** Сколько раз план «выполнить задание» ВЫИГРАЛ выбор цели хода. */
+    public static final java.util.concurrent.atomic.AtomicLong ВЫБРАНО_ЗАДАНИЕ =
+        new java.util.concurrent.atomic.AtomicLong();
+
+    /** Сколько раз выбор цели хода вообще состоялся. */
+    public static final java.util.concurrent.atomic.AtomicLong ВЫБОРОВ =
+        new java.util.concurrent.atomic.AtomicLong();
+
+    /**
+     * ОЖИДАЕМАЯ ПОЛЬЗА ОТ ПОГОНИ ЗА ЭТИМ ЗАДАНИЕМ: цена карты, взвешенная
+     * близостью к выполнению.
+     *
+     * <p>Цена берётся ту же, какой её считают подсказки движка
+     * ({@link kelium.engine.ObjectiveHints#rewardValue}) — второй прейскурант
+     * рано или поздно разошёлся бы с первым. Учитывается награда С УСИЛЕНИЕМ:
+     * бот, идущий к карте, вправе рассчитывать на её потолок.
+     *
+     * <p>Близость спрашивается у самой карты. Дно 0.35 не даёт «прилипнуть» к
+     * начатой карте, когда рядом лежит вдвое дороже; потолок 1.0 — карта, чьё
+     * требование уже выполнено, сюда не попадает (её разбирает ветка выше).
+     */
+    private static double objectiveValue(GameState s, int seat, String cid,
+                                         kelium.engine.cards.ObjectiveCard oc,
+                                         Map<String, Object> card) {
+        double price = kelium.engine.ObjectiveHints.rewardValue(card.get("base_reward"))
+            + kelium.engine.ObjectiveHints.rewardValue(card.get("special_reward"));
+        if (price <= 0) {
+            price = 4.0;    // карта без разобранной награды всё равно чего-то стоит
+        }
+        double closeness = 0.0;
+        if (oc != null) {
+            try {
+                closeness = oc.progress(new kelium.engine.cards.EngineCardContext(s, seat));
+            } catch (RuntimeException notNow) {
+                closeness = 0.0;
+            }
+        }
+        if (Double.isNaN(closeness) || closeness < 0) {
+            closeness = 0.0;
+        }
+        return price * (0.35 + 0.65 * Math.min(1.0, closeness));
     }
 
     private static String cardName(kelium.dataio.ContentSet content, String cid) {

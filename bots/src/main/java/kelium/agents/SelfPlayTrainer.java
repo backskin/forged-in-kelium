@@ -123,6 +123,13 @@ public final class SelfPlayTrainer {
             case "scientist": return Fitness.Goal.УЧЁНЫЙ;
             case "superweapon": return Fitness.Goal.СУПЕРОРУЖИЕ;
             case "cuhunter": return Fitness.Goal.ОХОТНИК;
+            // СОСТАВ 4.0 (21.08.2026). Цель каждой линии — ПОБЕДА плюс её
+            // фирменная дорога к ней: иначе характер стирается за первые же
+            // поколения (это уже случалось — см. коридор весов в Genome).
+            case "builder": return Fitness.Goal.ЗАДАЧНИК;
+            case "supplier": return Fitness.Goal.АРСЕНАЛ;
+            case "stalker": return Fitness.Goal.ОХОТНИК;
+            case "punisher": return Fitness.Goal.ВОЙНА;
             default: break;
         }
         return Fitness.Goal.ПОБЕДА;
@@ -136,7 +143,11 @@ public final class SelfPlayTrainer {
         this.population = Math.max(4, population);
         this.gamesPerGenome = Math.max(4, gamesPerGenome);
         this.brain = brain;
-        int threads = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
+        // СКОЛЬКО ЯДЕР ОТДАТЬ ОБУЧЕНИЮ. По умолчанию почти все, но настройкой
+        // запуска (-Dkelium.train.threads) можно оставить машине силы на замеры:
+        // долгое обучение идёт часами, и всё это время на ней надо работать.
+        int threads = Integer.getInteger("kelium.train.threads",
+            Math.max(1, Runtime.getRuntime().availableProcessors() - 2));
         this.pool = Executors.newFixedThreadPool(threads);
         say("ядер под обучение: " + threads);
         say("мозг обучающих партий: " + brain);
@@ -514,8 +525,22 @@ public final class SelfPlayTrainer {
         // Шестой аргумент — партий на характер в ЭТАПЕ ЗНАКОМСТВА С КАРТАМИ
         // (заказ дизайнера 14.08.2026, см. run(long,long,long)). 0 = пропустить.
         long cardGames = args.length > 5 ? Long.parseLong(args[5]) : 0L;
+        // Седьмой аргумент — КАКИЕ ЛИНИИ УЧИТЬ, через запятую («состав4» —
+        // действующие четыре характера). Без него учатся все, включая архивные:
+        // полный проход по пятнадцати линиям идёт много часов, а нужны обычно
+        // четыре (заказ дизайнера 21.08.2026).
+        java.util.List<String> only = java.util.List.of();
+        if (args.length > 6 && !args[6].isBlank()) {
+            only = "состав4".equalsIgnoreCase(args[6]) || "roster4".equalsIgnoreCase(args[6])
+                ? Bots.ROSTER_4
+                : java.util.List.of(args[6].split(","));
+        }
 
         SelfPlayTrainer t = new SelfPlayTrainer(population, gamesPerGenome, brain);
+        t.setOnly(only);
+        System.out.println("[ОБУЧЕНИЕ] линии: "
+            + (only.isEmpty() ? "все" : String.join(", ", only))
+            + "; мозг: " + brain + "; партий на характер: " + perCharacter);
         t.run(perCharacter, mirror, cardGames);
         saveLog(t);
     }

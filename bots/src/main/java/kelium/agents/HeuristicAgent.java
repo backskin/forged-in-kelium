@@ -793,7 +793,7 @@ public class HeuristicAgent extends Agent {
             if (!ammoRoom && !unitRoom) {
                 return 0.2;
             }
-            // АРМИЯ НУЖНА, А СБОРКУ НЕ БЕРУТ. Замер 12.08.2026: Сборка
+            // АРМИЯ НУЖНА, А СНАРЯЖЕНИЕ НЕ БЕРУТ. Замер 12.08.2026: Снаряжение
             // предлагалась 19 раз за партию на игрока, а выбиралась 2.6 — боты
             // почти всегда играли Добычу из того же приказа, и войск на поле не
             // набиралось даже на кулак из двух жетонов. Пока подвижных войск
@@ -1982,25 +1982,63 @@ public class HeuristicAgent extends Agent {
         return want > have ? 6.0 : 0.4;
     }
 
+    /**
+     * СПРОСИТЬ САМУ КАРТУ, чего она стоит — установка или утиль (21.08.2026).
+     *
+     * <p>ЗАЧЕМ. У каждой карты арсенала есть самооценка
+     * ({@code ArsenalCard.usefulness}): она знает силу своей способности, её
+     * узкое место, горизонт и условие применимости, и умеет сказать, стоит ли
+     * ставить карту ИМЕННО В ЭТОМ положении. Этот метод не вызывал НИКТО — ни
+     * один бот. Вместо него установка оценивалась таблицей из восьми имён
+     * пассивок, и все они — из арсенала 1.x: в действующей колоде 2.3.0 таких
+     * имён нет ВООБЩЕ, поэтому каждая карта получала «прочее, 2.0», а утиль
+     * почти всегда давал больше. Замер: 26 карт арсенала из 45 не установлены ни
+     * разу за 300 партий.
+     *
+     * <p>Возвращает 0..1 или отрицательное число, если карта самооценки не
+     * поддерживает (тогда решает прежняя формула).
+     */
+    private double cardOpinion(GameState state, String cid, boolean install) {
+        try {
+            var card = kelium.engine.cards.CardRegistry.arsenal(cid);
+            if (card == null) {
+                return -1;
+            }
+            double u = card.usefulness(
+                new kelium.engine.cards.EngineCardContext(state, seat), install);
+            return Double.isNaN(u) ? -1 : Math.max(0, Math.min(1, u));
+        } catch (RuntimeException notNow) {
+            return -1;
+        }
+    }
+
     private double scoreArsenalInstall(GameState state, String cid) {
         Map<String, Object> card = Ctx.cards(state, "arsenal").find(cid);
         if (card == null) {
             return 2.0;
         }
+        // МНЕНИЕ КАРТЫ — ГЛАВНЫЙ ЧЛЕН. Множитель 4 приводит её 0..1 к той же
+        // шкале, на которой считается утиль (там числа 1..4), иначе сравнение
+        // «поставить или сжечь» было бы сравнением разных линеек.
+        double opinion = cardOpinion(state, cid, true);
         Map<String, Object> bottom = card.get("bottom") instanceof Map<?, ?> m
             ? (Map<String, Object>) m : Map.of();
         String passive = String.valueOf(bottom.get("passive"));
-        double base = 2.0;
-        // Боевые/экономические постоянки ценнее для соответствующих характеров.
-        switch (passive) {
-            case "buildings_plus1_hp" -> base = 2.2 + 1.0 * wget("defense");
-            case "bonus_trophy_on_kill", "ammo_on_kill" -> base = 2.2 + 1.2 * wget("aggression");
+        double base = opinion >= 0 ? 1.0 + 4.0 * opinion : 2.0;
+        // ХАРАКТЕР ТЕПЕРЬ ДОБАВЛЯЕТ, А НЕ ЗАМЕЩАЕТ. Прежде эта таблица
+        // ПРИСВАИВАЛА базу, то есть решала за карту; теперь она только наклоняет
+        // мнение карты в сторону характера. Имена — из арсенала 1.x, в
+        // действующей колоде их нет: таблица оставлена для старых наборов, на
+        // которых до сих пор гоняются сравнительные замеры.
+        base += switch (passive) {
+            case "buildings_plus1_hp" -> 1.0 * wget("defense");
+            case "bonus_trophy_on_kill", "ammo_on_kill" -> 1.2 * wget("aggression");
             case "anti_armor_minus1_ammo", "first_attack_minus1_ammo",
-                 "no_second_battle_surcharge" -> base = 2.0 + 1.0 * wget("aggression");
-            case "plus1_storage_cell" -> base = 2.4 + 1.0 * wget("economy");
-            case "extraction_flip_bonus_trophy" -> base = 2.0 + 0.8 * wget("economy");
-            default -> base = 2.0;
-        }
+                 "no_second_battle_surcharge" -> 1.0 * wget("aggression");
+            case "plus1_storage_cell" -> 1.0 * wget("economy");
+            case "extraction_flip_bonus_trophy" -> 0.8 * wget("economy");
+            default -> 0.0;
+        };
         // Если все 3 слота заняты — установка вытеснит старую карту, чуть дешевле.
         for (PlayerState p : state.players) {
             if (p.seat == seat && p.arsenalInstalled.size() >= 3) {
@@ -2026,6 +2064,32 @@ public class HeuristicAgent extends Agent {
         String effect = String.valueOf(top.get("effect"));
         Map<String, Object> params = top.get("params") instanceof Map<?, ?> m
             ? (Map<String, Object>) m : Map.of();
+        // МНЕНИЕ КАРТЫ ОБ УТИЛЕ — на той же шкале, что и об установке, иначе
+        // сравнение снова стало бы сравнением разных линеек. Карта знает, чего
+        // не хватает игроку прямо сейчас, а формула ниже знает только, что
+        // напечатано.
+        double opinion = cardOpinion(state, cid, false);
+        // ХАРАКТЕР НАКЛОНЯЕТ ВЫБОР, но не решает его: ястребу бесплатный Бой
+        // ценнее, чем голубю, и это правда — но это ПОПРАВКА к цене, а не сама
+        // цена. Числа держатся малыми (до ~1.2), чтобы не перевесить мнение
+        // карты: раньше именно эти прибавки и делали утиль всегда выгоднее.
+        double tilt = 0.0;
+        if ("free_action".equals(effect)) {
+            tilt = switch (String.valueOf(params.get("action"))) {
+                case "combat" -> 0.4 * wget("aggression");
+                case "mining" -> 0.3 * wget("economy");
+                case "science" -> 0.4;
+                default -> 0.2;
+            };
+        } else if ("place_damage".equals(effect)) {
+            tilt = 0.4 * wget("aggression");
+        }
+        if (opinion >= 0) {
+            return 1.0 + 4.0 * opinion + tilt;
+        }
+        // ЗАПАСНОЙ ПУТЬ — прежняя формула по печатному верху. Нужен старым
+        // наборам карт, где самооценки нет: на них до сих пор гоняются
+        // сравнительные замеры, и менять их поведение задним числом нельзя.
         double val = 1.0;
         if ("gain".equals(effect)) {
             val += num(params, "trophy") * 1.3 + num(params, "ammo") * 0.6

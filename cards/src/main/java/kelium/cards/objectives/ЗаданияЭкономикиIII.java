@@ -294,6 +294,17 @@ public final class ЗаданияЭкономикиIII {
             return satisfied(ctx) ? "" : "потратить все монеты и все боеприпасы";
         }
 
+        /**
+         * Действие подсказывается по тому, ЧЕГО БОЛЬШЕ ОСТАЛОСЬ: монеты уходят в
+         * Стройку, боеприпасы — в Бой. Единственная карта, где подсказка зависит
+         * от обстановки: у остальных условие закрывается всегда одним и тем же
+         * действием, а здесь тратить надо то, что мешает.
+         */
+        @Override
+        protected String действие(CardContext ctx) {
+            return ctx.have(Resource.AMMO) > ctx.have(Resource.COIN) ? "combat" : "build";
+        }
+
         @Override
         public boolean burn(CardContext ctx) {
             return свободнаяНаука(ctx);

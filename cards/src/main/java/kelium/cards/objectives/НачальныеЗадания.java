@@ -101,6 +101,13 @@ public final class НачальныеЗадания {
             int есть = ctx.me().buildingsOnField().size();
             return есть >= 3 ? "" : "построить ещё " + (3 - есть) + " здания";
         }
+
+        /** Три здания ставятся Стройкой. */
+        @Override
+        protected String действие() {
+            return "build";
+        }
+
     }
 
     /** n2 «Первый боец» — найм войска любого рода, кроме вышки. */
@@ -148,6 +155,13 @@ public final class НачальныеЗадания {
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "нанять войско, кроме вышки";
         }
+
+        /** Войско делается только Сборкой. */
+        @Override
+        protected String действие() {
+            return "assembly";
+        }
+
     }
 
     /** n3 «Патроны» — не меньше трёх боеприпасов. */
@@ -180,6 +194,13 @@ public final class НачальныеЗадания {
             int надо = 3 - ctx.have(Resource.AMMO);
             return надо <= 0 ? "" : "накопить ещё " + надо + " боеприпаса";
         }
+
+        /** Боеприпасы делает Сборка. */
+        @Override
+        protected String действие() {
+            return "assembly";
+        }
+
     }
 
     /** n4 «Первая сделка» — предложение карты сделок на рынке. */
@@ -213,6 +234,13 @@ public final class НачальныеЗадания {
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "оплатить предложение карты сделок на рынке";
         }
+
+        /** Предложение карты сделок берут на Рынке. */
+        @Override
+        protected String действие() {
+            return "market";
+        }
+
     }
 
     /** n5 «Коммутация» — запитанное здание вне гекса своего ЦУ. */
@@ -266,6 +294,13 @@ public final class НачальныеЗадания {
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "запитать здание вне гекса своего ЦУ";
         }
+
+        /** Кубик разводит Смена энергии. */
+        @Override
+        protected String действие() {
+            return "energy_swap";
+        }
+
     }
 
     /** n6 «Выход» — войско на расстоянии двух и больше гексов от своего ЦУ. */
@@ -322,6 +357,13 @@ public final class НачальныеЗадания {
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "отвести войско на два гекса от своего ЦУ";
         }
+
+        /** Уйти от базы можно только Движением. */
+        @Override
+        protected String действие() {
+            return "movement";
+        }
+
     }
 
     /** n7 «Жила» — не меньше трёх келемия. */
@@ -354,6 +396,13 @@ public final class НачальныеЗадания {
             int надо = 3 - ctx.have(Resource.KELIUM);
             return надо <= 0 ? "" : "добыть ещё " + надо + " келемия";
         }
+
+        /** Келемий приносит Добыча. */
+        @Override
+        protected String действие() {
+            return "mining";
+        }
+
     }
 
     /** n8 «Находка» — два неоткрытых контейнера на руках. */
@@ -386,6 +435,13 @@ public final class НачальныеЗадания {
             int надо = 2 - ctx.me().containers;
             return надо <= 0 ? "" : "взять ещё " + надо + " контейнер";
         }
+
+        /** Контейнеры приходят с Добычей. */
+        @Override
+        protected String действие() {
+            return "mining";
+        }
+
     }
 
     /** n9 «Первый шаг» — шаг на любом треке технологий. */
@@ -424,6 +480,13 @@ public final class НачальныеЗадания {
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "шагнуть на любом треке технологий";
         }
+
+        /** Шаг по треку делает Наука. */
+        @Override
+        protected String действие() {
+            return "science";
+        }
+
     }
 
     /** n10 «Первый трофей» — хотя бы один жетон в трофеях. */
@@ -470,6 +533,13 @@ public final class НачальныеЗадания {
         public String needed(CardContext ctx) {
             return satisfied(ctx) ? "" : "уничтожить чужой жетон и взять его в трофеи";
         }
+
+        /** Трофей берут в Бою. */
+        @Override
+        protected String действие() {
+            return "combat";
+        }
+
     }
 
     /** n11 «Второй заход» — действие с нижнего приказа своей карты приказа. */
