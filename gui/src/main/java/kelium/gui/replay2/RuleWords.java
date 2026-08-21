@@ -337,6 +337,10 @@ public final class RuleWords {
                 "боеприпасов за Бой спец-действием (0 — так нельзя)";
             case "economy.vp_per_kill" ->
                 "победных очков за каждый уничтоженный чужой жетон";
+            case "economy.vp_per_installed_arsenal" ->
+                "победных очков за каждую установленную карту арсенала";
+            case "economy.vp_per_installed_super_arsenal" ->
+                "победных очков за каждую установленную карту супер-арсенала";
             case "tech.pair_bonus_coin" -> "монет за парный обмен науки";
 
             // ---------- Конец раунда ----------

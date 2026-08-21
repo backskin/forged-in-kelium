@@ -157,6 +157,31 @@ public final class Scoring {
         // движок умеет их считать.
         breakdown.put("arsenal_vp", arsenalGoalVp(state, p));
 
+        // УСТАНОВЛЕННАЯ КАРТА АРСЕНАЛА САМА СТОИТ ОЧКОВ (правило дизайнера
+        // 21.08.2026).
+        //
+        // ЗАЧЕМ. Замер: за партию игрок берёт полторы карты арсенала и СЖИГАЕТ
+        // их чаще, чем ставит (0.74 против 0.72), потому что утиль даёт понятную
+        // выгоду сейчас, а установка — способность, которая может и не
+        // пригодиться. Теперь установка платит сама по себе, и выбор «сжечь или
+        // поставить» становится выбором между «сейчас» и «наверняка».
+        //
+        // Обычная карта и карта СУПЕР-арсенала считаются ОТДЕЛЬНЫМИ ключами:
+        // супер-арсенал дороже (правило дизайнера — два очка), и смешивать их в
+        // одну строку значило бы потерять это в разбивке «откуда очки».
+        //
+        // Мандат совета (sa8) держит карту у себя — она тоже установлена и
+        // работает, поэтому считается вместе с обычными (allInstalledArsenal).
+        int perCard = ((Number) rs.get("economy.vp_per_installed_arsenal", 0)).intValue();
+        if (perCard != 0) {
+            breakdown.put("installed_arsenal", perCard * p.allInstalledArsenal().size());
+        }
+        int perSuper = ((Number) rs.get("economy.vp_per_installed_super_arsenal", 0))
+            .intValue();
+        if (perSuper != 0) {
+            breakdown.put("installed_super_arsenal", perSuper * p.superArsenalCards.size());
+        }
+
         int star = 0;
         for (BuildingToken b : p.buildingsOnField()) {
             if ((b.type == BuildingType.MINER || b.type == BuildingType.POWER_PLANT)

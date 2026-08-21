@@ -50,6 +50,8 @@ public final class Names {
             case "super_first_part" -> "первая часть супер-задания";
             case "kills" -> "уничтожения";
             case "level4_stars" -> "звёзды 4-го уровня";
+            case "installed_arsenal" -> "установленные карты арсенала";
+            case "installed_super_arsenal" -> "установленный супер-арсенал";
             // Прямые очки с карты задания (CardContext.grantVp — редкий пункт vp
             // в данных карты, отдельно от обычной награды монетами/картами).
             case "objective_card_vp" -> "очки с карты задания";
@@ -193,7 +195,7 @@ public final class Names {
     /** Действие: то, что игрок делает по приказу. */
     public static String action(String code) {
         return switch (code) {
-            case "assembly" -> "сборка";
+            case "assembly" -> "снаряжение";
             case "mining" -> "добыча";
             case "build" -> "стройка";
             case "energy_swap" -> "энергия";
@@ -312,7 +314,7 @@ public final class Names {
     }
 
     private static final Map<String, String> FREE = Map.of(
-        "assembly", "сборка",
+        "assembly", "снаряжение",
         "build", "стройка",
         "mining", "добыча",
         "movement", "движение",
