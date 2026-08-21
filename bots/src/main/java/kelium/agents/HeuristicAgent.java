@@ -161,6 +161,25 @@ public class HeuristicAgent extends Agent {
             case "combat_target" -> (s, o) -> scoreCombatTarget(s, o);
             case "attack" -> (s, o) -> scoreAttack(s, o);
             case "pay_power" -> (s, o) -> scorePayPower(s, o, ctx);
+            // ЗАМЕНА НА ПОЛНОМ ПЛАНШЕТЕ (21.08.2026): что снять и стоит ли вообще.
+            //
+            // Сравниваются мнения самих карт: чего стоит НОВАЯ против того, чего
+            // стоит снимаемая. Снимать выгодно только если новая лучше, и выигрыш
+            // тем больше, чем слабее снимаемая. Отказ («pass») стоит 0.2, поэтому
+            // при любой невыгодной замене планшет остаётся как есть: работающую
+            // способность не выбрасывают ради случайной новой.
+            case "arsenal_replace" -> (s, o) -> {
+                if (o.payload() == null) {
+                    return 0.2;                 // оставить планшет как есть
+                }
+                String новая = ctx == null ? null : String.valueOf(ctx.get("card"));
+                double ценаНовой = новая == null ? -1 : cardOpinion(s, новая, true);
+                double ценаСтарой = cardOpinion(s, String.valueOf(o.payload()), true);
+                if (ценаНовой < 0 || ценаСтарой < 0) {
+                    return 0.1;                 // самооценки нет — не трогаем планшет
+                }
+                return 4.0 * (ценаНовой - ценаСтарой);
+            };
             case "module_place_red" -> (s, o) -> scoreModuleRed(s, o);
             case "module_place_blue" -> (s, o) -> scoreModuleBlue(s, o);
             // K3: выбор гекса-исхода Смены энергии — ценим по числу простаивающих

@@ -16,23 +16,27 @@ import kelium.engine.GameEngine;
 import kelium.engine.Setup;
 
 /**
- * ЧЕТЫРЕ ПЕЧАТНЫХ ОБМЕНА КАЖДОГО ПЛАНШЕТА — И СКОЛЬКО КАРТ АРСЕНАЛА ПРИХОДИТ.
+ * АРСЕНАЛ: СКОЛЬКО КАРТ БЕРУТ — И ЧЕТЫРЕ ПЕЧАТНЫХ ОБМЕНА КАЖДОГО ПЛАНШЕТА.
  *
- * <p>Два вопроса дизайнера 21.08.2026: сколько карт арсенала в среднем приходит
- * игроку за партию, и как используются четыре постоянных обмена на планшете рынка
- * и четыре на планшете науки — в штуках и в долях.
+ * <p>Вопросы дизайнера 21.08.2026: сколько карт арсенала берут за партию (всего и
+ * на игрока), как часто новая карта НЕ ВЛЕЗАЕТ в полный планшет и игрок решает
+ * ничего не снимать, и как используются четыре постоянных обмена на планшете
+ * рынка и четыре на планшете науки — в штуках и в долях.
  *
- * <p>ВСЁ СЧИТАЕТСЯ ПО СОБЫТИЯМ ДВИЖКА, не по выведенным числам:
+ * <p>СТАРТОВАЯ КАРТА АРСЕНАЛА В СТАТИСТИКУ НЕ ВХОДИТ ВООБЩЕ (требование дизайнера).
+ * Она раздаётся на подготовке всем и поровну, ничего не говорит ни об игре, ни о
+ * решениях игрока — и, попав в счёт, только завышает всё остальное.
+ *
+ * <p>ВСЁ СЧИТАЕТСЯ ПО СОБЫТИЯМ И СОСТОЯНИЮ ДВИЖКА, не по выведенным числам:
  * <ul>
- *   <li>обмены рынка — телеметрия действия {@code market}, поля
- *       {@code deal_<что>}: движок пишет, сколько раз за действие взят каждый
- *       печатный обмен;</li>
- *   <li>обмены науки — телеметрия действия {@code science}, поле
- *       {@code exchange}: взятые за действие обмены, склеенные через «+»;</li>
- *   <li>приход арсенала — ОБЪЕДИНЕНИЕМ всех карт, побывавших в руке: единого
- *       события «карта пришла» в движке нет, карты приходят пятью путями, и счёт
- *       по событиям забыл бы один из них молча. Стартовая карта считается
- *       отдельно, иначе раздача смешалась бы с добычей.</li>
+ *   <li>взятые карты — объединение всех карт, побывавших в руке, МИНУС стартовая:
+ *       единого события «карта пришла» в движке нет (пять путей прихода), и счёт
+ *       по событиям молча забыл бы один из них;</li>
+ *   <li>не влезло — событие {@code arsenal_no_room}: планшет полон, и игрок
+ *       отказался что-либо снимать;</li>
+ *   <li>заменено — событие {@code arsenal_replaced};</li>
+ *   <li>обмены — телеметрия действий {@code market} и {@code science} (она лежит
+ *       ВЛОЖЕННОЙ картой в поле {@code telemetry}, а не в самом событии).</li>
  * </ul>
  *
  * <p>Запуск: {@code kelium.ОбменыИАрсенал [игроков] [партий] [свод]}.
@@ -58,25 +62,30 @@ public final class ОбменыИАрсенал {
         System.setOut(new java.io.PrintStream(new java.io.FileOutputStream(
             java.io.FileDescriptor.out), true, StandardCharsets.UTF_8));
         int players = args.length > 0 ? Integer.parseInt(args[0]) : 4;
-        int games = args.length > 1 ? Integer.parseInt(args[1]) : 200;
+        int games = args.length > 1 ? Integer.parseInt(args[1]) : 150;
         String ruleset = args.length > 2 ? args[2] : GameConfig.DEFAULT_RULESET;
         List<String> стол = List.of("builder:3", "supplier:3", "stalker:3", "punisher:3");
 
         Map<String, Long> рынок = new TreeMap<>();
         Map<String, Long> наука = new TreeMap<>();
-        long пришлоАрсенала = 0;
-        long стартовых = 0;
+        long взято = 0;
         long установлено = 0;
         long сожжено = 0;
+        long неВлезло = 0;
+        long заменено = 0;
+        long осталосьВРуке = 0;
         long действийРынок = 0;
         long действийНаука = 0;
 
         for (int g = 0; g < games; g++) {
             GameConfig cfg = GameConfig.buildCached(ruleset, players, 21000L + g, null, null);
             GameState s = Setup.buildGame(cfg);
-            // Стартовые карты арсенала уже в руках — это раздача, не добыча.
+            // СТАРТОВЫЕ КАРТЫ ЗАПОМИНАЮТСЯ, ЧТОБЫ ИХ ИСКЛЮЧИТЬ ИЗ ВСЕГО.
+            List<java.util.Set<String>> стартовые = new ArrayList<>();
+            List<java.util.Set<String>> вРуке = new ArrayList<>();
             for (int i = 0; i < players; i++) {
-                стартовых += s.player(i).arsenalHand.size();
+                стартовые.add(new java.util.LinkedHashSet<>(s.player(i).arsenalHand));
+                вРуке.add(new java.util.LinkedHashSet<>());
             }
             List<Agent> ags = new ArrayList<>();
             int shift = g % players;
@@ -84,103 +93,128 @@ public final class ОбменыИАрсенал {
                 ags.add(kelium.agents.BotCatalog.create(стол.get((i + shift) % players), i,
                     new Random(i * 97L + g), players));
             }
-            long[] c = new long[5];
-            // СКОЛЬКО КАРТ ПОБЫВАЛО В РУКЕ — объединением, а не событием.
-            //
-            // Единого события «карта арсенала пришла» в движке нет: карты
-            // приходят пятью разными путями (витрина, обмен науки, награда
-            // задания, эффект карты, наплыв в Обновление), и каждый пишет своё.
-            // Считать по событиям значило бы забыть один из путей и не узнать об
-            // этом. Объединение всех карт, ЛЕЖАВШИХ в руке, ничего не забывает:
-            // мимо руки карта не проходит.
-            List<java.util.Set<String>> вРуке = new ArrayList<>();
-            for (int i = 0; i < players; i++) {
-                вРуке.add(new java.util.LinkedHashSet<>(s.player(i).arsenalHand));
-            }
+            long[] c = new long[6];
             GameEngine.playGame(s, ags, ev -> {
                 for (int i = 0; i < players; i++) {
-                    вРуке.get(i).addAll(s.player(i).arsenalHand);
+                    for (String cid : s.player(i).arsenalHand) {
+                        if (!стартовые.get(i).contains(cid)) {
+                            вРуке.get(i).add(cid);
+                        }
+                    }
                 }
                 String t = String.valueOf(ev.get("type"));
-                if ("arsenal".equals(t)) {
-                    String mode = String.valueOf(ev.get("mode"));
-                    if (mode.startsWith("install")) {
-                        c[1]++;
-                    } else if ("burn".equals(mode)) {
-                        c[2]++;
-                    }
-                } else if ("action".equals(t)) {
-                    String action = String.valueOf(ev.get("action"));
-                    if ("market".equals(action)) {
-                        c[3]++;
-                        for (Map.Entry<String, Object> e : ev.entrySet()) {
-                            if (e.getKey().startsWith("deal_")
-                                    && e.getValue() instanceof Number n) {
-                                рынок.merge(e.getKey().substring("deal_".length()),
-                                    n.longValue(), Long::sum);
-                            }
+                switch (t) {
+                    case "arsenal" -> {
+                        String карта = String.valueOf(ev.get("card"));
+                        int seat = ev.get("seat") instanceof Number n ? n.intValue() : -1;
+                        boolean стартовая = seat >= 0 && стартовые.get(seat).contains(карта);
+                        if (стартовая) {
+                            return;      // стартовая карта в статистику не входит
                         }
-                    } else if ("science".equals(action)) {
-                        c[4]++;
-                        Object ex = ev.get("exchange");
-                        if (ex != null) {
-                            for (String part : String.valueOf(ex).split("\\+")) {
-                                if (!part.isBlank()) {
-                                    наука.merge(part.trim(), 1L, Long::sum);
+                        String mode = String.valueOf(ev.get("mode"));
+                        if (mode.startsWith("install")) {
+                            c[1]++;
+                        } else if ("burn".equals(mode)) {
+                            c[2]++;
+                        }
+                    }
+                    case "arsenal_no_room" -> c[3]++;
+                    case "arsenal_replaced" -> c[4]++;
+                    case "action" -> {
+                        String action = String.valueOf(ev.get("action"));
+                        Map<?, ?> tel = ev.get("telemetry") instanceof Map<?, ?> m
+                            ? m : Map.of();
+                        if ("market".equals(action)) {
+                            c[5]++;
+                            for (Map.Entry<?, ?> e : tel.entrySet()) {
+                                String k = String.valueOf(e.getKey());
+                                if (k.startsWith("deal_") && e.getValue() instanceof Number n) {
+                                    рынок.merge(k.substring("deal_".length()),
+                                        n.longValue(), Long::sum);
+                                }
+                            }
+                        } else if ("science".equals(action)) {
+                            c[0]++;
+                            Object ex = tel.get("exchange");
+                            if (ex != null) {
+                                for (String part : String.valueOf(ex).split("\\+")) {
+                                    if (part.isBlank()) {
+                                        continue;
+                                    }
+                                    // ОБМЕН, А НЕ «ОБМЕН И ЧТО ВЫПАЛО». Движок
+                                    // пишет «draw_arsenal:b24» — с номером
+                                    // доставшейся карты. Без отсечения хвоста
+                                    // таблица распадалась на сорок строк по 2 %
+                                    // вместо одной строки обмена.
+                                    String id = part.trim();
+                                    int двоеточие = id.indexOf(':');
+                                    наука.merge(двоеточие < 0 ? id : id.substring(0, двоеточие),
+                                        1L, Long::sum);
                                 }
                             }
                         }
                     }
+                    default -> { }
                 }
             });
-            for (java.util.Set<String> набор : вРуке) {
-                пришлоАрсенала += набор.size();
+            for (int i = 0; i < players; i++) {
+                взято += вРуке.get(i).size();
+                for (String cid : s.player(i).arsenalHand) {
+                    if (!стартовые.get(i).contains(cid)) {
+                        осталосьВРуке++;
+                    }
+                }
             }
             установлено += c[1];
             сожжено += c[2];
-            действийРынок += c[3];
-            действийНаука += c[4];
+            неВлезло += c[3];
+            заменено += c[4];
+            действийНаука += c[0];
+            действийРынок += c[5];
         }
 
         int мест = games * players;
         StringBuilder b = new StringBuilder();
-        b.append("# Печатные обмены планшетов и приход карт арсенала\n\n");
+        b.append("# Арсенал: сколько карт берут — и печатные обмены планшетов\n\n");
         b.append("Свод **").append(ruleset).append("**, партий **").append(games)
             .append("**, игроков ").append(players).append(", стол: ")
             .append(String.join(", ", стол)).append(". Места ротируются.\n\n");
+        b.append("**СТАРТОВАЯ КАРТА АРСЕНАЛА ИСКЛЮЧЕНА ИЗ ВСЕХ ЧИСЕЛ**: она ")
+            .append("раздаётся всем поровну и ни о чём не говорит.\n\n");
 
-        b.append("## Карты арсенала: сколько приходит игроку за партию\n\n");
-        b.append("| откуда | за партию на игрока |\n|---|---:|\n");
-        b.append("| стартовая карта (раздача) | ")
-            .append(String.format("%.2f", стартовых / (double) мест)).append(" |\n");
-        b.append("| добыто за партию (витрина, награды, обмены) | ")
-            .append(String.format("%.2f",
-                Math.max(0, пришлоАрсенала - стартовых) / (double) мест)).append(" |\n");
-        b.append("| **всего побывало в руке за партию** | **")
-            .append(String.format("%.2f", пришлоАрсенала / (double) мест))
-            .append("** |\n");
-        b.append("| из них установлено | ")
-            .append(String.format("%.2f", установлено / (double) мест)).append(" |\n");
-        b.append("| из них сожжено на утиль | ")
-            .append(String.format("%.2f", сожжено / (double) мест)).append(" |\n\n");
+        b.append("## Карты арсенала\n\n");
+        b.append("| что | за партию ВСЕГО | за партию на игрока |\n|---|---:|---:|\n");
+        строка(b, "ВЗЯТО карт (витрина, обмены науки, награды, эффекты)",
+            взято, games, мест);
+        строка(b, "установлено в свою зону", установлено, games, мест);
+        строка(b, "сожжено на утиль", сожжено, games, мест);
+        строка(b, "заменило карту на полном планшете", заменено, games, мест);
+        строка(b, "НЕ ВЛЕЗЛО: планшет полон, игрок ничего не снял", неВлезло, games, мест);
+        строка(b, "осталось в руке к концу партии", осталосьВРуке, games, мест);
+        b.append("\n");
 
-        печать(b, "## Планшет РЫНКА: четыре печатных обмена", рынок, мест,
-            действийРынок, games);
-        печать(b, "## Планшет НАУКИ: четыре печатных обмена", наука, мест,
-            действийНаука, games);
+        печать(b, "## Планшет РЫНКА: печатные обмены", рынок, мест, действийРынок, games);
+        печать(b, "## Планшет НАУКИ: печатные обмены", наука, мест, действийНаука, games);
 
         b.append("\n## Как читать\n\n");
-        b.append("«За партию на игрока» — абсолютное число: сколько раз этот обмен взят.\n");
-        b.append("«Доля» — от всех взятых обменов ЭТОГО планшета: чем пользуются, а чем нет.\n");
-        b.append("«На одно действие» — сколько раз обмен берут за один заход на планшет:\n");
-        b.append("печатным обменом можно пользоваться сколько угодно раз за действие,\n");
-        b.append("поэтому число больше единицы здесь законно.\n");
+        b.append("«За партию на игрока» — абсолютное число на одного игрока.\n\n");
+        b.append("«Доля» — от всех взятых обменов ЭТОГО планшета: чем пользуются, ")
+            .append("а чем не пользуются вовсе.\n\n");
+        b.append("«На одно действие» — сколько раз обмен берут за один заход на ")
+            .append("планшет: печатным обменом можно пользоваться сколько угодно ")
+            .append("раз за действие, поэтому число больше единицы здесь законно.\n");
 
-        Path out = Path.of("reports", "balance", "обмены-планшетов.md");
+        Path out = Path.of("reports", "balance", "арсенал-и-обмены.md");
         Files.createDirectories(out.getParent());
         Files.writeString(out, b.toString(), StandardCharsets.UTF_8);
         System.out.println(b);
         System.out.println("отчёт: " + out.toAbsolutePath());
+    }
+
+    private static void строка(StringBuilder b, String имя, long сумма, int games, int мест) {
+        b.append("| ").append(имя).append(" | ")
+            .append(String.format("%.2f", сумма / (double) games)).append(" | ")
+            .append(String.format("%.2f", сумма / (double) мест)).append(" |\n");
     }
 
     private static void печать(StringBuilder b, String заголовок, Map<String, Long> счёт,
@@ -203,7 +237,7 @@ public final class ОбменыИАрсенал {
                 .append(" |\n");
         }
         if (rows.isEmpty()) {
-            b.append("| — | 0.00 | — | — |\n");
+            b.append("| ни один обмен не взят ни разу | 0.00 | — | — |\n");
         }
         b.append("\n");
     }

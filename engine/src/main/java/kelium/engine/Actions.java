@@ -2019,9 +2019,15 @@ public final class Actions {
                 boolean did = resolver.runBattle(player.seat, agent);
                 if (!did) {
                     // бой не состоялся (пас/нет целей): вернуть наценку — право
-                    // не было использовано
+                    // не было использовано.
+                    //
+                    // ВОЗВРАТ ИДЁТ ЧЕРЕЗ СКЛАД. Казалось бы, возвращаем своё же и
+                    // переполнить не можем — но между платой и возвратом успевает
+                    // пройти бой, а в бою сносят здания: закрылись ячейки, и
+                    // прежнее количество боеприпасов уже не помещается. Поймано
+                    // сторожем StorageNeverOverflowsTest на одной партии из девяти.
                     if (surcharge > 0) {
-                        player.resources.add(Resource.AMMO, surcharge);
+                        Storage.addAmmoCapped(state, player, surcharge);
                     }
                     break;
                 }
@@ -2427,7 +2433,11 @@ public final class Actions {
             int spentTotal = 0;
             StringBuilder detail = new StringBuilder();
             while (steppedTracks.size() < tracksAllowed) {
-                int pool = player.trophySpacePoints() + player.resources.debris();
+                // ЧЕМ ПЛАТИМ, ТЕМ И СЧИТАЕМ КАРМАН (см. payTrophy): при
+                // tech.pay_with_debris_only жетоны в оплату не идут, значит и
+                // предлагать шаги «по карману из жетонов» нельзя — иначе игрок
+                // увидел бы вариант, который не может оплатить.
+                int pool = сколькоМожемЗаплатить(player);
                 List<Choice> opts = new ArrayList<>();
                 for (String track : tech.tracks) {
                     if (steppedTracks.contains(track)) {
@@ -2671,6 +2681,19 @@ public final class Actions {
             }
         }
 
+        /**
+         * СКОЛЬКО ИГРОК МОЖЕТ ЗАПЛАТИТЬ ЗА НАУКУ — тем же счётом, каким платит.
+         *
+         * <p>Иначе меню и оплата расходятся: предложение считалось по жетонам с
+         * обломками, а оплата (при новом правиле) берёт только обломки, и игрок
+         * видел бы шаги, за которые ему нечем платить.
+         */
+        private int сколькоМожемЗаплатить(PlayerState player) {
+            return rs.getBool("tech.pay_with_debris_only", false)
+                ? player.resources.debris()
+                : player.trophySpacePoints() + player.resources.debris();
+        }
+
         private void payTrophy(PlayerState player, int cost) {
             payTrophy(player, cost, null);
         }
@@ -2697,6 +2720,42 @@ public final class Actions {
          */
         private void payTrophy(PlayerState player, int cost, Agent agent) {
             int remaining = cost;
+            // ПЛАТЯТ ОБЛОМКАМИ, А НЕ ЦЕЛЫМИ ЖЕТОНАМИ (уточнение дизайнера
+            // 21.08.2026, ключ tech.pay_with_debris_only).
+            //
+            // Правило целиком: снесённый жетон уезжает к тебе на трофейное место,
+            // а в Возврат ВСЕ трофеи конвертируются в обломки 1:1 (это уже
+            // работает, см. GameEngine.returnStep). Обломок и есть монета науки.
+            // Движок же до сих пор позволял сдать в науку сам ЖЕТОН, минуя
+            // конвертацию, — то есть тратить трофей в тот же ход, когда он взят.
+            // Это меняло темп: война оплачивала науку немедленно, без раунда
+            // ожидания, и «трофей» с «обломком» становились одним и тем же.
+            //
+            // Ключа нет — работает как раньше (жетоны, потом обломки), поэтому
+            // старые своды и замеры воспроизводятся без правок.
+            if (rs.getBool("tech.pay_with_debris_only", false)) {
+                // ТОЧКА ПРАВИЛ СПРАШИВАЕТСЯ ЗАРАНЕЕ И ВСЕГДА — ровно по той же
+                // причине, что и в ветке ниже: если спрашивать её только когда
+                // обломков не хватило, точка молчит почти всегда, и «способность
+                // подключена» становится правдой лишь иногда. Это поймал сторож
+                // AbilityFrameworkTest, а не партия.
+                boolean keliumOkHere = kelium.engine.ability.RuleQuery
+                    .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
+                    .base(0).ask() >= 1.0;
+                int pay = Math.min(remaining, player.resources.debris());
+                if (pay > 0) {
+                    player.resources.pay(Resource.DEBRIS, pay);
+                    remaining -= pay;
+                }
+                if (remaining > 0 && keliumOkHere) {
+                    // «Научный подряд» по-прежнему разрешает келемий.
+                    int keliumPay = Math.min(remaining, player.resources.kelium());
+                    if (keliumPay > 0) {
+                        player.resources.pay(Resource.KELIUM, keliumPay);
+                    }
+                }
+                return;
+            }
             // ТОЧКА ПРАВИЛ спрашивается ЗАРАНЕЕ и всегда: иначе она срабатывала бы
             // только в редкой ветке «трофеев не хватило», и объявление «точка
             // подключена» было бы правдой лишь иногда.
@@ -2756,7 +2815,7 @@ public final class Actions {
         /** Предложить вечные обмены. Вернуть id взятого обмена или null. */
         @SuppressWarnings("unchecked")
         private String maybeExchange(PlayerState player, Agent agent) {
-            int pool = player.trophySpacePoints() + player.resources.debris();
+            int pool = сколькоМожемЗаплатить(player);
             List<Choice> opts = new ArrayList<>();
             if (pool >= 1) {
                 Map<String, Object> ex = new HashMap<>();

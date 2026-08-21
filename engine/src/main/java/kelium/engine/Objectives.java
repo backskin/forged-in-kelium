@@ -194,6 +194,24 @@ public final class Objectives {
                     t.setCapturedBy(null);
                     t.resetDamage();
                     t.setHexId(null);
+                    // ЖЕТОН ВЕРНУЛСЯ ВЛАДЕЛЬЦУ — И ЛЁГ НА ЕГО ПЛАНШЕТ ХРАНИЛИЩА,
+                    // ЗАКРЫВ ЯЧЕЙКИ. Добытчик и энергостанция открывают ячейки
+                    // склада, пока стоят на поле или лежат чужим трофеем; вернувшись
+                    // в запас, они накрывают их собой, и то, что в них лежало, обязано
+                    // сгореть — то же правило, что при обычном возврате здания.
+                    //
+                    // Здесь этого не делалось, и склад ВЛАДЕЛЬЦА (не игрока, сдающего
+                    // жертву!) оставался переполненным: поймано сторожем
+                    // StorageNeverOverflowsTest — «занято 5 при 4 ячейках» у соседа
+                    // после того, как карта o22 вернула ему здание.
+                    //
+                    // ownTurnChoice=false: владелец в этот момент не действует, свой
+                    // ход не его, — значит и выбирать, что сгорит, ему не дают.
+                    if (t instanceof kelium.core.BuildingToken bt
+                            && (bt.type == kelium.core.BuildingType.MINER
+                                || bt.type == kelium.core.BuildingType.POWER_PLANT)) {
+                        Storage.evictOnBuildingReturn(s, s.player(bt.owner()), false);
+                    }
                     left--;
                 }
             }
@@ -425,6 +443,23 @@ public final class Objectives {
                         p.arsenalHand.add(c);
                     }
                     into.put("arsenal", 1);
+                }
+                case "arsenal_from_display" -> {
+                    // КАРТА С ВИТРИНЫ — ВЫБОР ИЗ ДВУХ ОТКРЫТЫХ, а не слепая тяга
+                    // (правило дизайнера 21.08.2026). Дороже обычной карты
+                    // арсенала именно этим, поэтому и стоит на самых трудных
+                    // заданиях. Витрина сразу пополняется с верха колоды.
+                    int taken = 0;
+                    for (int i = 0; i < Math.max(1, n); i++) {
+                        String c = kelium.engine.Actions.takeFromArsenalDisplay(s, p,
+                            s.agents == null || p.seat >= s.agents.size()
+                                ? null : s.agents.get(p.seat));
+                        if (c == null) {
+                            break;
+                        }
+                        taken++;
+                    }
+                    into.put("arsenal_from_display", taken);
                 }
                 case "objective_card" -> {
                     int drawn = 0;

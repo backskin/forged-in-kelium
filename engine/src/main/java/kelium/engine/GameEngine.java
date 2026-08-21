@@ -1544,9 +1544,54 @@ public final class GameEngine {
             }
         }
         if (p.arsenalInstalled.size() >= 3) {
-            String dropped = p.arsenalInstalled.remove(0);
+            // ПЛАНШЕТ ПОЛОН — ЭТО РЕШЕНИЕ ИГРОКА, А НЕ АВТОМАТИЗМ (правило
+            // дизайнера 21.08.2026).
+            //
+            // Прежде движок молча выбрасывал САМУЮ СТАРУЮ карту: игрока не
+            // спрашивали ни какую снять, ни хочет ли он вообще менять. То есть
+            // установка четвёртой карты могла выбросить работающую способность
+            // против воли игрока — а за столом так не бывает: карту сперва
+            // читают, потом решают, стоит ли она места.
+            //
+            // Теперь предлагается снять любую из трёх ИЛИ отказаться. Отказ
+            // возвращает карту в руку: она никуда не делась, просто не встала.
+            String dropped = p.arsenalInstalled.get(0);
+            if (agent != null) {
+                List<Choice> opts = new ArrayList<>();
+                for (String уже : p.arsenalInstalled) {
+                    opts.add(new Choice("arsenal_replace", уже,
+                        "снять " + уже + " ради " + cid));
+                }
+                opts.add(new Choice("pass", null,
+                    "оставить планшет как есть, карту не устанавливать"));
+                Choice pick = agent.choose(s, opts,
+                    Map.of("kind", "arsenal_replace", "card", cid,
+                        "installed", List.copyOf(p.arsenalInstalled)));
+                if (pick == null || pick.payload() == null) {
+                    // МЕСТА НЕ НАШЛОСЬ, И ИГРОК НЕ СТАЛ ОСВОБОЖДАТЬ — карта
+                    // остаётся в руке. Отдельное событие: без него «карта не
+                    // влезла» ничем не отличить от «карту не захотели».
+                    p.arsenalHand.add(cid);
+                    emit(ev("type", "arsenal_no_room", "seat", p.seat, "card", cid,
+                        "installed", List.copyOf(p.arsenalInstalled)));
+                    return;
+                }
+                dropped = String.valueOf(pick.payload());
+            }
+            p.arsenalInstalled.remove(dropped);
             applyHpPassive(p, dropped, -1);   // B7: снять бонус вытесненной карты
             s.decks.get("arsenal").discard(dropped);
+            // СНЯТАЯ КАРТА МОГЛА ДАВАТЬ ЯЧЕЙКИ СКЛАДА («+1 ячейка боеприпаса»,
+            // «+2 ячейки под обломки»). Со снятием ячейки закрываются, и то, что
+            // в них лежало, обязано сгореть — ровно как при возврате здания на
+            // планшет. Без этого склад оставался переполненным: поймано
+            // сторожем StorageNeverOverflowsTest, не партией.
+            //
+            // Выбор игрока (ownTurnChoice=true): это его собственное действие в
+            // его ход, значит и решать, что сгорит, ему.
+            Storage.evictOnBuildingReturn(s, p, true);
+            emit(ev("type", "arsenal_replaced", "seat", p.seat, "card", cid,
+                "dropped", dropped));
         }
         p.arsenalInstalled.add(cid);
         applyHpPassive(p, cid, +1);           // B7: вшить бонус HP в жетоны
@@ -1769,9 +1814,19 @@ public final class GameEngine {
                     }
                 }
                 p.trophySpace.clear();
-            }
-            for (int ownerSeat : ownersToReconcile) {
-                Storage.forceEvictOnBuildingReturn(s, s.player(ownerSeat));
+                // СЖИГАЕМ ИЗЛИШЕК СРАЗУ, А НЕ ПОСЛЕ ВСЕГО ЦИКЛА.
+                //
+                // Итог тот же, но по ходу дела состояние остаётся согласованным. С
+                // отложенным сжиганием получалось так: игрок 0 вернул сопернику
+                // добытчик, ячейки соседа закрылись — а сжигание ждало конца
+                // цикла, и в это окно попадал СНИМОК ЗАПИСИ (кадр
+                // «трофеи в обломки» следующего игрока). Запись показывала
+                // «занято 4 при 3 ячейках», хотя партия к концу шага была в
+                // порядке. Поймано сторожем StorageNeverOverflowsTest.
+                for (int ownerSeat : ownersToReconcile) {
+                    Storage.forceEvictOnBuildingReturn(s, s.player(ownerSeat));
+                }
+                ownersToReconcile.clear();
             }
             emit(ev("type", "tokens_returned", "round", s.round, "count", returned));
         }
