@@ -1149,6 +1149,23 @@ public final class GameEngine {
         // спец-действие без правки движка (13.08.2026).
         opts.addAll(kelium.engine.ability.Abilities.options(
             s, p.seat, kelium.engine.ability.OptionSource.Slot.SPEC));
+        // ОПЫТ «БОЙ ЗА БОЕПРИПАС» (actions.combat.as_spec_ammo, 0 = выключено).
+        //
+        // ЗАЧЕМ. Замер показал: если платить победными очками за уничтожение
+        // (economy.vp_per_kill), уничтожений НЕ СТАНОВИТСЯ БОЛЬШЕ — 6.13 против
+        // 5.88 и 5.55 за партию при плате 0, 1 и 2 очка. То есть война ограничена
+        // не желанием, а ВОЗМОЖНОСТЬЮ: действие Бой живёт только на приказе
+        // «Операция», значит боёв не может быть больше одного за раунд на игрока,
+        // сколько бы за них ни платили. Этот ключ поднимает потолок: бой можно
+        // провести ещё и спец-действием, заплатив боеприпасами.
+        //
+        // По умолчанию ключа нет — действующие правила не меняются.
+        int specBattleAmmo = ((Number) rs().get("actions.combat.as_spec_ammo", 0)).intValue();
+        if (specBattleAmmo > 0
+                && p.resources.canPay(kelium.core.Resource.AMMO, specBattleAmmo)) {
+            opts.add(new Choice("spec_combat", specBattleAmmo,
+                "СПЕЦ: провести Бой за " + specBattleAmmo + " боеприпас(ов)"));
+        }
         if (opts.isEmpty()) {
             return;
         }
@@ -1180,6 +1197,20 @@ public final class GameEngine {
             case "spec_symbol_reveal" -> revealSymbol(p, (String) ch.payload());
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
+            case "spec_combat" -> {
+                // Плата вперёд, и только потом бой: не хватило — предложения бы и
+                // не было (см. проверку выше), а порядок важен для журнала.
+                int цена = (Integer) ch.payload();
+                p.resources.pay(kelium.core.Resource.AMMO, цена);
+                TurnContext бойCtx = new TurnContext(p.seat, 0);
+                var res = kelium.engine.Actions.create("combat", s)
+                    .perform(p, бойCtx, agents.get(p.seat));
+                if (res != null && res.ok()) {
+                    j.onAction(p.seat, "combat", res.telemetry());
+                }
+                emit(ev("type", "spec_combat", "seat", p.seat, "ammo", цена,
+                    "detail", res == null ? "" : res.detail()));
+            }
             default -> {
                 // вариант от способности: исполняет сама карта
                 if (kelium.engine.ability.Abilities.isAbilityChoice(ch)) {
