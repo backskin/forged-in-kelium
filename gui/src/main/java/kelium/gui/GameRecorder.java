@@ -195,6 +195,24 @@ public final class GameRecorder {
     public static ReplayRecord playWithAgents(GameConfig cfg, GameState state,
                                                List<Agent> agents, List<String> seatLabels,
                                                long seed, Consumer<String> note) {
+        return playWithAgents(cfg, state, agents, seatLabels, seed, note, null);
+    }
+
+    /**
+     * То же, плюс {@code onFrame} — вызывается на каждый добавленный кадр СРАЗУ,
+     * пока партия ещё играется. Нужно живому окну (hot-seat/сеть): та же запись
+     * {@code rec}, что вернётся из этого вызова, все это время растёт у него на
+     * руках — {@link FieldView}/{@link BoardsPanel} умеют показывать её "на
+     * ходу", кадр за кадром, точно как готовую запись в {@code replay2}.
+     *
+     * <p>Вызывается в потоке движка — если это Swing, окну нужно самому уйти на
+     * EDT ({@code SwingUtilities.invokeLater}), сюда это не встроено: движок не
+     * должен знать о существовании Swing.
+     */
+    public static ReplayRecord playWithAgents(GameConfig cfg, GameState state,
+                                               List<Agent> agents, List<String> seatLabels,
+                                               long seed, Consumer<String> note,
+                                               Consumer<ReplayRecord> onFrame) {
         ReplayRecord rec = header(cfg, state, state.numPlayers(), seed, seatLabels,
             cfg.scenarioId, cfg.cuFacing);
         rememberExpansions(rec);
@@ -208,7 +226,11 @@ public final class GameRecorder {
 
         ReplayText text = new ReplayText(cfg, rec);
         Recorder rc = new Recorder(state, rec, text, pending);
-        Map<String, Object> result = GameEngine.playGame(state, agents, rc);
+        Consumer<Map<String, Object>> sink = onFrame == null ? rc : event -> {
+            rc.accept(event);
+            onFrame.accept(rec);
+        };
+        Map<String, Object> result = GameEngine.playGame(state, agents, sink);
 
         rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
         rec.condition = String.valueOf(result.get("condition"));

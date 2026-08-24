@@ -88,6 +88,17 @@ public final class FieldView extends JComponent {
     private boolean blink = true;
     private final Timer blinkTimer;
 
+    /**
+     * ЦЕЛИ ДЛЯ КЛИКА (живая партия, не разбор записи) — гексы, которые сейчас
+     * можно выбрать ответом на точку решения движка ({@code kind} вида
+     * {@code build_hex}/{@code move}/{@code combat_target} и т.п., см.
+     * {@code HotSeatWindow}). Пусто — вид ведёт себя как раньше, чисто для
+     * просмотра: клик по гексу ничего не делает.
+     */
+    java.util.Set<String> selectableHexIds = java.util.Set.of();
+    java.util.function.Consumer<String> onHexPick;
+    private String hoverHexId;
+
     public FieldView() {
         setOpaque(true);
         setBackground(new Color(0xFB, 0xFB, 0xFB));
@@ -98,6 +109,7 @@ public final class FieldView extends JComponent {
         ToolTipManager.sharedInstance().registerComponent(this);
         MouseInputAdapter mouse = new MouseInputAdapter() {
             private Point drag;
+            private Point pressedAt;
 
             @Override
             public void mousePressed(java.awt.event.MouseEvent e) {
@@ -106,13 +118,26 @@ public final class FieldView extends JComponent {
                 }
                 requestFocusInWindow();
                 drag = e.getPoint();
+                pressedAt = e.getPoint();
                 setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
             }
 
             @Override
             public void mouseReleased(java.awt.event.MouseEvent e) {
                 drag = null;
-                setCursor(Cursor.getDefaultCursor());
+                // КЛИК, А НЕ ПЕРЕТАСКИВАНИЕ — если указатель почти не сдвинулся с
+                // нажатия. Иначе конец панорамирования всегда засчитывался бы как
+                // клик по гексу под курсором в момент отпускания.
+                if (pressedAt != null && onHexPick != null
+                    && pressedAt.distance(e.getPoint()) < 4) {
+                    String id = hexIdAt(e.getPoint());
+                    if (id != null && selectableHexIds.contains(id) && onHexPick != null) {
+                        onHexPick.accept(id);
+                    }
+                }
+                pressedAt = null;
+                setCursor(hoverHexId != null && selectableHexIds.contains(hoverHexId)
+                    ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
             }
 
             @Override
@@ -125,6 +150,20 @@ public final class FieldView extends JComponent {
                 panY += e.getY() - drag.y;
                 drag = e.getPoint();
                 repaint();
+            }
+
+            @Override
+            public void mouseMoved(java.awt.event.MouseEvent e) {
+                String id = hexIdAt(e.getPoint());
+                boolean selectable = id != null && selectableHexIds.contains(id);
+                setCursor(selectable ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                    : Cursor.getDefaultCursor());
+                if (!java.util.Objects.equals(id, hoverHexId)) {
+                    hoverHexId = id;
+                    if (!selectableHexIds.isEmpty()) {
+                        repaint();
+                    }
+                }
             }
         };
         addMouseListener(mouse);
@@ -207,6 +246,28 @@ public final class FieldView extends JComponent {
     public void setFrame(ReplayRecord.Frame f) {
         this.frame = f;
         repaint();
+    }
+
+    /**
+     * ЖИВАЯ ПАРТИЯ: пометить гексы, которые сейчас можно выбрать кликом — ответ
+     * движку на точку решения, чей payload — id гекса ({@code build_hex},
+     * {@code move} и т.п., см. {@code HotSeatWindow.hexTargetOf}). {@code onPick}
+     * вызывается с id выбранного гекса РОВНО когда клик попал по гексу из
+     * {@code hexIds} — вызывающий код сам решает, что дальше (обычно —
+     * {@code InteractiveAgent.submitIndex} на нужный вариант).
+     *
+     * <p>{@code clearSelectable()} — снять подсветку и вернуть вид в режим
+     * чистого просмотра (клик снова ничего не делает).
+     */
+    public void setSelectable(java.util.Set<String> hexIds,
+                               java.util.function.Consumer<String> onPick) {
+        this.selectableHexIds = hexIds == null ? java.util.Set.of() : hexIds;
+        this.onHexPick = onPick;
+        repaint();
+    }
+
+    public void clearSelectable() {
+        setSelectable(java.util.Set.of(), null);
     }
 
     /** Текущий масштаб (1.0 = как в отчётах). */
@@ -625,6 +686,39 @@ public final class FieldView extends JComponent {
             }
             drawHighlights(g, f, info);
         }
+        if (!selectableHexIds.isEmpty()) {
+            drawSelectable(g);
+        }
+    }
+
+    /**
+     * ЦЕЛИ ДЛЯ КЛИКА — рисуется ПОСЛЕДНИМ, поверх всего остального (порядок
+     * рисования — это слои: активная точка решения важнее любой другой подсветки).
+     * Гекс под курсором — сплошная светлая заливка, остальные — просто контур:
+     * иначе, пока целей много, экран превращается в частокол одинаковых рамок и
+     * непонятно, какую из них курсор зацепит по клику.
+     */
+    private void drawSelectable(Graphics2D g) {
+        Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo h : record.hexes) {
+            info.put(h.id, h);
+        }
+        Color accent = kelium.gui.replay2.Theme.accent();
+        for (String id : selectableHexIds) {
+            double[] c = center(info, id);
+            if (c == null) {
+                continue;
+            }
+            boolean hovered = id.equals(hoverHexId);
+            Path2D path = hexPath(c[0], c[1], BASE * 0.94);
+            if (hovered) {
+                g.setColor(withAlpha(accent, 90));
+                g.fill(path);
+            }
+            g.setColor(withAlpha(accent, hovered ? 255 : 190));
+            g.setStroke(hovered ? pen(3.0) : penDashed(2.2, 5, 4));
+            g.draw(path);
+        }
     }
 
     // ---------------- подсветки последнего действия ----------------
@@ -737,10 +831,14 @@ public final class FieldView extends JComponent {
         return hi == null ? null : FieldGeometry.hexCenter(hi.q, hi.r, BASE);
     }
 
-    // ---------------- подсказка под курсором ----------------
-    @Override
-    public String getToolTipText(java.awt.event.MouseEvent e) {
-        if (record == null || frame == null || frame.snapshot == null) {
+    /** Гекс под экранной точкой (та же проекция, что рисование), либо null. */
+    private String hexIdAt(Point screenPoint) {
+        ReplayRecord.HexInfo hi = hexInfoAt(screenPoint);
+        return hi == null ? null : hi.id;
+    }
+
+    private ReplayRecord.HexInfo hexInfoAt(Point screenPoint) {
+        if (record == null) {
             return null;
         }
         Point2D p;
@@ -748,17 +846,27 @@ public final class FieldView extends JComponent {
             AffineTransform at = new AffineTransform();
             at.translate(panX, panY);
             at.scale(zoom, zoom);
-            p = at.createInverse().transform(e.getPoint(), null);
+            p = at.createInverse().transform(screenPoint, null);
         } catch (java.awt.geom.NoninvertibleTransformException ex) {
             return null;
         }
         int[] qr = FieldGeometry.hexAt(p.getX(), p.getY(), BASE);
         for (ReplayRecord.HexInfo hi : record.hexes) {
             if (hi.q == qr[0] && hi.r == qr[1]) {
-                return hexTip(hi);
+                return hi;
             }
         }
         return null;
+    }
+
+    // ---------------- подсказка под курсором ----------------
+    @Override
+    public String getToolTipText(java.awt.event.MouseEvent e) {
+        if (record == null || frame == null || frame.snapshot == null) {
+            return null;
+        }
+        ReplayRecord.HexInfo hi = hexInfoAt(e.getPoint());
+        return hi == null ? null : hexTip(hi);
     }
 
     private String hexTip(ReplayRecord.HexInfo hi) {
