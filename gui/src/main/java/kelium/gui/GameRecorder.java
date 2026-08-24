@@ -197,6 +197,7 @@ public final class GameRecorder {
                                                long seed, Consumer<String> note) {
         ReplayRecord rec = header(cfg, state, state.numPlayers(), seed, seatLabels,
             cfg.scenarioId, cfg.cuFacing);
+        rememberExpansions(rec);
 
         List<ReplayRecord.Thought> pending = new ArrayList<>();
         for (Agent a : agents) {
