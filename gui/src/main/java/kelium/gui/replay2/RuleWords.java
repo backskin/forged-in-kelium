@@ -218,6 +218,7 @@ public final class RuleWords {
             // ---------- Действия ----------
             case "actions.spec_per_turn" -> "спец-действий за ход";
             case "actions.coincidence_rule_enabled" -> "правило совпадения приказов";
+            case "actions.top_actions_per_turn" -> "действий с верхнего приказа за ход";
             case "actions.empty_energy_slot_coin_cost" ->
                 "монет за работу здания с пустой ячейкой энергии";
             case "actions.build.surcharge_coins" ->

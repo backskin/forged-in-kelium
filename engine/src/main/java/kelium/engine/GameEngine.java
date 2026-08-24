@@ -717,7 +717,11 @@ public final class GameEngine {
         }
 
         if (isJoker) {
-            playActions(p, ctx, Actions.ALL_NAMES, 2, true);
+            // Джокер даёт столько же действий, сколько верх обычной карты: иначе
+            // в варианте «одно действие за ход» БЕЗОПАСНОСТЬ станет вдвое сильнее
+            // всех остальных карт руки.
+            int jokerA = rs.getInt("actions.top_actions_per_turn", 2);
+            playActions(p, ctx, Actions.ALL_NAMES, jokerA, true);
             // БАГ (найден дизайнером 14.08.2026): карта БЕЗОПАСНОСТЬ (джокер) не
             // шлёт turn_orders вовсе — только у неё есть этот код, у обычных
             // приказов событие ниже. Проигрыватель ждёт именно turn_orders, чтобы
@@ -728,7 +732,7 @@ public final class GameEngine {
             // важен, поэтому TurnContext.actionsPlayed — LinkedHashSet).
             emit(ev("type", "turn_orders", "seat", seat, "card", cardId,
                 "top", "joker", "top_actions", new ArrayList<>(ctx.actionsPlayed),
-                "top_allowed", 2, "coincided", false,
+                "top_allowed", jokerA, "coincided", false,
                 "bottom", null, "bottom_open", false, "bottom_actions", List.of(),
                 "maneuver", false));
         } else {
@@ -736,7 +740,16 @@ public final class GameEngine {
             boolean coincided = rs.getBool("actions.coincidence_rule_enabled", true)
                 && orderCounts.getOrDefault(top, 0) > 1;
             List<String> names = List.of(Order.ORDER_ACTIONS.get(top));
-            int maxA = coincided ? 1 : 2;
+            // ТОЧКА ПРАВИЛ: сколько действий даёт ВЕРХНИЙ приказ.
+            //
+            // По действующему своду приказ даёт ОБА своих действия, а совпадение
+            // приказов срезает их до одного — это и есть «блок». Вариант
+            // дизайнера от 21.08.2026: верх ВСЕГДА даёт выбор ОДНОГО действия из
+            // двух, а блока не существует вовсе. Тогда совпадение приказов
+            // перестаёт быть наказанием, и обе половины ключа надо ставить
+            // вместе: top_actions_per_turn: 1 и coincidence_rule_enabled: false.
+            int topA = rs.getInt("actions.top_actions_per_turn", 2);
+            int maxA = coincided ? Math.min(1, topA) : topA;
             // Признак блокировки нужен способностям карт («Резервный штаб»
             // обходит её за келемий): OptionSource видит состояние партии, но не
             // ход, поэтому флаг живёт в журнале хода.
