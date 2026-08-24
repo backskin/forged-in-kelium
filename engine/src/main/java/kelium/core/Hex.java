@@ -164,6 +164,14 @@ public final class Hex {
     }
 
     /**
+     * Восстановить этот гекс НА МЕСТЕ (тот же объект) из {@code other} — см.
+     * {@link StateRestore} и {@link GameState#restoreFrom} (откат действия).
+     */
+    public void restoreFrom(Hex other) {
+        StateRestore.copyFields(this, other);
+    }
+
+    /**
      * Точная копия гекса — вся изменяемая обстановка (занятость сторон, жетоны,
      * нейтралы, тайл зарождения). Нужна копии состояния для просчёта вперёд.
      */

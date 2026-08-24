@@ -1,0 +1,136 @@
+package kelium.core;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.junit.jupiter.api.Test;
+
+import kelium.support.Fix;
+
+/**
+ * {@link UndoableAgent} — та же проверка, что и в живой игре, но без Swing и
+ * без полного {@code GameEngine.playGame}: сам {@link Agent#choose} вызывается
+ * вручную (как это бы сделал {@code GameEngine.playActions}), а точки решения
+ * отвечаются с ДРУГОГО потока через {@link InteractiveAgent#submitIndex} — так
+ * же, как это делает GUI. {@link #choose} блокирует, поэтому каждый вызов идёт
+ * на отдельном потоке ({@link CompletableFuture}), а тест поллит {@code
+ * pending()} перед тем, как отвечать — тот же паттерн, что уже был проверен в
+ * {@code HotSeatWindow}/{@code HotSeatCli}.
+ */
+class UndoableAgentTest {
+
+    @Test
+    void snapshotsBeforeSafeActionAndRestoresOnUndo() throws Exception {
+        GameState state = Fix.game(2, 1L);
+        PlayerState p = state.player(0);
+        p.resources.add(Resource.COIN, 20);
+        int coinBefore = p.resources.coin();
+
+        AtomicReference<InteractiveAgent.PendingDecision> lastDecision = new AtomicReference<>();
+        UndoableAgent agent = new UndoableAgent(0, "test", state,
+            lastDecision::set, ev -> { });
+
+        // 1) движок спрашивает "какое действие" — отвечаем "build".
+        List<Choice> actionOpts = List.of(
+            new Choice("action", "build", "build"),
+            new Choice("pass", null, "ничего не делать"));
+        Choice picked = chooseOnOtherThread(agent, state, actionOpts,
+            Map.of("kind", "action"), 0);
+        assertEquals("build", picked.payload());
+
+        // Снимок снят СРАЗУ по выбору безопасного действия — до того, как оно
+        // реально что-то изменит (см. javadoc UndoableAgent.choose).
+        assertTrue(agent.canUndo());
+        assertEquals("build", agent.undoLabel());
+
+        // 2) само действие (в реальности — build_pick/build_hex/build_facing)
+        // тут просто симулируется прямой правкой состояния, как сделал бы
+        // Actions.java.
+        p.resources.pay(Resource.COIN, 6);
+        assertEquals(coinBefore - 6, p.resources.coin());
+
+        // 3) движок снова спрашивает "какое действие" — ДО ответа игрок жмёт
+        // "отменить": решение ещё висит нерешённым, undo() можно звать сразу.
+        List<Choice> actionOpts2 = List.of(
+            new Choice("action", "mining", "mining"),
+            new Choice("pass", null, "ничего не делать"));
+        CompletableFuture<Choice> future2 = new CompletableFuture<>();
+        Thread t = new Thread(() -> {
+            try {
+                future2.complete(agent.choose(state, actionOpts2, Map.of("kind", "action")));
+            } catch (Throwable ex) {
+                future2.completeExceptionally(ex);
+            }
+        });
+        t.start();
+        waitForPending(agent);
+
+        agent.undo();
+        assertEquals(coinBefore, p.resources.coin());
+        assertFalse(agent.canUndo());
+        assertNull(agent.undoLabel());
+
+        // Точка решения всё ещё ждёт ответа — отвечаем "pass", чтобы поток не
+        // повис навсегда, и завершаем.
+        agent.submitIndex(1);
+        Choice picked2 = future2.get(5, TimeUnit.SECONDS);
+        assertNull(picked2.payload());
+    }
+
+    @Test
+    void nonSafeActionsAreNeverUndoable() throws Exception {
+        GameState state = Fix.game(2, 2L);
+        UndoableAgent agent = new UndoableAgent(0, "test", state, d -> { }, ev -> { });
+
+        List<Choice> opts = List.of(
+            new Choice("action", "combat", "combat"),
+            new Choice("pass", null, "ничего не делать"));
+        chooseOnOtherThread(agent, state, opts, Map.of("kind", "action"), 0);
+
+        assertFalse(agent.canUndo());
+    }
+
+    @Test
+    void undoWithoutASnapshotThrows() {
+        GameState state = Fix.game(2, 3L);
+        UndoableAgent agent = new UndoableAgent(0, "test", state, d -> { }, ev -> { });
+        assertThrows(IllegalStateException.class, agent::undo);
+    }
+
+    /** Вызвать choose() на отдельном потоке и ответить индексом {@code answer}. */
+    private static Choice chooseOnOtherThread(UndoableAgent agent, GameState state,
+                                                List<Choice> options, Map<String, Object> ctx,
+                                                int answer) throws Exception {
+        CompletableFuture<Choice> future = new CompletableFuture<>();
+        Thread t = new Thread(() -> {
+            try {
+                future.complete(agent.choose(state, options, ctx));
+            } catch (Throwable ex) {
+                future.completeExceptionally(ex);
+            }
+        });
+        t.start();
+        waitForPending(agent);
+        agent.submitIndex(answer);
+        return future.get(5, TimeUnit.SECONDS);
+    }
+
+    private static void waitForPending(UndoableAgent agent) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5000;
+        while (agent.pending() == null) {
+            if (System.currentTimeMillis() > deadline) {
+                throw new AssertionError("точка решения не появилась за 5с");
+            }
+            Thread.sleep(5);
+        }
+    }
+}

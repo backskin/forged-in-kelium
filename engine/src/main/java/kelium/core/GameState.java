@@ -170,6 +170,78 @@ public final class GameState {
         return s;
     }
 
+    /**
+     * ОТКАТ НА МЕСТЕ — вернуть ЭТОТ объект (тот же самый, не новый) к
+     * состоянию {@code snapshot} (обычно — результат более раннего
+     * {@link #deepCopy}). Нужен живому окну (заказ на цифровую версию):
+     * пока игрок пробует Стройку/Добычу/Манёвр и передумывает, отменить их
+     * можно, ПОКА никто другой ещё не увидел результат (см. {@code
+     * UndoableAgent} — там же граница, где это безопасно вызывать).
+     *
+     * <p>ПОЧЕМУ НА МЕСТЕ, А НЕ ПОДМЕНОЙ ССЫЛКИ: движок ({@code GameEngine})
+     * держит {@code GameState} одной и той же ссылкой всю партию, и
+     * {@code GameEngine.playActions(PlayerState p, ...)} держит СВОЮ ссылку
+     * на {@code PlayerState} параметром на ВЕСЬ ход (не на одно действие) —
+     * это ПРОВЕРЕНО тестом ({@code GameStateRestoreFromTest}): первая версия
+     * этого метода подменяла игроков в списке новыми объектами, и второй
+     * откат за тот же ход возвращал не то состояние, потому что чужой код
+     * продолжал молча писать в осиротевший старый объект. Поэтому игроки и
+     * гексы восстанавливаются {@link PlayerState#restoreFrom}/{@link
+     * Hex#restoreFrom} — НА МЕСТЕ, поле за полем (см. {@link StateRestore}),
+     * а не пересозданием списка/карты. Вызывать это можно только МЕЖДУ
+     * вызовами {@code choose} (граница «какое действие» — см. {@code
+     * UndoableAgent}), никогда пока какой-то код по действию ещё «на стеке».
+     *
+     * @param pinnedSeed тот же сид, что был передан в {@code deepCopy} при
+     *                   снятии {@code snapshot} — ГСЧ живой партии ставится
+     *                   на ту же точку, чтобы дальнейшая случайность была
+     *                   воспроизводима от исходного сида партии (заказ §3:
+     *                   «партию можно детерминированно воспроизвести»), а не
+     *                   от посторонней энтропии, которую откат бы иначе внёс.
+     */
+    public void restoreFrom(GameState snapshot, long pinnedSeed) {
+        GameState fresh = snapshot.deepCopy(pinnedSeed);
+        for (int i = 0; i < players.size(); i++) {
+            players.get(i).restoreFrom(fresh.players.get(i));
+        }
+        for (Hex h : field.hexes.values()) {
+            Hex fh = fresh.field.hexes.get(h.id);
+            if (fh != null) {
+                h.restoreFrom(fh);
+            }
+        }
+        tech.occupancy.clear();
+        tech.occupancy.putAll(fresh.tech.occupancy);
+        tech.firstArriverClaimed.clear();
+        tech.firstArriverClaimed.putAll(fresh.tech.firstArriverClaimed);
+        tech.stepOneArrivals.clear();
+        tech.stepOneArrivals.putAll(fresh.tech.stepOneArrivals);
+        decks.clear();
+        decks.putAll(fresh.decks);
+        round = fresh.round;
+        circle = fresh.circle;
+        firstPlayer = fresh.firstPlayer;
+        firstPlayerHeld = fresh.firstPlayerHeld;
+        marketActive = fresh.marketActive;
+        superArsenalOffer.clear();
+        superArsenalOffer.putAll(fresh.superArsenalOffer);
+        arsenalDisplay.clear();
+        arsenalDisplay.addAll(fresh.arsenalDisplay);
+        redBag.clear();
+        redBag.addAll(fresh.redBag);
+        blueBag.clear();
+        blueBag.addAll(fresh.blueBag);
+        for (int side = 0; side < marketCells.length; side++) {
+            System.arraycopy(fresh.marketCells[side], 0, marketCells[side], 0,
+                fresh.marketCells[side].length);
+        }
+        finished = fresh.finished;
+        winner = fresh.winner;
+        winCondition = fresh.winCondition;
+        journal = fresh.journal;
+        rng.setSeed(pinnedSeed);
+    }
+
     /** Число игроков в партии. */
     public int numPlayers() {
         return players.size();
