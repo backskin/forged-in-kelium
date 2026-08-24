@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,14 +58,57 @@ class CombatRulesTest {
             "без боеприпасов бой невозможен");
     }
 
-    /** Цели нет — боя нет, даже с полным складом боеприпасов. */
+    /**
+     * БИТЬ НЕЧЕМ — БОЯ НЕТ. Именно нечем, а не некого: с двумя атаками
+     * (диктовка 24.08.2026) универсальная достаёт ЛЮБОЙ тип, включая здания и
+     * нейтральные постройки. Значит «рядом нет подходящей цели» перестало
+     * существовать как причина: пока у игрока есть войско на поле и боеприпасы,
+     * цель почти всегда найдётся. Единственный честный случай отсутствия боя —
+     * когда своих войск на поле нет вовсе.
+     */
     @Test
-    void withNoTargetThereIsNoBattle() {
+    void withoutOwnUnitsOnTheFieldThereIsNoBattle() {
         GameState s = Fix.game(2, 42L);
         s.player(0).resources.setAmmo(9);
-        // все чужие жетоны далеко: соседей у старта первого игрока не заселяем
+        for (UnitToken u : s.player(0).units) {
+            u.setHexId(null);
+        }
         assertFalse(combat(s).anyAttackPossible(0),
-            "бить некого — бой не должен считаться возможным");
+            "своих войск на поле нет — бить нечем, боя быть не может");
+    }
+
+    /**
+     * НЕЙТРАЛЬНАЯ ПОСТРОЙКА — УЖЕ ЦЕЛЬ. До двух атак пехота по зданиям не била
+     * вовсе, и стоять рядом с нейтралом было безопасно. Теперь универсальная
+     * атака достаёт и её, поэтому бой возможен без единого чужого жетона рядом.
+     */
+    @Test
+    void aNeutralBuildingAloneIsEnoughForABattle() {
+        GameState s = Fix.game(2, 42L);
+        s.player(0).resources.setAmmo(9);
+        for (UnitToken u : s.player(0).units) {
+            u.setHexId(null);
+        }
+        String рядомСНейтралом = null;
+        for (String hex : s.field.hexes.keySet()) {
+            for (String nb : s.field.neighbors(hex)) {
+                if (s.field.get(nb).hasNeutral() && s.field.get(hex).hasNeutral()) {
+                    continue;
+                }
+                if (s.field.get(nb).hasNeutral()) {
+                    рядомСНейтралом = hex;
+                    break;
+                }
+            }
+            if (рядомСНейтралом != null) {
+                break;
+            }
+        }
+        assumeTrue(рядомСНейтралом != null,
+            "на этой раскладке нет гекса рядом с нейтральной постройкой");
+        Fix.unit(s, 0, UnitType.INFANTRY, рядомСНейтралом);
+        assertTrue(combat(s).anyAttackPossible(0),
+            "универсальная атака достаёт нейтральную постройку — бой возможен");
     }
 
     /** Бой реально снимает боеприпасы у атакующего. */

@@ -271,8 +271,15 @@ public final class CombatResolver {
         if (base == null) {
             return rows;
         }
-        int specCost = unit.type == UnitType.TOWER ? 0
-            : rs.getInt("actions.combat.secondary_row_ammo_cost");
+        // ЦЕНА СПЕЦИАЛЬНОЙ АТАКИ — ОДНА ДЛЯ ВСЕХ РОДОВ (диктовка дизайнера
+        // 24.08.2026): 1 боеприпас, и у вышки тоже. Прежний черновик «Бой 2.0»
+        // (18.08.2026) давал вышке спец-атаку бесплатно; ключ оставлен, чтобы
+        // тот замер воспроизводился, но по умолчанию поблажки нет.
+        int specCost = rs.getBool("actions.combat.tower_specialized_free", false)
+            && unit.type == UnitType.TOWER
+            ? 0
+            : rs.getInt("actions.combat.specialized_ammo_cost",
+                rs.getInt("actions.combat.secondary_row_ammo_cost"));
 
         Map<String, Object> mod = Modules.redModuleOn(state.player(seat), unit.type);
         Object rawTargets = mod == null ? null : mod.get("targets");
@@ -1327,6 +1334,14 @@ public final class CombatResolver {
         Storage.addContainersCapped(s, owner,
             rs.getInt("command_center.owner_compensation_containers"),
             "компенсация за снесённое ЦУ");
+
+        // СНОС ЦУ — СОБЫТИЕ. До 24.08.2026 его не было вовсе: самое громкое
+        // событие партии нигде не отмечалось, и вопрос «как быстро владелец
+        // ставит ЦУ обратно» нельзя было даже измерить. Жетоны разрушения тут же,
+        // потому что военная победа считается ими, а не числом сносов.
+        emit("type", "cu_destroyed", "seat", cu.owner, "by", attackerSeat,
+            "round", s.round, "tokens_of_attacker", attacker.cuDestructionTokens,
+            "need", need);
 
         if (heldForeignToken
                 && rs.getBool("command_center.military_win_on_second_cu_kill", true)) {

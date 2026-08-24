@@ -34,27 +34,37 @@ import kelium.core.Agent;
 class StrategicAgentTest {
 
     /**
-     * Мнение бота о том, кого он может убить, сверяется с ДАННЫМИ планшета —
-     * реальной таблицей атак из boards.*.yaml.
+     * Мнение бота о том, кого он может убить, сверяется с БОЕВЫМ РЕЗОЛВЕРОМ —
+     * единственным источником правды о том, что чем достаётся.
      *
-     * <p>Прежняя версия этого теста была тавтологией: она сравнивала выражение
-     * само с собой (обе стороны равенства считались по одной и той же паре
-     * целей) и не могла упасть никогда.
+     * <p>ПОЧЕМУ НЕ С ПЕЧАТНОЙ ТАБЛИЦЕЙ. С двумя атаками (диктовка 24.08.2026)
+     * печатная цель — только СПЕЦИАЛЬНАЯ атака за 1 боеприпас; универсальная за
+     * 2 достаёт любой тип, а красный модуль печатную цель и вовсе закрывает.
+     * Сверять бота с печатной таблицей значит проверять его против той картины,
+     * по которой бой уже не идёт.
+     *
+     * <p>Прежняя версия этого теста была тавтологией: обе стороны равенства
+     * считались по одной и той же паре целей, и упасть она не могла никогда.
      */
     @Test
-    void canKillAgreesWithTheAttackTableFromTheData() {
+    void canKillAgreesWithTheCombatResolver() {
         GameState s = kelium.support.Fix.game(4, 4000L);
         WorldView wv = new WorldView(s, 0);
         String spot = kelium.support.Fix.freeNeighbour(s, s.player(0).startHex);
-        Target[] pair = s.player(0).board.troop.attacks(UnitType.INFANTRY);
+        kelium.core.UnitToken мой =
+            kelium.support.Fix.unit(s, 0, UnitType.INFANTRY, s.player(0).startHex);
 
-        // ставим по жетону каждой категории и спрашиваем бота
         for (UnitType type : UnitType.values()) {
             kelium.core.UnitToken enemy = kelium.support.Fix.unit(s, 1, type, spot);
-            boolean inTable = pair[0] == enemy.category() || pair[1] == enemy.category();
-            assertEquals(inTable, wv.canKill(UnitType.INFANTRY, enemy),
-                "пехота против " + type + " (" + enemy.category() + "): таблица говорит "
-                    + inTable);
+            boolean достаёт = kelium.engine.CombatResolver.canHit(s, 0, мой, enemy);
+            assertEquals(достаёт, wv.canKill(UnitType.INFANTRY, enemy),
+                "пехота против " + type + " (" + enemy.category()
+                    + "): резолвер говорит " + достаёт);
+            if (s.player(0).board.troop.dualCell()) {
+                assertTrue(достаёт,
+                    "с двумя атаками универсальная достаёт любой тип, а " + type
+                        + " оказался недостижим");
+            }
             s.player(1).units.remove(enemy);
         }
     }
