@@ -136,7 +136,8 @@ public final class HotSeatWindow {
     // ==================== сборка окна ====================
 
     private void buildUi() {
-        Theme.apply(true);
+        // Светлая тема — просьба дизайнера 24.08.2026 («работай пока со светлой»).
+        Theme.apply(false);
         frame = new JFrame("Кристаллы Раздора — Командный пункт");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new BorderLayout());
@@ -721,7 +722,55 @@ public final class HotSeatWindow {
 
         hands.clearPickable();
         field.clearSelectable();
+        field.clearGhost();
+        field.clearFacingChoice();
         prompt.hideAll();
+
+        // ВЫБОР ДУГИ СЕКТОРОВ (концепт §4): движок уже назвал гекс и варианты,
+        // колесо мыши вращает дугу, клик по гексу ставит. Плашки-варианты внизу
+        // остаются как равноправный путь.
+        if ("build_facing".equals(kind) && d.context().get("hex") instanceof String fhex) {
+            List<List<Integer>> variants = new ArrayList<>();
+            boolean allLists = true;
+            for (Choice c : options) {
+                if (c.payload() instanceof List<?> l) {
+                    List<Integer> sides = new ArrayList<>();
+                    for (Object o : l) {
+                        sides.add(((Number) o).intValue());
+                    }
+                    variants.add(sides);
+                } else {
+                    allLists = false;
+                    break;
+                }
+            }
+            if (allLists && !variants.isEmpty()) {
+                actionBar.idle("не сейчас");
+                endBtn.setTexts("Сначала решение", KIND_LABELS.get(kind));
+                endBtn.setState(KpButton.State.DISABLED);
+                if (d.context().get("btype") instanceof String bt) {
+                    field.setGhost(kelium.report.Labels.buildingCode(bt), Theme.seat(seat));
+                }
+                field.setFacingChoice(fhex, variants, idx -> {
+                    agent.submitIndex(idx);
+                    clearDecision();
+                });
+                List<PromptOverlay.Option> opts = new ArrayList<>();
+                for (int i = 0; i < options.size(); i++) {
+                    int idx = i;
+                    opts.add(new PromptOverlay.Option(options.get(i).label(), () -> {
+                        agent.submitIndex(idx);
+                        clearDecision();
+                    }));
+                }
+                prompt.showOptions(seat, title
+                    + " — колесо мыши вращает дугу, клик по гексу ставит; зелёные рёбра = встанет",
+                    opts);
+                layoutPrompt();
+                frame.toFront();
+                return;
+            }
+        }
 
         if ("action".equals(kind)) {
             Map<String, Integer> avail = new LinkedHashMap<>();
@@ -752,7 +801,17 @@ public final class HotSeatWindow {
 
             Map<String, Integer> hexToIndex = hexTargets(kind, options);
             if (hexToIndex != null) {
-                prompt.showHint(seat, title, "Выберите гекс на поле — допустимые подсвечены");
+                // Призрак здания за курсором — для стройки и переноса (§4).
+                boolean ghost = ("build_hex".equals(kind) || "move_hex".equals(kind))
+                    && d.context().get("btype") instanceof String;
+                if (ghost) {
+                    field.setGhost(kelium.report.Labels.buildingCode(
+                        (String) d.context().get("btype")), Theme.seat(seat));
+                    prompt.showHint(seat, title,
+                        "Призрак следует за курсором · клик по подсвеченному гексу — поставить");
+                } else {
+                    prompt.showHint(seat, title, "Выберите гекс на поле — допустимые подсвечены");
+                }
                 field.setSelectable(hexToIndex.keySet(), hexId -> {
                     Integer idx = hexToIndex.get(hexId);
                     if (idx != null) {
@@ -839,6 +898,8 @@ public final class HotSeatWindow {
     private void clearDecision() {
         prompt.hideAll();
         field.clearSelectable();
+        field.clearGhost();
+        field.clearFacingChoice();
         hands.clearPickable();
         actionBar.idle("ход соперника");
         awaitingSeat = null;

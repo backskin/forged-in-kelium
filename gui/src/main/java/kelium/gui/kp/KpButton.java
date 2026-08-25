@@ -145,7 +145,10 @@ public final class KpButton extends JComponent {
                 : hover ? Theme.lighten(Theme.accent(), 0.10) : Theme.accent())
                 : Theme.tile();
             line = on ? Theme.accent() : Theme.border();
-            inkTitle = on ? new Color(0x0D, 0x14, 0x20) : Theme.ink3();
+            // Текст на заливке акцентом: тёмный на светлом акценте тёмной темы,
+            // белый на насыщенном акценте светлой.
+            inkTitle = on ? (Theme.isDark() ? new Color(0x0D, 0x14, 0x20) : Color.WHITE)
+                : Theme.ink3();
         } else {
             switch (state) {
                 case ACTIVE -> {
@@ -199,7 +202,10 @@ public final class KpButton extends JComponent {
         if (twoLines) {
             g.setFont(Theme.font(10, Font.PLAIN));
             g.setColor(state == State.PLAYED ? Theme.kelium()
-                : primary && clickable() ? new Color(0x0D, 0x14, 0x20, 190) : Theme.ink3());
+                : primary && clickable()
+                    ? (Theme.isDark() ? new Color(0x0D, 0x14, 0x20, 190)
+                        : new Color(255, 255, 255, 210))
+                    : Theme.ink3());
             var fm2 = g.getFontMetrics();
             g.drawString(ellipsize(sub, fm2, w - x - Theme.px(8)), x,
                 h / 2 + fm2.getAscent() + Theme.px(1));

@@ -97,7 +97,25 @@ public final class FieldView extends JComponent {
      */
     java.util.Set<String> selectableHexIds = java.util.Set.of();
     java.util.function.Consumer<String> onHexPick;
-    private String hoverHexId;
+    String hoverHexId;
+
+    /**
+     * ПРИЗРАК ЗДАНИЯ (концепт §4): при выборе гекса стройки/переноса за
+     * курсором ездит полупрозрачный силуэт с кодом здания. На допустимом
+     * гексе — цветом игрока, на недопустимом — красным «нельзя».
+     */
+    String ghostLabel;
+    private java.awt.Color ghostColor;
+
+    /**
+     * ВЫБОР ДУГИ СЕКТОРОВ ({@code build_facing}): движок предложил варианты
+     * (каждый — список смежных сторон 0..5), колесо мыши вращает выбор, клик
+     * по гексу ставит. Пока режим активен, колесо НЕ масштабирует поле.
+     */
+    private String facingHexId;
+    java.util.List<java.util.List<Integer>> facingVariants;
+    private int facingSelected;
+    private java.util.function.IntConsumer onFacingPick;
 
     public FieldView() {
         setOpaque(true);
@@ -128,8 +146,13 @@ public final class FieldView extends JComponent {
                 // КЛИК, А НЕ ПЕРЕТАСКИВАНИЕ — если указатель почти не сдвинулся с
                 // нажатия. Иначе конец панорамирования всегда засчитывался бы как
                 // клик по гексу под курсором в момент отпускания.
-                if (pressedAt != null && onHexPick != null
-                    && pressedAt.distance(e.getPoint()) < 4) {
+                boolean isClick = pressedAt != null && pressedAt.distance(e.getPoint()) < 4;
+                if (isClick && facingVariants != null && onFacingPick != null) {
+                    String id = hexIdAt(e.getPoint());
+                    if (facingHexId != null && facingHexId.equals(id)) {
+                        onFacingPick.accept(facingSelected);
+                    }
+                } else if (isClick && onHexPick != null) {
                     String id = hexIdAt(e.getPoint());
                     if (id != null && selectableHexIds.contains(id) && onHexPick != null) {
                         onHexPick.accept(id);
@@ -155,12 +178,13 @@ public final class FieldView extends JComponent {
             @Override
             public void mouseMoved(java.awt.event.MouseEvent e) {
                 String id = hexIdAt(e.getPoint());
-                boolean selectable = id != null && selectableHexIds.contains(id);
+                boolean selectable = id != null && selectableHexIds.contains(id)
+                    || facingVariants != null && id != null && id.equals(facingHexId);
                 setCursor(selectable ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
                 if (!java.util.Objects.equals(id, hoverHexId)) {
                     hoverHexId = id;
-                    if (!selectableHexIds.isEmpty()) {
+                    if (!selectableHexIds.isEmpty() || ghostLabel != null) {
                         repaint();
                     }
                 }
@@ -169,6 +193,16 @@ public final class FieldView extends JComponent {
         addMouseListener(mouse);
         addMouseMotionListener(mouse);
         addMouseWheelListener(e -> {
+            // В режиме выбора дуги колесо ВРАЩАЕТ дугу по гексу (концепт §4),
+            // а не масштабирует поле — иначе поле уезжало бы под курсором в
+            // самый ответственный момент стройки.
+            if (facingVariants != null && !facingVariants.isEmpty()) {
+                int n = facingVariants.size();
+                facingSelected = Math.floorMod(
+                    facingSelected + (e.getWheelRotation() > 0 ? 1 : -1), n);
+                repaint();
+                return;
+            }
             autoFit = false;
             double factor = e.getWheelRotation() < 0 ? 1.12 : 1 / 1.12;
             zoomAt(e.getX(), e.getY(), factor);
@@ -268,6 +302,45 @@ public final class FieldView extends JComponent {
 
     public void clearSelectable() {
         setSelectable(java.util.Set.of(), null);
+    }
+
+    /** Включить призрак здания: {@code label} — код («Эн-1»), цвет — игрока. */
+    public void setGhost(String label, java.awt.Color color) {
+        this.ghostLabel = label;
+        this.ghostColor = color;
+        repaint();
+    }
+
+    public void clearGhost() {
+        this.ghostLabel = null;
+        this.ghostColor = null;
+        repaint();
+    }
+
+    /**
+     * Режим выбора дуги секторов на гексе {@code hexId}: варианты — как их
+     * предложил движок ({@code build_facing}), колесо вращает, клик по гексу
+     * подтверждает ({@code onPick} получает НОМЕР варианта).
+     */
+    public void setFacingChoice(String hexId, java.util.List<java.util.List<Integer>> variants,
+                                 java.util.function.IntConsumer onPick) {
+        this.facingHexId = hexId;
+        this.facingVariants = variants;
+        this.facingSelected = 0;
+        this.onFacingPick = onPick;
+        repaint();
+    }
+
+    public void clearFacingChoice() {
+        this.facingHexId = null;
+        this.facingVariants = null;
+        this.onFacingPick = null;
+        repaint();
+    }
+
+    /** Выбранный сейчас вариант дуги (для прогонщиков/тестов). */
+    public int facingSelected() {
+        return facingSelected;
     }
 
     /** Текущий масштаб (1.0 = как в отчётах). */
@@ -689,6 +762,104 @@ public final class FieldView extends JComponent {
         if (!selectableHexIds.isEmpty()) {
             drawSelectable(g);
         }
+        if (facingVariants != null && facingHexId != null) {
+            drawFacing(g);
+        }
+        if (ghostLabel != null) {
+            drawGhost(g);
+        }
+    }
+
+    /**
+     * ВАРИАНТЫ ДУГИ: все возможные стороны — тонким пунктиром акцента, стороны
+     * ВЫБРАННОГО варианта — толстой зелёной чертой по ребру (цвет «встанет» =
+     * келемий, как в макете «Экран 2»).
+     */
+    private void drawFacing(Graphics2D g) {
+        Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo h : record.hexes) {
+            info.put(h.id, h);
+        }
+        double[] c = center(info, facingHexId);
+        if (c == null) {
+            return;
+        }
+        g.setColor(withAlpha(kelium.gui.replay2.Theme.accent(), 220));
+        g.setStroke(pen(2.6));
+        g.draw(hexPath(c[0], c[1], BASE * 0.94));
+        java.util.Set<Integer> all = new java.util.HashSet<>();
+        for (java.util.List<Integer> v : facingVariants) {
+            all.addAll(v);
+        }
+        for (int side : all) {
+            drawEdge(g, c[0], c[1], side,
+                withAlpha(kelium.gui.replay2.Theme.accent(), 130), 3.2, true);
+        }
+        java.util.List<Integer> sel = facingVariants.get(
+            Math.min(facingSelected, facingVariants.size() - 1));
+        for (int side : sel) {
+            drawEdge(g, c[0], c[1], side, kelium.gui.replay2.Theme.kelium(), 6.0, false);
+        }
+    }
+
+    /** Черта по ребру {@code side} гекса — той же геометрией, что сектора движка. */
+    private void drawEdge(Graphics2D g, double cx, double cy, int side,
+                          Color color, double screenPx, boolean dashedLine) {
+        double ang = Math.toRadians(FieldGeometry.edgeAngle(side));
+        double ap = FieldGeometry.apothem(BASE) * 0.90;
+        double mx = cx + ap * Math.cos(ang);
+        double my = cy + ap * Math.sin(ang);
+        // вдоль ребра — перпендикуляр к направлению «наружу»
+        double ux = -Math.sin(ang);
+        double uy = Math.cos(ang);
+        double half = BASE * 0.42;
+        g.setColor(color);
+        g.setStroke(dashedLine ? penDashed(screenPx, 5, 4) : pen(screenPx));
+        g.draw(new Line2D.Double(mx - ux * half, my - uy * half,
+            mx + ux * half, my + uy * half));
+    }
+
+    /**
+     * ПРИЗРАК ЗДАНИЯ на гексе под курсором (в режиме дуги — на гексе стройки):
+     * полупрозрачный четырёхугольник с кодом здания; на недопустимом гексе —
+     * красный с подписью «нельзя».
+     */
+    private void drawGhost(Graphics2D g) {
+        String hexId = facingHexId != null ? facingHexId : hoverHexId;
+        if (hexId == null) {
+            return;
+        }
+        boolean legal = facingHexId != null || selectableHexIds.contains(hexId);
+        Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo h : record.hexes) {
+            info.put(h.id, h);
+        }
+        double[] c = center(info, hexId);
+        if (c == null) {
+            return;
+        }
+        Color base = legal && ghostColor != null ? ghostColor
+            : kelium.gui.replay2.Theme.bad();
+        double w = BASE * 0.86;
+        double h = BASE * 0.5;
+        double skew = BASE * 0.14;
+        Path2D q = new Path2D.Double();
+        q.moveTo(c[0] - w / 2 + skew, c[1] - h / 2);
+        q.lineTo(c[0] + w / 2 + skew, c[1] - h / 2);
+        q.lineTo(c[0] + w / 2 - skew, c[1] + h / 2);
+        q.lineTo(c[0] - w / 2 - skew, c[1] + h / 2);
+        q.closePath();
+        g.setColor(withAlpha(base, 105));
+        g.fill(q);
+        g.setColor(withAlpha(base, 220));
+        g.setStroke(penDashed(2.0, 5, 4));
+        g.draw(q);
+        g.setFont(getFont().deriveFont(Font.BOLD, (float) (BASE * 0.30)));
+        g.setColor(withAlpha(Color.WHITE, 235));
+        String text = legal ? ghostLabel : "нельзя";
+        var fm = g.getFontMetrics();
+        g.drawString(text, (float) (c[0] - fm.stringWidth(text) / 2.0),
+            (float) (c[1] + fm.getAscent() / 2.0 - 2));
     }
 
     /**
