@@ -77,6 +77,18 @@ public final class PublicView {
     public int[][] marketCells = {{-1, -1}, {-1, -1}};
     /** Витрина треков: трек → карта супер-арсенала на его вершине. */
     public final Map<String, String> superArsenalOffer = new LinkedHashMap<>();
+    /**
+     * ВИТРИНА АРСЕНАЛА — две открытые карты рядом с планшетом науки. Лежат
+     * лицом вверх, видны всем (дыра §8 п.1 концепта «Командный пункт»).
+     */
+    public final List<String> arsenalDisplay = new ArrayList<>();
+    /**
+     * СКОЛЬКО КАРТ ОСТАЛОСЬ В КОЛОДАХ и в сбросах: тип набора → число. За
+     * столом толщина колоды видна каждому (дыра §8 п.2 концепта); СОСТАВ
+     * колоды — нет, поэтому только числа.
+     */
+    public final Map<String, Integer> deckSizes = new LinkedHashMap<>();
+    public final Map<String, Integer> discardSizes = new LinkedHashMap<>();
     /** Кто стоит на треках науки: трек → по шагам список мест в порядке прихода. */
     public final Map<String, List<List<Integer>>> techOccupancy = new LinkedHashMap<>();
 
@@ -127,6 +139,19 @@ public final class PublicView {
         public int trophyPoints;
         /** Трофейная карта: какие именно чужие жетоны на ней лежат. */
         public final List<Map<String, Object>> trophyCard = new ArrayList<>();
+        /**
+         * Трофеи, ЗАДЕРЖАННЫЕ на карте «Трофейный склад» — лежат открыто и,
+         * в отличие от трофейной карты, не вернутся владельцу в Возврат.
+         */
+        public final List<Map<String, Object>> trophyHeld = new ArrayList<>();
+
+        // --- открыто лежащее на планшете ---
+        /** Жетоны щита на строках родов войск (коды родов) — лежат открыто. */
+        public final List<String> shieldedKinds = new ArrayList<>();
+        /** Сколько карт-символов подсунуто под планшет (факт публичен). */
+        public int tuckedCount;
+        /** ВСКРЫТЫЕ карты-символы — с момента вскрытия лежат открыто. */
+        public final List<String> tuckedRevealed = new ArrayList<>();
 
         // --- наука и модули ---
         /** Трек → достигнутый шаг. */
@@ -189,6 +214,12 @@ public final class PublicView {
         public List<String> objectiveHand;
         public List<String> arsenalHand;
         public String setAsideOrder;
+        /**
+         * Свои подложенные карты-символы ЦЕЛИКОМ (kind/card/rev) — владелец
+         * помнит, что подсунул; соседям — только {@link #tuckedCount} и
+         * {@link #tuckedRevealed}.
+         */
+        public List<Map<String, Object>> tucked;
     }
 
     /**
@@ -220,6 +251,11 @@ public final class PublicView {
             v.marketCells[i] = snap.marketCells[i].clone();
         }
         v.superArsenalOffer.putAll(snap.superArsenalOffer);
+        v.arsenalDisplay.addAll(snap.arsenalDisplay);
+        for (var e : snap.decks.entrySet()) {
+            v.deckSizes.put(e.getKey(), e.getValue().draw.size());
+            v.discardSizes.put(e.getKey(), e.getValue().discard.size());
+        }
         v.techOccupancy.putAll(snap.techOccupancy);
         v.hexes.addAll(snap.hexes);
         v.tokens.addAll(snap.tokens);
@@ -272,13 +308,18 @@ public final class PublicView {
         st.trophyTokens = p.trophyTokens;
         st.trophyPoints = p.trophyPoints;
         for (ReplayRecord.TrophyToken t : p.trophyCard) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("uid", t.uid);
-            m.put("owner", t.owner);
-            m.put("type", t.type);
-            m.put("building", t.building);
-            m.put("value", t.value);
-            st.trophyCard.add(m);
+            st.trophyCard.add(trophyMap(t));
+        }
+        for (ReplayRecord.TrophyToken t : p.trophyHeld) {
+            st.trophyHeld.add(trophyMap(t));
+        }
+
+        st.shieldedKinds.addAll(p.shieldedKinds);
+        st.tuckedCount = p.tucked.size();
+        for (ReplayRecord.Tucked t : p.tucked) {
+            if (t.revealed) {
+                st.tuckedRevealed.add(t.cardId);
+            }
         }
 
         st.tech.putAll(p.tech);
@@ -320,8 +361,26 @@ public final class PublicView {
             st.objectiveHand = List.copyOf(p.objectiveHand);
             st.arsenalHand = List.copyOf(p.arsenalHand);
             st.setAsideOrder = p.orderSetAside;
+            st.tucked = new ArrayList<>();
+            for (ReplayRecord.Tucked t : p.tucked) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("kind", t.kind);
+                m.put("card", t.cardId);
+                m.put("rev", t.revealed);
+                st.tucked.add(m);
+            }
         }
         return st;
+    }
+
+    private static Map<String, Object> trophyMap(ReplayRecord.TrophyToken t) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("uid", t.uid);
+        m.put("owner", t.owner);
+        m.put("type", t.type);
+        m.put("building", t.building);
+        m.put("value", t.value);
+        return m;
     }
 
     private static Map<String, Object> moduleMap(ReplayRecord.Module m) {
@@ -358,6 +417,9 @@ public final class PublicView {
         }
         o.put("marketCells", mc);
         o.put("superArsenalOffer", superArsenalOffer);
+        o.put("arsenalDisplay", arsenalDisplay);
+        o.put("deckSizes", deckSizes);
+        o.put("discardSizes", discardSizes);
         o.put("techOccupancy", techOccupancy);
         List<Object> hx = new ArrayList<>();
         for (ReplayRecord.HexState h : hexes) {
@@ -465,6 +527,10 @@ public final class PublicView {
         o.put("trophyTokens", st.trophyTokens);
         o.put("trophyPoints", st.trophyPoints);
         o.put("trophyCard", st.trophyCard);
+        o.put("trophyHeld", st.trophyHeld);
+        o.put("shieldedKinds", st.shieldedKinds);
+        o.put("tuckedCount", st.tuckedCount);
+        o.put("tuckedRevealed", st.tuckedRevealed);
         o.put("tech", st.tech);
         o.put("redModules", st.redModules);
         o.put("blueModules", st.blueModules);
@@ -494,6 +560,7 @@ public final class PublicView {
         o.put("objectiveHand", st.objectiveHand);
         o.put("arsenalHand", st.arsenalHand);
         o.put("setAsideOrder", st.setAsideOrder);
+        o.put("tucked", st.tucked);
         return o;
     }
 }

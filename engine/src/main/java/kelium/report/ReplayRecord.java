@@ -134,6 +134,20 @@ public final class ReplayRecord {
         public int value;
     }
 
+    /**
+     * КАРТА-СИМВОЛ ПОД ПЛАНШЕТОМ ВОЙСК (супер-модуль). В записи (всевидящей)
+     * id карты пишется всегда — дизайнеру для разбора партии нужно видеть, ЧТО
+     * подсунуто (заказ на цифровую версию, §3). Честный вид от лица места
+     * ({@code kelium.observe.PublicView}) сам решает, что из этого показать:
+     * закрытым соседям — только число и вскрытые.
+     */
+    public static final class Tucked {
+        /** {@code container} или {@code arsenal}. */
+        public String kind = "";
+        public String cardId = "";
+        public boolean revealed;
+    }
+
     /** Изменяемая часть гекса на конкретном шаге. */
     public static final class HexState {
         public String id;
@@ -231,6 +245,23 @@ public final class ReplayRecord {
          * нечем (просьба дизайнера 13.08.2026).
          */
         public final List<TrophyToken> trophyCard = new ArrayList<>();
+        /**
+         * ТРОФЕИ, ЗАДЕРЖАННЫЕ НА КАРТЕ «Трофейный склад» (b13) — ОТДЕЛЬНО от
+         * обычного трофейного пространства: за столом это разные места, и
+         * жетон отсюда не вернётся владельцу в ближайший Возврат. Раньше
+         * запись их не различала (дыра §8 п.6 концепта «Командный пункт»).
+         */
+        public final List<TrophyToken> trophyHeld = new ArrayList<>();
+        /**
+         * КАРТЫ-СИМВОЛЫ ПОД ПЛАНШЕТОМ — раньше в запись не попадали вовсе
+         * (дыра §8 п.3 концепта): ни факт (публичен), ни лица (нужны журналу).
+         */
+        public final List<Tucked> tucked = new ArrayList<>();
+        /**
+         * ЖЕТОНЫ ЩИТА на строках родов войск — лежат на планшете открыто,
+         * в запись не писались (дыра §8 п.5 концепта). Коды родов войск.
+         */
+        public final List<String> shieldedKinds = new ArrayList<>();
         public int containers;
         public int containerCap;
         public int keliumCap;
@@ -674,6 +705,26 @@ public final class ReplayRecord {
             tt.value = t.trophyValue();
             v.trophyCard.add(tt);
         }
+        for (kelium.core.Token t : p.trophyHeldOnCards) {
+            TrophyToken tt = new TrophyToken();
+            tt.uid = t.uid();
+            tt.owner = t.owner();
+            tt.building = t instanceof kelium.core.BuildingToken;
+            tt.type = t instanceof kelium.core.BuildingToken bt ? bt.type.code
+                : ((kelium.core.UnitToken) t).type.code;
+            tt.value = t.trophyValue();
+            v.trophyHeld.add(tt);
+        }
+        for (kelium.core.PlayerState.TuckedCard t : p.tucked) {
+            Tucked x = new Tucked();
+            x.kind = t.kind;
+            x.cardId = t.cardId;
+            x.revealed = t.revealed;
+            v.tucked.add(x);
+        }
+        for (kelium.core.UnitType u : p.shieldedKinds) {
+            v.shieldedKinds.add(u.code);
+        }
         v.containers = p.containers;
         int cap = Storage.containerCapacity(s, p);
         v.containerCap = cap == Integer.MAX_VALUE ? -1 : cap;
@@ -1043,6 +1094,33 @@ public final class ReplayRecord {
             }
             o.put("trophyCard", tc);
         }
+        if (!p.trophyHeld.isEmpty()) {
+            List<Object> th = new ArrayList<>();
+            for (TrophyToken t : p.trophyHeld) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("uid", t.uid);
+                m.put("owner", t.owner);
+                m.put("building", t.building);
+                m.put("type", t.type);
+                m.put("value", t.value);
+                th.add(m);
+            }
+            o.put("trophyHeld", th);
+        }
+        if (!p.tucked.isEmpty()) {
+            List<Object> tu = new ArrayList<>();
+            for (Tucked t : p.tucked) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("kind", t.kind);
+                m.put("card", t.cardId);
+                m.put("rev", t.revealed);
+                tu.add(m);
+            }
+            o.put("tucked", tu);
+        }
+        if (!p.shieldedKinds.isEmpty()) {
+            o.put("shields", p.shieldedKinds);
+        }
         o.put("containers", p.containers);
         o.put("containerCap", p.containerCap);
         o.put("keliumCap", p.keliumCap);
@@ -1361,6 +1439,27 @@ public final class ReplayRecord {
             t.value = Json.i(m, "value");
             p.trophyCard.add(t);
         }
+        for (Object to : Json.list(o, "trophyHeld")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> m = (Map<String, Object>) to;
+            TrophyToken t = new TrophyToken();
+            t.uid = Json.i(m, "uid");
+            t.owner = Json.i(m, "owner");
+            t.building = Json.b(m, "building");
+            t.type = Json.s(m, "type");
+            t.value = Json.i(m, "value");
+            p.trophyHeld.add(t);
+        }
+        for (Object to : Json.list(o, "tucked")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> m = (Map<String, Object>) to;
+            Tucked t = new Tucked();
+            t.kind = Json.s(m, "kind");
+            t.cardId = Json.s(m, "card");
+            t.revealed = Json.b(m, "rev");
+            p.tucked.add(t);
+        }
+        p.shieldedKinds.addAll(Json.strings(o, "shields"));
         p.containers = Json.i(o, "containers");
         p.containerCap = Json.i(o, "containerCap");
         p.keliumCap = Json.i(o, "keliumCap");
