@@ -1,9 +1,11 @@
 package kelium.gui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Point;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,14 +17,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
-import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
 import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
@@ -34,26 +34,30 @@ import kelium.core.GameState;
 import kelium.core.InteractiveAgent;
 import kelium.dataio.GameConfig;
 import kelium.engine.Setup;
+import kelium.gui.kp.ActionBar;
+import kelium.gui.kp.CardTile;
+import kelium.gui.kp.ChipLabel;
+import kelium.gui.kp.HandPanel;
+import kelium.gui.kp.KpButton;
+import kelium.gui.kp.KpTab;
+import kelium.gui.kp.PromptOverlay;
+import kelium.gui.kp.ZoomCard;
 import kelium.gui.replay2.BoardSheet;
 import kelium.gui.replay2.Session;
 import kelium.gui.replay2.Theme;
 import kelium.report.ReplayRecord;
 
 /**
- * «КОМАНДНЫЙ ПУНКТ» — живое окно партии (hot-seat + боты). Каркас по
- * утверждённому концепту (design-docs/КОНЦЕПТ — игровой интерфейс цифровой
- * версии (Командный пункт).md, §2, этап 1 из §10):
+ * «КОМАНДНЫЙ ПУНКТ» — живое окно партии (hot-seat + боты) по утверждённому
+ * концепту (design-docs/КОНЦЕПТ — игровой интерфейс цифровой версии).
  *
- * <ul>
- *   <li>ПОЛЕ — якорь: центр экрана, никаких вкладок, что его прячут;</li>
- *   <li>ЯЩИКИ слева ПОВЕРХ поля: «Наука и рынок» ({@link BoardsPanel}),
- *       «Планшет» ({@link BoardSheet} по местам), «Журнал» (полная лента) —
- *       всё готовые панели replay2, ящик — только обёртка;</li>
- *   <li>полоса хода сверху: раунд/круг, чей ход, ресурсы с потолками;</li>
- *   <li>справа: шаги текущего хода (пока без отката — этап 5) и лента;</li>
- *   <li>снизу: руки (пока текстом — карточки в этапе 3), панель решений,
- *       кнопка «Завершить ход» с остатком действий.</li>
- * </ul>
+ * <p>Постоянная зона игрока (замечание дизайнера 24.08: органы управления
+ * НЕ появляются и не исчезают): три руки карточками ({@link HandPanel}, при
+ * наведении — увеличенная карта), панель из восьми всегда видимых плиток
+ * действий ({@link ActionBar}), большая кнопка «Завершить ход». Контекстные
+ * варианты точек решения — плавающая панель поверх поля ({@link PromptOverlay}),
+ * гексовые решения — кликом по самому полю. Ящики поверх поля — готовые панели
+ * replay2 (наука/рынок, планшет, журнал).
  *
  * <p>Запуск: {@code kelium.gui.HotSeatWindow <players> [seed] [seat0] ...},
  * место — {@code human} либо имя характера бота ({@link Bots#CHARACTERS}).
@@ -71,14 +75,8 @@ public final class HotSeatWindow {
         SwingUtilities.invokeLater(() -> new HotSeatWindow(players, seed, seatSpecs).start());
     }
 
-    /** Русские названия действий движка — для плиток и шагов хода. */
-    private static final Map<String, String> ACTION_RU = Map.of(
-        "build", "Стройка", "mining", "Добыча", "movement", "Манёвр",
-        "combat", "Бой", "market", "Рынок", "science", "Наука",
-        "assembly", "Сборка", "energy_swap", "Энергия");
-
-    private static final int DRAWER_W = 480;
     private static final int RAIL_W = 260;
+    private static final int DRAWER_W = 480;
 
     private final int players;
     private final long seed;
@@ -89,39 +87,38 @@ public final class HotSeatWindow {
     JFrame frame;
     private JLabel roundLabel;
     private JLabel turnLabel;
-    private JLabel chipVp;
-    private JLabel chipCoin;
-    private JLabel chipKelium;
-    private JLabel chipAmmo;
-    private JLabel chipDebris;
+    private ChipLabel chipVp;
+    private ChipLabel chipCoin;
+    private ChipLabel chipKelium;
+    private ChipLabel chipAmmo;
+    private ChipLabel chipDebris;
     FieldView field;
     private BoardsPanel boards;
     private BoardSheet sheet;
-    private JToggleButton[] sheetSeatTabs;
     private JLayeredPane layered;
     private final Map<String, JComponent> drawers = new LinkedHashMap<>();
-    final Map<String, JToggleButton> drawerTabs = new LinkedHashMap<>();
+    final Map<String, KpTab> drawerTabs = new LinkedHashMap<>();
     private JComponent openDrawer;
     private JPanel stepsBox;
     private JLabel stepsCaption;
     private JPanel feedBox;
     private JScrollPane feedScroll;
     private JPanel journalBox;
-    private JTextArea handArea;
-    JPanel decisionPanel;
-    JButton endBtn;
-    private JLabel endHint;
+    HandPanel hands;
+    ActionBar actionBar;
+    PromptOverlay prompt;
+    private ZoomCard zoom;
+    KpButton endBtn;
     private int viewedSeat = 0;
     private volatile GameConfig cfg;
+    private volatile GameState liveState;
     private boolean sessionBound;
     private Integer stepsTurnSeat;
     private int stepNo;
+    private String lastFeedText;
     volatile ReplayRecord rec;
     /** Место, для которого сейчас реально ждём клика/кнопки — иначе null. */
     volatile Integer awaitingSeat;
-    /** Ответ «пас» текущей точки решения (для кнопки «Завершить ход»). */
-    private Integer pendingPassIndex;
-    private InteractiveAgent pendingAgent;
 
     HotSeatWindow(int players, long seed, List<String> seatSpecs) {
         this.players = players;
@@ -149,10 +146,15 @@ public final class HotSeatWindow {
         frame.add(buildTabStrip(), BorderLayout.WEST);
         frame.add(buildCenter(), BorderLayout.CENTER);
         frame.add(buildRail(), BorderLayout.EAST);
-        frame.add(buildBottom(), BorderLayout.SOUTH);
+        frame.add(buildPlayerZone(), BorderLayout.SOUTH);
+
+        zoom = new ZoomCard();
+        zoom.setSize(Theme.px(220), Theme.px(300));
+        zoom.setVisible(false);
+        frame.getLayeredPane().add(zoom, JLayeredPane.POPUP_LAYER);
 
         frame.setSize(Theme.px(1500), Theme.px(950));
-        frame.setMinimumSize(new Dimension(Theme.px(1100), Theme.px(720)));
+        frame.setMinimumSize(new Dimension(Theme.px(1150), Theme.px(760)));
         frame.setLocationByPlatform(true);
         frame.setVisible(true);
     }
@@ -160,7 +162,7 @@ public final class HotSeatWindow {
     private JComponent buildTopBar() {
         JPanel bar = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets " + Theme.px(8) + " " + Theme.px(12) + " " + Theme.px(8) + " " + Theme.px(12)
-                + ", gapx " + Theme.px(14), "[][]push[][][][][]"));
+                + ", gapx " + Theme.px(12), "[][]push[][][][][]"));
         bar.setBackground(Theme.panel());
         bar.setBorder(BorderFactory.createMatteBorder(0, 0, Theme.px(2), 0, Theme.border()));
 
@@ -174,55 +176,43 @@ public final class HotSeatWindow {
         turnLabel.setForeground(Theme.ink());
         bar.add(turnLabel);
 
-        chipVp = chip(bar);
-        chipCoin = chip(bar);
-        chipKelium = chip(bar);
-        chipAmmo = chip(bar);
-        chipDebris = chip(bar);
+        chipVp = new ChipLabel("SUPER", Theme.points());
+        chipCoin = new ChipLabel("COIN", Theme.points());
+        chipKelium = new ChipLabel("KELIUM", Theme.kelium());
+        chipAmmo = new ChipLabel("AMMO", Theme.energy());
+        chipDebris = new ChipLabel("DEBRIS", Theme.neutral());
+        for (ChipLabel c : List.of(chipVp, chipCoin, chipKelium, chipAmmo, chipDebris)) {
+            bar.add(c);
+        }
         return bar;
     }
 
-    private JLabel chip(JPanel bar) {
-        JLabel c = new JLabel(" ");
-        c.setFont(Theme.mono(12, Font.PLAIN));
-        c.setForeground(Theme.ink());
-        c.setOpaque(true);
-        c.setBackground(Theme.tile());
-        c.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Theme.border()),
-            BorderFactory.createEmptyBorder(Theme.px(3), Theme.px(8), Theme.px(3), Theme.px(8))));
-        bar.add(c);
-        return c;
-    }
-
-    /** Корешки ящиков: клик открывает панель ПОВЕРХ поля, повторный — закрывает. */
     private JComponent buildTabStrip() {
         JPanel strip = new JPanel();
         strip.setLayout(new BoxLayout(strip, BoxLayout.Y_AXIS));
         strip.setBackground(Theme.panel());
-        strip.setBorder(BorderFactory.createMatteBorder(0, 0, 0, Theme.px(1), Theme.border()));
+        strip.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 0, Theme.px(1), Theme.border()),
+            BorderFactory.createEmptyBorder(Theme.px(10), Theme.px(4), Theme.px(10), Theme.px(4))));
         addDrawerTab(strip, "Наука и рынок");
         addDrawerTab(strip, "Планшет");
         addDrawerTab(strip, "Журнал");
+        strip.add(javax.swing.Box.createVerticalGlue());
         return strip;
     }
 
     private void addDrawerTab(JPanel strip, String name) {
-        JToggleButton b = new JToggleButton(name);
-        b.setFont(Theme.font(11, Font.BOLD));
-        b.setForeground(Theme.ink2());
-        b.setFocusable(false);
-        b.setAlignmentX(Component.CENTER_ALIGNMENT);
-        b.addActionListener(e -> toggleDrawer(name));
-        drawerTabs.put(name, b);
-        strip.add(b);
-        strip.add(javax.swing.Box.createVerticalStrut(Theme.px(4)));
+        KpTab tab = new KpTab(name, () -> toggleDrawer(name));
+        tab.setPreferredSize(new Dimension(Theme.px(36), Theme.px(132)));
+        tab.setMaximumSize(new Dimension(Theme.px(36), Theme.px(132)));
+        tab.setAlignmentX(Component.CENTER_ALIGNMENT);
+        drawerTabs.put(name, tab);
+        strip.add(tab);
+        strip.add(javax.swing.Box.createVerticalStrut(Theme.px(8)));
     }
 
     private JComponent buildCenter() {
         field = new FieldView();
-        // «Чей ход» поверх поля дублирует полосу хода сверху — в живом окне
-        // эту подпись рисуем только там (концепт §2: одна зона — один вопрос).
         field.setShowTurnCaption(false);
         boards = new BoardsPanel();
         sheet = new BoardSheet(session, 0);
@@ -240,7 +230,6 @@ public final class HotSeatWindow {
             "insets " + Theme.px(6) + ", gapx " + Theme.px(4)));
         seatRow.setBackground(Theme.panel());
         ButtonGroup group = new ButtonGroup();
-        sheetSeatTabs = new JToggleButton[players];
         for (int i = 0; i < players; i++) {
             int s = i;
             JToggleButton b = new JToggleButton((i + 1) + " · " + seatSpecs.get(i));
@@ -250,7 +239,6 @@ public final class HotSeatWindow {
             b.setSelected(i == 0);
             b.addActionListener(e -> sheet.setSeat(s));
             group.add(b);
-            sheetSeatTabs[i] = b;
             seatRow.add(b);
         }
         sheetWrap.add(seatRow, BorderLayout.NORTH);
@@ -268,8 +256,9 @@ public final class HotSeatWindow {
         journalScroll.setBorder(null);
         drawers.put("Журнал", wrapDrawer(journalScroll));
 
-        // Раскладка руками: поле всегда во весь центр, открытый ящик — слева
-        // поверх него. LayoutManager у JLayeredPane нарочно нет.
+        prompt = new PromptOverlay();
+        layered.add(prompt, JLayeredPane.MODAL_LAYER);
+
         layered.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
@@ -289,12 +278,26 @@ public final class HotSeatWindow {
         return p;
     }
 
-    private void layoutLayers() {
+    void layoutLayers() {
         field.setBounds(0, 0, layered.getWidth(), layered.getHeight());
         int w = Math.min(Theme.px(DRAWER_W), Math.max(Theme.px(320), layered.getWidth() / 2));
         for (JComponent d : drawers.values()) {
             d.setBounds(0, 0, w, layered.getHeight());
         }
+        layoutPrompt();
+    }
+
+    private void layoutPrompt() {
+        int maxW = Math.max(Theme.px(320), layered.getWidth() - Theme.px(24)
+            - (openDrawer != null && openDrawer.isVisible() ? openDrawer.getWidth() : 0));
+        int x = Theme.px(12)
+            + (openDrawer != null && openDrawer.isVisible() ? openDrawer.getWidth() : 0);
+        prompt.setSize(new Dimension(Math.min(Theme.px(760), maxW), 10));
+        Dimension pref = prompt.getPreferredSize();
+        int h = Math.min(pref.height, layered.getHeight() - Theme.px(24));
+        prompt.setBounds(x, layered.getHeight() - h - Theme.px(12),
+            Math.min(Theme.px(760), maxW), h);
+        prompt.revalidate();
     }
 
     private void toggleDrawer(String name) {
@@ -350,61 +353,79 @@ public final class HotSeatWindow {
         return c;
     }
 
-    private JComponent buildBottom() {
-        JPanel bottom = new JPanel(new BorderLayout(Theme.px(10), 0));
-        bottom.setBackground(Theme.panel());
-        bottom.setBorder(BorderFactory.createCompoundBorder(
+    /** ПОСТОЯННАЯ ЗОНА ИГРОКА: руки карточками · панель действий · завершить ход. */
+    private JComponent buildPlayerZone() {
+        JPanel zone = new JPanel(new BorderLayout(Theme.px(14), 0));
+        zone.setBackground(Theme.panel());
+        zone.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(Theme.px(1), 0, 0, 0, Theme.border()),
             BorderFactory.createEmptyBorder(Theme.px(8), Theme.px(12), Theme.px(8), Theme.px(12))));
-        bottom.setPreferredSize(new Dimension(10, Theme.px(190)));
+        zone.setPreferredSize(new Dimension(10, Theme.px(132)));
 
-        handArea = new JTextArea();
-        handArea.setEditable(false);
-        handArea.setFont(Theme.mono(11.5, Font.PLAIN));
-        handArea.setBackground(Theme.tile());
-        handArea.setForeground(Theme.ink());
-        handArea.setBorder(BorderFactory.createEmptyBorder(Theme.px(6), Theme.px(8), Theme.px(6), Theme.px(8)));
-        JScrollPane handScroll = new JScrollPane(handArea);
-        handScroll.setBorder(BorderFactory.createLineBorder(Theme.border()));
-        handScroll.setPreferredSize(new Dimension(Theme.px(360), 10));
-        bottom.add(handScroll, BorderLayout.WEST);
+        hands = new HandPanel(new HandPanel.HoverSink() {
+            @Override
+            public void onHover(CardTile tile, String group) {
+                showZoom(tile, group);
+            }
 
-        decisionPanel = new JPanel();
-        decisionPanel.setLayout(new BoxLayout(decisionPanel, BoxLayout.Y_AXIS));
-        decisionPanel.setBackground(Theme.panel());
-        JScrollPane decScroll = new JScrollPane(decisionPanel);
-        decScroll.setBorder(null);
-        decScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(20));
-        bottom.add(decScroll, BorderLayout.CENTER);
-
-        JPanel end = new JPanel();
-        end.setLayout(new BoxLayout(end, BoxLayout.Y_AXIS));
-        end.setBackground(Theme.panel());
-        endBtn = new JButton("Ход соперника…");
-        endBtn.setFont(Theme.font(14, Font.BOLD));
-        endBtn.setFocusPainted(false);
-        endBtn.setEnabled(false);
-        endBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        endBtn.addActionListener(e -> {
-            InteractiveAgent a = pendingAgent;
-            Integer pass = pendingPassIndex;
-            if (a != null && pass != null) {
-                a.submitIndex(pass);
-                clearDecisionPanel();
+            @Override
+            public void onHoverOff() {
+                zoom.setVisible(false);
             }
         });
-        endHint = new JLabel(" ");
-        endHint.setFont(Theme.font(11, Font.PLAIN));
-        endHint.setForeground(Theme.ink3());
-        endHint.setAlignmentX(Component.CENTER_ALIGNMENT);
-        end.add(javax.swing.Box.createVerticalGlue());
-        end.add(endBtn);
-        end.add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
-        end.add(endHint);
-        end.add(javax.swing.Box.createVerticalGlue());
-        end.setPreferredSize(new Dimension(Theme.px(190), 10));
-        bottom.add(end, BorderLayout.EAST);
-        return bottom;
+        JScrollPane handScroll = new JScrollPane(hands,
+            JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        handScroll.setBorder(null);
+        handScroll.getViewport().setOpaque(false);
+        handScroll.setOpaque(false);
+        zone.add(handScroll, BorderLayout.CENTER);
+
+        JPanel right = new JPanel();
+        right.setOpaque(false);
+        right.setLayout(new BoxLayout(right, BoxLayout.X_AXIS));
+        actionBar = new ActionBar();
+        actionBar.setPreferredSize(new Dimension(Theme.px(420), Theme.px(100)));
+        actionBar.setMaximumSize(new Dimension(Theme.px(420), Theme.px(110)));
+        right.add(actionBar);
+        right.add(javax.swing.Box.createHorizontalStrut(Theme.px(14)));
+
+        endBtn = new KpButton("Ход соперника…", "", null).primary(true);
+        endBtn.setState(KpButton.State.DISABLED);
+        endBtn.setPreferredSize(new Dimension(Theme.px(180), Theme.px(100)));
+        endBtn.setMaximumSize(new Dimension(Theme.px(180), Theme.px(110)));
+        right.add(endBtn);
+        zone.add(right, BorderLayout.EAST);
+        return zone;
+    }
+
+    private void showZoom(CardTile tile, String group) {
+        String type;
+        String detail = "";
+        double progress = -1;
+        if ("Задания".equals(group)) {
+            type = "Задание";
+            try {
+                var card = kelium.engine.cards.CardRegistry.objective(tile.cardId);
+                GameState s = liveState;
+                if (card != null && s != null) {
+                    var ctx = new kelium.engine.cards.EngineCardContext(s, viewedSeat);
+                    progress = card.progress(ctx);
+                    detail = String.valueOf(card.needed(ctx));
+                }
+            } catch (RuntimeException ignore) {
+                // прогресс — украшение подсказки; без него карта всё равно видна
+            }
+        } else if ("Приказы".equals(group)) {
+            type = "Приказ";
+        } else {
+            type = "Арсенал";
+        }
+        zoom.show(tile.cardName(), type, tile.bandColor(), detail, progress);
+        Point p = SwingUtilities.convertPoint(tile, 0, 0, frame.getLayeredPane());
+        int x = Math.max(Theme.px(6),
+            Math.min(p.x - Theme.px(60), frame.getLayeredPane().getWidth() - zoom.getWidth() - Theme.px(6)));
+        int y = Math.max(Theme.px(6), p.y - zoom.getHeight() - Theme.px(4));
+        zoom.setLocation(x, y);
     }
 
     // ==================== партия ====================
@@ -413,6 +434,7 @@ public final class HotSeatWindow {
         GameConfig cfg = GameConfig.build(GameConfig.DEFAULT_RULESET, players, seed, null, null);
         this.cfg = cfg;
         GameState state = Setup.buildGame(cfg);
+        this.liveState = state;
         SwingUtilities.invokeLater(() -> {
             boards.setRules(cfg.ruleset, cfg.content);
             session.setContent(cfg.content);
@@ -456,9 +478,9 @@ public final class HotSeatWindow {
                 + " · раундов " + finalRec.rounds);
             turnLabel.setForeground(finalRec.winner == null
                 ? Theme.ink() : Theme.seatInk(finalRec.winner));
-            endBtn.setEnabled(false);
-            endBtn.setText("Партия окончена");
-            clearDecisionPanel();
+            endBtn.setTexts("Партия окончена", "");
+            endBtn.setState(KpButton.State.DISABLED);
+            clearDecision();
         });
         try {
             java.nio.file.Path out = java.nio.file.Path.of("reports", "hotseat",
@@ -497,7 +519,7 @@ public final class HotSeatWindow {
             feedLine(f.seat, f.log);
         }
         trackSteps(f);
-        refreshHandPanel();
+        refreshHands(f);
         refreshTopBar(f);
     }
 
@@ -523,18 +545,55 @@ public final class HotSeatWindow {
             for (int v : p.vp.values()) {
                 vp += v;
             }
-            chipVp.setText("ПО " + vp);
-            chipVp.setForeground(Theme.points());
-            chipCoin.setText("монеты " + p.coin);
-            chipKelium.setText("келемий " + p.kelium + "/" + p.keliumCap);
-            chipKelium.setForeground(Theme.kelium());
-            chipAmmo.setText("БП " + p.ammo + "/" + p.ammoCap);
-            chipAmmo.setForeground(Theme.energy());
-            chipDebris.setText("обломки " + p.debris + "/" + p.debrisCap);
+            chipVp.set(String.valueOf(vp), null);
+            chipCoin.set(String.valueOf(p.coin), null);
+            chipKelium.set(String.valueOf(p.kelium), String.valueOf(p.keliumCap));
+            chipAmmo.set(String.valueOf(p.ammo), String.valueOf(p.ammoCap));
+            chipDebris.set(String.valueOf(p.debris), String.valueOf(p.debrisCap));
         }
     }
 
-    /** Шаги ТЕКУЩЕГО хода (пока витрина; откат «до точки» — этап 5 концепта). */
+    private void refreshHands(ReplayRecord.Frame f) {
+        if (f.snapshot == null || viewedSeat >= f.snapshot.players.size()) {
+            return;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(viewedSeat);
+        hands.setCards("Приказы", p.orderHand, this::cardName, orderBand(p.orderColor),
+            null, null);
+        hands.setCards("Задания", p.objectiveHand, this::cardName, Theme.points(),
+            this::objectiveTag, Theme.kelium());
+        hands.setCards("Арсенал", p.arsenalHand, this::cardName, Theme.container(),
+            null, null);
+    }
+
+    private Color orderBand(String color) {
+        if (color == null) {
+            return Theme.accent();
+        }
+        return switch (color) {
+            case "red" -> new Color(0xC75450);
+            case "green" -> new Color(0x4E9E5F);
+            case "blue" -> new Color(0x4A8ACD);
+            case "yellow" -> new Color(0xC9A23B);
+            default -> Theme.accent();
+        };
+    }
+
+    private String objectiveTag(String cardId) {
+        try {
+            var card = kelium.engine.cards.CardRegistry.objective(cardId);
+            GameState s = liveState;
+            if (card == null || s == null) {
+                return null;
+            }
+            double pr = card.progress(new kelium.engine.cards.EngineCardContext(s, viewedSeat));
+            return Math.round(pr * 100) + "%";
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Шаги ТЕКУЩЕГО хода (витрина; откат «до точки» — этап 5 концепта). */
     private void trackSteps(ReplayRecord.Frame f) {
         if ("turn_orders".equals(f.type) && f.seat != null) {
             stepsTurnSeat = f.seat;
@@ -542,11 +601,9 @@ public final class HotSeatWindow {
             stepsBox.removeAll();
             stepsCaption.setText("ШАГИ ХОДА — ИГРОК " + (f.seat + 1));
             addStep("Приказ вскрыт", true, f.seat);
+            actionBar.turnStarted();
         } else if ("action".equals(f.type) && f.seat != null && f.seat.equals(stepsTurnSeat)) {
-            Object detail = f.log;
-            String name = String.valueOf(detail);
-            // Из строки лога имя действия не выковырять надёжно — берём короткую
-            // форму: тип события знает только "action", имя лежит в самом логе.
+            String name = String.valueOf(f.log);
             addStep(name.length() > 42 ? name.substring(0, 41) + "…" : name, false, f.seat);
         } else if ("turn_end".equals(f.type) && f.seat != null && f.seat.equals(stepsTurnSeat)) {
             stepsTurnSeat = null;
@@ -567,14 +624,14 @@ public final class HotSeatWindow {
         stepsBox.add(row);
     }
 
-    private String lastFeedText;
-
     /** Строка ленты (и её копия в ящик «Журнал»). seat null — служебное. */
     private void feedLine(Integer seat, String text) {
-        // Подряд идущие одинаковые строки (движок шлёт по событию на повтор)
-        // схлопываются: лента — для чтения человеком, а не для полноты (полнота
-        // — в журнале партии на диске).
         if (text.equals(lastFeedText)) {
+            return;
+        }
+        // Сырые служебные события (телеметрия ботов вида «objective_hints {…}»)
+        // человеку в ленте не нужны — в полном журнале партии они остаются.
+        if (text.matches("^[a-z_]+ \\{.*")) {
             return;
         }
         lastFeedText = text;
@@ -592,8 +649,6 @@ public final class HotSeatWindow {
     }
 
     private JComponent feedRow(Integer seat, String text) {
-        // Ширина прописана в html: без неё JLabel не переносит строки и лента
-        // уезжает за край колонки горизонтальной прокруткой.
         JLabel row = new JLabel("<html><body style='width:" + Theme.px(196) + "px'>"
             + text + "</body></html>");
         row.setFont(Theme.font(11, Font.PLAIN));
@@ -608,11 +663,7 @@ public final class HotSeatWindow {
 
     // ==================== точки решения ====================
 
-    /**
-     * Виды точек решения, чей payload — гекс (или сводится к нему): выбираются
-     * кликом по полю (концепт §3, семья A). Правило «всё или ничего» — см.
-     * {@link #hexTargets}.
-     */
+    /** Семья A концепта §3 — цель на поле, payload сводится к гексу. */
     private static final Set<String> HEX_TARGET_KINDS = Set.of(
         "tower_hex", "build_hex", "move_hex", "energy_hex", "combat_source", "combat_target");
 
@@ -620,7 +671,7 @@ public final class HotSeatWindow {
         Map.entry("action", "выберите действие"),
         Map.entry("spec", "СПЕЦ-действие"),
         Map.entry("reveal_order", "выберите карту круга"),
-        Map.entry("blind_discard", "отложите приказ (место для трофеев)"),
+        Map.entry("blind_discard", "отложите приказ — место для трофеев"),
         Map.entry("build_pick", "стройка: что строим"),
         Map.entry("build_facing", "какими секторами поставить"),
         Map.entry("tower_hex", "гекс для вышки"),
@@ -646,19 +697,20 @@ public final class HotSeatWindow {
     private void showDecision(int seat, InteractiveAgent.PendingDecision d) {
         viewedSeat = seat;
         awaitingSeat = seat;
-        refreshHandPanel();
+        if (rec != null && !rec.frames.isEmpty()) {
+            refreshHands(rec.frames.get(rec.frames.size() - 1));
+        }
 
         String kind = String.valueOf(d.context().get("kind"));
         InteractiveAgent agent = humansBySeat.get(seat);
         List<Choice> options = d.options();
+        String title = "Игрок " + (seat + 1) + " — " + KIND_LABELS.getOrDefault(kind, kind);
 
         turnLabel.setText("ВАШ ХОД — Игрок " + (seat + 1) + ": "
             + KIND_LABELS.getOrDefault(kind, kind));
         turnLabel.setForeground(Theme.seatInk(seat));
 
-        // «Завершить ход» = вариант "пас" точки решения вида action.
-        pendingAgent = agent;
-        pendingPassIndex = null;
+        // «Завершить ход» = вариант "пас" точки вида action.
         int passIdx = -1;
         for (int i = 0; i < options.size(); i++) {
             if ("pass".equals(options.get(i).kind()) && options.get(i).payload() == null) {
@@ -666,74 +718,95 @@ public final class HotSeatWindow {
                 break;
             }
         }
-        if ("action".equals(kind) && passIdx >= 0) {
-            pendingPassIndex = passIdx;
-            endBtn.setEnabled(true);
-            endBtn.setText("Завершить ход");
-            Object remaining = d.context().get("remaining");
-            endHint.setText(remaining instanceof Number n
-                ? "доступно действий: " + n : " ");
-        } else {
-            endBtn.setEnabled(false);
-            endBtn.setText("Ход соперника…".equals(endBtn.getText()) || awaitingSeat != null
-                ? "Сначала решение слева" : endBtn.getText());
-            endHint.setText(" ");
-        }
 
-        decisionPanel.removeAll();
-        Map<String, Integer> hexToIndex = hexTargets(kind, options);
-        if (hexToIndex != null) {
-            JLabel hint = new JLabel("Выберите гекс на поле — подсвечены допустимые");
-            hint.setFont(Theme.font(12, Font.PLAIN));
-            hint.setForeground(Theme.ink2());
-            hint.setBorder(BorderFactory.createEmptyBorder(Theme.px(8), Theme.px(8), Theme.px(8), Theme.px(8)));
-            decisionPanel.add(hint);
-            field.setSelectable(hexToIndex.keySet(), hexId -> {
-                Integer idx = hexToIndex.get(hexId);
-                if (idx != null) {
-                    agent.submitIndex(idx);
-                    clearDecisionPanel();
-                }
-            });
-        } else {
+        hands.clearPickable();
+        field.clearSelectable();
+        prompt.hideAll();
+
+        if ("action".equals(kind)) {
+            Map<String, Integer> avail = new LinkedHashMap<>();
             for (int i = 0; i < options.size(); i++) {
-                Choice c = options.get(i);
-                if ("action".equals(kind) && i == passIdx) {
-                    continue; // пас хода живёт в большой кнопке справа
+                if (options.get(i).payload() instanceof String name) {
+                    avail.put(name, i);
                 }
-                String raw = c.label() == null || c.label().isEmpty()
-                    ? String.valueOf(c.payload()) : c.label();
-                String text = "action".equals(kind)
-                    ? ACTION_RU.getOrDefault(String.valueOf(c.payload()), raw) : raw;
-                JButton b = new JButton(text);
-                b.setFont(Theme.font(12, Font.PLAIN));
-                b.setForeground(Theme.ink());
-                b.setBackground(Theme.tile());
-                b.setAlignmentX(Component.LEFT_ALIGNMENT);
-                b.setFocusPainted(false);
-                b.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
-                b.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createMatteBorder(0, 0, Theme.px(1), 0, Theme.border()),
-                    BorderFactory.createEmptyBorder(Theme.px(6), Theme.px(8), Theme.px(6), Theme.px(8))));
-                int idx = i;
-                b.addActionListener(e -> {
-                    agent.submitIndex(idx);
-                    clearDecisionPanel();
+            }
+            actionBar.showDecision(avail, idx -> {
+                agent.submitIndex(idx);
+                clearDecision();
+            });
+            if (passIdx >= 0) {
+                int pi = passIdx;
+                endBtn.setTexts("Завершить ход",
+                    d.context().get("remaining") instanceof Number n
+                        ? "доступно действий: " + n : "");
+                endBtn.setState(KpButton.State.AVAILABLE);
+                endBtn.onClick(() -> {
+                    agent.submitIndex(pi);
+                    clearDecision();
                 });
-                decisionPanel.add(b);
+            }
+        } else {
+            actionBar.idle("не сейчас");
+            endBtn.setTexts("Сначала решение", KIND_LABELS.getOrDefault(kind, kind));
+            endBtn.setState(KpButton.State.DISABLED);
+
+            Map<String, Integer> hexToIndex = hexTargets(kind, options);
+            if (hexToIndex != null) {
+                prompt.showHint(seat, title, "Выберите гекс на поле — допустимые подсвечены");
+                field.setSelectable(hexToIndex.keySet(), hexId -> {
+                    Integer idx = hexToIndex.get(hexId);
+                    if (idx != null) {
+                        agent.submitIndex(idx);
+                        clearDecision();
+                    }
+                });
+            } else {
+                // Карты из руки — рука сама орган ввода; остальное — плашки.
+                Map<String, Integer> cardToOption = new LinkedHashMap<>();
+                List<PromptOverlay.Option> rest = new ArrayList<>();
+                for (int i = 0; i < options.size(); i++) {
+                    Choice c = options.get(i);
+                    int idx = i;
+                    if (c.payload() instanceof String id && inAnyHand(id)) {
+                        cardToOption.put(id, i);
+                    } else {
+                        String label = c.label() == null || c.label().isEmpty()
+                            ? String.valueOf(c.payload()) : c.label();
+                        rest.add(new PromptOverlay.Option(label, () -> {
+                            agent.submitIndex(idx);
+                            clearDecision();
+                        }));
+                    }
+                }
+                if (!cardToOption.isEmpty()) {
+                    hands.setPickable(cardToOption, (cardId, idx) -> {
+                        agent.submitIndex(idx);
+                        clearDecision();
+                    });
+                    prompt.showOptions(seat, title + " — карта в руке подсвечена", rest);
+                } else {
+                    prompt.showOptions(seat, title, rest);
+                }
             }
         }
-        decisionPanel.revalidate();
-        decisionPanel.repaint();
+        layoutPrompt();
         frame.toFront();
     }
 
-    /**
-     * Если у ВСЕХ опций точки решения извлекается id гекса — карта «гекс →
-     * номер опции» для клика по полю; иначе null (решение кнопками). Правило
-     * «всё или ничего»: придумывать вариант, которого движок не предлагал,
-     * нельзя.
-     */
+    private boolean inAnyHand(String id) {
+        if (rec == null || rec.frames.isEmpty()) {
+            return false;
+        }
+        ReplayRecord.Frame f = rec.frames.get(rec.frames.size() - 1);
+        if (f.snapshot == null || viewedSeat >= f.snapshot.players.size()) {
+            return false;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(viewedSeat);
+        return p.orderHand.contains(id) || p.objectiveHand.contains(id)
+            || p.arsenalHand.contains(id);
+    }
+
+    /** «Всё или ничего»: см. концепт §3, семья A. */
     Map<String, Integer> hexTargets(String kind, List<Choice> options) {
         Map<String, Integer> out = new LinkedHashMap<>();
         for (int i = 0; i < options.size(); i++) {
@@ -763,46 +836,15 @@ public final class HotSeatWindow {
         return null;
     }
 
-    private void clearDecisionPanel() {
-        decisionPanel.removeAll();
-        decisionPanel.revalidate();
-        decisionPanel.repaint();
+    private void clearDecision() {
+        prompt.hideAll();
         field.clearSelectable();
+        hands.clearPickable();
+        actionBar.idle("ход соперника");
         awaitingSeat = null;
-        pendingAgent = null;
-        pendingPassIndex = null;
-        endBtn.setEnabled(false);
-        endBtn.setText("Ход соперника…");
-        endHint.setText(" ");
-    }
-
-    // ==================== руки (этап 3 заменит на карточки) ====================
-
-    private void refreshHandPanel() {
-        if (rec == null || rec.frames.isEmpty()) {
-            return;
-        }
-        ReplayRecord.Frame f = rec.frames.get(rec.frames.size() - 1);
-        if (f.snapshot == null || viewedSeat >= f.snapshot.players.size()) {
-            return;
-        }
-        ReplayRecord.Player p = f.snapshot.players.get(viewedSeat);
-        StringBuilder sb = new StringBuilder();
-        sb.append("Игрок ").append(viewedSeat + 1).append(" — ")
-            .append(seatSpecs.get(viewedSeat)).append('\n');
-        appendHand(sb, "Приказы", p.orderHand);
-        appendHand(sb, "Задания", p.objectiveHand);
-        appendHand(sb, "Арсенал", p.arsenalHand);
-        handArea.setText(sb.toString());
-        handArea.setCaretPosition(0);
-    }
-
-    private void appendHand(StringBuilder sb, String title, List<String> ids) {
-        sb.append(title).append(" (").append(ids.size()).append("): ");
-        for (int i = 0; i < ids.size(); i++) {
-            sb.append(i > 0 ? " · " : "").append(cardName(ids.get(i)));
-        }
-        sb.append('\n');
+        endBtn.setTexts("Ход соперника…", "");
+        endBtn.setState(KpButton.State.DISABLED);
+        endBtn.onClick(null);
     }
 
     private String cardName(String id) {
