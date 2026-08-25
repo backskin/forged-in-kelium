@@ -749,7 +749,7 @@ public final class HotSeatWindow {
                 endBtn.setTexts("Сначала решение", KIND_LABELS.get(kind));
                 endBtn.setState(KpButton.State.DISABLED);
                 if (d.context().get("btype") instanceof String bt) {
-                    field.setGhost(kelium.report.Labels.buildingCode(bt), Theme.seat(seat));
+                    field.setGhost(bt, seat);
                 }
                 field.setFacingChoice(fhex, variants, idx -> {
                     agent.submitIndex(idx);
@@ -805,10 +805,9 @@ public final class HotSeatWindow {
                 boolean ghost = ("build_hex".equals(kind) || "move_hex".equals(kind))
                     && d.context().get("btype") instanceof String;
                 if (ghost) {
-                    field.setGhost(kelium.report.Labels.buildingCode(
-                        (String) d.context().get("btype")), Theme.seat(seat));
+                    field.setGhost((String) d.context().get("btype"), seat);
                     prompt.showHint(seat, title,
-                        "Призрак следует за курсором · клик по подсвеченному гексу — поставить");
+                        "Здание встаёт под курсор — наведись на сектор, клик по подсвеченному гексу ставит");
                 } else {
                     prompt.showHint(seat, title, "Выберите гекс на поле — допустимые подсвечены");
                 }

@@ -100,12 +100,17 @@ public final class FieldView extends JComponent {
     String hoverHexId;
 
     /**
-     * ПРИЗРАК ЗДАНИЯ (концепт §4): при выборе гекса стройки/переноса за
-     * курсором ездит полупрозрачный силуэт с кодом здания. На допустимом
-     * гексе — цветом игрока, на недопустимом — красным «нельзя».
+     * ПРИЗРАК ЗДАНИЯ (концепт §4, уточнение дизайнера 24.08): НАСТОЯЩИЙ силуэт
+     * жетона ({@link FieldGeometry#buildingByCode}), рисуется тем же вызовом,
+     * что живые здания, и ПОВОРАЧИВАЕТСЯ вслед за сектором под курсором —
+     * игрок водит мышкой и сразу видит, как здание встанет. На недопустимом
+     * гексе — красный.
      */
-    String ghostLabel;
-    private java.awt.Color ghostColor;
+    String ghostType;
+    private int ghostSeat;
+    private int ghostFootprint = 1;
+    /** Последняя позиция курсора (экранные координаты) — для поворота призрака. */
+    private Point lastMouse;
 
     /**
      * ВЫБОР ДУГИ СЕКТОРОВ ({@code build_facing}): движок предложил варианты
@@ -177,16 +182,27 @@ public final class FieldView extends JComponent {
 
             @Override
             public void mouseMoved(java.awt.event.MouseEvent e) {
+                lastMouse = e.getPoint();
                 String id = hexIdAt(e.getPoint());
                 boolean selectable = id != null && selectableHexIds.contains(id)
                     || facingVariants != null && id != null && id.equals(facingHexId);
                 setCursor(selectable ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
+                boolean liveGhost = ghostType != null || facingVariants != null;
+                if (facingVariants != null && facingHexId != null
+                        && facingHexId.equals(id)) {
+                    // Наведение на сектор гекса ВЫБИРАЕТ вариант дуги: здание
+                    // «встаёт под мышку» без колеса и без плашек.
+                    int v = variantAtCursor(e.getPoint());
+                    if (v >= 0 && v != facingSelected) {
+                        facingSelected = v;
+                    }
+                }
                 if (!java.util.Objects.equals(id, hoverHexId)) {
                     hoverHexId = id;
-                    if (!selectableHexIds.isEmpty() || ghostLabel != null) {
-                        repaint();
-                    }
+                }
+                if (liveGhost || !selectableHexIds.isEmpty()) {
+                    repaint();
                 }
             }
         };
@@ -304,17 +320,102 @@ public final class FieldView extends JComponent {
         setSelectable(java.util.Set.of(), null);
     }
 
-    /** Включить призрак здания: {@code label} — код («Эн-1»), цвет — игрока. */
-    public void setGhost(String label, java.awt.Color color) {
-        this.ghostLabel = label;
-        this.ghostColor = color;
+    /** Включить призрак здания: настоящий силуэт {@code typeCode} цвета места. */
+    public void setGhost(String typeCode, int seat) {
+        this.ghostType = typeCode;
+        this.ghostSeat = seat;
+        int fp = 1;
+        try {
+            fp = Placement.footprint(kelium.core.BuildingType.fromCode(typeCode));
+        } catch (RuntimeException ignore) {
+            // неизвестный код — призрак в одну сторону, хуже не станет
+        }
+        this.ghostFootprint = Math.max(1, fp);
         repaint();
     }
 
     public void clearGhost() {
-        this.ghostLabel = null;
-        this.ghostColor = null;
+        this.ghostType = null;
         repaint();
+    }
+
+    /** Мировая точка (координаты поля) под экранной, либо null. */
+    private java.awt.geom.Point2D worldPoint(Point screen) {
+        try {
+            AffineTransform at = new AffineTransform();
+            at.translate(panX, panY);
+            at.scale(zoom, zoom);
+            return at.createInverse().transform(screen, null);
+        } catch (java.awt.geom.NoninvertibleTransformException e) {
+            return null;
+        }
+    }
+
+    /** Ближайшая к экранной точке сторона гекса {@code (cx,cy)} (0..5). */
+    private int nearestSide(double cx, double cy, Point screen) {
+        java.awt.geom.Point2D w = screen == null ? null : worldPoint(screen);
+        if (w == null) {
+            return 0;
+        }
+        double ang = Math.toDegrees(Math.atan2(w.getY() - cy, w.getX() - cx));
+        int best = 0;
+        double bestD = Double.MAX_VALUE;
+        for (int s = 0; s < 6; s++) {
+            double d = Math.abs(angleDiff(ang, FieldGeometry.edgeAngle(s)));
+            if (d < bestD) {
+                bestD = d;
+                best = s;
+            }
+        }
+        return best;
+    }
+
+    private static double angleDiff(double a, double b) {
+        double d = (a - b) % 360;
+        if (d > 180) {
+            d -= 360;
+        }
+        if (d < -180) {
+            d += 360;
+        }
+        return d;
+    }
+
+    /** Вариант дуги, лучше всего отвечающий сектору под курсором (−1 — нет). */
+    private int variantAtCursor(Point screen) {
+        if (facingVariants == null || facingHexId == null || record == null) {
+            return -1;
+        }
+        Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo h : record.hexes) {
+            info.put(h.id, h);
+        }
+        double[] c = center(info, facingHexId);
+        if (c == null) {
+            return -1;
+        }
+        java.awt.geom.Point2D w = worldPoint(screen);
+        if (w == null) {
+            return -1;
+        }
+        double ang = Math.toDegrees(Math.atan2(w.getY() - c[1], w.getX() - c[0]));
+        int side = nearestSide(c[0], c[1], screen);
+        int best = -1;
+        double bestD = Double.MAX_VALUE;
+        for (int i = 0; i < facingVariants.size(); i++) {
+            java.util.List<Integer> v = facingVariants.get(i);
+            double d = Math.abs(angleDiff(ang, FieldGeometry.meanEdgeAngle(v)));
+            // вариант, СОДЕРЖАЩИЙ сектор под курсором, всегда предпочтительнее
+            // просто ближайшего по среднему углу
+            if (v.contains(side)) {
+                d -= 1000;
+            }
+            if (d < bestD) {
+                bestD = d;
+                best = i;
+            }
+        }
+        return best;
     }
 
     /**
@@ -765,7 +866,7 @@ public final class FieldView extends JComponent {
         if (facingVariants != null && facingHexId != null) {
             drawFacing(g);
         }
-        if (ghostLabel != null) {
+        if (ghostType != null) {
             drawGhost(g);
         }
     }
@@ -819,14 +920,20 @@ public final class FieldView extends JComponent {
             mx + ux * half, my + uy * half));
     }
 
+    /** Прижатие жетона к кромке — ТО ЖЕ, что у FieldPainter.EDGE_SHIFT. */
+    private static final double GHOST_EDGE_SHIFT = 0.052;
+
     /**
-     * ПРИЗРАК ЗДАНИЯ на гексе под курсором (в режиме дуги — на гексе стройки):
-     * полупрозрачный четырёхугольник с кодом здания; на недопустимом гексе —
-     * красный с подписью «нельзя».
+     * ПРИЗРАК ЗДАНИЯ — настоящий силуэт жетона, рисуется тем же вызовом
+     * ({@code canvas.shape} + {@code buildingByCode}/{@code seatScale}/{@code
+     * meanEdgeAngle}), что и живые здания в {@code FieldPainter.paintBuilding},
+     * поэтому встаёт В ТОЧНОСТИ так, как встанет настоящий жетон: та же дуга,
+     * тот же поворот, то же прижатие к кромке. Дуга следует за сектором под
+     * курсором; в режиме {@code build_facing} — за выбранным вариантом движка.
      */
     private void drawGhost(Graphics2D g) {
         String hexId = facingHexId != null ? facingHexId : hoverHexId;
-        if (hexId == null) {
+        if (hexId == null || record == null) {
             return;
         }
         boolean legal = facingHexId != null || selectableHexIds.contains(hexId);
@@ -838,28 +945,43 @@ public final class FieldView extends JComponent {
         if (c == null) {
             return;
         }
-        Color base = legal && ghostColor != null ? ghostColor
-            : kelium.gui.replay2.Theme.bad();
-        double w = BASE * 0.86;
-        double h = BASE * 0.5;
-        double skew = BASE * 0.14;
-        Path2D q = new Path2D.Double();
-        q.moveTo(c[0] - w / 2 + skew, c[1] - h / 2);
-        q.lineTo(c[0] + w / 2 + skew, c[1] - h / 2);
-        q.lineTo(c[0] + w / 2 - skew, c[1] + h / 2);
-        q.lineTo(c[0] - w / 2 - skew, c[1] + h / 2);
-        q.closePath();
-        g.setColor(withAlpha(base, 105));
-        g.fill(q);
-        g.setColor(withAlpha(base, 220));
-        g.setStroke(penDashed(2.0, 5, 4));
-        g.draw(q);
-        g.setFont(getFont().deriveFont(Font.BOLD, (float) (BASE * 0.30)));
-        g.setColor(withAlpha(Color.WHITE, 235));
-        String text = legal ? ghostLabel : "нельзя";
-        var fm = g.getFontMetrics();
-        g.drawString(text, (float) (c[0] - fm.stringWidth(text) / 2.0),
-            (float) (c[1] + fm.getAscent() / 2.0 - 2));
+
+        List<Integer> sides;
+        if (facingVariants != null && !facingVariants.isEmpty()) {
+            sides = facingVariants.get(Math.min(facingSelected, facingVariants.size() - 1));
+        } else {
+            // дуга из fp смежных секторов, ЦЕНТРИРОВАННАЯ на сектор под курсором
+            int near = nearestSide(c[0], c[1], lastMouse);
+            sides = new ArrayList<>();
+            int start = near - (ghostFootprint - 1) / 2;
+            for (int k = 0; k < ghostFootprint; k++) {
+                sides.add(Math.floorMod(start + k, 6));
+            }
+        }
+        double face = FieldGeometry.meanEdgeAngle(sides);
+        double[] pos = FieldGeometry.polar(c[0], c[1], BASE * GHOST_EDGE_SHIFT, face);
+        FieldGeometry.Shape sh;
+        try {
+            sh = FieldGeometry.buildingByCode(ghostType);
+        } catch (RuntimeException unknown) {
+            return;
+        }
+        String fill = legal ? FieldGeometry.SEAT_TOKEN[ghostSeat % 4] : "#E5584F";
+        String stroke = legal ? FieldGeometry.SEAT_STROKE[ghostSeat % 4] : "#7A1F1A";
+        kelium.report.Java2DCanvas canvas =
+            new kelium.report.Java2DCanvas(g, zoom, getFont());
+        canvas.alpha(0.55);
+        canvas.shape(sh, pos[0], pos[1], face - sh.outward(),
+            FieldGeometry.seatScale(sh, BASE), sh.hexCx(), sh.hexCy(),
+            fill, stroke, 1.6);
+        canvas.alpha(1);
+        if (!legal) {
+            g.setFont(getFont().deriveFont(Font.BOLD, (float) (BASE * 0.26)));
+            g.setColor(withAlpha(Color.WHITE, 240));
+            var fm = g.getFontMetrics();
+            g.drawString("нельзя", (float) (c[0] - fm.stringWidth("нельзя") / 2.0),
+                (float) (c[1] + fm.getAscent() / 2.0 - 2));
+        }
     }
 
     /**
@@ -1003,7 +1125,7 @@ public final class FieldView extends JComponent {
     }
 
     /** Гекс под экранной точкой (та же проекция, что рисование), либо null. */
-    private String hexIdAt(Point screenPoint) {
+    String hexIdAt(Point screenPoint) {
         ReplayRecord.HexInfo hi = hexInfoAt(screenPoint);
         return hi == null ? null : hi.id;
     }
