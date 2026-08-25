@@ -1,0 +1,766 @@
+<title>Командный пункт</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tektur:wdth,wght@75..100,400..900&display=swap">
+<style>
+  /* Палитра — дословно из Theme.java (тёмная тема приложения). Страница
+     сознательно одно-темная: это макет игрового HUD, он тёмный по решению
+     дизайн-системы проекта. */
+  :root{
+    --page:#0E1014;          /* подложка страницы, темнее фона приложения */
+    --bg:#14171C;            /* фон приложения */
+    --panel:#1B1F26;
+    --tile:#232830;
+    --hover:#2A313B;
+    --border:#2E353F;
+    --divider:#3A424E;
+    --ink:#ECEFF4;
+    --ink2:#A8B1BF;
+    --ink3:#6F7986;
+    --paper:#1F242B;         /* подложка поля */
+    --accent:#4C9BE8;
+    --kelium:#6BC26F;
+    --energy:#FFCE3D;
+    --damage:#E5584F;
+    --points:#E8B84B;
+    --container:#BFA779;
+    --neutral:#8B93A0;
+    --seat1:#3B82D0; --seat1s:#2B6CB0;
+    --seat2:#E07038; --seat2s:#C05621;
+    --seat3:#3F9E60; --seat3s:#2F855A;
+    --seat4:#B04A96; --seat4s:#97266D;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--page);
+    color:var(--ink);
+    font-family:'Tektur','Bahnschrift','Segoe UI',system-ui,sans-serif;
+    font-stretch:87.5%;
+    line-height:1.45;
+    padding:0 0 96px;
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+
+  /* ==================== шапка ==================== */
+  header.hero{padding:64px 0 40px;border-bottom:1px solid var(--border)}
+  .kicker{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink3);font-weight:600}
+  h1{font-size:52px;font-weight:800;letter-spacing:.01em;margin:10px 0 14px;text-wrap:balance}
+  h1 .accent{color:var(--accent)}
+  .lede{max-width:62ch;color:var(--ink2);font-size:16px}
+  .lede b{color:var(--ink);font-weight:600}
+  .status{display:inline-flex;gap:8px;align-items:center;margin-top:18px;
+    background:var(--panel);border:1px solid var(--border);border-radius:6px;
+    padding:8px 14px;font-size:13px;color:var(--ink2)}
+  .status .dot{width:8px;height:8px;border-radius:50%;background:var(--energy)}
+
+  /* принципы */
+  .principles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:36px 0 0}
+  .pr{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+  .pr h3{font-size:13.5px;font-weight:700;margin-bottom:4px}
+  .pr p{font-size:12.5px;color:var(--ink2)}
+  @media(max-width:900px){.principles{grid-template-columns:1fr}}
+
+  /* ==================== секции-экраны ==================== */
+  section.screen{padding:56px 0 8px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .sec-num{font-size:13px;color:var(--accent);font-weight:700;letter-spacing:.12em}
+  h2{font-size:28px;font-weight:800}
+  .sec-sub{color:var(--ink2);font-size:14px;max-width:74ch;margin-bottom:20px}
+
+  /* рамка «монитора» */
+  .frame{background:var(--bg);border:1px solid var(--divider);border-radius:10px;
+    overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,.5)}
+  .frame-note{font-size:11.5px;color:var(--ink3);margin-top:8px}
+
+  /* --------------- общий HUD-каркас --------------- */
+  .hud{display:grid;grid-template-rows:auto 1fr auto;height:640px}
+  .topbar{display:flex;align-items:center;gap:18px;background:var(--panel);
+    border-bottom:2px solid var(--border);padding:8px 14px;font-size:13px}
+  .topbar .round{color:var(--ink2)}
+  .turn-owner{font-weight:800;font-size:15px;letter-spacing:.04em}
+  .res{display:flex;gap:8px;margin-left:auto;align-items:center}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--tile);
+    border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:12.5px;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .chip .sw{width:9px;height:9px;border-radius:2px;flex:none}
+  .chip small{color:var(--ink3);font-size:10.5px}
+
+  .mid{display:grid;grid-template-columns:44px 1fr 252px;min-height:0}
+
+  /* левые корешки-ящики */
+  .drawers{background:var(--panel);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;gap:6px;padding:10px 6px}
+  .drawer-tab{writing-mode:vertical-rl;transform:rotate(180deg);
+    background:var(--tile);border:1px solid var(--border);border-radius:5px;
+    color:var(--ink2);font-size:11.5px;padding:10px 6px;text-align:center;
+    letter-spacing:.08em;cursor:pointer}
+  .drawer-tab:hover{background:var(--hover);color:var(--ink)}
+
+  /* поле */
+  .fieldbox{background:var(--paper);position:relative;min-height:0;overflow:hidden}
+  .fieldbox svg{width:100%;height:100%;display:block}
+
+  /* правая колонка */
+  .rail{background:var(--panel);border-left:1px solid var(--border);
+    display:flex;flex-direction:column;min-height:0}
+  .rail h4{font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink3);padding:12px 12px 6px}
+  .steps{display:flex;flex-direction:column;gap:6px;padding:0 10px}
+  .step{display:flex;align-items:center;gap:8px;background:var(--tile);
+    border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12.5px}
+  .step .n{color:var(--ink3);font-size:11px;font-variant-numeric:tabular-nums}
+  .step.locked{color:var(--ink3)}
+  .step.locked .lock{margin-left:auto;font-size:11px;color:var(--ink3)}
+  .step.done{border-color:var(--divider)}
+  .step.done .undo-to{margin-left:auto;color:var(--accent);font-size:11px;cursor:pointer}
+  .step.current{border:1px dashed var(--accent);color:var(--ink)}
+  .step.current .spin{margin-left:auto;color:var(--accent);font-size:11px}
+  .feed{flex:1;overflow:auto;margin-top:10px;border-top:1px solid var(--border);
+    padding:8px 10px;display:flex;flex-direction:column;gap:5px}
+  .ev{display:flex;gap:8px;align-items:baseline;font-size:12px;color:var(--ink2)}
+  .ev .dot{width:8px;height:8px;border-radius:50%;flex:none;position:relative;top:1px}
+  .ev.hl{color:var(--ink)}
+
+  /* нижняя зона */
+  .bottom{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:end;
+    background:var(--panel);border-top:1px solid var(--border);padding:10px 14px}
+  .hands{display:flex;gap:16px;align-items:flex-end}
+  .hand-group{display:flex;flex-direction:column;gap:5px}
+  .hand-group .cap{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+  .cards{display:flex;gap:5px}
+  .card{width:44px;height:62px;border-radius:5px;background:var(--tile);
+    border:1px solid var(--divider);border-top:3px solid var(--ink3);
+    font-size:9px;color:var(--ink2);padding:4px;cursor:pointer;position:relative}
+  .card:hover{background:var(--hover)}
+  .card.order{border-top-color:var(--seat1)}
+  .card.obj{border-top-color:var(--points)}
+  .card.ars{border-top-color:var(--container)}
+  .card.zoomed{position:absolute;bottom:74px;left:-30px;width:150px;height:210px;
+    z-index:5;background:var(--tile);border:1px solid var(--accent);
+    box-shadow:0 14px 40px rgba(0,0,0,.6);font-size:11.5px;color:var(--ink);
+    padding:10px;border-radius:8px}
+  .card.zoomed .t{font-weight:700;margin-bottom:6px}
+  .card.zoomed .d{color:var(--ink2);font-size:10.5px}
+  .card.zoomed .pr-line{margin-top:8px;color:var(--kelium);font-size:10.5px}
+
+  .actions{display:flex;flex-direction:column;gap:6px}
+  .actions .cap{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+  .act-grid{display:grid;grid-template-columns:repeat(4,92px);gap:6px}
+  .act{background:var(--tile);border:1px solid var(--border);border-radius:6px;
+    padding:7px 6px 6px;font-size:12px;text-align:center;cursor:pointer}
+  .act small{display:block;font-size:9.5px;color:var(--ink3);margin-top:2px}
+  .act:hover{background:var(--hover);border-color:var(--accent)}
+  .act.off{color:var(--ink3);cursor:default;border-style:dashed}
+  .act.off:hover{background:var(--tile);border-color:var(--border)}
+  .act.active{border-color:var(--accent);background:var(--hover);color:var(--ink)}
+  .spec-row{display:flex;gap:6px}
+  .spec{font-size:11px;background:var(--tile);border:1px solid var(--border);
+    border-radius:5px;padding:4px 9px;color:var(--ink2);cursor:pointer}
+  .spec:hover{color:var(--ink);border-color:var(--accent)}
+
+  .endturn{display:flex;flex-direction:column;gap:4px;align-items:stretch}
+  .end-btn{background:var(--accent);color:#0d1420;font-weight:800;font-size:14px;
+    border:none;border-radius:8px;padding:16px 22px;cursor:pointer;font-family:inherit;
+    font-stretch:inherit}
+  .end-btn small{display:block;font-weight:600;font-size:10.5px;opacity:.75}
+  .end-btn.waiting{background:var(--tile);color:var(--ink2);border:1px solid var(--border)}
+
+  /* пины-метки */
+  .pin{position:absolute;z-index:9;width:22px;height:22px;border-radius:50%;
+    background:var(--accent);color:#0d1420;font-size:12px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px rgba(76,155,232,.28)}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:8px 26px;margin:16px 0 0}
+  .leg{display:flex;gap:10px;font-size:13px;color:var(--ink2);align-items:baseline}
+  .leg .pn{flex:none;width:20px;height:20px;border-radius:50%;background:var(--accent);
+    color:#0d1420;font-size:11.5px;font-weight:800;display:inline-flex;
+    align-items:center;justify-content:center;position:relative;top:3px}
+  .leg b{color:var(--ink);font-weight:700}
+  .kind{font-family:ui-monospace,Consolas,monospace;font-size:10.5px;color:var(--accent);
+    background:rgba(76,155,232,.12);border-radius:4px;padding:1px 5px;white-space:nowrap}
+  @media(max-width:900px){.legend{grid-template-columns:1fr}}
+
+  /* --------------- экран 3: подтверждение --------------- */
+  .confirm{position:absolute;right:18px;top:70px;width:290px;z-index:8;
+    background:var(--panel);border:1px solid var(--damage);border-radius:10px;
+    padding:14px;box-shadow:0 20px 50px rgba(0,0,0,.65)}
+  .confirm h5{font-size:14px;font-weight:800;margin-bottom:8px}
+  .confirm .prev{background:var(--tile);border:1px solid var(--border);border-radius:6px;
+    padding:8px 10px;font-size:12px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+  .confirm .prev b{color:var(--ink)}
+  .confirm .warn{font-size:11.5px;color:var(--damage);margin:10px 0}
+  .confirm .btns{display:flex;gap:8px}
+  .btn-danger{flex:1;background:var(--damage);border:none;color:#1a0e0d;font-weight:800;
+    border-radius:6px;padding:9px;font-size:12.5px;cursor:pointer;font-family:inherit;font-stretch:inherit}
+  .btn-ghost{background:var(--tile);border:1px solid var(--border);color:var(--ink2);
+    border-radius:6px;padding:9px 14px;font-size:12.5px;cursor:pointer;font-family:inherit;font-stretch:inherit}
+
+  /* стройка: панель контекста */
+  .buildctx{position:absolute;left:18px;bottom:16px;z-index:8;display:flex;gap:8px;align-items:center}
+  .bc-chip{background:var(--panel);border:1px solid var(--border);border-radius:6px;
+    padding:7px 11px;font-size:12px;color:var(--ink2)}
+  .bc-chip b{color:var(--ink)}
+  .bc-chip.good{border-color:var(--kelium);color:var(--kelium)}
+  .bc-cancel{background:var(--tile);border:1px dashed var(--accent);color:var(--accent);
+    border-radius:6px;padding:7px 11px;font-size:12px;cursor:pointer}
+
+  /* экран 4 */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:900px){.duo{grid-template-columns:1fr}}
+  .hud-half{display:grid;grid-template-rows:auto 1fr;height:430px}
+  .botbar{display:flex;align-items:center;gap:10px;background:var(--panel);
+    border-bottom:2px solid var(--seat2);padding:8px 12px;font-size:13px}
+  .botbar .who{color:var(--seat2);font-weight:800}
+  .skip{margin-left:auto;background:var(--tile);border:1px solid var(--border);
+    color:var(--ink2);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer}
+  .skip:hover{color:var(--ink);border-color:var(--accent)}
+  .curtain{position:relative;background:var(--bg);display:flex;align-items:center;
+    justify-content:center;height:430px}
+  .curtain-inner{text-align:center;max-width:340px}
+  .curtain .pass{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3)}
+  .curtain .who2{font-size:32px;font-weight:800;color:var(--seat2);margin:8px 0 2px}
+  .curtain .clr{font-size:13px;color:var(--ink2);margin-bottom:18px}
+  .resume{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    text-align:left;padding:12px 14px;margin-bottom:18px}
+  .resume .cap{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px}
+  .resume ul{list-style:none;font-size:12.5px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+  .resume li b{color:var(--ink)}
+  .iam{background:var(--seat2);border:none;color:#1c0f06;font-weight:800;font-size:15px;
+    border-radius:8px;padding:14px 30px;cursor:pointer;font-family:inherit;font-stretch:inherit}
+
+  /* сводная таблица */
+  .map-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+  .map-table th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);
+    text-align:left;padding:8px 12px;border-bottom:1px solid var(--divider)}
+  .map-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--ink2);vertical-align:top}
+  .map-table td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
+  .tblwrap{overflow-x:auto}
+
+  footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--border);
+    font-size:12.5px;color:var(--ink3);max-width:70ch}
+  a{color:var(--accent)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media(prefers-reduced-motion:no-preference){
+    .pulse{animation:pulse 1.6s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.35}50%{opacity:.9}}
+  }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">Кристаллы Раздора · цифровая версия · концепт интерфейса</div>
+  <h1>Командный <span class="accent">пункт</span></h1>
+  <p class="lede">Экран живой партии для hot-seat и (позже) сети. Поле — всегда в центре и никогда
+  не прячется; всё остальное — панели вокруг него. Каждый элемент управления на этих макетах
+  привязан к настоящей точке решения движка (моно-теги вида <span class="kind">build_hex</span>) —
+  здесь нет ни одной кнопки, под которой не было бы готового кода движка.</p>
+  <div class="status"><span class="dot"></span>Концепт на утверждение — код не пишется, пока макеты не согласованы</div>
+
+  <div class="principles">
+    <div class="pr"><h3>Поле — якорь</h3><p>Центр экрана всегда занят полем. Наука, рынок, чужие планшеты — выезжающие панели поверх, не вкладки и не отдельные экраны.</p></div>
+    <div class="pr"><h3>Обратимое — мгновенно, необратимое — через крупное «да»</h3><p>Стройка/добыча/манёвр/энергия/сборка играются без подтверждений и откатываются по клику. Бой и рынок — одно крупное подтверждение с предпросмотром последствий.</p></div>
+    <div class="pr"><h3>Всё в один клик</h3><p>Любой факт партии — не дальше одного клика или наведения: полный текст карты по hover, слагаемые счётчика в подсказке, чужой планшет в ящике.</p></div>
+    <div class="pr"><h3>Выбираешь на поле, а не в списке</h3><p>Гекс, сектор, цель атаки — кликом по самому полю с подсветкой легального. Кнопки остаются только для именованных вариантов (действия, треки, ставки).</p></div>
+    <div class="pr"><h3>Ничего не телепортируется</h3><p>Чужой ход проигрывается шаг за шагом с подсветкой места события и кнопкой «пропустить». Каждое событие дублируется строкой в ленте.</p></div>
+    <div class="pr"><h3>Честный экран</h3><p>Скрытая информация чужих мест не попадает на экран никогда. Между людьми — шторка передачи устройства с явным подтверждением «это я».</p></div>
+  </div>
+</header>
+
+<!-- ==================== ЭКРАН 1 ==================== -->
+<section class="screen" id="s1">
+  <div class="sec-head"><span class="sec-num">ЭКРАН 1</span><h2>Свой ход — главный экран</h2></div>
+  <p class="sec-sub">Игрок 1 (синий) в середине хода: приказ вскрыт, стройка и добыча сделаны,
+  движок ждёт выбора следующего действия. Поле по центру рисует существующий FieldView —
+  здесь оно показано условной схемой.</p>
+
+  <div class="frame">
+    <div class="hud">
+      <div class="topbar">
+        <span class="round">Раунд 3 · круг 2</span>
+        <span class="turn-owner" style="color:var(--seat1)">ВАШ ХОД — Игрок 1</span>
+        <div class="res">
+          <span class="chip"><span class="sw" style="background:var(--points)"></span>7 <small>ПО</small></span>
+          <span class="chip"><span class="sw" style="background:#c9a35a"></span>6 <small>монет</small></span>
+          <span class="chip"><span class="sw" style="background:var(--kelium)"></span>2/4 <small>келемий</small></span>
+          <span class="chip"><span class="sw" style="background:var(--energy)"></span>1 <small>БП</small></span>
+          <span class="chip"><span class="sw" style="background:#3A3D42"></span>0/3 <small>обломки</small></span>
+        </div>
+      </div>
+      <div class="mid">
+        <div class="drawers">
+          <div class="drawer-tab">Наука</div>
+          <div class="drawer-tab">Рынок</div>
+          <div class="drawer-tab">Игроки</div>
+          <div class="drawer-tab">Планшет</div>
+          <div class="drawer-tab">Журнал</div>
+        </div>
+        <div class="fieldbox" style="position:relative">
+          <svg id="f1" viewBox="0 0 760 520" role="img" aria-label="Схема игрового поля"></svg>
+          <div class="pin" style="left:12px;top:12px">1</div>
+        </div>
+        <div class="rail" style="position:relative">
+          <div class="pin" style="left:-11px;top:8px">2</div>
+          <h4>Шаги этого хода</h4>
+          <div class="steps">
+            <div class="step locked"><span class="n">1</span> Приказ: Лиса · ИНФРА/РАЗР <span class="lock">🔒</span></div>
+            <div class="step done"><span class="n">2</span> Стройка: добытчик L1 <span class="undo-to">⟲ сюда</span></div>
+            <div class="step done"><span class="n">3</span> Добыча: +2 келемия <span class="undo-to">⟲ сюда</span></div>
+            <div class="step current"><span class="n">4</span> Выбор действия… <span class="spin">1 из 3 осталось</span></div>
+          </div>
+          <h4 style="margin-top:6px">Лента партии</h4>
+          <div class="feed">
+            <div class="ev hl"><span class="dot" style="background:var(--seat1)"></span>Вы добыли 2 келемия (h1_2)</div>
+            <div class="ev"><span class="dot" style="background:var(--seat1)"></span>Вы построили добытчик L1 → h2_1</div>
+            <div class="ev"><span class="dot" style="background:var(--seat2)"></span>Игрок 2 занял ячейку рынка</div>
+            <div class="ev"><span class="dot" style="background:var(--seat2)"></span>Игрок 2 продвинулся: наука, красный трек</div>
+            <div class="ev"><span class="dot" style="background:var(--seat1)"></span>Вы вскрыли приказ «Лиса»</div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom" style="position:relative">
+        <div class="pin" style="left:8px;top:-11px">3</div>
+        <div class="hands">
+          <div class="hand-group">
+            <span class="cap">Приказы · 3</span>
+            <div class="cards">
+              <div class="card order">Лиса<br>ПРИОБР</div>
+              <div class="card order" style="position:relative">
+                Лиса<br>ОПЕР
+                <div class="card zoomed">
+                  <div class="t">Лиса — ОПЕРАЦИЯ / ОПЕРАЦИЯ</div>
+                  <div class="d">Два действия Операции этим ходом. Блокировка: келемий.</div>
+                  <div class="pr-line">Наведение — полная карта. Клик в фазе вскрытия — сыграть.</div>
+                </div>
+              </div>
+              <div class="card order">БЕЗОП<br>дж. 2</div>
+            </div>
+          </div>
+          <div class="hand-group">
+            <span class="cap">Задания · 2</span>
+            <div class="cards">
+              <div class="card obj">Засада<br><small style="color:var(--kelium)">2/3</small></div>
+              <div class="card obj">Отгрузка<br><small style="color:var(--ink3)">0/4</small></div>
+            </div>
+          </div>
+          <div class="hand-group">
+            <span class="cap">Арсенал · 1</span>
+            <div class="cards"><div class="card ars">Марод.</div></div>
+          </div>
+        </div>
+        <div class="actions" style="position:relative">
+          <div class="pin" style="left:-4px;top:-11px">4</div>
+          <span class="cap">Действия хода</span>
+          <div class="act-grid">
+            <div class="act active">Стройка<small>сыграно ✓</small></div>
+            <div class="act">Добыча<small>сыграно ✓</small></div>
+            <div class="act">Манёвр<small>доступно</small></div>
+            <div class="act off">Бой<small>нет БП в зоне</small></div>
+            <div class="act">Рынок<small>доступно</small></div>
+            <div class="act">Наука<small>доступно</small></div>
+            <div class="act off">Сборка<small>нет зданий</small></div>
+            <div class="act">Энергия<small>доступно</small></div>
+          </div>
+          <div class="spec-row">
+            <span class="cap" style="align-self:center">СПЕЦ:</span>
+            <span class="spec">Сдать задание</span>
+            <span class="spec">Установить арсенал</span>
+            <span class="spec">Вскрыть контейнер</span>
+          </div>
+        </div>
+        <div class="endturn" style="position:relative">
+          <div class="pin" style="right:-6px;top:-11px;left:auto">5</div>
+          <button class="end-btn">Завершить ход<small>останется 1 действие и СПЕЦ</small></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="frame-note">Поле — условная схема; в приложении его рисует существующий FieldView со всеми авторскими силуэтами.</p>
+
+  <div class="legend">
+    <div class="leg"><span class="pn">1</span><span><b>Поле.</b> Всегда видно, зум колесом, перетаскивание мышью. Пунктирная рамка — гексы активного игрока. Наведение на гекс — плашка с содержимым секторов. <span class="kind">FieldView</span></span></div>
+    <div class="leg"><span class="pn">2</span><span><b>Шаги хода.</b> Каждое сыгранное действие — строка. Клик «⟲ сюда» откатывает к этой точке (стек снимков уже в движке). Замок — необратимое: приказ, бой, рынок. Ниже — лента всей партии.</span></div>
+    <div class="leg"><span class="pn">3</span><span><b>Три руки.</b> Миниатюры карт, при наведении — полная карта (как в макете над «Лиса ОПЕР»). У заданий прямо на миниатюре прогресс 2/3. В фазах выбора карты рука сама становится кликабельной. <span class="kind">tuck</span> <span class="kind">reveal_order</span></span></div>
+    <div class="leg"><span class="pn">4</span><span><b>Панель действий.</b> Все 8 действий всегда видны; недоступные — серые с причиной. Клик по доступному запускает действие. Под ними СПЕЦ-действия. <span class="kind">action</span> <span class="kind">spec_*</span></span></div>
+    <div class="leg"><span class="pn">5</span><span><b>Завершить ход.</b> Показывает остаток; если остались обязательные решения — говорит какие, а не молча блокируется. Это и есть <span class="kind">pass</span> верхнего меню.</span></div>
+  </div>
+</section>
+
+<!-- ==================== ЭКРАН 2 ==================== -->
+<section class="screen" id="s2">
+  <div class="sec-head"><span class="sec-num">ЭКРАН 2</span><h2>Стройка — призрак и секторы</h2></div>
+  <p class="sec-sub">Игрок выбрал «Энергостанция L1» из меню стройки. За курсором ездит
+  полупрозрачный призрак; легальные гексы обведены, у гекса под курсором раскрашены СЕКТОРЫ:
+  зелёные — дуга встанет, красный — сектор занят. Колесо мыши вращает дугу по гексу.</p>
+
+  <div class="frame">
+    <div class="hud" style="grid-template-rows:auto 1fr">
+      <div class="topbar">
+        <span class="round">Раунд 3 · круг 2</span>
+        <span class="turn-owner" style="color:var(--seat1)">СТРОЙКА — выберите место</span>
+        <div class="res"><span class="chip">цена: <b style="color:#c9a35a">2 монеты</b></span></div>
+      </div>
+      <div class="mid" style="grid-template-columns:44px 1fr">
+        <div class="drawers">
+          <div class="drawer-tab">Наука</div>
+          <div class="drawer-tab">Рынок</div>
+          <div class="drawer-tab">Игроки</div>
+        </div>
+        <div class="fieldbox" style="position:relative">
+          <svg id="f2" viewBox="0 0 760 560" role="img" aria-label="Режим размещения здания"></svg>
+          <div class="pin" style="left:290px;top:150px">1</div>
+          <div class="pin" style="left:512px;top:250px">2</div>
+          <div class="buildctx">
+            <span class="bc-chip"><b>Энергостанция L1</b> · дуга 2 сектора</span>
+            <span class="bc-chip">колесо мыши — повернуть дугу</span>
+            <span class="bc-chip good">стенкой к жиле: добыча рядом</span>
+            <span class="bc-cancel">Esc — отменить стройку</span>
+          </div>
+          <div class="pin" style="left:12px;bottom:64px;top:auto">3</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="leg"><span class="pn">1</span><span><b>Легальные гексы</b> обведены цветом акцента (список даёт движок — на клиенте ничего не пересчитывается). Нелегальный гекс под курсором показывает призрак серо-красным и причину: «сектора заняты». <span class="kind">build_hex</span></span></div>
+    <div class="leg"><span class="pn">2</span><span><b>Призрак и секторы.</b> Здание — полупрозрачный силуэт цвета игрока; дуга из 2 смежных секторов подсвечена зелёным, конфликтный сектор — красным. Колесо/клавиши поворачивают дугу между вариантами движка. Клик — поставить. <span class="kind">build_facing</span></span></div>
+    <div class="leg"><span class="pn">3</span><span><b>Контекст стройки:</b> что строим, цена, подсказка последствий соседства, отмена. Стройка — обратимое действие: после установки она появится в «Шагах хода» с «⟲ сюда», никаких диалогов подтверждения.</span></div>
+    <div class="leg"><span class="pn" style="background:var(--ink3)">·</span><span>Тот же приём таргетинга на поле работает для манёвра (подсветка дальности хода), энергии и вышки. <span class="kind">move</span> <span class="kind">move_hex</span> <span class="kind">energy_hex</span> <span class="kind">tower_hex</span></span></div>
+  </div>
+</section>
+
+<!-- ==================== ЭКРАН 3 ==================== -->
+<section class="screen" id="s3">
+  <div class="sec-head"><span class="sec-num">ЭКРАН 3</span><h2>Бой — необратимое действие</h2></div>
+  <p class="sec-sub">Единственное место в своём ходу, где интерфейс останавливает игрока крупным
+  подтверждением: бой виден всем сразу, откатить его нельзя. Поле пригашено, источник и цель
+  подняты над затемнением, между ними стрелка.</p>
+
+  <div class="frame">
+    <div class="hud" style="grid-template-rows:auto 1fr">
+      <div class="topbar">
+        <span class="round">Раунд 3 · круг 2</span>
+        <span class="turn-owner" style="color:var(--damage)">БОЙ — подтвердите атаку</span>
+      </div>
+      <div class="mid" style="grid-template-columns:1fr 252px">
+        <div class="fieldbox" style="position:relative">
+          <svg id="f3" viewBox="0 0 760 560" role="img" aria-label="Подтверждение атаки"></svg>
+          <div class="confirm">
+            <h5>Атака: танк → энергостанция Игрока 2</h5>
+            <div class="prev">
+              <span>Урон: <b>2</b> (прочность цели 3 → 1)</span>
+              <span>Расход: <b>1 боеприпас</b> (останется 0)</span>
+              <span>Вторая атака: <b>откроется</b> после этой</span>
+              <span>Ответка цели: <b>нет</b> (вне дальности)</span>
+            </div>
+            <div class="warn">После подтверждения откат шагов 2–4 станет недоступен.</div>
+            <div class="btns">
+              <button class="btn-danger">Атаковать</button>
+              <button class="btn-ghost">Отмена</button>
+            </div>
+          </div>
+          <div class="pin" style="left:300px;top:210px">1</div>
+          <div class="pin" style="right:300px;top:78px;left:auto">2</div>
+        </div>
+        <div class="rail">
+          <h4>Шаги этого хода</h4>
+          <div class="steps">
+            <div class="step locked"><span class="n">1</span> Приказ: Волк · ОПЕР/ОПЕР <span class="lock">🔒</span></div>
+            <div class="step done"><span class="n">2</span> Манёвр: танк → h2_2 <span class="undo-to">⟲ сюда</span></div>
+            <div class="step done"><span class="n">3</span> Стройка: казарма <span class="undo-to">⟲ сюда</span></div>
+            <div class="step current" style="border-color:var(--damage);color:var(--ink)">
+              <span class="n">4</span> Бой: выбор целей… <span class="spin" style="color:var(--damage)">🔒 после — замок</span>
+            </div>
+          </div>
+          <div class="feed" style="margin-top:10px">
+            <div class="ev hl"><span class="dot" style="background:var(--seat1)"></span>Источник: танк (h2_2)</div>
+            <div class="ev hl"><span class="dot" style="background:var(--seat2)"></span>Цель: энергостанция (h3_1)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="leg"><span class="pn">1</span><span><b>Выбор жестом:</b> клик по своему жетону-источнику → подсветка легальных целей движка, остальное поле гаснет → клик по цели натягивает стрелку. Отпустить в пустоте — отмена без штрафа. <span class="kind">combat_source</span> <span class="kind">combat_target</span> <span class="kind">combat_victim</span></span></div>
+    <div class="leg"><span class="pn">2</span><span><b>Панель подтверждения с предпросмотром:</b> урон, расход БП, откроется ли вторая атака, будет ли ответка — всё видно ДО клика. Красная кнопка прямо говорит, что́ станет неоткатываемым. Это единственный тип диалога в своём ходу.</span></div>
+    <div class="leg"><span class="pn" style="background:var(--ink3)">·</span><span>Так же подтверждаются рынок (ячейка расходуется на весь стол) и завершение хода, если остались неиспользованные обязательные решения.</span></div>
+  </div>
+</section>
+
+<!-- ==================== ЭКРАН 4 ==================== -->
+<section class="screen" id="s4">
+  <div class="sec-head"><span class="sec-num">ЭКРАН 4</span><h2>Чужой ход и передача устройства</h2></div>
+  <p class="sec-sub">Слева — ход бота: события проигрываются по одному, место события пульсирует,
+  всё дублируется лентой; панели и подсказки остаются живыми. Справа — шторка между людьми:
+  рука следующего игрока не откроется, пока он сам не нажмёт «Это я».</p>
+
+  <div class="duo">
+    <div class="frame">
+      <div class="hud-half">
+        <div class="botbar">
+          <span class="who">Ходит: Игрок 2 · Обученный (бот)</span>
+          <span style="color:var(--ink3);font-size:11.5px">шаг 3 из 6…</span>
+          <button class="skip">Пропустить ▸▸</button>
+        </div>
+        <div class="fieldbox" style="position:relative">
+          <svg id="f4" viewBox="0 0 760 430" role="img" aria-label="Ход бота"></svg>
+          <div class="pin" style="right:14px;top:12px;left:auto">1</div>
+        </div>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="curtain">
+        <div class="curtain-inner">
+          <div class="pass">Передайте устройство</div>
+          <div class="who2">Игрок 2</div>
+          <div class="clr">оранжевый · место 2</div>
+          <div class="resume">
+            <div class="cap">Пока вы отсутствовали (открытое)</div>
+            <ul>
+              <li><b>Игрок 1</b>: построил добытчик, добыл 2 келемия</li>
+              <li><b>Игрок 1</b>: занял левую ячейку рынка</li>
+              <li>Обновление: новая карта рынка открыта</li>
+            </ul>
+          </div>
+          <button class="iam">Я — Игрок 2. Показать мою руку</button>
+          <div class="pin" style="right:14px;top:12px;left:auto;position:absolute">2</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="leg"><span class="pn">1</span><span><b>Пейсинг бота:</b> каждый шаг ~0,6 с, гекс события подсвечен пульсом, лента пишет строку. «Пропустить» мгновенно доигрывает до конца и оставляет лог. Скорость — в настройках. Смотреть свои панели можно в любой момент.</span></div>
+    <div class="leg"><span class="pn">2</span><span><b>Двухступенчатая шторка:</b> экран гаснет в конце хода человека; рука следующего откроется только по явному клику. На шторке — открытое резюме случившегося: подглядывать в чужой ход не нужно.</span></div>
+  </div>
+</section>
+
+<!-- ==================== таблица соответствий ==================== -->
+<section class="screen">
+  <div class="sec-head"><span class="sec-num">СВОДКА</span><h2>Каждой точке движка — своя интеракция</h2></div>
+  <p class="sec-sub">Полная таблица (~50 видов решений) будет в концепт-документе; здесь — правило
+  распределения, по которому она строится.</p>
+  <div class="tblwrap">
+  <table class="map-table">
+    <tr><th>Семья решений</th><th>Интеракция</th><th>Примеры видов</th></tr>
+    <tr><td>Цель на поле</td><td>Клик по гексу/жетону с подсветкой легального; призрак и секторы для стройки</td><td><span class="kind">build_hex</span> <span class="kind">build_facing</span> <span class="kind">move</span> <span class="kind">combat_target</span> <span class="kind">energy_hex</span></td></tr>
+    <tr><td>Карта из руки</td><td>Рука сама кликабельна: легальные карты приподняты, остальные пригашены</td><td><span class="kind">reveal_order</span> <span class="kind">tuck</span> <span class="kind">blind_discard</span> <span class="kind">spec_arsenal_install</span></td></tr>
+    <tr><td>Именованный вариант</td><td>Кнопки/плитки в контекстной панели (меню действия, трек науки, ставка рынка)</td><td><span class="kind">action</span> <span class="kind">sci_track</span> <span class="kind">market_rate</span> <span class="kind">assemble</span></td></tr>
+    <tr><td>Необратимое</td><td>Жест выбора + крупное подтверждение с предпросмотром</td><td><span class="kind">attack</span> <span class="kind">market_offer</span> <span class="kind">pass</span> (конец хода)</td></tr>
+  </table>
+  </div>
+</section>
+
+<footer>
+  Макеты соответствуют дизайн-системе приложения: палитра и шрифт Tektur — из Theme.java,
+  цвета мест — из FieldGeometry. Поле на схемах условное; в приложении его рисует
+  существующий FieldView. Концепт-документ с полной таблицей решений и этапами реализации —
+  в design-docs репозитория.
+</footer>
+
+</div>
+
+<script>
+/* Условное гекс-поле (flat-top, как в игре). Не претендует на точность
+   FieldView — только на узнаваемую схему для макета. */
+(function(){
+  var R = 46, SQ3 = Math.sqrt(3);
+  function corners(cx, cy, r){
+    var pts = [];
+    for (var i = 0; i < 6; i++){
+      var a = Math.PI/180 * (60*i);
+      pts.push([cx + r*Math.cos(a), cy + r*Math.sin(a)]);
+    }
+    return pts;
+  }
+  function ptsAttr(pts){ return pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' '); }
+  function center(q, r, ox, oy){ return [ox + 1.5*R*q, oy + SQ3*R*(r + q/2)]; }
+  function el(name, attrs){
+    var e = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  var css = getComputedStyle(document.documentElement);
+  function v(name){ return css.getPropertyValue(name).trim(); }
+
+  function hexRing(rad){
+    var out = [];
+    for (var q = -rad; q <= rad; q++)
+      for (var r = -rad; r <= rad; r++)
+        if (Math.abs(q + r) <= rad) out.push([q, r]);
+    return out;
+  }
+
+  function token(svg, cx, cy, seat, label, big){
+    var w = big ? 34 : 26, h = big ? 20 : 15, skew = 6;
+    var pts = [[cx-w/2+skew,cy-h/2],[cx+w/2+skew,cy-h/2],[cx+w/2-skew,cy+h/2],[cx-w/2-skew,cy+h/2]];
+    var fills = [v('--seat1'), v('--seat2'), v('--seat3'), v('--seat4')];
+    var strokes = [v('--seat1s'), v('--seat2s'), v('--seat3s'), v('--seat4s')];
+    svg.appendChild(el('polygon', {points: ptsAttr(pts), fill: fills[seat], stroke: strokes[seat], 'stroke-width': 1.5}));
+    var t = el('text', {x: cx, y: cy + 3.5, 'text-anchor': 'middle', 'font-size': big ? 11 : 9,
+      'font-weight': 700, fill: '#fff', 'font-family': 'Tektur, sans-serif'});
+    t.textContent = label;
+    svg.appendChild(t);
+  }
+  function spawn(svg, cx, cy, label){
+    var pts = corners(cx, cy, R * 0.66);
+    svg.appendChild(el('polygon', {points: ptsAttr(pts), fill: v('--kelium'), 'fill-opacity': .22,
+      stroke: v('--kelium'), 'stroke-width': 1.5}));
+    var t = el('text', {x: cx, y: cy + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 800,
+      fill: v('--kelium'), 'font-family': 'Tektur, sans-serif'});
+    t.textContent = label;
+    svg.appendChild(t);
+  }
+  function qmark(svg, cx, cy){
+    svg.appendChild(el('rect', {x: cx-8, y: cy-8, width: 16, height: 16, rx: 3,
+      fill: v('--container'), 'fill-opacity': .8}));
+    var t = el('text', {x: cx, y: cy + 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: '#2a2416'});
+    t.textContent = '?';
+    svg.appendChild(t);
+  }
+
+  /* базовое поле: подложка + гексы */
+  function drawBase(svg, ox, oy, opts){
+    opts = opts || {};
+    hexRing(2).forEach(function(qr){
+      var c = center(qr[0], qr[1], ox, oy);
+      var p = el('polygon', {points: ptsAttr(corners(c[0], c[1], R - 1.5)),
+        fill: v('--bg'), stroke: v('--divider'), 'stroke-width': 1});
+      p.setAttribute('data-q', qr[0]); p.setAttribute('data-r', qr[1]);
+      svg.appendChild(p);
+    });
+  }
+  function outline(svg, q, r, ox, oy, color, dash, w){
+    var c = center(q, r, ox, oy);
+    var p = el('polygon', {points: ptsAttr(corners(c[0], c[1], R - 4)), fill: 'none',
+      stroke: color, 'stroke-width': w || 2.4});
+    if (dash) p.setAttribute('stroke-dasharray', dash);
+    svg.appendChild(p);
+    return c;
+  }
+  function sectorEdge(svg, q, r, ox, oy, side, color, w){
+    var c = center(q, r, ox, oy);
+    var pts = corners(c[0], c[1], R - 7);
+    var a = pts[side % 6], b = pts[(side + 1) % 6];
+    svg.appendChild(el('line', {x1: a[0], y1: a[1], x2: b[0], y2: b[1],
+      stroke: color, 'stroke-width': w || 7, 'stroke-linecap': 'round'}));
+  }
+  function arrow(svg, from, to, color){
+    var dx = to[0]-from[0], dy = to[1]-from[1], len = Math.hypot(dx,dy);
+    var ux = dx/len, uy = dy/len;
+    var sx = from[0]+ux*R*0.5, sy = from[1]+uy*R*0.5;
+    var ex = to[0]-ux*R*0.6, ey = to[1]-uy*R*0.6;
+    svg.appendChild(el('line', {x1:sx, y1:sy, x2:ex, y2:ey, stroke:'#ffffff', 'stroke-opacity':.75, 'stroke-width':7, 'stroke-linecap':'round'}));
+    svg.appendChild(el('line', {x1:sx, y1:sy, x2:ex, y2:ey, stroke:color, 'stroke-width':4, 'stroke-linecap':'round'}));
+    var h = 14;
+    var tip = [[ex,ey],[ex-h*(ux*0.87-uy*0.5), ey-h*(uy*0.87+ux*0.5)],[ex-h*(ux*0.87+uy*0.5), ey-h*(uy*0.87-ux*0.5)]];
+    svg.appendChild(el('polygon', {points: ptsAttr(tip), fill: color}));
+  }
+  function ghost(svg, q, r, ox, oy, seatColor){
+    var c = center(q, r, ox, oy);
+    var w = 40, h = 24, skew = 7, cx = c[0], cy = c[1];
+    var pts = [[cx-w/2+skew,cy-h/2],[cx+w/2+skew,cy-h/2],[cx+w/2-skew,cy+h/2],[cx-w/2-skew,cy+h/2]];
+    svg.appendChild(el('polygon', {points: ptsAttr(pts), fill: seatColor, 'fill-opacity': .42,
+      stroke: seatColor, 'stroke-width': 1.6, 'stroke-dasharray': '5 4'}));
+    var t = el('text', {x: cx, y: cy + 4, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700,
+      fill: '#fff', 'fill-opacity': .8, 'font-family': 'Tektur, sans-serif'});
+    t.textContent = 'Эн-1';
+    svg.appendChild(t);
+    return c;
+  }
+  function label(svg, x, y, txt, color, size){
+    var t = el('text', {x: x, y: y, 'text-anchor': 'middle', 'font-size': size || 10,
+      fill: color || v('--ink3'), 'font-family': 'Tektur, sans-serif'});
+    t.textContent = txt;
+    svg.appendChild(t);
+  }
+
+  /* ------- экран 1: обычное поле ------- */
+  var f1 = document.getElementById('f1');
+  if (f1) {
+    var ox = 380, oy = 260;
+    drawBase(f1, ox, oy);
+    spawn(f1, center(0,0,ox,oy)[0], center(0,0,ox,oy)[1], 'K');
+    spawn(f1, center(-2,1,ox,oy)[0], center(-2,1,ox,oy)[1], 'S');
+    spawn(f1, center(2,-1,ox,oy)[0], center(2,-1,ox,oy)[1], 'S');
+    var c;
+    c = center(-1,-1,ox,oy); token(f1, c[0], c[1], 0, 'ЦУ', true);
+    c = center(-1,0,ox,oy);  token(f1, c[0], c[1]-10, 0, 'Дб');  token(f1, c[0]+6, c[1]+12, 0, 'пех');
+    c = center(0,-1,ox,oy);  token(f1, c[0], c[1], 0, 'Эн');
+    c = center(2,0,ox,oy);   token(f1, c[0], c[1], 1, 'ЦУ', true);
+    c = center(1,1,ox,oy);   token(f1, c[0], c[1], 1, 'Кз');
+    c = center(1,0,ox,oy);   qmark(f1, c[0]+18, c[1]-14);
+    c = center(0,2,ox,oy);   qmark(f1, c[0], c[1]);
+    /* рамка гексов активного игрока */
+    [[-1,-1],[-1,0],[0,-1]].forEach(function(qr){ outline(f1, qr[0], qr[1], ox, oy, v('--seat1'), '6 4', 2); });
+  }
+
+  /* ------- экран 2: стройка ------- */
+  var f2 = document.getElementById('f2');
+  if (f2) {
+    var ox2 = 380, oy2 = 280;
+    drawBase(f2, ox2, oy2);
+    spawn(f2, center(0,0,ox2,oy2)[0], center(0,0,ox2,oy2)[1], 'K');
+    var c2;
+    c2 = center(-1,-1,ox2,oy2); token(f2, c2[0], c2[1], 0, 'ЦУ', true);
+    c2 = center(-1,0,ox2,oy2);  token(f2, c2[0], c2[1], 0, 'Дб');
+    c2 = center(2,0,ox2,oy2);   token(f2, c2[0], c2[1], 1, 'ЦУ', true);
+    /* легальные гексы */
+    [[-2,0],[-1,1],[0,-1]].forEach(function(qr){ outline(f2, qr[0], qr[1], ox2, oy2, v('--accent'), null, 2.4); });
+    /* гекс под курсором: призрак + секторы */
+    outline(f2, -1, 1, ox2, oy2, v('--accent'), null, 3.4);
+    sectorEdge(f2, -1, 1, ox2, oy2, 2, v('--kelium'));
+    sectorEdge(f2, -1, 1, ox2, oy2, 3, v('--kelium'));
+    sectorEdge(f2, -1, 1, ox2, oy2, 4, v('--damage'));
+    var gc = ghost(f2, -1, 1, ox2, oy2, v('--seat1'));
+    label(f2, gc[0], gc[1] + 44, 'зелёные секторы — дуга встанет · красный — занят', v('--ink2'), 11);
+    /* курсор */
+    var cur = el('path', {d: 'M '+(gc[0]+26)+' '+(gc[1]-30)+' l 0 16 l 5 -4 l 3 7 l 4 -2 l -3 -7 l 6 -1 z',
+      fill: '#fff', stroke: '#000', 'stroke-width': .8});
+    f2.appendChild(cur);
+  }
+
+  /* ------- экран 3: бой ------- */
+  var f3 = document.getElementById('f3');
+  if (f3) {
+    var ox3 = 340, oy3 = 280;
+    drawBase(f3, ox3, oy3);
+    var src = center(0,1,ox3,oy3), dst = center(1,-1,ox3,oy3);
+    /* затемнение */
+    f3.appendChild(el('rect', {x:0, y:0, width:760, height:560, fill:'#0B0D11', 'fill-opacity':.55}));
+    /* поднятые над затемнением гексы */
+    [[0,1],[1,-1]].forEach(function(qr){
+      var cc = center(qr[0],qr[1],ox3,oy3);
+      f3.appendChild(el('polygon', {points: ptsAttr(corners(cc[0], cc[1], R-1.5)),
+        fill: v('--bg'), stroke: v('--divider'), 'stroke-width': 1}));
+    });
+    outline(f3, 0, 1, ox3, oy3, v('--seat1'), null, 3);
+    outline(f3, 1, -1, ox3, oy3, v('--damage'), null, 3);
+    token(f3, src[0], src[1], 0, 'Тнк');
+    token(f3, dst[0], dst[1], 1, 'Эн');
+    arrow(f3, src, dst, v('--damage'));
+    label(f3, src[0], src[1] + 40, 'источник', v('--seat1'), 11);
+    label(f3, dst[0], dst[1] - 34, 'цель · прочность 3', v('--damage'), 11);
+  }
+
+  /* ------- экран 4: ход бота ------- */
+  var f4 = document.getElementById('f4');
+  if (f4) {
+    var ox4 = 380, oy4 = 215;
+    drawBase(f4, ox4, oy4);
+    spawn(f4, center(0,0,ox4,oy4)[0], center(0,0,ox4,oy4)[1], 'K');
+    var c4;
+    c4 = center(-1,-1,ox4,oy4); token(f4, c4[0], c4[1], 0, 'ЦУ', true);
+    c4 = center(2,0,ox4,oy4);   token(f4, c4[0], c4[1], 1, 'ЦУ', true);
+    c4 = center(1,0,ox4,oy4);   token(f4, c4[0], c4[1], 1, 'Дб');
+    /* пульс события */
+    var pc = center(1,0,ox4,oy4);
+    var pulse = el('polygon', {points: ptsAttr(corners(pc[0], pc[1], R-4)), fill: 'none',
+      stroke: v('--seat2'), 'stroke-width': 3.4});
+    pulse.setAttribute('class', 'pulse');
+    f4.appendChild(pulse);
+    label(f4, pc[0], pc[1] + 42, 'Игрок 2 строит добытчик…', v('--seat2'), 11.5);
+  }
+})();
+</script>
