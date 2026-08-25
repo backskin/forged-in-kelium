@@ -29,13 +29,13 @@ import java.util.Map;
  * держит на него ссылку); массивы копируются поэлементно по той же причине.
  * Скаляры и ссылки на прочие объекты — обычным присваиванием.
  */
-final class StateRestore {
+public final class StateRestore {
 
     private StateRestore() {
     }
 
     @SuppressWarnings("unchecked")
-    static void copyFields(Object target, Object source) {
+    public static void copyFields(Object target, Object source) {
         if (target.getClass() != source.getClass()) {
             throw new IllegalArgumentException("не совпадают классы для восстановления: "
                 + target.getClass() + " vs " + source.getClass());

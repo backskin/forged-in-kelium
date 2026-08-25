@@ -64,6 +64,12 @@ public final class ActionBar extends JPanel {
         playedThisTurn.add(name);
     }
 
+    /** ПЕРЕЗАПИСАТЬ сыгранное — после отката «до точки» (концепт §5). */
+    public void setPlayed(java.util.Collection<String> names) {
+        playedThisTurn.clear();
+        playedThisTurn.addAll(names);
+    }
+
     /**
      * Точка решения вида {@code action}: доступные действия — кликабельны,
      * сыгранные — с галкой, остальные — серые с причиной.

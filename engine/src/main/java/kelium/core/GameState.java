@@ -96,6 +96,13 @@ public final class GameState {
     // Агенты по местам (нужны эффектам/бою для inline-выборов и ответок).
     /** Агенты по местам — их спрашивают эффекты и бой. Привязывается движком. */
     public List<Agent> agents = null;
+    /**
+     * Контекст ТЕКУЩЕГО хода как памятка для отката (см. {@link TurnUndo}).
+     * Привязывается движком на время хода; вне хода — null. В {@link #deepCopy}
+     * и {@link #restoreFrom} НЕ переносится нарочно: он принадлежит живому
+     * стеку движка, а не снимку.
+     */
+    public TurnUndo turnUndo = null;
 
     public GameState(Object config, List<PlayerState> players, Field field,
                      TokenStats tokenStats, TechBoard tech,

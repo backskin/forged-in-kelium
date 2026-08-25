@@ -106,6 +106,73 @@ class UndoableAgentTest {
         assertThrows(IllegalStateException.class, agent::undo);
     }
 
+    /** СТЕК точек: откат «до точки» возвращает состояние ПЕРЕД ней (концепт §5). */
+    @Test
+    void undoToEarliestPointRewindsAcrossSeveralActions() throws Exception {
+        GameState state = Fix.game(2, 4L);
+        PlayerState p = state.player(0);
+        p.resources.add(Resource.COIN, 20);
+        int coinStart = p.resources.coin();
+
+        UndoableAgent agent = new UndoableAgent(0, "test", state, d -> { }, ev -> { });
+
+        chooseAction(agent, state, "build");      // точка 0 — перед стройкой
+        p.resources.pay(Resource.COIN, 3);        // «стройка» что-то потратила
+        chooseAction(agent, state, "mining");     // точка 1 — перед добычей
+        p.resources.pay(Resource.COIN, 5);
+        chooseAction(agent, state, "movement");   // точка 2
+        p.resources.pay(Resource.COIN, 2);
+
+        assertEquals(List.of("build", "mining", "movement"), agent.checkpointLabels());
+        agent.undoTo(0);
+        assertEquals(coinStart, p.resources.coin());
+        assertFalse(agent.canUndo());
+    }
+
+    /** Необратимое действие ЗАПЕКАЕТ прошлое: стек очищается (концепт §5). */
+    @Test
+    void unsafeActionBakesEverythingBefore() throws Exception {
+        GameState state = Fix.game(2, 5L);
+        UndoableAgent agent = new UndoableAgent(0, "test", state, d -> { }, ev -> { });
+        chooseAction(agent, state, "build");
+        chooseAction(agent, state, "mining");
+        assertEquals(2, agent.checkpointLabels().size());
+        chooseAction(agent, state, "combat");
+        assertFalse(agent.canUndo());
+    }
+
+    /** Памятка хода: откат возвращает и счётчик сыгранного, и список действий. */
+    @Test
+    void undoRestoresTurnContextThroughMemento() throws Exception {
+        GameState state = Fix.game(2, 6L);
+        kelium.engine.TurnContext ctx = new kelium.engine.TurnContext(0, 1);
+        state.turnUndo = ctx;
+        UndoableAgent agent = new UndoableAgent(0, "test", state, d -> { }, ev -> { });
+
+        chooseAction(agent, state, "build");      // памятка: сыграно 0, пусто
+        ctx.actionsPlayed.add("build");
+        ctx.playedCount = 1;
+        chooseAction(agent, state, "mining");     // памятка: сыграно 1, {build}
+        ctx.actionsPlayed.add("mining");
+        ctx.playedCount = 2;
+
+        agent.undoTo(1);                          // перед добычей
+        assertEquals(1, ctx.playedCount);
+        assertEquals(java.util.Set.of("build"), ctx.actionsPlayed);
+
+        agent.undoTo(0);                          // перед стройкой
+        assertEquals(0, ctx.playedCount);
+        assertTrue(ctx.actionsPlayed.isEmpty());
+    }
+
+    private static void chooseAction(UndoableAgent agent, GameState state, String name)
+            throws Exception {
+        List<Choice> opts = List.of(
+            new Choice("action", name, name),
+            new Choice("pass", null, "ничего не делать"));
+        chooseOnOtherThread(agent, state, opts, Map.of("kind", "action"), 0);
+    }
+
     /** Вызвать choose() на отдельном потоке и ответить индексом {@code answer}. */
     private static Choice chooseOnOtherThread(UndoableAgent agent, GameState state,
                                                 List<Choice> options, Map<String, Object> ctx,

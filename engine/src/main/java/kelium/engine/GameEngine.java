@@ -711,6 +711,10 @@ public final class GameEngine {
             .ask());
         specLimit = Math.max(0, specLimit - specPenalty);
         TurnContext ctx = new TurnContext(seat, specLimit);
+        // Контекст хода — памятка для отката безопасных действий (концепт
+        // «Командный пункт» §5): без него откат возвращал состояние, но не
+        // знание «что сыграно», и игрок терял слот действия.
+        s.turnUndo = ctx;
         if (specPenalty > 0) {
             emit(ev("type", "spec_penalty", "seat", seat, "penalty", specPenalty,
                 "ability", "ignore_coincidence"));
@@ -828,6 +832,7 @@ public final class GameEngine {
                 offerManeuver(p);
             }
         }
+        s.turnUndo = null;
         emit(ev("type", "turn_end", "seat", seat, "resources", resourcesMap(p)));
     }
 
@@ -841,7 +846,11 @@ public final class GameEngine {
         // СУПЕР ЗАДАНИЯ 2.0: подсунуть карты под планшет ради символов — не
         // действие и не СПЕЦ, поэтому предлагается один раз перед ходом.
         offerTuck(p);
-        int played = 0;
+        // Счётчик сыгранных действий живёт в КОНТЕКСТЕ хода, а не в локальной
+        // переменной: откат безопасного действия (концепт «Командный пункт» §5)
+        // возвращает его вместе с actionsPlayed через памятку TurnUndo — иначе
+        // отменённое действие продолжало бы занимать слот.
+        ctx.playedCount = 0;
         // Лишние действия, выданные способностями карт уже ПО ХОДУ дела (обход
         // блокировки приказа за келемий). Предел нельзя посчитать заранее:
         // разрешение выдаётся СПЕЦ-действием между основными действиями.
@@ -851,7 +860,7 @@ public final class GameEngine {
         // этот ход — редакция 17.08.2026: игрок платит победным очком, и
         // запрещать ему повтор было бы двойной ценой.
         int repeatable = 0;
-        while (played < maxActions + extra && !s.finished) {
+        while (ctx.playedCount < maxActions + extra && !s.finished) {
             List<String> candidates = new ArrayList<>();
             for (String nname : actionNames) {
                 if (repeatable > 0 || !ctx.actionsPlayed.contains(nname)) {
@@ -867,7 +876,7 @@ public final class GameEngine {
             }
             opts.add(new Choice("pass", null, "ничего не делать"));
             Choice ch = agents.get(p.seat).choose(s, opts,
-                ev("kind", "action", "remaining", maxActions - played));
+                ev("kind", "action", "remaining", maxActions - ctx.playedCount));
             if (ch.payload() == null) {
                 break;
             }
@@ -879,7 +888,7 @@ public final class GameEngine {
             }
             emit(ev("type", "action", "seat", p.seat, "action", actionName,
                 "ok", res.ok(), "detail", res.detail(), "telemetry", res.telemetry()));
-            played += 1;
+            ctx.playedCount += 1;
             if (repeatable > 0) {
                 repeatable--;
             }

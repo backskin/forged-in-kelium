@@ -81,7 +81,7 @@ public final class HotSeatWindow {
     private final int players;
     private final long seed;
     private final List<String> seatSpecs;
-    final Map<Integer, InteractiveAgent> humansBySeat = new ConcurrentHashMap<>();
+    final Map<Integer, kelium.core.UndoableAgent> humansBySeat = new ConcurrentHashMap<>();
     private final Session session = new Session();
 
     JFrame frame;
@@ -99,8 +99,17 @@ public final class HotSeatWindow {
     private final Map<String, JComponent> drawers = new LinkedHashMap<>();
     final Map<String, KpTab> drawerTabs = new LinkedHashMap<>();
     private JComponent openDrawer;
-    private JPanel stepsBox;
+    kelium.gui.kp.TurnStepsPanel steps;
     private JLabel stepsCaption;
+    /** Замороженные («запёкшиеся») шаги текущего хода — до точек отката. */
+    private final List<String> lockedSteps = new ArrayList<>();
+    /** Шаги хода бота (просто витрина, некликабельно). */
+    private final List<String> botSteps = new ArrayList<>();
+    private Integer turnSeat;
+    private String pendingKind;
+    /** Подписи точек, снятые перед необратимым кликом — запекутся на кадре. */
+    private List<String> pendingBake;
+    private String pendingBakeName;
     private JPanel feedBox;
     private JScrollPane feedScroll;
     private JPanel journalBox;
@@ -113,8 +122,6 @@ public final class HotSeatWindow {
     private volatile GameConfig cfg;
     private volatile GameState liveState;
     private boolean sessionBound;
-    private Integer stepsTurnSeat;
-    private int stepNo;
     private String lastFeedText;
     volatile ReplayRecord rec;
     /** Место, для которого сейчас реально ждём клика/кнопки — иначе null. */
@@ -324,11 +331,9 @@ public final class HotSeatWindow {
         top.setBackground(Theme.panel());
         stepsCaption = caption("ШАГИ ХОДА");
         top.add(stepsCaption);
-        stepsBox = new JPanel();
-        stepsBox.setLayout(new BoxLayout(stepsBox, BoxLayout.Y_AXIS));
-        stepsBox.setBackground(Theme.panel());
-        stepsBox.setBorder(BorderFactory.createEmptyBorder(0, Theme.px(10), Theme.px(8), Theme.px(10)));
-        top.add(stepsBox);
+        steps = new kelium.gui.kp.TurnStepsPanel();
+        steps.setAlignmentX(Component.LEFT_ALIGNMENT);
+        top.add(steps);
         rail.add(top, BorderLayout.NORTH);
 
         JPanel feedWrap = new JPanel(new BorderLayout());
@@ -447,7 +452,8 @@ public final class HotSeatWindow {
             String spec = seatSpecs.get(seat);
             if ("human".equals(spec)) {
                 int seatFinal = seat;
-                InteractiveAgent ia = new InteractiveAgent(seat, "Игрок " + (seat + 1),
+                kelium.core.UndoableAgent ia = new kelium.core.UndoableAgent(
+                    seat, "Игрок " + (seat + 1), state,
                     d -> SwingUtilities.invokeLater(() -> showDecision(seatFinal, d)),
                     ev -> { });
                 humansBySeat.put(seat, ia);
@@ -594,35 +600,102 @@ public final class HotSeatWindow {
         }
     }
 
-    /** Шаги ТЕКУЩЕГО хода (витрина; откат «до точки» — этап 5 концепта). */
+    /** События хода → источники ленты шагов (концепт §5). */
     private void trackSteps(ReplayRecord.Frame f) {
         if ("turn_orders".equals(f.type) && f.seat != null) {
-            stepsTurnSeat = f.seat;
-            stepNo = 0;
-            stepsBox.removeAll();
+            turnSeat = f.seat;
+            lockedSteps.clear();
+            botSteps.clear();
+            pendingBake = null;
+            pendingBakeName = null;
+            lockedSteps.add("Приказ вскрыт");
             stepsCaption.setText("ШАГИ ХОДА — ИГРОК " + (f.seat + 1));
-            addStep("Приказ вскрыт", true, f.seat);
             actionBar.turnStarted();
-        } else if ("action".equals(f.type) && f.seat != null && f.seat.equals(stepsTurnSeat)) {
-            String name = String.valueOf(f.log);
-            addStep(name.length() > 42 ? name.substring(0, 41) + "…" : name, false, f.seat);
-        } else if ("turn_end".equals(f.type) && f.seat != null && f.seat.equals(stepsTurnSeat)) {
-            stepsTurnSeat = null;
+        } else if ("action".equals(f.type) && f.seat != null && f.seat.equals(turnSeat)) {
+            if (humansBySeat.containsKey(turnSeat)) {
+                // Необратимое действие человека доиграло — запекаем всё до него.
+                if (pendingBakeName != null) {
+                    if (pendingBake != null) {
+                        lockedSteps.addAll(pendingBake);
+                    }
+                    lockedSteps.add(pendingBakeName);
+                    pendingBake = null;
+                    pendingBakeName = null;
+                }
+            } else {
+                String name = String.valueOf(f.log);
+                botSteps.add(name.length() > 40 ? name.substring(0, 39) + "…" : name);
+            }
+        } else if ("turn_end".equals(f.type) && f.seat != null && f.seat.equals(turnSeat)) {
+            turnSeat = null;
         }
-        stepsBox.revalidate();
-        stepsBox.repaint();
+        refreshSteps();
     }
 
-    private void addStep(String text, boolean locked, int seat) {
-        stepNo++;
-        JLabel row = new JLabel(stepNo + ". " + text + (locked ? "  🔒" : ""));
-        row.setFont(Theme.font(11.5, Font.PLAIN));
-        row.setForeground(locked ? Theme.ink3() : Theme.ink());
-        row.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, Theme.px(2), 0, 0, Theme.seat(seat)),
-            BorderFactory.createEmptyBorder(Theme.px(3), Theme.px(6), Theme.px(3), 0)));
-        row.setAlignmentX(Component.LEFT_ALIGNMENT);
-        stepsBox.add(row);
+    /** Собрать ленту: запёкшееся → точки отката агента → текущая точка. */
+    private void refreshSteps() {
+        List<kelium.gui.kp.TurnStepsPanel.Row> rows = new ArrayList<>();
+        int seat = turnSeat == null ? viewedSeat : turnSeat;
+        for (String s : lockedSteps) {
+            rows.add(new kelium.gui.kp.TurnStepsPanel.Row(s,
+                kelium.gui.kp.TurnStepsPanel.Kind.LOCKED, null));
+        }
+        kelium.core.UndoableAgent agent =
+            turnSeat == null ? null : humansBySeat.get(turnSeat);
+        if (agent != null) {
+            // Откат безопасен только на границе действий: пока движок стоит на
+            // точке вида action этого же хода (см. javadoc UndoableAgent).
+            boolean undoNow = awaitingSeat != null && awaitingSeat.equals(turnSeat)
+                && "action".equals(pendingKind);
+            List<String> labels = agent.checkpointLabels();
+            for (int i = 0; i < labels.size(); i++) {
+                String ru = ActionBar.ACTIONS.getOrDefault(labels.get(i), labels.get(i));
+                int idx = i;
+                rows.add(new kelium.gui.kp.TurnStepsPanel.Row(ru,
+                    undoNow ? kelium.gui.kp.TurnStepsPanel.Kind.UNDOABLE
+                        : kelium.gui.kp.TurnStepsPanel.Kind.INFO,
+                    undoNow ? () -> doUndoTo(agent, idx) : null));
+            }
+        } else {
+            for (String s : botSteps) {
+                rows.add(new kelium.gui.kp.TurnStepsPanel.Row(s,
+                    kelium.gui.kp.TurnStepsPanel.Kind.INFO, null));
+            }
+        }
+        if (awaitingSeat != null && awaitingSeat.equals(turnSeat) && pendingKind != null) {
+            rows.add(new kelium.gui.kp.TurnStepsPanel.Row(
+                KIND_LABELS.getOrDefault(pendingKind, pendingKind),
+                kelium.gui.kp.TurnStepsPanel.Kind.CURRENT, null));
+        }
+        steps.setRows(seat, rows);
+    }
+
+    /**
+     * ОТКАТ «ДО ТОЧКИ»: партия возвращается к моменту перед шагом, экран
+     * перерисовывается сразу (движок молчит — он всё ещё ждёт наш ответ),
+     * след отката остаётся и в ленте, и в журнале партии.
+     */
+    private void doUndoTo(kelium.core.UndoableAgent agent, int idx) {
+        String ru = ActionBar.ACTIONS.getOrDefault(
+            agent.checkpointLabels().get(idx), agent.checkpointLabels().get(idx));
+        agent.undoTo(idx);
+        List<String> left = agent.checkpointLabels();
+        actionBar.setPlayed(left);
+        GameState s = liveState;
+        if (rec != null && s != null) {
+            ReplayRecord.Frame f = new ReplayRecord.Frame();
+            f.type = "undo";
+            f.round = s.round;
+            f.circle = s.circle;
+            f.seat = agent.seat;
+            f.log = "Игрок " + (agent.seat + 1) + " вернулся к моменту перед шагом «"
+                + ru + "»";
+            f.snapshot = ReplayRecord.snapshotOf(s, agent.seat);
+            rec.frames.add(f);
+            onFrame(rec);
+        } else {
+            refreshSteps();
+        }
     }
 
     /** Строка ленты (и её копия в ящик «Журнал»). seat null — служебное. */
@@ -703,7 +776,8 @@ public final class HotSeatWindow {
         }
 
         String kind = String.valueOf(d.context().get("kind"));
-        InteractiveAgent agent = humansBySeat.get(seat);
+        pendingKind = kind;
+        kelium.core.UndoableAgent agent = humansBySeat.get(seat);
         List<Choice> options = d.options();
         String title = "Игрок " + (seat + 1) + " — " + KIND_LABELS.getOrDefault(kind, kind);
 
@@ -767,6 +841,7 @@ public final class HotSeatWindow {
                     + " — колесо мыши вращает дугу, клик по гексу ставит; зелёные рёбра = встанет",
                     opts);
                 layoutPrompt();
+                refreshSteps();
                 frame.toFront();
                 return;
             }
@@ -780,6 +855,23 @@ public final class HotSeatWindow {
                 }
             }
             actionBar.showDecision(avail, idx -> {
+                // Необратимое действие: запомнить, что запечь в ленте шагов,
+                // КОГДА оно доиграет (событие action) — концепт §5.
+                String name = null;
+                for (var e : avail.entrySet()) {
+                    if (e.getValue().equals(idx)) {
+                        name = e.getKey();
+                        break;
+                    }
+                }
+                if (name != null && !kelium.core.UndoableAgent.SAFE_ACTIONS.contains(name)) {
+                    List<String> baked = new ArrayList<>();
+                    for (String l : agent.checkpointLabels()) {
+                        baked.add(ActionBar.ACTIONS.getOrDefault(l, l));
+                    }
+                    pendingBake = baked;
+                    pendingBakeName = ActionBar.ACTIONS.getOrDefault(name, name);
+                }
                 agent.submitIndex(idx);
                 clearDecision();
             });
@@ -848,6 +940,7 @@ public final class HotSeatWindow {
             }
         }
         layoutPrompt();
+        refreshSteps();
         frame.toFront();
     }
 
@@ -902,9 +995,11 @@ public final class HotSeatWindow {
         hands.clearPickable();
         actionBar.idle("ход соперника");
         awaitingSeat = null;
+        pendingKind = null;
         endBtn.setTexts("Ход соперника…", "");
         endBtn.setState(KpButton.State.DISABLED);
         endBtn.onClick(null);
+        refreshSteps();
     }
 
     private String cardName(String id) {

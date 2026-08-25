@@ -13,11 +13,19 @@ import java.util.Set;
  * операций для наценок, множество уже сыгранных действий приказа и флаг
  * использования бесплатного хода ЦУ.
  */
-public final class TurnContext {
+public final class TurnContext implements kelium.core.TurnUndo {
 
     public final int seat;
     public int specUsed = 0;
     public int specLimit = 1;
+    /**
+     * СКОЛЬКО ДЕЙСТВИЙ УЖЕ РАЗЫГРАНО в этом ходу (включая повторы за докупку).
+     * Раньше это была локальная переменная цикла {@code GameEngine.playActions}
+     * — и откат действия (концепт «Командный пункт», §5) не мог её вернуть:
+     * отменённое действие продолжало занимать слот. Теперь счётчик живёт здесь
+     * и входит в памятку {@link #saveTurn}.
+     */
+    public int playedCount = 0;
     // счётчики операций по имени действия -> сколько раз выполнена «операция»
     public final Map<String, Integer> opCounts = new HashMap<>();
     // действия приказа, уже сыгранные в этот ход (каждое по разу). LinkedHashSet,
@@ -181,4 +189,26 @@ public final class TurnContext {
 
     /** Наука: разрешён обмен обломков на монеты по печатному курсу утиля. */
     public boolean scienceDebrisToCoin = false;
+
+    // ==================== памятка хода для отката ====================
+
+    /**
+     * Памятка — ПОЛНАЯ копия изменяемого состояния контекста (см.
+     * {@link kelium.core.TurnUndo}). Поле за полем через рефлексию, а не
+     * списком руками: контекст прирастает полями с каждым новым правилом
+     * (см. выше freeBuildingMoves/freeMinerMoves/…), и пропущенное вручную
+     * поле откатывалось бы молча — тот же довод, что у
+     * {@code kelium.core.StateRestore}.
+     */
+    @Override
+    public Object saveTurn() {
+        TurnContext copy = new TurnContext(seat, specLimit);
+        kelium.core.StateRestore.copyFields(copy, this);
+        return copy;
+    }
+
+    @Override
+    public void restoreTurn(Object memento) {
+        kelium.core.StateRestore.copyFields(this, (TurnContext) memento);
+    }
 }
