@@ -175,9 +175,23 @@ public final class TurnJournal {
          * вечного курса.
          */
         public final Set<String> scienceOffersUsed = new HashSet<>();
-        /** Сдано трофейных ЖЕТОНОВ действием Наука за ход — o39 «Сдача». */
-        public int scienceTrophiesSpent = 0;
-        /** На какие треки они ушли: один трек на всё — усиление o39. */
+        /**
+         * ЕДИНИЦ ОПЛАТЫ, ВНЕСЁННЫХ В НАУКУ за ход — o39 «Сдача».
+         *
+         * <p>БЫЛО СЛОМАНО с 21.08.2026 и починено 25.08.2026. Поле называлось
+         * scienceTrophiesSpent и считало, насколько уменьшилось ТРОФЕЙНОЕ МЕСТО.
+         * Пока наука брала целые жетоны, это работало. Потом правило поменялось
+         * (tech.pay_with_debris_only: наука платится обломками), трофейное место
+         * перестало уменьшаться вовсе — и счётчик застыл на нуле. Условие o39
+         * стало невыполнимым: карту раздали 89 раз за 200 партий и не выполнили
+         * НИ РАЗУ.
+         *
+         * <p>Теперь считается то, чем платят: сколько единиц оплаты реально
+         * ушло в науку (обломки по действующему своду, жетоны по старому). Так
+         * счётчик не зависит от того, какое правило оплаты включено.
+         */
+        public int sciencePaidUnits = 0;
+        /** На какие треки ушла оплата — один трек за действие по своду 1.20.0. */
         public final Set<String> scienceTracksUsed = new HashSet<>();
         /** Нижний приказ карты приказа открылся и дал действие — n11. */
         public boolean lowerOrderOpen = false;
@@ -286,7 +300,7 @@ public final class TurnJournal {
             marketOffersUsed.addAll(o.marketOffersUsed);
             scienceOffersUsed.clear();
             scienceOffersUsed.addAll(o.scienceOffersUsed);
-            scienceTrophiesSpent = o.scienceTrophiesSpent;
+            sciencePaidUnits = o.sciencePaidUnits;
             scienceTracksUsed.clear();
             scienceTracksUsed.addAll(o.scienceTracksUsed);
             lowerOrderOpen = o.lowerOrderOpen;
@@ -376,7 +390,7 @@ public final class TurnJournal {
             movedCuThisTurn = false;
             marketOffersUsed.clear();
             scienceOffersUsed.clear();
-            scienceTrophiesSpent = 0;
+            sciencePaidUnits = 0;
             scienceTracksUsed.clear();
             lowerOrderOpen = false;
             speedBoostKind = null;

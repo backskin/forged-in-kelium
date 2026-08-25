@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
@@ -167,19 +168,29 @@ public final class ЗаданияПоКартам {
         b.append("**Ни разу не выполнено: ").append(ниразу).append(" карт из ")
             .append(карты.size()).append("**\n\n");
 
-        b.append("| карта | название | вид | пришла, раз | выполнена, раз | ")
-            .append("усиленно, раз | сожжена, раз | толк карты |\n");
-        b.append("|---|---|---|---:|---:|---:|---:|---:|\n");
+        b.append("«Была готова» — сколько раз условие карты УЖЕ выполнялось и ")
+            .append("карту оставалось только сыграть. Это и делит ноль на два ")
+            .append("рода: карта, которая часто была готова и не сыграна, — ")
+            .append("вина ботов; карта, которая не была готова ни разу, — вина ")
+            .append("условия или его проверки.\n\n");
+        b.append("| карта | название | вид | пришла, раз | была готова, раз | ")
+            .append("выполнена, раз | усиленно, раз | сожжена, раз | ")
+            .append("толк карты | сыграно из готовых |\n");
+        b.append("|---|---|---|---:|---:|---:|---:|---:|---:|---:|\n");
         for (var e : список) {
             Карта к = e.getValue();
             b.append("| ").append(e.getKey()).append(" | ").append(к.имя)
                 .append(" | ").append("starting".equals(к.вид) ? "начальное" : "обычное")
                 .append(" | ").append(к.пришла)
+                .append(" | ").append(к.готова)
                 .append(" | ").append(к.выполнена)
                 .append(" | ").append(к.усиленно)
                 .append(" | ").append(к.сожжена)
                 .append(" | ").append(к.пришла == 0 ? "—"
-                    : String.format("%.0f%%", 100.0 * толк(к))).append(" |\n");
+                    : String.format(Locale.ROOT, "%.0f%%", 100.0 * толк(к)))
+                .append(" | ").append(к.готова == 0 ? "—"
+                    : String.format(Locale.ROOT, "%.0f%%", 100.0 * к.выполнена / к.готова))
+                .append(" |\n");
         }
 
         b.append("\n## Условия карт, которые не выполнены НИ РАЗУ\n\n");

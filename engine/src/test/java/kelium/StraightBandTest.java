@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import kelium.core.BuildingToken;
+import kelium.core.BuildingType;
 import kelium.core.GameState;
 import kelium.core.Hex;
 import kelium.core.PlayerState;
@@ -50,22 +52,28 @@ class StraightBandTest {
     }
 
     /**
-     * СВОЙ ЖЕТОН ДЛЯ ФИГУРЫ. На старте у игрока один жетон войска (вышка от ЦУ),
-     * а фигура требует по жетону на каждый гекс — поэтому нужные жетоны тест
-     * заводит сам, а не надеется на стартовую обстановку.
+     * СВОЙ ЖЕТОН ДЛЯ ФИГУРЫ — ЗДАНИЕ, А НЕ ВОЙСКО (правка 25.08.2026).
+     *
+     * <p>Прежде фигуру собирали пехотой, кладя ОДИН жетон сразу на три сектора.
+     * По СВОДу так нельзя: пехота занимает один сектор, техника два смежных, и
+     * многосекторный след бывает только у зданий. Пока войска не имели секторов
+     * вовсе, разница была незаметна; теперь раскладка войск выводится из
+     * свободных секторов ({@code СекторыВойск}), и жетон, вписанный в разметку
+     * руками, сам себе занимает место. Фигура собирается зданиями — у них след
+     * из смежных секторов законен и хранится именно в разметке гекса.
      */
-    private static UnitToken freshUnit(PlayerState p, int uid) {
-        UnitToken u = new UnitToken(kelium.core.UnitType.INFANTRY, p.seat, 1, uid);
-        p.units.add(u);
-        return u;
+    private static BuildingToken freshBuilding(PlayerState p, int uid) {
+        BuildingToken b = new BuildingToken(BuildingType.AIRBASE, p.seat, 3, 3, null, uid);
+        p.buildings.add(b);
+        return b;
     }
 
-    /** Поставить жетон на гекс и занять им перечисленные ячейки. */
-    private static void occupy(GameState s, UnitToken u, String hexId, int... cells) {
-        u.hexId = hexId;
+    /** Поставить здание на гекс и занять им перечисленные секторы. */
+    private static void occupy(GameState s, BuildingToken b, String hexId, int... cells) {
+        b.hexId = hexId;
         Hex h = s.field.get(hexId);
         for (int c : cells) {
-            h.sideOwner[Math.floorMod(c, 6)] = u.uid;
+            h.sideOwner[Math.floorMod(c, 6)] = b.uid;
         }
     }
 
@@ -113,9 +121,9 @@ class StraightBandTest {
 
         // ПОЛОВИНА A — три ячейки, ЗАКАНЧИВАЮЩИЕСЯ на стороне к B;
         // ПОЛОВИНА B — три ячейки, НАЧИНАЮЩИЕСЯ со стороны к A, то же вращение.
-        occupy(s, freshUnit(me, 9001), a.id,
+        occupy(s, freshBuilding(me, 9001), a.id,
             d[0] - 2 * dir, d[0] - dir, d[0]);
-        occupy(s, freshUnit(me, 9002), bId,
+        occupy(s, freshBuilding(me, 9002), bId,
             d[1], d[1] + dir, d[1] + 2 * dir);
 
         assertEquals(2, Shapes.longestStraightBand(s, 0),
@@ -141,8 +149,8 @@ class StraightBandTest {
 
         // ВРАЩЕНИЕ РАЗВЁРНУТО НА ВТОРОМ ГЕКСЕ: половины смыкаются через общее
         // ребро, но полоса заворачивает назад, а не идёт прямо.
-        occupy(s, freshUnit(me, 9011), a.id, d[0] - 2, d[0] - 1, d[0]);
-        occupy(s, freshUnit(me, 9012), bId, d[1], d[1] - 1, d[1] - 2);
+        occupy(s, freshBuilding(me, 9011), a.id, d[0] - 2, d[0] - 1, d[0]);
+        occupy(s, freshBuilding(me, 9012), bId, d[1], d[1] - 1, d[1] - 2);
 
         assertTrue(Shapes.longestStraightBand(s, 0) < 2,
             "изгиб не должен считаться прямой полосой из двух половин");
@@ -155,7 +163,7 @@ class StraightBandTest {
 
         Hex a = someHexWithNeighbour(s);
         // ДВЕ ЯЧЕЙКИ ВМЕСТО ТРЁХ — половины нет, значит и полосы нет.
-        occupy(s, freshUnit(me, 9021), a.id, 0, 1);
+        occupy(s, freshBuilding(me, 9021), a.id, 0, 1);
 
         assertEquals(0, Shapes.longestStraightBand(s, 0),
             "две ячейки — это не половина гекса");

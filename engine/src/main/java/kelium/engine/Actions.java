@@ -435,6 +435,9 @@ public final class Actions {
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
             int ammoMade = 0;
             int unitsMade = 0;
+            // Сколько войск КАЖДОГО рода сделано этим действием — уходит в
+            // телеметрию: по ней мерится, какие рода игрок вообще производит.
+            Map<String, Integer> madeByType = new HashMap<>();
             int[] paid = {0, 0};
             // ПРЕДЕЛ С КАРТЫ: бесплатная Сборка бывает «не более чем N зданиями».
             int buildingLimit = ctx.objectLimit(name());
@@ -560,6 +563,13 @@ public final class Actions {
                                 continue;
                             }
                             unitsMade++;
+                            // РАЗБИВКА ПО РОДАМ В ТЕЛЕМЕТРИИ: без неё нельзя
+                            // измерить, КАКИЕ войска игрок производит, а вопрос
+                            // «почему на поле нет техники и авиации» без этого
+                            // числа решается только домыслами. Журнал знает то же
+                            // (producedByType), но журнал живёт один ход и в
+                            // события не попадает.
+                            madeByType.merge(unitType.code, 1, Integer::sum);
                             // журнал: набор уникальных зданий, произведших юнитов
                             // (задание «Конвейер» усиление «3 разных здания»).
                             jf.unitsProducedBuildings.add(b.uid);
@@ -576,6 +586,7 @@ public final class Actions {
             ctx.actionsPlayed.add(name());
             Map<String, Object> tel = new HashMap<>();
             tel.put("units", unitsMade);
+            tel.put("units_by_type", madeByType);
             tel.put("power_coins", paid[0]);
             tel.put("power_offers", paid[1]);
             tel.put("ammo", ammoMade);
@@ -2491,14 +2502,17 @@ public final class Actions {
                 for (int to = step + 1; to <= target; to++) {
                     cost += sciStepCost(player, costs, to - 1, stepsMade);
                 }
-                // o39 «Сдача» и o34 «Научный отдел»: считаем СДАННЫЕ ЖЕТОНЫ (а не
-                // трофейные очки) и то, на какие треки они ушли. Жетоны уходят
-                // внутри payTrophy, поэтому меряем размер трофейного пространства
-                // до и после — другого места, где это видно, нет.
-                int trophiesBefore = player.trophySpace.size();
-                payTrophy(player, cost, agent);
+                // o39 «Сдача»: считаем ЕДИНИЦЫ ОПЛАТЫ, ушедшие в науку.
+                //
+                // ПОЧЕМУ НЕ РАЗМЕР ТРОФЕЙНОГО МЕСТА, как было до 25.08.2026.
+                // Тот замер работал, только пока наука брала целые жетоны. С
+                // ключом tech.pay_with_debris_only жетоны в оплату не идут,
+                // трофейное место не уменьшается — и счётчик застыл на нуле,
+                // сделав условие o39 невыполнимым. Платёж знает сам payTrophy,
+                // поэтому он и возвращает уплаченное.
+                int paid = payTrophy(player, cost, agent);
                 TurnJournal.TurnFacts sf = journal(state).of(player.seat);
-                sf.scienceTrophiesSpent += Math.max(0, trophiesBefore - player.trophySpace.size());
+                sf.sciencePaidUnits += paid;
                 sf.scienceTracksUsed.add(track);
                 sf.scienceOffersUsed.add("track:" + track);
                 player.techSteps.put(track, target);
@@ -2698,6 +2712,13 @@ public final class Actions {
             payTrophy(player, cost, null);
         }
 
+        /*
+         * ВОЗВРАЩАЕТ УПЛАЧЕННОЕ. Ровно этого числа не хватало заданию o39: чем
+         * платят за науку, зависит от свода (обломки или жетоны), и мерить это
+         * снаружи — через размер трофейного места — можно только для одного из
+         * двух правил. Кто платит, тот и знает сумму.
+         */
+
         /**
          * Стоимость шага науки. Пассив science_first_step_discount (стартовая
          * карта «Изыскатели»): ПЕРВЫЙ шаг каждого действия Наука на 1 трофей
@@ -2718,7 +2739,7 @@ public final class Actions {
          * СНИЗУ (минимизация потерь). B4: сданные жетоны ВОЗВРАЩАЮТСЯ владельцам
          * (правило §5.2), а не уничтожаются.
          */
-        private void payTrophy(PlayerState player, int cost, Agent agent) {
+        private int payTrophy(PlayerState player, int cost, Agent agent) {
             int remaining = cost;
             // ПЛАТЯТ ОБЛОМКАМИ, А НЕ ЦЕЛЫМИ ЖЕТОНАМИ (уточнение дизайнера
             // 21.08.2026, ключ tech.pay_with_debris_only).
@@ -2752,9 +2773,10 @@ public final class Actions {
                     int keliumPay = Math.min(remaining, player.resources.kelium());
                     if (keliumPay > 0) {
                         player.resources.pay(Resource.KELIUM, keliumPay);
+                        remaining -= keliumPay;
                     }
                 }
-                return;
+                return cost - remaining;
             }
             // ТОЧКА ПРАВИЛ спрашивается ЗАРАНЕЕ и всегда: иначе она срабатывала бы
             // только в редкой ветке «трофеев не хватило», и объявление «точка
@@ -2808,8 +2830,12 @@ public final class Actions {
                 int pay = Math.min(remaining, player.resources.kelium());
                 if (pay > 0) {
                     player.resources.pay(Resource.KELIUM, pay);
+                    remaining -= pay;
                 }
             }
+            // Жетон мог стоить больше остатка (трофейное очко неделимо), поэтому
+            // остаток бывает отрицательным — переплата в счёт не идёт.
+            return cost - Math.max(0, remaining);
         }
 
         /** Предложить вечные обмены. Вернуть id взятого обмена или null. */
