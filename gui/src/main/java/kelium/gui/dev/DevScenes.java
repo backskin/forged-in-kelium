@@ -111,12 +111,20 @@ public final class DevScenes {
         for (int i = 0; i < types.length; i++) {
             Integer lvl = types[i] == BuildingType.MINER || types[i] == BuildingType.POWER_PLANT
                 ? (i % 4) + 1 : null;
-            s.building(0, hexes[i % hexes.length], types[i], lvl, 0).damage(i % 3);
+            // РАНЕН, НО ЖИВ: урон на единицу меньше прочности — по правилам
+            // «двух атак» жетон с damage >= hp мёртв и с поля исчезает,
+            // и прежняя сцена (урон i % 3) после смены прочностей показывала
+            // пустое поле вместо раненых.
+            int hp = s.state().tokenStats.buildingHp(types[i], lvl);
+            s.building(0, hexes[i % hexes.length], types[i], lvl, 0)
+                .damage(Math.max(0, hp - 1));
         }
         UnitType[] units = {UnitType.INFANTRY, UnitType.VEHICLE, UnitType.AIRCRAFT,
             UnitType.TOWER};
         for (int i = 0; i < units.length; i++) {
-            s.unit(1, hexes[(i + 2) % hexes.length], units[i]).damage(i % 2 + 1);
+            int hp = s.state().tokenStats.unitHp(units[i]);
+            s.unit(1, hexes[(i + 2) % hexes.length], units[i])
+                .damage(Math.max(0, hp - 1));
         }
         return s.round(7, 1);
     }
