@@ -1,0 +1,702 @@
+<title>Штабной стол</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root {
+  --kraft:      #EDE5D5;
+  --ground:     #E4DBC8;
+  --paper:      #F9F6EF;
+  --panel:      #FFFDF8;
+  --line:       #CFC4AC;
+  --line-soft:  #DED5C1;
+  --ink:        #23282E;
+  --ink-2:      #55606B;
+  --ink-3:      #8A8574;
+  --brick:      #8C4B45;
+  --brick-soft: #B8746C;
+  --steel:      #4E6172;
+  --steel-soft: #8DA0AF;
+  --gold:       #C98D12;
+  --moss:       #5E7A4B;
+  --seat-1:     #2F6FA8;
+  --seat-2:     #C4622C;
+  --shadow:     rgba(52, 42, 24, .16);
+  --hex-fill:   #F4EFE3;
+  --hex-line:   #BEB39A;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --kraft:      #1B1E22;
+    --ground:     #15181B;
+    --paper:      #23272C;
+    --panel:      #2A2F35;
+    --line:       #3B424A;
+    --line-soft:  #333940;
+    --ink:        #E8E3D7;
+    --ink-2:      #AEB6BE;
+    --ink-3:      #7C8189;
+    --brick:      #D08278;
+    --brick-soft: #8C4B45;
+    --steel:      #9DB2C4;
+    --steel-soft: #55636F;
+    --gold:       #E0AB3C;
+    --moss:       #90B076;
+    --seat-1:     #6BA8DC;
+    --seat-2:     #E08B52;
+    --shadow:     rgba(0, 0, 0, .45);
+    --hex-fill:   #262B31;
+    --hex-line:   #414851;
+  }
+}
+:root[data-theme="dark"] {
+  --kraft:      #1B1E22;
+  --ground:     #15181B;
+  --paper:      #23272C;
+  --panel:      #2A2F35;
+  --line:       #3B424A;
+  --line-soft:  #333940;
+  --ink:        #E8E3D7;
+  --ink-2:      #AEB6BE;
+  --ink-3:      #7C8189;
+  --brick:      #D08278;
+  --brick-soft: #8C4B45;
+  --steel:      #9DB2C4;
+  --steel-soft: #55636F;
+  --gold:       #E0AB3C;
+  --moss:       #90B076;
+  --seat-1:     #6BA8DC;
+  --seat-2:     #E08B52;
+  --shadow:     rgba(0, 0, 0, .45);
+  --hex-fill:   #262B31;
+  --hex-line:   #414851;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Golos Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 72px; }
+
+/* ---------- шапка страницы ---------- */
+.pagehead {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px;
+  padding-bottom: 14px; margin-bottom: 22px;
+  border-bottom: 2px solid var(--line);
+}
+.pagehead h1 {
+  font-family: "Exo 2", "Golos Text", sans-serif;
+  font-weight: 700; font-size: clamp(26px, 3.4vw, 38px);
+  letter-spacing: .01em; margin: 0; text-wrap: balance;
+}
+.pagehead .sub { color: var(--ink-2); font-size: 15px; max-width: 62ch; }
+.stamp {
+  font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--brick); border: 1.5px solid var(--brick);
+  padding: 3px 9px; border-radius: 3px; white-space: nowrap;
+}
+
+/* ---------- рамка макета ---------- */
+.mock {
+  background: var(--kraft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 10px 34px -18px var(--shadow);
+  overflow: hidden;
+}
+.titlebar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink-3);
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+
+.screen {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 0;
+}
+@media (max-width: 860px) { .screen { grid-template-columns: 1fr; } }
+
+/* ---------- левая колонка решений ---------- */
+.rail {
+  background: var(--paper);
+  border-right: 1px solid var(--line);
+  padding: 16px 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.card > header {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 9px 12px 7px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.card h3 {
+  margin: 0; font-family: "Exo 2", sans-serif; font-weight: 600;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.card .now {
+  font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-3);
+}
+.card .body { padding: 11px 12px 13px; display: flex; flex-direction: column; gap: 9px; }
+
+/* режимы */
+.modes { display: flex; flex-direction: column; gap: 6px; }
+.mode {
+  display: flex; gap: 10px; align-items: flex-start; text-align: left;
+  padding: 8px 10px; border-radius: 4px; cursor: pointer;
+  background: transparent; border: 1.5px solid var(--line-soft);
+  color: inherit; font: inherit;
+}
+.mode:hover { border-color: var(--steel-soft); }
+.mode[aria-pressed="true"] {
+  border-color: var(--brick); background: color-mix(in srgb, var(--brick) 8%, transparent);
+}
+.mode .glyph {
+  flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center;
+  border-radius: 3px; background: var(--kraft); color: var(--steel);
+}
+.mode b { display: block; font-weight: 600; font-size: 14px; line-height: 1.25; }
+.mode span { display: block; color: var(--ink-3); font-size: 12px; line-height: 1.35; }
+
+/* поля-строки */
+.row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.row label { color: var(--ink-2); font-size: 13px; }
+.pillset { display: flex; gap: 4px; }
+.pill {
+  font: 600 13px/1 "JetBrains Mono", monospace;
+  padding: 6px 10px; border-radius: 3px; cursor: pointer;
+  background: var(--kraft); border: 1.5px solid transparent; color: var(--ink-2);
+}
+.pill[aria-pressed="true"] { border-color: var(--steel); color: var(--ink); background: var(--panel); }
+.seedbox {
+  display: flex; align-items: center; gap: 6px;
+  font-family: "JetBrains Mono", monospace; font-size: 13px;
+  background: var(--kraft); border: 1px solid var(--line-soft);
+  border-radius: 3px; padding: 5px 8px;
+}
+.seedbox input {
+  width: 76px; border: 0; background: transparent; color: var(--ink);
+  font: inherit; padding: 0;
+}
+.seedbox button {
+  border: 0; background: transparent; cursor: pointer; color: var(--steel);
+  font: inherit; padding: 0 2px;
+}
+select.plain {
+  font: inherit; font-size: 13px; color: var(--ink);
+  background: var(--kraft); border: 1px solid var(--line-soft);
+  border-radius: 3px; padding: 5px 8px;
+}
+
+/* тренировочные значения */
+.warn {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 12px; line-height: 1.4; color: var(--ink-2);
+  background: color-mix(in srgb, var(--gold) 14%, transparent);
+  border-left: 3px solid var(--gold);
+  padding: 8px 10px; border-radius: 0 3px 3px 0;
+}
+.stat { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.stat .k { font-size: 13px; color: var(--ink-2); }
+.stat .v {
+  font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 7px;
+}
+.stat .v em { font-style: normal; color: var(--ink-3); font-weight: 400; font-size: 11px; }
+.step {
+  width: 20px; height: 20px; line-height: 1; border-radius: 3px; cursor: pointer;
+  border: 1px solid var(--line-soft); background: var(--kraft); color: var(--ink-2);
+  font: 600 13px/1 "JetBrains Mono", monospace;
+}
+
+/* ---------- поле ---------- */
+.stage { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.stagehead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.maps { display: flex; flex-wrap: wrap; gap: 5px; }
+.map {
+  font: 500 12.5px/1 "Golos Text", sans-serif;
+  padding: 6px 10px; border-radius: 3px; cursor: pointer;
+  background: var(--panel); border: 1.5px solid var(--line-soft); color: var(--ink-2);
+}
+.map[aria-pressed="true"] { border-color: var(--brick); color: var(--ink); }
+.hint {
+  font-size: 12.5px; color: var(--ink-3);
+  display: flex; align-items: center; gap: 7px;
+}
+.hint b { color: var(--brick); font-weight: 600; }
+
+.board {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  padding: 6px;
+  min-height: 300px;
+}
+.board svg { display: block; width: 100%; height: auto; }
+.hx { fill: var(--hex-fill); stroke: var(--hex-line); stroke-width: 1.4; }
+.hx.spawn { fill: color-mix(in srgb, var(--steel) 14%, var(--hex-fill)); }
+.hx.pickable { cursor: pointer; stroke: var(--steel); stroke-width: 2.4; stroke-dasharray: 6 4; }
+.hx.pickable:hover { fill: color-mix(in srgb, var(--steel) 26%, var(--hex-fill)); }
+.hx.mine { fill: color-mix(in srgb, var(--seat-1) 26%, var(--hex-fill)); stroke: var(--seat-1); stroke-width: 2.6; stroke-dasharray: none; }
+.hx.foe  { fill: color-mix(in srgb, var(--seat-2) 22%, var(--hex-fill)); stroke: var(--seat-2); stroke-width: 2.6; stroke-dasharray: none; }
+.wedge { fill: transparent; cursor: pointer; }
+.wedge:hover { fill: color-mix(in srgb, var(--seat-1) 34%, transparent); }
+.wedge.on { fill: color-mix(in srgb, var(--seat-1) 52%, transparent); }
+.seatlabel {
+  font-family: "Exo 2", sans-serif; font-weight: 700; font-size: 13px;
+  text-anchor: middle; pointer-events: none;
+}
+.glyphtext { font-size: 13px; text-anchor: middle; pointer-events: none; }
+
+/* ---------- полоса стола ---------- */
+.table {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+.seat {
+  background: var(--panel); border: 1px solid var(--line-soft);
+  border-radius: 5px; padding: 10px 11px;
+  border-top: 3px solid var(--line);
+}
+.seat.me { border-top-color: var(--seat-1); }
+.seat.bot { border-top-color: var(--seat-2); }
+.seat .who {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  font-family: "Exo 2", sans-serif; font-weight: 600; font-size: 14px;
+}
+.seat .who small {
+  font-family: "JetBrains Mono", monospace; font-weight: 400;
+  font-size: 10.5px; letter-spacing: .1em; color: var(--ink-3); text-transform: uppercase;
+}
+.seat .desc { font-size: 12px; color: var(--ink-3); line-height: 1.4; margin-top: 3px; }
+.seat .meta {
+  margin-top: 7px; display: flex; flex-wrap: wrap; gap: 4px;
+}
+.tag {
+  font: 500 11px/1 "JetBrains Mono", monospace; letter-spacing: .04em;
+  padding: 4px 7px; border-radius: 3px;
+  background: var(--kraft); color: var(--ink-2);
+}
+.tag.locked { color: var(--ink-3); }
+
+/* ---------- подвал экрана ---------- */
+.footbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 13px 18px;
+  background: var(--paper); border-top: 1px solid var(--line);
+}
+.ready { font-size: 13px; color: var(--ink-2); }
+.ready b { color: var(--ink); }
+.go {
+  font-family: "Exo 2", sans-serif; font-weight: 700; font-size: 16px;
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 13px 30px; border-radius: 4px; cursor: pointer;
+  color: #FFF8EC; background: var(--brick); border: 0;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--brick) 60%, #000);
+}
+.go:hover { filter: brightness(1.06); }
+.go:disabled {
+  background: var(--line); color: var(--ink-3); cursor: not-allowed;
+  box-shadow: none;
+}
+.go:focus-visible, .mode:focus-visible, .pill:focus-visible, .map:focus-visible,
+.step:focus-visible, .seedbox button:focus-visible {
+  outline: 2.5px solid var(--steel); outline-offset: 2px;
+}
+
+/* ---------- пояснения под макетом ---------- */
+.notes { margin-top: 40px; display: grid; gap: 22px; }
+.notes h2 {
+  font-family: "Exo 2", sans-serif; font-weight: 600; font-size: 13px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
+  margin: 0 0 2px; padding-bottom: 7px; border-bottom: 1px solid var(--line-soft);
+}
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
+.note {
+  background: var(--paper); border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--steel); border-radius: 0 4px 4px 0; padding: 12px 14px;
+}
+.note.new { border-left-color: var(--brick); }
+.note h4 {
+  margin: 0 0 5px; font-family: "Exo 2", sans-serif; font-weight: 600; font-size: 14.5px;
+}
+.note p { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+.note code {
+  font-family: "JetBrains Mono", monospace; font-size: 12px;
+  background: var(--kraft); padding: 1px 4px; border-radius: 2px; color: var(--ink-2);
+}
+ol.q { margin: 0; padding-left: 22px; display: grid; gap: 9px; }
+ol.q li { font-size: 14.5px; }
+ol.q b { font-weight: 600; }
+.foot {
+  margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--line-soft);
+  font-size: 12.5px; color: var(--ink-3);
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="pagehead">
+    <h1>Штабной стол</h1>
+    <span class="stamp">концепт · ждёт вердикта</span>
+    <p class="sub">Экран, с которого начинается партия: собрать стол — режим, правила, поле, своё место, соперников — и сесть играть. Сейчас такого экрана нет: живая партия запускается строкой в консоли.</p>
+  </header>
+
+  <div class="mock">
+    <div class="titlebar">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span>Кристаллы Раздора — Штаб</span>
+    </div>
+
+    <div class="screen">
+
+      <!-- ЛЕВАЯ КОЛОНКА РЕШЕНИЙ -->
+      <aside class="rail">
+
+        <section class="card">
+          <header><h3>Режим</h3><span class="now" id="now-mode">против ботов</span></header>
+          <div class="body">
+            <div class="modes" role="group" aria-label="Режим игры">
+              <button class="mode" aria-pressed="true" data-mode="боты">
+                <span class="glyph">◆</span>
+                <span><b>Один против ботов</b><span>Вы и до трёх соперников-программ</span></span>
+              </button>
+              <button class="mode" aria-pressed="false" data-mode="общий">
+                <span class="glyph">◈</span>
+                <span><b>Общий компьютер</b><span>Живые игроки по очереди за одним экраном</span></span>
+              </button>
+              <button class="mode" aria-pressed="false" data-mode="сеть">
+                <span class="glyph">◇</span>
+                <span><b>По сети</b><span>Вы поднимаете стол, к нему подключаются</span></span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <header><h3>Стол</h3><span class="now" id="now-table">2 места · 1.24.0</span></header>
+          <div class="body">
+            <div class="row">
+              <label id="lbl-players">игроков</label>
+              <div class="pillset" role="group" aria-labelledby="lbl-players">
+                <button class="pill" aria-pressed="true" data-players="2">2</button>
+                <button class="pill" aria-pressed="false" data-players="3">3</button>
+                <button class="pill" aria-pressed="false" data-players="4">4</button>
+              </div>
+            </div>
+            <div class="row">
+              <label for="rules">правила</label>
+              <select class="plain" id="rules">
+                <option>свод 1.24.0</option>
+                <option>свод 1.23.0</option>
+                <option>свод 1.22.0</option>
+              </select>
+            </div>
+            <div class="row">
+              <label for="seed">сид</label>
+              <span class="seedbox">
+                <input id="seed" value="777001" inputmode="numeric">
+                <button type="button" id="reseed" title="бросить новый">⟳</button>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <header><h3>Стартовые значения</h3><span class="now" id="now-train">как в правилах</span></header>
+          <div class="body">
+            <div class="stat">
+              <span class="k">монеты</span>
+              <span class="v"><button class="step" data-d="-1" data-res="монеты">−</button><span data-v="монеты">5</span><button class="step" data-d="1" data-res="монеты">+</button><em>по правилам 5</em></span>
+              <span class="k">келемий</span>
+              <span class="v"><button class="step" data-d="-1" data-res="келемий">−</button><span data-v="келемий">1</span><button class="step" data-d="1" data-res="келемий">+</button><em>по правилам 1</em></span>
+              <span class="k">боеприпасы</span>
+              <span class="v"><button class="step" data-d="-1" data-res="боеприпасы">−</button><span data-v="боеприпасы">1</span><button class="step" data-d="1" data-res="боеприпасы">+</button><em>по правилам 1</em></span>
+            </div>
+            <div class="warn" id="trainwarn" hidden>
+              <span>⚠</span>
+              <span>Значения отличаются от свода. Партия пойдёт в журнал с меткой <b>ТРЕНИРОВОЧНАЯ</b> — иначе она попадёт в замеры баланса и испортит их.</span>
+            </div>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- ПОЛЕ -->
+      <main class="stage">
+        <div class="stagehead">
+          <div class="maps" role="group" aria-label="Раскладка поля">
+            <button class="map" aria-pressed="true">на 2 игроков · 1.0.0</button>
+            <button class="map" aria-pressed="false">карта Б1</button>
+            <button class="map" aria-pressed="false">другая сборка блоков</button>
+            <button class="map" aria-pressed="false">случайная</button>
+          </div>
+          <p class="hint" id="fieldhint"><b>Кликните стартовый гекс</b> — это будет ваше место</p>
+        </div>
+
+        <div class="board" id="board"></div>
+
+        <div class="table" id="tablestrip"></div>
+      </main>
+    </div>
+
+    <div class="footbar">
+      <span class="ready" id="ready">Осталось: <b>выбрать своё место на поле</b></span>
+      <button class="go" id="go" disabled>Начать партию</button>
+    </div>
+  </div>
+
+  <!-- ПОЯСНЕНИЯ -->
+  <div class="notes">
+
+    <section>
+      <h2>Пять решений — на одном экране, без шагов «далее»</h2>
+      <div class="grid2">
+        <div class="note"><h4>Режим</h4><p>Против ботов, общий компьютер, по сети. Сетевой стол ведёт в лобби — оно уже работает в коде (<code>GameServer</code>, <code>Lobby</code>, <code>SeatChannel</code>), ему нужен только вид.</p></div>
+        <div class="note"><h4>Стол</h4><p>Мест, версия свода, сид. Один сид, та же раскладка и тот же состав соперников дают ровно ту же партию — этим разбираются спорные ситуации.</p></div>
+        <div class="note new"><h4>Поле и своё место</h4><p>Настоящее поле тем же рисовальщиком, что в партии. Клик по стартовому гексу выбирает ваше место, наведение на сектор — поворот ЦУ: движок это уже умеет (<code>cuFacing</code>).</p></div>
+        <div class="note"><h4>Соперники</h4><p>Шестнадцать: четыре характера на четырёх уровнях умения. Описания берутся из <code>BotCatalog</code> — те, что уже написаны, а не сочинённые заново.</p></div>
+        <div class="note new"><h4>Стартовые значения</h4><p>Правятся руками — но такая партия помечается <b>ТРЕНИРОВОЧНОЙ</b> и метка идёт в журнал: иначе она попадёт в замеры баланса и испортит их.</p></div>
+        <div class="note"><h4>Органы — как в партии</h4><p>Те же рисованные плитки, что в «Командном пункте». Стоковых Swing-виджетов в меню не будет, иначе меню и партия выглядят как две разные программы.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Что уже есть в коде, а что придётся делать</h2>
+      <div class="grid2">
+        <div class="note"><h4>Готово — брать как есть</h4><p>Каталог соперников с описаниями, версии свода, раскладки полей <code>data/scenarios/*.kmap</code>, поворот ЦУ по месту, рисовальщик поля, сетевой стол с лобби и переподключением.</p></div>
+        <div class="note new"><h4>Делать</h4><p>Сам экран и его органы; выбор места кликом по стартовому гексу; тренировочные значения и метка в журнале; вид лобби для сетевого режима.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Вопросы дизайнеру</h2>
+      <ol class="q">
+        <li><b>Режимы.</b> Нужен ли «общий компьютер» сразу — или сперва только против ботов, а живые соседи и сеть потом?</li>
+        <li><b>Тренировочные значения.</b> Помечать такие партии в журнале — или пусть это отдельный «полигон», который в журнал вообще не пишет?</li>
+        <li><b>Выбор места.</b> Клик по стартовому гексу выбирает место за столом — или ещё и цвет? Сейчас цвет привязан к номеру места.</li>
+        <li><b>Колода приказов.</b> Игрок выбирает свою сам — или её тянут вслепую, как на столе?</li>
+        <li><b>Имя экрана.</b> «Штаб» — или лучше другое?</li>
+      </ol>
+    </section>
+  </div>
+
+  <p class="foot">Макет живой: попробуйте выбрать место на поле и повернуть ЦУ по сектору. Числа и соперники — настоящие из игры.</p>
+</div>
+
+<script>
+(function () {
+  var R = 40, TILT = 0;
+  var BOARD = document.getElementById('board');
+
+  // Гексы плоской стороной вверх — как на настоящем поле.
+  function hexPoints(cx, cy, r) {
+    var p = [];
+    for (var i = 0; i < 6; i++) {
+      var a = Math.PI / 180 * (60 * i + TILT);
+      p.push((cx + r * Math.cos(a)).toFixed(1) + ',' + (cy + r * Math.sin(a)).toFixed(1));
+    }
+    return p.join(' ');
+  }
+  function centre(q, r) {
+    return { x: R * 1.5 * q, y: R * Math.sqrt(3) * (r + q / 2) };
+  }
+
+  var field = [];
+  for (var q = -2; q <= 2; q++) {
+    for (var r = -2; r <= 2; r++) {
+      if (Math.abs(q + r) <= 2) field.push({ q: q, r: r, kind: 'hex' });
+    }
+  }
+  // Стартовые гексы по кругу: на двоих — напротив друг друга, на троих и
+  // четверых добавляются верхний и нижний.
+  var SPAWNS = [
+    { q: -3, r: 1, kind: 'spawn', seat: 0 },
+    { q: 3, r: -1, kind: 'spawn', seat: 1 },
+    { q: 0, r: -3, kind: 'spawn', seat: 2 },
+    { q: 0, r: 3, kind: 'spawn', seat: 3 }
+  ];
+
+  // немного печатной начинки, чтобы поле читалось как настоящее
+  var marks = { '0,0': '⬢', '1,-1': '⚡', '-1,1': '⚡', '2,-1': '?', '-2,1': '?', '0,2': '⚡', '0,-2': '?' };
+
+  var mySeat = null, facing = null, players = 2;
+
+  function seats() {
+    return field.concat(SPAWNS.slice(0, players));
+  }
+
+  function draw() {
+    var live = seats();
+    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+    live.forEach(function (h) {
+      var c = centre(h.q, h.r);
+      minX = Math.min(minX, c.x - R); maxX = Math.max(maxX, c.x + R);
+      minY = Math.min(minY, c.y - R); maxY = Math.max(maxY, c.y + R);
+    });
+    var pad = 26;
+    var svg = ['<svg viewBox="' + (minX - pad) + ' ' + (minY - pad) + ' ' +
+      (maxX - minX + pad * 2) + ' ' + (maxY - minY + pad * 2) + '" role="img" aria-label="Раскладка поля на двух игроков">'];
+
+    live.forEach(function (h, i) {
+      var c = centre(h.q, h.r);
+      var cls = 'hx';
+      var attrs = '';
+      if (h.kind === 'spawn') {
+        cls += ' spawn';
+        if (mySeat === h.seat) cls += ' mine';
+        else if (mySeat !== null) cls += ' foe';
+        else cls += ' pickable';
+        if (mySeat === null) {
+          attrs = ' tabindex="0" role="button" aria-label="Выбрать это место" data-seat="' + h.seat + '"';
+        }
+      }
+      svg.push('<polygon class="' + cls + '" points="' + hexPoints(c.x, c.y, R * 0.94) + '"' + attrs + '></polygon>');
+
+      var key = h.q + ',' + h.r;
+      if (marks[key]) {
+        svg.push('<text class="glyphtext" x="' + c.x + '" y="' + (c.y + 5) + '" fill="var(--ink-3)">' + marks[key] + '</text>');
+      }
+      if (h.kind === 'spawn') {
+        var txt = mySeat === h.seat ? 'ВЫ' : (mySeat === null ? 'старт' : 'соперник');
+        var col = mySeat === h.seat ? 'var(--seat-1)' : (mySeat === null ? 'var(--ink-3)' : 'var(--seat-2)');
+        svg.push('<text class="seatlabel" x="' + c.x + '" y="' + (c.y + 5) + '" fill="' + col + '">' + txt + '</text>');
+      }
+    });
+
+    // Секторы своего стартового гекса — куда встанет ЦУ (он занимает две стенки).
+    if (mySeat !== null) {
+      var me = SPAWNS[mySeat];
+      var c2 = centre(me.q, me.r);
+      for (var s = 0; s < 6; s++) {
+        var a1 = Math.PI / 180 * (60 * s + TILT), a2 = Math.PI / 180 * (60 * (s + 1) + TILT);
+        var rr = R * 0.94;
+        var pts = c2.x + ',' + c2.y + ' ' +
+          (c2.x + rr * Math.cos(a1)) + ',' + (c2.y + rr * Math.sin(a1)) + ' ' +
+          (c2.x + rr * Math.cos(a2)) + ',' + (c2.y + rr * Math.sin(a2));
+        var on = facing !== null && (s === facing || s === (facing + 1) % 6) ? ' on' : '';
+        svg.push('<polygon class="wedge' + on + '" points="' + pts + '" tabindex="0" role="button" ' +
+          'aria-label="Поставить ЦУ этими стенками" data-face="' + s + '"></polygon>');
+      }
+    }
+    svg.push('</svg>');
+    BOARD.innerHTML = svg.join('');
+
+    BOARD.querySelectorAll('[data-seat]').forEach(function (el) {
+      var act = function () { mySeat = +el.getAttribute('data-seat'); facing = null; draw(); sync(); };
+      el.addEventListener('click', act);
+      el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
+    });
+    BOARD.querySelectorAll('[data-face]').forEach(function (el) {
+      var act = function () { facing = +el.getAttribute('data-face'); draw(); sync(); };
+      el.addEventListener('click', act);
+      el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
+    });
+  }
+
+  var BOTS = [
+    { n: 'Каратель', lvl: 'гроссмейстер', d: 'Считает ходы вперёд, доигрывая копию партии, и всё считанное ведёт к одному — снести вас с поля', deck: 'Волк' },
+    { n: 'Снабженец', lvl: 'мастер', d: 'Живёт хозяйством: рынок, арсенал, обмены — и обращает их в силу', deck: 'Лиса' },
+    { n: 'Зодчий', lvl: 'любитель', d: 'Спокойно строит, выполняет задания и качает науку', deck: 'Барс' }
+  ];
+
+  function sync() {
+    var strip = document.getElementById('tablestrip');
+    var seats = [];
+    for (var i = 0; i < players; i++) {
+      if (i === mySeat) {
+        seats.push('<div class="seat me"><div class="who">Вы <small>место ' + (i + 1) + '</small></div>' +
+          '<div class="desc">живой игрок</div><div class="meta">' +
+          '<span class="tag">приказы: Ястреб</span>' +
+          '<span class="tag">ЦУ: ' + (facing === null ? 'не повёрнут' : 'стенки ' + (facing + 1) + '–' + ((facing + 1) % 6 + 1)) + '</span>' +
+          '<span class="tag locked">сторона А</span></div></div>');
+      } else {
+        var b = BOTS[(i + 2) % BOTS.length];
+        seats.push('<div class="seat bot"><div class="who">' + b.n + ' <small>место ' + (i + 1) + '</small></div>' +
+          '<div class="desc">' + b.lvl + ' · ' + b.d + '</div><div class="meta">' +
+          '<span class="tag">приказы: ' + b.deck + '</span><span class="tag locked">сторона А</span></div></div>');
+      }
+    }
+    strip.innerHTML = seats.join('');
+
+    var ready = document.getElementById('ready'), go = document.getElementById('go');
+    var hint = document.getElementById('fieldhint');
+    if (mySeat === null) {
+      ready.innerHTML = 'Осталось: <b>выбрать своё место на поле</b>';
+      hint.innerHTML = '<b>Кликните стартовый гекс</b> — это будет ваше место';
+      go.disabled = true;
+    } else if (facing === null) {
+      ready.innerHTML = 'Осталось: <b>повернуть центр управления</b>';
+      hint.innerHTML = '<b>Наведите на сектор</b> — так встанет ваш центр управления';
+      go.disabled = true;
+    } else {
+      ready.innerHTML = 'Стол собран: <b>' + players + ' места, свод 1.24.0, сид ' +
+        document.getElementById('seed').value + '</b>';
+      hint.innerHTML = 'Место выбрано, ЦУ повёрнут — можно начинать';
+      go.disabled = false;
+    }
+  }
+
+  function group(sel, attr, after) {
+    document.querySelectorAll(sel).forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll(sel).forEach(function (o) { o.setAttribute('aria-pressed', 'false'); });
+        b.setAttribute('aria-pressed', 'true');
+        if (after) after(b.getAttribute(attr) || b.textContent.trim());
+      });
+    });
+  }
+  group('.mode', 'data-mode', function (v) { document.getElementById('now-mode').textContent =
+    v === 'боты' ? 'против ботов' : v === 'общий' ? 'общий компьютер' : 'по сети'; });
+  group('.pill', 'data-players', function (v) {
+    players = +v;
+    document.getElementById('now-table').textContent = v + ' места · 1.24.0';
+    if (mySeat !== null && mySeat >= players) { mySeat = null; facing = null; }
+    draw();
+    sync();
+  });
+  group('.map', null, null);
+
+  document.getElementById('reseed').addEventListener('click', function () {
+    document.getElementById('seed').value = String(Math.floor(Math.random() * 900000) + 100000);
+    sync();
+  });
+  document.getElementById('seed').addEventListener('input', sync);
+
+  var BASE = { 'монеты': 5, 'келемий': 1, 'боеприпасы': 1 };
+  document.querySelectorAll('.step').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var res = b.getAttribute('data-res');
+      var el = document.querySelector('[data-v="' + res + '"]');
+      el.textContent = Math.max(0, +el.textContent + (+b.getAttribute('data-d')));
+      var off = Object.keys(BASE).some(function (k) {
+        return +document.querySelector('[data-v="' + k + '"]').textContent !== BASE[k];
+      });
+      document.getElementById('trainwarn').hidden = !off;
+      document.getElementById('now-train').textContent = off ? 'ТРЕНИРОВОЧНАЯ' : 'как в правилах';
+    });
+  });
+
+  draw();
+  sync();
+})();
+</script>
