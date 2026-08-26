@@ -174,6 +174,10 @@ public final class HotSeatWindow {
     volatile ReplayRecord rec;
     /** Место, для которого сейчас реально ждём клика/кнопки — иначе null. */
     volatile Integer awaitingSeat;
+    /** Окно закрыто игроком: живые обновления больше не нужны. */
+    private volatile boolean stopped;
+    /** Партия доиграна до конца — закрывать её можно без вопросов. */
+    private volatile boolean finished;
 
     HotSeatWindow(int players, long seed, List<String> seatSpecs) {
         this(Options.simple(players, seed, seatSpecs));
@@ -204,7 +208,15 @@ public final class HotSeatWindow {
         // Светлая тема — просьба дизайнера 24.08.2026 («работай пока со светлой»).
         Theme.apply(false);
         frame = new JFrame("Кристаллы Раздора — Командный пункт");
-        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        // Закрытие окна НЕ гасит программу: партию всегда можно закрыть и
+        // вернуться в меню, а гасит программу уже само меню.
+        frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                askClose();
+            }
+        });
         frame.getContentPane().setLayout(new BorderLayout());
         frame.getContentPane().setBackground(Theme.bg());
 
@@ -262,6 +274,15 @@ public final class HotSeatWindow {
         turnLabel.setFont(Theme.font(16, Font.BOLD));
         turnLabel.setForeground(Theme.ink());
         bar.add(turnLabel);
+
+        // ВЫЙТИ ИЗ ПАРТИИ МОЖНО ВСЕГДА (просьба дизайнера 26.08): закрыли —
+        // вернулись в «Штаб» и собрали стол заново.
+        KpButton toMenu = new KpButton("В меню", "закрыть партию", null);
+        toMenu.setPreferredSize(new Dimension(Theme.px(126), Theme.px(38)));
+        toMenu.setToolTipText("Закрыть партию и вернуться в «Штаб». "
+            + "Недоигранная партия всё равно попадёт в журнал");
+        toMenu.onClick(this::askClose);
+        bar.add(toMenu);
 
         // Полоса всех мест — открытый счёт стола (блокер приёмки №1).
         JPanel north = new JPanel();
@@ -699,7 +720,15 @@ public final class HotSeatWindow {
             result = GameRecorder.playWithAgents(cfg, state, agents, labels, seed,
                 msg -> SwingUtilities.invokeLater(() -> feedLine(null, msg)),
                 r -> SwingUtilities.invokeLater(() -> onFrame(r)));
+        } catch (kelium.core.GameAborted e) {
+            // Игрок закрыл партию — это не поломка. Записываем то, что успело
+            // случиться: журнал партии нужен дизайнеру и от недоигранной.
+            saveJournal(rec, "-прервана");
+            return;
         } catch (Throwable t) {
+            if (stopped) {
+                return;      // окно уже закрыто, жаловаться некому
+            }
             SwingUtilities.invokeLater(() -> {
                 turnLabel.setText("Партия прервана ошибкой");
                 feedLine(null, String.valueOf(t));
@@ -716,12 +745,21 @@ public final class HotSeatWindow {
                 ? Theme.ink() : Theme.seatInk(finalRec.winner));
             endBtn.setTexts("Партия окончена", "");
             endBtn.setState(KpButton.State.DISABLED);
+            finished = true;
             clearDecision();
         });
+        saveJournal(finalRec, "");
+    }
+
+    /** Записать журнал партии на диск. {@code suffix} — пометка в имени файла. */
+    private void saveJournal(ReplayRecord r, String suffix) {
+        if (r == null) {
+            return;
+        }
         try {
             java.nio.file.Path out = java.nio.file.Path.of("reports", "hotseat",
-                "hotseat-" + seed + ".kelium-replay.json");
-            finalRec.save(out);
+                "hotseat-" + seed + suffix + ".kelium-replay.json");
+            r.save(out);
             SwingUtilities.invokeLater(() ->
                 feedLine(null, "Журнал партии записан: " + out.toAbsolutePath()));
         } catch (java.io.IOException e) {
@@ -731,6 +769,43 @@ public final class HotSeatWindow {
     }
 
     // ==================== живое обновление ====================
+
+    /**
+     * ЗАКРЫТЬ ПАРТИЮ И ВЕРНУТЬСЯ В «ШТАБ». Недоигранную партию спрашиваем: она
+     * пропадёт, и сказать об этом надо ДО, а не после.
+     */
+    void askClose() {
+        if (stopped || finished) {
+            closeToMenu();
+            return;
+        }
+        confirm.open("Закрыть партию?",
+            "Партия не доиграна — вернуться к ней будет нельзя",
+            List.of("Всё, что успело случиться, останется в журнале партии",
+                "Стол в «Штабе» соберётся заново с теми же настройками"),
+            List.of(new kelium.gui.kp.ConfirmDialog.Option("Закрыть и выйти в меню",
+                "вернуться в «Штаб»", this::closeToMenu)),
+            new kelium.gui.kp.ConfirmDialog.Option("Продолжить играть", "остаться в партии",
+                () -> confirm.close()));
+    }
+
+    /**
+     * Снять движок с недоигранной партии и открыть меню.
+     *
+     * <p>Движок синхронный и сейчас ждёт ответа игрока, поэтому он размыкается
+     * {@link kelium.core.UndoableAgent#abort} — поток выходит из точки решения
+     * сам, ничего не решая за игрока. Если сейчас думает бот, поток закончит
+     * его ход и выйдет на следующей точке живого игрока.
+     */
+    private void closeToMenu() {
+        stopped = true;
+        confirm.close();
+        for (kelium.core.UndoableAgent a : humansBySeat.values()) {
+            a.abort();
+        }
+        frame.dispose();
+        StartMenuWindow.open(options);
+    }
 
     /**
      * ТРЕНИРОВОЧНЫЕ ЗНАЧЕНИЯ ПОДГОТОВКИ. Правится КОПИЯ свода этой партии
@@ -768,6 +843,9 @@ public final class HotSeatWindow {
     }
 
     private void onFrame(ReplayRecord r) {
+        if (stopped) {
+            return;          // окно закрыто — движку уже некуда рисовать
+        }
         if (this.rec != r) {
             this.rec = r;
             field.setRecord(r);

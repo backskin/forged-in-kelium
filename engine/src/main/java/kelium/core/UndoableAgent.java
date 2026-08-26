@@ -96,6 +96,11 @@ public final class UndoableAgent extends Agent {
         return delegate.pending();
     }
 
+    /** Закрыть партию, не доиграв (см. {@link InteractiveAgent#abort}). */
+    public void abort() {
+        delegate.abort();
+    }
+
     public void submitIndex(int index) {
         delegate.submitIndex(index);
     }

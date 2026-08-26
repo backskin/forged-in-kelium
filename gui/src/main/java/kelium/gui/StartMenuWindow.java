@@ -54,6 +54,57 @@ public final class StartMenuWindow {
         SwingUtilities.invokeLater(() -> new StartMenuWindow().start());
     }
 
+    /**
+     * ВЕРНУТЬСЯ В МЕНЮ ПОСЛЕ ПАРТИИ, не собирая стол заново: настройки той
+     * партии восстанавливаются, и поменять достаточно то, что хотелось.
+     * {@code previous} может быть null — тогда стол чистый.
+     */
+    public static void open(HotSeatWindow.Options previous) {
+        SwingUtilities.invokeLater(() -> {
+            StartMenuWindow w = new StartMenuWindow();
+            w.restore(previous);
+            w.start();
+        });
+    }
+
+    /** Взять настройки прошлой партии за исходные. */
+    private void restore(HotSeatWindow.Options o) {
+        if (o == null) {
+            return;
+        }
+        rulesetId = o.rulesetId();
+        players = o.players();
+        seed = o.seed();
+        restoreSpecs = List.copyOf(o.seatSpecs());
+        restoreMapId = o.scenarioId();
+        restoreMapFile = o.scenarioFile();
+        restoreCoins = o.startCoins();
+        restoreKelium = o.startKelium();
+        restoreAmmo = o.startAmmo();
+        // Место игрока и поворот ЦУ — из состава мест прошлой партии.
+        for (int i = 0; i < restoreSpecs.size(); i++) {
+            if (HUMAN.equals(restoreSpecs.get(i))) {
+                restoreSeat = i;
+                break;
+            }
+        }
+        if (o.cuFacing() != null && restoreSeat != null
+                && restoreSeat < o.cuFacing().size()) {
+            restoreFacing = o.cuFacing().get(restoreSeat);
+        }
+        mode = restoreSpecs.stream().filter(HUMAN::equals).count() > 1
+            ? Mode.HOTSEAT : Mode.BOTS;
+    }
+
+    private List<String> restoreSpecs;
+    private String restoreMapId;
+    private java.nio.file.Path restoreMapFile;
+    private Integer restoreSeat;
+    private Integer restoreFacing;
+    private Integer restoreCoins;
+    private Integer restoreKelium;
+    private Integer restoreAmmo;
+
     private static final int RAIL_W = 320;
 
     /** Режимы стола. Сеть и общий компьютер ждут своих экранов. */
@@ -111,7 +162,49 @@ public final class StartMenuWindow {
         frame.setSize(Theme.px(1280), Theme.px(860));
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
+        applyRestored();
         rebuildPreview();
+    }
+
+    /** Разложить настройки прошлой партии по органам уже собранного окна. */
+    private void applyRestored() {
+        if (restoreSpecs == null) {
+            return;
+        }
+        countTiles.forEach((k, b) -> b.setState(k == players
+            ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE));
+        modeTiles.forEach((k, t) -> {
+            if (t.state() != KpButton.State.DISABLED) {
+                t.setState(k.equals(mode.name())
+                    ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
+            }
+        });
+        rulesBox.select(rulesetId);
+        seedBox.set(seed);
+        ensureBots();
+        for (int i = 0; i < restoreSpecs.size() && i < bots.size(); i++) {
+            bots.set(i, restoreSpecs.get(i));
+        }
+        refreshMaps();
+        for (FieldOption f : maps) {
+            if (restoreMapId != null && restoreMapId.equals(f.id())
+                    || restoreMapId == null && restoreMapFile == null && f.id() == null) {
+                map = f;
+                mapBox.select(f.label());
+                break;
+            }
+        }
+        mySeat = restoreSeat;
+        myFacing = restoreFacing;
+        if (restoreCoins != null) {
+            coinStep.step(restoreCoins - coinStep.value());
+        }
+        if (restoreKelium != null) {
+            keliumStep.step(restoreKelium - keliumStep.value());
+        }
+        if (restoreAmmo != null) {
+            ammoStep.step(restoreAmmo - ammoStep.value());
+        }
     }
 
     private JComponent buildHead() {
@@ -273,15 +366,18 @@ public final class StartMenuWindow {
         JPanel col = new JPanel();
         col.setOpaque(false);
         col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
-        JLabel note = new JLabel("<html><body style='width:"
-            + Theme.px(240) + "px'>Правите значения — партия помечается "
-            + "<b>тренировочной</b>, и метка идёт в журнал: в замеры баланса "
-            + "такая партия не годится.</body></html>");
-        note.setFont(Theme.font(11, Font.PLAIN));
-        note.setForeground(Theme.ink3());
-        note.setAlignmentX(Component.LEFT_ALIGNMENT);
-        note.setBorder(BorderFactory.createEmptyBorder(0, 0, Theme.px(6), 0));
-        col.add(note);
+        // Пояснение — ОБЫЧНЫМИ строками, а не html с заданной шириной: ширина
+        // колонки зависит от масштаба темы, и подогнанное html-число на другом
+        // масштабе обрезало строку краем панели.
+        for (String line : List.of("Правите значения — партия станет ТРЕНИРОВОЧНОЙ,",
+                "и метка уйдёт в журнал: в замеры баланса", "такая партия не годится.")) {
+            JLabel note = new JLabel(line);
+            note.setFont(Theme.font(11, Font.PLAIN));
+            note.setForeground(Theme.ink3());
+            note.setAlignmentX(Component.LEFT_ALIGNMENT);
+            col.add(note);
+        }
+        col.add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
 
         int[] print = printedStart();
         coinStep = new Stepper("монеты", "COIN", print[0], 0, 30, v -> refreshReady());

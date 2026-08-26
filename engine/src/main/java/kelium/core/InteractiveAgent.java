@@ -28,6 +28,10 @@ public final class InteractiveAgent extends Agent {
     private final Consumer<Map<String, Object>> onPublicEvent;
     private final BlockingQueue<Choice> answer = new ArrayBlockingQueue<>(1);
     private volatile PendingDecision pending;
+    /** Партию закрыли, не доиграв: ожидание ответа надо размотать. */
+    private volatile boolean aborted;
+    /** Метка «ответа не будет» — ею разблокируется ожидание при закрытии. */
+    private static final Choice POISON = new Choice("aborted", null, "партия закрыта");
 
     /**
      * @param onDecision    вызывается в потоке движка при каждом {@link #choose}
@@ -44,16 +48,37 @@ public final class InteractiveAgent extends Agent {
 
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
+        if (aborted) {
+            throw new GameAborted("Игрок #" + seat + " закрыл партию");
+        }
         pending = new PendingDecision(state, options, context);
         onDecision.accept(pending);
         try {
             Choice picked = answer.take();
             pending = null;
+            if (aborted || picked == POISON) {
+                throw new GameAborted("Игрок #" + seat + " закрыл партию");
+            }
             return picked;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Ожидание выбора игрока #" + seat + " прервано", e);
         }
+    }
+
+    /**
+     * ЗАКРЫТЬ ПАРТИЮ, НЕ ДОИГРАВ. Ожидание ответа размыкается меткой, и поток
+     * движка выходит из {@link #choose} исключением {@link GameAborted} —
+     * не заканчивая партию и ничего не решая за игрока.
+     */
+    public void abort() {
+        aborted = true;
+        answer.offer(POISON);
+    }
+
+    /** Закрыта ли партия этим игроком. */
+    public boolean aborted() {
+        return aborted;
     }
 
     @Override
