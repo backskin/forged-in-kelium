@@ -98,6 +98,8 @@ public final class HotSeatWindow {
     private JLayeredPane layered;
     private final Map<String, JComponent> drawers = new LinkedHashMap<>();
     final Map<String, KpTab> drawerTabs = new LinkedHashMap<>();
+    /** Кнопки ящиков в нижней зоне игрока (планшет, наука и рынок). */
+    final Map<String, KpButton> drawerBtns = new LinkedHashMap<>();
     private JComponent openDrawer;
     kelium.gui.kp.TurnStepsPanel steps;
     private JLabel stepsCaption;
@@ -117,6 +119,7 @@ public final class HotSeatWindow {
     PromptOverlay prompt;
     private ZoomCard zoom;
     kelium.gui.kp.ConfirmDialog confirm;
+    kelium.gui.kp.CardChoiceOverlay ceremony;
     private kelium.gui.kp.OpponentStrip opponents;
     KpButton endBtn;
     /** Выезд контекстной панели снизу (120–180 мс по скиллу интерфейса). */
@@ -164,9 +167,13 @@ public final class HotSeatWindow {
         frame.add(buildPlayerZone(), BorderLayout.SOUTH);
 
         zoom = new ZoomCard();
-        zoom.setSize(Theme.px(220), Theme.px(300));
+        zoom.setSize(Theme.px(236), Theme.px(348));
         zoom.setVisible(false);
         frame.getLayeredPane().add(zoom, JLayeredPane.POPUP_LAYER);
+
+        // Церемония выбора карты круга/отложенного приказа — крупными лицами.
+        ceremony = new kelium.gui.kp.CardChoiceOverlay();
+        frame.getLayeredPane().add(ceremony, JLayeredPane.MODAL_LAYER);
 
         // Модальное окно необратимого — во весь слой окна, поверх всего.
         confirm = new kelium.gui.kp.ConfirmDialog();
@@ -176,9 +183,13 @@ public final class HotSeatWindow {
             public void componentResized(java.awt.event.ComponentEvent e) {
                 confirm.setBounds(0, 0, frame.getLayeredPane().getWidth(),
                     frame.getLayeredPane().getHeight());
+                ceremony.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+                    frame.getLayeredPane().getHeight());
             }
         });
         confirm.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        ceremony.setBounds(0, 0, frame.getLayeredPane().getWidth(),
             frame.getLayeredPane().getHeight());
 
         frame.setSize(Theme.px(1500), Theme.px(950));
@@ -203,20 +214,6 @@ public final class HotSeatWindow {
         turnLabel.setFont(Theme.font(16, Font.BOLD));
         turnLabel.setForeground(Theme.ink());
         bar.add(turnLabel);
-
-        chipVp = new ChipLabel("SUPER", Theme.points(), "ПО");
-        chipVp.setToolTipText("Победные очки (сумма всех источников)");
-        chipCoin = new ChipLabel("COIN", Theme.points(), "монеты");
-        chipCoin.setToolTipText("Монеты");
-        chipKelium = new ChipLabel("KELIUM", Theme.kelium(), "келемий");
-        chipKelium.setToolTipText("Келемий: на складе / потолок склада");
-        chipAmmo = new ChipLabel("AMMO", Theme.energy(), "БПР");
-        chipAmmo.setToolTipText("Боеприпасы: на складе / потолок склада");
-        chipDebris = new ChipLabel("DEBRIS", Theme.neutral(), "обломки");
-        chipDebris.setToolTipText("Обломки: на складе / потолок");
-        for (ChipLabel c : List.of(chipVp, chipCoin, chipKelium, chipAmmo, chipDebris)) {
-            bar.add(c);
-        }
 
         // Полоса всех мест — открытый счёт стола (блокер приёмки №1).
         JPanel north = new JPanel();
@@ -243,8 +240,8 @@ public final class HotSeatWindow {
         strip.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 0, Theme.px(1), Theme.border()),
             BorderFactory.createEmptyBorder(Theme.px(10), Theme.px(4), Theme.px(10), Theme.px(4))));
-        addDrawerTab(strip, "Наука и рынок");
-        addDrawerTab(strip, "Планшет");
+        // Замечание дизайнера 25.08: вся информация игрока живёт ВНИЗУ, в его
+        // зоне; сбоку остаётся только журнал («ладно, оставь его сбоку»).
         addDrawerTab(strip, "Журнал");
         strip.add(javax.swing.Box.createVerticalGlue());
         return strip;
@@ -391,7 +388,14 @@ public final class HotSeatWindow {
             if (e.getValue() != target) {
                 e.getValue().setVisible(false);
             }
-            drawerTabs.get(e.getKey()).setSelected(on);
+            KpTab tab = drawerTabs.get(e.getKey());
+            if (tab != null) {
+                tab.setSelected(on);
+            }
+            KpButton btn = drawerBtns.get(e.getKey());
+            if (btn != null) {
+                btn.setState(on ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
+            }
         }
         if (closing) {
             JComponent t = target;
@@ -462,6 +466,53 @@ public final class HotSeatWindow {
             BorderFactory.createEmptyBorder(Theme.px(8), Theme.px(12), Theme.px(8), Theme.px(12))));
         zone.setPreferredSize(new Dimension(10, Theme.px(132)));
 
+        // ВСЯ ИНФОРМАЦИЯ ИГРОКА В ОДНОМ МЕСТЕ (замечание дизайнера 25.08):
+        // ресурсы и ПО — здесь же, внизу, рядом с кнопками планшета и науки.
+        chipVp = new ChipLabel("SUPER", Theme.points(), "ПО");
+        chipVp.setToolTipText("Победные очки (сумма всех источников)");
+        chipCoin = new ChipLabel("COIN", Theme.points(), "монеты");
+        chipCoin.setToolTipText("Монеты");
+        chipKelium = new ChipLabel("KELIUM", Theme.kelium(), "келемий");
+        chipKelium.setToolTipText("Келемий: на складе / потолок склада");
+        chipAmmo = new ChipLabel("AMMO", Theme.energy(), "БПР");
+        chipAmmo.setToolTipText("Боеприпасы: на складе / потолок склада");
+        chipDebris = new ChipLabel("DEBRIS", Theme.neutral(), "обломки");
+        chipDebris.setToolTipText("Обломки: на складе / потолок");
+        JPanel me = new JPanel();
+        me.setOpaque(false);
+        me.setLayout(new BoxLayout(me, BoxLayout.Y_AXIS));
+        JPanel chipsRow = new JPanel(new net.miginfocom.swing.MigLayout(
+            "insets 0, gapx " + Theme.px(6)));
+        chipsRow.setOpaque(false);
+        for (ChipLabel c : List.of(chipVp, chipCoin, chipKelium, chipAmmo, chipDebris)) {
+            chipsRow.add(c);
+        }
+        chipsRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        me.add(chipsRow);
+        me.add(javax.swing.Box.createVerticalStrut(Theme.px(8)));
+        JPanel btnRow = new JPanel(new net.miginfocom.swing.MigLayout(
+            "insets 0, gapx " + Theme.px(8)));
+        btnRow.setOpaque(false);
+        KpButton boardBtn = new KpButton("Планшет", "склад · войска", null);
+        boardBtn.setToolTipText(
+            "Планшеты игроков: склад, войска, трофеи, арсенал — свой и соперников");
+        boardBtn.setPreferredSize(new Dimension(Theme.px(128), Theme.px(46)));
+        boardBtn.onClick(() -> toggleDrawer("Планшет"));
+        boardBtn.setState(KpButton.State.AVAILABLE);
+        drawerBtns.put("Планшет", boardBtn);
+        KpButton sciBtn = new KpButton("Наука и рынок", "доска · курс", null);
+        sciBtn.setToolTipText(
+            "Доска науки и активная карта рынка — открываются поверх поля в любой момент");
+        sciBtn.setPreferredSize(new Dimension(Theme.px(128), Theme.px(46)));
+        sciBtn.onClick(() -> toggleDrawer("Наука и рынок"));
+        sciBtn.setState(KpButton.State.AVAILABLE);
+        drawerBtns.put("Наука и рынок", sciBtn);
+        btnRow.add(boardBtn);
+        btnRow.add(sciBtn);
+        btnRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        me.add(btnRow);
+        zone.add(me, BorderLayout.WEST);
+
         hands = new HandPanel(new HandPanel.HoverSink() {
             @Override
             public void onHover(CardTile tile, String group) {
@@ -500,6 +551,11 @@ public final class HotSeatWindow {
     }
 
     private void showZoom(CardTile tile, String group) {
+        if ("Приказы".equals(group) && tile.orderFaceInfo() != null) {
+            zoom.showOrder(tile.orderFaceInfo(), tile.cardName(), orderDesc(tile.cardId));
+            placeZoom(tile);
+            return;
+        }
         String type;
         String detail = "";
         double progress = -1;
@@ -522,6 +578,10 @@ public final class HotSeatWindow {
             type = "Арсенал";
         }
         zoom.show(tile.cardName(), type, tile.bandColor(), detail, progress);
+        placeZoom(tile);
+    }
+
+    private void placeZoom(CardTile tile) {
         Point p = SwingUtilities.convertPoint(tile, 0, 0, frame.getLayeredPane());
         int x = Math.max(Theme.px(6),
             Math.min(p.x - Theme.px(60), frame.getLayeredPane().getWidth() - zoom.getWidth() - Theme.px(6)));
@@ -681,11 +741,11 @@ public final class HotSeatWindow {
         }
         ReplayRecord.Player p = f.snapshot.players.get(viewedSeat);
         hands.setCards("Приказы", p.orderHand, this::cardName, orderBand(p.orderColor),
-            null, null);
+            null, null, this::orderFace);
         hands.setCards("Задания", p.objectiveHand, this::cardName, Theme.points(),
-            this::objectiveTag, Theme.kelium());
+            this::objectiveTag, Theme.kelium(), null);
         hands.setCards("Арсенал", p.arsenalHand, this::cardName, Theme.container(),
-            null, null);
+            null, null, null);
     }
 
     private Color orderBand(String color) {
@@ -824,9 +884,6 @@ public final class HotSeatWindow {
 
     /** Строка ленты (и её копия в ящик «Журнал»). seat null — служебное. */
     private void feedLine(Integer seat, String text) {
-        if (text.equals(lastFeedText)) {
-            return;
-        }
         // Сырые служебные события (телеметрия ботов вида «objective_hints {…}»)
         // человеку в ленте не нужны — в полном журнале партии они остаются.
         if (text.matches("^[a-z_]+ \\{.*")) {
@@ -837,8 +894,16 @@ public final class HotSeatWindow {
         // их сохраняет. Длинные протокольные записи сокращаются.
         text = text.replaceAll("\\s*\\([a-z0-9_:>.\\-]+\\)", "")
             .replaceAll("\\s{2,}", " ").trim();
+        // Человеческое место называется «Игрок N», и playerName записи склеивает
+        // «Игрок 1 · Игрок 1» — второй повтор игроку не нужен.
+        text = text.replaceAll("(Игрок \\d+) · \\1", "$1");
         if (text.length() > 160) {
             text = text.substring(0, 159) + "…";
+        }
+        // Повторы сверяем ПОСЛЕ чистки: сырые строки могли отличаться только
+        // внутренними скобками, и лента забивалась дюжиной одинаковых строк.
+        if (text.equals(lastFeedText)) {
+            return;
         }
         lastFeedText = text;
         feedBox.add(feedRow(seat, text));
@@ -890,7 +955,7 @@ public final class HotSeatWindow {
         Map.entry("combat_target", "цель атаки"),
         Map.entry("combat_victim", "кого поразить"),
         Map.entry("neutral_victim", "какой нейтрал атаковать"),
-        Map.entry("attack", "залп"),
+        Map.entry("attack", "атака"),
         Map.entry("mine", "добыча"),
         Map.entry("assemble", "сборка"),
         Map.entry("tuck", "подложить карту-символ"),
@@ -931,6 +996,41 @@ public final class HotSeatWindow {
         field.clearGhost();
         field.clearFacingChoice();
         prompt.hideAll();
+
+        // ЦЕРЕМОНИЯ КАРТ КРУГА (просьба дизайнера 24.08): выбор карты круга и
+        // отложенного приказа — крупными лицами по центру, с печатным
+        // описанием под наведённой картой.
+        if ("reveal_order".equals(kind) || "blind_discard".equals(kind)) {
+            boolean allCards = options.stream().allMatch(c -> c.payload() instanceof String);
+            if (allCards && !options.isEmpty()) {
+                actionBar.idle("не сейчас");
+                endBtn.setTexts("Сначала решение", KIND_LABELS.getOrDefault(kind, kind));
+                endBtn.setState(KpButton.State.DISABLED);
+                zoom.setVisible(false);
+                List<kelium.gui.kp.CardChoiceOverlay.Card> cards = new ArrayList<>();
+                for (int i = 0; i < options.size(); i++) {
+                    String id = (String) options.get(i).payload();
+                    int idx = i;
+                    cards.add(new kelium.gui.kp.CardChoiceOverlay.Card(id,
+                        orderFace(id), cardName(id), orderDesc(id), () -> {
+                            ceremony.close();
+                            agent.submitIndex(idx);
+                            clearDecision();
+                        }));
+                }
+                boolean reveal = "reveal_order".equals(kind);
+                ceremony.open(
+                    reveal ? "Выберите карту круга"
+                        : "Отложите приказ — место для трофеев",
+                    reveal
+                        ? "Верхний приказ сыграете вы; нижний откроется, если ту же карту вскроет соперник"
+                        : "Отложенная карта лежит рубашкой вверх весь раунд и принимает трофеи",
+                    cards);
+                refreshSteps();
+                frame.toFront();
+                return;
+            }
+        }
 
         // ВЫБОР ДУГИ СЕКТОРОВ (концепт §4): движок уже назвал гекс и варианты,
         // колесо мыши вращает дугу, клик по гексу ставит. Плашки-варианты внизу
@@ -1095,13 +1195,13 @@ public final class HotSeatWindow {
         zoom.setVisible(false);   // увеличенная карта не должна висеть под модалкой
         String target = d.context().get("target") instanceof String t ? t : null;
         String title = switch (kind) {
-            case "attack" -> "Бой — залп" + (target == null ? "" : " по гексу " + target);
+            case "attack" -> "Бой — атака" + (target == null ? "" : " по гексу " + target);
             case "combat_victim" -> "Кого поразить"
                 + (target == null ? "" : " в гексе " + target);
             default -> "Какой нейтрал" + (target == null ? "" : " в гексе " + target);
         };
         String warn = "attack".equals(kind) && agent.canUndo()
-            ? "Первый залп сделает откат шагов этого хода недоступным"
+            ? "Первая атака сделает откат шагов этого хода недоступным"
             : "Бой необратим";
 
         List<String> info = new ArrayList<>();
@@ -1140,10 +1240,10 @@ public final class HotSeatWindow {
         }
         // ПРОГНОЗ — предпросмотр последствий до подтверждения (приёмка №9):
         // урон печатный, из свода партии, не пересчёт «на глазок».
-        info.add("Залп снимает " + dmg + " прочности");
+        info.add("Атака снимает " + dmg + " прочности (печатное правило свода)");
         if ("attack".equals(kind) && enemies == 1 && lastEnemyLeft > 0
                 && lastEnemyLeft <= dmg) {
-            info.add("Этот залп УНИЧТОЖИТ цель");
+            info.add("Эта атака УНИЧТОЖИТ цель");
         }
         info.add("После боя пострадавшие могут ответить своим боем");
 
@@ -1159,7 +1259,7 @@ public final class HotSeatWindow {
             };
             if ("pass".equals(c.kind()) && c.payload() == null) {
                 cancel = new kelium.gui.kp.ConfirmDialog.Option(
-                    "Прекратить бой", "выйти без залпа — ничего не потеряно", pick);
+                    "Прекратить бой", "выйти без атаки — ничего не потеряно", pick);
                 continue;
             }
             String label = c.label() == null ? "" : c.label();
@@ -1248,6 +1348,7 @@ public final class HotSeatWindow {
 
     private void clearDecision() {
         confirm.close();
+        ceremony.close();
         zoom.setVisible(false);
         prompt.hideAll();
         field.clearSelectable();
@@ -1265,5 +1366,30 @@ public final class HotSeatWindow {
 
     private String cardName(String id) {
         return rec == null ? id : rec.cardNames.getOrDefault(id, id);
+    }
+
+    /** Данные карты приказа из контента партии (null — не приказ/нет данных). */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> orderData(String id) {
+        GameConfig c = cfg;
+        if (c == null || id == null) {
+            return null;
+        }
+        try {
+            return (Map<String, Object>) c.content.get("orders").byId(id);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private kelium.gui.kp.OrderCardFace.Info orderFace(String id) {
+        return kelium.gui.kp.OrderCardFace.Info.of(id, orderData(id));
+    }
+
+    /** Печатное «описание» карты приказа — как она играется. */
+    private String orderDesc(String id) {
+        Map<String, Object> d = orderData(id);
+        Object t = d == null ? null : d.get("описание");
+        return t == null ? "" : String.valueOf(t);
     }
 }

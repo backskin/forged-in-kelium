@@ -23,9 +23,11 @@ public final class ZoomCard extends JComponent {
     private Color band = Theme.border();
     private String detail = "";
     private double progress = -1;
+    private OrderCardFace.Info orderInfo;
     private final Anim fade = new Anim();
 
     public void show(String name, String typeLabel, Color band, String detail, double progress) {
+        this.orderInfo = null;
         this.name = name;
         this.typeLabel = typeLabel;
         this.band = band;
@@ -34,6 +36,13 @@ public final class ZoomCard extends JComponent {
         setVisible(true);
         fade.snap(0);
         fade.play(1, 120, v -> repaint(), null);
+    }
+
+    /** Увеличенный ПРИКАЗ: настоящее лицо карты + печатное описание. */
+    public void showOrder(OrderCardFace.Info info, String name, String description) {
+        show(name, "Приказ", ActionIcons.deckColor(info == null ? null : info.deck()),
+            description, -1);
+        this.orderInfo = info;
     }
 
     @Override
@@ -60,6 +69,26 @@ public final class ZoomCard extends JComponent {
 
         int pad = Theme.px(12);
         int y = Theme.px(24);
+        if (orderInfo != null) {
+            // Приказ крупно: НАСТОЯЩЕЕ лицо карты, ниже — печатное описание.
+            int faceW = (int) ((w - Theme.px(6)) * 0.62);
+            int faceH = (int) (faceW * 1.42);
+            OrderCardFace.paint(g, orderInfo, (w - Theme.px(6) - faceW) / 2, y - Theme.px(6),
+                faceW, faceH, false);
+            y += faceH + Theme.px(2);
+            if (!detail.isBlank()) {
+                g.setFont(Theme.font(10.5, Font.PLAIN));
+                g.setColor(Theme.ink2());
+                var dfm = g.getFontMetrics();
+                for (String line : CardTile.wrap(detail, dfm,
+                        w - Theme.px(6) - pad * 2, 8)) {
+                    y += dfm.getHeight();
+                    g.drawString(line, pad, y);
+                }
+            }
+            g.dispose();
+            return;
+        }
         g.setFont(Theme.font(10, Font.BOLD));
         g.setColor(Theme.ink3());
         g.drawString(typeLabel.toUpperCase(java.util.Locale.ROOT), pad, y + Theme.px(4));

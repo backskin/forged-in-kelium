@@ -37,7 +37,7 @@ public final class HandPanel extends JPanel {
         void onHoverOff();
     }
 
-    private final Map<String, JPanel> rows = new LinkedHashMap<>();
+    private final Map<String, OverlapRow> rows = new LinkedHashMap<>();
     private final Map<String, GroupCaption> captions = new LinkedHashMap<>();
     private final List<CardTile> tiles = new ArrayList<>();
     private final HoverSink hover;
@@ -58,8 +58,7 @@ public final class HandPanel extends JPanel {
         GroupCaption cap = new GroupCaption(name, icon);
         cap.setAlignmentX(LEFT_ALIGNMENT);
         col.add(cap);
-        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, Theme.px(4), 0));
-        row.setOpaque(false);
+        OverlapRow row = new OverlapRow();
         row.setAlignmentX(LEFT_ALIGNMENT);
         col.add(row);
         rows.put(name, row);
@@ -68,25 +67,38 @@ public final class HandPanel extends JPanel {
         add(javax.swing.Box.createHorizontalStrut(Theme.px(12)));
     }
 
-    /** Перестроить группу карт. {@code tag} — ярлык на плитку (прогресс и т.п.). */
+    /**
+     * Перестроить группу карт. {@code tag} — ярлык на плитку (прогресс и т.п.),
+     * {@code faceOf} — лицо карты приказа (null у других групп).
+     */
     public void setCards(String group, List<String> ids,
                           java.util.function.Function<String, String> nameOf,
                           Color band,
                           java.util.function.Function<String, String> tagOf,
-                          Color tagColor) {
-        JPanel row = rows.get(group);
+                          Color tagColor,
+                          java.util.function.Function<String, OrderCardFace.Info> faceOf) {
+        OverlapRow row = rows.get(group);
         for (var c : row.getComponents()) {
             if (c instanceof CardTile t) {
                 tiles.remove(t);
             }
         }
-        row.removeAll();
+        row.clearTiles();
+        boolean faces = faceOf != null;
+        int w = faces ? Theme.px(80) : Theme.px(64);
+        int h = faces ? Theme.px(112) : Theme.px(94);
         for (String id : ids) {
             String grp = group;
             CardTile t = new CardTile(id, nameOf.apply(id), band,
-                tile -> hover.onHover(tile, grp), hover::onHoverOff);
+                tile -> {
+                    row.toFront(tile);
+                    hover.onHover(tile, grp);
+                }, hover::onHoverOff);
             t.setToolTipText(t.cardName());
-            t.setPreferredSize(new Dimension(Theme.px(64), Theme.px(88)));
+            t.setPreferredSize(new Dimension(w, h));
+            if (faces) {
+                t.orderFace(faceOf.apply(id));
+            }
             if (tagOf != null) {
                 String tag = tagOf.apply(id);
                 if (tag != null) {
@@ -94,11 +106,53 @@ public final class HandPanel extends JPanel {
                 }
             }
             tiles.add(t);
-            row.add(t);
+            row.addTile(t, w, h);
         }
         captions.get(group).setCount(ids.size());
         row.revalidate();
         row.repaint();
+    }
+
+    /**
+     * РЯД ВНАХЛЁСТ («стопкой, наезжающим», просьба дизайнера 24.08): карты
+     * перекрывают друг друга на треть, наведённая поднимается НАВЕРХ стопки.
+     */
+    private static final class OverlapRow extends javax.swing.JLayeredPane {
+        private final List<CardTile> ordered = new ArrayList<>();
+        private int tileW = Theme.px(64);
+        private int tileH = Theme.px(94);
+
+        OverlapRow() {
+            setOpaque(false);
+        }
+
+        void clearTiles() {
+            ordered.clear();
+            removeAll();
+        }
+
+        void addTile(CardTile t, int w, int h) {
+            tileW = w;
+            tileH = h;
+            int step = (int) (w * 0.66);
+            t.setBounds(ordered.size() * step, 0, w, h);
+            add(t, Integer.valueOf(ordered.size()));
+            ordered.add(t);
+            setPreferredSize(new Dimension(
+                ordered.isEmpty() ? Theme.px(20)
+                    : step * (ordered.size() - 1) + w + Theme.px(4), h));
+            setMaximumSize(getPreferredSize());
+        }
+
+        void toFront(CardTile t) {
+            setLayer(t, 500);
+            for (CardTile other : ordered) {
+                if (other != t) {
+                    setLayer(other, ordered.indexOf(other));
+                }
+            }
+            repaint();
+        }
     }
 
     /**

@@ -33,6 +33,8 @@ public final class CardTile extends JComponent {
     public final String cardId;
     private final String name;
     private final Color band;
+    /** Лицо карты приказа (null — обычная миниатюра с названием). */
+    private OrderCardFace.Info orderFace;
     private String tag;
     private Color tagColor = Theme.ink3();
     private Mode mode = Mode.NORMAL;
@@ -76,6 +78,16 @@ public final class CardTile extends JComponent {
 
     public String cardName() {
         return name;
+    }
+
+    /** Сделать миниатюру НАСТОЯЩИМ лицом карты приказа. */
+    public void orderFace(OrderCardFace.Info info) {
+        this.orderFace = info;
+        repaint();
+    }
+
+    public OrderCardFace.Info orderFaceInfo() {
+        return orderFace;
     }
 
     public Color bandColor() {
@@ -126,6 +138,18 @@ public final class CardTile extends JComponent {
         int cardH = h - Theme.px(8);
         int arc = Theme.px(7);
 
+        if (orderFace != null) {
+            // Приказ рисуется НАСТОЯЩИМ лицом: верх/низ, действия с глифами.
+            OrderCardFace.paint(g, orderFace, 0, top, w - 1, cardH - 1,
+                mode == Mode.DIMMED);
+            if (mode == Mode.RAISED || (hover && mode != Mode.DIMMED)) {
+                g.setColor(Theme.accent());
+                g.setStroke(new BasicStroke(Theme.pxf(1.8)));
+                g.drawRoundRect(0, top, w - 1, cardH - 1, Theme.px(7), Theme.px(7));
+            }
+            g.dispose();
+            return;
+        }
         g.setColor(hover && mode != Mode.DIMMED ? Theme.hover() : Theme.tile());
         g.fillRoundRect(0, top, w - 1, cardH - 1, arc, arc);
         // цветная полоса типа
