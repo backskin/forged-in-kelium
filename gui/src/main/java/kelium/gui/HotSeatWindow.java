@@ -77,6 +77,8 @@ public final class HotSeatWindow {
 
     private static final int RAIL_W = 260;
     private static final int DRAWER_W = 480;
+    /** Ящики с планшетами и досками — шире: там печатные компоненты. */
+    private static final int WIDE_DRAWER_W = 920;
 
     private final int players;
     private final long seed;
@@ -95,6 +97,12 @@ public final class HotSeatWindow {
     FieldView field;
     private BoardsPanel boards;
     private BoardSheet sheet;
+    private JScrollPane sheetScroll;
+
+    /** Прокрутка ящика «Планшет» — нужна прогонщикам для снимков. */
+    JScrollPane sheetScroll() {
+        return sheetScroll;
+    }
     private JLayeredPane layered;
     private final Map<String, JComponent> drawers = new LinkedHashMap<>();
     final Map<String, KpTab> drawerTabs = new LinkedHashMap<>();
@@ -307,6 +315,7 @@ public final class HotSeatWindow {
         sheetScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
         sheetScroll.setBorder(null);
         sheetWrap.add(sheetScroll, BorderLayout.CENTER);
+        this.sheetScroll = sheetScroll;
         drawers.put("Планшет", wrapDrawer(sheetWrap));
 
         journalBox = new JPanel();
@@ -351,8 +360,16 @@ public final class HotSeatWindow {
         layoutPrompt();
     }
 
+    /**
+     * Ширина ящика — ПО ЕГО СОДЕРЖИМОМУ, а не одна на всех. Планшету нужен
+     * простор: в нём лежат печатные планшеты игрока во всю ширину, и в узкой
+     * полосе они превращаются в марку. «Науке и рынку» — тоже (в узком ящике
+     * резались карты, замечание приёмки). Журналу хватает узкой ленты.
+     */
     private int drawerWidth() {
-        return Math.min(Theme.px(DRAWER_W), Math.max(Theme.px(320), layered.getWidth() / 2));
+        int want = openDrawer == drawers.get("Журнал")
+            ? Theme.px(DRAWER_W) : Theme.px(WIDE_DRAWER_W);
+        return Math.min(want, Math.max(Theme.px(320), (int) (layered.getWidth() * 0.72)));
     }
 
     private int openDrawerSpan() {

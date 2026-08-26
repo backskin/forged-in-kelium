@@ -148,6 +148,24 @@ public final class Textures {
         return find(list);
     }
 
+    /**
+     * ПЕЧАТНЫЙ ПЛАНШЕТ ИГРОКА — картинка настоящего компонента со стола. Лежат в
+     * папке {@code board/}: {@code troop-A} (планшет войск), {@code storage-A}
+     * (планшет хранилища). Ключ — вид планшета и сторона.
+     *
+     * <p>Куда на этой картинке игра кладёт живое (кубики склада, жетоны модулей),
+     * записано рядом в {@code board/anchors.yaml} — он сгенерирован по самой
+     * картинке и сверен с {@code data/boards}. Нет картинки своей стороны —
+     * планшет рисуется прежним рисованным видом, партия от этого не зависит.
+     */
+    public static BufferedImage board(String... keys) {
+        List<String> list = new ArrayList<>(keys.length);
+        for (String k : keys) {
+            list.add("board/" + k);
+        }
+        return find(list);
+    }
+
     /** Имена-кандидаты в порядке убывания точности. */
     public static List<String> names(String type, Integer level, int seat) {
         List<String> out = new ArrayList<>(4);

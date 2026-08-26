@@ -37,7 +37,7 @@ import kelium.report.ReplayRecord;
  * Отсутствующее показано пунктиром: подпись говорит, где оно (в запасе или в
  * трофеях).
  */
-public final class BoardSheet extends JComponent {
+public final class BoardSheet extends JComponent implements javax.swing.Scrollable {
 
     private static final long serialVersionUID = 1L;
 
@@ -134,6 +134,40 @@ public final class BoardSheet extends JComponent {
         return new Dimension(px(980), Math.max(px(560), contentH));
     }
 
+    // ============ ШИРИНА — ПО ЯЩИКУ, А НЕ ПО СЕБЕ ============
+    //
+    // На листе лежат ПЕЧАТНЫЕ планшеты во всю ширину, и при жёстко заданной
+    // ширине лист вылезал за ящик: четвёртая колонка («Вышка», «Центр
+    // управления») уезжала за край и её приходилось прокручивать вбок. Пока в
+    // ящике не теснее нижнего предела, лист растягивается ровно по нему —
+    // боковая прокрутка не нужна вовсе.
+
+    @Override
+    public boolean getScrollableTracksViewportWidth() {
+        return getParent() instanceof javax.swing.JViewport vp && vp.getWidth() >= px(560);
+    }
+
+    @Override
+    public boolean getScrollableTracksViewportHeight() {
+        return false;
+    }
+
+    @Override
+    public Dimension getPreferredScrollableViewportSize() {
+        return getPreferredSize();
+    }
+
+    @Override
+    public int getScrollableUnitIncrement(Rectangle visible, int orientation, int direction) {
+        return px(24);
+    }
+
+    @Override
+    public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction) {
+        return orientation == javax.swing.SwingConstants.VERTICAL
+            ? visible.height - px(24) : visible.width - px(24);
+    }
+
     // ==================== отрисовка ====================
     @Override
     protected void paintComponent(Graphics g0) {
@@ -187,9 +221,33 @@ public final class BoardSheet extends JComponent {
         // («центр управления»), ни строки атак — текст обрезался краем. На
         // печатном планшете эти четыре столбца тоже идут во всю ширину, так что
         // так и правильнее по сути, а не только по месту.
-        y = paintTroops(g, f, p, pad, y, getWidth() - pad * 2) + px(12);
+        // ПЕЧАТНЫЕ ПЛАНШЕТЫ — САМИ КОМПОНЕНТЫ СО СТОЛА (просьба дизайнера
+        // 25.08.2026: «хочу, чтобы планшет выглядел так же»). Есть картинка
+        // своей стороны — показываем её с живым поверх; нет — прежний
+        // рисованный вид, он же остаётся источником чисел, которых на печати
+        // нет (запас жетонов, цены, скорости).
+        int full = getWidth() - pad * 2;
+        boolean printed = PrintedBoards.available(p.side);
+        if (printed) {
+            printedSpots.clear();
+            PrintedBoards.paintTroop(g, pad, y, full, p, troopSide(p), printedSpots);
+            y += PrintedBoards.troopHeight(p.side, full) + px(8);
+            y = paintStockStrip(g, f, p, pad, y, full) + px(10);
+        }
+        if (!printed) {
+            y = paintTroops(g, f, p, pad, y, full) + px(12);
+        }
 
         int yLeft = paintBuildings(g, f, p, pad, y, leftW);
+        if (printed) {
+            // Планшет хранилища идёт ПОСЛЕ зданий: ячейки на нём открывают
+            // именно они, и читается это сверху вниз, как на столе. Ширина —
+            // две трети листа: в узкую колонку он ужимался до марки.
+            int sw = (int) (full * 0.66);
+            PrintedBoards.paintStorage(g, pad, yLeft + px(10), sw, p,
+                cellFill, startFill, coveredCells(buildingsOf(f, p.seat)));
+            yLeft += px(10) + PrintedBoards.storageHeight(p.side, sw) + px(6);
+        }
         yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW);
 
         int yRight = paintModulesAndCards(g, p, rightX, y, rightW);
@@ -352,6 +410,74 @@ public final class BoardSheet extends JComponent {
 
     /** Заполняется при отрисовке; читается подсказкой. */
     private final Map<Rectangle, ModuleSpot> moduleSpots = new LinkedHashMap<>();
+
+    /** То же для жетонов, лежащих на ПЕЧАТНОМ планшете. */
+    private final Map<Rectangle, Object[]> printedSpots = new LinkedHashMap<>();
+
+    /**
+     * Складские здания, чей жетон ЛЕЖИТ НА ПЛАНШЕТЕ и накрывает свои печатные
+     * ячейки. Ключи те же, что у {@link ReplayRecord.Player#storageCells}.
+     */
+    private java.util.Set<String> coveredCells(List<ReplayRecord.Tok> all) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (Slot s : storageSlots(all)) {
+            if (s.inStock()) {
+                out.add(cellKey(s));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * ЗАПАС ЖЕТОНОВ ПО РОДАМ — единственное, чего на печатном планшете войск
+     * нет: сколько родов уже на поле, а сколько ещё лежит у игрока. Узкая
+     * строка под планшетом, по колонке на род — ровно под своей колонкой печати.
+     */
+    private int paintStockStrip(Graphics2D g, ReplayRecord.Frame f,
+                                ReplayRecord.Player p, int x, int y, int w) {
+        String[] types = {"infantry", "vehicle", "aircraft", "tower"};
+        Map<String, int[]> byType = new LinkedHashMap<>();
+        for (String t : types) {
+            byType.put(t, new int[2]);
+        }
+        for (ReplayRecord.Tok t : f.snapshot.tokens) {
+            if (t.building || t.owner != p.seat || !t.alive) {
+                continue;
+            }
+            int[] pair = byType.get(t.type);
+            if (pair != null) {
+                if (t.hexId != null) {
+                    pair[0]++;
+                } else {
+                    pair[1]++;
+                }
+            }
+        }
+        int colW = w / 4;
+        int h = px(32);
+        for (int i = 0; i < types.length; i++) {
+            int[] c = byType.get(types[i]);
+            int onField = c[0];
+            int all = Math.max(session.record().unitStockOf(types[i]), onField + c[1]);
+            int cx = x + i * colW;
+            g.setColor(Theme.tile());
+            g.fill(new RoundRectangle2D.Double(cx + px(2), y, colW - px(4), h,
+                Theme.R_TILE, Theme.R_TILE));
+            // Две строки, а не одна: в четверть ширины планшета длинная строка
+            // «пехота: на поле 1 · запас 3» не влезала и наезжала на соседнюю.
+            g.setFont(font(9, Font.BOLD));
+            g.setColor(Theme.ink3());
+            String top = Names.unit(types[i]).toUpperCase(java.util.Locale.ROOT);
+            g.drawString(top, cx + (colW - g.getFontMetrics().stringWidth(top)) / 2,
+                y + px(12));
+            g.setFont(mono(10, Font.BOLD));
+            g.setColor(Theme.ink2());
+            String bot = "на поле " + onField + " · запас " + (all - onField);
+            g.drawString(bot, cx + (colW - g.getFontMetrics().stringWidth(bot)) / 2,
+                y + h - px(7));
+        }
+        return y + h;
+    }
 
     /** Места жетонов хранилища: прямоугольник → сторона жетона (null — пусто). */
     private final Map<Rectangle, String> storeTokenSpots = new LinkedHashMap<>();
@@ -1552,6 +1678,13 @@ public final class BoardSheet extends JComponent {
             if (en.getKey().contains(e.getPoint())) {
                 ModuleSpot sp = en.getValue();
                 return Ui2.tip(ModuleSlot.describe(sp.module(), sp.red(), sp.slotName()));
+            }
+        }
+        for (Map.Entry<Rectangle, Object[]> en : printedSpots.entrySet()) {
+            if (en.getKey().contains(e.getPoint())) {
+                Object[] sp = en.getValue();
+                return Ui2.tip(ModuleSlot.describe((ReplayRecord.Module) sp[0],
+                    (Boolean) sp[1], String.valueOf(sp[2])));
             }
         }
         for (Map.Entry<Rectangle, String> en : storeTokenSpots.entrySet()) {
