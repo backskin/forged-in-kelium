@@ -107,8 +107,7 @@ public final class HotSeatWindow {
     private final List<String> botSteps = new ArrayList<>();
     private Integer turnSeat;
     private String pendingKind;
-    /** Подписи точек, снятые перед необратимым кликом — запекутся на кадре. */
-    private List<String> pendingBake;
+    /** Имя необратимого действия, выбранного кликом, — запечётся по факту. */
     private String pendingBakeName;
     private JPanel feedBox;
     private JScrollPane feedScroll;
@@ -117,7 +116,14 @@ public final class HotSeatWindow {
     ActionBar actionBar;
     PromptOverlay prompt;
     private ZoomCard zoom;
+    kelium.gui.kp.ConfirmDialog confirm;
     KpButton endBtn;
+    /** Выезд контекстной панели снизу (120–180 мс по скиллу интерфейса). */
+    private final kelium.gui.kp.Anim promptSlide = new kelium.gui.kp.Anim();
+    /** Выезд ящика слева. */
+    private final kelium.gui.kp.Anim drawerSlide = new kelium.gui.kp.Anim();
+    /** Подписи точек отката на прошлой перерисовке — ловим «запекание». */
+    private List<String> lastAgentLabels = new ArrayList<>();
     private int viewedSeat = 0;
     private volatile GameConfig cfg;
     private volatile GameState liveState;
@@ -161,6 +167,19 @@ public final class HotSeatWindow {
         zoom.setVisible(false);
         frame.getLayeredPane().add(zoom, JLayeredPane.POPUP_LAYER);
 
+        // Модальное окно необратимого — во весь слой окна, поверх всего.
+        confirm = new kelium.gui.kp.ConfirmDialog();
+        frame.getLayeredPane().add(confirm, JLayeredPane.MODAL_LAYER);
+        frame.getLayeredPane().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                confirm.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+                    frame.getLayeredPane().getHeight());
+            }
+        });
+        confirm.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+
         frame.setSize(Theme.px(1500), Theme.px(950));
         frame.setMinimumSize(new Dimension(Theme.px(1150), Theme.px(760)));
         frame.setLocationByPlatform(true);
@@ -185,10 +204,15 @@ public final class HotSeatWindow {
         bar.add(turnLabel);
 
         chipVp = new ChipLabel("SUPER", Theme.points());
+        chipVp.setToolTipText("Победные очки (сумма всех источников)");
         chipCoin = new ChipLabel("COIN", Theme.points());
+        chipCoin.setToolTipText("Монеты");
         chipKelium = new ChipLabel("KELIUM", Theme.kelium());
+        chipKelium.setToolTipText("Келемий: на складе / потолок склада");
         chipAmmo = new ChipLabel("AMMO", Theme.energy());
+        chipAmmo.setToolTipText("Боеприпасы: на складе / потолок склада");
         chipDebris = new ChipLabel("DEBRIS", Theme.neutral());
+        chipDebris.setToolTipText("Обломки: на складе / потолок");
         for (ChipLabel c : List.of(chipVp, chipCoin, chipKelium, chipAmmo, chipDebris)) {
             bar.add(c);
         }
@@ -211,6 +235,11 @@ public final class HotSeatWindow {
 
     private void addDrawerTab(JPanel strip, String name) {
         KpTab tab = new KpTab(name, () -> toggleDrawer(name));
+        tab.setToolTipText(switch (name) {
+            case "Наука и рынок" -> "Доска науки и активная карта рынка — открываются поверх поля в любой момент";
+            case "Планшет" -> "Планшеты игроков: склад, войска, трофеи, арсенал — свой и соперников";
+            default -> "Полная лента событий партии";
+        });
         tab.setPreferredSize(new Dimension(Theme.px(36), Theme.px(132)));
         tab.setMaximumSize(new Dimension(Theme.px(36), Theme.px(132)));
         tab.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -288,36 +317,74 @@ public final class HotSeatWindow {
 
     void layoutLayers() {
         field.setBounds(0, 0, layered.getWidth(), layered.getHeight());
-        int w = Math.min(Theme.px(DRAWER_W), Math.max(Theme.px(320), layered.getWidth() / 2));
+        int w = drawerWidth();
+        // Открытый ящик ВЫЕЗЖАЕТ слева: доля выезда — из аниматора, прерванное
+        // движение продолжается с текущего места (правило скилла).
+        int x = (int) Math.round((drawerSlide.value() - 1) * w);
         for (JComponent d : drawers.values()) {
-            d.setBounds(0, 0, w, layered.getHeight());
+            d.setBounds(x, 0, w, layered.getHeight());
         }
         layoutPrompt();
     }
 
+    private int drawerWidth() {
+        return Math.min(Theme.px(DRAWER_W), Math.max(Theme.px(320), layered.getWidth() / 2));
+    }
+
+    private int openDrawerSpan() {
+        return openDrawer != null && openDrawer.isVisible()
+            ? (int) Math.round(drawerWidth() * drawerSlide.value()) : 0;
+    }
+
     private void layoutPrompt() {
-        int maxW = Math.max(Theme.px(320), layered.getWidth() - Theme.px(24)
-            - (openDrawer != null && openDrawer.isVisible() ? openDrawer.getWidth() : 0));
-        int x = Theme.px(12)
-            + (openDrawer != null && openDrawer.isVisible() ? openDrawer.getWidth() : 0);
+        int span = openDrawerSpan();
+        int maxW = Math.max(Theme.px(320), layered.getWidth() - Theme.px(24) - span);
+        int x = Theme.px(12) + span;
         prompt.setSize(new Dimension(Math.min(Theme.px(760), maxW), 10));
         Dimension pref = prompt.getPreferredSize();
         int h = Math.min(pref.height, layered.getHeight() - Theme.px(24));
-        prompt.setBounds(x, layered.getHeight() - h - Theme.px(12),
+        // Панель ПОДЪЕЗЖАЕТ снизу: доля подъезда — из своего аниматора.
+        int lift = (int) Math.round((1 - promptSlide.value()) * Theme.px(20));
+        prompt.setBounds(x, layered.getHeight() - h - Theme.px(12) + lift,
             Math.min(Theme.px(760), maxW), h);
         prompt.revalidate();
     }
 
+    /** Показ контекстной панели с подъездом снизу. */
+    private void promptIn() {
+        promptSlide.snap(0);
+        promptSlide.play(1, 150, v -> layoutPrompt(), null);
+    }
+
     private void toggleDrawer(String name) {
         JComponent target = drawers.get(name);
+        boolean closing = openDrawer == target;
         for (Map.Entry<String, JComponent> e : drawers.entrySet()) {
-            boolean on = e.getValue() == target && openDrawer != target;
-            e.getValue().setVisible(on);
+            boolean on = e.getValue() == target && !closing;
+            if (e.getValue() != target) {
+                e.getValue().setVisible(false);
+            }
             drawerTabs.get(e.getKey()).setSelected(on);
         }
-        openDrawer = openDrawer == target ? null : target;
-        layoutLayers();
-        layered.repaint();
+        if (closing) {
+            JComponent t = target;
+            drawerSlide.play(0, 140, v -> {
+                layoutLayers();
+                layered.repaint();
+            }, () -> {
+                t.setVisible(false);
+                openDrawer = null;
+                layoutLayers();
+            });
+        } else {
+            openDrawer = target;
+            target.setVisible(true);
+            drawerSlide.snap(openDrawerSpan() > 0 ? drawerSlide.value() : 0);
+            drawerSlide.play(1, 160, v -> {
+                layoutLayers();
+                layered.repaint();
+            }, null);
+        }
     }
 
     private JComponent buildRail() {
@@ -396,6 +463,7 @@ public final class HotSeatWindow {
         right.add(javax.swing.Box.createHorizontalStrut(Theme.px(14)));
 
         endBtn = new KpButton("Ход соперника…", "", null).primary(true);
+        endBtn.setToolTipText("Завершить ход — пас по действиям; СПЕЦ-действие может остаться доступным");
         endBtn.setState(KpButton.State.DISABLED);
         endBtn.setPreferredSize(new Dimension(Theme.px(180), Theme.px(100)));
         endBtn.setMaximumSize(new Dimension(Theme.px(180), Theme.px(110)));
@@ -606,26 +674,15 @@ public final class HotSeatWindow {
             turnSeat = f.seat;
             lockedSteps.clear();
             botSteps.clear();
-            pendingBake = null;
             pendingBakeName = null;
+            lastAgentLabels = new ArrayList<>();
             lockedSteps.add("Приказ вскрыт");
             stepsCaption.setText("ШАГИ ХОДА — ИГРОК " + (f.seat + 1));
             actionBar.turnStarted();
-        } else if ("action".equals(f.type) && f.seat != null && f.seat.equals(turnSeat)) {
-            if (humansBySeat.containsKey(turnSeat)) {
-                // Необратимое действие человека доиграло — запекаем всё до него.
-                if (pendingBakeName != null) {
-                    if (pendingBake != null) {
-                        lockedSteps.addAll(pendingBake);
-                    }
-                    lockedSteps.add(pendingBakeName);
-                    pendingBake = null;
-                    pendingBakeName = null;
-                }
-            } else {
-                String name = String.valueOf(f.log);
-                botSteps.add(name.length() > 40 ? name.substring(0, 39) + "…" : name);
-            }
+        } else if ("action".equals(f.type) && f.seat != null && f.seat.equals(turnSeat)
+                && !humansBySeat.containsKey(turnSeat)) {
+            String name = String.valueOf(f.log);
+            botSteps.add(name.length() > 40 ? name.substring(0, 39) + "…" : name);
         } else if ("turn_end".equals(f.type) && f.seat != null && f.seat.equals(turnSeat)) {
             turnSeat = null;
         }
@@ -634,6 +691,26 @@ public final class HotSeatWindow {
 
     /** Собрать ленту: запёкшееся → точки отката агента → текущая точка. */
     private void refreshSteps() {
+        // ЗАПЕКАНИЕ ПО ФАКТУ: точки исчезли из агента (первый залп/рынок/наука
+        // очистили стек) — их подписи переезжают в замки вместе с именем
+        // необратимого действия, запомненным при клике по плитке.
+        kelium.core.UndoableAgent bakeAgent =
+            turnSeat == null ? null : humansBySeat.get(turnSeat);
+        if (bakeAgent != null) {
+            List<String> now = new ArrayList<>();
+            for (String l : bakeAgent.checkpointLabels()) {
+                now.add(ActionBar.ACTIONS.getOrDefault(l, l));
+            }
+            if (now.isEmpty() && !lastAgentLabels.isEmpty() && pendingBakeName != null) {
+                lockedSteps.addAll(lastAgentLabels);
+            }
+            if (now.isEmpty() && pendingBakeName != null) {
+                lockedSteps.add(pendingBakeName);
+                pendingBakeName = null;
+            }
+            lastAgentLabels = now;
+        }
+
         List<kelium.gui.kp.TurnStepsPanel.Row> rows = new ArrayList<>();
         int seat = turnSeat == null ? viewedSeat : turnSeat;
         for (String s : lockedSteps) {
@@ -841,10 +918,23 @@ public final class HotSeatWindow {
                     + " — колесо мыши вращает дугу, клик по гексу ставит; зелёные рёбра = встанет",
                     opts);
                 layoutPrompt();
+                promptIn();
                 refreshSteps();
                 frame.toFront();
                 return;
             }
+        }
+
+        // НЕОБРАТИМОЕ РЕШЕНИЕ БОЯ — модальное окно с предпросмотром (концепт §6).
+        if ("attack".equals(kind) || "combat_victim".equals(kind)
+                || "neutral_victim".equals(kind)) {
+            actionBar.idle("не сейчас");
+            endBtn.setTexts("Сначала решение", KIND_LABELS.getOrDefault(kind, kind));
+            endBtn.setState(KpButton.State.DISABLED);
+            showCombatDialog(seat, kind, agent, options, d);
+            refreshSteps();
+            frame.toFront();
+            return;
         }
 
         if ("action".equals(kind)) {
@@ -865,11 +955,6 @@ public final class HotSeatWindow {
                     }
                 }
                 if (name != null && !kelium.core.UndoableAgent.SAFE_ACTIONS.contains(name)) {
-                    List<String> baked = new ArrayList<>();
-                    for (String l : agent.checkpointLabels()) {
-                        baked.add(ActionBar.ACTIONS.getOrDefault(l, l));
-                    }
-                    pendingBake = baked;
                     pendingBakeName = ActionBar.ACTIONS.getOrDefault(name, name);
                 }
                 agent.submitIndex(idx);
@@ -940,8 +1025,103 @@ public final class HotSeatWindow {
             }
         }
         layoutPrompt();
+        promptIn();
         refreshSteps();
         frame.toFront();
+    }
+
+    /**
+     * Модальное окно залпа/жертвы: затемнение, предпросмотр (кто стоит в цели,
+     * расход БПР), варианты красными плашками, «Прекратить бой» — серой; Esc —
+     * тоже отказ. Первый залп честно предупреждает, что запечёт откат.
+     */
+    private void showCombatDialog(int seat, String kind, kelium.core.UndoableAgent agent,
+                                   List<Choice> options, InteractiveAgent.PendingDecision d) {
+        String target = d.context().get("target") instanceof String t ? t : null;
+        String title = switch (kind) {
+            case "attack" -> "Бой — залп" + (target == null ? "" : " по гексу " + target);
+            case "combat_victim" -> "Кого поразить"
+                + (target == null ? "" : " в гексе " + target);
+            default -> "Какой нейтрал" + (target == null ? "" : " в гексе " + target);
+        };
+        String warn = "attack".equals(kind) && agent.canUndo()
+            ? "Первый залп сделает откат шагов этого хода недоступным"
+            : "Бой необратим";
+
+        List<String> info = new ArrayList<>();
+        if (target != null && rec != null && !rec.frames.isEmpty()) {
+            ReplayRecord.Frame f = rec.frames.get(rec.frames.size() - 1);
+            if (f.snapshot != null) {
+                int listed = 0;
+                for (ReplayRecord.Tok t : f.snapshot.tokens) {
+                    if (target.equals(t.hexId) && listed < 4) {
+                        String nm = t.building
+                            ? kelium.report.Labels.buildingLabel(t.type, t.level)
+                            : kelium.report.Labels.unitName(t.type);
+                        info.add("В цели: " + nm + " · прочность "
+                            + (t.hp - t.damage) + "/" + t.hp
+                            + " · Игрок " + (t.owner + 1));
+                        listed++;
+                    }
+                }
+            }
+        }
+        info.add("После боя пострадавшие могут ответить своим боем");
+
+        List<kelium.gui.kp.ConfirmDialog.Option> opts = new ArrayList<>();
+        kelium.gui.kp.ConfirmDialog.Option cancel = null;
+        for (int i = 0; i < options.size(); i++) {
+            Choice c = options.get(i);
+            int idx = i;
+            Runnable pick = () -> {
+                confirm.close();
+                agent.submitIndex(idx);
+                clearDecision();
+            };
+            if ("pass".equals(c.kind()) && c.payload() == null) {
+                cancel = new kelium.gui.kp.ConfirmDialog.Option(
+                    "Прекратить бой", "выйти без залпа — ничего не потеряно", pick);
+                continue;
+            }
+            String label = c.label() == null ? "" : c.label();
+            String sub = null;
+            if (c.payload() instanceof Map<?, ?> pl) {
+                label = attackLabelRu(label, pl);
+                if (pl.get("ammo") instanceof Number n) {
+                    sub = "расход БПР: " + n;
+                }
+            }
+            opts.add(new kelium.gui.kp.ConfirmDialog.Option(label, sub, pick));
+        }
+        confirm.open(title, warn, info, opts, cancel);
+    }
+
+    /** «infantry.universal->units» → «Пехота · универсальная атака → по войскам». */
+    private String attackLabelRu(String raw, Map<?, ?> payload) {
+        int dot = raw.indexOf('.');
+        int arrow = raw.indexOf("->");
+        if (dot <= 0 || arrow <= dot) {
+            return raw;
+        }
+        String unit = kelium.report.Labels.unitName(raw.substring(0, dot));
+        String row = switch (raw.substring(dot + 1, arrow)) {
+            case "universal" -> "универсальная атака";
+            case "special", "specialized" -> "спец-атака";
+            default -> "атака «" + raw.substring(dot + 1, arrow) + "»";
+        };
+        String tcat = Boolean.TRUE.equals(payload.get("neutral")) ? "снос нейтрала"
+            : switch (String.valueOf(payload.get("tcat"))) {
+                case "infantry" -> "по пехоте";
+                case "vehicle" -> "по технике";
+                case "aircraft" -> "по авиации";
+                case "units" -> "по войскам";
+                case "buildings_towers" -> "по зданиям и вышкам";
+                case "any" -> "по любой цели";
+                default -> "по " + payload.get("tcat");
+            };
+        String cap = unit.isEmpty() ? raw.substring(0, dot) : unit;
+        return Character.toUpperCase(cap.charAt(0)) + cap.substring(1)
+            + " · " + row + " → " + tcat;
     }
 
     private boolean inAnyHand(String id) {
@@ -988,6 +1168,7 @@ public final class HotSeatWindow {
     }
 
     private void clearDecision() {
+        confirm.close();
         prompt.hideAll();
         field.clearSelectable();
         field.clearGhost();

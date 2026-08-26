@@ -85,6 +85,7 @@ public final class HandPanel extends JPanel {
             String grp = group;
             CardTile t = new CardTile(id, nameOf.apply(id), band,
                 tile -> hover.onHover(tile, grp), hover::onHoverOff);
+            t.setToolTipText(t.cardName());
             t.setPreferredSize(new Dimension(Theme.px(64), Theme.px(88)));
             if (tagOf != null) {
                 String tag = tagOf.apply(id);

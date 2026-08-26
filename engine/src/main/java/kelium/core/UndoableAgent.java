@@ -37,6 +37,16 @@ public final class UndoableAgent extends Agent {
     public static final Set<String> SAFE_ACTIONS = Set.of(
         "build", "mining", "movement", "energy_swap", "assembly");
 
+    /**
+     * ВИДЫ РЕШЕНИЙ, ФАКТИЧЕСКИ СОВЕРШАЮЩИЕ необратимое: первый залп боя,
+     * занятие ячейки рынка, шаг/обмен науки. Запекание происходит ЗДЕСЬ, а не
+     * при выборе действия из меню: игрок, вошедший в Бой и вышедший пасом, не
+     * выстрелив, ничего необратимого не сделал — его точки отката живы
+     * (уточнение к концепту §5, 24.08.2026 вечер).
+     */
+    public static final Set<String> COMMIT_KINDS = Set.of(
+        "attack", "market_rate", "market_offer", "sci_track", "sci_exchange");
+
     private record Mark(String label, GameState snapshot, long seed, Object turnMemento) {
     }
 
@@ -56,13 +66,13 @@ public final class UndoableAgent extends Agent {
     public Choice choose(GameState s, List<Choice> options, Map<String, Object> context) {
         Choice pick = delegate.choose(s, options, context);
         String kind = String.valueOf(context.get("kind"));
-        if ("action".equals(kind) && pick.payload() instanceof String actionName) {
-            if (SAFE_ACTIONS.contains(actionName)) {
-                push(actionName);
-            } else {
-                // Необратимое действие: всё, что было до него, запекается.
-                clearCheckpoints();
-            }
+        if ("action".equals(kind) && pick.payload() instanceof String actionName
+                && SAFE_ACTIONS.contains(actionName)) {
+            push(actionName);
+        } else if (COMMIT_KINDS.contains(kind) && pick.payload() != null) {
+            // Свершилось необратимое (первый залп, ячейка рынка, шаг науки):
+            // всё, что было до него, запекается.
+            clearCheckpoints();
         } else if ("reveal_order".equals(kind)) {
             // Новый круг — точки прошлого хода недействительны.
             clearCheckpoints();

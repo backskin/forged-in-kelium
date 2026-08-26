@@ -39,6 +39,7 @@ public final class TurnStepsPanel extends JComponent {
 
     public TurnStepsPanel() {
         setOpaque(false);
+        javax.swing.ToolTipManager.sharedInstance().registerComponent(this);
         MouseAdapter m = new MouseAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
@@ -92,6 +93,20 @@ public final class TurnStepsPanel extends JComponent {
     /** Строки (для прогонщиков/тестов). */
     public List<Row> rows() {
         return List.copyOf(rows);
+    }
+
+    @Override
+    public String getToolTipText(MouseEvent e) {
+        int i = rowAt(e.getY());
+        if (i < 0) {
+            return null;
+        }
+        return switch (rows.get(i).kind()) {
+            case UNDOABLE -> "Кликните — партия вернётся к моменту ПЕРЕД этим шагом";
+            case LOCKED -> "Необратимый шаг: откат к нему и раньше недоступен";
+            case CURRENT -> "Сейчас решается";
+            default -> "Точка отката станет кликабельной на выборе действия";
+        };
     }
 
     @Override

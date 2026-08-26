@@ -23,6 +23,7 @@ public final class ZoomCard extends JComponent {
     private Color band = Theme.border();
     private String detail = "";
     private double progress = -1;
+    private final Anim fade = new Anim();
 
     public void show(String name, String typeLabel, Color band, String detail, double progress) {
         this.name = name;
@@ -31,7 +32,8 @@ public final class ZoomCard extends JComponent {
         this.detail = detail == null ? "" : detail;
         this.progress = progress;
         setVisible(true);
-        repaint();
+        fade.snap(0);
+        fade.play(1, 120, v -> repaint(), null);
     }
 
     @Override
@@ -40,6 +42,7 @@ public final class ZoomCard extends JComponent {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setComposite(java.awt.AlphaComposite.SrcOver.derive((float) fade.value()));
         int w = getWidth();
         int h = getHeight();
         int arc = Theme.px(12);

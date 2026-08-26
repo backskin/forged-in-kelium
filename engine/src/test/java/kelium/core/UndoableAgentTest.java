@@ -129,15 +129,30 @@ class UndoableAgentTest {
         assertFalse(agent.canUndo());
     }
 
-    /** Необратимое действие ЗАПЕКАЕТ прошлое: стек очищается (концепт §5). */
+    /**
+     * Запекает не ВЫБОР боя, а ПЕРВЫЙ ЗАЛП: вход в Бой с выходом пасом ничего
+     * необратимого не совершил — точки живы (уточнение к концепту §5).
+     */
     @Test
-    void unsafeActionBakesEverythingBefore() throws Exception {
+    void combatBakesOnFirstShotNotOnMenuPick() throws Exception {
         GameState state = Fix.game(2, 5L);
         UndoableAgent agent = new UndoableAgent(0, "test", state, d -> { }, ev -> { });
         chooseAction(agent, state, "build");
         chooseAction(agent, state, "mining");
-        assertEquals(2, agent.checkpointLabels().size());
         chooseAction(agent, state, "combat");
+        assertEquals(2, agent.checkpointLabels().size(),
+            "выбор Боя в меню сам по себе ничего не запекает");
+
+        // «пас» в меню залпов — бой отменён, точки живы
+        List<Choice> passOnly = List.of(
+            new Choice("attack", Map.of("uid", 1, "row", "r", "ammo", 1, "tcat", "units"),
+                "залп"),
+            new Choice("pass", null, "stop attacking"));
+        chooseOnOtherThread(agent, state, passOnly, Map.of("kind", "attack"), 1);
+        assertEquals(2, agent.checkpointLabels().size(), "пас по залпам не запекает");
+
+        // настоящий залп — всё запеклось
+        chooseOnOtherThread(agent, state, passOnly, Map.of("kind", "attack"), 0);
         assertFalse(agent.canUndo());
     }
 
