@@ -306,7 +306,10 @@ public final class GameRecorder {
         for (int seat = 0; seat < players; seat++) {
             String id = seat < seatIds.size() ? seatIds.get(seat) : "trained:balanced";
             rec.seatIds.add(id);
-            rec.seatLabels.add(botLabel(id));
+            // «human» — не бот из справочника, а живое место цифровой версии:
+            // без этого в планшетах игрока красовалось сырое «human» (блокер
+            // приёмки: отладка на экране игрока).
+            rec.seatLabels.add("human".equals(id) ? "Игрок " + (seat + 1) : botLabel(id));
             rec.sides.add(state.player(seat).board.troop.side);
         }
         fillTableAndField(rec, cfg, state);

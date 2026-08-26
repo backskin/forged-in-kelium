@@ -21,12 +21,14 @@ public final class ChipLabel extends JComponent {
 
     private final String icon;
     private final Color iconColor;
+    private final String caption;
     private String value = "";
     private String cap = "";
 
-    public ChipLabel(String icon, Color iconColor) {
+    public ChipLabel(String icon, Color iconColor, String caption) {
         this.icon = icon;
         this.iconColor = iconColor;
+        this.caption = caption;
         setOpaque(false);
     }
 
@@ -38,7 +40,7 @@ public final class ChipLabel extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(Theme.px(96), Theme.px(28));
+        return new Dimension(Theme.px(96) + caption.length() * Theme.px(6), Theme.px(28));
     }
 
     @Override
@@ -61,12 +63,18 @@ public final class ChipLabel extends JComponent {
         int x = Theme.px(10) + (int) s + Theme.px(4);
         int y = (h + fm.getAscent() - fm.getDescent()) / 2;
         g.drawString(value, x, y);
+        int vx = x + fm.stringWidth(value);
         if (!cap.isEmpty()) {
-            int vw = fm.stringWidth(value);
             g.setFont(Theme.mono(10.5, Font.PLAIN));
             g.setColor(Theme.ink3());
-            g.drawString("/" + cap, x + vw + Theme.px(1), y);
+            g.drawString("/" + cap, vx + Theme.px(1), y);
+            vx += Theme.px(1) + g.getFontMetrics().stringWidth("/" + cap);
         }
+        // ПОДПИСЬ — не подсказка: значение читают каждый взгляд (приёмка
+        // агентом-игроком: «пять неподписанных пиктограмм — экзамен»).
+        g.setFont(Theme.font(9.5, Font.PLAIN));
+        g.setColor(Theme.ink3());
+        g.drawString(caption, vx + Theme.px(5), y);
         g.dispose();
     }
 }

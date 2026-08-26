@@ -970,7 +970,13 @@ public final class FieldView extends JComponent {
         String stroke = legal ? FieldGeometry.SEAT_STROKE[ghostSeat % 4] : "#7A1F1A";
         kelium.report.Java2DCanvas canvas =
             new kelium.report.Java2DCanvas(g, zoom, getFont());
-        canvas.alpha(0.55);
+        // Белая подложка-обводка отделяет призрак от стоящих жетонов: на приёмке
+        // агентом-игроком призрак «почти неотличим от уже стоящих зданий».
+        canvas.alpha(0.9);
+        canvas.shape(sh, pos[0], pos[1], face - sh.outward(),
+            FieldGeometry.seatScale(sh, BASE), sh.hexCx(), sh.hexCy(),
+            "none", "#FFFFFF", 3.6);
+        canvas.alpha(0.62);
         canvas.shape(sh, pos[0], pos[1], face - sh.outward(),
             FieldGeometry.seatScale(sh, BASE), sh.hexCx(), sh.hexCy(),
             fill, stroke, 1.6);

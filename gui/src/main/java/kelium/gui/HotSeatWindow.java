@@ -117,6 +117,7 @@ public final class HotSeatWindow {
     PromptOverlay prompt;
     private ZoomCard zoom;
     kelium.gui.kp.ConfirmDialog confirm;
+    private kelium.gui.kp.OpponentStrip opponents;
     KpButton endBtn;
     /** Выезд контекстной панели снизу (120–180 мс по скиллу интерфейса). */
     private final kelium.gui.kp.Anim promptSlide = new kelium.gui.kp.Anim();
@@ -203,20 +204,36 @@ public final class HotSeatWindow {
         turnLabel.setForeground(Theme.ink());
         bar.add(turnLabel);
 
-        chipVp = new ChipLabel("SUPER", Theme.points());
+        chipVp = new ChipLabel("SUPER", Theme.points(), "ПО");
         chipVp.setToolTipText("Победные очки (сумма всех источников)");
-        chipCoin = new ChipLabel("COIN", Theme.points());
+        chipCoin = new ChipLabel("COIN", Theme.points(), "монеты");
         chipCoin.setToolTipText("Монеты");
-        chipKelium = new ChipLabel("KELIUM", Theme.kelium());
+        chipKelium = new ChipLabel("KELIUM", Theme.kelium(), "келемий");
         chipKelium.setToolTipText("Келемий: на складе / потолок склада");
-        chipAmmo = new ChipLabel("AMMO", Theme.energy());
+        chipAmmo = new ChipLabel("AMMO", Theme.energy(), "БПР");
         chipAmmo.setToolTipText("Боеприпасы: на складе / потолок склада");
-        chipDebris = new ChipLabel("DEBRIS", Theme.neutral());
+        chipDebris = new ChipLabel("DEBRIS", Theme.neutral(), "обломки");
         chipDebris.setToolTipText("Обломки: на складе / потолок");
         for (ChipLabel c : List.of(chipVp, chipCoin, chipKelium, chipAmmo, chipDebris)) {
             bar.add(c);
         }
-        return bar;
+
+        // Полоса всех мест — открытый счёт стола (блокер приёмки №1).
+        JPanel north = new JPanel();
+        north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+        north.setBackground(Theme.panel());
+        bar.setAlignmentX(Component.LEFT_ALIGNMENT);
+        north.add(bar);
+        opponents = new kelium.gui.kp.OpponentStrip();
+        opponents.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel oppWrap = new JPanel(new BorderLayout());
+        oppWrap.setBackground(Theme.panel());
+        oppWrap.setBorder(BorderFactory.createMatteBorder(Theme.px(1), 0, Theme.px(2), 0,
+            Theme.border()));
+        oppWrap.add(opponents, BorderLayout.CENTER);
+        oppWrap.setAlignmentX(Component.LEFT_ALIGNMENT);
+        north.add(oppWrap);
+        return north;
     }
 
     private JComponent buildTabStrip() {
@@ -248,9 +265,19 @@ public final class HotSeatWindow {
         strip.add(javax.swing.Box.createVerticalStrut(Theme.px(8)));
     }
 
+    /** Имя места для игрока: без сырых «human»/«balanced» (блокер приёмки №4). */
+    private String seatName(int seat) {
+        String spec = seatSpecs.get(seat);
+        return "human".equals(spec) ? "Игрок " + (seat + 1)
+            : kelium.agents.BotCatalog.label(spec);
+    }
+
     private JComponent buildCenter() {
         field = new FieldView();
         field.setShowTurnCaption(false);
+        // Отладочные подписи гексов игроку не показываются; для наведения
+        // работает подсказка гекса, для решений — подсветка целей.
+        field.setShowIds(false);
         boards = new BoardsPanel();
         sheet = new BoardSheet(session, 0);
 
@@ -269,7 +296,7 @@ public final class HotSeatWindow {
         ButtonGroup group = new ButtonGroup();
         for (int i = 0; i < players; i++) {
             int s = i;
-            JToggleButton b = new JToggleButton((i + 1) + " · " + seatSpecs.get(i));
+            JToggleButton b = new JToggleButton(seatName(i));
             b.setFont(Theme.font(11, Font.BOLD));
             b.setForeground(Theme.seatInk(i));
             b.setFocusable(false);
@@ -599,7 +626,17 @@ public final class HotSeatWindow {
     }
 
     private void refreshTopBar(ReplayRecord.Frame f) {
-        roundLabel.setText("Раунд " + f.round + " · круг " + f.circle);
+        int circles = 4;
+        GameConfig c = cfg;
+        if (c != null) {
+            try {
+                circles = c.ruleset.getInt("rounds.circles_per_round");
+            } catch (RuntimeException ignore) {
+                // часы — украшение, партия важнее
+            }
+        }
+        roundLabel.setText("Раунд " + f.round + " · "
+            + (f.circle <= 0 ? "подготовка круга" : "круг " + f.circle + " из " + circles));
         Integer active = f.snapshot == null ? null : f.snapshot.active;
         if (awaitingSeat == null) {
             if (active == null) {
@@ -607,8 +644,7 @@ public final class HotSeatWindow {
                 turnLabel.setForeground(Theme.ink2());
             } else {
                 boolean bot = !"human".equals(seatSpecs.get(active));
-                turnLabel.setText("Ходит: Игрок " + (active + 1)
-                    + (bot ? " · " + seatSpecs.get(active) + " (бот)" : ""));
+                turnLabel.setText("Ходит: " + seatName(active) + (bot ? " (бот)" : ""));
                 turnLabel.setForeground(Theme.seatInk(active));
             }
         }
@@ -616,16 +652,27 @@ public final class HotSeatWindow {
             : active != null && humansBySeat.containsKey(active) ? active : viewedSeat;
         if (f.snapshot != null && seat < f.snapshot.players.size()) {
             ReplayRecord.Player p = f.snapshot.players.get(seat);
-            int vp = 0;
-            for (int v : p.vp.values()) {
-                vp += v;
-            }
-            chipVp.set(String.valueOf(vp), null);
+            chipVp.set(String.valueOf(vpTotal(p)), null);
             chipCoin.set(String.valueOf(p.coin), null);
             chipKelium.set(String.valueOf(p.kelium), String.valueOf(p.keliumCap));
             chipAmmo.set(String.valueOf(p.ammo), String.valueOf(p.ammoCap));
             chipDebris.set(String.valueOf(p.debris), String.valueOf(p.debrisCap));
         }
+        if (f.snapshot != null) {
+            List<kelium.gui.kp.OpponentStrip.Row> rows = new ArrayList<>();
+            for (ReplayRecord.Player p : f.snapshot.players) {
+                rows.add(new kelium.gui.kp.OpponentStrip.Row(p.seat, seatName(p.seat),
+                    p.seat == seat, vpTotal(p), p.coin, p.kelium, p.ammo,
+                    p.orderHand.size(), p.objectiveHand.size(), p.arsenalHand.size(),
+                    p.trophyPoints));
+            }
+            opponents.update(rows);
+        }
+    }
+
+    private static int vpTotal(ReplayRecord.Player p) {
+        return p.vp.getOrDefault("total",
+            p.vp.values().stream().mapToInt(Integer::intValue).sum());
     }
 
     private void refreshHands(ReplayRecord.Frame f) {
@@ -784,6 +831,14 @@ public final class HotSeatWindow {
         // человеку в ленте не нужны — в полном журнале партии они остаются.
         if (text.matches("^[a-z_]+ \\{.*")) {
             return;
+        }
+        // ВНУТРЕННИЕ ИДЕНТИФИКАТОРЫ в скобках — (yellow_dev), (security_4) —
+        // игроку не нужны никогда (блокер приёмки №2); журнал партии на диске
+        // их сохраняет. Длинные протокольные записи сокращаются.
+        text = text.replaceAll("\\s*\\([a-z0-9_:>.\\-]+\\)", "")
+            .replaceAll("\\s{2,}", " ").trim();
+        if (text.length() > 160) {
+            text = text.substring(0, 159) + "…";
         }
         lastFeedText = text;
         feedBox.add(feedRow(seat, text));
@@ -1037,6 +1092,7 @@ public final class HotSeatWindow {
      */
     private void showCombatDialog(int seat, String kind, kelium.core.UndoableAgent agent,
                                    List<Choice> options, InteractiveAgent.PendingDecision d) {
+        zoom.setVisible(false);   // увеличенная карта не должна висеть под модалкой
         String target = d.context().get("target") instanceof String t ? t : null;
         String title = switch (kind) {
             case "attack" -> "Бой — залп" + (target == null ? "" : " по гексу " + target);
@@ -1049,22 +1105,45 @@ public final class HotSeatWindow {
             : "Бой необратим";
 
         List<String> info = new ArrayList<>();
+        int dmg = 1;
+        if (cfg != null) {
+            try {
+                dmg = cfg.ruleset.getInt("combat_model.all_attacks_damage");
+            } catch (RuntimeException ignore) {
+                // печатный урон недоступен — остаётся правило по умолчанию
+            }
+        }
+        int enemies = 0;
+        int lastEnemyLeft = -1;
         if (target != null && rec != null && !rec.frames.isEmpty()) {
             ReplayRecord.Frame f = rec.frames.get(rec.frames.size() - 1);
             if (f.snapshot != null) {
                 int listed = 0;
                 for (ReplayRecord.Tok t : f.snapshot.tokens) {
-                    if (target.equals(t.hexId) && listed < 4) {
-                        String nm = t.building
-                            ? kelium.report.Labels.buildingLabel(t.type, t.level)
-                            : kelium.report.Labels.unitName(t.type);
-                        info.add("В цели: " + nm + " · прочность "
-                            + (t.hp - t.damage) + "/" + t.hp
-                            + " · Игрок " + (t.owner + 1));
-                        listed++;
+                    if (target.equals(t.hexId)) {
+                        if (t.owner != seat) {
+                            enemies++;
+                            lastEnemyLeft = t.hp - t.damage;
+                        }
+                        if (listed < 4) {
+                            String nm = t.building
+                                ? kelium.report.Labels.buildingLabel(t.type, t.level)
+                                : kelium.report.Labels.unitName(t.type);
+                            info.add("В цели: " + nm + " · прочность "
+                                + (t.hp - t.damage) + "/" + t.hp
+                                + " · " + seatName(t.owner));
+                            listed++;
+                        }
                     }
                 }
             }
+        }
+        // ПРОГНОЗ — предпросмотр последствий до подтверждения (приёмка №9):
+        // урон печатный, из свода партии, не пересчёт «на глазок».
+        info.add("Залп снимает " + dmg + " прочности");
+        if ("attack".equals(kind) && enemies == 1 && lastEnemyLeft > 0
+                && lastEnemyLeft <= dmg) {
+            info.add("Этот залп УНИЧТОЖИТ цель");
         }
         info.add("После боя пострадавшие могут ответить своим боем");
 
@@ -1169,6 +1248,7 @@ public final class HotSeatWindow {
 
     private void clearDecision() {
         confirm.close();
+        zoom.setVisible(false);
         prompt.hideAll();
         field.clearSelectable();
         field.clearGhost();

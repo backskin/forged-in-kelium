@@ -161,6 +161,12 @@ public final class CardTile extends JComponent {
         List<String> out = new ArrayList<>();
         StringBuilder line = new StringBuilder();
         for (String word : s.split("\\s+")) {
+            // Слово ДЛИННЕЕ строки само по себе («ИНФРАСТРУКТУРА») раньше
+            // рисовалось как есть и обрезалось краем компонента без многоточия
+            // (блокер приёмки агентом-игроком) — теперь честно сокращается.
+            if (fm.stringWidth(word) > maxW) {
+                word = KpButton.ellipsize(word, fm, maxW);
+            }
             String probe = line.isEmpty() ? word : line + " " + word;
             if (fm.stringWidth(probe) <= maxW || line.isEmpty()) {
                 line = new StringBuilder(probe);
