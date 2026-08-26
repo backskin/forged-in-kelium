@@ -120,7 +120,7 @@ public final class FieldView extends JComponent {
     private String facingHexId;
     java.util.List<java.util.List<Integer>> facingVariants;
     private int facingSelected;
-    private java.util.function.IntConsumer onFacingPick;
+    java.util.function.IntConsumer onFacingPick;
 
     public FieldView() {
         setOpaque(true);

@@ -80,6 +80,31 @@ public final class HotSeatWindow {
     /** Ящики с планшетами и досками — шире: там печатные компоненты. */
     private static final int WIDE_DRAWER_W = 920;
 
+    /**
+     * НАСТРОЙКИ ПАРТИИ — всё, что решается ДО первого хода. Их собирает меню
+     * запуска ({@link StartMenuWindow}); из командной строки берутся умолчания.
+     *
+     * <p>{@code startCoins}/{@code startKelium}/{@code startAmmo} — не null
+     * только у ТРЕНИРОВОЧНОЙ партии: значения подготовки берутся из свода, и
+     * если игрок их поправил, партия помечается меткой, которая идёт в журнал.
+     */
+    public record Options(String rulesetId, int players, long seed, List<String> seatSpecs,
+                           String scenarioId, java.nio.file.Path scenarioFile,
+                           List<Integer> cuFacing,
+                           Integer startCoins, Integer startKelium, Integer startAmmo) {
+
+        /** Партия с правкой значений подготовки — не обычная. */
+        public boolean training() {
+            return startCoins != null || startKelium != null || startAmmo != null;
+        }
+
+        public static Options simple(int players, long seed, List<String> seatSpecs) {
+            return new Options(GameConfig.DEFAULT_RULESET, players, seed, seatSpecs,
+                null, null, null, null, null, null);
+        }
+    }
+
+    private final Options options;
     private final int players;
     private final long seed;
     private final List<String> seatSpecs;
@@ -137,6 +162,11 @@ public final class HotSeatWindow {
     /** Подписи точек отката на прошлой перерисовке — ловим «запекание». */
     private List<String> lastAgentLabels = new ArrayList<>();
     private int viewedSeat = 0;
+    /**
+     * МЕСТО ЖИВОГО ИГРОКА — то, что подписано «вы». Прежде эту пометку носило
+     * место, на которое СЕЙЧАС СМОТРЯТ, и в ход бота «вы» переезжало на бота.
+     */
+    private int mySeat = 0;
     private volatile GameConfig cfg;
     private volatile GameState liveState;
     private boolean sessionBound;
@@ -146,9 +176,19 @@ public final class HotSeatWindow {
     volatile Integer awaitingSeat;
 
     HotSeatWindow(int players, long seed, List<String> seatSpecs) {
-        this.players = players;
-        this.seed = seed;
-        this.seatSpecs = seatSpecs;
+        this(Options.simple(players, seed, seatSpecs));
+    }
+
+    public HotSeatWindow(Options options) {
+        this.options = options;
+        this.players = options.players();
+        this.seed = options.seed();
+        this.seatSpecs = options.seatSpecs();
+    }
+
+    /** Открыть окно партии по собранным настройкам (зовёт меню запуска). */
+    public static void open(Options options) {
+        SwingUtilities.invokeLater(() -> new HotSeatWindow(options).start());
     }
 
     void start() {
@@ -609,7 +649,9 @@ public final class HotSeatWindow {
     // ==================== партия ====================
 
     private void runGame() {
-        GameConfig cfg = GameConfig.build(GameConfig.DEFAULT_RULESET, players, seed, null, null);
+        GameConfig cfg = GameConfig.buildCached(options.rulesetId(), players, seed, null, null,
+            options.scenarioId(), options.cuFacing(), options.scenarioFile());
+        applyTrainingSetup(cfg);
         this.cfg = cfg;
         GameState state = Setup.buildGame(cfg);
         this.liveState = state;
@@ -629,12 +671,27 @@ public final class HotSeatWindow {
                     d -> SwingUtilities.invokeLater(() -> showDecision(seatFinal, d)),
                     ev -> { });
                 humansBySeat.put(seat, ia);
+                if (humansBySeat.size() == 1) {
+                    mySeat = seat;
+                    viewedSeat = seat;
+                }
                 agents.add(ia);
                 labels.add("human");
             } else {
-                agents.add(Bots.create(spec, seat, new Random(seed * 131 + seat + 1), players));
+                // КОГО САЖАТЬ — РЕШАЕТ СПРАВОЧНИК БОТОВ, один на всю программу:
+                // он же разбирает уровень умения («punisher:4»). Прежний прямой
+                // Bots.create принимал только имя характера и на составе с
+                // уровнем падал, пытаясь открыть файл с двоеточием в имени.
+                agents.add(kelium.agents.BotCatalog.create(spec, seat,
+                    new Random(seed * 131 + seat + 1), players));
                 labels.add(spec);
             }
+        }
+
+        if (options.training()) {
+            SwingUtilities.invokeLater(() -> feedLine(null,
+                "ТРЕНИРОВОЧНАЯ ПАРТИЯ: значения подготовки заданы вручную — "
+                    + trainingNote() + ". В замеры баланса такая партия не годится."));
         }
 
         ReplayRecord result;
@@ -674,6 +731,41 @@ public final class HotSeatWindow {
     }
 
     // ==================== живое обновление ====================
+
+    /**
+     * ТРЕНИРОВОЧНЫЕ ЗНАЧЕНИЯ ПОДГОТОВКИ. Правится КОПИЯ свода этой партии
+     * ({@code buildCached} отдаёт копию нарочно), файлы правил не трогаются.
+     */
+    private void applyTrainingSetup(GameConfig cfg) {
+        if (options.startCoins() != null) {
+            List<Integer> coins = new ArrayList<>();
+            for (int i = 0; i < players; i++) {
+                coins.add(options.startCoins());
+            }
+            cfg.ruleset.override("setup.start_coins", coins);
+        }
+        if (options.startKelium() != null) {
+            cfg.ruleset.override("setup.start_kelium", options.startKelium());
+        }
+        if (options.startAmmo() != null) {
+            cfg.ruleset.override("setup.start_ammo", options.startAmmo());
+        }
+    }
+
+    /** Чем тренировочная партия отличается от обычной — словами для журнала. */
+    private String trainingNote() {
+        List<String> parts = new ArrayList<>();
+        if (options.startCoins() != null) {
+            parts.add("монет " + options.startCoins());
+        }
+        if (options.startKelium() != null) {
+            parts.add("келемия " + options.startKelium());
+        }
+        if (options.startAmmo() != null) {
+            parts.add("боеприпасов " + options.startAmmo());
+        }
+        return String.join(", ", parts);
+    }
 
     private void onFrame(ReplayRecord r) {
         if (this.rec != r) {
@@ -739,7 +831,7 @@ public final class HotSeatWindow {
             List<kelium.gui.kp.OpponentStrip.Row> rows = new ArrayList<>();
             for (ReplayRecord.Player p : f.snapshot.players) {
                 rows.add(new kelium.gui.kp.OpponentStrip.Row(p.seat, seatName(p.seat),
-                    p.seat == seat, vpTotal(p), p.coin, p.kelium, p.ammo,
+                    p.seat == mySeat, vpTotal(p), p.coin, p.kelium, p.ammo,
                     p.orderHand.size(), p.objectiveHand.size(), p.arsenalHand.size(),
                     p.trophyPoints));
             }
@@ -897,6 +989,18 @@ public final class HotSeatWindow {
         } else {
             refreshSteps();
         }
+    }
+
+    /**
+     * ПОДПИСЬ ДЛЯ ЧЕЛОВЕКА: без внутренних кодов в скобках — «Колосс (koloss)»
+     * превращается в «Колосс». Той же меркой чистится лента партии: игроку эти
+     * коды не нужны нигде, а в журнале на диске они остаются.
+     */
+    static String humanLabel(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("\\s*\\([a-z0-9_:>.\\-]+\\)", "").trim();
     }
 
     /** Строка ленты (и её копия в ящик «Журнал»). seat null — служебное. */
@@ -1081,7 +1185,7 @@ public final class HotSeatWindow {
                 List<PromptOverlay.Option> opts = new ArrayList<>();
                 for (int i = 0; i < options.size(); i++) {
                     int idx = i;
-                    opts.add(new PromptOverlay.Option(options.get(i).label(), () -> {
+                    opts.add(new PromptOverlay.Option(humanLabel(options.get(i).label()), () -> {
                         agent.submitIndex(idx);
                         clearDecision();
                     }));
@@ -1179,7 +1283,7 @@ public final class HotSeatWindow {
                     } else {
                         String label = c.label() == null || c.label().isEmpty()
                             ? String.valueOf(c.payload()) : c.label();
-                        rest.add(new PromptOverlay.Option(label, () -> {
+                        rest.add(new PromptOverlay.Option(humanLabel(label), () -> {
                             agent.submitIndex(idx);
                             clearDecision();
                         }));
