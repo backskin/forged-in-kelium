@@ -78,6 +78,7 @@ public final class StartMenuWindow {
         restoreSpecs = List.copyOf(o.seatSpecs());
         restoreMapId = o.scenarioId();
         restoreMapFile = o.scenarioFile();
+        restoreColors = o.seatColors();
         restoreCoins = o.startCoins();
         restoreKelium = o.startKelium();
         restoreAmmo = o.startAmmo();
@@ -101,6 +102,7 @@ public final class StartMenuWindow {
     private java.nio.file.Path restoreMapFile;
     private Integer restoreSeat;
     private Integer restoreFacing;
+    private List<Integer> restoreColors;
     private Integer restoreCoins;
     private Integer restoreKelium;
     private Integer restoreAmmo;
@@ -136,6 +138,11 @@ public final class StartMenuWindow {
     /** Поворот ЦУ моего места (номер первой из пары стенок); null — на усмотрение. */
     Integer myFacing;
     private final List<String> bots = new ArrayList<>();
+    /**
+     * ЦВЕТ КАЖДОГО МЕСТА — номер краски 0..3. По умолчанию цвет идёт за номером
+     * места, как на столе; игрок может взять себе любой, и соперникам тоже.
+     */
+    private final List<Integer> colors = new ArrayList<>(List.of(0, 1, 2, 3));
 
     /** Раскладка поля: авторская по id или своя из файла. */
     record FieldOption(String id, String label, java.nio.file.Path file) {
@@ -192,6 +199,13 @@ public final class StartMenuWindow {
                 map = f;
                 mapBox.select(f.label());
                 break;
+            }
+        }
+        if (restoreColors != null) {
+            for (int i = 0; i < restoreColors.size() && i < colors.size(); i++) {
+                if (restoreColors.get(i) != null) {
+                    colors.set(i, restoreColors.get(i));
+                }
             }
         }
         mySeat = restoreSeat;
@@ -525,11 +539,17 @@ public final class StartMenuWindow {
         card.setPreferredSize(new Dimension(Theme.px(230), Theme.px(74)));
         card.setMaximumSize(new Dimension(Theme.px(260), Theme.px(74)));
 
+        JPanel head = new JPanel();
+        head.setOpaque(false);
+        head.setLayout(new BoxLayout(head, BoxLayout.X_AXIS));
+        head.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel who = new JLabel(mine ? "ВЫ · место " + (seat + 1) : "место " + (seat + 1));
         who.setFont(Theme.font(11, Font.BOLD));
         who.setForeground(mine ? Theme.seatInk(seat) : Theme.ink3());
-        who.setAlignmentX(Component.LEFT_ALIGNMENT);
-        card.add(who);
+        head.add(who);
+        head.add(javax.swing.Box.createHorizontalGlue());
+        head.add(colorPicker(seat));
+        card.add(head);
 
         if (mine) {
             JLabel me = new JLabel(myFacing == null ? "живой игрок · ЦУ не повёрнут"
@@ -559,6 +579,101 @@ public final class StartMenuWindow {
         return card;
     }
 
+    /**
+     * ВЫБОР КРАСКИ МЕСТА — четыре кружка своих цветов; занятый чужим местом
+     * пригашен. Цвет к правилам отношения не имеет, но за столом играют своим
+     * цветом, а не «местом номер два», и в журнал партии он попадает вместе с ней.
+     */
+    private JComponent colorPicker(int seat) {
+        JPanel row = new JPanel();
+        row.setOpaque(false);
+        row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
+        for (int c = 0; c < 4; c++) {
+            row.add(new ColorDot(seat, c));
+            if (c < 3) {
+                row.add(javax.swing.Box.createHorizontalStrut(Theme.px(3)));
+            }
+        }
+        return row;
+    }
+
+    /** Кружок краски: свой — с ободком, чужой занятый — пригашен. */
+    private final class ColorDot extends JComponent {
+        private final int seat;
+        private final int color;
+
+        ColorDot(int seat, int color) {
+            this.seat = seat;
+            this.color = color;
+            setOpaque(false);
+            int d = Theme.px(15);
+            setPreferredSize(new Dimension(d, d));
+            setMaximumSize(new Dimension(d, d));
+            int other = takenBy(color);
+            setToolTipText(COLOR_NAMES[color]
+                + (other >= 0 && other != seat ? " — сейчас у места " + (other + 1)
+                    + ", возьмёте — поменяетесь" : ""));
+            setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+            addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseClicked(java.awt.event.MouseEvent e) {
+                    pickColor(seat, color);
+                }
+            });
+        }
+
+        @Override
+        protected void paintComponent(java.awt.Graphics g0) {
+            java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+            g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            int d = Math.min(getWidth(), getHeight()) - Theme.px(2);
+            boolean own = colors.get(seat) == color;
+            int other = takenBy(color);
+            boolean busy = other >= 0 && other != seat;
+            java.awt.Color base = SEAT_PAINT[color];
+            g.setColor(busy ? Theme.alpha(base, 0.28) : base);
+            g.fillOval(Theme.px(1), Theme.px(1), d, d);
+            g.setColor(own ? Theme.ink() : Theme.alpha(Theme.border(), busy ? 0.5 : 1));
+            g.setStroke(new java.awt.BasicStroke(own ? Theme.pxf(2.2) : 1f));
+            g.drawOval(Theme.px(1), Theme.px(1), d, d);
+            g.dispose();
+        }
+    }
+
+    /** Краски гнёзд как они напечатаны на жетонах — для кружков выбора. */
+    private static final java.awt.Color[] SEAT_PAINT = {
+        java.awt.Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[0]),
+        java.awt.Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[1]),
+        java.awt.Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[2]),
+        java.awt.Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[3])};
+
+    /** Чьё это гнездо цвета сейчас (−1 — ничьё). */
+    private int takenBy(int color) {
+        for (int i = 0; i < players && i < colors.size(); i++) {
+            if (colors.get(i) == color) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Взять месту краску. Занятая краска МЕНЯЕТСЯ МЕСТАМИ с прежним владельцем —
+     * так и за столом делают, и двух одинаковых цветов на поле не возникает.
+     */
+    private void pickColor(int seat, int color) {
+        int other = takenBy(color);
+        if (other == seat) {
+            return;
+        }
+        if (other >= 0) {
+            colors.set(other, colors.get(seat));
+        }
+        colors.set(seat, color);
+        rebuildPreview();
+    }
+
     /** Строка о том, как играет этот соперник, — из каталога, а не сочинённая. */
     private static String botTip(String id) {
         for (BotCatalog.Entry e : BotCatalog.players()) {
@@ -571,6 +686,9 @@ public final class StartMenuWindow {
 
     /** Значение места, за которым сидит человек. */
     static final String HUMAN = "human";
+
+    /** Краски мест в порядке гнёзд — так они называются на столе. */
+    static final String[] COLOR_NAMES = {"синий", "оранжевый", "зелёный", "лиловый"};
 
     private List<KpChooser.Item> botList() {
         List<KpChooser.Item> out = new ArrayList<>();
@@ -678,6 +796,8 @@ public final class StartMenuWindow {
                     facing.add(i == mySeat ? myFacing : null);
                 }
             }
+            // Краски ставим ДО сборки: по ним рисуются жетоны предпросмотра.
+            kelium.report.FieldGeometry.useSeatColors(colors.subList(0, players));
             GameConfig cfg = GameConfig.buildCached(rulesetId, players, seed, null, null,
                 map == null ? null : map.id(), facing, map == null ? null : map.file());
             previewCfg = cfg;
@@ -693,6 +813,7 @@ public final class StartMenuWindow {
                 rec.seatLabels.add(i == (mySeat == null ? -1 : mySeat) ? "вы" : "соперник");
                 rec.sides.add(state.player(i).board.troop.side);
             }
+            rec.seatColors.addAll(colors.subList(0, players));
             GameRecorder.fillTableAndField(rec, cfg, state);
             ReplayRecord.Frame f = new ReplayRecord.Frame();
             f.type = "setup";
@@ -795,9 +916,20 @@ public final class StartMenuWindow {
         boolean training = coinStep.changed() || keliumStep.changed() || ammoStep.changed();
         return new HotSeatWindow.Options(rulesetId, players, seed,
             specs, map == null ? null : map.id(), map == null ? null : map.file(), facing,
+            List.copyOf(colors.subList(0, players)),
             training && coinStep.changed() ? coinStep.value() : null,
             training && keliumStep.changed() ? keliumStep.value() : null,
             training && ammoStep.changed() ? ammoStep.value() : null);
+    }
+
+    /** Взять месту краску — для прогонщиков и тестов, то же что клик по кружку. */
+    void pickColorForTest(int seat, int color) {
+        pickColor(seat, color);
+    }
+
+    /** Краски мест сейчас — для прогонщиков и тестов. */
+    List<Integer> colorsForTest() {
+        return List.copyOf(colors.subList(0, players));
     }
 
     /** Счётчики стартовых значений — для прогонщиков и тестов. */

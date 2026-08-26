@@ -254,7 +254,7 @@ public final class FieldPainter {
             c.alpha(st.ownerBuilt ? 0.30 : 0.13);
             c.polygon(FieldGeometry.outlineRoundedHexPoints(cx, cy, size,
                     FieldGeometry.TILE_ROUND, neighbor, 4),
-                FieldGeometry.SEAT_FILL[st.ownerTint % 4], null, 0);
+                FieldGeometry.SEAT_FILL[FieldGeometry.seatColor(st.ownerTint)], null, 0);
             c.alpha(1);
         }
 
@@ -697,8 +697,8 @@ public final class FieldPainter {
             // ОБВОДКА ПОЖИРНЕЕ и темнее самого жетона — силуэт перестаёт сливаться
             // с подкраской гекса (просьба дизайнера 13.08.2026).
             c.shape(sh, cx, cy, face - sh.outward(), FieldGeometry.seatScale(sh, size),
-                sh.hexCx(), sh.hexCy(), tone(FieldGeometry.SEAT_TOKEN[seat]),
-                FieldGeometry.SEAT_STROKE[seat], TOKEN_STROKE);
+                sh.hexCx(), sh.hexCy(), tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(seat)]),
+                FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(seat)], TOKEN_STROKE);
         }
         // РАНЕНЫЙ ЖЕТОН обводится красным: видно издалека, а на сколько именно
         // ранен — говорит подсказка при наведении.
@@ -763,7 +763,7 @@ public final class FieldPainter {
         // обводится ЕЩЁ РАЗ последним слоем, уже без заливки, и рамка снова целая
         // по всему периметру (просьба дизайнера 13.08.2026).
         c.shape(sh, cx, cy, face - sh.outward(), FieldGeometry.seatScale(sh, size),
-            sh.hexCx(), sh.hexCy(), "none", FieldGeometry.SEAT_STROKE[seat], TOKEN_STROKE);
+            sh.hexCx(), sh.hexCy(), "none", FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(seat)], TOKEN_STROKE);
         // ПОДПИСЬ ЖЕТОНА — общая с планшетом: «Эн-3», «Дб-1», «ЦУ»
         String code = Labels.buildingLabel(b.type, b.level);
         // ПОДПИСЬ ИДЁТ ВДОЛЬ СВОЕЙ СТЕНКИ. Первый заход брал угол самой ФОРМЫ
@@ -1348,8 +1348,8 @@ public final class FieldPainter {
             double ay = cy - airDrawn * 6;
             FieldGeometry.Shape sh = FieldGeometry.SH_AIRCRAFT;
             c.shape(sh, ax, ay, 0, size * 0.40 / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
-                tone(FieldGeometry.SEAT_TOKEN[u.owner % 4]),
-                FieldGeometry.SEAT_STROKE[u.owner % 4], TOKEN_STROKE);
+                tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
+                FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
             paintHpPipsAt(c, size, u.hp, u.damage, ax, ay - size * 0.20, 0);
             airDrawn++;
         }
@@ -1406,8 +1406,8 @@ public final class FieldPainter {
                 } else {
                     c.shape(sh, pos[0], pos[1], FieldGeometry.unitRotation(sh, face),
                         w / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
-                        tone(FieldGeometry.SEAT_TOKEN[u.owner % 4]),
-                        FieldGeometry.SEAT_STROKE[u.owner % 4], TOKEN_STROKE);
+                        tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
+                        FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
                 }
                 unitAngle = face + 90;
                 paintUnitLetter(c, u, pos, w, unitAngle);
@@ -1419,8 +1419,8 @@ public final class FieldPainter {
                     drawUnitTexture(c, tex, sh, pos, 0, w);
                 } else {
                     c.shape(sh, pos[0], pos[1], 0, w / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
-                        tone(FieldGeometry.SEAT_TOKEN[u.owner % 4]),
-                        FieldGeometry.SEAT_STROKE[u.owner % 4], TOKEN_STROKE);
+                        tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
+                        FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
                 }
                 unitAngle = 0;
                 paintUnitLetter(c, u, pos, w, unitAngle);
@@ -1468,7 +1468,7 @@ public final class FieldPainter {
     private static void paintHidden(FieldCanvas c, double size, ReplayRecord.Tok u,
                                     double x, double y) {
         double r = size * 0.115;
-        c.circle(x, y, r, tone(FieldGeometry.SEAT_TOKEN[u.owner % 4]), WHITE, 1.4);
+        c.circle(x, y, r, tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]), WHITE, 1.4);
         c.text(unitLetter(u.type), x, y + r * 0.62, r * 1.5, true, WHITE);
         // Урон укрытого войска значок не несёт — он и так мелкий; точные числа
         // даёт подсказка при наведении (проект «гнёзда прочности»).

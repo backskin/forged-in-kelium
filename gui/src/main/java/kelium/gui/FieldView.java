@@ -281,6 +281,10 @@ public final class FieldView extends JComponent {
     public void setRecord(ReplayRecord rec) {
         this.record = rec;
         this.frame = null;
+        // КРАСКИ МЕСТ — ИЗ САМОЙ ЗАПИСИ: партия могла играться с выбранными
+        // цветами, и её журнал обязан показываться в тех же. Пусто в записи —
+        // цвет по номеру места, как было всегда.
+        kelium.report.FieldGeometry.useSeatColors(rec == null ? null : rec.seatColors);
         // Вписываем заново только пока масштабом распоряжаемся мы: если человек уже
         // приблизил интересный угол, смена настроек не должна его сбрасывать.
         this.fitPending = autoFit;
@@ -966,8 +970,8 @@ public final class FieldView extends JComponent {
         } catch (RuntimeException unknown) {
             return;
         }
-        String fill = legal ? FieldGeometry.SEAT_TOKEN[ghostSeat % 4] : "#E5584F";
-        String stroke = legal ? FieldGeometry.SEAT_STROKE[ghostSeat % 4] : "#7A1F1A";
+        String fill = legal ? FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(ghostSeat)] : "#E5584F";
+        String stroke = legal ? FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(ghostSeat)] : "#7A1F1A";
         kelium.report.Java2DCanvas canvas =
             new kelium.report.Java2DCanvas(g, zoom, getFont());
         // Белая подложка-обводка отделяет призрак от стоящих жетонов: на приёмке

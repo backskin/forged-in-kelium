@@ -58,6 +58,24 @@ public final class ReplayRecord {
     /** Стартовый поворот ЦУ по местам (сторона 0..5); пусто — автоподбор. */
     public final List<Integer> cuFacing = new ArrayList<>();
     /**
+     * ЦВЕТ МЕСТА: место → номер цветового гнезда 0..3. Пусто — цвет по номеру
+     * места, как было всегда.
+     *
+     * <p>Цвет к правилам отношения не имеет: движок о нём не знает, и партия от
+     * него не меняется. Но в записи он нужен — иначе журнал переиграется не в
+     * тех красках, в каких игрок за столом сидел, и разбирать партию по нему
+     * будет неудобно.
+     */
+    public final List<Integer> seatColors = new ArrayList<>();
+
+    /** Цветовое гнездо места: из записи, иначе по номеру места. */
+    public int seatColor(int seat) {
+        if (seat >= 0 && seat < seatColors.size() && seatColors.get(seat) != null) {
+            return Math.floorMod(seatColors.get(seat), 4);
+        }
+        return Math.floorMod(seat, 4);
+    }
+    /**
      * ВКЛЮЧЁННЫЕ ДОПОЛНЕНИЯ на момент партии: {@code expansions.<имя> → вкл}.
      *
      * <p>Добавлено 20.08.2026. Дополнения накладываются на свод ДО сборки партии
@@ -864,6 +882,7 @@ public final class ReplayRecord {
         m.put("scenarioId", scenarioId);
         m.put("scenarioFile", scenarioFile);
         m.put("cuFacing", cuFacing);
+        m.put("seatColors", seatColors);
         m.put("winner", winner);
         m.put("condition", condition);
         m.put("rounds", rounds);
@@ -1183,6 +1202,9 @@ public final class ReplayRecord {
         r.sides.addAll(Json.strings(m, "sides"));
         r.scenarioId = Json.s(m, "scenarioId");
         r.scenarioFile = Json.s(m, "scenarioFile");
+        for (Object o : Json.list(m, "seatColors")) {
+            r.seatColors.add(o instanceof Number n3 ? n3.intValue() : null);
+        }
         for (Object o : Json.list(m, "cuFacing")) {
             r.cuFacing.add(o instanceof Number n2 ? n2.intValue() : null);
         }

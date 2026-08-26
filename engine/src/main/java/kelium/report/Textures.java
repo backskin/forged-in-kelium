@@ -169,7 +169,10 @@ public final class Textures {
     /** Имена-кандидаты в порядке убывания точности. */
     public static List<String> names(String type, Integer level, int seat) {
         List<String> out = new ArrayList<>(4);
-        int p = Math.floorMod(seat, 4) + 1;
+        // Рисунок жетона выбирается по ЦВЕТУ места, а не по его номеру: игрок
+        // выбирает цвет в меню запуска, и картинка обязана идти за силуэтом,
+        // иначе синий жетон окажется в красной раскраске.
+        int p = FieldGeometry.seatColor(seat) + 1;
         if (level != null) {
             out.add(type + "_l" + level + "_p" + p);
             out.add(type + "_p" + p);

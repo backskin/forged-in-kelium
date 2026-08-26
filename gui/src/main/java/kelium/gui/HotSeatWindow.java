@@ -90,7 +90,7 @@ public final class HotSeatWindow {
      */
     public record Options(String rulesetId, int players, long seed, List<String> seatSpecs,
                            String scenarioId, java.nio.file.Path scenarioFile,
-                           List<Integer> cuFacing,
+                           List<Integer> cuFacing, List<Integer> seatColors,
                            Integer startCoins, Integer startKelium, Integer startAmmo) {
 
         /** Партия с правкой значений подготовки — не обычная. */
@@ -100,7 +100,7 @@ public final class HotSeatWindow {
 
         public static Options simple(int players, long seed, List<String> seatSpecs) {
             return new Options(GameConfig.DEFAULT_RULESET, players, seed, seatSpecs,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
         }
     }
 
@@ -670,6 +670,9 @@ public final class HotSeatWindow {
     // ==================== партия ====================
 
     private void runGame() {
+        // КРАСКИ МЕСТ ставятся ДО сборки партии: по ним рисуется и поле, и
+        // фишки, и картинки жетонов.
+        kelium.report.FieldGeometry.useSeatColors(options.seatColors());
         GameConfig cfg = GameConfig.buildCached(options.rulesetId(), players, seed, null, null,
             options.scenarioId(), options.cuFacing(), options.scenarioFile());
         applyTrainingSetup(cfg);
@@ -718,6 +721,7 @@ public final class HotSeatWindow {
         ReplayRecord result;
         try {
             result = GameRecorder.playWithAgents(cfg, state, agents, labels, seed,
+                options.seatColors(),
                 msg -> SwingUtilities.invokeLater(() -> feedLine(null, msg)),
                 r -> SwingUtilities.invokeLater(() -> onFrame(r)));
         } catch (kelium.core.GameAborted e) {

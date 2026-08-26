@@ -39,9 +39,42 @@ class StartMenuTest {
         assertFalse(plain.training(), "обычная партия не может быть тренировочной");
 
         HotSeatWindow.Options trained = new HotSeatWindow.Options(plain.rulesetId(), 2, 7L,
-            plain.seatSpecs(), null, null, null, 9, null, null);
+            plain.seatSpecs(), null, null, null, null, 9, null, null);
         assertTrue(trained.training(), "правка значений подготовки делает партию тренировочной");
         assertEquals(9, trained.startCoins());
+    }
+
+    @Test
+    void цветаМестПереживаютЗаписьЖурнала(@org.junit.jupiter.api.io.TempDir
+                                          java.nio.file.Path dir) throws Exception {
+        // Настоящая запись, а не собранная руками: у читателя журнала строгая
+        // проверка, и синтетика до неё не доживает.
+        var rec = kelium.gui.dev.DevScenes.build("энергия").record();
+        rec.seatColors.clear();
+        rec.seatColors.addAll(List.of(2, 0));
+        var out = dir.resolve("colors.kelium-replay.json");
+        rec.save(out);
+
+        var back = kelium.report.ReplayRecord.load(out);
+        assertEquals(List.of(2, 0), back.seatColors,
+            "журнал обязан помнить, каким цветом играли");
+        assertEquals(2, back.seatColor(0));
+        assertEquals(0, back.seatColor(1));
+    }
+
+    @Test
+    void безВыбораЦветаКраскаИдётЗаНомеромМеста() {
+        kelium.report.FieldGeometry.useSeatColors(null);
+        assertEquals(0, kelium.report.FieldGeometry.seatColor(0));
+        assertEquals(3, kelium.report.FieldGeometry.seatColor(3));
+
+        kelium.report.FieldGeometry.useSeatColors(List.of(2, 0));
+        assertEquals(2, kelium.report.FieldGeometry.seatColor(0),
+            "выбранная краска должна перебивать номер места");
+        assertEquals(0, kelium.report.FieldGeometry.seatColor(1));
+        assertEquals(2, kelium.report.FieldGeometry.seatColor(2),
+            "место вне таблицы красится по своему номеру");
+        kelium.report.FieldGeometry.useSeatColors(null);
     }
 
     @Test

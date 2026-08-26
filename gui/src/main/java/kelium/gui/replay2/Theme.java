@@ -336,13 +336,18 @@ public final class Theme {
         return out;
     }
 
-    /** Цвет места — тот же, что у жетона на поле. */
+    /**
+     * Цвет места — тот же, что у жетона на поле, и тем же путём: через гнездо
+     * цвета партии ({@link FieldGeometry#seatColor}). Иначе фишки и полосы
+     * игроков красились бы по номеру места, а жетоны на поле — по выбранному
+     * цвету, и одно место оказалось бы двух разных цветов сразу.
+     */
     public static Color seat(int i) {
-        return SEAT[Math.floorMod(i, SEAT.length)];
+        return SEAT[FieldGeometry.seatColor(i)];
     }
 
     public static Color seatStroke(int i) {
-        return SEAT_STROKE[Math.floorMod(i, SEAT_STROKE.length)];
+        return SEAT_STROKE[FieldGeometry.seatColor(i)];
     }
 
     /**

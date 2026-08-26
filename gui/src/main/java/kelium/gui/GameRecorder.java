@@ -213,8 +213,24 @@ public final class GameRecorder {
                                                List<Agent> agents, List<String> seatLabels,
                                                long seed, Consumer<String> note,
                                                Consumer<ReplayRecord> onFrame) {
+        return playWithAgents(cfg, state, agents, seatLabels, seed, null, note, onFrame);
+    }
+
+    /**
+     * То же, плюс ЦВЕТА МЕСТ, выбранные игроком в меню запуска. Они не меняют
+     * партию, но обязаны попасть в её журнал: иначе запись переиграется не в тех
+     * красках, в каких за столом сидели.
+     */
+    public static ReplayRecord playWithAgents(GameConfig cfg, GameState state,
+                                               List<Agent> agents, List<String> seatLabels,
+                                               long seed, List<Integer> seatColors,
+                                               Consumer<String> note,
+                                               Consumer<ReplayRecord> onFrame) {
         ReplayRecord rec = header(cfg, state, state.numPlayers(), seed, seatLabels,
             cfg.scenarioId, cfg.cuFacing);
+        if (seatColors != null) {
+            rec.seatColors.addAll(seatColors);
+        }
         rememberExpansions(rec);
 
         List<ReplayRecord.Thought> pending = new ArrayList<>();
