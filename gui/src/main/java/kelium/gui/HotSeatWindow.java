@@ -178,6 +178,16 @@ public final class HotSeatWindow {
     private volatile boolean stopped;
     /** Партия доиграна до конца — закрывать её можно без вопросов. */
     private volatile boolean finished;
+    /**
+     * ЛЕНТА ПРИНЯТЫХ РЕШЕНИЙ — из неё складывается сохранение партии. Пишется
+     * на каждом решении любого места; см. {@link MoveLog}.
+     */
+    private final List<Integer> moves = java.util.Collections.synchronizedList(
+        new ArrayList<>());
+    /** Лента загруженного сохранения: её надо доиграть, прежде чем спрашивать игрока. */
+    private final List<Integer> replay = new ArrayList<>();
+    /** Партия ещё догоняет сохранение — окно не мешает и ничего не спрашивает. */
+    private volatile boolean catchingUp;
 
     HotSeatWindow(int players, long seed, List<String> seatSpecs) {
         this(Options.simple(players, seed, seatSpecs));
@@ -193,6 +203,19 @@ public final class HotSeatWindow {
     /** Открыть окно партии по собранным настройкам (зовёт меню запуска). */
     public static void open(Options options) {
         SwingUtilities.invokeLater(() -> new HotSeatWindow(options).start());
+    }
+
+    /**
+     * ПРОДОЛЖИТЬ СОХРАНЁННУЮ ПАРТИЮ. Она доигрывается с первого хода по ленте
+     * записанных решений — быстро, не спрашивая ни игрока, ни ботов, — и на
+     * месте сохранения возвращается к живой игре.
+     */
+    public static void open(GameSave save) {
+        SwingUtilities.invokeLater(() -> {
+            HotSeatWindow w = new HotSeatWindow(save.options);
+            w.replay.addAll(save.moves);
+            w.start();
+        });
     }
 
     void start() {
@@ -277,6 +300,13 @@ public final class HotSeatWindow {
 
         // ВЫЙТИ ИЗ ПАРТИИ МОЖНО ВСЕГДА (просьба дизайнера 26.08): закрыли —
         // вернулись в «Штаб» и собрали стол заново.
+        KpButton saveBtn = new KpButton("Сохранить", "продолжить потом", null);
+        saveBtn.setPreferredSize(new Dimension(Theme.px(130), Theme.px(38)));
+        saveBtn.setToolTipText("Записать партию, чтобы продолжить её из меню. "
+            + "Сохраняются настройки стола и все принятые решения");
+        saveBtn.onClick(this::saveGame);
+        bar.add(saveBtn);
+
         KpButton toMenu = new KpButton("В меню", "закрыть партию", null);
         toMenu.setPreferredSize(new Dimension(Theme.px(126), Theme.px(38)));
         toMenu.setToolTipText("Закрыть партию и вернуться в «Штаб». "
@@ -718,9 +748,25 @@ public final class HotSeatWindow {
                     + trainingNote() + ". В замеры баланса такая партия не годится."));
         }
 
+        // ЛЕНТА РЕШЕНИЙ пишется всегда: без неё партию не сохранить. Если
+        // партию продолжают, поверх ложится проигрывающая обёртка — она доводит
+        // стол до места сохранения и передаёт игру живым.
+        List<Agent> playing = agents;
+        if (!replay.isEmpty()) {
+            catchingUp = true;
+            SwingUtilities.invokeLater(() -> turnLabel.setText(
+                "Доигрываем сохранённое — " + replay.size() + " решений…"));
+            playing = MoveLog.playback(playing, replay,
+                () -> SwingUtilities.invokeLater(this::onCaughtUp));
+        }
+        // ПИШУЩАЯ ОБЁРТКА — САМАЯ ВЕРХНЯЯ, поверх проигрывающей: иначе
+        // доигранные по сохранению ходы мимо ленты пройдут, и сохранить
+        // продолженную партию будет нечем.
+        playing = MoveLog.recording(playing, moves);
+
         ReplayRecord result;
         try {
-            result = GameRecorder.playWithAgents(cfg, state, agents, labels, seed,
+            result = GameRecorder.playWithAgents(cfg, state, playing, labels, seed,
                 options.seatColors(),
                 msg -> SwingUtilities.invokeLater(() -> feedLine(null, msg)),
                 r -> SwingUtilities.invokeLater(() -> onFrame(r)));
@@ -773,6 +819,63 @@ public final class HotSeatWindow {
     }
 
     // ==================== живое обновление ====================
+
+    /** Что окно сейчас говорит о партии — для прогонщиков и тестов. */
+    String statusForTest() {
+        return turnLabel == null ? "?" : turnLabel.getText();
+    }
+
+    /** Последние строки ленты — для прогонщиков и тестов. */
+    String lastFeedForTest() {
+        return lastFeedText == null ? "" : lastFeedText;
+    }
+
+    /** Зарядить ленту сохранения до start() — для прогонщиков и тестов. */
+    void loadForTest(List<Integer> moves) {
+        replay.clear();
+        replay.addAll(moves);
+    }
+
+    /** Сохранение доиграно: дальше партия живая. */
+    private void onCaughtUp() {
+        catchingUp = false;
+        // ПЕРЕРИСОВАТЬ ВСЁ ЦЕЛИКОМ: пока доигрывали, кадры пропускались ради
+        // скорости, и последний из них мог оказаться пропущенным — окно тогда
+        // встречает игрока пустым полем, хотя партия уже идёт.
+        if (rec != null && !rec.frames.isEmpty()) {
+            onFrame(rec);
+        }
+        feedLine(null, "Сохранённая партия восстановлена — играем дальше");
+    }
+
+    /**
+     * СОХРАНИТЬ ПАРТИЮ. Пишутся настройки стола и лента принятых решений —
+     * этого хватает, чтобы повторить партию до этого места в точности.
+     */
+    void saveGame() {
+        List<Integer> snapshot;
+        synchronized (moves) {
+            snapshot = new ArrayList<>(moves);
+        }
+        ReplayRecord r = rec;
+        int round = r == null || r.frames.isEmpty() ? 0
+            : r.frames.get(r.frames.size() - 1).round;
+        int circle = r == null || r.frames.isEmpty() ? 0
+            : r.frames.get(r.frames.size() - 1).circle;
+        String when = java.time.LocalDateTime.now()
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        String name = "партия " + seed;
+        GameSave save = new GameSave(name, options, snapshot, options.rulesetId(),
+            GameSave.contentVersionsOf(cfg), when, round, circle);
+        try {
+            java.nio.file.Path file = GameSave.fileFor(name);
+            save.save(file);
+            feedLine(null, "Партия сохранена: " + file.toAbsolutePath()
+                + " (решений " + snapshot.size() + ")");
+        } catch (java.io.IOException e) {
+            feedLine(null, "Не удалось сохранить партию: " + e.getMessage());
+        }
+    }
 
     /**
      * ЗАКРЫТЬ ПАРТИЮ И ВЕРНУТЬСЯ В «ШТАБ». Недоигранную партию спрашиваем: она
@@ -850,11 +953,20 @@ public final class HotSeatWindow {
         if (stopped) {
             return;          // окно закрыто — движку уже некуда рисовать
         }
+        // ЗАПИСЬ ПРИВЯЗЫВАЕТСЯ ВСЕГДА, даже пока доигрываем сохранение: это не
+        // перерисовка, а связь окна с партией. Пропускать её было ошибкой —
+        // восстановленная партия открывалась «пустой», хотя уже шла.
         if (this.rec != r) {
             this.rec = r;
             field.setRecord(r);
         }
         if (r.frames.isEmpty()) {
+            return;
+        }
+        if (catchingUp && r.frames.size() % 40 != 0) {
+            // Доигрывание сохранения идёт сотнями кадров в секунду: перерисовывать
+            // каждый — только тормозить. Показываем каждый сороковой, чтобы было
+            // видно, что дело движется.
             return;
         }
         int last = r.frames.size() - 1;

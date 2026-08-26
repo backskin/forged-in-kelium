@@ -252,6 +252,8 @@ public final class StartMenuWindow {
             BorderFactory.createEmptyBorder(Theme.px(12), Theme.px(12),
                 Theme.px(12), Theme.px(12))));
 
+        rail.add(section("ПРОДОЛЖИТЬ", buildContinue()));
+        rail.add(javax.swing.Box.createVerticalStrut(Theme.px(14)));
         rail.add(section("РЕЖИМ", buildModes()));
         rail.add(javax.swing.Box.createVerticalStrut(Theme.px(14)));
         rail.add(section("СТОЛ", buildTable()));
@@ -274,6 +276,90 @@ public final class StartMenuWindow {
         box.add(body, BorderLayout.CENTER);
         box.setMaximumSize(new Dimension(Integer.MAX_VALUE, box.getPreferredSize().height));
         return box;
+    }
+
+    /**
+     * ПРОДОЛЖИТЬ СОХРАНЁННУЮ ПАРТИЮ — первым делом на экране: у кого партия
+     * начата, тому не стол собирать, а вернуться в неё.
+     *
+     * <p>Сохранений нет — строка честно говорит об этом и не притворяется
+     * кнопкой. Сохранение, снятое на других правилах, тоже видно: оно в списке,
+     * но с причиной, почему по нему уже не сыграть.
+     */
+    private JComponent buildContinue() {
+        JPanel col = new JPanel();
+        col.setOpaque(false);
+        col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
+        List<GameSave> saves = GameSave.all();
+        if (saves.isEmpty()) {
+            JLabel none = new JLabel("сохранённых партий нет");
+            none.setFont(Theme.font(12, Font.PLAIN));
+            none.setForeground(Theme.ink3());
+            none.setAlignmentX(Component.LEFT_ALIGNMENT);
+            col.add(none);
+            return col;
+        }
+        List<KpChooser.Item> items = new ArrayList<>();
+        for (GameSave sv : saves) {
+            String why = sv.checkCompatible();
+            items.add(new KpChooser.Item(sv.name, sv.name,
+                why == null ? sv.describe() : "не подходит: " + why));
+        }
+        saveBox = new KpChooser(null, items, it -> {
+            for (GameSave sv : saves) {
+                if (sv.name.equals(it.value())) {
+                    chosenSave = sv;
+                    break;
+                }
+            }
+            refreshContinue();
+        });
+        chosenSave = saves.get(0);
+        saveBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+        saveBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, Theme.px(30)));
+        col.add(saveBox);
+        col.add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
+
+        continueBtn = new KpButton("Продолжить партию", "", null);
+        continueBtn.setPreferredSize(new Dimension(Theme.px(280), Theme.px(40)));
+        continueBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, Theme.px(40)));
+        continueBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+        continueBtn.onClick(this::continueSaved);
+        col.add(continueBtn);
+        refreshContinue();
+        return col;
+    }
+
+    private KpChooser saveBox;
+    private KpButton continueBtn;
+    private GameSave chosenSave;
+
+    /** Годится ли выбранное сохранение — и что об этом сказать игроку. */
+    private void refreshContinue() {
+        if (continueBtn == null || chosenSave == null) {
+            return;
+        }
+        String why = chosenSave.checkCompatible();
+        if (why == null) {
+            continueBtn.setTexts("Продолжить партию", chosenSave.describe());
+            continueBtn.setState(KpButton.State.AVAILABLE);
+        } else {
+            continueBtn.setTexts("Продолжить нельзя", why);
+            continueBtn.setState(KpButton.State.DISABLED);
+        }
+        continueBtn.setToolTipText(why == null
+            ? "Партия доиграется по записанным решениям до места сохранения и "
+                + "вернётся к вам живой"
+            : why);
+    }
+
+    /** Открыть окно партии и доиграть его до места сохранения. */
+    private void continueSaved() {
+        if (chosenSave == null || chosenSave.checkCompatible() != null) {
+            return;
+        }
+        frame.dispose();
+        HotSeatWindow.open(chosenSave);
     }
 
     private JComponent buildModes() {
