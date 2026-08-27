@@ -82,19 +82,19 @@ public final class StartMenuWindow {
         restoreCoins = o.startCoins();
         restoreKelium = o.startKelium();
         restoreAmmo = o.startAmmo();
-        // Место игрока и поворот ЦУ — из состава мест прошлой партии.
-        for (int i = 0; i < restoreSpecs.size(); i++) {
-            if (HUMAN.equals(restoreSpecs.get(i))) {
-                restoreSeat = i;
-                break;
-            }
+        // Место игрока и поворот ЦУ — из состава мест прошлой партии. Живой
+        // был один — его место и есть «ваше»; живых было несколько — своего
+        // места нет ни у кого, они равны.
+        if (restoreSpecs.stream().filter(HUMAN::equals).count() == 1) {
+            restoreSeat = restoreSpecs.indexOf(HUMAN);
         }
         if (o.cuFacing() != null && restoreSeat != null
                 && restoreSeat < o.cuFacing().size()) {
             restoreFacing = o.cuFacing().get(restoreSeat);
         }
-        mode = restoreSpecs.stream().filter(HUMAN::equals).count() > 1
-            ? Mode.HOTSEAT : Mode.BOTS;
+        mode = Mode.OFFLINE;
+        // Сколько мест было отдано ботам — столько и предложим снова.
+        restoreBots = (int) restoreSpecs.stream().filter(x -> !HUMAN.equals(x)).count();
     }
 
     private List<String> restoreSpecs;
@@ -103,14 +103,20 @@ public final class StartMenuWindow {
     private Integer restoreSeat;
     private Integer restoreFacing;
     private List<Integer> restoreColors;
+    private Integer restoreBots = -1;
     private Integer restoreCoins;
     private Integer restoreKelium;
     private Integer restoreAmmo;
 
     private static final int RAIL_W = 320;
 
-    /** Режимы стола. Сеть и общий компьютер ждут своих экранов. */
-    private enum Mode { BOTS, HOTSEAT, NET }
+    /**
+     * РЕЖИМОВ ДВА, А НЕ ТРИ (упрощение по просьбе дизайнера 27.08.2026).
+     * «Один против ботов» и «общий компьютер» — это была одна и та же игра за
+     * одним столом, разделённая надвое; вопрос «сколько из игроков боты»
+     * отвечается ниже числом, а не выбором режима.
+     */
+    private enum Mode { OFFLINE, NET }
 
     JFrame frame;
     FieldView field;
@@ -128,7 +134,28 @@ public final class StartMenuWindow {
     private Stepper keliumStep;
     private Stepper ammoStep;
 
-    private Mode mode = Mode.BOTS;
+    private Mode mode = Mode.OFFLINE;
+    /**
+     * СКОЛЬКО ИЗ ИГРОКОВ — БОТЫ. Остальные места живые и ходят по очереди за
+     * этим же компьютером. По умолчанию все, кроме вас.
+     */
+    private int botCount = 1;
+
+    /** Сколько мест за столом живые. */
+    private int humans() {
+        return players - botCount;
+    }
+
+    /**
+     * ОДИН ЖИВОЙ ЗА СТОЛОМ. Только тогда есть смысл в «ВЫ» и в выборе своего
+     * места: сесть можно куда хочешь, остальные места займут боты. Живых
+     * несколько — они РАВНЫ между собой, все места и так заняты, и выбирать
+     * некому и нечего (вопрос дизайнера 27.08: «чем Я отличаюсь от других
+     * офлайн-игроков?» — ничем).
+     */
+    private boolean soloHuman() {
+        return humans() == 1;
+    }
     private int players = 2;
     private long seed = 100000 + new Random().nextInt(900000);
     private String rulesetId = GameConfig.DEFAULT_RULESET;
@@ -191,6 +218,10 @@ public final class StartMenuWindow {
         ensureBots();
         for (int i = 0; i < restoreSpecs.size() && i < bots.size(); i++) {
             bots.set(i, restoreSpecs.get(i));
+        }
+        if (restoreBots != null && restoreBots >= 0) {
+            botCount = Math.min(restoreBots, players - 1);
+            rebuildBotRow();
         }
         refreshMaps();
         for (FieldOption f : maps) {
@@ -366,8 +397,8 @@ public final class StartMenuWindow {
         JPanel col = new JPanel();
         col.setOpaque(false);
         col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
-        addMode(col, Mode.BOTS, "Один против ботов", "вы и до трёх соперников-программ");
-        addMode(col, Mode.HOTSEAT, "Общий компьютер", "живые игроки по очереди за одним экраном");
+        addMode(col, Mode.OFFLINE, "За одним компьютером",
+            "вы, боты и живые соседи по очереди");
         addMode(col, Mode.NET, "По сети", "вы поднимаете стол, к нему подключаются");
         return col;
     }
@@ -396,20 +427,12 @@ public final class StartMenuWindow {
                         ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
                 }
             });
-            // «Общий компьютер» — стол живых людей: места становятся живыми, и
-            // игрок сам решает, какие отдать ботам.
-            for (int i = 0; i < bots.size(); i++) {
-                bots.set(i, m == Mode.HOTSEAT ? HUMAN
-                    : BotCatalog.ХАРАКТЕРЫ.get(i % BotCatalog.ХАРАКТЕРЫ.size()).id()
-                        + ":" + DEFAULT_LEVEL);
-            }
             refreshSeats();
             refreshReady();
         });
         b.setToolTipText(switch (m) {
-            case BOTS -> "Играете вы один, остальные места занимают боты";
-            case HOTSEAT -> "Несколько живых игроков ходят по очереди на этом компьютере; "
-                + "свободные места добираются ботами";
+            case OFFLINE -> "Все за одним экраном: сколько из игроков боты, "
+                + "выбирается ниже; живые ходят по очереди, между ними опускается шторка";
             default -> "Стол поднимается на этом компьютере, соперники подключаются по сети";
         });
         modeTiles.put(m.name(), b);
@@ -440,6 +463,16 @@ public final class StartMenuWindow {
             counts.add(b);
         }
         col.add(counts);
+        col.add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
+
+        // СКОЛЬКО ИЗ НИХ БОТЫ — отдельным вопросом, а не выбором режима.
+        // Остальные места живые и ходят по очереди за этим же компьютером.
+        botRow = new JPanel(new net.miginfocom.swing.MigLayout(
+            "insets 0, gapx " + Theme.px(5)));
+        botRow.setOpaque(false);
+        botRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        col.add(botRow);
+        rebuildBotRow();
         col.add(javax.swing.Box.createVerticalStrut(Theme.px(8)));
 
         rulesBox = new KpChooser("правила", rulesetList(), it -> {
@@ -462,6 +495,79 @@ public final class StartMenuWindow {
             + "дают ровно ту же партию. Щёлкните по числу, чтобы набрать своё");
         col.add(seedBox);
         return col;
+    }
+
+    private JPanel botRow;
+    private final Map<Integer, KpButton> botCountTiles = new LinkedHashMap<>();
+
+    /**
+     * Ряд «из них боты»: от нуля до всех, кроме одного — хотя бы одно место
+     * должно остаться живым, иначе играть будет некому.
+     */
+    private void rebuildBotRow() {
+        if (botRow == null) {
+            return;
+        }
+        botRow.removeAll();
+        botCountTiles.clear();
+        JLabel bl = new JLabel("из них боты");
+        bl.setFont(Theme.font(12, Font.PLAIN));
+        bl.setForeground(Theme.ink2());
+        botRow.add(bl);
+        for (int n = 0; n <= players - 1; n++) {
+            int nn = n;
+            KpButton b = new KpButton(String.valueOf(n), "", null);
+            b.setPreferredSize(new Dimension(Theme.px(34), Theme.px(30)));
+            b.setState(n == botCount ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
+            b.setToolTipText(n == 0 ? "все места живые — ходят по очереди за этим экраном"
+                : n == players - 1 ? "вы один против ботов"
+                    : n + " бот(а) и живые соседи");
+            b.onClick(() -> setBotCount(nn));
+            botCountTiles.put(n, b);
+            botRow.add(b);
+        }
+        botRow.revalidate();
+        botRow.repaint();
+    }
+
+    void setBotCount(int n) {
+        botCount = Math.max(0, Math.min(players - 1, n));
+        botCountTiles.forEach((k, b) -> b.setState(k == botCount
+            ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE));
+        refreshSeats();
+        applyFieldPicking();
+        refreshReady();
+    }
+
+    /**
+     * РАЗЛОЖИТЬ МЕСТА ПО ВЫБОРУ: моё место всегда живое, из остальных первые
+     * {@code botCount} — боты, прочие живые. Уже выбранный характер и уровень
+     * бота сохраняются, чтобы правка числа не сбрасывала настройку соперников.
+     */
+    private void applyBotCount() {
+        ensureBots();
+        if (!soloHuman()) {
+            // Живых несколько (или все) — своё место не выбирают: за столом
+            // заняты все, и «ВЫ» ни за одним из них не закреплено.
+            mySeat = null;
+            myFacing = null;
+        }
+        int осталось = botCount;
+        for (int i = 0; i < players; i++) {
+            if (mySeat != null && i == mySeat) {
+                bots.set(i, HUMAN);
+                continue;
+            }
+            if (осталось > 0) {
+                if (HUMAN.equals(bots.get(i))) {
+                    bots.set(i, BotCatalog.ХАРАКТЕРЫ
+                        .get(i % BotCatalog.ХАРАКТЕРЫ.size()).id() + ":" + DEFAULT_LEVEL);
+                }
+                осталось--;
+            } else {
+                bots.set(i, HUMAN);
+            }
+        }
     }
 
     private JComponent buildTraining() {
@@ -581,7 +687,7 @@ public final class StartMenuWindow {
 
     // ==================== состав стола ====================
 
-    private void setPlayers(int n) {
+    void setPlayers(int n) {
         players = n;
         countTiles.forEach((k, b) -> b.setState(k == n
             ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE));
@@ -589,6 +695,8 @@ public final class StartMenuWindow {
             mySeat = null;
             myFacing = null;
         }
+        botCount = Math.min(botCount, n - 1);
+        rebuildBotRow();
         refreshMaps();
         refreshSeats();
         rebuildPreview();
@@ -603,7 +711,7 @@ public final class StartMenuWindow {
     }
 
     private void refreshSeats() {
-        ensureBots();
+        applyBotCount();
         seatStrip.removeAll();
         seatBoxes.clear();
         for (int i = 0; i < players; i++) {
@@ -632,17 +740,30 @@ public final class StartMenuWindow {
         head.setOpaque(false);
         head.setLayout(new BoxLayout(head, BoxLayout.X_AXIS));
         head.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JLabel who = new JLabel(mine ? "ВЫ · место " + (seat + 1) : "место " + (seat + 1));
+        boolean живой = HUMAN.equals(bots.get(seat));
+        // «ВЫ» — только когда живой за столом ОДИН. Иначе живые равны, и
+        // выделять одного из них не за что.
+        boolean этоЯ = живой && soloHuman();
+        JLabel who = new JLabel(этоЯ ? "ВЫ · место " + (seat + 1) : "место " + (seat + 1));
         who.setFont(Theme.font(11, Font.BOLD));
-        who.setForeground(mine ? Theme.seatInk(seat) : Theme.ink3());
+        who.setForeground(этоЯ ? Theme.seatInk(seat) : Theme.ink3());
         head.add(who);
         head.add(javax.swing.Box.createHorizontalGlue());
         head.add(colorPicker(seat));
         card.add(head);
 
-        if (mine) {
-            JLabel me = new JLabel(myFacing == null ? "живой игрок · ЦУ не повёрнут"
-                : "живой игрок · ЦУ стенками " + (myFacing + 1) + "–" + ((myFacing + 1) % 6 + 1));
+        if (живой) {
+            // ЖИВОЕ МЕСТО — НИКАКИХ СПИСКОВ. Раньше здесь стоял выбор характера
+            // и уровня, и на столе без ботов игроку предлагали выбрать
+            // «сложность» живого человека (вопрос дизайнера 27.08).
+            String подпись = "живой игрок";
+            if (этоЯ) {
+                подпись += myFacing == null ? " · ЦУ не повёрнут"
+                    : " · ЦУ стенками " + (myFacing + 1) + "–" + ((myFacing + 1) % 6 + 1);
+            } else {
+                подпись += " · ходит по очереди";
+            }
+            JLabel me = new JLabel(подпись);
             me.setFont(Theme.font(12, Font.PLAIN));
             me.setForeground(Theme.ink2());
             me.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -795,10 +916,6 @@ public final class StartMenuWindow {
     /** Первый список: кем играет соперник (плюс «живой игрок» в общем столе). */
     private List<KpChooser.Item> kindList() {
         List<KpChooser.Item> out = new ArrayList<>();
-        if (mode == Mode.HOTSEAT) {
-            out.add(new KpChooser.Item(HUMAN, "живой игрок",
-                "ходит по очереди на этом же компьютере"));
-        }
         for (BotCatalog.Entry e : BotCatalog.ХАРАКТЕРЫ) {
             out.add(new KpChooser.Item(e.id(), e.label(), e.tip()));
         }
@@ -1019,6 +1136,12 @@ public final class StartMenuWindow {
     private void applyFieldPicking() {
         field.clearSelectable();
         field.clearFacingChoice();
+        if (!soloHuman()) {
+            hint.setText("Живых игроков " + humans()
+                + " — места заняты все, выбирать нечего; ходят по очереди");
+            hint.setForeground(Theme.ink2());
+            return;
+        }
         if (mySeat == null) {
             field.setSelectable(new LinkedHashSet<>(startHexes.values()), hexId -> {
                 for (Map.Entry<Integer, String> e : startHexes.entrySet()) {
@@ -1058,7 +1181,7 @@ public final class StartMenuWindow {
         }
         boolean training = coinStep != null
             && (coinStep.changed() || keliumStep.changed() || ammoStep.changed());
-        if (mySeat == null) {
+        if (soloHuman() && mySeat == null) {
             readyLine.setText("осталось: выбрать своё место на поле");
             startBtn.setState(KpButton.State.DISABLED);
         } else {
@@ -1081,13 +1204,14 @@ public final class StartMenuWindow {
 
     /** Настройки стола, как он собран сейчас; null — место ещё не выбрано. */
     HotSeatWindow.Options optionsNow() {
-        if (mySeat == null) {
-            return null;
+        if (soloHuman() && mySeat == null) {
+            return null;                 // одинокий живой обязан выбрать место
         }
         List<String> specs = new ArrayList<>();
         for (int i = 0; i < players; i++) {
             // «Общий компьютер»: все места живые, кроме тех, что игрок отдал ботам.
-            specs.add(i == mySeat || HUMAN.equals(bots.get(i)) ? HUMAN : bots.get(i));
+            specs.add(mySeat != null && i == mySeat || HUMAN.equals(bots.get(i))
+                ? HUMAN : bots.get(i));
         }
         List<Integer> facing = null;
         if (myFacing != null) {
@@ -1108,6 +1232,11 @@ public final class StartMenuWindow {
     /** Взять месту краску — для прогонщиков и тестов, то же что клик по кружку. */
     void pickColorForTest(int seat, int color) {
         pickColor(seat, color);
+    }
+
+    /** Состав мест сейчас — для прогонщиков и тестов. */
+    List<String> botsForTest() {
+        return List.copyOf(bots.subList(0, players));
     }
 
     /** Краски мест сейчас — для прогонщиков и тестов. */
