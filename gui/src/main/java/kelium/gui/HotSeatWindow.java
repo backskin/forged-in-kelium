@@ -173,10 +173,15 @@ public final class HotSeatWindow {
     private List<String> lastAgentLabels = new ArrayList<>();
     private int viewedSeat = 0;
     /**
-     * МЕСТО ЖИВОГО ИГРОКА — то, что подписано «вы». Прежде эту пометку носило
-     * место, на которое СЕЙЧАС СМОТРЯТ, и в ход бота «вы» переезжало на бота.
+     * МЕСТО ЖИВОГО ИГРОКА — то, что подписано «вы»; −1, когда такого места нет.
+     * Прежде эту пометку носило место, на которое СЕЙЧАС СМОТРЯТ, и в ход бота
+     * «вы» переезжало на бота.
+     *
+     * <p>«Вы» есть, только если живой за столом ОДИН, а прочие места заняты
+     * ботами. Живых несколько — компьютер просто передаёт ход каждому по
+     * очереди, и который из них «вы», не значит ничего: пометки нет ни у кого.
      */
-    private int mySeat = 0;
+    private int mySeat = -1;
     private volatile GameConfig cfg;
     private volatile GameState liveState;
     private boolean sessionBound;
@@ -773,7 +778,6 @@ public final class HotSeatWindow {
                     ev -> { });
                 humansBySeat.put(seat, ia);
                 if (humansBySeat.size() == 1) {
-                    mySeat = seat;
                     viewedSeat = seat;
                 }
                 agents.add(ia);
@@ -788,6 +792,7 @@ public final class HotSeatWindow {
                 labels.add(spec);
             }
         }
+        mySeat = meSeat(seatSpecs);
 
         if (options.training()) {
             SwingUtilities.invokeLater(() -> feedLine(null,
@@ -849,6 +854,32 @@ public final class HotSeatWindow {
     }
 
     /** Записать журнал партии на диск. {@code suffix} — пометка в имени файла. */
+    /**
+     * ЧЬЁ МЕСТО ПОДПИСАТЬ «ВЫ» — или −1, если ничьё.
+     *
+     * <p>Пометка имеет смысл ровно в одном случае: живой за столом ОДИН, а
+     * прочие места заняты ботами — тогда «вы» отличает вас от соперников.
+     * Живых несколько — компьютер просто передаёт ход каждому по очереди, и
+     * который из них «я», не значит ничего: отмечать некого.
+     */
+    public static int meSeat(List<String> seatSpecs) {
+        int found = -1;
+        for (int i = 0; i < seatSpecs.size(); i++) {
+            if ("human".equals(seatSpecs.get(i))) {
+                if (found >= 0) {
+                    return -1;
+                }
+                found = i;
+            }
+        }
+        return found;
+    }
+
+    /** Место с пометкой «вы» (−1 — ни у кого) — для прогонщиков и тестов. */
+    int mySeatForTest() {
+        return mySeat;
+    }
+
     private void saveJournal(ReplayRecord r, String suffix) {
         if (r == null) {
             return;

@@ -82,11 +82,12 @@ public final class StartMenuWindow {
         restoreCoins = o.startCoins();
         restoreKelium = o.startKelium();
         restoreAmmo = o.startAmmo();
-        // Место игрока и поворот ЦУ — из состава мест прошлой партии. Живой
-        // был один — его место и есть «ваше»; живых было несколько — своего
-        // места нет ни у кого, они равны.
-        if (restoreSpecs.stream().filter(HUMAN::equals).count() == 1) {
-            restoreSeat = restoreSpecs.indexOf(HUMAN);
+        // Место игрока и поворот ЦУ — из состава мест прошлой партии, по тому
+        // же правилу, что и пометка «вы» в окне партии: живой был один — его
+        // место и есть ваше; живых было несколько — своего места нет ни у кого.
+        int me = HotSeatWindow.meSeat(restoreSpecs);
+        if (me >= 0) {
+            restoreSeat = me;
         }
         if (o.cuFacing() != null && restoreSeat != null
                 && restoreSeat < o.cuFacing().size()) {

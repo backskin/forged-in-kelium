@@ -77,6 +77,27 @@ class StartMenuTest {
         kelium.report.FieldGeometry.useSeatColors(null);
     }
 
+    /**
+     * ПОМЕТКА «ВЫ» ЕСТЬ, ТОЛЬКО КОГДА ЖИВОЙ ОДИН. За одним компьютером с
+     * несколькими живыми ход просто передаётся каждому по очереди, и который
+     * из них «я», не значит ничего. Дважды выходило иначе: сперва пометку
+     * носило место, на которое СМОТРЯТ (и в ход бота «вы» переезжало на бота),
+     * потом — первое живое место, кто бы за ним ни сидел.
+     */
+    @Test
+    void пометкаВыДостаётсяТолькоОдинокомуЖивому() {
+        assertEquals(0, HotSeatWindow.meSeat(List.of("human", "builder:2")),
+            "живой один — пометка на его месте");
+        assertEquals(2, HotSeatWindow.meSeat(List.of("builder:2", "punisher:2", "human")),
+            "место живого ищется по составу, а не по номеру");
+        assertEquals(-1, HotSeatWindow.meSeat(List.of("human", "human", "punisher:2")),
+            "живых двое — отмечать некого");
+        assertEquals(-1, HotSeatWindow.meSeat(List.of("human", "human", "human", "human")),
+            "стол целиком живой — отмечать некого");
+        assertEquals(-1, HotSeatWindow.meSeat(List.of("builder:2", "punisher:2")),
+            "живых нет вовсе — отмечать некого");
+    }
+
     @Test
     void стартовыеЗначенияПодготовкиЧитаютсяИзСвода() {
         var cfg = kelium.dataio.GameConfig.buildCached(
