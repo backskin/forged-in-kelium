@@ -399,7 +399,9 @@ public final class StartMenuWindow {
             // «Общий компьютер» — стол живых людей: места становятся живыми, и
             // игрок сам решает, какие отдать ботам.
             for (int i = 0; i < bots.size(); i++) {
-                bots.set(i, m == Mode.HOTSEAT ? HUMAN : "builder:2");
+                bots.set(i, m == Mode.HOTSEAT ? HUMAN
+                    : BotCatalog.ХАРАКТЕРЫ.get(i % BotCatalog.ХАРАКТЕРЫ.size()).id()
+                        + ":" + DEFAULT_LEVEL);
             }
             refreshSeats();
             refreshReady();
@@ -595,7 +597,8 @@ public final class StartMenuWindow {
     /** Соперники по умолчанию: ровные середняки, чтобы стол был играбельным сразу. */
     private void ensureBots() {
         while (bots.size() < 4) {
-            bots.add("builder:2");
+            bots.add(BotCatalog.ХАРАКТЕРЫ.get(bots.size() % BotCatalog.ХАРАКТЕРЫ.size()).id()
+                + ":" + DEFAULT_LEVEL);
         }
     }
 
@@ -647,20 +650,43 @@ public final class StartMenuWindow {
             card.add(me);
             seatBoxes.add(null);
         } else {
-            KpChooser box = new KpChooser(null, botList(), it -> {
-                bots.set(seat, it.value());
+            // ДВА СПИСКА, А НЕ ОДИН ИЗ ШЕСТНАДЦАТИ (решение дизайнера 25.08.2026,
+            // так же сделано в проигрывателе): за столом это два разных вопроса —
+            // КЕМ играет соперник и НАСКОЛЬКО хорошо он это делает.
+            JPanel who2 = new JPanel();
+            who2.setOpaque(false);
+            who2.setLayout(new BoxLayout(who2, BoxLayout.X_AXIS));
+            who2.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            KpChooser kind = new KpChooser(null, kindList(), it -> {
+                bots.set(seat, HUMAN.equals(it.value()) ? HUMAN
+                    : it.value() + ":" + levelOf(bots.get(seat)));
                 refreshSeats();
             });
-            box.select(bots.get(seat));
-            box.setAlignmentX(Component.LEFT_ALIGNMENT);
-            box.setPreferredSize(new Dimension(Theme.px(214), Theme.px(30)));
-            box.setMaximumSize(new Dimension(Theme.px(214), Theme.px(30)));
-            box.setToolTipText(HUMAN.equals(bots.get(seat))
+            kind.select(HUMAN.equals(bots.get(seat)) ? HUMAN : kindOf(bots.get(seat)));
+            kind.setPreferredSize(new Dimension(Theme.px(116), Theme.px(30)));
+            kind.setMaximumSize(new Dimension(Theme.px(116), Theme.px(30)));
+            kind.setToolTipText(HUMAN.equals(bots.get(seat))
                 ? "За этим местом сидит человек — ходит по очереди на этом компьютере"
-                : botTip(bots.get(seat)));
+                : "Кем играет соперник");
+            who2.add(kind);
+            who2.add(javax.swing.Box.createHorizontalStrut(Theme.px(4)));
+
+            KpChooser level = new KpChooser(null, levelList(), it -> {
+                bots.set(seat, kindOf(bots.get(seat)) + ":" + it.value());
+                refreshSeats();
+            });
+            level.select(levelOf(bots.get(seat)));
+            level.setPreferredSize(new Dimension(Theme.px(96), Theme.px(30)));
+            level.setMaximumSize(new Dimension(Theme.px(96), Theme.px(30)));
+            level.setToolTipText("Насколько хорошо он это делает");
+            // Человек за местом — уровень выбирать не у кого.
+            level.setVisible(!HUMAN.equals(bots.get(seat)));
+            who2.add(level);
+
             card.add(javax.swing.Box.createVerticalStrut(Theme.px(3)));
-            card.add(box);
-            seatBoxes.add(box);
+            card.add(who2);
+            seatBoxes.add(kind);
         }
         return card;
     }
@@ -760,33 +786,58 @@ public final class StartMenuWindow {
         rebuildPreview();
     }
 
-    /** Строка о том, как играет этот соперник, — из каталога, а не сочинённая. */
-    private static String botTip(String id) {
-        for (BotCatalog.Entry e : BotCatalog.players()) {
-            if (e.id().equals(id)) {
-                return e.tip();
-            }
-        }
-        return null;
-    }
-
     /** Значение места, за которым сидит человек. */
     static final String HUMAN = "human";
 
     /** Краски мест в порядке гнёзд — так они называются на столе. */
     static final String[] COLOR_NAMES = {"синий", "оранжевый", "зелёный", "лиловый"};
 
-    private List<KpChooser.Item> botList() {
+    /** Первый список: кем играет соперник (плюс «живой игрок» в общем столе). */
+    private List<KpChooser.Item> kindList() {
         List<KpChooser.Item> out = new ArrayList<>();
         if (mode == Mode.HOTSEAT) {
             out.add(new KpChooser.Item(HUMAN, "живой игрок",
                 "ходит по очереди на этом же компьютере"));
         }
-        for (BotCatalog.Entry e : BotCatalog.players()) {
+        for (BotCatalog.Entry e : BotCatalog.ХАРАКТЕРЫ) {
             out.add(new KpChooser.Item(e.id(), e.label(), e.tip()));
         }
         return out;
     }
+
+    /** Второй список: насколько хорошо он это делает. */
+    private List<KpChooser.Item> levelList() {
+        List<KpChooser.Item> out = new ArrayList<>();
+        for (BotCatalog.Entry e : BotCatalog.УРОВНИ) {
+            out.add(new KpChooser.Item(e.id(), e.label(), e.tip()));
+        }
+        return out;
+    }
+
+    /** Характер из полного имени бота («punisher:3» → «punisher»). */
+    private static String kindOf(String spec) {
+        if (spec == null || HUMAN.equals(spec)) {
+            return BotCatalog.ХАРАКТЕРЫ.get(0).id();
+        }
+        int at = spec.indexOf(':');
+        return at < 0 ? spec : spec.substring(0, at);
+    }
+
+    /**
+     * Уровень из полного имени бота. По умолчанию МАСТЕР, а не гроссмейстер:
+     * гроссмейстер доигрывает копию партии на каждом выборе приказа и думает
+     * заметно дольше, а сесть играть хочется сразу.
+     */
+    private static String levelOf(String spec) {
+        if (spec == null || HUMAN.equals(spec)) {
+            return DEFAULT_LEVEL;
+        }
+        int at = spec.indexOf(':');
+        return at < 0 ? DEFAULT_LEVEL : spec.substring(at + 1);
+    }
+
+    /** Уровень соперника по умолчанию — мастер. */
+    static final String DEFAULT_LEVEL = "3";
 
     private List<KpChooser.Item> rulesetList() {
         List<KpChooser.Item> out = new ArrayList<>();
