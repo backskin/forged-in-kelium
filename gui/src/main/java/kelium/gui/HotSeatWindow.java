@@ -122,6 +122,8 @@ public final class HotSeatWindow {
     FieldView field;
     private BoardsPanel boards;
     private BoardSheet sheet;
+    /** Кнопки выбора места в ящике «Планшет» — их приходится запирать. */
+    private final Map<Integer, JToggleButton> sheetSeatBtns = new LinkedHashMap<>();
     private JScrollPane sheetScroll;
 
     /** Прокрутка ящика «Планшет» — нужна прогонщикам для снимков. */
@@ -153,6 +155,10 @@ public final class HotSeatWindow {
     private ZoomCard zoom;
     kelium.gui.kp.ConfirmDialog confirm;
     kelium.gui.kp.CardChoiceOverlay ceremony;
+    /** Шторка передачи устройства — только когда за столом больше одного живого. */
+    kelium.gui.kp.HandoverCurtain curtain;
+    /** Кому в прошлый раз отдавали ход: сменился — поднимаем шторку. */
+    private int lastServedHuman = -1;
     private kelium.gui.kp.OpponentStrip opponents;
     KpButton endBtn;
     /** Выезд контекстной панели снизу (120–180 мс по скиллу интерфейса). */
@@ -261,6 +267,11 @@ public final class HotSeatWindow {
         // Модальное окно необратимого — во весь слой окна, поверх всего.
         confirm = new kelium.gui.kp.ConfirmDialog();
         frame.getLayeredPane().add(confirm, JLayeredPane.MODAL_LAYER);
+
+        // ШТОРКА ПЕРЕДАЧИ — ВЫШЕ МОДАЛОК: она прячет экран целиком, и если её
+        // перекроет хоть что-нибудь, прятать будет нечего.
+        curtain = new kelium.gui.kp.HandoverCurtain();
+        frame.getLayeredPane().add(curtain, JLayeredPane.DRAG_LAYER);
         frame.getLayeredPane().addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
@@ -268,9 +279,13 @@ public final class HotSeatWindow {
                     frame.getLayeredPane().getHeight());
                 ceremony.setBounds(0, 0, frame.getLayeredPane().getWidth(),
                     frame.getLayeredPane().getHeight());
+                curtain.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+                    frame.getLayeredPane().getHeight());
             }
         });
         confirm.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        curtain.setBounds(0, 0, frame.getLayeredPane().getWidth(),
             frame.getLayeredPane().getHeight());
         ceremony.setBounds(0, 0, frame.getLayeredPane().getWidth(),
             frame.getLayeredPane().getHeight());
@@ -400,6 +415,7 @@ public final class HotSeatWindow {
             b.addActionListener(e -> sheet.setSeat(s));
             group.add(b);
             seatRow.add(b);
+            sheetSeatBtns.put(i, b);
         }
         sheetWrap.add(seatRow, BorderLayout.NORTH);
         JScrollPane sheetScroll = new JScrollPane(sheet);
@@ -906,6 +922,7 @@ public final class HotSeatWindow {
      */
     private void closeToMenu() {
         stopped = true;
+        curtain.drop();
         confirm.close();
         for (kelium.core.UndoableAgent a : humansBySeat.values()) {
             a.abort();
@@ -1280,8 +1297,73 @@ public final class HotSeatWindow {
         Map.entry("super_pick", "выберите супер-задание"),
         Map.entry("start_objective_pick", "стартовое задание"));
 
+    /**
+     * ТОЧКА РЕШЕНИЯ ЖИВОГО ИГРОКА. Если за столом несколько людей и ход
+     * переходит к другому — сперва ШТОРКА: пока новый игрок не сказал «я на
+     * месте», на экране не должно появиться ни его руки, ни чужой.
+     *
+     * <p>Порядок важен: сначала поднять шторку, и только потом трогать
+     * {@code viewedSeat} и руки. Наоборот — рука успеет мелькнуть.
+     */
     private void showDecision(int seat, InteractiveAgent.PendingDecision d) {
+        if (needsCurtain(seat)) {
+            String why = String.valueOf(d.context().get("kind"));
+            curtain.raise(seatName(seat), Theme.seatInk(seat), curtainReason(why),
+                () -> {
+                    lastServedHuman = seat;
+                    showDecisionNow(seat, d);
+                });
+            frame.toFront();
+            return;
+        }
+        lastServedHuman = seat;
+        showDecisionNow(seat, d);
+    }
+
+    /**
+     * Нужна ли шторка перед этой точкой решения. Один живой за столом — нет:
+     * прятать не от кого, а лишний экран между ходами только злит.
+     */
+    private boolean needsCurtain(int seat) {
+        return humansBySeat.size() > 1 && seat != lastServedHuman && !stopped;
+    }
+
+    /** Зачем зовут игрока — короткой строкой на шторке. */
+    private String curtainReason(String kind) {
+        return switch (kind) {
+            case "reveal_order" -> "вскрываем приказ круга";
+            case "blind_discard" -> "отложите приказ под трофеи";
+            case "combat_victim", "neutral_victim" -> "по вам ударили — выберите жертву";
+            case "action" -> "ваш ход";
+            default -> KIND_LABELS.getOrDefault(kind, "ваш ход");
+        };
+    }
+
+    /**
+     * ЧУЖОЙ ПЛАНШЕТ ЗА ОБЩИМ СТОЛОМ НЕ ПОКАЗЫВАЕМ. На планшете лежит скрытое —
+     * отложенный приказ, подсунутые карты, — и за столом чужой планшет в руки
+     * не берут. Пока живой игрок один, смотреть можно всё: прятать не от кого,
+     * а разбирать партию удобнее целиком.
+     */
+    private void refreshSheetSeats() {
+        boolean общийСтол = humansBySeat.size() > 1;
+        sheetSeatBtns.forEach((s, b) -> {
+            boolean свой = !общийСтол || s == viewedSeat;
+            b.setEnabled(свой);
+            b.setToolTipText(свой ? null
+                : "Чужой планшет за общим столом не смотрят — там скрытые карты");
+            if (общийСтол && s == viewedSeat) {
+                b.setSelected(true);
+            }
+        });
+        if (общийСтол) {
+            sheet.setSeat(viewedSeat);
+        }
+    }
+
+    private void showDecisionNow(int seat, InteractiveAgent.PendingDecision d) {
         viewedSeat = seat;
+        refreshSheetSeats();
         awaitingSeat = seat;
         if (rec != null && !rec.frames.isEmpty()) {
             refreshHands(rec.frames.get(rec.frames.size() - 1));
