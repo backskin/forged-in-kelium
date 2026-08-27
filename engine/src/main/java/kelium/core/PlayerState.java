@@ -239,6 +239,23 @@ public final class PlayerState {
     // СОБСТВЕННЫЙ жетон разрушения игрока — стартует у него, отдаётся тому, кто
     // первым разрушит его ЦУ. После отдачи повторное разрушение не даёт ничего.
     public boolean ownCuTokenAvailable = true;
+    /**
+     * КАКОЙ РОД ВОЙСК ЗАПЕЧАТАН СОБСТВЕННЫМ ЖЕТОНОМ (решение дизайнера
+     * 25.08.2026). Жетон разрушения ЦУ — это КРАСНЫЙ жетон, и лицом он лежит на
+     * планшете владельца, ЗАВАРИВАЯ ячейку специальной атаки одного рода: этот
+     * род бьёт только универсальной за 2 боеприпаса.
+     *
+     * <p>ЗАЧЕМ ТАК. Во-первых, компонентов не прибавляется: жетон разрушения и
+     * так нужен, а теперь он с первого раунда объясняет игроку саму механику
+     * ячейки под модуль — её видно на своём планшете, а не когда-нибудь потом.
+     * Во-вторых, снос ЦУ перестаёт быть только потерей: жетон уезжает к
+     * захватчику, и ячейка РАСПЕЧАТЫВАЕТСЯ — чем сильнее тебя бьют, тем
+     * свободнее твой планшет.
+     *
+     * <p>Печать снимается сама: она действует, только пока
+     * {@link #ownCuTokenAvailable} истинно.
+     */
+    public UnitType sealedUnit = null;
 
     /** Сколько тайлов зарождения выработано ДО КОНЦА (оборот) — всего. */
     public int claimedSpawnTiles = 0;
@@ -356,6 +373,7 @@ public final class PlayerState {
         p.mandateContainers = mandateContainers;
         p.cuDestructionTokens = cuDestructionTokens;
         p.ownCuTokenAvailable = ownCuTokenAvailable;
+        p.sealedUnit = sealedUnit;
         p.claimedSpawnTiles = claimedSpawnTiles;
         p.claimedStartTiles = claimedStartTiles;
         p.claimedNormalTiles = claimedNormalTiles;

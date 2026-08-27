@@ -164,6 +164,7 @@ public final class GameEngine {
 
         emit(ev("type", "game_start", "players", s.numPlayers(), "ruleset", rs.id));
         dealStart();
+        offerSealChoice();
         offerSuperPick();
         offerStartObjectivePick();
         loop(1, 1, true);
@@ -1401,6 +1402,47 @@ public final class GameEngine {
             }
             emit(ev("type", "start_objective_pick", "seat", p.seat, "card", chosen,
                 "offered", new ArrayList<>(p.startObjectiveOffer)));
+        }
+    }
+
+    /**
+     * РАЗДАЧА ПЛОМБ — жеребьёвкой, без единого решения (правило дизайнера
+     * 25.08.2026).
+     *
+     * <p>Жетон уничтожения ЦУ — тёмный жетон размером с красный модуль.
+     * РУБАШКИ У ВСЕХ ЧЕТЫРЁХ ОДИНАКОВЫЕ (оборот — 3 победных очка тому, кто
+     * снёс чужое ЦУ), а ЛИЦА РАЗНЫЕ: на каждом нарисован свой род войск. В
+     * подготовку жетоны кладут лицом вниз, мешают, и каждый берёт себе один
+     * наугад — и кладёт лицом на ячейку специальной атаки того рода, что на нём
+     * нарисован.
+     *
+     * <p>ЧТО ЭТО ДАЁТ. Решений при подготовке ноль, а игра у каждого своя: один
+     * род бьёт только универсальной за 2 боеприпаса. На четверых каждый род
+     * запечатан ровно один раз — стол симметричен, а игроки разные.
+     *
+     * <p>Печать снимается только войной: снесли твоё ЦУ — жетон уехал к
+     * захватчику, у тебя ячейка распечаталась. Перекладывать пломбу, как обычный
+     * красный модуль, нельзя: на ней нарисован её род.
+     */
+    private void offerSealChoice() {
+        GameState s = state;
+        if (!rs().getBool("command_center.destruction_token_seals_cell", false)) {
+            return;
+        }
+        // Роды, у которых на этой стороне планшета есть что запечатывать.
+        List<UnitType> мешок = new ArrayList<>();
+        for (UnitType t : UnitType.values()) {
+            if (s.player(0).board.troop.specializedTarget(t) != null) {
+                мешок.add(t);
+            }
+        }
+        java.util.Collections.shuffle(мешок, s.rng);
+        for (PlayerState p : s.players) {
+            if (мешок.isEmpty()) {
+                break;      // игроков больше, чем пломб — остальные без печати
+            }
+            p.sealedUnit = мешок.remove(0);
+            emit(ev("type", "seal_unit", "seat", p.seat, "unit", p.sealedUnit.code));
         }
     }
 

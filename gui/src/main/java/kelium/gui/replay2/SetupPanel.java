@@ -64,8 +64,16 @@ public final class SetupPanel extends JPanel {
     /** Первый пункт таких списков: версию называют правила. */
     private static final String AS_IN_RULES = "как в правилах";
     private final JComboBox<FieldOption> fieldBox = new JComboBox<>();
+    /**
+     * ХАРАКТЕР бота на каждом месте. УРОВЕНЬ выбирается отдельным списком
+     * ({@link #levels}) — заказ дизайнера 25.08.2026: за столом это два разных
+     * вопроса, и в одном списке из шестнадцати строк они смешаны.
+     */
     @SuppressWarnings("unchecked")
     private final JComboBox<GameRecorder.SeatOption>[] seats = new JComboBox[4];
+    /** Уровень силы бота на каждом месте: от новичка до гроссмейстера. */
+    @SuppressWarnings("unchecked")
+    private final JComboBox<GameRecorder.SeatOption>[] levels = new JComboBox[4];
     @SuppressWarnings("unchecked")
     private final JComboBox<String>[] cuFacing = new JComboBox[4];
     private final JLabel[] seatCaption = new JLabel[4];
@@ -220,7 +228,8 @@ public final class SetupPanel extends JPanel {
         tableButton.setFocusable(false);
         tableButton.addActionListener(e -> {
             if (TableDialog.show(this, String.valueOf(ruleset.getSelectedItem()),
-                    playerCount(), seats, cuFacing, seatChip, this::randomSeatBot)) {
+                    playerCount(), seats, levels, cuFacing, seatChip,
+                    this::randomSeatBot)) {
                 refreshTableButton();
                 onPreview.run();
                 say.accept("Стол пересобран: " + TableDialog.summary(playerCount()));
@@ -293,6 +302,29 @@ public final class SetupPanel extends JPanel {
                 seats[seat].setToolTipText(o == null ? null : Ui2.tip(o.tip()));
                 refresh();
             });
+
+            // УРОВЕНЬ — свой список. Ширина меньше, чем у характера: названия
+            // короче, и растянутый список выглядел бы пустым.
+            levels[i] = new JComboBox<>();
+            levels[i].setFont(Theme.body());
+            levels[i].setPreferredSize(new Dimension(Theme.px(140),
+                levels[i].getPreferredSize().height));
+            levels[i].setMinimumSize(new Dimension(Theme.px(110),
+                levels[i].getPreferredSize().height));
+            for (GameRecorder.SeatOption o : GameRecorder.levelOptions()) {
+                levels[i].addItem(o);
+            }
+            // ПО УМОЛЧАНИЮ МАСТЕР, А НЕ ГРОССМЕЙСТЕР: гроссмейстер доигрывает
+            // копию партии на каждом выборе приказа и считает вдвое дольше.
+            // Смотреть партию хочется сразу, а не ждать расчёта.
+            levels[i].setSelectedIndex(1);
+            levels[i].addActionListener(e -> {
+                GameRecorder.SeatOption o =
+                    (GameRecorder.SeatOption) levels[seat].getSelectedItem();
+                levels[seat].setToolTipText(o == null ? null : Ui2.tip(o.tip()));
+                refresh();
+            });
+            levels[i].setToolTipText(Ui2.tip(GameRecorder.levelOptions().get(1).tip()));
             // СТОРОНЫ СВЕТА ВМЕСТО НОМЕРОВ. «Сторона 4» человеку ничего не говорит,
             // а «запад» видно на поле сразу (просьба дизайнера 13.08.2026).
             String[] facings = new String[7];
@@ -412,6 +444,7 @@ public final class SetupPanel extends JPanel {
         fieldBox.setEnabled(!busy);
         for (int i = 0; i < 4; i++) {
             seats[i].setEnabled(!busy && enabled(i));
+            levels[i].setEnabled(!busy && enabled(i));
             cuFacing[i].setEnabled(!busy && enabled(i));
         }
     }
@@ -425,6 +458,7 @@ public final class SetupPanel extends JPanel {
         for (int i = 0; i < 4; i++) {
             boolean on = enabled(i);
             seats[i].setEnabled(on);
+            levels[i].setEnabled(on);
             cuFacing[i].setEnabled(on);
             if (seatChip[i] != null) {
                 seatChip[i].setStrong(on);      // лишнее место — плашка бледнеет
@@ -444,7 +478,10 @@ public final class SetupPanel extends JPanel {
     private List<String> seatIds() {
         List<String> ids = new ArrayList<>();
         for (int i = 0; i < playerCount(); i++) {
-            ids.add(((GameRecorder.SeatOption) seats[i].getSelectedItem()).id());
+            // ИМЯ БОТА — ДВЕ ПОЛОВИНЫ: характер и уровень выбираются отдельно.
+            ids.add(GameRecorder.botId(
+                ((GameRecorder.SeatOption) seats[i].getSelectedItem()).id(),
+                ((GameRecorder.SeatOption) levels[i].getSelectedItem()).id()));
         }
         return ids;
     }
@@ -478,9 +515,17 @@ public final class SetupPanel extends JPanel {
             return;
         }
         box.setSelectedIndex(rng.nextInt(box.getItemCount()));
+        // КУБИК КИДАЕТ И УРОВЕНЬ ТОЖЕ: он стоит в той же строке места, и бросок
+        // «характера отдельно от силы» оставлял бы половину места неслучайной.
+        JComboBox<GameRecorder.SeatOption> lvl = levels[seat];
+        if (lvl.getItemCount() > 0) {
+            lvl.setSelectedIndex(rng.nextInt(lvl.getItemCount()));
+        }
         GameRecorder.SeatOption o = (GameRecorder.SeatOption) box.getSelectedItem();
+        GameRecorder.SeatOption l = (GameRecorder.SeatOption) lvl.getSelectedItem();
         if (o != null) {
-            say.accept("Место " + (seat + 1) + ": выпал «" + o.label() + "».");
+            say.accept("Место " + (seat + 1) + ": выпал «" + o.label()
+                + (l == null ? "" : " · " + l.label()) + "».");
         }
         refresh();
     }
@@ -778,7 +823,9 @@ public final class SetupPanel extends JPanel {
         try {
             Object keep = box.getSelectedItem();
             box.removeAllItems();
-            List<GameRecorder.SeatOption> options = GameRecorder.seatOptions(playerCount());
+            // ТОЛЬКО ХАРАКТЕРЫ: уровень выбирается своим списком, и мешать их
+            // в одном означало бы вернуть те самые шестнадцать строк.
+            List<GameRecorder.SeatOption> options = GameRecorder.characterOptions();
             for (GameRecorder.SeatOption o : options) {
                 box.addItem(o);
             }
@@ -881,6 +928,9 @@ public final class SetupPanel extends JPanel {
             for (int i = 0; i < playerCount(); i++) {
                 if (seats[i].getItemCount() > 0) {
                     seats[i].setSelectedIndex(rng.nextInt(seats[i].getItemCount()));
+                }
+                if (levels[i].getItemCount() > 0) {
+                    levels[i].setSelectedIndex(rng.nextInt(levels[i].getItemCount()));
                 }
                 cuFacing[i].setSelectedIndex(rng.nextInt(cuFacing[i].getItemCount()));
             }

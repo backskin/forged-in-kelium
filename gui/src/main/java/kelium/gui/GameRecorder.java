@@ -82,6 +82,34 @@ public final class GameRecorder {
         return out;
     }
 
+    /**
+     * ХАРАКТЕР ОТДЕЛЬНО ОТ УРОВНЯ (заказ дизайнера 25.08.2026). За столом это
+     * два разных вопроса — кем играет соперник и насколько хорошо, — и в одном
+     * списке из шестнадцати строк они смешаны. Полное имя бота собирается из
+     * двух половин: {@code характер + ":" + уровень}.
+     */
+    public static List<SeatOption> characterOptions() {
+        List<SeatOption> out = new ArrayList<>();
+        for (var e : kelium.agents.BotCatalog.ХАРАКТЕРЫ) {
+            out.add(new SeatOption(e.id(), e.label(), e.tip()));
+        }
+        return out;
+    }
+
+    /** Уровни силы — от гроссмейстера к новичку. */
+    public static List<SeatOption> levelOptions() {
+        List<SeatOption> out = new ArrayList<>();
+        for (var e : kelium.agents.BotCatalog.УРОВНИ) {
+            out.add(new SeatOption(e.id(), e.label(), e.tip()));
+        }
+        return out;
+    }
+
+    /** Собрать имя бота из выбранного характера и уровня. */
+    public static String botId(String character, String level) {
+        return character + ":" + level;
+    }
+
     /** Кого можно посадить на место (состав не зависит от числа игроков). */
     public static final List<SeatOption> SEAT_OPTIONS = seatOptions(4);
 

@@ -110,6 +110,23 @@ public final class Toggle extends JComponent {
         return getPreferredSize();
     }
 
+    /**
+     * МИНИМУМ РАВЕН ПРЕДПОЧТИТЕЛЬНОМУ — иначе тумблер режется.
+     *
+     * <p>НАЙДЕНО 25.08.2026 по скриншоту дизайнера («тумблеры визуально
+     * порезались»). Снимок компонента показал: он просит 128×26, а получает
+     * 128×13 — ровно вдвое меньше по высоте. Причина в ловушке Swing: у
+     * {@code JComponent} без своей раскладки и без явного минимума
+     * {@code getMinimumSize} не равен предпочтительному, и {@code BoxLayout}
+     * считает себя вправе сжать компонент. Дорожка высотой в 22 точки не влезала
+     * в 13 и обрезалась сверху и снизу — на глаз это выглядело как круглые
+     * скобки по бокам от подписи.
+     */
+    @Override
+    public Dimension getMinimumSize() {
+        return getPreferredSize();
+    }
+
     @Override
     protected void paintComponent(Graphics g0) {
         Graphics2D g = (Graphics2D) g0.create();
@@ -117,9 +134,13 @@ public final class Toggle extends JComponent {
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        int tw = Theme.px(TRACK_W);
-        int th = Theme.px(TRACK_H);
-        int ty = (getHeight() - th) / 2;
+        // РИСУЕМ ТОЛЬКО ВНУТРИ СВОИХ ГРАНИЦ. Даже с honest-минимумом компонент
+        // может получить меньше запрошенного — например, когда лента настройки
+        // сжата по ширине. Дорожка тогда УМЕНЬШАЕТСЯ, а не вылезает за край:
+        // маленький целый тумблер читается, обрезанный — нет.
+        int th = Math.max(Theme.px(10), Math.min(Theme.px(TRACK_H), getHeight()));
+        int tw = Math.max(th, Math.min(Theme.px(TRACK_W), getWidth()));
+        int ty = Math.max(0, (getHeight() - th) / 2);
 
         // ДОРОЖКА. Включённый тумблер красится акцентом темы, выключенный —
         // цветом рамки: разница читается и на глаз, и в чёрно-белой печати

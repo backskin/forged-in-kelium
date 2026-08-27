@@ -1534,13 +1534,14 @@ public final class Predicates {
         // o39 «Сдача»: сдано N трофейных ЖЕТОНОВ действием Наука (усил. — все на
         // один трек; больше одного шага на трек за действие не делается, поэтому
         // «оба на один трек» дороже, чем выглядит).
-        reg("science_trophies_spent", false, (s, seat, j, p) -> {
-            TurnJournal.TurnFacts f = j.of(seat);
-            if (f.scienceTrophiesSpent < intp(p, "count", 2)) {
-                return false;
-            }
-            return !Boolean.TRUE.equals(p.get("same_track")) || f.scienceTracksUsed.size() == 1;
-        });
+        // ЗАПЛАЧЕНО В НАУКУ ЗА ХОД. Имя предиката оставлено прежним, чтобы
+        // прошлые версии каталога заданий читались без правок, но считает он
+        // теперь ЕДИНИЦЫ ОПЛАТЫ (обломки по действующему своду), а не жетоны:
+        // см. TurnJournal.sciencePaidUnits. Параметр same_track больше не
+        // спрашивается — с правилом «один трек за действие» он всегда истина, и
+        // усиление на нём было бесплатным.
+        reg("science_trophies_spent", false, (s, seat, j, p) ->
+            j.of(seat).sciencePaidUnits >= intp(p, "count", 2));
 
         // n5 «Коммутация»: запитанное здание НЕ на гексе своего ЦУ.
         reg("powered_building_off_cu_hex", false, (s, seat, j, p) -> {
