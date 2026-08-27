@@ -286,7 +286,7 @@ public final class RuleWords {
             case "command_center.owner_compensation_containers" ->
                 "контейнеров хозяину за снесённый центр управления";
             case "command_center.destruction_token_seals_cell" ->
-                "жетон уничтожения ЦУ заваривает ячейку спец-атаки нарисованного рода";
+                "жетон уничтоженного ЦУ пустой стороной закрывает ячейку спец-атаки";
 
             // ---------- Контейнеры за снос ----------
             case "building_compensation_containers.barracks" -> "контейнеров за казарму";
