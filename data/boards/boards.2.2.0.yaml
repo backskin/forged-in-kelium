@@ -1,0 +1,259 @@
+# ============================================================================
+#  CONTENT: boards  version 2.2.0 — ЭКОНОМИКА ПО ЗАКАЗУ 25.08.2026
+#  (две атаки без изменений, см. ниже)
+#
+#  ЧТО ИЗМЕНИЛОСЬ ОТ 2.1.0 — три числа, все из заметок дизайнера:
+#    ЦУ даёт ОДИН кубик энергии вместо двух. Это самая крупная правка
+#      экономики: ЦУ — единственный источник энергии на старте. Побочное
+#      следствие, замеченное дизайнером: раз кубик один, ПОВОРОТ ЦУ перестал
+#      что-либо значить, и это развязывает руки раскладкам поля.
+#    АВИАБАЗА: две ячейки энергии вместо трёх, цена 3 монеты.
+#    ЗАВОД: цена 2 монеты.
+#  Сумма цен военных зданий на стороне А осталась той же — шесть монет:
+#  казарма 1 + завод 2 + авиабаза 3.
+# ============================================================================
+#  ОСНОВНОЙ И ВТОРОСТЕПЕННОЙ АТАК БОЛЬШЕ НЕ СУЩЕСТВУЕТ. У каждого рода войск
+#  РОВНО ДВЕ атаки, и третьей нет:
+#
+#    УНИВЕРСАЛЬНАЯ — 2 боеприпаса, 1 урон, ЛЮБОЙ тип жетонов. Не улучшается
+#      ничем, одна и та же у всех. Смысл: ударить можно всегда и по кому угодно,
+#      просто дорого.
+#
+#    СПЕЦИАЛЬНАЯ — 1 боеприпас, РОВНО ОДИН напечатанный тип цели. Это та самая
+#      ячейка, на которую кладётся ЖЕТОН МОДУЛЯ АТАКИ. Смысл: платить меньше за
+#      удар по своему профилю — и это единственная атака, которую можно
+#      расширить и улучшить.
+#
+#  ЖЕТОН МОДУЛЯ АТАКИ накрывает ячейку специальной атаки: напечатанный тип
+#  закрывается ЦЕЛИКОМ, вместо него открываются ДВА типа, напечатанных на самом
+#  жетоне, каждый за 1 боеприпас.
+#    обычная сторона — цель НА ВЫБОР из двух, один выстрел за бой;
+#    ЗОЛОТАЯ сторона — ОБА типа сразу за ОДИН боеприпас, по 1 урону каждому.
+#  Жетонов шесть видов (все шесть пар из четырёх типов целей), каждый в двух
+#  экземплярах в мешке — набор R30 в data/modules/modules.3.0.0.yaml.
+#
+#  РАСПРЕДЕЛЕНИЕ СПЕЦИАЛЬНЫХ АТАК НА СТОРОНЕ А (диктовка 24.08.2026):
+#    пехота  -> авиация
+#    техника -> здания и вышки
+#    авиация -> техника
+#    вышка   -> пехота
+#  Это перестановка без неподвижных точек: ни один род не бьёт свой тип, и все
+#  четыре цели покрыты ровно один раз.
+#
+#  ЧТО ИЗМЕНИЛОСЬ ОТ 2.0.0. Там у авиации специальная была по пехоте, а у вышки
+#  по технике — сторона А приведена к диктовке. Стороны Б1–Б4 остались как в
+#  2.0.0: они не играются (asymmetry.mode: A) и ждут отдельной диктовки.
+#
+#  Флаг `dual_cell: true` на стороне включает эту систему. Без флага сторона
+#  работает по старым парам ОСН/ВТР — так живут версии 1.0.x.
+# ============================================================================
+
+meta:
+  id: 2.2.0
+  type: boards
+  draft_fields: ["troop_side.speeds", "troop_side.building_prices"]
+
+# The single top-level list the loader validates; we group real structure under
+# named entries so each addressable chunk still has an id.
+boards:
+
+  # -- Token stats (fixed for everyone) ------------------------------------
+  - id: tokens
+    kind: token_stats
+    units:
+      # trophy value list = value depending on count already taken (1st/2nd/3rd/4th)
+      # count = ЛИЧНЫЙ ЗАПАС игрока по этому роду: ровно 4 жетона, и это не
+      # меняется за партию — уничтоженные возвращаются владельцу на этапе
+      # Возврата («Бой — полные правила», §трофеи). Раньше здесь стояло
+      # count: null, и движок ограничивал только ОБЩЕЕ число жетонов (16 на цвет)
+      # — то есть игрок мог выставить девять вышек. Поймано дизайнером в
+      # проигрывателе 13.08.2026.
+      # trophy = ЧТО НАПЕЧАТАНО НА ОБОРОТЕ каждого из четырёх жетонов рода
+      # (уточнение дизайнера 13.08.2026). Не «сколько дадут за первого,
+      # второго, третьего» — а именно жетон номер 1, 2, 3, 4.
+      #   вышки   — на всех четырёх по 1 ТО
+      #   пехота  — на трёх по 1, на четвёртом 2
+      #   техника — на двух по 2, на двух по 1
+      #   авиация — так же, как техника
+      infantry: {hp: 1, trophy: [1, 1, 1, 2], count: 4}
+      vehicle:  {hp: 2, trophy: [1, 1, 2, 2], count: 4}
+      aircraft: {hp: 1, trophy: [1, 1, 2, 2], count: 4}
+      tower:    {hp: 2, trophy: [1, 1, 1, 1], count: 4}
+    # Сумма личных запасов по родам: 4 рода × 4 жетона.
+    unit_tokens_per_color: 16
+    building_tokens_per_color: 12
+    buildings:
+      barracks:   {energy_slots: 1, hp: 1, assembly: [infantry, ammo], trophy: 2}
+      factory:    {energy_slots: 2, hp: 2, assembly: [vehicle, ammo],  trophy: 3}
+      # АВИАБАЗА: 2 ячейки энергии вместо 3, цена постройки +1 монета на всех
+      # сторонах (решение дизайнера 13.08.2026). Замер показывал, что при трёх
+      # ячейках авиабазу почти не строят: общий дефицит энергии 3 кубика, и она
+      # съедала его целиком. Два ячейки дают +48% авиации на поле; цена растёт,
+      # чтобы дешевле не стало.
+      airbase:    {energy_slots: 2, hp: 3, assembly: [aircraft, ammo], trophy: 4}
+      # hp 3 и trophy 0 — решение дизайнера 11.08.2026: ЦУ в трофеи не идёт,
+      # вся награда — жетон уничтожения ЦУ (см. ruleset command_center).
+      # ЦУ: ОДНА ячейка энергии как у военного здания (energy_slots), но даёт
+      # ДВА кубика как источник (energy_gives). Ключ energy_needed: 2 здесь был
+      # устаревшим и перебивал energy_slots — из-за него ЦУ просило две ячейки
+      # вместо одной (поправлено 12.08.2026 по указанию дизайнера).
+      command_center: {energy_gives: 1, energy_slots: 1, hp: 3, assembly: [tower, ammo], trophy: 0}
+    miners:   # №1–4
+      - {level: 1, energy_slots: 2, hp: 1, yield_kelium: 1, cost: 1, trophy: 1}
+      - {level: 2, energy_slots: 1, hp: 1, yield_kelium: 1, cost: 2, trophy: 1}
+      - {level: 3, energy_slots: 2, hp: 2, yield_kelium: 2, cost: 3, trophy: 2}
+      - {level: 4, energy_slots: 1, hp: 2, yield_kelium: 2, cost: 4, trophy: 3, vp_on_field: true}
+    power_plants:  # №1–4
+      - {level: 1, hp: 1, energy_gives: 1, cost: 1, trophy: 1}
+      - {level: 2, hp: 1, energy_gives: 2, cost: 2, trophy: 1}
+      - {level: 3, hp: 2, energy_gives: 2, cost: 3, trophy: 2}
+      - {level: 4, hp: 2, energy_gives: 3, cost: 4, trophy: 3, vp_on_field: true}
+    # Energy invariant: sources give 8 (1+2+2+3) + CU 2 = 10; consumers hold 13 → deficit 3.
+    energy_invariant: {sources: 10, consumer_slots: 13, deficit: 3}
+    modules:
+      red_per_player: 4    # attack modules, overlay secondary row
+      blue_per_player: 4   # assembly modules, overlay printed "1" -> 2 (gold 3)
+
+  # -- Troop board sides (БОЙ 2.0, dual_cell) --------------------------------
+  # attacks: {unit: target} — ОДНА печатная цель (специализированная ячейка).
+  # Универсальная ячейка (любая цель, 2 БП) есть у всех и в этот файл не
+  # входит — см. заголовок файла. targets в {infantry, vehicle, aircraft,
+  # buildings_towers}. speeds order П·Т·А·В. Каждая сторона — перестановка
+  # без неподвижных точек: все 4 цели покрыты ровно один раз, никто не бьёт
+  # свой тип.
+  - id: troop_A
+    kind: troop_side
+    side: A
+    shared: true          # identical for all players
+    dual_cell: true
+    attacks:
+      infantry: aircraft            # пехота бьёт авиацию
+      vehicle:  buildings_towers    # техника — здания и вышки
+      aircraft: vehicle             # авиация — технику
+      tower:    infantry            # вышка — пехоту
+    speeds: {infantry: 1, vehicle: 1, aircraft: 2, tower: 0}
+    building_prices: {barracks: 1, factory: 2, airbase: 3}   # заказ 25.08.2026: завод 2, авиабаза 3
+
+  - id: troop_B1
+    kind: troop_side
+    side: B1
+    name: "Авиакрыло"
+    pillar: aircraft
+    dual_cell: true
+    attacks:
+      infantry: vehicle
+      vehicle:  buildings_towers
+      aircraft: infantry
+      tower:    aircraft
+    building_prices: {barracks: 2, factory: 3, airbase: 1}   # без изменений от 1.0.1
+    speeds: {infantry: 1, vehicle: 1, aircraft: 2, tower: 0}
+
+  - id: troop_B2
+    kind: troop_side
+    side: B2
+    name: "Старая школа"
+    pillar: vehicle
+    dual_cell: true
+    attacks:
+      infantry: vehicle
+      vehicle:  aircraft
+      aircraft: buildings_towers
+      tower:    infantry
+    # АВИАБАЗА 3->2 (заказ дизайнера 18.08.2026, «бой-планшеты-переработка»):
+    # была самой дешёвой постройкой на этой стороне непропорционально; казарма
+    # компенсирует 2->3, сумма остаётся 6.
+    building_prices: {barracks: 3, factory: 1, airbase: 2}
+    speeds: {infantry: 1, vehicle: 2, aircraft: 1, tower: 0}
+
+  - id: troop_B3
+    kind: troop_side
+    side: B3
+    name: "Лёгкий десант"
+    pillar: infantry
+    dual_cell: true
+    attacks:
+      infantry: vehicle
+      vehicle:  infantry
+      aircraft: buildings_towers
+      tower:    aircraft
+    building_prices: {barracks: 1, factory: 3, airbase: 2}   # без изменений от 1.0.1
+    speeds: {infantry: 2, vehicle: 1, aircraft: 1, tower: 0}
+
+  - id: troop_B4
+    kind: troop_side
+    side: B4
+    name: "Инженерный корпус"
+    pillar: tower
+    dual_cell: true
+    towers_move: true
+    attacks:
+      infantry: buildings_towers
+      vehicle:  aircraft
+      aircraft: vehicle
+      tower:    infantry
+    # АВИАБАЗА 3->1 (тот же заказ, тот же принцип): казарма компенсирует 1->3,
+    # завод не тронут, сумма остаётся 6.
+    building_prices: {barracks: 3, factory: 2, airbase: 1}
+    speeds: {infantry: 1, vehicle: 1, aircraft: 1, tower: 1}
+
+  # -- Storage board sides --------------------------------------------------
+  # cells: list per level 1..4; each is a string of cell types (У/К/Б) →
+  # normalized here as codes: U universal, K kelium, A ammo. "" = no cells.
+  - id: storage_A
+    kind: storage_side
+    side: A
+    shared: true
+    miners:  ["U", "U", "UU", "UU"]
+    plants:  ["U", "U", "UU", "UU"]
+    prices:  [1, 2, 3, 4]
+    storage_token: {sides: ["+1_energy", "+1_universal_cell"]}
+    vp_star_level: 4
+
+  - id: storage_B1
+    kind: storage_side
+    side: B1
+    miners: ["KK", "KK", "U", "U"]
+    plants: ["AA", "AA", "U", "U"]
+    prices: [1, 2, 3, 4]
+    vp_star_level: 4
+
+  - id: storage_B2
+    kind: storage_side
+    side: B2
+    miners: ["U", "U", "UU", "UU"]
+    plants: ["AA", "U", "UU", "U"]
+    prices: [2, 2, 3, 3]
+    vp_star_level: 4
+
+  - id: storage_B3
+    kind: storage_side
+    side: B3
+    miners: ["", "KK", "KK", "UU"]
+    plants: ["", "AA", "AA", "UU"]
+    prices: [1, 1, 4, 4]
+    vp_star_level: 4
+
+  - id: storage_B4
+    kind: storage_side
+    side: B4
+    miners: ["KU", "KU", "KU", "KU"]
+    plants: ["A", "A", "A", "A"]
+    prices: [3, 3, 2, 2]
+    vp_star_level: 4
+
+  # -- Tech / development board (3 shared tracks) ---------------------------
+  # Step numeric values (cost/vp/capacity) live in the RULESET so they can be
+  # tuned; here we describe the fixed *structure* — which track gives what.
+  - id: tech_tracks
+    kind: tech_board
+    tracks:
+      - {id: left,   modules: red,     ability: "+1 ammo in combat"}
+      - {id: middle, modules: storage, ability: "+1 kelium per Mining"}
+      - {id: right,  modules: blue,    ability: "+1 extra move"}
+    step_rewards: ["prize_cube", "module", "module", "super_arsenal_card"]
+    first_arriver_prizes: {left: "1_ammo", middle: "1_kelium", right: "1_coin"}
+    science_dept_exchanges:
+      - "1-2 trophy -> 1-2 coins"
+      - "1 trophy -> move 1 module"
+      - "2 trophy -> draw 2 arsenal keep 1"
+      - "3 trophy -> gild (upgrade) 1 module"
