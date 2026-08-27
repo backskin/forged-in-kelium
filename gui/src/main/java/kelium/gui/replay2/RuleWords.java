@@ -288,6 +288,15 @@ public final class RuleWords {
             case "command_center.destruction_token_seals_cell" ->
                 "жетон-заглушка занимает ячейку красного модуля и закрывает собой "
                     + "ту спец-атаку, на которой лежит";
+            case "command_center.must_replace_cu_with_spec" ->
+                "центр управления в запасе обязан вернуться на поле спец-действием";
+            case "command_center.cu_buildable_by_build_action" ->
+                "центр управления можно поставить и обычной Стройкой";
+
+            case "actions.build.demolish_cu_allowed" ->
+                "своё здание можно снести в запас, получив монету — в том числе ЦУ";
+            case "actions.build.one_op_per_building" ->
+                "над одним зданием за действие Стройка ровно одна операция";
 
             // ---------- Контейнеры за снос ----------
             case "building_compensation_containers.barracks" -> "контейнеров за казарму";

@@ -843,10 +843,18 @@ public final class StartMenuWindow {
         List<KpChooser.Item> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         try {
+            List<String> all = new ArrayList<>();
             for (String r : GameConfig.availableRulesets(null)) {
                 if (seen.add(r)) {
-                    out.add(new KpChooser.Item(r, "свод " + r));
+                    all.add(r);
                 }
+            }
+            // ПО ВЕРСИИ, А НЕ ПО БУКВАМ, И СВЕЖИЕ СВЕРХУ. Строкой «1.7.1»
+            // оказывалось ПОСЛЕ «1.24.0», а «1.10.0» — раньше «1.9.0»: список
+            // выглядел перемешанным, и найти в нём действующий свод было нельзя.
+            all.sort((a, b) -> -compareVersions(a, b));
+            for (String r : all) {
+                out.add(new KpChooser.Item(r, "свод " + r));
             }
         } catch (RuntimeException ignore) {
             // список не прочитан — остаётся действующий свод
@@ -854,6 +862,44 @@ public final class StartMenuWindow {
         if (out.isEmpty()) {
             out.add(new KpChooser.Item(GameConfig.DEFAULT_RULESET,
                 "свод " + GameConfig.DEFAULT_RULESET));
+        }
+        return out;
+    }
+
+    /**
+     * Сравнение сводов ПО ЧИСЛАМ версии: 1.9.0 меньше 1.10.0, 1.7.1 меньше всех
+     * двадцатых. Хвост после номера («1.24.0-пломба») идёт ПОСЛЕ чистой версии:
+     * это ответвление на замер, а не следующая редакция.
+     */
+    static int compareVersions(String a, String b) {
+        String[] ap = a.split("-", 2);
+        String[] bp = b.split("-", 2);
+        int[] an = numbers(ap[0]);
+        int[] bn = numbers(bp[0]);
+        for (int i = 0; i < Math.max(an.length, bn.length); i++) {
+            int x = i < an.length ? an[i] : 0;
+            int y = i < bn.length ? bn[i] : 0;
+            if (x != y) {
+                return Integer.compare(x, y);
+            }
+        }
+        String at = ap.length > 1 ? ap[1] : "";
+        String bt = bp.length > 1 ? bp[1] : "";
+        if (at.isEmpty() != bt.isEmpty()) {
+            return at.isEmpty() ? 1 : -1;      // чистая версия выше ответвления
+        }
+        return at.compareTo(bt);
+    }
+
+    private static int[] numbers(String v) {
+        String[] parts = v.split("\\.");
+        int[] out = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            try {
+                out[i] = Integer.parseInt(parts[i].replaceAll("[^0-9]", ""));
+            } catch (NumberFormatException e) {
+                out[i] = 0;
+            }
         }
         return out;
     }
