@@ -39,9 +39,25 @@ public final class CardMenu extends JComponent {
     public record Act(String label, String sub, boolean enabled, String why, Runnable onPick) {
     }
 
-    /** Карта в меню: чем подписана, что на ней написано и что с ней можно. */
+    /**
+     * Карта в меню — со всем, что на ней НАПЕЧАТАНО.
+     *
+     * @param note   короткая пометка состояния: прогресс, «в руке», «установлена»
+     * @param text   печатный текст карты — главное её содержимое
+     * @param reward что дают за выполнение (пусто — нечего показывать)
+     * @param util   во что превратится, если сжечь (null — верхнего эффекта нет)
+     */
     public record Card(String id, String title, String note, String text,
-                        Color band, List<Act> acts) {
+                        String reward, String util, Color band, List<Act> acts) {
+
+        /**
+         * Как назвать первую строку подвала. У задания это НАГРАДА за
+         * выполнение, у карты арсенала — то, что она делает, пока установлена.
+         */
+        String rewardLabel() {
+            return acts.stream().anyMatch(a -> a.label().startsWith("Выполнить"))
+                ? "НАГРАДА" : "РАБОТАЕТ";
+        }
     }
 
     private String title = "";
@@ -308,29 +324,100 @@ public final class CardMenu extends JComponent {
         g.setStroke(new BasicStroke(sel ? Theme.pxf(2.4) : 1f));
         g.drawRoundRect(r.x, r.y, r.width, r.height, Theme.px(10), Theme.px(10));
 
-        g.setFont(Theme.font(sel ? 13 : 12, Font.BOLD));
+        int pad = Theme.px(8);
+        int textW = r.width - pad * 2;
+
+        // ИМЯ
+        g.setFont(Theme.font(sel ? 13 : 11.5, Font.BOLD));
         g.setColor(sel ? Theme.ink() : Theme.ink2());
         var fm = g.getFontMetrics();
-        int ty = r.y + Theme.px(30);
-        for (String line : CardTile.wrap(c.title(), fm, r.width - Theme.px(16), 3)) {
-            g.drawString(line, r.x + Theme.px(8), ty);
+        int ty = r.y + Theme.px(28);
+        for (String line : CardTile.wrap(c.title(), fm, textW, 2)) {
+            g.drawString(line, r.x + pad, ty);
             ty += fm.getHeight();
         }
+
+        // ПОМЕТКА СОСТОЯНИЯ — прогресс, «в руке», «установлена»
         if (c.note() != null && !c.note().isBlank()) {
-            g.setFont(Theme.font(10, Font.PLAIN));
-            g.setColor(Theme.ink3());
+            g.setFont(Theme.font(9.5, Font.BOLD));
+            g.setColor(Theme.alpha(c.band(), 0.95));
             var f2 = g.getFontMetrics();
-            ty += Theme.px(4);
-            for (String line : CardTile.wrap(c.note(), f2, r.width - Theme.px(16), 4)) {
-                g.drawString(line, r.x + Theme.px(8), ty);
-                ty += f2.getHeight();
+            g.drawString(KpButton.ellipsize(c.note(), f2, textW), r.x + pad, ty + Theme.px(2));
+            ty += f2.getHeight() + Theme.px(2);
+        }
+
+        // Низ карты держим под награду и утиль — текст занимает всё остальное.
+        int footer = footerHeight(c);
+        int bottom = r.y + r.height - footer - Theme.px(6);
+
+        g.setColor(Theme.alpha(Theme.border(), 0.7));
+        g.setStroke(new BasicStroke(1f));
+        g.drawLine(r.x + pad, ty + Theme.px(1), r.x + r.width - pad, ty + Theme.px(1));
+        ty += Theme.px(8);
+
+        // ПЕЧАТНЫЙ ТЕКСТ — главное, что на карте. Раньше его тут не было вовсе,
+        // и карта выглядела пустым белым прямоугольником (замечание дизайнера
+        // 27.08.2026): весь текст жил в панели под лентой.
+        if (c.text() != null && !c.text().isBlank()) {
+            g.setFont(Theme.font(sel ? 10 : 9, Font.PLAIN));
+            g.setColor(Theme.ink2());
+            var f3 = g.getFontMetrics();
+            int room = Math.max(1, (bottom - ty) / f3.getHeight());
+            for (String line : CardTile.wrap(c.text(), f3, textW, room)) {
+                ty += f3.getHeight();
+                if (ty > bottom) {
+                    break;
+                }
+                g.drawString(line, r.x + pad, ty);
             }
+        }
+
+        // НАГРАДА И УТИЛЬ — в подвале карты, каждый своей строкой
+        int fy = r.y + r.height - footer - Theme.px(2);
+        if (c.reward() != null && !c.reward().isBlank()) {
+            fy = footerLine(g, r, pad, fy, c.rewardLabel(), c.reward(), Theme.points());
+        }
+        if (c.util() != null && !c.util().isBlank()) {
+            footerLine(g, r, pad, fy, "УТИЛЬ", c.util(), Theme.debris());
         }
     }
 
-    /** Печатный текст выбранной карты — под лентой, на тёмном. */
+    /** Сколько места занимает подвал карты (награда и утиль). */
+    private int footerHeight(Card c) {
+        int n = 0;
+        if (c.reward() != null && !c.reward().isBlank()) {
+            n++;
+        }
+        if (c.util() != null && !c.util().isBlank()) {
+            n++;
+        }
+        return n * Theme.px(20);
+    }
+
+    /** Строка подвала: маленький ярлык и значение под ним. */
+    private int footerLine(Graphics2D g, Rectangle r, int pad, int y,
+                           String label, String value, Color colour) {
+        g.setFont(Theme.font(8, Font.BOLD));
+        g.setColor(Theme.alpha(colour, 0.9));
+        var fl = g.getFontMetrics();
+        g.drawString(label, r.x + pad, y);
+        int lw = fl.stringWidth(label) + Theme.px(5);
+        g.setFont(Theme.font(9.5, Font.BOLD));
+        g.setColor(Theme.ink());
+        var fv = g.getFontMetrics();
+        g.drawString(KpButton.ellipsize(value, fv, r.width - pad * 2 - lw),
+            r.x + pad + lw, y);
+        return y + Theme.px(20);
+    }
+
+    /**
+     * ПОЛНЫЙ ТЕКСТ ВЫБРАННОЙ КАРТЫ — под лентой, на тёмном.
+     *
+     * <p>Показывается только тогда, когда текст не влез на саму карту: иначе
+     * это была бы вторая копия того же самого прямо под первой.
+     */
     private void paintText(Graphics2D g, Card c) {
-        if (c.text() == null || c.text().isBlank()) {
+        if (c.text() == null || c.text().isBlank() || fitsOnCard(c)) {
             return;
         }
         int w = Math.min(Theme.px(700), getWidth() - Theme.px(60));
@@ -348,6 +435,19 @@ public final class CardMenu extends JComponent {
             ty += fm.getHeight();
             g.drawString(line, x + Theme.px(12), ty);
         }
+    }
+
+    /** Влезает ли печатный текст целиком на выбранную карту. */
+    private boolean fitsOnCard(Card c) {
+        Rectangle r = cardRect(selected);
+        var fm = getFontMetrics(Theme.font(10, Font.PLAIN));
+        int pad = Theme.px(8);
+        int top = r.y + Theme.px(28) + fm.getHeight() * 2 + Theme.px(18);
+        int bottom = r.y + r.height - footerHeight(c) - Theme.px(6);
+        int room = Math.max(0, (bottom - top) / fm.getHeight());
+        List<String> lines = CardTile.wrap(c.text(), fm, r.width - pad * 2, room + 1);
+        return lines.size() <= room && (lines.isEmpty()
+            || !lines.get(lines.size() - 1).endsWith("…"));
     }
 
     private void paintAct(Graphics2D g, int i, Act act) {

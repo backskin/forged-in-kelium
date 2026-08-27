@@ -1447,26 +1447,9 @@ public final class HotSeatWindow {
                 утиль == null ? "" : утиль, доСожжения != null,
                 утиль == null ? "у карты нет верхнего эффекта" : "сейчас нельзя",
                 доСожжения == null ? () -> { } : () -> submitSpec(agent, доСожжения)));
-            // На самой карте — то, ради чего её держат: сколько уже сделано,
-            // что дадут за выполнение и во что она превратится, если сжечь.
-            StringBuilder note = new StringBuilder();
-            String tag = objectiveTag(id);
-            if (tag != null && !tag.isBlank()) {
-                note.append(tag).append(" · ");
-            }
-            String reward = objectiveReward(id);
-            if (!reward.isBlank()) {
-                note.append("награда: ").append(reward).append(" · ");
-            }
-            if (утиль != null) {
-                note.append("утиль: ").append(утиль);
-            }
-            String подпись = note.toString();
-            if (подпись.endsWith(" · ")) {
-                подпись = подпись.substring(0, подпись.length() - 3);
-            }
             cards.add(new kelium.gui.kp.CardMenu.Card(id, cardName(id),
-                подпись, objectiveText(id), Theme.points(), acts));
+                objectiveTag(id), objectiveText(id), objectiveReward(id), утиль,
+                Theme.points(), acts));
         }
         if (cards.isEmpty()) {
             return;
@@ -1493,7 +1476,8 @@ public final class HotSeatWindow {
         List<kelium.gui.kp.CardMenu.Card> cards = new ArrayList<>();
         for (String id : p.arsenalInstalled) {
             cards.add(new kelium.gui.kp.CardMenu.Card(id, cardName(id), "установлена",
-                cardText(id), Theme.container(),
+                cardText(id), arsenalLabel(id, "bottom"), arsenalLabel(id, "top"),
+                Theme.container(),
                 List.of(new kelium.gui.kp.CardMenu.Act("Уже работает", "стоит на полке",
                     false, "установленную карту снимают только правила карт", () -> { }))));
         }
@@ -1501,7 +1485,8 @@ public final class HotSeatWindow {
             Integer поставить = indexOfSpec(opts, "spec_arsenal_install", id);
             Integer сжечь = indexOfSpec(opts, "spec_arsenal_burn", id);
             cards.add(new kelium.gui.kp.CardMenu.Card(id, cardName(id), "в руке",
-                cardText(id), Theme.container(),
+                cardText(id), arsenalLabel(id, "bottom"), arsenalLabel(id, "top"),
+                Theme.container(),
                 List.of(
                     new kelium.gui.kp.CardMenu.Act("Установить", "займёт место на полке",
                         поставить != null, "сейчас нельзя",
@@ -1553,6 +1538,18 @@ public final class HotSeatWindow {
             return String.valueOf(m.get("label"));
         }
         return top instanceof Map<?, ?> ? "верхний эффект" : null;
+    }
+
+    /**
+     * Подпись половины карты арсенала: {@code bottom} — что она делает,
+     * пока установлена, {@code top} — что даёт, если её сжечь.
+     */
+    private String arsenalLabel(String id, String half) {
+        Object h = cardField("arsenal", id, half);
+        if (h instanceof Map<?, ?> m && m.get("label") != null) {
+            return String.valueOf(m.get("label"));
+        }
+        return null;
     }
 
     private String cardText(String id) {
