@@ -157,10 +157,14 @@ public final class HotSeatWindow {
     kelium.gui.kp.CardChoiceOverlay ceremony;
     /** Шторка передачи устройства — только когда за столом больше одного живого. */
     kelium.gui.kp.HandoverCurtain curtain;
+    /** Меню карт: задания и арсенал раскладываются перед игроком. */
+    kelium.gui.kp.CardMenu cardMenu;
     /** Кому в прошлый раз отдавали ход: сменился — поднимаем шторку. */
     private int lastServedHuman = -1;
     private kelium.gui.kp.OpponentStrip opponents;
     KpButton endBtn;
+    KpButton objMenuBtn;
+    KpButton arsMenuBtn;
     /** Выезд контекстной панели снизу (120–180 мс по скиллу интерфейса). */
     private final kelium.gui.kp.Anim promptSlide = new kelium.gui.kp.Anim();
     /** Выезд ящика слева. */
@@ -270,6 +274,9 @@ public final class HotSeatWindow {
 
         // ШТОРКА ПЕРЕДАЧИ — ВЫШЕ МОДАЛОК: она прячет экран целиком, и если её
         // перекроет хоть что-нибудь, прятать будет нечего.
+        cardMenu = new kelium.gui.kp.CardMenu();
+        frame.getLayeredPane().add(cardMenu, JLayeredPane.MODAL_LAYER);
+
         curtain = new kelium.gui.kp.HandoverCurtain();
         frame.getLayeredPane().add(curtain, JLayeredPane.DRAG_LAYER);
         frame.getLayeredPane().addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -281,11 +288,15 @@ public final class HotSeatWindow {
                     frame.getLayeredPane().getHeight());
                 curtain.setBounds(0, 0, frame.getLayeredPane().getWidth(),
                     frame.getLayeredPane().getHeight());
+                cardMenu.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+                    frame.getLayeredPane().getHeight());
             }
         });
         confirm.setBounds(0, 0, frame.getLayeredPane().getWidth(),
             frame.getLayeredPane().getHeight());
         curtain.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        cardMenu.setBounds(0, 0, frame.getLayeredPane().getWidth(),
             frame.getLayeredPane().getHeight());
         ceremony.setBounds(0, 0, frame.getLayeredPane().getWidth(),
             frame.getLayeredPane().getHeight());
@@ -624,6 +635,26 @@ public final class HotSeatWindow {
         boardBtn.onClick(() -> toggleDrawer("Планшет"));
         boardBtn.setState(KpButton.State.AVAILABLE);
         drawerBtns.put("Планшет", boardBtn);
+        // ВЫЗОВ МЕНЮ КАРТ (просьба дизайнера 27.08): руку заданий и зону
+        // арсенала раскладывают перед собой и разбирают. Кнопки горят только
+        // тогда, когда движок реально предлагает СПЕЦ-действие — иначе
+        // разбирать нечего, и обещать действие нельзя.
+        objMenuBtn = new KpButton("Задания", "выполнить · сжечь", null);
+        objMenuBtn.setPreferredSize(new Dimension(Theme.px(128), Theme.px(46)));
+        objMenuBtn.setToolTipText("Разложить руку заданий: выполнить выполнимое "
+            + "или сжечь карту ради верхнего эффекта");
+        objMenuBtn.onClick(this::openObjectiveMenu);
+        objMenuBtn.setState(KpButton.State.DISABLED);
+        btnRow.add(objMenuBtn);
+
+        arsMenuBtn = new KpButton("Арсенал", "полка · рука", null);
+        arsMenuBtn.setPreferredSize(new Dimension(Theme.px(128), Theme.px(46)));
+        arsMenuBtn.setToolTipText("Зона арсенала: что стоит на полке и что можно "
+            + "поставить или сжечь");
+        arsMenuBtn.onClick(this::openArsenalMenu);
+        arsMenuBtn.setState(KpButton.State.DISABLED);
+        btnRow.add(arsMenuBtn);
+
         KpButton sciBtn = new KpButton("Наука и рынок", "доска · курс", null);
         sciBtn.setToolTipText(
             "Доска науки и активная карта рынка — открываются поверх поля в любой момент");
@@ -922,6 +953,7 @@ public final class HotSeatWindow {
      */
     private void closeToMenu() {
         stopped = true;
+        cardMenu.close();
         curtain.drop();
         confirm.close();
         for (kelium.core.UndoableAgent a : humansBySeat.values()) {
@@ -1361,6 +1393,217 @@ public final class HotSeatWindow {
         }
     }
 
+    /**
+     * Кнопки меню карт горят только на СПЕЦ-действии: только там движок и
+     * предлагает выполнить задание, сжечь его или тронуть арсенал.
+     */
+    private void refreshCardMenus() {
+        if (objMenuBtn == null) {
+            return;
+        }
+        boolean live = specMenuOptions != null;
+        objMenuBtn.setState(live ? KpButton.State.AVAILABLE : KpButton.State.DISABLED);
+        arsMenuBtn.setState(live ? KpButton.State.AVAILABLE : KpButton.State.DISABLED);
+        objMenuBtn.setTexts("Задания", live ? "выполнить · сжечь" : "не сейчас");
+        arsMenuBtn.setTexts("Арсенал", live ? "полка · рука" : "не сейчас");
+    }
+
+    /** Варианты текущего СПЕЦ-действия — из них строится меню карт. */
+    private List<Choice> specMenuOptions;
+    private kelium.core.UndoableAgent specMenuAgent;
+
+    /**
+     * МЕНЮ КАРТ ЗАДАНИЙ. Раскладывает руку заданий перед игроком: пролистал,
+     * выбрал, увидел печатный текст — и либо выполнил, либо сжёг ради верхнего
+     * (утиль) эффекта.
+     *
+     * <p>ЧТО ДОСТУПНО, РЕШАЕТ ДВИЖОК: он присылает {@code spec_objective} только
+     * для тех заданий, что выполнимы прямо сейчас, и {@code spec_objective_burn}
+     * только для тех, у кого есть верхний эффект. Окно ничего не проверяет само
+     * — иначе оно рано или поздно разошлось бы с правилами.
+     */
+    void openObjectiveMenu() {
+        List<Choice> opts = specMenuOptions;
+        var agent = specMenuAgent;
+        if (opts == null || agent == null || rec == null || rec.frames.isEmpty()) {
+            return;
+        }
+        ReplayRecord.Frame f = rec.frames.get(rec.frames.size() - 1);
+        if (f.snapshot == null || viewedSeat >= f.snapshot.players.size()) {
+            return;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(viewedSeat);
+        List<kelium.gui.kp.CardMenu.Card> cards = new ArrayList<>();
+        for (String id : p.objectiveHand) {
+            Integer доВыполнения = indexOfSpec(opts, "spec_objective", id);
+            Integer доСожжения = indexOfSpec(opts, "spec_objective_burn", id);
+            List<kelium.gui.kp.CardMenu.Act> acts = new ArrayList<>();
+            acts.add(new kelium.gui.kp.CardMenu.Act("Выполнить задание",
+                objectiveReward(id), доВыполнения != null,
+                "условие ещё не выполнено",
+                доВыполнения == null ? () -> { } : () -> submitSpec(agent, доВыполнения)));
+            String утиль = objectiveTop(id);
+            acts.add(new kelium.gui.kp.CardMenu.Act("Сжечь ради утиля",
+                утиль == null ? "" : утиль, доСожжения != null,
+                утиль == null ? "у карты нет верхнего эффекта" : "сейчас нельзя",
+                доСожжения == null ? () -> { } : () -> submitSpec(agent, доСожжения)));
+            // На самой карте — то, ради чего её держат: сколько уже сделано,
+            // что дадут за выполнение и во что она превратится, если сжечь.
+            StringBuilder note = new StringBuilder();
+            String tag = objectiveTag(id);
+            if (tag != null && !tag.isBlank()) {
+                note.append(tag).append(" · ");
+            }
+            String reward = objectiveReward(id);
+            if (!reward.isBlank()) {
+                note.append("награда: ").append(reward).append(" · ");
+            }
+            if (утиль != null) {
+                note.append("утиль: ").append(утиль);
+            }
+            String подпись = note.toString();
+            if (подпись.endsWith(" · ")) {
+                подпись = подпись.substring(0, подпись.length() - 3);
+            }
+            cards.add(new kelium.gui.kp.CardMenu.Card(id, cardName(id),
+                подпись, objectiveText(id), Theme.points(), acts));
+        }
+        if (cards.isEmpty()) {
+            return;
+        }
+        cardMenu.open("Задания — выполнить или сжечь", cards, null);
+        frame.toFront();
+    }
+
+    /**
+     * МЕНЮ ЗОНЫ АРСЕНАЛА. Три места под установленные карты, плюс то, что лежит
+     * в руке: карту можно поставить или сжечь ради её эффекта.
+     */
+    void openArsenalMenu() {
+        List<Choice> opts = specMenuOptions;
+        var agent = specMenuAgent;
+        if (opts == null || agent == null || rec == null || rec.frames.isEmpty()) {
+            return;
+        }
+        ReplayRecord.Frame f = rec.frames.get(rec.frames.size() - 1);
+        if (f.snapshot == null || viewedSeat >= f.snapshot.players.size()) {
+            return;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(viewedSeat);
+        List<kelium.gui.kp.CardMenu.Card> cards = new ArrayList<>();
+        for (String id : p.arsenalInstalled) {
+            cards.add(new kelium.gui.kp.CardMenu.Card(id, cardName(id), "установлена",
+                cardText(id), Theme.container(),
+                List.of(new kelium.gui.kp.CardMenu.Act("Уже работает", "стоит на полке",
+                    false, "установленную карту снимают только правила карт", () -> { }))));
+        }
+        for (String id : p.arsenalHand) {
+            Integer поставить = indexOfSpec(opts, "spec_arsenal_install", id);
+            Integer сжечь = indexOfSpec(opts, "spec_arsenal_burn", id);
+            cards.add(new kelium.gui.kp.CardMenu.Card(id, cardName(id), "в руке",
+                cardText(id), Theme.container(),
+                List.of(
+                    new kelium.gui.kp.CardMenu.Act("Установить", "займёт место на полке",
+                        поставить != null, "сейчас нельзя",
+                        поставить == null ? () -> { } : () -> submitSpec(agent, поставить)),
+                    new kelium.gui.kp.CardMenu.Act("Сжечь ради эффекта", "карта уйдёт в сброс",
+                        сжечь != null, "сейчас нельзя",
+                        сжечь == null ? () -> { } : () -> submitSpec(agent, сжечь)))));
+        }
+        if (cards.isEmpty()) {
+            return;
+        }
+        cardMenu.open("Зона арсенала", cards, null);
+        frame.toFront();
+    }
+
+    /** Номер варианта такого вида для этой карты, либо null. */
+    private static Integer indexOfSpec(List<Choice> opts, String kind, String cardId) {
+        for (int i = 0; i < opts.size(); i++) {
+            Choice c = opts.get(i);
+            if (kind.equals(c.kind()) && cardId.equals(String.valueOf(c.payload()))) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    private void submitSpec(kelium.core.UndoableAgent agent, int index) {
+        pendingBakeName = "СПЕЦ-действие";
+        agent.submitIndex(index);
+        clearDecision();
+    }
+
+    /** Печатный текст карты задания. */
+    private String objectiveText(String id) {
+        Object t = cardField("objectives", id, "описание");
+        return t == null ? "" : String.valueOf(t);
+    }
+
+    /** Награда за выполнение — короткой строкой под кнопкой. */
+    private String objectiveReward(String id) {
+        Object r = cardField("objectives", id, "base_reward");
+        return r instanceof Map<?, ?> m ? rewardWords(m) : "";
+    }
+
+    /** Подпись верхнего (утиль) эффекта, либо null — его нет. */
+    private String objectiveTop(String id) {
+        Object top = cardField("objectives", id, "top");
+        if (top instanceof Map<?, ?> m && m.get("label") != null) {
+            return String.valueOf(m.get("label"));
+        }
+        return top instanceof Map<?, ?> ? "верхний эффект" : null;
+    }
+
+    private String cardText(String id) {
+        Object t = cardField("arsenal", id, "описание");
+        return t == null ? "" : String.valueOf(t);
+    }
+
+    /** Поле карты из набора партии (null — набора нет или поля нет). */
+    private Object cardField(String set, String id, String field) {
+        GameConfig c = cfg;
+        if (c == null || id == null) {
+            return null;
+        }
+        try {
+            Object raw = c.content.get(set).byId(id);
+            return raw instanceof Map<?, ?> m ? m.get(field) : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Награда словами: «3 боеприпаса · карта арсенала». */
+    private static String rewardWords(Map<?, ?> m) {
+        List<String> parts = new ArrayList<>();
+        for (Map.Entry<?, ?> e : m.entrySet()) {
+            String k = String.valueOf(e.getKey());
+            // СЫРЫЕ КЛЮЧИ ИГРОКУ НЕ ПОКАЗЫВАЕМ: «1 objective_card» в награде —
+            // это не текст игры, а внутреннее имя поля.
+            String слово = switch (k) {
+                case "ammo" -> "боеприпасов";
+                case "kelium" -> "келемия";
+                case "coin", "coins" -> "монет";
+                case "debris" -> "обломков";
+                case "vp" -> "ПО";
+                case "arsenal", "arsenal_card" -> "карта арсенала";
+                case "objective", "objective_card" -> "карта задания";
+                case "container", "containers" -> "контейнеров";
+                case "module_red" -> "красный модуль";
+                case "module_blue" -> "синий модуль";
+                case "tech", "tech_step" -> "шаг науки";
+                default -> k;
+            };
+            // Число ПОСЛЕ слова: так не надо согласовывать окончание («1 обломок»,
+            // «2 обломка», «5 обломков») — и не будет уродливого «1 обломков».
+            boolean безЧисла = слово.startsWith("карта") || слово.startsWith("шаг")
+                || слово.endsWith("модуль");
+            parts.add(безЧисла ? слово : слово + " " + e.getValue());
+        }
+        return String.join(" · ", parts);
+    }
+
     private void showDecisionNow(int seat, InteractiveAgent.PendingDecision d) {
         viewedSeat = seat;
         refreshSheetSeats();
@@ -1373,6 +1616,9 @@ public final class HotSeatWindow {
         pendingKind = kind;
         kelium.core.UndoableAgent agent = humansBySeat.get(seat);
         List<Choice> options = d.options();
+        specMenuOptions = "spec".equals(kind) ? options : null;
+        specMenuAgent = "spec".equals(kind) ? agent : null;
+        refreshCardMenus();
         String title = "Игрок " + (seat + 1) + " — " + KIND_LABELS.getOrDefault(kind, kind);
 
         turnLabel.setText("ВАШ ХОД — Игрок " + (seat + 1) + ": "
@@ -1746,6 +1992,10 @@ public final class HotSeatWindow {
     private void clearDecision() {
         confirm.close();
         ceremony.close();
+        cardMenu.close();
+        specMenuOptions = null;
+        specMenuAgent = null;
+        refreshCardMenus();
         zoom.setVisible(false);
         prompt.hideAll();
         field.clearSelectable();
