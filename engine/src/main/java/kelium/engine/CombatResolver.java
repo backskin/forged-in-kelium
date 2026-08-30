@@ -757,11 +757,28 @@ public final class CombatResolver {
             journal().noteCombatHit(attackerSeat, owner, uidOf(victim), vtype, destroyed, isRetaliation);
             TurnJournal.TurnFacts af = journal().of(attackerSeat);
             enemyDamagedThisBattle = true;
+            // ЧУЖИЕ ЖЕТОНЫ ПОД УРОНОМ И ДОБИТЫЕ — общий счёт хода.
+            //
+            // НАЙДЕНО 28.08.2026 ЗАМЕРОМ БЛИЗОСТИ. Оба поля журнала читались
+            // картами и предикатами, но не заполнялись НИКЕМ: бой писал только
+            // здания (enemyBuildingsDamaged) и убийства по жетонам-убийцам.
+            // Из-за этого «Подранки» (двое раненых, никого добитого) держали
+            // близость РОВНО НОЛЬ во всех 58 попаданиях карты в руку за 60
+            // партий — условие было невыполнимо в принципе, а выглядело как
+            // тупость ботов. Той же дырой болели предикаты
+            // damaged_distinct_no_kills, damaged_distinct и destroyed_count.
+            af.enemyTokensDamaged.add(uidOf(victim));
+            // o43 «Охота на сильного» считает прогресс по РАНЕНОМУ лидеру, а не
+            // только по добитому — поэтому признак ставится здесь, на уроне.
+            if (owner == leadingRivalOf(attackerSeat)) {
+                af.damagedLeader = true;
+            }
             if (victim instanceof BuildingToken) {
                 af.enemyBuildingHits += 1;   // o25 в прежней редакции
                 af.enemyBuildingsDamaged.add(uidOf(victim));   // o45 «Пристрелка»
             }
             if (destroyed) {
+                af.enemyTokensDestroyed += 1;
                 af.minKillAmmoCost = Math.min(af.minKillAmmoCost, ammo);
                 if (af.movedUids.contains(unit.uid)) {
                     af.movedAndKilledSameUnit = true;
@@ -1272,6 +1289,10 @@ public final class CombatResolver {
         {
             TurnJournal.TurnFacts j = s.journal.of(attackerSeat);
             j.destroyedOwners.add(victim.owner());
+            // ПОТЕРИ ЖЕРТВЫ — в её собственный журнал. Поле читалось (условие
+            // «без потерь» и ответный бой), но не заполнялось ничем: та же дыра,
+            // что была у destroyedTypes.
+            s.journal.of(victim.owner()).lostOwnThisTurn += 1;
             if (victim instanceof UnitToken u) {
                 j.destroyedTypes.add(u.type.code);
             } else if (victim instanceof BuildingToken b) {
@@ -1360,6 +1381,14 @@ public final class CombatResolver {
         int need = ((Number) rs.get("command_center.cu_tokens_for_military_win", 2))
             .intValue();
         boolean heldForeignToken = attacker.cuDestructionTokens >= need - 1;
+        // Супер-задания 5.0: «Трофейный обоз» и «Тень штаба» смотрят, разрушалось
+        // ли ЦУ игрока ХОТЬ РАЗ за партию.
+        owner.super5CuEverLost = true;
+        // «Тень штаба»: глухой жетон изъят из игры навсегда — за снос этого ЦУ
+        // захватчик не получает НИЧЕГО: ни оборота, ни шага к военной победе.
+        if (owner.super5SealRemoved) {
+            owner.ownCuTokenAvailable = false;
+        }
         if (owner.ownCuTokenAvailable) {
             owner.ownCuTokenAvailable = false;
             attacker.cuDestructionTokens += 1;

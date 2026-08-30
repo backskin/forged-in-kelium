@@ -343,6 +343,7 @@ public final class Objectives {
 
         p.objectiveHand.remove(cid);
         s.decks.get("objectives").discard(cid);
+        p.objectivesCompleted += 1;   // накопитель «Архива штаба» (супер 5.0)
 
         Map<String, Object> granted = new HashMap<>();
         granted.put("base", base);

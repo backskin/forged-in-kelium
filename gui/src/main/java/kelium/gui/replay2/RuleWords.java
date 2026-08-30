@@ -346,6 +346,7 @@ public final class RuleWords {
             case "tech.step_capacity" -> "сколько игроков влезает на шаг";
             case "tech.step_cost_trophy" -> "трофеев/обломков за шаг (тратится общий пул)";
             case "tech.step_vp_cumulative" -> "победные очки по шагам, накопительно";
+            case "tech.step_rewards" -> "награды шагов трека (перебивает доску)";
             case "tech.science_exchanges" -> "постоянные обмены научного отдела";
             case "tech.science_one_step_per_track_per_action" ->
                 "за одно действие — не больше шага на трек";
@@ -362,6 +363,7 @@ public final class RuleWords {
             case "economy.vp_per_installed_super_arsenal" ->
                 "победных очков за каждую установленную карту супер-арсенала";
             case "tech.pair_bonus_coin" -> "монет за парный обмен науки";
+            case "tech.gild_trophy_cost" -> "обломков за позолоту модуля";
 
             // ---------- Конец раунда ----------
             case "return_step.return_destroyed_tokens" ->

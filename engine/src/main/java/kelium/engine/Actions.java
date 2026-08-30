@@ -2598,6 +2598,15 @@ public final class Actions {
                 }
                 rewards = (List<Object>) te.get("step_rewards");
             }
+            // СВОД ПЕРЕБИВАЕТ ДОСКУ. Лестница шагов — настраиваемая величина
+            // (цена, очки, ёмкость шагов уже живут в своде), и когда вариант
+            // правил меняет ЧИСЛО шагов, список наград обязан меняться вместе с
+            // ними. Держать его только на доске значило бы плодить копию всего
+            // набора планшетов ради одной строки.
+            if (cfg.ruleset.get("tech.step_rewards", null) instanceof List<?> rl
+                    && !rl.isEmpty()) {
+                rewards = new ArrayList<>(rl);
+            }
             // Награда шага берётся из данных step_rewards[reached-1], чтобы правка
             // числа шагов не требовала менять код. Возможные значения:
             // prize_cube / module / permanent_ability / super_arsenal_card.
@@ -2661,7 +2670,7 @@ public final class Actions {
                 //   синий трек    → синий модуль (сборка);
                 //   зелёный трек  → ПОЗОЛОТА одного своего модуля.
                 // Зелёный трек своих жетонов не производит (он про хранилище), и
-                // позолота — ровно то, что он и продаёт за 3 трофея вечным
+                // позолота — ровно то, что он и продаёт за два обломка вечным
                 // курсом. Десять монет здесь были бы вдвое слабее: 10 МОН это
                 // 2 ПО, а вершина стоит четырёх трофеев.
                 if (!kelium.engine.Setup.expansionOn(rs, "super_arsenal")) {
@@ -2702,7 +2711,7 @@ public final class Actions {
          * </ul>
          *
          * <p>Зелёный трек своих жетонов не печатает, и позолота — ровно тот приз,
-         * который он и продаёт вечным курсом за 3 трофея. Десять монет здесь были
+         * который он и продаёт вечным курсом за два обломка. Десять монет здесь были
          * бы вдвое слабее: 10 МОН это 2 ПО, а вершина стоит четырёх трофеев.
          *
          * @param kind род модулей трека из данных доски: red | blue | storage
@@ -2894,11 +2903,18 @@ public final class Actions {
                 ex.put("give", 2);
                 opts.add(new Choice("sci_exchange", ex, "2 trophy -> draw 2 arsenal, keep 1"));
             }
-            if (pool >= 3 && (player.redModules + player.blueModules) > player.goldModules) {
+            // ЦЕНА ПОЗОЛОТЫ — из свода, а не из кода (решение дизайнера
+            // 28.08.2026: два обломка вместо трёх). Старым сводам, где ключа
+            // нет, остаётся прежняя тройка — числа сыгранных партий не должны
+            // меняться задним числом.
+            int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();
+            if (pool >= gildCost
+                    && (player.redModules + player.blueModules) > player.goldModules) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "gild");
-                ex.put("give", 3);
-                opts.add(new Choice("sci_exchange", ex, "3 trophy -> gild a module"));
+                ex.put("give", gildCost);
+                opts.add(new Choice("sci_exchange", ex,
+                    gildCost + " trophy -> gild a module"));
             }
             // Вечный курс: 1 трофей -> 1 перемещение модуля (перестановка
             // посреди раунда, не дожидаясь Смены модулей в Обновление).

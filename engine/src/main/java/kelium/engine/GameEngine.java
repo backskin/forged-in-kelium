@@ -543,6 +543,8 @@ public final class GameEngine {
                 "on_field", TokenContainers.onField(s)));
         }
         moduleSwapAll();
+        // Накопитель «Штабной игры» (супер-задания 5.0): раунды первым игроком.
+        s.player(s.firstPlayer).super5RoundsFirst += 1;
         emit(ev("type", "refresh", "round", rnd, "first_player", s.firstPlayer));
     }
 
@@ -1161,6 +1163,12 @@ public final class GameEngine {
                 opts.add(new Choice("spec_arsenal_use", cid, "SPEC " + passive + " (" + cid + ")"));
             }
         }
+        // СУПЕР-ЗАДАНИЕ 5.0: сжечь свою карту ради суперутиля. Один раз за
+        // партию, в любой момент между действиями — как всякий СПЕЦ.
+        if (p.super5Card != null && !p.super5Burned && Super5.on(s)) {
+            opts.add(new Choice("spec_super5_burn", p.super5Card,
+                "СУПЕРУТИЛЬ " + p.super5Card));
+        }
         // СПОСОБНОСТИ АРСЕНАЛА сами кладут свои варианты в меню СПЕЦ: движок не
         // знает про карты, он спрашивает «что добавить?». Так карта даёт НОВОЕ
         // спец-действие без правки движка (13.08.2026).
@@ -1214,6 +1222,11 @@ public final class GameEngine {
             case "spec_symbol_reveal" -> revealSymbol(p, (String) ch.payload());
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
+            case "spec_super5_burn" -> {
+                Map<String, Object> got = Super5.burn(s, p, agents.get(p.seat), this::emit);
+                emit(ev("type", "super5_burn", "seat", p.seat,
+                    "card", ch.payload(), "got", got));
+            }
             case "spec_combat" -> {
                 // Плата вперёд, и только потом бой: не хватило — предложения бы и
                 // не было (см. проверку выше), а порядок важен для журнала.

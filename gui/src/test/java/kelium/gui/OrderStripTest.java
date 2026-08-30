@@ -54,7 +54,7 @@ class OrderStripTest {
         f1.type = "action";
         f1.round = 2;
         f1.seat = 0;
-        f1.log = "   ▪ СБОРКА: собрал пехоту";
+        f1.log = "   ▪ СНАРЯЖЕНИЕ: собрал пехоту";
         f1.snapshot = new ReplayRecord.Snapshot();
         rec.frames.add(f1);
         return rec;

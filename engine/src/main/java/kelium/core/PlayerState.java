@@ -294,6 +294,20 @@ public final class PlayerState {
      */
     public int killsTotal = 0;
 
+    // === СУПЕР-ЗАДАНИЯ 5.0 («суперутиль или накопитель», черновик 25.08.2026) ===
+    /** Карта 5.0, розданная втайне при подготовке; null — режим выключен. */
+    public String super5Card = null;
+    /** Сожжена ли карта ради суперутиля (накопитель тогда пропал). */
+    public boolean super5Burned = false;
+    /** Сколько раундов игрок начинал первым (накопитель «Штабной игры»). */
+    public int super5RoundsFirst = 0;
+    /** Разрушалось ли ЦУ игрока хоть раз («Трофейный обоз», «Тень штаба»). */
+    public boolean super5CuEverLost = false;
+    /** Глухой жетон изъят из игры навсегда («Тень штаба»): снос ЦУ не даёт оборота. */
+    public boolean super5SealRemoved = false;
+    /** Выполнено заданий за партию (накопитель «Архива штаба»). */
+    public int objectivesCompleted = 0;
+
     public PlayerState(int seat, PlayerBoard board, Resources resources, String startHex) {
         this.seat = seat;
         this.board = board;
@@ -379,6 +393,12 @@ public final class PlayerState {
         p.warTrackVp = warTrackVp;
         p.cuKills = cuKills;
         p.killsTotal = killsTotal;
+        p.super5Card = super5Card;
+        p.super5Burned = super5Burned;
+        p.super5RoundsFirst = super5RoundsFirst;
+        p.super5CuEverLost = super5CuEverLost;
+        p.super5SealRemoved = super5SealRemoved;
+        p.objectivesCompleted = objectivesCompleted;
         return p;
     }
 
