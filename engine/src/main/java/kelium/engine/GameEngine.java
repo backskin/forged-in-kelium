@@ -642,21 +642,24 @@ public final class GameEngine {
         }
         emit(ev("type", "reveal", "circle", circle, "revealed", new HashMap<>(revealed)));
 
-        Map<Integer, Order> topOrders = new HashMap<>();
-        Map<Order, Integer> orderCounts = new HashMap<>();
-        for (Map.Entry<Integer, String> e : revealed.entrySet()) {
-            Order o = topOrder(e.getValue());
-            topOrders.put(e.getKey(), o);
-            if (o != null) {
-                orderCounts.merge(o, 1, Integer::sum);
-            }
-        }
+        // ВСКРЫВАЮТ ПО ОЧЕРЕДИ, А НЕ ВСЕ РАЗОМ. Эффекты вскрытия — совпадение
+        // верхних приказов и открытие нижнего — считаются только с теми, кто
+        // вскрыл карту РАНЬШЕ тебя в этом круге; первый игрок круга не
+        // встречает никого (правило дизайнера 30.08.2026).
+        //
+        // Прежде обе карты сравнивались со ВСЕМИ вскрытыми сразу, включая тех,
+        // кто ходит после: игрок получал блок приказа от соседа, который свою
+        // карту ещё даже не открыл.
+        Map<Integer, Order> вскрытыеРанее = new java.util.LinkedHashMap<>();
 
         for (int seat : s.seatsInOrder()) {
             if (!revealed.containsKey(seat)) {
                 continue;
             }
-            resolveTurn(seat, revealed.get(seat), topOrders, orderCounts);
+            resolveTurn(seat, revealed.get(seat), вскрытыеРанее);
+            // Своя карта уходит в общий счёт ПОСЛЕ хода: для следующих игроков
+            // она уже вскрыта, для себя самого — не считается.
+            вскрытыеРанее.put(seat, topOrder(revealed.get(seat)));
             if (s.finished) {
                 return;
             }
@@ -666,8 +669,11 @@ public final class GameEngine {
         }
     }
 
-    private void resolveTurn(int seat, String cardId, Map<Integer, Order> topOrders,
-                             Map<Order, Integer> orderCounts) {
+    /**
+     * @param topOrders верхние приказы тех, кто вскрыл карту РАНЬШЕ этого места
+     *                  в текущем круге. У первого игрока круга пусто.
+     */
+    private void resolveTurn(int seat, String cardId, Map<Integer, Order> topOrders) {
         GameState s = state;
         PlayerState p = s.player(seat);
         Ruleset rs = rs();
@@ -687,11 +693,11 @@ public final class GameEngine {
         // здесь, а не когда сама sa5 разыгрывается: карта не разыгрывается вовсе,
         // она удерживается на вершине трека и действует постоянно.
         //
-        // ПОРЯДОК ЗНАЧИМ: если держатель sa5 ещё не ходил в этот раунд, штраф не
-        // сработает — topOrders хранит только УЖЕ сыгранные верхи. Это тот же
-        // порядок, каким считается совпадение приказов (coincidence_rule), и
-        // держатель карты просто оказывается в выгодном положении, если ходит
-        // раньше того, кого хочет наказать.
+        // ПОРЯДОК ЗНАЧИМ: если держатель sa5 ещё не вскрыл карту в этом круге,
+        // штраф не сработает — topOrders хранит только УЖЕ вскрытые верхи. Это
+        // тот же порядок, каким считается совпадение приказов, и держатель
+        // карты просто оказывается в выгодном положении, если вскрывает раньше
+        // того, кого хочет наказать.
         int specPenalty = 0;
         if (!isJoker) {
             Order myTop = Order.fromCode((String) card.get("top"));
@@ -742,8 +748,10 @@ public final class GameEngine {
                 "maneuver", false));
         } else {
             Order top = Order.fromCode((String) card.get("top"));
+            // СОВПАДЕНИЕ — с теми, кто вскрыл РАНЬШЕ. Своей карты в этом счёте
+            // нет вовсе, поэтому достаточно одного совпавшего соседа.
             boolean coincided = rs.getBool("actions.coincidence_rule_enabled", true)
-                && orderCounts.getOrDefault(top, 0) > 1;
+                && topOrders.containsValue(top);
             List<String> names = List.of(Order.ORDER_ACTIONS.get(top));
             // ТОЧКА ПРАВИЛ: сколько действий даёт ВЕРХНИЙ приказ.
             //
@@ -764,8 +772,9 @@ public final class GameEngine {
             s.journal.of(seat).orderBlocked = coincided;
 
             // Нижняя половина срабатывает, только если ЭТОТ приказ вскрыл сверху
-            // кто-то другой. Считаем это ДО хода, чтобы отчёты и проигрыватель
-            // могли показать полную раскладку приказа сразу (просьба дизайнера).
+            // кто-то, кто вскрылся РАНЬШЕ в этом круге. Считаем это ДО хода,
+            // чтобы отчёты и проигрыватель могли показать полную раскладку
+            // приказа сразу (просьба дизайнера).
             Order bo = card.get("bottom") == null ? null
                 : Order.fromCode(card.get("bottom").toString());
             boolean bottomOpen = false;
