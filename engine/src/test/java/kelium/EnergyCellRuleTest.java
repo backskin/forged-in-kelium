@@ -34,16 +34,26 @@ import kelium.support.Fix;
  */
 class EnergyCellRuleTest {
 
-    /** Разметка поля: у каждого играбельного гекса одна жёлтая наземная ячейка. */
+    /**
+     * Разметка поля под набором 1.4.0: жёлтая ячейка есть НЕ на каждом гексе
+     * (пустые гексы блока не несут ни её, ни контейнера), но там, где есть, —
+     * всегда наземная и не та же, что контейнерная. Размеченных гексов при
+     * этом большинство: 3 из 5 на малом блоке, 4 из 6 на большом.
+     */
     @Test
-    void everyPlayableHexHasOneGroundEnergyCellApartFromTheContainer() {
+    void markedHexesCarryAGroundEnergyCellApartFromTheContainer() {
         GameState s = Fix.game();
+        int playable = 0;
         int marked = 0;
         for (Hex h : s.field.hexes.values()) {
             if (h.kind == HexKind.FORBIDDEN || h.hasSpawnTile()) {
                 continue;   // на такие гексы жетоны не встают, картон под ними накрыт
             }
-            assertTrue(h.energyCell >= 0 && h.energyCell < 6,
+            playable++;
+            if (h.energyCell < 0) {
+                continue;   // пустой гекс блока — без жёлтой ячейки, это законно
+            }
+            assertTrue(h.energyCell < 6,
                 "гекс " + h.id + ": жёлтая ячейка обязана быть НАЗЕМНОЙ (0..5), "
                 + "а не " + h.energyCell);
             assertNotEquals(h.containerCell, h.energyCell,
@@ -51,6 +61,8 @@ class EnergyCellRuleTest {
             marked++;
         }
         assertTrue(marked > 0, "поле не размечено ни одной жёлтой ячейкой");
+        assertTrue(marked >= playable / 2,
+            "жёлтых ячеек должно быть большинство: " + marked + " из " + playable);
     }
 
     /** Станция на жёлтой ячейке даёт номинал своего уровня. */
