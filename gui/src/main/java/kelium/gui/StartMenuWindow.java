@@ -196,7 +196,7 @@ public final class StartMenuWindow {
 
         frame.setSize(Theme.px(1280), Theme.px(860));
         frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
+        Offscreen.show(frame);
         applyRestored();
         rebuildPreview();
     }

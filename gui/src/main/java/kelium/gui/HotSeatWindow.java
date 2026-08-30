@@ -309,7 +309,7 @@ public final class HotSeatWindow {
         frame.setSize(Theme.px(1500), Theme.px(950));
         frame.setMinimumSize(new Dimension(Theme.px(1150), Theme.px(760)));
         frame.setLocationByPlatform(true);
-        frame.setVisible(true);
+        Offscreen.show(frame);
     }
 
     private JComponent buildTopBar() {
