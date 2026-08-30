@@ -132,6 +132,8 @@ public final class HotSeatWindow {
     }
     private JLayeredPane layered;
     private final Map<String, JComponent> drawers = new LinkedHashMap<>();
+    private JPanel discardBox;
+    private List<String> discardShown = List.of();
     final Map<String, KpTab> drawerTabs = new LinkedHashMap<>();
     /** Кнопки ящиков в нижней зоне игрока (планшет, наука и рынок). */
     final Map<String, KpButton> drawerBtns = new LinkedHashMap<>();
@@ -441,6 +443,19 @@ public final class HotSeatWindow {
         this.sheetScroll = sheetScroll;
         drawers.put("Планшет", wrapDrawer(sheetWrap));
 
+        // СБРОС ПРИКАЗОВ — ЛИЧНЫЙ. Разыгранные в круге приказы уходят в свой
+        // сброс и возвращаются в руку в начале следующего раунда; пока раунд
+        // идёт, по сбросу видно, что уже потрачено (просьба дизайнера
+        // 30.08.2026: «сброс карт приказов можно открывать кнопкой»).
+        discardBox = new JPanel(new net.miginfocom.swing.MigLayout(
+            "insets " + Theme.px(12) + ", wrap 3, gapx " + Theme.px(8)
+                + ", gapy " + Theme.px(8)));
+        discardBox.setBackground(Theme.panel());
+        JScrollPane discardScroll = new JScrollPane(discardBox);
+        discardScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
+        discardScroll.setBorder(null);
+        drawers.put("Сброс приказов", wrapDrawer(discardScroll));
+
         journalBox = new JPanel();
         journalBox.setLayout(new BoxLayout(journalBox, BoxLayout.Y_AXIS));
         journalBox.setBackground(Theme.panel());
@@ -676,6 +691,15 @@ public final class HotSeatWindow {
         drawerBtns.put("Наука и рынок", sciBtn);
         btnRow.add(boardBtn);
         btnRow.add(sciBtn);
+
+        KpButton discardBtn = new KpButton("Сброс", "разыграно в раунде", null);
+        discardBtn.setPreferredSize(new Dimension(Theme.px(118), Theme.px(34)));
+        discardBtn.setToolTipText("Ваш личный сброс приказов: карты, разыгранные "
+            + "в этом раунде. Вернутся в руку в начале следующего");
+        discardBtn.onClick(() -> toggleDrawer("Сброс приказов"));
+        discardBtn.setState(KpButton.State.AVAILABLE);
+        drawerBtns.put("Сброс приказов", discardBtn);
+        btnRow.add(discardBtn);
         me.setMaximumSize(new Dimension(Theme.px(260), Integer.MAX_VALUE));
         btnRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         me.add(btnRow);
@@ -1143,6 +1167,32 @@ public final class HotSeatWindow {
             this::objectiveTag, Theme.kelium(), null);
         hands.setCards("Арсенал", p.arsenalHand, this::cardName, Theme.container(),
             null, null, null);
+        refreshDiscard(p);
+    }
+
+    /** Личный сброс приказов смотрящего места — лицами карт, как в руке. */
+    private void refreshDiscard(ReplayRecord.Player p) {
+        if (discardBox == null || discardShown.equals(p.orderPlayed)) {
+            return;                          // не пересобирать неизменившееся
+        }
+        discardShown = List.copyOf(p.orderPlayed);
+        discardBox.removeAll();
+        JLabel cap = new JLabel(discardShown.isEmpty()
+            ? "СБРОС ПРИКАЗОВ — пусто: в этом раунде вы ещё ничего не разыграли"
+            : "СБРОС ПРИКАЗОВ — разыграно в этом раунде: " + discardShown.size());
+        cap.setFont(Theme.font(10, Font.BOLD));
+        cap.setForeground(Theme.ink3());
+        discardBox.add(cap, "span 3, wrap");
+        for (String id : discardShown) {
+            CardTile t = new CardTile(id, cardName(id), orderBand(null),
+                tile -> showZoom(tile, "Приказы"), () -> zoom.setVisible(false));
+            t.setPreferredSize(new Dimension(Theme.px(96), Theme.px(134)));
+            t.orderFace(orderFace(id));
+            t.setToolTipText(cardName(id));
+            discardBox.add(t);
+        }
+        discardBox.revalidate();
+        discardBox.repaint();
     }
 
     private Color orderBand(String color) {
