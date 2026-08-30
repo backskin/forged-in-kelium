@@ -12,6 +12,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -55,6 +59,9 @@ public final class ActionBar extends JPanel {
     private final Set<String> playedThisTurn = new LinkedHashSet<>();
     private final Map<String, KpButton> shown = new LinkedHashMap<>();
 
+    /** Карта приказа, вскрытая в этот ход, — приставлена слева к кнопкам. */
+    private final OrderPlate plate = new OrderPlate();
+
     private final JLabel topCap = cap();
     private final JLabel bottomCap = cap();
     private final JPanel topRow = row();
@@ -62,15 +69,84 @@ public final class ActionBar extends JPanel {
 
     public ActionBar() {
         setOpaque(false);
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        add(topCap);
-        add(javax.swing.Box.createVerticalStrut(Theme.px(2)));
-        add(topRow);
-        add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
-        add(bottomCap);
-        add(javax.swing.Box.createVerticalStrut(Theme.px(2)));
-        add(bottomRow);
+        setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
+        // ВСКРЫТЫЙ ПРИКАЗ ПРИСТАВЛЕН К КНОПКАМ. Действия берутся с этой карты —
+        // и стоят вплотную к ней, чтобы не держать её в голове.
+        add(plate);
+        add(javax.swing.Box.createHorizontalStrut(Theme.px(10)));
+        JPanel rows = new JPanel();
+        rows.setOpaque(false);
+        rows.setLayout(new BoxLayout(rows, BoxLayout.Y_AXIS));
+        rows.add(topCap);
+        rows.add(javax.swing.Box.createVerticalStrut(Theme.px(2)));
+        rows.add(topRow);
+        rows.add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
+        rows.add(bottomCap);
+        rows.add(javax.swing.Box.createVerticalStrut(Theme.px(2)));
+        rows.add(bottomRow);
+        add(rows);
         idle("ход соперника");
+    }
+
+    /**
+     * ВСКРЫТЫЙ В ЭТОТ ХОД ПРИКАЗ. {@code null} — карту ещё не вскрыли или ход
+     * чужой: тогда на её месте пустое гнездо, и раскладка не прыгает.
+     */
+    public void setOrderCard(OrderCardFace.Info info, boolean bottomOpen) {
+        plate.info = info;
+        plate.bottomOpen = bottomOpen;
+        plate.repaint();
+    }
+
+    /** Гнездо вскрытого приказа: лицо карты или пунктирная пустота. */
+    private static final class OrderPlate extends JPanel {
+        private OrderCardFace.Info info;
+        private boolean bottomOpen;
+
+        OrderPlate() {
+            setOpaque(false);
+            Dimension d = new Dimension(Theme.px(84), Theme.px(118));
+            setPreferredSize(d);
+            setMinimumSize(d);
+            setMaximumSize(d);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g0) {
+            Graphics2D g = (Graphics2D) g0.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            int w = getWidth() - 1;
+            int h = getHeight() - 1;
+            if (info == null) {
+                // МЕСТО ДЕРЖИТСЯ ПУНКТИРОМ, а не пустотой: иначе кнопки
+                // действий переезжают всякий раз, как вскрывают приказ.
+                g.setColor(Theme.ink3());
+                g.setStroke(new java.awt.BasicStroke(1f, java.awt.BasicStroke.CAP_BUTT,
+                    java.awt.BasicStroke.JOIN_MITER, 10f, new float[]{4f, 3f}, 0f));
+                g.drawRoundRect(0, 0, w, h, Theme.px(8), Theme.px(8));
+                g.setFont(Theme.font(9, Font.PLAIN));
+                var fm = g.getFontMetrics();
+                String t = "приказ";
+                g.drawString(t, (w - fm.stringWidth(t)) / 2, h / 2);
+                g.dispose();
+                return;
+            }
+            OrderCardFace.paint(g, info, 0, 0, w, h, false);
+            if (!bottomOpen && info.bottom() != null) {
+                // Нижняя половина не открылась — так и написано на карте.
+                g.setColor(Theme.alpha(Theme.panel(), 0.55));
+                g.fillRoundRect(0, h / 2, w, h - h / 2, Theme.px(8), Theme.px(8));
+                g.setFont(Theme.font(8.5, Font.BOLD));
+                g.setColor(Theme.ink3());
+                var fm = g.getFontMetrics();
+                String t = "низ закрыт";
+                g.drawString(t, (w - fm.stringWidth(t)) / 2, h - Theme.px(6));
+            }
+            g.dispose();
+        }
     }
 
     private static JLabel cap() {

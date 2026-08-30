@@ -1183,12 +1183,25 @@ public final class HotSeatWindow {
             lockedSteps.add("Приказ вскрыт");
             stepsCaption.setText("ШАГИ ХОДА — ИГРОК " + (f.seat + 1));
             actionBar.turnStarted();
+            // ВСКРЫТЫЙ ПРИКАЗ — К КНОПКАМ ДЕЙСТВИЙ: действия берутся с этой
+            // карты, и держать её в голове игрок не должен.
+            actionBar.setOrderCard(null, false);
+            if (rec != null) {
+                for (int i = rec.orderPlays.size() - 1; i >= 0; i--) {
+                    var play = rec.orderPlays.get(i);
+                    if (play.seat == f.seat) {
+                        actionBar.setOrderCard(orderFace(play.card), play.bottomOpen);
+                        break;
+                    }
+                }
+            }
         } else if ("action".equals(f.type) && f.seat != null && f.seat.equals(turnSeat)
                 && !humansBySeat.containsKey(turnSeat)) {
             String name = String.valueOf(f.log);
             botSteps.add(name.length() > 40 ? name.substring(0, 39) + "…" : name);
         } else if ("turn_end".equals(f.type) && f.seat != null && f.seat.equals(turnSeat)) {
             turnSeat = null;
+            actionBar.setOrderCard(null, false);
         }
         refreshSteps();
     }
