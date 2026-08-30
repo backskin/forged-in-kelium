@@ -19,7 +19,7 @@ import kelium.engine.Scoring;
 import kelium.engine.Setup;
 
 /**
- * РАВНЫ ЛИ ПЛОМБЫ МЕЖДУ СОБОЙ.
+ * РАВНЫ ЛИ ГЛУХИЕ ЖЕТОНЫ МЕЖДУ СОБОЙ.
  *
  * <p>ЗАМЫСЕЛ ДИЗАЙНЕРА 25.08.2026: жетон уничтожения ЦУ лежит лицом на планшете
  * владельца и заваривает ячейку специальной атаки одного рода — какого, решает
@@ -72,7 +72,14 @@ public final class Пломбы {
             GameEngine.playGame(s, ags, ev -> { });
 
             for (PlayerState p : s.players) {
-                String пломба = p.sealedUnit == null ? "без пломбы" : p.sealedUnit.code;
+                // Глухой жетон лежит в общей раскладке модулей — ищем его там.
+                String пломба = "без жетона";
+                for (var e : p.redPlacements.entrySet()) {
+                    if (Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                        пломба = e.getKey().code;
+                        break;
+                    }
+                }
                 Итог t = поПломбам.computeIfAbsent(пломба, k -> new Итог());
                 t.партий++;
                 t.очков += Scoring.scorePlayer(s, p.seat).getOrDefault("total", 0);
@@ -87,11 +94,11 @@ public final class Пломбы {
         }
 
         StringBuilder b = new StringBuilder();
-        b.append("# Равны ли пломбы между собой\n\n");
+        b.append("# Равны ли глухие жетоны между собой\n\n");
         b.append("Свод **").append(ruleset).append("**, партий **").append(games)
             .append("**, игроков ").append(players)
             .append(". Места и характеры ротируются.\n\n");
-        b.append("Пломба заваривает ячейку СПЕЦИАЛЬНОЙ атаки одного рода: этот род ")
+        b.append("Глухой жетон закрывает ячейку СПЕЦИАЛЬНОЙ атаки одного рода: этот род ")
             .append("бьёт только универсальной за 2 боеприпаса, пока цело своё ЦУ.\n\n");
         b.append("| что запечатано | партий | средние очки | побед | доля побед |\n");
         b.append("|---|---:|---:|---:|---:|\n");
@@ -108,7 +115,7 @@ public final class Пломбы {
         b.append("| военных побед | ").append(военныхПобед).append(" из ").append(games)
             .append(" (").append(проц(военныхПобед, games)).append(") |\n");
 
-        Path out = Path.of("reports", "balance", "пломбы-" + players + "p.md");
+        Path out = Path.of("reports", "balance", "глухой-жетон-" + players + "p.md");
         Files.createDirectories(out.getParent());
         Files.writeString(out, b.toString(), StandardCharsets.UTF_8);
         System.out.println("отчёт: " + out.toAbsolutePath());

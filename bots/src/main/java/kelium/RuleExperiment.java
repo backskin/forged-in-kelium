@@ -387,6 +387,11 @@ public final class RuleExperiment {
             runAll(variants, players, games, set);
             return;
         }
+        if ("track".equals(set) || "трек".equals(set)) {
+            trackVariants(variants);
+            runAll(variants, players, games, set);
+            return;
+        }
         variants.add(new Variant("уничтожение НАВСЕГДА",
             "убитые жетоны не возвращаются владельцу в Возврат",
             Map.of("return_step.return_destroyed_tokens", false)));
@@ -479,6 +484,47 @@ public final class RuleExperiment {
      * негде поместиться — поэтому здесь же проверяются длина и прочность ЦУ
      * вместе, а не по отдельности.
      */
+    /**
+     * ТРЕКИ БЕЗ ПЕРВОГО ШАГА (заказ дизайнера 28.08.2026).
+     *
+     * <p>Лестница начинается сразу с бывшего второго шага и стоит 2 обломка:
+     * шагов три вместо четырёх, полный трек 9 обломков и 6 ПО вместо 10 и 7.
+     * Кубиковый приз бывшего шага 1 исчезает, а МОДУЛЬ переезжает на самый вход.
+     *
+     * <p>Проверять надо не только приток модулей. Вершина стала на шаг ближе, а
+     * занятие всех трёх вершин — условие конца партии: вариант может незаметно
+     * укоротить партию, и это будет видно в строках «раундов» и «по вершинам».
+     */
+    private static void trackVariants(List<Variant> variants) {
+        Map<String, Object> без1 = new LinkedHashMap<>();
+        без1.put("tech.steps_per_track", 3);
+        без1.put("tech.step_cost_trophy", List.of(2, 3, 4));
+        // Очки позиций сохранены: список складывается по пройденным шагам, и
+        // наивное [1,2,3] обесценило бы каждое место на треке вдвое.
+        без1.put("tech.step_vp_cumulative", List.of(2, 2, 3));
+        без1.put("tech.step_cells",
+            List.of(List.of(2, 3, 4), List.of(2, 3), List.of(2)));
+        без1.put("tech.step_capacity", List.of(3, 2, 1));
+        без1.put("tech.step_rewards",
+            List.of("module", "module", "super_arsenal_card"));
+        variants.add(new Variant("без шага 1",
+            "лестница начинается сразу со второго шага, вход 2 обломка (свод 1.28.0)",
+            без1));
+        // Контрольный образец: цену входа снизили, но лестницу НЕ укоротили.
+        // Без него нельзя будет сказать, что дало эффект — дешёвый вход или
+        // приблизившаяся вершина.
+        Map<String, Object> просевшие = new LinkedHashMap<>(без1);
+        просевшие.put("tech.step_vp_cumulative", List.of(1, 2, 3));
+        variants.add(new Variant("без шага 1, очки не выправлены",
+            "то же, но лестница ПО [1,2,3] — каждая позиция на треке дешевеет вдвое",
+            просевшие));
+        variants.add(new Variant("вход дешевле, шагов четыре",
+            "шаг 1 стоит 2 обломка и сразу даёт модуль, но шагов по-прежнему четыре",
+            Map.of("tech.step_cost_trophy", List.of(2, 3, 4, 5),
+                   "tech.step_rewards",
+                   List.of("module", "module", "module", "super_arsenal_card"))));
+    }
+
     private static void lengthVariants(List<Variant> variants) {
         variants.add(new Variant("тайлы не обрывают",
             "условие «остался последний тайл» выключено — партию держат только карты рынка",

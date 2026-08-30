@@ -159,7 +159,7 @@ public final class ObjectiveRewards {
         out.println("\nполучено за задания (на игрока за партию):");
         row(out, md, "ОБЛОМКОВ (трофейных кубиков)", debris / perPlayer);
         row(out, md, "жетонов модулей АТАКИ (красных)", modулesRed / perPlayer);
-        row(out, md, "жетонов модулей СБОРКИ (синих)", modulesBlue / perPlayer);
+        row(out, md, "жетонов модулей СНАРЯЖЕНИЯ (синих)", modulesBlue / perPlayer);
         row(out, md, "жетонов хранилища", storageTokens / perPlayer);
         row(out, md, "келемия", kelium / perPlayer);
         row(out, md, "лишних карт заданий", objectiveCards / perPlayer);
