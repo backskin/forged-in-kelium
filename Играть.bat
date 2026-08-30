@@ -11,6 +11,10 @@ rem
 rem  «Играть.bat пересобрать» — сборка НАЧИСТО (mvn clean), как у остальных
 rem  наших приложений: если что-то ведёт себя странно после обновления кода,
 rem  начинать надо с неё.
+rem
+rem  «Играть.bat exe» — пересобрать ОДНОФАЙЛОВЫЙ dist\Играть.exe (и остальные
+rem  наши exe заодно: они собираются одним проходом). Занимает несколько минут:
+rem  внутрь зашивается урезанная Java-среда.
 rem ============================================================================
 chcp 65001 >nul
 cd /d "%~dp0"
@@ -18,7 +22,30 @@ cd /d "%~dp0"
 if /i "%~1"=="пересобрать" goto rebuild
 if /i "%~1"=="rebuild" goto rebuild
 if /i "%~1"=="clean" goto rebuild
+if /i "%~1"=="exe" goto makeexe
+if /i "%~1"=="эксе" goto makeexe
 goto run
+
+:makeexe
+echo Пересобираю exe начисто ^(несколько минут: внутрь зашивается Java^)...
+call mvn -o clean package -DskipTests -q
+if errorlevel 1 (
+    echo.
+    echo ОШИБКА сборки. Нужны Java 21+ и Maven.
+    pause
+    exit /b 1
+)
+powershell -ExecutionPolicy Bypass -File "%~dp0make-exe.ps1"
+if errorlevel 1 (
+    echo.
+    echo ОШИБКА сборки exe — смотрите сообщение выше.
+    pause
+    exit /b 1
+)
+echo.
+echo Готово: dist\Играть.exe
+pause
+exit /b 0
 
 :rebuild
 echo Пересобираю начисто ^(это займёт минуту-две^)...

@@ -875,6 +875,11 @@ public final class HotSeatWindow {
         return found;
     }
 
+    /** Вид ожидаемого решения — для прогонщиков и тестов. */
+    String pendingKindForTest() {
+        return pendingKind;
+    }
+
     /** Место с пометкой «вы» (−1 — ни у кого) — для прогонщиков и тестов. */
     int mySeatForTest() {
         return mySeat;
