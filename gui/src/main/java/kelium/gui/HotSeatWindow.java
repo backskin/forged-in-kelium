@@ -604,7 +604,10 @@ public final class HotSeatWindow {
         zone.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(Theme.px(1), 0, 0, 0, Theme.border()),
             BorderFactory.createEmptyBorder(Theme.px(8), Theme.px(12), Theme.px(8), Theme.px(12))));
-        zone.setPreferredSize(new Dimension(10, Theme.px(132)));
+        // ВЫСОТА ПОД КАРТУ ЦЕЛИКОМ. Карты приказов — главный орган управления
+        // ходом, и они не должны быть обрезаны снизу (замечание дизайнера
+        // 30.08.2026: «не видно карты приказов, нельзя их даже пролистать»).
+        zone.setPreferredSize(new Dimension(10, Theme.px(200)));
 
         // ВСЯ ИНФОРМАЦИЯ ИГРОКА В ОДНОМ МЕСТЕ (замечание дизайнера 25.08):
         // ресурсы и ПО — здесь же, внизу, рядом с кнопками планшета и науки.
@@ -621,22 +624,26 @@ public final class HotSeatWindow {
         JPanel me = new JPanel();
         me.setOpaque(false);
         me.setLayout(new BoxLayout(me, BoxLayout.Y_AXIS));
+        // ФИШКИ В ДВЕ СТРОКИ ПО ТРИ. Одной лентой из пяти они тянулись на
+        // пол-окна и отжимали карты приказов в щель.
         JPanel chipsRow = new JPanel(new net.miginfocom.swing.MigLayout(
-            "insets 0, gapx " + Theme.px(6)));
+            "insets 0, wrap 3, gapx " + Theme.px(5) + ", gapy " + Theme.px(4)));
         chipsRow.setOpaque(false);
         for (ChipLabel c : List.of(chipVp, chipCoin, chipKelium, chipAmmo, chipDebris)) {
             chipsRow.add(c);
         }
         chipsRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         me.add(chipsRow);
-        me.add(javax.swing.Box.createVerticalStrut(Theme.px(8)));
+        me.add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
+        // ЯЩИКИ — ДВА НА ДВА, узкими кнопками. Ряд из четырёх по 128 пикселей
+        // уходил за 560 и съедал место у руки.
         JPanel btnRow = new JPanel(new net.miginfocom.swing.MigLayout(
-            "insets 0, gapx " + Theme.px(8)));
+            "insets 0, wrap 2, gapx " + Theme.px(5) + ", gapy " + Theme.px(5)));
         btnRow.setOpaque(false);
         KpButton boardBtn = new KpButton("Планшет", "склад · войска", null);
         boardBtn.setToolTipText(
             "Планшеты игроков: склад, войска, трофеи, арсенал — свой и соперников");
-        boardBtn.setPreferredSize(new Dimension(Theme.px(128), Theme.px(46)));
+        boardBtn.setPreferredSize(new Dimension(Theme.px(118), Theme.px(34)));
         boardBtn.onClick(() -> toggleDrawer("Планшет"));
         boardBtn.setState(KpButton.State.AVAILABLE);
         drawerBtns.put("Планшет", boardBtn);
@@ -645,7 +652,7 @@ public final class HotSeatWindow {
         // тогда, когда движок реально предлагает СПЕЦ-действие — иначе
         // разбирать нечего, и обещать действие нельзя.
         objMenuBtn = new KpButton("Задания", "выполнить · сжечь", null);
-        objMenuBtn.setPreferredSize(new Dimension(Theme.px(128), Theme.px(46)));
+        objMenuBtn.setPreferredSize(new Dimension(Theme.px(118), Theme.px(34)));
         objMenuBtn.setToolTipText("Разложить руку заданий: выполнить выполнимое "
             + "или сжечь карту ради верхнего эффекта");
         objMenuBtn.onClick(this::openObjectiveMenu);
@@ -653,7 +660,7 @@ public final class HotSeatWindow {
         btnRow.add(objMenuBtn);
 
         arsMenuBtn = new KpButton("Арсенал", "полка · рука", null);
-        arsMenuBtn.setPreferredSize(new Dimension(Theme.px(128), Theme.px(46)));
+        arsMenuBtn.setPreferredSize(new Dimension(Theme.px(118), Theme.px(34)));
         arsMenuBtn.setToolTipText("Зона арсенала: что стоит на полке и что можно "
             + "поставить или сжечь");
         arsMenuBtn.onClick(this::openArsenalMenu);
@@ -663,12 +670,13 @@ public final class HotSeatWindow {
         KpButton sciBtn = new KpButton("Наука и рынок", "доска · курс", null);
         sciBtn.setToolTipText(
             "Доска науки и активная карта рынка — открываются поверх поля в любой момент");
-        sciBtn.setPreferredSize(new Dimension(Theme.px(128), Theme.px(46)));
+        sciBtn.setPreferredSize(new Dimension(Theme.px(118), Theme.px(34)));
         sciBtn.onClick(() -> toggleDrawer("Наука и рынок"));
         sciBtn.setState(KpButton.State.AVAILABLE);
         drawerBtns.put("Наука и рынок", sciBtn);
         btnRow.add(boardBtn);
         btnRow.add(sciBtn);
+        me.setMaximumSize(new Dimension(Theme.px(260), Integer.MAX_VALUE));
         btnRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         me.add(btnRow);
         zone.add(me, BorderLayout.WEST);
@@ -694,17 +702,18 @@ public final class HotSeatWindow {
         JPanel right = new JPanel();
         right.setOpaque(false);
         right.setLayout(new BoxLayout(right, BoxLayout.X_AXIS));
+        // ПАНЕЛЬ ДЕЙСТВИЙ РАСТЁТ ПО СОДЕРЖИМОМУ: пока действий нет, она узкая,
+        // и вся ширина достаётся руке. Жёсткие 420 пикселей держались всегда,
+        // даже в чужой ход.
         actionBar = new ActionBar();
-        actionBar.setPreferredSize(new Dimension(Theme.px(420), Theme.px(100)));
-        actionBar.setMaximumSize(new Dimension(Theme.px(420), Theme.px(110)));
         right.add(actionBar);
-        right.add(javax.swing.Box.createHorizontalStrut(Theme.px(14)));
+        right.add(javax.swing.Box.createHorizontalStrut(Theme.px(12)));
 
         endBtn = new KpButton("Ход соперника…", "", null).primary(true);
         endBtn.setToolTipText("Завершить ход — пас по действиям; СПЕЦ-действие может остаться доступным");
         endBtn.setState(KpButton.State.DISABLED);
-        endBtn.setPreferredSize(new Dimension(Theme.px(180), Theme.px(100)));
-        endBtn.setMaximumSize(new Dimension(Theme.px(180), Theme.px(110)));
+        endBtn.setPreferredSize(new Dimension(Theme.px(148), Theme.px(96)));
+        endBtn.setMaximumSize(new Dimension(Theme.px(148), Theme.px(120)));
         right.add(endBtn);
         zone.add(right, BorderLayout.EAST);
         return zone;
@@ -1775,7 +1784,11 @@ public final class HotSeatWindow {
                     avail.put(name, i);
                 }
             }
-            actionBar.showDecision(avail, idx -> {
+            // ОТКУДА ЭТИ ДЕЙСТВИЯ — с верхней половины карты или с нижней:
+            // панель ставит их в ту же половину, что и печатная карта.
+            String half = d.context().get("half") instanceof String h ? h : null;
+            String orderCat = d.context().get("order") instanceof String o ? o : null;
+            actionBar.showDecision(avail, half, orderCat, idx -> {
                 // Необратимое действие: запомнить, что запечь в ленте шагов,
                 // КОГДА оно доиграет (событие action) — концепт §5.
                 String name = null;

@@ -85,8 +85,11 @@ public final class HandPanel extends JPanel {
         }
         row.clearTiles();
         boolean faces = faceOf != null;
-        int w = faces ? Theme.px(80) : Theme.px(64);
-        int h = faces ? Theme.px(112) : Theme.px(94);
+        // КРУПНЕЕ, ЧЕМ БЫЛО (просьба дизайнера 30.08.2026: «надо чтобы всё было
+        // красиво, наглядно, КРУПНО и не перекрывалось»). Карта приказа несёт
+        // две половины с четырьмя действиями — на 80×112 они не читались.
+        int w = faces ? Theme.px(96) : Theme.px(76);
+        int h = faces ? Theme.px(134) : Theme.px(112);
         for (String id : ids) {
             String grp = group;
             CardTile t = new CardTile(id, nameOf.apply(id), band,
@@ -114,8 +117,14 @@ public final class HandPanel extends JPanel {
     }
 
     /**
-     * РЯД ВНАХЛЁСТ («стопкой, наезжающим», просьба дизайнера 24.08): карты
-     * перекрывают друг друга на треть, наведённая поднимается НАВЕРХ стопки.
+     * РЯД КАРТ — БЕЗ НАХЛЁСТА. Карты лежат рядом целиком; не влезли в ширину —
+     * ряд прокручивается вбок.
+     *
+     * <p>Прежде карты накрывали друг друга на две трети «стопкой», и от каждой
+     * оставалась узкая полоска: прочитать приказ было нельзя, а прокрутки не
+     * было вовсе (дизайнер 30.08.2026: «не видно карты приказов, нельзя их даже
+     * пролистать… надо чтобы всё было крупно и не перекрывалось»). Подъём
+     * наведённой карты наверх оставлен — он нужен для тени и увеличения.
      */
     private static final class OverlapRow extends javax.swing.JLayeredPane {
         private final List<CardTile> ordered = new ArrayList<>();
@@ -134,7 +143,7 @@ public final class HandPanel extends JPanel {
         void addTile(CardTile t, int w, int h) {
             tileW = w;
             tileH = h;
-            int step = (int) (w * 0.66);
+            int step = w + Theme.px(6);
             t.setBounds(ordered.size() * step, 0, w, h);
             add(t, Integer.valueOf(ordered.size()));
             ordered.add(t);

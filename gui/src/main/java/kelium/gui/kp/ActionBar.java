@@ -1,57 +1,92 @@
 package kelium.gui.kp;
 
+import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.GridLayout;
+import java.awt.Font;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import javax.swing.BoxLayout;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import kelium.gui.replay2.Theme;
 
 /**
- * ПАНЕЛЬ ДЕЙСТВИЙ ХОДА — восемь ПОСТОЯННЫХ плиток (концепт §2: «все 8 действий
- * видны всегда, недоступные — серые с причиной»). Плитки никогда не исчезают —
- * меняются только их состояния:
+ * ДЕЙСТВИЯ ХОДА — то, что можно сыграть ПРЯМО СЕЙЧАС, и ничего сверх того.
  *
- * <ul>
- *   <li>доступно — движок предложил его в текущей точке {@code action};</li>
- *   <li>сыграно ✓ — уже играно в этом ходу (по событиям);</li>
- *   <li>серое с причиной — прямо сейчас не предлагается.</li>
- * </ul>
+ * <p>Панель повторяет устройство карты приказа: у карты две половины, верхняя и
+ * нижняя, и каждая даёт свои действия. Здесь так же — верхний приказ сверху,
+ * нижний снизу. Играется всегда одна половина, её действия и стоят кнопками;
+ * вторая строка в это время только подписана, чтобы место не прыгало.
+ *
+ * <p>ПОКАЗЫВАЮТСЯ ТОЛЬКО ДОСТУПНЫЕ ДЕЙСТВИЯ. Прежде здесь висели все восемь
+ * постоянной сеткой 2×4: шесть из них всегда были серыми, сетка занимала треть
+ * нижней панели, и картам приказов не оставалось места (замечание дизайнера
+ * 30.08.2026: «кнопки действий справа огромные, да и нахуя все восемь
+ * показывать; выбираешь карту приказа, и после этого появляются те кнопки
+ * действий, которые доступны»). Что уже сыграно в этом ходу, видно в ленте
+ * шагов хода — дублировать это восемью серыми плитками незачем.
  */
 public final class ActionBar extends JPanel {
 
-    /** Порядок плиток фиксирован — игрок выучивает раскладку, она не скачет. */
+    /** Русские имена действий. Порядок печатный — он же порядок на карте. */
     public static final Map<String, String> ACTIONS = new LinkedHashMap<>();
     static {
         ACTIONS.put("build", "Стройка");
+        ACTIONS.put("energy_swap", "Энергия");
+        ACTIONS.put("assembly", "Сборка");
         ACTIONS.put("mining", "Добыча");
         ACTIONS.put("movement", "Манёвр");
         ACTIONS.put("combat", "Бой");
         ACTIONS.put("market", "Рынок");
         ACTIONS.put("science", "Наука");
-        ACTIONS.put("assembly", "Сборка");
-        ACTIONS.put("energy_swap", "Энергия");
     }
 
-    private final Map<String, KpButton> tiles = new LinkedHashMap<>();
+    private static final int BTN_W = 108;
+    private static final int BTN_H = 42;
+
     private final Set<String> playedThisTurn = new LinkedHashSet<>();
+    private final Map<String, KpButton> shown = new LinkedHashMap<>();
+
+    private final JLabel topCap = cap();
+    private final JLabel bottomCap = cap();
+    private final JPanel topRow = row();
+    private final JPanel bottomRow = row();
 
     public ActionBar() {
         setOpaque(false);
-        setLayout(new GridLayout(2, 4, Theme.px(6), Theme.px(6)));
-        for (var e : ACTIONS.entrySet()) {
-            KpButton b = new KpButton(e.getValue(), "", null);
-            b.setPreferredSize(new Dimension(Theme.px(96), Theme.px(46)));
-            b.setState(KpButton.State.DISABLED);
-            b.setTexts(e.getValue(), "не сейчас");
-            tiles.put(e.getKey(), b);
-            add(b);
-        }
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        add(topCap);
+        add(javax.swing.Box.createVerticalStrut(Theme.px(2)));
+        add(topRow);
+        add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
+        add(bottomCap);
+        add(javax.swing.Box.createVerticalStrut(Theme.px(2)));
+        add(bottomRow);
+        idle("ход соперника");
+    }
+
+    private static JLabel cap() {
+        JLabel l = new JLabel(" ");
+        l.setFont(Theme.font(9.5, Font.BOLD));
+        l.setForeground(Theme.ink3());
+        l.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return l;
+    }
+
+    private static JPanel row() {
+        JPanel p = new JPanel(new net.miginfocom.swing.MigLayout(
+            "insets 0, gapx " + Theme.px(6) + ", gapy 0"));
+        p.setOpaque(false);
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return p;
     }
 
     /** Начался чей-то ход: если наш — счёт сыгранного с нуля. */
@@ -64,55 +99,113 @@ public final class ActionBar extends JPanel {
         playedThisTurn.add(name);
     }
 
-    /** ПЕРЕЗАПИСАТЬ сыгранное — после отката «до точки» (концепт §5). */
-    public void setPlayed(java.util.Collection<String> names) {
+    /** ПЕРЕЗАПИСАТЬ сыгранное — после отката «до точки». */
+    public void setPlayed(Collection<String> names) {
         playedThisTurn.clear();
         playedThisTurn.addAll(names);
     }
 
-    /**
-     * Точка решения вида {@code action}: доступные действия — кликабельны,
-     * сыгранные — с галкой, остальные — серые с причиной.
-     */
+    /** Что уже сыграно в этом ходу — для ленты шагов и прогонщиков. */
+    public Set<String> played() {
+        return Set.copyOf(playedThisTurn);
+    }
+
+    /** Совместимость: точка решения без указания половины приказа. */
     public void showDecision(Map<String, Integer> availableToOption, Consumer<Integer> onPick) {
-        for (var e : tiles.entrySet()) {
-            String name = e.getKey();
-            KpButton b = e.getValue();
-            Integer idx = availableToOption.get(name);
-            if (idx != null) {
-                b.setState(KpButton.State.AVAILABLE);
-                b.setTexts(ACTIONS.get(name), "доступно");
-                b.onClick(() -> onPick.accept(idx));
-                b.setToolTipText(null);
-            } else if (playedThisTurn.contains(name)) {
-                b.setState(KpButton.State.PLAYED);
-                b.setTexts(ACTIONS.get(name), "сыграно ✓");
-                b.setToolTipText("Уже сыграно в этом ходу");
-            } else {
-                b.setState(KpButton.State.DISABLED);
-                b.setTexts(ACTIONS.get(name), "не в приказе");
-                b.setToolTipText("Вскрытый приказ не открывает это действие сейчас");
-            }
-        }
+        showDecision(availableToOption, null, null, onPick);
     }
 
-    /** Точка решения не про действия (или чужой ход) — плитки гаснут, но ОСТАЮТСЯ. */
+    /**
+     * Точка решения вида {@code action}.
+     *
+     * @param half {@code top} / {@code bottom} / {@code joker} — какая половина
+     *             карты сейчас играется; {@code null}, если движок не сказал.
+     * @param orderCat код категории приказа этой половины (у джокера — null).
+     */
+    public void showDecision(Map<String, Integer> availableToOption, String half,
+                              String orderCat, Consumer<Integer> onPick) {
+        shown.clear();
+        topRow.removeAll();
+        bottomRow.removeAll();
+
+        boolean снизу = "bottom".equals(half);
+        JPanel цель = снизу ? bottomRow : topRow;
+        JLabel подпись = снизу ? bottomCap : topCap;
+        JLabel другая = снизу ? topCap : bottomCap;
+
+        подпись.setText(заголовок(half, orderCat));
+        подпись.setForeground(Theme.accent());
+        другая.setText(снизу ? "ВЕРХНИЙ ПРИКАЗ — сыгран" : "НИЖНИЙ ПРИКАЗ — если откроется");
+        другая.setForeground(Theme.ink3());
+
+        // Порядок кнопок — печатный порядок действий на карте, а не тот, в
+        // котором их перечислил движок: раскладка не должна скакать.
+        List<String> names = new ArrayList<>(ACTIONS.keySet());
+        names.retainAll(availableToOption.keySet());
+        for (String name : availableToOption.keySet()) {
+            if (!names.contains(name)) {
+                names.add(name);
+            }
+        }
+        for (String name : names) {
+            int idx = availableToOption.get(name);
+            KpButton b = new KpButton(ACTIONS.getOrDefault(name, name), "доступно", null);
+            b.setPreferredSize(new Dimension(Theme.px(BTN_W), Theme.px(BTN_H)));
+            b.setState(KpButton.State.AVAILABLE);
+            b.onClick(() -> onPick.accept(idx));
+            shown.put(name, b);
+            цель.add(b);
+        }
+        if (names.isEmpty()) {
+            цель.add(пусто("нет доступных действий"));
+        }
+        обновить();
+    }
+
+    /** Точка решения не про действия (или чужой ход): кнопок нет вовсе. */
     public void idle(String why) {
-        for (var e : tiles.entrySet()) {
-            KpButton b = e.getValue();
-            if (playedThisTurn.contains(e.getKey())) {
-                b.setState(KpButton.State.PLAYED);
-                b.setTexts(ACTIONS.get(e.getKey()), "сыграно ✓");
-            } else {
-                b.setState(KpButton.State.DISABLED);
-                b.setTexts(ACTIONS.get(e.getKey()), why);
-            }
-            b.onClick(null);
-        }
+        shown.clear();
+        topRow.removeAll();
+        bottomRow.removeAll();
+        topCap.setText("ДЕЙСТВИЯ ХОДА");
+        topCap.setForeground(Theme.ink3());
+        bottomCap.setText(" ");
+        bottomCap.setForeground(Theme.ink3());
+        topRow.add(пусто(why == null || why.isBlank() ? "не сейчас" : why));
+        обновить();
     }
 
-    /** Плитка по имени действия (для прогонщиков/тестов). */
+    private static JLabel пусто(String текст) {
+        // ПУСТОТА — ОБЪЯСНЕНИЕ, А НЕ ДЫРА: строка занимает высоту кнопки, чтобы
+        // соседи не переезжали, когда действия появляются и исчезают.
+        JLabel l = new JLabel(текст);
+        l.setFont(Theme.italic());
+        l.setForeground(Theme.ink3());
+        l.setPreferredSize(new Dimension(Theme.px(2 * BTN_W), Theme.px(BTN_H)));
+        return l;
+    }
+
+    private static String заголовок(String half, String orderCat) {
+        String кат = orderCat == null ? "" : " · " + ActionIcons.categoryRu(orderCat);
+        if ("bottom".equals(half)) {
+            return "НИЖНИЙ ПРИКАЗ" + кат;
+        }
+        if ("joker".equals(half)) {
+            return "БЕЗОПАСНОСТЬ · любые два разных";
+        }
+        if ("top".equals(half)) {
+            return "ВЕРХНИЙ ПРИКАЗ" + кат;
+        }
+        return "ДОСТУПНЫЕ ДЕЙСТВИЯ";
+    }
+
+    private void обновить() {
+        revalidate();
+        repaint();
+    }
+
+    /** Кнопка по имени действия — или null, если сейчас не предлагается. */
     public KpButton tile(String action) {
-        return tiles.get(action);
+        return shown.get(action);
     }
 }

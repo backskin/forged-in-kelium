@@ -33,14 +33,31 @@ public final class ChipLabel extends JComponent {
     }
 
     public void set(String value, String cap) {
+        String было = this.value + "/" + this.cap;
         this.value = value;
         this.cap = cap == null ? "" : cap;
+        if (!было.equals(this.value + "/" + this.cap)) {
+            revalidate();                      // ширина считается по тексту
+        }
         repaint();
     }
 
+    /**
+     * Ширина — ПО ИЗМЕРЕННОМУ ТЕКСТУ, а не по прикидке. Прежняя формула
+     * «96 плюс шесть пикселей за букву подписи» давала фишке «обломки» 144
+     * пикселя при нужных сотне: пять фишек съедали пол-панели, и картам
+     * приказов внизу не оставалось места.
+     */
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(Theme.px(96) + caption.length() * Theme.px(6), Theme.px(28));
+        var fmV = getFontMetrics(Theme.mono(12.5, Font.BOLD));
+        var fmC = getFontMetrics(Theme.mono(10.5, Font.PLAIN));
+        var fmL = getFontMetrics(Theme.font(9.5, Font.PLAIN));
+        int w = Theme.px(10) + Theme.px(14) + Theme.px(4)
+            + fmV.stringWidth(value.isEmpty() ? "00" : value)
+            + (cap.isEmpty() ? 0 : Theme.px(1) + fmC.stringWidth("/" + cap))
+            + Theme.px(5) + fmL.stringWidth(caption) + Theme.px(8);
+        return new Dimension(w, Theme.px(26));
     }
 
     @Override

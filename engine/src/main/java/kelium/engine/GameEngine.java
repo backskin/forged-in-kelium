@@ -726,7 +726,7 @@ public final class GameEngine {
             // в варианте «одно действие за ход» БЕЗОПАСНОСТЬ станет вдвое сильнее
             // всех остальных карт руки.
             int jokerA = rs.getInt("actions.top_actions_per_turn", 2);
-            playActions(p, ctx, Actions.ALL_NAMES, jokerA, true);
+            playActions(p, ctx, Actions.ALL_NAMES, jokerA, true, "joker", null);
             // БАГ (найден дизайнером 14.08.2026): карта БЕЗОПАСНОСТЬ (джокер) не
             // шлёт turn_orders вовсе — только у неё есть этот код, у обычных
             // приказов событие ниже. Проигрыватель ждёт именно turn_orders, чтобы
@@ -808,7 +808,7 @@ public final class GameEngine {
                 }
             }
 
-            playActions(p, ctx, names, maxA, false);
+            playActions(p, ctx, names, maxA, false, "top", top.code);
 
             if (bottomOpen) {
                 // ТОЧКА ПРАВИЛ: сколько действий даёт открытый нижний приказ.
@@ -824,7 +824,8 @@ public final class GameEngine {
                 if (tradeTopForBottom) {
                     ctx.actionsPlayed.removeAll(List.of(Order.ORDER_ACTIONS.get(bo)));
                 }
-                playActions(p, ctx, List.of(Order.ORDER_ACTIONS.get(bo)), bottomA, false);
+                playActions(p, ctx, List.of(Order.ORDER_ACTIONS.get(bo)), bottomA, false,
+                    "bottom", bo.code);
             }
             // Плашка манёвра: на картах maneuver:true — одно бесплатное
             // перемещение одного жетона войска на его скорость (не открывает
@@ -837,8 +838,16 @@ public final class GameEngine {
         emit(ev("type", "turn_end", "seat", seat, "resources", resourcesMap(p)));
     }
 
+    /**
+     * @param half   ОТКУДА эти действия: {@code top} — верхний приказ карты,
+     *               {@code bottom} — открывшийся нижний, {@code joker} — джокер.
+     *               Уходит в точку решения: интерфейс подписывает предложенные
+     *               действия той половиной карты, с которой они пришли, и не
+     *               заставляет игрока помнить это самому.
+     * @param order  код категории приказа этой половины (у джокера — null).
+     */
     private void playActions(PlayerState p, TurnContext ctx, List<String> actionNames,
-                             int maxActions, boolean distinct) {
+                             int maxActions, boolean distinct, String half, String order) {
         GameState s = state;
         // Что ещё можно сыграть в этом ходу — знание хода, а не приказа: его
         // читают индикаторы заданий, когда строят план на этот ход.
@@ -877,7 +886,8 @@ public final class GameEngine {
             }
             opts.add(new Choice("pass", null, "ничего не делать"));
             Choice ch = agents.get(p.seat).choose(s, opts,
-                ev("kind", "action", "remaining", maxActions - ctx.playedCount));
+                ev("kind", "action", "remaining", maxActions - ctx.playedCount,
+                    "half", half, "order", order));
             if (ch.payload() == null) {
                 break;
             }
