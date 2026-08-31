@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -129,6 +130,14 @@ public final class BlockCatalogPanel extends JPanel {
     private final Галерея малые = new Галерея();
     private final Галерея большие = new Галерея();
     private boolean обновляюсь;
+    /**
+     * ПОВОРОТ ПОКАЗА — на сколько шагов по 60° повёрнуты ВСЕ блоки разом
+     * (просьба дизайнера 30.08.2026: блоки в каталоге лежали не тем углом,
+     * что на его примерах). Это чистый показ: данные версий не трогаются,
+     * YAML остаётся как был. Один на обе галереи — малые и большие крутятся
+     * вместе, шесть нажатий возвращают исходный вид.
+     */
+    private int поворот;
 
     public BlockCatalogPanel(Path dataRoot) {
         super(new java.awt.BorderLayout());
@@ -141,6 +150,23 @@ public final class BlockCatalogPanel extends JPanel {
         top.add(энергияПикер);
         top.add(new JLabel("Версия:"));
         top.add(совпаденияПикер);
+        // Кнопка поворота — БЕЗ значка-эмодзи: эмодзи в Swing выводились
+        // пустыми квадратами (скриншот дизайнера 12.08.2026), текст надёжнее.
+        JButton повернутьКнопка = new JButton("Повернуть на 60°");
+        повернутьКнопка.setToolTipText("<html><div style='width:280px'>"
+            + "<b>Повернуть все блоки</b><br>"
+            + "Каждое нажатие поворачивает ВСЕ стороны всех блоков на 60° "
+            + "по часовой стрелке — и малые, и большие разом.<br>"
+            + "Ячейки контейнеров и жёлтые ячейки поворачиваются вместе с "
+            + "гексами. Шесть нажатий — полный круг.<br>"
+            + "<i>Только показ: файлы версий не меняются.</i></div></html>");
+        повернутьКнопка.setFocusPainted(false);
+        повернутьКнопка.addActionListener(e -> {
+            поворот = (поворот + 1) % 6;
+            малые.поворот(поворот);
+            большие.поворот(поворот);
+        });
+        top.add(повернутьКнопка);
         add(top, java.awt.BorderLayout.NORTH);
 
         JPanel малыеБлок = обёртка("Малые блоки (5 гексов) — 10 сторон", малые);
@@ -301,11 +327,19 @@ public final class BlockCatalogPanel extends JPanel {
             ряд.revalidate();
             ряд.repaint();
         }
+
+        /** Задать поворот показа (шагов по 60° по часовой) и перерисовать. */
+        void поворот(int шагов) {
+            ряд.поворот = шагов;
+            ряд.repaint();
+        }
     }
 
     /** Сам ряд карточек — рисует все стороны блоков одна за одной. */
     private static final class Ряд extends JComponent {
         private List<Face> faces = List.of();
+        /** Поворот показа: шагов по 60° по часовой стрелке (0..5). */
+        private int поворот;
         private static final int CARD_W = 260;
         private static final int CARD_H = 230;
         private static final int GAP = 14;
@@ -353,17 +387,32 @@ public final class BlockCatalogPanel extends JPanel {
          * же, какими они закрашены на планшетах и на поле в проигрывателе.
          */
         private void рисоватьБлок(Graphics2D g, Face f, int cx0, int cy0, double size) {
+            List<HexRec> гексы = повернутые(f.hexes());
             // ЧТО ВХОДИТ В ЭТУ КАРТОНКУ — нужно, чтобы скруглить контур блока и
             // НЕ скруглять швы между его гексами: срезанные общие углы давали
             // дырки на стыках (правка дизайнера 19.08.2026).
+            // Заодно считается рамка блока: повёрнутый блок центрируется по ней,
+            // иначе после поворота вокруг гекса (0,0) фигура уезжала бы из
+            // карточки — блоки в данных не обязаны быть симметричны началу.
             java.util.Set<Long> свои = new java.util.HashSet<>();
-            for (HexRec h : f.hexes()) {
+            double minX = Double.MAX_VALUE;
+            double minY = Double.MAX_VALUE;
+            double maxX = -Double.MAX_VALUE;
+            double maxY = -Double.MAX_VALUE;
+            for (HexRec h : гексы) {
                 свои.add((((long) h.q()) << 32) ^ (h.r() & 0xffffffffL));
+                double[] c = FieldGeometry.hexCenter(h.q(), h.r(), size);
+                minX = Math.min(minX, c[0]);
+                maxX = Math.max(maxX, c[0]);
+                minY = Math.min(minY, c[1]);
+                maxY = Math.max(maxY, c[1]);
             }
-            for (HexRec hx : f.hexes()) {
+            double сдвигX = cx0 - (minX + maxX) / 2;
+            double сдвигY = cy0 - (minY + maxY) / 2;
+            for (HexRec hx : гексы) {
                 double[] c = FieldGeometry.hexCenter(hx.q(), hx.r(), size);
-                double cx = cx0 + c[0];
-                double cy = cy0 + c[1];
+                double cx = сдвигX + c[0];
+                double cy = сдвигY + c[1];
 
                 рисоватьСекторы(g, cx, cy, size);
 
@@ -394,6 +443,43 @@ public final class BlockCatalogPanel extends JPanel {
                     рисоватьМетку(g, cx, cy, apothem, hx.container(), Theme.container(), false, size);
                 }
             }
+        }
+
+        /**
+         * ГЕКСЫ СТОРОНЫ, ПОВЁРНУТЫЕ на {@link #поворот} шагов по 60° по часовой.
+         *
+         * <p>Математика поворота выведена из геометрии поля ({@code hexCenter}:
+         * x = 1.5q, y = √3(r + q/2), ось y экрана вниз): шаг по часовой стрелке —
+         * это {@code (q, r) → (−r, q + r)}. Ячейки контейнера и энергии привязаны
+         * к НОМЕРУ СТОРОНЫ гекса, а нумерация сторон {@code Field.AXIAL_DIRS}
+         * идёт ПРОТИВ часовой — поэтому при повороте по часовой номер стороны
+         * сдвигается назад: {@code k → (k + 5) % 6}. Воздушная ячейка (номер 6)
+         * стороне не принадлежит и не поворачивается.
+         */
+        private List<HexRec> повернутые(List<HexRec> исходные) {
+            if (поворот == 0) {
+                return исходные;
+            }
+            List<HexRec> out = new ArrayList<>(исходные.size());
+            for (HexRec h : исходные) {
+                int q = h.q();
+                int r = h.r();
+                int контейнер = h.container();
+                int энергия = h.energy();
+                for (int i = 0; i < поворот; i++) {
+                    int nq = -r;
+                    r = q + r;
+                    q = nq;
+                    if (контейнер >= 0 && контейнер < 6) {
+                        контейнер = (контейнер + 5) % 6;
+                    }
+                    if (энергия >= 0 && энергия < 6) {
+                        энергия = (энергия + 5) % 6;
+                    }
+                }
+                out.add(new HexRec(q, r, контейнер, энергия));
+            }
+            return out;
         }
 
         /**
