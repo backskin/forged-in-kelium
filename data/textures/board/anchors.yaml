@@ -1,0 +1,43 @@
+# ===========================================================================
+#  ЯКОРЯ ПЕЧАТНЫХ ПЛАНШЕТОВ — где на картинке лежит живое
+# ===========================================================================
+#  Файл СГЕНЕРИРОВАН по самим картинкам (tools/gen_anchors.py) и сверен
+#  с boards.2.1.0.yaml. Художник перерисовал планшет — перегенерировать, а не
+#  править руками. Координаты — пиксели ИСХОДНОЙ картинки, игра пересчитает
+#  их под свой масштаб сама.
+# ===========================================================================
+
+meta:
+  id: 1.0.0
+  type: board_anchors
+  source: boards.2.1.0.yaml
+
+boards:
+  - id: storage-A
+    kind: storage
+    side: A
+    size: [1547, 886]
+    cells:
+      - {group: miner, level: 1, type: U, box: [460, 39, 115, 113]}
+      - {group: miner, level: 2, type: U, box: [175, 232, 116, 114]}
+      - {group: miner, level: 3, type: U, box: [140, 496, 116, 113]}
+      - {group: miner, level: 3, type: U, box: [205, 618, 116, 113]}
+      - {group: miner, level: 4, type: U, box: [385, 736, 116, 113]}
+      - {group: miner, level: 4, type: U, box: [535, 736, 116, 113]}
+      - {group: plant, level: 1, type: U, box: [965, 40, 115, 113]}
+      - {group: plant, level: 2, type: U, box: [1256, 232, 115, 114]}
+      - {group: plant, level: 3, type: U, box: [1296, 492, 116, 113]}
+      - {group: plant, level: 3, type: U, box: [1233, 613, 116, 113]}
+      - {group: plant, level: 4, type: U, box: [893, 736, 116, 113]}
+      - {group: plant, level: 4, type: U, box: [1043, 736, 116, 113]}
+      - {group: base, level: 0, type: U, box: [713, 425, 116, 113]}
+      - {group: base, level: 0, type: U, box: [713, 560, 116, 113]}
+  - id: troop-A
+    kind: troop
+    side: A
+    size: [1713, 443]
+    columns:
+      - {unit: infantry, building: barracks, attack: [238, 226, 151, 150], assembly: [342, 5, 92, 148]}
+      - {unit: vehicle, building: factory, attack: [650, 226, 151, 150], assembly: [763, 7, 92, 146]}
+      - {unit: aircraft, building: airbase, attack: [1078, 226, 150, 150], assembly: [1185, 4, 92, 149]}
+      - {unit: tower, building: command_center, attack: [1495, 226, 150, 150], assembly: [1537, 4, 93, 150]}

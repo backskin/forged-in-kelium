@@ -13,6 +13,7 @@ import kelium.core.Target;
 import kelium.core.UnitType;
 import kelium.core.Agent;
 import kelium.core.Choice;
+import kelium.dataio.Ctx;
 
 /**
  * Система модулей — модули сборки (синие) и атаки (красные). У игрока комплект
@@ -193,6 +194,12 @@ public final class Modules {
             p.redPlacements.put(глухой.getKey(), глухой.getValue());
         }
 
+        // ЖЕТОН-ЗАГЛУШКА КЛАДЁТСЯ ПЕРВЫМ (правило дизайнера 27.08.2026): он
+        // такой же красный жетон, как остальные, и ячейку занимает
+        // ПО-НАСТОЯЩЕМУ — значит место под ним должно быть занято ДО того, как
+        // игрок разложит рабочие модули, иначе они успеют занять его сами.
+        moveSealToken(s, p, agent, emit);
+
         // Красные: у игрока комплект из 4 УНИКАЛЬНЫХ жетонов (М1-М4); выдано
         // (доступно) redModules штук — игрок сам выбирает, КАКИЕ из четырёх
         // задействовать и на какие рода войск положить.
@@ -217,6 +224,9 @@ public final class Modules {
                     // нет», и асимметрия по модулям была невозможна.
                     if (redSlotsFor(p, t) <= 0) {
                         continue;
+                    }
+                    if (sealSits(s, p, t)) {
+                        continue;   // место занято жетоном-заглушкой
                     }
                     if (!p.redPlacements.containsKey(t)) {
                         Map<String, Object> pl = new HashMap<>();
@@ -383,6 +393,79 @@ public final class Modules {
      * ничего не говорит — считаем по одному месту на род, как было до наборов
      * «В» и «Г»: старые планшеты не должны менять поведение.
      */
+    /**
+     * ГЛУХОЙ ЖЕТОН НА ЭТОЙ ЯЧЕЙКЕ? Пока он у игрока, ячейка занята, и рабочий
+     * красный модуль туда не положить. Уехал к захватчику за снесённое ЦУ —
+     * место освободилось.
+     *
+     * <p>Жетон живёт в {@link PlayerState#redPlacements} рядом с обычными
+     * модулями и помечен флагом {@code blocks}: он и есть такой же красный
+     * жетон, только ничего не открывает.
+     */
+    public static boolean sealSits(GameState s, PlayerState p, UnitType type) {
+        Map<String, Object> м = p.redPlacements.get(type);
+        return sealActive(s, p) && м != null && Boolean.TRUE.equals(м.get("blocks"));
+    }
+
+    /** Лежит ли у игрока глухой жетон (и включено ли правило вообще). */
+    public static boolean sealActive(GameState s, PlayerState p) {
+        if (!p.ownCuTokenAvailable
+                || !Ctx.rules(s).getBool("command_center.destruction_token_seals_cell", false)) {
+            return false;
+        }
+        return sealUnit(p) != null;
+    }
+
+    /** Род войск, чью ячейку сейчас закрывает глухой жетон, или null. */
+    private static UnitType sealUnit(PlayerState p) {
+        for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
+            if (Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                return e.getKey();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * ПЕРЕЛОЖИТЬ ГЛУХОЙ ЖЕТОН (правило дизайнера 27.08.2026).
+     *
+     * <p>Он — обычный красный жетон и переносится по тем же правилам: в
+     * Обновление игрок раскладывает красные заново, и его тоже. Род войск,
+     * нарисованный на лице, значил ТОЛЬКО стартовое положение при подготовке —
+     * после того как жетон лёг, картинка не значит ничего, и держать его на
+     * своём роде игрок не обязан.
+     */
+    private static void moveSealToken(GameState s, PlayerState p, Agent agent,
+                                      Consumer<Map<String, Object>> emit) {
+        if (!sealActive(s, p)) {
+            return;
+        }
+        UnitType был = sealUnit(p);
+        List<Choice> opts = new ArrayList<>();
+        for (UnitType t : UnitType.values()) {
+            if (redSlotsFor(p, t) > 0) {
+                opts.add(new Choice("seal_slot", t, "глухой жетон -> " + t.code));
+            }
+        }
+        if (opts.size() <= 1) {
+            return;             // класть некуда, кроме как обратно
+        }
+        Choice ch = agent.choose(s, opts, Map.of("kind", "seal_move"));
+        if (!(ch.payload() instanceof UnitType picked) || picked == был) {
+            return;
+        }
+        Map<String, Object> жетон = p.redPlacements.remove(был);
+        p.redPlacements.put(picked, жетон);
+        if (emit != null) {
+            Map<String, Object> ev = new HashMap<>();
+            ev.put("type", "seal_move");
+            ev.put("seat", p.seat);
+            ev.put("from", был.code);
+            ev.put("unit", picked.code);
+            emit.accept(ev);
+        }
+    }
+
     public static int redSlotsFor(PlayerState p, UnitType type) {
         Object raw = p.board == null || p.board.troop == null ? null
             : p.board.troop.raw.get("red_slots");

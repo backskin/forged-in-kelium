@@ -81,6 +81,39 @@ public final class FieldGeometry {
     /** Насыщенный цвет игрока — заливка САМОЙ формы жетона. */
     public static final String[] SEAT_TOKEN = {"#3b82d0", "#e07038", "#3f9e60", "#b04a96"};
 
+    /**
+     * ЦВЕТА МЕСТ ЭТОЙ ПАРТИИ: место → цветовое гнездо. Игрок выбирает свой цвет
+     * в меню запуска, и цвет перестаёт быть намертво привязан к номеру места.
+     *
+     * <p>Одна таблица на программу — так же, как папка текстур и тумблеры
+     * показа: и окно партии, и проигрыватель разбора показывают ОДНУ запись за
+     * раз, и второй таблицы им негде понадобиться. Ставится из записи партии
+     * ({@code ReplayRecord.seatColors}); {@code null} — цвет по номеру места.
+     */
+    private static int[] seatColors;
+
+    public static synchronized void useSeatColors(java.util.List<Integer> colors) {
+        if (colors == null || colors.isEmpty()) {
+            seatColors = null;
+            return;
+        }
+        int[] out = new int[colors.size()];
+        for (int i = 0; i < colors.size(); i++) {
+            Integer c = colors.get(i);
+            out[i] = c == null ? Math.floorMod(i, 4) : Math.floorMod(c, 4);
+        }
+        seatColors = out;
+    }
+
+    /** Цветовое гнездо места — через него идут ВСЕ краски мест. */
+    public static synchronized int seatColor(int seat) {
+        int[] t = seatColors;
+        if (t != null && seat >= 0 && seat < t.length) {
+            return t[seat];
+        }
+        return Math.floorMod(seat, 4);
+    }
+
     // ===================== силуэты жетонов ==================================
     /**
      * Силуэт жетона.

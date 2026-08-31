@@ -288,8 +288,6 @@ public final class RuleWords {
                 "ЦУ из запаса обязано вернуться на поле спец-действием";
             case "command_center.cu_buildable_by_build_action" ->
                 "ЦУ можно поставить и обычным действием Стройка";
-            case "command_center.destruction_token_seals_cell" ->
-                "жетон уничтожения ЦУ лежит на планшете и закрывает ячейку атаки";
             case "command_center.destruction_token_vp" ->
                 "победных очков тому, кто снёс центр управления";
             case "command_center.own_token_vp_if_cu_never_destroyed" ->
@@ -298,6 +296,10 @@ public final class RuleWords {
                 "военная победа за второй снесённый центр управления";
             case "command_center.owner_compensation_containers" ->
                 "контейнеров хозяину за снесённый центр управления";
+            case "command_center.destruction_token_seals_cell" ->
+                "жетон-заглушка занимает ячейку красного модуля и закрывает собой "
+                    + "ту спец-атаку, на которой лежит";
+
 
             // ---------- Контейнеры за снос ----------
             case "building_compensation_containers.barracks" -> "контейнеров за казарму";

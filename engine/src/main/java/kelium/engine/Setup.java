@@ -459,7 +459,14 @@ public final class Setup {
             } else {
                 startCoins = seat < START_COINS.length ? START_COINS[seat] : 4;
             }
-            Resources res = new Resources(startCoins, START_KELIUM, START_AMMO, 0);
+            // Стартовые келемий и боеприпасы — тем же путём, что монеты: из
+            // свода, если ключ задан, иначе печатное умолчание. Меню запуска
+            // правит их для ТРЕНИРОВОЧНОЙ партии, не трогая файлы правил.
+            int startKelium = ruleset.get("setup.start_kelium", null) instanceof Number kn
+                ? kn.intValue() : START_KELIUM;
+            int startAmmo = ruleset.get("setup.start_ammo", null) instanceof Number an
+                ? an.intValue() : START_AMMO;
+            Resources res = new Resources(startCoins, startKelium, startAmmo, 0);
             String startHex = startHexes.get(seat);
             PlayerState ps = new PlayerState(seat, board, res, startHex);
             Hex sh = field.get(startHex);

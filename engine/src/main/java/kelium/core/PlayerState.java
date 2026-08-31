@@ -411,6 +411,16 @@ public final class PlayerState {
         return p;
     }
 
+    /**
+     * Восстановить это состояние игрока НА МЕСТЕ (тот же объект) из {@code
+     * other} — см. {@link StateRestore} и {@link GameState#restoreFrom} (откат
+     * действия). {@code seat}/{@code board} не трогаются: они не меняются за
+     * партию, и {@code other} тем же образом их несёт неизменными.
+     */
+    public void restoreFrom(PlayerState other) {
+        StateRestore.copyFields(this, other);
+    }
+
     /** Сумма трофейных очков жетонов, лежащих в трофейном пространстве. */
     /**
      * Сколько жетонов этого рода у игрока УЖЕ ЗАВЕДЕНО (не считая супер-войск с

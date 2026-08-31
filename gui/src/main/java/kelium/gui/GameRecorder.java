@@ -208,6 +208,85 @@ public final class GameRecorder {
     }
 
     /**
+     * То же, что {@link #play}, но со СВОИМ списком агентов вместо ботов по
+     * справочнику — вызывающий код (hot-seat, сетевой сервер) сам решает, кто
+     * сидит на каждом месте: {@link kelium.core.InteractiveAgent} для живого
+     * игрока, {@code Bots.create(...)} для бота. Запись пишется ТЕМ ЖЕ кодом
+     * ({@code header}/{@code Recorder}/{@code ReplayText}), что и симуляции —
+     * заказ на цифровую версию (§3, п.6) требует одинакового формата журнала
+     * независимо от режима партии.
+     *
+     * @param seatLabels подписи мест для шапки записи (например {@code "human"}
+     *                   для живого игрока, имя характера — для бота); длина
+     *                   должна совпадать с {@code agents.size()}.
+     */
+    public static ReplayRecord playWithAgents(GameConfig cfg, GameState state,
+                                               List<Agent> agents, List<String> seatLabels,
+                                               long seed, Consumer<String> note) {
+        return playWithAgents(cfg, state, agents, seatLabels, seed, note, null);
+    }
+
+    /**
+     * То же, плюс {@code onFrame} — вызывается на каждый добавленный кадр СРАЗУ,
+     * пока партия ещё играется. Нужно живому окну (hot-seat/сеть): та же запись
+     * {@code rec}, что вернётся из этого вызова, все это время растёт у него на
+     * руках — {@link FieldView}/{@link BoardsPanel} умеют показывать её "на
+     * ходу", кадр за кадром, точно как готовую запись в {@code replay2}.
+     *
+     * <p>Вызывается в потоке движка — если это Swing, окну нужно самому уйти на
+     * EDT ({@code SwingUtilities.invokeLater}), сюда это не встроено: движок не
+     * должен знать о существовании Swing.
+     */
+    public static ReplayRecord playWithAgents(GameConfig cfg, GameState state,
+                                               List<Agent> agents, List<String> seatLabels,
+                                               long seed, Consumer<String> note,
+                                               Consumer<ReplayRecord> onFrame) {
+        return playWithAgents(cfg, state, agents, seatLabels, seed, null, note, onFrame);
+    }
+
+    /**
+     * То же, плюс ЦВЕТА МЕСТ, выбранные игроком в меню запуска. Они не меняют
+     * партию, но обязаны попасть в её журнал: иначе запись переиграется не в тех
+     * красках, в каких за столом сидели.
+     */
+    public static ReplayRecord playWithAgents(GameConfig cfg, GameState state,
+                                               List<Agent> agents, List<String> seatLabels,
+                                               long seed, List<Integer> seatColors,
+                                               Consumer<String> note,
+                                               Consumer<ReplayRecord> onFrame) {
+        ReplayRecord rec = header(cfg, state, state.numPlayers(), seed, seatLabels,
+            cfg.scenarioId, cfg.cuFacing);
+        if (seatColors != null) {
+            rec.seatColors.addAll(seatColors);
+        }
+        rememberExpansions(rec);
+
+        List<ReplayRecord.Thought> pending = new ArrayList<>();
+        for (Agent a : agents) {
+            if (a instanceof StrategicAgent sa) {
+                sa.withThoughts((seat, txt) -> pending.add(new ReplayRecord.Thought(seat, txt)));
+            }
+        }
+
+        ReplayText text = new ReplayText(cfg, rec);
+        Recorder rc = new Recorder(state, rec, text, pending);
+        Consumer<Map<String, Object>> sink = onFrame == null ? rc : event -> {
+            rc.accept(event);
+            onFrame.accept(rec);
+        };
+        Map<String, Object> result = GameEngine.playGame(state, agents, sink);
+
+        rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
+        rec.condition = String.valueOf(result.get("condition"));
+        rec.rounds = result.get("rounds") instanceof Number n ? n.intValue() : state.round;
+        if (note != null) {
+            note.accept("Партия сыграна: шагов " + rec.frames.size()
+                + ", раундов " + rec.rounds + ".");
+        }
+        return rec;
+    }
+
+    /**
      * ПОДГОТОВКА без прогона: собрать состояние партии и вернуть запись из
      * одного кадра — стартовую расстановку. Нужна проигрывателю, чтобы поле
      * перерисовывалось СРАЗУ при смене числа игроков, раскладки или поворота ЦУ,
@@ -271,7 +350,10 @@ public final class GameRecorder {
         for (int seat = 0; seat < players; seat++) {
             String id = seat < seatIds.size() ? seatIds.get(seat) : "trained:balanced";
             rec.seatIds.add(id);
-            rec.seatLabels.add(botLabel(id));
+            // «human» — не бот из справочника, а живое место цифровой версии:
+            // без этого в планшетах игрока красовалось сырое «human» (блокер
+            // приёмки: отладка на экране игрока).
+            rec.seatLabels.add("human".equals(id) ? "Игрок " + (seat + 1) : botLabel(id));
             rec.sides.add(state.player(seat).board.troop.side);
         }
         fillTableAndField(rec, cfg, state);

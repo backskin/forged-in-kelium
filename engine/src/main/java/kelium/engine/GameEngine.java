@@ -644,21 +644,24 @@ public final class GameEngine {
         }
         emit(ev("type", "reveal", "circle", circle, "revealed", new HashMap<>(revealed)));
 
-        Map<Integer, Order> topOrders = new HashMap<>();
-        Map<Order, Integer> orderCounts = new HashMap<>();
-        for (Map.Entry<Integer, String> e : revealed.entrySet()) {
-            Order o = topOrder(e.getValue());
-            topOrders.put(e.getKey(), o);
-            if (o != null) {
-                orderCounts.merge(o, 1, Integer::sum);
-            }
-        }
+        // ВСКРЫВАЮТ ПО ОЧЕРЕДИ, А НЕ ВСЕ РАЗОМ. Эффекты вскрытия — совпадение
+        // верхних приказов и открытие нижнего — считаются только с теми, кто
+        // вскрыл карту РАНЬШЕ тебя в этом круге; первый игрок круга не
+        // встречает никого (правило дизайнера 30.08.2026).
+        //
+        // Прежде обе карты сравнивались со ВСЕМИ вскрытыми сразу, включая тех,
+        // кто ходит после: игрок получал блок приказа от соседа, который свою
+        // карту ещё даже не открыл.
+        Map<Integer, Order> вскрытыеРанее = new java.util.LinkedHashMap<>();
 
         for (int seat : s.seatsInOrder()) {
             if (!revealed.containsKey(seat)) {
                 continue;
             }
-            resolveTurn(seat, revealed.get(seat), topOrders, orderCounts);
+            resolveTurn(seat, revealed.get(seat), вскрытыеРанее);
+            // Своя карта уходит в общий счёт ПОСЛЕ хода: для следующих игроков
+            // она уже вскрыта, для себя самого — не считается.
+            вскрытыеРанее.put(seat, topOrder(revealed.get(seat)));
             if (s.finished) {
                 return;
             }
@@ -668,8 +671,11 @@ public final class GameEngine {
         }
     }
 
-    private void resolveTurn(int seat, String cardId, Map<Integer, Order> topOrders,
-                             Map<Order, Integer> orderCounts) {
+    /**
+     * @param topOrders верхние приказы тех, кто вскрыл карту РАНЬШЕ этого места
+     *                  в текущем круге. У первого игрока круга пусто.
+     */
+    private void resolveTurn(int seat, String cardId, Map<Integer, Order> topOrders) {
         GameState s = state;
         PlayerState p = s.player(seat);
         Ruleset rs = rs();
@@ -689,11 +695,11 @@ public final class GameEngine {
         // здесь, а не когда сама sa5 разыгрывается: карта не разыгрывается вовсе,
         // она удерживается на вершине трека и действует постоянно.
         //
-        // ПОРЯДОК ЗНАЧИМ: если держатель sa5 ещё не ходил в этот раунд, штраф не
-        // сработает — topOrders хранит только УЖЕ сыгранные верхи. Это тот же
-        // порядок, каким считается совпадение приказов (coincidence_rule), и
-        // держатель карты просто оказывается в выгодном положении, если ходит
-        // раньше того, кого хочет наказать.
+        // ПОРЯДОК ЗНАЧИМ: если держатель sa5 ещё не вскрыл карту в этом круге,
+        // штраф не сработает — topOrders хранит только УЖЕ вскрытые верхи. Это
+        // тот же порядок, каким считается совпадение приказов, и держатель
+        // карты просто оказывается в выгодном положении, если вскрывает раньше
+        // того, кого хочет наказать.
         int specPenalty = 0;
         if (!isJoker) {
             Order myTop = Order.fromCode((String) card.get("top"));
@@ -714,6 +720,10 @@ public final class GameEngine {
             .ask());
         specLimit = Math.max(0, specLimit - specPenalty);
         TurnContext ctx = new TurnContext(seat, specLimit);
+        // Контекст хода — памятка для отката безопасных действий (концепт
+        // «Командный пункт» §5): без него откат возвращал состояние, но не
+        // знание «что сыграно», и игрок терял слот действия.
+        s.turnUndo = ctx;
         if (specPenalty > 0) {
             emit(ev("type", "spec_penalty", "seat", seat, "penalty", specPenalty,
                 "ability", "ignore_coincidence"));
@@ -724,7 +734,7 @@ public final class GameEngine {
             // в варианте «одно действие за ход» БЕЗОПАСНОСТЬ станет вдвое сильнее
             // всех остальных карт руки.
             int jokerA = rs.getInt("actions.top_actions_per_turn", 2);
-            playActions(p, ctx, Actions.ALL_NAMES, jokerA, true);
+            playActions(p, ctx, Actions.ALL_NAMES, jokerA, true, "joker", null);
             // БАГ (найден дизайнером 14.08.2026): карта БЕЗОПАСНОСТЬ (джокер) не
             // шлёт turn_orders вовсе — только у неё есть этот код, у обычных
             // приказов событие ниже. Проигрыватель ждёт именно turn_orders, чтобы
@@ -740,8 +750,10 @@ public final class GameEngine {
                 "maneuver", false));
         } else {
             Order top = Order.fromCode((String) card.get("top"));
+            // СОВПАДЕНИЕ — с теми, кто вскрыл РАНЬШЕ. Своей карты в этом счёте
+            // нет вовсе, поэтому достаточно одного совпавшего соседа.
             boolean coincided = rs.getBool("actions.coincidence_rule_enabled", true)
-                && orderCounts.getOrDefault(top, 0) > 1;
+                && topOrders.containsValue(top);
             List<String> names = List.of(Order.ORDER_ACTIONS.get(top));
             // ТОЧКА ПРАВИЛ: сколько действий даёт ВЕРХНИЙ приказ.
             //
@@ -762,8 +774,9 @@ public final class GameEngine {
             s.journal.of(seat).orderBlocked = coincided;
 
             // Нижняя половина срабатывает, только если ЭТОТ приказ вскрыл сверху
-            // кто-то другой. Считаем это ДО хода, чтобы отчёты и проигрыватель
-            // могли показать полную раскладку приказа сразу (просьба дизайнера).
+            // кто-то, кто вскрылся РАНЬШЕ в этом круге. Считаем это ДО хода,
+            // чтобы отчёты и проигрыватель могли показать полную раскладку
+            // приказа сразу (просьба дизайнера).
             Order bo = card.get("bottom") == null ? null
                 : Order.fromCode(card.get("bottom").toString());
             boolean bottomOpen = false;
@@ -806,7 +819,7 @@ public final class GameEngine {
                 }
             }
 
-            playActions(p, ctx, names, maxA, false);
+            playActions(p, ctx, names, maxA, false, "top", top.code);
 
             if (bottomOpen) {
                 // ТОЧКА ПРАВИЛ: сколько действий даёт открытый нижний приказ.
@@ -822,7 +835,8 @@ public final class GameEngine {
                 if (tradeTopForBottom) {
                     ctx.actionsPlayed.removeAll(List.of(Order.ORDER_ACTIONS.get(bo)));
                 }
-                playActions(p, ctx, List.of(Order.ORDER_ACTIONS.get(bo)), bottomA, false);
+                playActions(p, ctx, List.of(Order.ORDER_ACTIONS.get(bo)), bottomA, false,
+                    "bottom", bo.code);
             }
             // Плашка манёвра: на картах maneuver:true — одно бесплатное
             // перемещение одного жетона войска на его скорость (не открывает
@@ -831,11 +845,20 @@ public final class GameEngine {
                 offerManeuver(p);
             }
         }
+        s.turnUndo = null;
         emit(ev("type", "turn_end", "seat", seat, "resources", resourcesMap(p)));
     }
 
+    /**
+     * @param half   ОТКУДА эти действия: {@code top} — верхний приказ карты,
+     *               {@code bottom} — открывшийся нижний, {@code joker} — джокер.
+     *               Уходит в точку решения: интерфейс подписывает предложенные
+     *               действия той половиной карты, с которой они пришли, и не
+     *               заставляет игрока помнить это самому.
+     * @param order  код категории приказа этой половины (у джокера — null).
+     */
     private void playActions(PlayerState p, TurnContext ctx, List<String> actionNames,
-                             int maxActions, boolean distinct) {
+                             int maxActions, boolean distinct, String half, String order) {
         GameState s = state;
         // Что ещё можно сыграть в этом ходу — знание хода, а не приказа: его
         // читают индикаторы заданий, когда строят план на этот ход.
@@ -844,7 +867,11 @@ public final class GameEngine {
         // СУПЕР ЗАДАНИЯ 2.0: подсунуть карты под планшет ради символов — не
         // действие и не СПЕЦ, поэтому предлагается один раз перед ходом.
         offerTuck(p);
-        int played = 0;
+        // Счётчик сыгранных действий живёт в КОНТЕКСТЕ хода, а не в локальной
+        // переменной: откат безопасного действия (концепт «Командный пункт» §5)
+        // возвращает его вместе с actionsPlayed через памятку TurnUndo — иначе
+        // отменённое действие продолжало бы занимать слот.
+        ctx.playedCount = 0;
         // Лишние действия, выданные способностями карт уже ПО ХОДУ дела (обход
         // блокировки приказа за келемий). Предел нельзя посчитать заранее:
         // разрешение выдаётся СПЕЦ-действием между основными действиями.
@@ -854,7 +881,7 @@ public final class GameEngine {
         // этот ход — редакция 17.08.2026: игрок платит победным очком, и
         // запрещать ему повтор было бы двойной ценой.
         int repeatable = 0;
-        while (played < maxActions + extra && !s.finished) {
+        while (ctx.playedCount < maxActions + extra && !s.finished) {
             List<String> candidates = new ArrayList<>();
             for (String nname : actionNames) {
                 if (repeatable > 0 || !ctx.actionsPlayed.contains(nname)) {
@@ -870,7 +897,8 @@ public final class GameEngine {
             }
             opts.add(new Choice("pass", null, "ничего не делать"));
             Choice ch = agents.get(p.seat).choose(s, opts,
-                ev("kind", "action", "remaining", maxActions - played));
+                ev("kind", "action", "remaining", maxActions - ctx.playedCount,
+                    "half", half, "order", order));
             if (ch.payload() == null) {
                 break;
             }
@@ -882,7 +910,7 @@ public final class GameEngine {
             }
             emit(ev("type", "action", "seat", p.seat, "action", actionName,
                 "ok", res.ok(), "detail", res.detail(), "telemetry", res.telemetry()));
-            played += 1;
+            ctx.playedCount += 1;
             if (repeatable > 0) {
                 repeatable--;
             }
@@ -1441,12 +1469,14 @@ public final class GameEngine {
      * закрыт ровно один раз.
      *
      * <p>ДАЛЬШЕ ЖЕТОН ДВИГАЕТСЯ КАК ЛЮБОЙ МОДУЛЬ: обменом на планшете науки за
-     * обломок, утилем карты задания. Нарисованный род — это МЕСТО, ОТКУДА он
-     * начинает, а не клетка навсегда: игрок переставляет его туда, где ему сейчас
-     * не нужна дешёвая атака.
+     * обломок, утилем карты задания, перекладыванием в Смену модулей
+     * ({@link Modules#moveSealToken}). Нарисованный род — это МЕСТО, ОТКУДА он
+     * начинает, а не клетка навсегда: после того как жетон лёг, картинка не
+     * значит ничего до конца партии, и игрок переставляет его туда, где ему
+     * сейчас не нужна дешёвая атака.
      *
      * <p>Снесли твоё ЦУ — жетон уехал к захватчику, запись пропала, ячейка
-     * открылась (см. CombatResolver.destroyCu).
+     * открылась под ещё один красный жетон (см. CombatResolver.destroyCu).
      */
     private void offerSealChoice() {
         GameState s = state;

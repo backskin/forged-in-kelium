@@ -3,6 +3,7 @@
 #   dist\KeliumRunner.exe      — прогоны симуляций
 #   dist\KeliumReplay2.exe     — разбор партии
 #   dist\KeliumHelp.exe        — СПРАВОЧНИК отдельно (правила и все карты)
+#   dist\Играть.exe            — САМА ИГРА: «Штаб» и партия
 #   (проигрыватель 1.0 заархивирован 13.08.2026 — см. archive/replay-1.0/)
 # Внутрь каждого зашито всё приложение вместе с урезанной Java-средой.
 # Запуск: powershell -ExecutionPolicy Bypass -File make-exe.ps1
@@ -98,7 +99,11 @@ New-Item -ItemType Directory -Force target\pkgin | Out-Null
 Remove-Item target\pkgin\*.jar -ErrorAction SilentlyContinue
 # Классы приложения — из ВСЕХ ТРЁХ модулей (jpackage строит classpath из
 # каждого jar в --input, отдельным файлом на модуль, а не одним fat-jar).
+# МОДУЛЕЙ ЧЕТЫРЕ, А НЕ ТРИ (разделено 14.08.2026, cards добавлен позже):
+# kelium-cards сюда не копировался, а из pkg-libs его вычищал -Exclude kelium-*,
+# и в собранное приложение он не попадал вовсе — карты не грузились.
 Copy-Item engine\target\kelium-engine-0.1.0.jar target\pkgin\
+Copy-Item cards\target\kelium-cards-0.1.0.jar target\pkgin\
 Copy-Item bots\target\kelium-bots-0.1.0.jar target\pkgin\
 Copy-Item gui\target\kelium-gui-0.1.0.jar target\pkgin\
 Copy-Item target\pkg-libs\*.jar target\pkgin\ -Exclude junit*, apiguardian*, opentest4j*, kelium-*
@@ -171,6 +176,15 @@ $helpProps += "java-options=-Dkelium.data=`"$dataPath`""
 $helpProps += "win-console=false"
 $helpProps | Out-File -Encoding ascii target\help-launcher.properties
 
+# САМА ИГРА (просьба дизайнера 27.08.2026). Точка входа — «Штаб»: собрать
+# стол и сесть играть. Отдельным лончером, а не заменой RunnerGui: раннер
+# прогонов — инструмент дизайнера, и подменять его игрой нельзя.
+$gameProps = @()
+$gameProps += "main-class=kelium.gui.StartMenuWindow"
+$gameProps += "java-options=-Dkelium.data=`"$dataPath`""
+$gameProps += "win-console=false"
+$gameProps | Out-File -Encoding ascii target\game-launcher.properties
+
 # KeliumBuilder В СБОРКУ НЕ ВХОДИТ (19.08.2026).
 #
 # Он затевался как «перенос конструктора на новый движок рендера», но проверка
@@ -195,7 +209,8 @@ jpackage --type app-image --name Kelium --input target\pkgin --runtime-image tar
   --main-jar kelium-gui-0.1.0.jar --main-class kelium.gui.LayoutEditor `
   --add-launcher KeliumRunner=target\runner-launcher.properties `
   --add-launcher KeliumReplay2=target\replay2-launcher.properties `
-  --add-launcher KeliumHelp=target\help-launcher.properties --dest dist\app
+  --add-launcher KeliumHelp=target\help-launcher.properties `
+  --add-launcher KeliumGame=target\game-launcher.properties --dest dist\app
 
 # jpackage режет --java-options по пробелам в пути, поэтому секцию [JavaOptions]
 # главного лончера собираем сами (у add-launcher она берётся из properties и цела).
@@ -247,7 +262,8 @@ foreach ($app in @(
         @{ Name = "KeliumConstructor"; Target = "Kelium.exe"; Icon = "constructor" },
         @{ Name = "KeliumRunner"; Target = "KeliumRunner.exe"; Icon = "runner" },
         @{ Name = "KeliumReplay2"; Target = "KeliumReplay2.exe"; Icon = "replay2" },
-        @{ Name = "KeliumHelp"; Target = "KeliumHelp.exe"; Icon = "help" })) {
+        @{ Name = "KeliumHelp"; Target = "KeliumHelp.exe"; Icon = "help" },
+        @{ Name = "Играть"; Target = "KeliumGame.exe"; Icon = "game" })) {
     $src = "target\stub_$($app.Name).cs"
     $stub.Replace("@VERSION@", $hash).Replace("@TARGET@", $app.Target) |
         Out-File -Encoding UTF8 $src
@@ -265,7 +281,8 @@ foreach ($app in @(
 }
 
 Write-Output "6/6 проверка…"
-foreach ($n in @("KeliumConstructor", "KeliumRunner", "KeliumReplay2", "KeliumHelp")) {
+foreach ($n in @("KeliumConstructor", "KeliumRunner", "KeliumReplay2", "KeliumHelp",
+                 "Играть")) {
     $f = Get-Item "dist\$n.exe"
     "   {0} — {1:N1} МБ" -f $f.Name, ($f.Length / 1MB) | Write-Output
 }
@@ -276,6 +293,7 @@ Write-Output "  dist\KeliumConstructor.exe  — конструктор раск�
 Write-Output "  dist\KeliumRunner.exe       — прогоны симуляций"
 Write-Output "  dist\KeliumReplay2.exe      — разбор партии"
 Write-Output "  dist\KeliumHelp.exe         — справочник: правила и все карты"
+Write-Output "  dist\Играть.exe             — САМА ИГРА: «Штаб» и партия"
 Write-Output ""
 Write-Output "Файлы самодостаточны: Java внутри, при первом запуске распаковываются"
 Write-Output "в %TEMP%\Kelium-$hash (дальше стартуют сразу). Отчёты и логи пишутся"
