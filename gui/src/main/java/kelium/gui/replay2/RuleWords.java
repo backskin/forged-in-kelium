@@ -27,6 +27,7 @@ public final class RuleWords {
             case "setup" -> "Подготовка";
             case "economy" -> "Экономика и обмен на очки";
             case "rounds" -> "Раунды и круги";
+            case "end_conditions" -> "Условия конца партии";
             case "asymmetry" -> "Асимметрия планшетов";
             case "actions" -> "Действия";
             case "combat_model" -> "Бой";
@@ -347,6 +348,8 @@ public final class RuleWords {
             case "tech.step_cost_trophy" -> "трофеев/обломков за шаг (тратится общий пул)";
             case "tech.step_vp_cumulative" -> "победные очки по шагам, накопительно";
             case "tech.step_rewards" -> "награды шагов трека (перебивает доску)";
+            case "end_conditions.last_spawn_tile_threshold" ->
+                "сколько источников келемия осталось, когда партия кончается";
             case "tech.science_exchanges" -> "постоянные обмены научного отдела";
             case "tech.science_one_step_per_track_per_action" ->
                 "за одно действие — не больше шага на трек";

@@ -525,7 +525,51 @@ public final class RuleExperiment {
                    List.of("module", "module", "module", "super_arsenal_card"))));
     }
 
+    /**
+     * ДЛИНА ПАРТИИ ПОД ЦЕЛЬ 4–6 РАУНДОВ (правило дизайнера 31.08.2026).
+     *
+     * <p>Прежде считалось, что 7–8 раундов — это норма, и все замеры баланса шли
+     * при 7.6–7.95. Дизайнер это отменил: восемь раундов — предел на случай
+     * долбоебизма игроков, а хорошая партия идёт 4–6. Значит длину надо не
+     * «мерить», а ЗАДАТЬ, и сравнивать рычаги по тому, какой даёт нужное число,
+     * не убив при этом развязки: партия, которую оборвали на четвёртом раунде
+     * потолком карт рынка, короткая, но недоигранная — это не то же самое, что
+     * партия, доигранная до выработки тайлов.
+     *
+     * <p>Рычагов ровно два, и они разного рода: ПОРОГ последнего тайла (условие
+     * конца срабатывает раньше) и ПОТОЛОК карт рынка (партию обрывают силой).
+     * Первый — развязка, второй — стена; поэтому в отчёте смотреть надо не
+     * только «раундов», но и колонку «потолок раундов».
+     */
     private static void lengthVariants(List<Variant> variants) {
+        variants.add(new Variant("порог 2 тайла",
+            "конец, когда осталось 2 источника келемия вместо одного",
+            Map.of("end_conditions.last_spawn_tile_threshold", 2)));
+        variants.add(new Variant("порог 3 тайла",
+            "конец, когда осталось 3 источника келемия",
+            Map.of("end_conditions.last_spawn_tile_threshold", 3)));
+        variants.add(new Variant("порог 5 тайлов",
+            "конец, когда осталось 5 источников келемия",
+            Map.of("end_conditions.last_spawn_tile_threshold", 5)));
+        variants.add(new Variant("порог 6 тайлов",
+            "конец, когда осталось 6 источников келемия",
+            Map.of("end_conditions.last_spawn_tile_threshold", 6)));
+        variants.add(new Variant("порог 4 тайла",
+            "конец, когда осталось 4 источника келемия",
+            Map.of("end_conditions.last_spawn_tile_threshold", 4)));
+        variants.add(new Variant("потолок 6 раундов",
+            "стена: партию обрывают после шестого раунда",
+            Map.of("rounds.reserve_cap", 6)));
+        variants.add(new Variant("потолок 5 раундов",
+            "стена: партию обрывают после пятого раунда",
+            Map.of("rounds.reserve_cap", 5)));
+        variants.add(new Variant("порог 3 тайла + потолок 6",
+            "развязка раньше, стена ниже — на случай если одного рычага мало",
+            Map.of("end_conditions.last_spawn_tile_threshold", 3,
+                   "rounds.reserve_cap", 6)));
+    }
+
+    private static void lengthVariantsOld(List<Variant> variants) {
         variants.add(new Variant("тайлы не обрывают",
             "условие «остался последний тайл» выключено — партию держат только карты рынка",
             Map.of("end_conditions.last_spawn_tile_threshold", -1)));

@@ -307,6 +307,14 @@ public final class PlayerState {
     public boolean super5SealRemoved = false;
     /** Выполнено заданий за партию (накопитель «Архива штаба»). */
     public int objectivesCompleted = 0;
+    /**
+     * НАГРАДА НИЗА СУПЕР-КАРТЫ ПОЛУЧЕНА (режим 6.0).
+     *
+     * <p>Отдельно от {@link #super5Burned}: в 6.0 карта НЕ сжигается — она
+     * остаётся перед игроком и до конца партии даёт множитель верха. Получить
+     * награду низа можно один раз, и это не отменяет множитель.
+     */
+    public boolean super6RewardTaken = false;
 
     public PlayerState(int seat, PlayerBoard board, Resources resources, String startHex) {
         this.seat = seat;
@@ -399,6 +407,7 @@ public final class PlayerState {
         p.super5CuEverLost = super5CuEverLost;
         p.super5SealRemoved = super5SealRemoved;
         p.objectivesCompleted = objectivesCompleted;
+        p.super6RewardTaken = super6RewardTaken;
         return p;
     }
 
