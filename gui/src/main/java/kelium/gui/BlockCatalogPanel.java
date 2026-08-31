@@ -17,15 +17,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.SwingConstants;
+import javax.swing.Scrollable;
 
 import kelium.gui.replay2.Theme;
 import kelium.report.FieldGeometry;
@@ -127,8 +125,9 @@ public final class BlockCatalogPanel extends JPanel {
     private final JComboBox<String> совпаденияПикер = new JComboBox<>();
     private final JLabel пусто = new JLabel(
         "Нет набора блоков с таким сочетанием контейнеров и энергии.");
-    private final Галерея малые = new Галерея();
-    private final Галерея большие = new Галерея();
+    private final Плитка плитка = new Плитка();
+    private final JScrollPane прокрутка = new JScrollPane(плитка,
+        JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
     private boolean обновляюсь;
     /**
      * ПОВОРОТ ПОКАЗА — на сколько шагов по 60° повёрнуты ВСЕ блоки разом
@@ -163,18 +162,27 @@ public final class BlockCatalogPanel extends JPanel {
         повернутьКнопка.setFocusPainted(false);
         повернутьКнопка.addActionListener(e -> {
             поворот = (поворот + 1) % 6;
-            малые.поворот(поворот);
-            большие.поворот(поворот);
+            плитка.поворот(поворот);
         });
         top.add(повернутьКнопка);
         add(top, java.awt.BorderLayout.NORTH);
 
-        JPanel малыеБлок = обёртка("Малые блоки (5 гексов) — 10 сторон", малые);
-        JPanel большиеБлок = обёртка("Большие блоки (6 гексов) — 10 сторон", большие);
-        final JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, малыеБлок, большиеБлок);
-        split.setResizeWeight(0.5);
-        split.setContinuousLayout(true);
-        add(split, java.awt.BorderLayout.CENTER);
+        // ПЛИТКА ДВЕ В ШИРИНУ, ПРОЛИСТЫВАНИЕ ВНИЗ (просьба дизайнера 31.08.2026).
+        //
+        // Прежде было два горизонтальных ряда рядом: слева малые блоки, справа
+        // большие, каждый со своей прокруткой. Плохо это тем, что карточки были
+        // фиксированные и мелкие (260 точек), десять сторон в ряд не влезали
+        // никогда, а по высоте оставалась пустая половина экрана.
+        //
+        // Теперь один вертикальный список, ДВА СТОЛБЦА, и строка — это ОДИН
+        // БЛОК: слева его сторона А, справа сторона Б. Так две стороны одной
+        // картонки видны рядом, а сравнивать их и надо чаще всего. Карточка
+        // занимает половину ширины окна, поэтому блок рисуется крупно, и
+        // разметка ячеек читается без прищуривания.
+        прокрутка.setBorder(null);
+        прокрутка.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
+        прокрутка.getViewport().setBackground(Theme.bg());
+        add(прокрутка, java.awt.BorderLayout.CENTER);
 
         // ВЫБОР ВЕДЁТ ТОЛЬКО К СУЩЕСТВУЮЩИМ НАБОРАМ (баг, найденный дизайнером
         // 31.08.2026).
@@ -200,22 +208,6 @@ public final class BlockCatalogPanel extends JPanel {
         }
         обновитьЭнергию();
 
-        // ПОЛОВИНА ОКНА КАЖДОМУ РАЗМЕРУ. Одного resizeWeight мало: делитель
-        // встаёт по предпочтительной ширине детей, а ряд из десяти карточек
-        // просит много — и панель малых блоков сжималась до одной карточки,
-        // хотя в заголовке написано «10 сторон» (снимок дизайнера 31.08.2026).
-        // Ставим делитель ровно посередине, как только окно получило размер.
-        addComponentListener(new java.awt.event.ComponentAdapter() {
-            private boolean поставлен;
-
-            @Override
-            public void componentResized(java.awt.event.ComponentEvent e) {
-                if (!поставлен && getWidth() > 0) {
-                    поставлен = true;
-                    split.setDividerLocation(0.5d);
-                }
-            }
-        });
     }
 
     /**
@@ -258,15 +250,6 @@ public final class BlockCatalogPanel extends JPanel {
         box.addItem(item);
     }
 
-    private static JPanel обёртка(String заголовок, JComponent содержимое) {
-        JPanel p = new JPanel(new java.awt.BorderLayout());
-        JLabel h = new JLabel(заголовок, SwingConstants.CENTER);
-        h.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
-        p.add(h, java.awt.BorderLayout.NORTH);
-        p.add(содержимое, java.awt.BorderLayout.CENTER);
-        return p;
-    }
-
     /**
      * Пересчитать список версий, подходящих под выбранное сочетание
      * контейнеров и энергии, — и сразу показать первую из них.
@@ -293,12 +276,10 @@ public final class BlockCatalogPanel extends JPanel {
         Version v = id == null ? null : versions.get(id);
         remove(пусто);
         if (v == null) {
-            малые.показать(List.of());
-            большие.показать(List.of());
+            плитка.показать(List.of(), List.of());
             add(пусто, java.awt.BorderLayout.SOUTH);
         } else {
-            малые.показать(v.small);
-            большие.показать(v.big);
+            плитка.показать(v.small, v.big);
         }
         revalidate();
         repaint();
@@ -363,76 +344,237 @@ public final class BlockCatalogPanel extends JPanel {
     }
 
     // ==================================================================
-    //  ГАЛЕРЕЯ: ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА СТОРОН ОДНОГО РАЗМЕРА
+    //  ПЛИТКА: ДВА СТОЛБЦА, ПРОЛИСТЫВАНИЕ ВНИЗ
     // ==================================================================
 
-    /** Прокручиваемый ряд карточек-блоков — тот же приём, что в «Картах». */
-    private static final class Галерея extends JScrollPane {
-        private final Ряд ряд = new Ряд();
-
-        Галерея() {
-            super(null, VERTICAL_SCROLLBAR_NEVER, HORIZONTAL_SCROLLBAR_AS_NEEDED);
-            setViewportView(ряд);
-            getHorizontalScrollBar().setUnitIncrement(24);
-            getViewport().setBackground(Color.WHITE);
-        }
-
-        void показать(List<Face> faces) {
-            ряд.faces = faces;
-            ряд.revalidate();
-            ряд.repaint();
-        }
-
-        /** Задать поворот показа (шагов по 60° по часовой) и перерисовать. */
-        void поворот(int шагов) {
-            ряд.поворот = шагов;
-            ряд.repaint();
-        }
-    }
-
-    /** Сам ряд карточек — рисует все стороны блоков одна за одной. */
-    private static final class Ряд extends JComponent {
-        private List<Face> faces = List.of();
+    /**
+     * Все двадцать сторон набора одной плиткой: строка — один блок, слева его
+     * сторона А, справа сторона Б.
+     *
+     * <p>Ширина карточки — половина окна, поэтому блок рисуется тем крупнее, чем
+     * шире окно, и разметка ячеек читается без прищуривания. Высота строки
+     * привязана к ширине карточки (не наоборот): у блоков фиксированная форма, и
+     * если считать высоту первой, широкое окно оставит по бокам пустоту.
+     *
+     * <p>Размеры и цвета — только из {@link Theme}: собственные пиксели и
+     * {@code new Color(...)} по месту рассыпаются при смене масштаба и темы, чем
+     * этот экран и болел (карточка была жёстко 260×230 и белая).
+     */
+    private static final class Плитка extends JComponent implements Scrollable {
+        private List<Face> малые = List.of();
+        private List<Face> большие = List.of();
         /** Поворот показа: шагов по 60° по часовой стрелке (0..5). */
         private int поворот;
-        private static final int CARD_W = 260;
-        private static final int CARD_H = 230;
-        private static final int GAP = 14;
+
+        /**
+         * ВЫСОТА СТРОКИ СЧИТАЕТСЯ ПО САМОМУ ВЫСОКОМУ БЛОКУ РАЗДЕЛА, а не берётся
+         * долей от ширины наугад.
+         *
+         * <p>Иначе получается ровно та беда, из-за которой вкладку и переделали:
+         * лишняя высота — это пустые поля внутри карточек и лишняя прокрутка, а
+         * нехватка — сплюснутый блок с полями по бокам. Габарит зависит и от
+         * формы блока, и от поворота показа, поэтому меряется каждый раз.
+         */
+        private double долиВысоты(List<Face> faces) {
+            double худшая = 0.5;
+            for (Face f : faces) {
+                double[] габ = габарит(f);
+                худшая = Math.max(худшая, габ[1] / габ[0]);
+            }
+            return худшая;
+        }
+
+        /** Ширина и высота блока при пробном радиусе гекса 100. */
+        private double[] габарит(Face f) {
+            double проба = 100;
+            double minX = Double.MAX_VALUE;
+            double minY = Double.MAX_VALUE;
+            double maxX = -Double.MAX_VALUE;
+            double maxY = -Double.MAX_VALUE;
+            for (HexRec hx : повернутые(f.hexes())) {
+                double[] c = FieldGeometry.hexCenter(hx.q(), hx.r(), проба);
+                minX = Math.min(minX, c[0]);
+                maxX = Math.max(maxX, c[0]);
+                minY = Math.min(minY, c[1]);
+                maxY = Math.max(maxY, c[1]);
+            }
+            return new double[]{(maxX - minX) + 2 * проба, (maxY - minY) + 2 * проба};
+        }
+
+        void показать(List<Face> м, List<Face> б) {
+            малые = м;
+            большие = б;
+            revalidate();
+            repaint();
+        }
+
+        void поворот(int шагов) {
+            поворот = шагов;
+            repaint();
+        }
+
+        /** Ширина карточки при текущей ширине компонента: ровно два столбца. */
+        private int ширинаКарточки() {
+            int свободно = Math.max(Theme.px(200), getWidth())
+                - 2 * Theme.px(Theme.PAD_PANEL) - Theme.px(Theme.GAP_TILE);
+            return Math.max(Theme.px(120), свободно / 2);
+        }
+
+        private int высотаКарточки(List<Face> faces) {
+            int поле = Theme.px(Theme.PAD_TILE) * 2;
+            int подпись = Theme.px(Theme.PAD_TILE) * 2 + Theme.px(12);
+            double блок = (ширинаКарточки() - поле) * долиВысоты(faces);
+            int h = (int) Math.round(блок) + поле + подпись;
+            // ПОТОЛОК ПО ВЫСОТЕ ОКНА. Без него карточка растёт вслед за шириной,
+            // и на экран влезает одна строка: листать двадцать сторон пришлось бы
+            // десятью экранами. С потолком видно больше двух строк сразу, а блок
+            // остаётся крупным — он просто перестаёт растягиваться по ширине и
+            // центрируется с полями по бокам.
+            if (getParent() instanceof javax.swing.JViewport vp && vp.getHeight() > 0) {
+                h = Math.min(h, (int) Math.round(vp.getHeight() / 2.2));
+            }
+            return Math.max(Theme.px(150), h);
+        }
+
+        /** Полная высота содержимого: два заголовка разделов и строки блоков. */
+        private int высотаВсего() {
+            int строкМалых = (малые.size() + 1) / 2;
+            int строкБольших = (большие.size() + 1) / 2;
+            int h = Theme.px(Theme.PAD_PANEL);
+            if (строкМалых > 0) {
+                h += высотаЗаголовка()
+                    + строкМалых * (высотаКарточки(малые) + Theme.px(Theme.GAP_TILE));
+            }
+            if (строкБольших > 0) {
+                h += Theme.px(Theme.GAP_BLOCK) + высотаЗаголовка()
+                    + строкБольших * (высотаКарточки(большие) + Theme.px(Theme.GAP_TILE));
+            }
+            return h + Theme.px(Theme.PAD_PANEL);
+        }
+
+        private static int высотаЗаголовка() {
+            return Theme.px(22);
+        }
 
         @Override
         public Dimension getPreferredSize() {
-            int w = faces.isEmpty() ? CARD_W
-                : faces.size() * (CARD_W + GAP) + GAP;
-            return new Dimension(w, CARD_H);
+            return new Dimension(Math.max(Theme.px(320), getWidth()), высотаВсего());
+        }
+
+        // Прокрутка по ширине окна: горизонтальной полосы у плитки нет вовсе,
+        // столбцы всегда ровно два и тянутся вместе с окном.
+        @Override public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        @Override public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        @Override public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
+
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) {
+            return Theme.px(24);
+        }
+
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) {
+            return Math.max(Theme.px(24), r.height - Theme.px(24));
         }
 
         @Override
         protected void paintComponent(Graphics g0) {
             Graphics2D g = (Graphics2D) g0.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(Color.WHITE);
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g.setColor(Theme.bg());
             g.fillRect(0, 0, getWidth(), getHeight());
-            int x = GAP;
-            for (Face f : faces) {
-                рисоватьКарточку(g, x, 0, CARD_W, CARD_H, f);
-                x += CARD_W + GAP;
+
+            int y = Theme.px(Theme.PAD_PANEL);
+            y = рисоватьРаздел(g, y, малые,
+                "МАЛЫЕ БЛОКИ · 5 гексов · " + (малые.size() / 2) + " блоков, "
+                    + малые.size() + " сторон");
+            if (!большие.isEmpty() && !малые.isEmpty()) {
+                y += Theme.px(Theme.GAP_BLOCK);
             }
+            рисоватьРаздел(g, y, большие,
+                "БОЛЬШИЕ БЛОКИ · 6 гексов · " + (большие.size() / 2) + " блоков, "
+                    + большие.size() + " сторон");
             g.dispose();
         }
 
+        /** Заголовок раздела и его строки; возвращает следующий свободный y. */
+        private int рисоватьРаздел(Graphics2D g, int y, List<Face> faces, String заголовок) {
+            if (faces.isEmpty()) {
+                return y;
+            }
+            g.setFont(Theme.caption());
+            g.setColor(Theme.ink3());
+            g.drawString(заголовок, Theme.px(Theme.PAD_PANEL),
+                y + высотаЗаголовка() - Theme.px(7));
+            y += высотаЗаголовка();
+
+            int cw = ширинаКарточки();
+            int ch = высотаКарточки(faces);
+            for (int i = 0; i < faces.size(); i++) {
+                int столбец = i % 2;
+                int x = Theme.px(Theme.PAD_PANEL) + столбец * (cw + Theme.px(Theme.GAP_TILE));
+                рисоватьКарточку(g, x, y, cw, ch, faces.get(i));
+                if (столбец == 1 || i == faces.size() - 1) {
+                    y += ch + Theme.px(Theme.GAP_TILE);
+                }
+            }
+            return y;
+        }
+
         private void рисоватьКарточку(Graphics2D g, int x, int y, int w, int h, Face f) {
-            g.setColor(new Color(0xF7F7F9));
-            g.fillRoundRect(x, y, w, h, 14, 14);
-            g.setColor(new Color(0xC9CDD2));
-            g.drawRoundRect(x, y, w - 1, h - 1, 14, 14);
+            int радиус = Theme.px(10);
+            g.setColor(Theme.tile());
+            g.fillRoundRect(x, y, w, h, радиус, радиус);
+            g.setColor(Theme.border());
+            g.drawRoundRect(x, y, w - 1, h - 1, радиус, радиус);
 
-            String подпись = f.blockId + " · " + f.faceName
-                + (("small".equals(f.kind)) ? " · малый" : " · большой");
-            g.setFont(getFont().deriveFont(Font.BOLD, 13f));
-            g.setColor(new Color(0x333333));
-            g.drawString(подпись, x + 10, y + 20);
+            String подпись = f.blockId + " · сторона " + f.faceName;
+            g.setFont(Theme.font(12, Font.BOLD));
+            g.setColor(Theme.ink());
+            g.drawString(подпись, x + Theme.px(Theme.PAD_TILE),
+                y + Theme.px(Theme.PAD_TILE) + g.getFontMetrics().getAscent());
 
-            рисоватьБлок(g, f, x + w / 2, y + h / 2 + 8, 25);
+            int верх = Theme.px(Theme.PAD_TILE) * 2 + Theme.px(12);
+            рисоватьБлок(g, f, x + w / 2, y + верх + (h - верх) / 2,
+                размерГекса(f, w, h - верх));
+        }
+
+        /**
+         * Какой радиус гекса взять, чтобы блок целиком влез в карточку.
+         *
+         * <p>Считается по РАМКЕ САМОГО БЛОКА при пробном размере, а не по
+         * прикидке «три гекса в ширину»: блоки в данных не симметричны началу
+         * координат, а показ ещё и поворачивается на 60°, поэтому габарит меняется.
+         * Мерить надо то, что будет нарисовано.
+         */
+        private double размерГекса(Face f, int w, int h) {
+            double проба = 100;
+            List<HexRec> гексы = повернутые(f.hexes());
+            double minX = Double.MAX_VALUE;
+            double minY = Double.MAX_VALUE;
+            double maxX = -Double.MAX_VALUE;
+            double maxY = -Double.MAX_VALUE;
+            for (HexRec hx : гексы) {
+                double[] c = FieldGeometry.hexCenter(hx.q(), hx.r(), проба);
+                minX = Math.min(minX, c[0]);
+                maxX = Math.max(maxX, c[0]);
+                minY = Math.min(minY, c[1]);
+                maxY = Math.max(maxY, c[1]);
+            }
+            // Плюс один радиус с каждой стороны — центры не учитывают сам гекс.
+            double шир = (maxX - minX) + 2 * проба;
+            double выс = (maxY - minY) + 2 * проба;
+            double поле = Theme.px(Theme.PAD_TILE) * 2;
+            double доля = Math.min((w - поле) / шир, (h - поле) / выс);
+            return Math.max(Theme.pxf(6), проба * доля);
         }
 
         /**
