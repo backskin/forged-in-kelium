@@ -48,9 +48,32 @@ class ЖетонЗаглушкаTest {
         GameConfig cfg = GameConfig.buildCached(СВОД, 2, 4242L, null, null);
         GameState s = Setup.buildGame(cfg);
         for (PlayerState p : s.players) {
-            p.sealedUnit = первыйРодСМестом(p);
+            положитьЗаглушку(p, первыйРодСМестом(p));
         }
         return s;
+    }
+
+    /**
+     * Положить глухой жетон на ячейку рода — ровно так, как это делает движок
+     * (см. GameEngine.offerSealChoice): запись в redPlacements с флагом blocks.
+     * Отдельного поля под заглушку в состоянии нет и быть не должно: жетон
+     * физически такой же красный, только ничего не открывает.
+     */
+    private static void положитьЗаглушку(PlayerState p, UnitType род) {
+        java.util.Map<String, Object> жетон = new java.util.HashMap<>();
+        жетон.put("id", PlayerState.CU_MODULE);
+        жетон.put("blocks", true);
+        p.redPlacements.put(род, жетон);
+    }
+
+    /** На каком роде сейчас лежит глухой жетон, или null. */
+    private static UnitType заглушкаНа(PlayerState p) {
+        for (var e : p.redPlacements.entrySet()) {
+            if (Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                return e.getKey();
+            }
+        }
+        return null;
     }
 
     /** Первый род войск, у которого на планшете есть место под красный жетон. */
@@ -91,10 +114,10 @@ class ЖетонЗаглушкаTest {
     void заглушкаЗанимаетСвоюЯчейкуПокаЖетонУВладельца() {
         GameState s = стол();
         PlayerState p = s.player(0);
-        assertNotNull(p.sealedUnit, "заглушка должна лежать в ячейке");
+        assertNotNull(заглушкаНа(p), "заглушка должна лежать в ячейке");
         assertTrue(p.ownCuTokenAvailable, "жетон ещё у владельца");
         assertTrue(Modules.sealActive(s, p), "правило включено — заглушка в игре");
-        assertTrue(Modules.sealSits(s, p, p.sealedUnit),
+        assertTrue(Modules.sealSits(s, p, заглушкаНа(p)),
             "заглушка занимает ту ячейку, на которой лежит");
     }
 
@@ -102,7 +125,7 @@ class ЖетонЗаглушкаTest {
     void заглушкуМожноПереложитьНаДругойРод() {
         GameState s = стол();
         PlayerState p = s.player(0);
-        UnitType было = p.sealedUnit;
+        UnitType было = заглушкаНа(p);
 
         UnitType куда = null;
         for (UnitType t : UnitType.values()) {
@@ -114,7 +137,7 @@ class ЖетонЗаглушкаTest {
         assertNotNull(куда, "на планшете должен быть второй род с местом под модуль");
 
         Modules.moduleSwap(s, 0, new Первый("seal_move", куда), ev -> { });
-        assertEquals(куда, p.sealedUnit,
+        assertEquals(куда, заглушкаНа(p),
             "нарисованный род значит только стартовое положение — заглушка переносится");
         assertTrue(Modules.sealSits(s, p, куда), "теперь занята новая ячейка");
         assertFalse(Modules.sealSits(s, p, было), "прежняя ячейка освободилась");
@@ -132,7 +155,7 @@ class ЖетонЗаглушкаTest {
                 // Заглушку не двигаем, а модули раскладываем куда дают.
                 if ("seal_move".equals(ctx.get("kind"))) {
                     for (Choice c : options) {
-                        if (p.sealedUnit.equals(c.payload())) {
+                        if (заглушкаНа(p).equals(c.payload())) {
                             return c;
                         }
                     }
@@ -141,7 +164,13 @@ class ЖетонЗаглушкаTest {
             }
         }, ev -> { });
 
-        assertFalse(p.redPlacements.containsKey(p.sealedUnit),
+        // ЧТО ИМЕННО ПРОВЕРЯЕТСЯ. Заглушка живёт в той же redPlacements, что и
+        // рабочие модули, поэтому «записи на этом роде нет» — не тот признак:
+        // запись есть всегда, это сама заглушка. Признак правила в том, что
+        // запись ОСТАЛАСЬ ГЛУХОЙ: рабочий модуль ячейку не занял.
+        UnitType подЗаглушкой = заглушкаНа(p);
+        assertNotNull(подЗаглушкой, "заглушка никуда не делась");
+        assertTrue(Boolean.TRUE.equals(p.redPlacements.get(подЗаглушкой).get("blocks")),
             "на ячейку под заглушкой рабочий красный модуль класть нельзя");
     }
 
@@ -149,7 +178,7 @@ class ЖетонЗаглушкаTest {
     void сносЦУУноситЗаглушкуИОсвобождаетЯчейку() {
         GameState s = стол();
         PlayerState p = s.player(0);
-        UnitType была = p.sealedUnit;
+        UnitType была = заглушкаНа(p);
 
         // Жетон уехал к захватчику — ровно это и значит ownCuTokenAvailable.
         p.ownCuTokenAvailable = false;
