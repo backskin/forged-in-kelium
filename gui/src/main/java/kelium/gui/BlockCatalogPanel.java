@@ -367,6 +367,24 @@ public final class BlockCatalogPanel extends JPanel {
         private int поворот;
 
         /**
+         * КЕГЛИ КАТАЛОГА (просьба дизайнера 31.08.2026: заголовок раздела крупнее
+         * в два с половиной раза, название блока — в полтора).
+         *
+         * <p>Числа не выдуманы, а посчитаны от ступеней {@link Theme}: заголовок
+         * раздела — это {@code caption()} (11) в 2.5 раза, название блока —
+         * прежние 12 в 1.5 раза. Так связь со шкалой видна в коде, а новой
+         * ступени в теме не появляется: каталог — экран для разглядывания, и
+         * крупный кегль здесь местная нужда, а не общая.
+         */
+        private static Font шрифтЗаголовка() {
+            return Theme.font(11 * 2.5, Font.BOLD);
+        }
+
+        private static Font шрифтНазвания() {
+            return Theme.font(12 * 1.5, Font.BOLD);
+        }
+
+        /**
          * ВЫСОТА СТРОКИ СЧИТАЕТСЯ ПО САМОМУ ВЫСОКОМУ БЛОКУ РАЗДЕЛА, а не берётся
          * долей от ширины наугад.
          *
@@ -452,8 +470,14 @@ public final class BlockCatalogPanel extends JPanel {
             return h + Theme.px(Theme.PAD_PANEL);
         }
 
-        private static int высотаЗаголовка() {
-            return Theme.px(22);
+        /**
+         * Высота полосы заголовка раздела — по МЕТРИКЕ шрифта плюс воздух.
+         * Константой её держать нельзя: кегль вырос в два с половиной раза, и
+         * прежние 22 точки обрезали бы буквы с нижними выносными.
+         */
+        private int высотаЗаголовка() {
+            java.awt.FontMetrics fm = getFontMetrics(шрифтЗаголовка());
+            return fm.getAscent() + fm.getDescent() + Theme.px(Theme.PAD_TILE);
         }
 
         @Override
@@ -510,10 +534,11 @@ public final class BlockCatalogPanel extends JPanel {
             if (faces.isEmpty()) {
                 return y;
             }
-            g.setFont(Theme.caption());
+            g.setFont(шрифтЗаголовка());
             g.setColor(Theme.ink3());
+            java.awt.FontMetrics fmЗ = g.getFontMetrics();
             g.drawString(заголовок, Theme.px(Theme.PAD_PANEL),
-                y + высотаЗаголовка() - Theme.px(7));
+                y + fmЗ.getAscent());
             y += высотаЗаголовка();
 
             int cw = ширинаКарточки();
@@ -537,12 +562,13 @@ public final class BlockCatalogPanel extends JPanel {
             g.drawRoundRect(x, y, w - 1, h - 1, радиус, радиус);
 
             String подпись = f.blockId + " · сторона " + f.faceName;
-            g.setFont(Theme.font(12, Font.BOLD));
+            g.setFont(шрифтНазвания());
             g.setColor(Theme.ink());
+            java.awt.FontMetrics fmН = g.getFontMetrics();
             g.drawString(подпись, x + Theme.px(Theme.PAD_TILE),
-                y + Theme.px(Theme.PAD_TILE) + g.getFontMetrics().getAscent());
+                y + Theme.px(Theme.PAD_TILE) + fmН.getAscent());
 
-            int верх = Theme.px(Theme.PAD_TILE) * 2 + Theme.px(12);
+            int верх = Theme.px(Theme.PAD_TILE) * 2 + fmН.getAscent() + fmН.getDescent();
             рисоватьБлок(g, f, x + w / 2, y + верх + (h - верх) / 2,
                 размерГекса(f, w, h - верх));
         }
