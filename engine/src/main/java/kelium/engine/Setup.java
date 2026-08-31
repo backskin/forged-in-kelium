@@ -550,8 +550,11 @@ public final class Setup {
         int deal = Math.max(1, ((Number) ruleset.get("super_objectives.deal", 1)).intValue());
         // СУПЕР-ЗАДАНИЯ 5.0 (mode: solo5): по ОДНОЙ карте втайне, без вскрытия
         // и счётчика; раздачу делает Super5 ниже, когда GameState уже собран.
-        boolean solo5 = "solo5".equals(String.valueOf(ruleset.get("super_objectives.mode", "")));
-        if (!solo5 && expansionOn(ruleset, "super_objectives")) {
+        // Прежняя раздача (несколько карт на выбор, вскрытие, счётчик) не
+        // действует ни в 5.0, ни в 6.0: там игроку идёт ОДНА карта втайне.
+        String режимСупер = String.valueOf(ruleset.get("super_objectives.mode", ""));
+        boolean одинокаяКарта = "solo5".equals(режимСупер) || "solo6".equals(режимСупер);
+        if (!одинокаяКарта && expansionOn(ruleset, "super_objectives")) {
             List<String> superIds = new ArrayList<>(content.get("super_objectives").ids());
             Collections.shuffle(superIds, rng);
             int at = 0;
@@ -805,7 +808,8 @@ public final class Setup {
         }
         // СУПЕР-ЗАДАНИЯ 5.0: по одной карте втайне каждому. Каталог 5.0.0 несёт
         // ровно двенадцать карт s5_01..s5_12; их эффекты и накопители — Super5.
-        if ("solo5".equals(String.valueOf(ruleset.get("super_objectives.mode", "")))) {
+        String суперРежим = String.valueOf(ruleset.get("super_objectives.mode", ""));
+        if ("solo5".equals(суперРежим) || "solo6".equals(суперРежим)) {
             try {
                 Super5.deal(s, content.get("super_objectives").ids(), rng);
             } catch (RuntimeException e) {

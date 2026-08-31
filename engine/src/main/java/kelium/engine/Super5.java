@@ -44,9 +44,24 @@ public final class Super5 {
     private Super5() {
     }
 
-    /** Включён ли режим 5.0 этим сводом. */
+    /** Включён ли режим 5.0 («суперутиль или накопитель») этим сводом. */
     public static boolean on(GameState s) {
         return "solo5".equals(String.valueOf(Ctx.rules(s).get("super_objectives.mode", "")));
+    }
+
+    /**
+     * Включён ли режим 6.0 («множитель в финале плюс жёсткое требование»).
+     *
+     * <p>ПОЧЕМУ 5.0 ОТМЕНЁН (правило дизайнера 31.08.2026). Разовый суперутиль
+     * жгли сразу же и дружно: ждать его невыгодно никогда, поэтому карта уходила
+     * из партии в первые ходы, и про неё забывали. Замер это и показал — 95–100%
+     * карт сожжено. В 6.0 карта НЕ СЖИГАЕТСЯ ВОВСЕ: верх даёт множитель победных
+     * очков в ФИНАЛЕ (значок финала вместо «всегда»), а прежний суперутиль стал
+     * НАГРАДОЙ за жёсткое требование низа — то самое ограничение, которого не
+     * хватало, чтобы эффектом нельзя было воспользоваться сразу.
+     */
+    public static boolean on6(GameState s) {
+        return "solo6".equals(String.valueOf(Ctx.rules(s).get("super_objectives.mode", "")));
     }
 
     /** Раздать по одной карте втайне (зовёт Setup). */
@@ -77,6 +92,29 @@ public final class Super5 {
             return got;
         }
         p.super5Burned = true;
+        return выдать(s, p, agent, emit, id);
+    }
+
+    /**
+     * НАГРАДА ЗА ВЫПОЛНЕННОЕ ТРЕБОВАНИЕ НИЗА (режим 6.0).
+     *
+     * <p>Эффекты те же, что были суперутилями в 5.0, — они и задумывались как
+     * «супер-приколдес, какого обычным путём не получить». Разница в цене: в 5.0
+     * их брали бесплатно и сразу, здесь за них надо выстроить жёсткое условие.
+     * Карта при этом остаётся на столе и продолжает давать множитель верха.
+     */
+    public static Map<String, Object> наградаНиза(GameState s, PlayerState p, Agent agent,
+                                                  java.util.function.Consumer<Map<String, Object>> emit) {
+        if (p.super5Card == null) {
+            return new HashMap<>();
+        }
+        return выдать(s, p, agent, emit, p.super5Card);
+    }
+
+    private static Map<String, Object> выдать(GameState s, PlayerState p, Agent agent,
+                                              java.util.function.Consumer<Map<String, Object>> emit,
+                                              String id) {
+        Map<String, Object> got = new HashMap<>();
         switch (id) {
             case "s5_01" -> got.put("hired", смотрВойск(s, p));
             case "s5_02" -> got.put("gathered", дальнийРубеж(s, p, agent));
@@ -408,10 +446,19 @@ public final class Super5 {
     //  НАКОПИТЕЛИ — очки в конце партии, если карта дожила нетронутой
     // ==================================================================
 
-    /** Очки накопителя игрока (0, если карты нет или она сожжена). */
+    /**
+     * ВЕРХ КАРТЫ В ОЧКАХ.
+     *
+     * <p>В режиме 5.0 это «накопитель»: платит, только если карта дожила до конца
+     * нетронутой. В режиме 6.0 это МНОЖИТЕЛЬ ФИНАЛА, и он платит ВСЕГДА: карта
+     * не сжигается ни при каких условиях, а награда низа его не отменяет.
+     */
     public static int stockpileVp(GameState s, int seat) {
         PlayerState p = s.player(seat);
-        if (p.super5Card == null || p.super5Burned) {
+        if (p.super5Card == null) {
+            return 0;
+        }
+        if (p.super5Burned && !on6(s)) {
             return 0;
         }
         return switch (p.super5Card) {
@@ -499,6 +546,140 @@ public final class Super5 {
             }
             default -> 0;
         };
+    }
+
+    // ==================================================================
+    //  НИЗ КАРТЫ 6.0 — ЖЁСТКОЕ ТРЕБОВАНИЕ
+    // ==================================================================
+
+    /**
+     * ВЫПОЛНЕНО ЛИ ЖЁСТКОЕ ТРЕБОВАНИЕ НИЗА (режим 6.0).
+     *
+     * <p>Требования нарочно тяжелее обычных заданий и НЕ совпадают с тем, за что
+     * платит множитель верха: если бы совпадали, карта платила бы дважды за одно
+     * и то же, и выбора внутри карты не осталось бы. Каждое требование — либо
+     * состояние поля, которое надо выстроить нарочно, либо счётчик партии.
+     *
+     * <p>ЧЕРНОВИК СОСТАВА: сами требования подобраны под темы карт и ждут ревью
+     * дизайнера; механика от их точных чисел не зависит.
+     */
+    public static boolean требованиеВыполнено(GameState s, int seat) {
+        PlayerState p = s.player(seat);
+        if (p.super5Card == null) {
+            return false;
+        }
+        switch (p.super5Card) {
+            case "s5_01": {
+                // Три РАЗНЫХ рода на одном гексе — смотр в прямом смысле.
+                Map<String, java.util.Set<UnitType>> поГексам = new HashMap<>();
+                for (UnitToken u : p.unitsOnField()) {
+                    поГексам.computeIfAbsent(u.hexId,
+                        k -> new java.util.HashSet<>()).add(u.type);
+                }
+                for (java.util.Set<UnitType> в : поГексам.values()) {
+                    if (в.size() >= 3) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            case "s5_02": {
+                // Своё войско рядом с ЧУЖИМ ЦУ — самое опасное место на поле.
+                for (UnitToken u : p.unitsOnField()) {
+                    for (String nb : s.field.neighbors(u.hexId)) {
+                        for (PlayerState o : s.players) {
+                            if (o.seat == seat) {
+                                continue;
+                            }
+                            for (BuildingToken b : o.buildingsOnField()) {
+                                if (b.type == BuildingType.COMMAND_CENTER
+                                        && nb.equals(b.hexId)) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+            case "s5_03": {
+                // Здания на пяти разных гексах — сеть, а не куча.
+                java.util.Set<String> гексы = new java.util.HashSet<>();
+                for (BuildingToken b : p.buildingsOnField()) {
+                    гексы.add(b.hexId);
+                }
+                return гексы.size() >= 5;
+            }
+            case "s5_04": {
+                // Три гекса, где стоят одновременно здание и войско.
+                java.util.Set<String> зд = new java.util.HashSet<>();
+                for (BuildingToken b : p.buildingsOnField()) {
+                    зд.add(b.hexId);
+                }
+                int n = 0;
+                for (UnitToken u : p.unitsOnField()) {
+                    if (зд.remove(u.hexId)) {
+                        n++;
+                    }
+                }
+                return n >= 3;
+            }
+            case "s5_05":
+                return p.objectivesCompleted >= 4;
+            case "s5_06":
+                return p.allInstalledArsenal().size() >= 3;
+            case "s5_07":
+                return p.resources.kelium() >= 5;
+            case "s5_08": {
+                // Быть выше всех сразу на ДВУХ треках.
+                int n = 0;
+                for (String track : s.tech.tracks) {
+                    int мой = p.techSteps.getOrDefault(track, 0);
+                    if (мой == 0) {
+                        continue;
+                    }
+                    boolean выше = true;
+                    for (PlayerState o : s.players) {
+                        if (o.seat != seat && o.techSteps.getOrDefault(track, 0) >= мой) {
+                            выше = false;
+                            break;
+                        }
+                    }
+                    if (выше) {
+                        n++;
+                    }
+                }
+                return n >= 2;
+            }
+            case "s5_09":
+                return p.killsTotal >= 4 && !p.super5CuEverLost;
+            case "s5_10":
+                return p.super5RoundsFirst >= 2;
+            case "s5_11": {
+                // Четыре здания первого уровня — широкая дешёвая сеть.
+                int n = 0;
+                for (BuildingToken b : p.buildingsOnField()) {
+                    if (b.level != null && b.level == 1) {
+                        n++;
+                    }
+                }
+                return n >= 4;
+            }
+            case "s5_12": {
+                // Твоё ЦУ цело, а у соперника уже снесли: война идёт, но не у тебя.
+                if (p.super5CuEverLost) {
+                    return false;
+                }
+                for (PlayerState o : s.players) {
+                    if (o.seat != seat && o.super5CuEverLost) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            default:
+                return false;
+        }
     }
 
     // ==================================================================

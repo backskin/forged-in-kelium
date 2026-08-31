@@ -1183,6 +1183,16 @@ public final class GameEngine {
             opts.add(new Choice("spec_super5_burn", p.super5Card,
                 "СУПЕРУТИЛЬ " + p.super5Card));
         }
+        // СУПЕР-ЗАДАНИЕ 6.0: низ карты. Карта НЕ сжигается — награда выдаётся за
+        // ВЫПОЛНЕННОЕ жёсткое требование, один раз за партию, и множитель верха
+        // после этого продолжает считаться. Именно это ограничение и просил
+        // дизайнер: разовым эффектом больше нельзя воспользоваться сразу же,
+        // сперва надо довести партию до нужного состояния.
+        if (p.super5Card != null && !p.super6RewardTaken && Super5.on6(s)
+                && Super5.требованиеВыполнено(s, p.seat)) {
+            opts.add(new Choice("spec_super6_claim", p.super5Card,
+                "СУПЕР-НАГРАДА " + p.super5Card));
+        }
         // СПОСОБНОСТИ АРСЕНАЛА сами кладут свои варианты в меню СПЕЦ: движок не
         // знает про карты, он спрашивает «что добавить?». Так карта даёт НОВОЕ
         // спец-действие без правки движка (13.08.2026).
@@ -1236,6 +1246,12 @@ public final class GameEngine {
             case "spec_symbol_reveal" -> revealSymbol(p, (String) ch.payload());
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
+            case "spec_super6_claim" -> {
+                p.super6RewardTaken = true;
+                Map<String, Object> got = Super5.наградаНиза(s, p, agents.get(p.seat), this::emit);
+                emit(ev("type", "super6_claim", "seat", p.seat,
+                    "card", ch.payload(), "got", got));
+            }
             case "spec_super5_burn" -> {
                 Map<String, Object> got = Super5.burn(s, p, agents.get(p.seat), this::emit);
                 emit(ev("type", "super5_burn", "seat", p.seat,

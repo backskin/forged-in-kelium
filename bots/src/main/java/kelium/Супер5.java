@@ -41,6 +41,8 @@ public final class Супер5 {
         String имя = "";
         long роздано;
         long сожжено;
+        long требованиеВзято;      // низ 6.0: награда получена
+        long требованиеБылоГотово;  // низ 6.0: условие выполнялось к концу партии
         long очковНакопителя;
         long побед;
     }
@@ -79,10 +81,16 @@ public final class Супер5 {
                 k.роздано++;
                 if (p.super5Burned) {
                     k.сожжено++;
-                } else {
-                    k.очковНакопителя += Scoring.scorePlayer(s, p.seat)
-                        .getOrDefault("super5_stockpile", 0);
                 }
+                if (p.super6RewardTaken) {
+                    k.требованиеВзято++;
+                }
+                if (kelium.engine.Super5.требованиеВыполнено(s, p.seat)) {
+                    k.требованиеБылоГотово++;
+                }
+                // В 6.0 множитель платит всегда — карта не сжигается.
+                k.очковНакопителя += Scoring.scorePlayer(s, p.seat)
+                    .getOrDefault("super5_stockpile", 0);
                 if (s.winner != null && s.winner == p.seat) {
                     k.побед++;
                 }
@@ -95,21 +103,23 @@ public final class Супер5 {
             .append("**, игроков ").append(players)
             .append(". Средняя длина партии: ")
             .append(окр((double) раундов / games)).append(" раундов.\n\n");
-        b.append("Черновик просит проверить: жгут и хранят примерно поровну; ")
-            .append("накопитель приносит 4–6 очков; карты не расходятся вдвое.\n\n");
+        b.append("Режим 6.0: карта не сжигается, верх даёт множитель в финале, низ — ")
+            .append("награду за жёсткое требование. Проверяем: множитель 4–6 очков, ")
+            .append("карты не расходятся вдвое, требование низа достижимо.\n\n");
 
-        b.append("| карта | название | роздано | сожжено | доля сожжённых | ")
-            .append("накопитель, ПО в среднем у сохранивших | побед с картой |\n");
-        b.append("|---|---|---:|---:|---:|---:|---:|\n");
+        b.append("| карта | название | роздано | множитель, ПО в среднем | ")
+            .append("низ: награда взята | низ: условие стояло к концу | ")
+            .append("сожжено (5.0) | побед с картой |\n");
+        b.append("|---|---|---:|---:|---:|---:|---:|---:|\n");
         for (var e : итог.entrySet()) {
             Карта k = e.getValue();
-            long сохранило = k.роздано - k.сожжено;
             b.append("| ").append(e.getKey()).append(" | ").append(k.имя)
                 .append(" | ").append(k.роздано)
-                .append(" | ").append(k.сожжено)
+                .append(" | ").append(k.роздано == 0 ? "—"
+                    : окр((double) k.очковНакопителя / k.роздано))
+                .append(" | ").append(проц(k.требованиеВзято, k.роздано))
+                .append(" | ").append(проц(k.требованиеБылоГотово, k.роздано))
                 .append(" | ").append(проц(k.сожжено, k.роздано))
-                .append(" | ").append(сохранило == 0 ? "—"
-                    : окр((double) k.очковНакопителя / сохранило))
                 .append(" | ").append(проц(k.побед, k.роздано))
                 .append(" |\n");
         }
@@ -119,8 +129,12 @@ public final class Супер5 {
         Files.writeString(out, b.toString(), StandardCharsets.UTF_8);
         long роздано = итог.values().stream().mapToLong(k -> k.роздано).sum();
         long сожжено = итог.values().stream().mapToLong(k -> k.сожжено).sum();
-        System.out.println("роздано: " + роздано + ", сожжено: " + сожжено
-            + " (" + проц(сожжено, роздано) + ")");
+        long взято = итог.values().stream().mapToLong(k -> k.требованиеВзято).sum();
+        long очки = итог.values().stream().mapToLong(k -> k.очковНакопителя).sum();
+        System.out.println("роздано: " + роздано
+            + ", награда низа взята: " + взято + " (" + проц(взято, роздано) + ")"
+            + ", множитель в среднем: " + окр((double) очки / Math.max(1, роздано))
+            + ", сожжено по 5.0: " + сожжено);
         System.out.println("отчёт: " + out.toAbsolutePath());
     }
 
