@@ -257,7 +257,10 @@ public final class Super5 {
         List<String> витрина = s.arsenalDisplay;
         if (витрина != null) {
             while (!витрина.isEmpty()) {
-                p.arsenalHand.add(витрина.remove(0));
+                if (!kelium.engine.Storage.takeArsenalCard(s, p, витрина.get(0))) {
+                    break;                  // ячейки кончились — витрина остаётся
+                }
+                витрина.remove(0);
                 got++;
             }
         }

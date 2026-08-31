@@ -404,7 +404,7 @@ public final class GameEngine {
         }
         GameState s = state;
         if (s.rng.nextDouble() < rate
-                && p.arsenalHand.size() + p.arsenalInstalled.size() < 3) {
+                && Storage.arsenalCellFree(s, p)) {
             String c = s.decks.get("arsenal").draw(s.rng);
             if (c != null) {
                 p.arsenalHand.add(c);

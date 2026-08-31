@@ -441,7 +441,7 @@ public final class Objectives {
                 case "arsenal" -> {
                     String c = s.decks.get("arsenal").draw(s.rng);
                     if (c != null) {
-                        p.arsenalHand.add(c);
+                        kelium.engine.Storage.takeArsenalCard(s, p, c);
                     }
                     into.put("arsenal", 1);
                 }

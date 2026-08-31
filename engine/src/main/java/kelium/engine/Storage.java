@@ -71,6 +71,78 @@ public final class Storage {
      * (установленная) карта с {@code container_slot: true} даёт 1 место, без —
      * 0. При выключенном правиле — без лимита.
      */
+    /**
+     * СВОБОДНА ЛИ ЯЧЕЙКА ПОД ЕЩЁ ОДНУ КАРТУ АРСЕНАЛА.
+     *
+     * <p>Ячейки общие: карта арсенала занимает ячейку целиком, контейнеры лежат
+     * по два в свободной ячейке. Значит взять карту арсенала можно, только если
+     * после неё контейнерам ещё хватит места — иначе занятых ячеек станет
+     * больше трёх.
+     *
+     * <p>Прежде проверка шла в одну сторону: контейнеры считались по свободным
+     * ячейкам, а карта арсенала приходила молча и сверх того. Замер на двенадцати
+     * партиях показал занятых ячеек ЧЕТЫРЕ при пределе три — две карты арсенала
+     * и три контейнера.
+     */
+    public static boolean arsenalCellFree(kelium.core.GameState s, PlayerState p) {
+        var rs = Ctx.rules(s);
+        if (!Boolean.TRUE.equals(rs.get("containers_storage.open_is_spec", Boolean.FALSE))) {
+            return true;                    // правило ячеек выключено
+        }
+        int cells = ((Number) rs.get("containers_storage.arsenal_cells", 3)).intValue();
+        return cellsUsed(s, p) + 1 <= cells;
+    }
+
+    /**
+     * СКОЛЬКО ЯЧЕЕК ПОД ПЛАНШЕТОМ ЗАНЯТО СЕЙЧАС: каждая карта арсенала — целая
+     * ячейка, контейнеры — по {@code slots_per_free_cell} в ячейке.
+     */
+    public static int cellsUsed(kelium.core.GameState s, PlayerState p) {
+        var rs = Ctx.rules(s);
+        int perFree = ((Number) rs.get("containers_storage.slots_per_free_cell", 2)).intValue();
+        int onCard = ((Number) rs.get("containers_storage.slots_on_open_card_with_slot", 1))
+            .intValue();
+        int арсенал = p.arsenalHand.size() + p.arsenalInstalled.size();
+        // ЛЕЖАЩИЕ НЕ В ЯЧЕЙКАХ НЕ СЧИТАЮТСЯ: контейнеры под «мандатом» лежат на
+        // своём отдельном месте, а у установленной карты с container_slot есть
+        // место НА САМОЙ КАРТЕ. Без этой поправки счёт завышал занятость и
+        // отказывал в карте арсенала там, где место на деле было.
+        int наКартах = 0;
+        var lib = Ctx.cards(s, "arsenal");
+        for (String cid : p.allInstalledArsenal()) {
+            var card = lib.find(cid);
+            if (card != null && Boolean.TRUE.equals(card.get("container_slot"))) {
+                наКартах += onCard;
+            }
+        }
+        int вЯчейках = Math.max(0, p.containers - p.mandateContainers - наКартах);
+        int подКонтейнеры = perFree <= 0 ? 0 : (вЯчейках + perFree - 1) / perFree;
+        return арсенал + подКонтейнеры;
+    }
+
+    /**
+     * ВЗЯТЬ КАРТУ АРСЕНАЛА В ЯЧЕЙКУ. Места нет — карта не берётся вовсе и
+     * уходит в сброс своей колоды: держать её негде, руки для карт арсенала не
+     * существует.
+     *
+     * @return взяли ли карту
+     */
+    public static boolean takeArsenalCard(kelium.core.GameState s, PlayerState p,
+                                          String cardId) {
+        if (cardId == null) {
+            return false;
+        }
+        if (!arsenalCellFree(s, p)) {
+            var deck = s.decks.get("arsenal");
+            if (deck != null) {
+                deck.discard(cardId);
+            }
+            return false;
+        }
+        p.arsenalHand.add(cardId);
+        return true;
+    }
+
     public static int containerCapacity(kelium.core.GameState s, PlayerState p) {
         var rs = Ctx.rules(s);
         if (!Boolean.TRUE.equals(rs.get("containers_storage.open_is_spec", Boolean.FALSE))) {

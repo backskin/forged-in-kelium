@@ -206,7 +206,9 @@ public final class Effects {
                 if (c == null) {
                     break;
                 }
-                pl.arsenalHand.add(c);
+                if (!kelium.engine.Storage.takeArsenalCard(s, pl, c)) {
+                    break;                  // ячейки заняты — карту брать некуда
+                }
                 drawn++;
             }
             got.put("arsenal", drawn);
@@ -1079,6 +1081,11 @@ public final class Effects {
         int victim = pick != null && pick.payload() instanceof Integer v
             ? v : (Integer) opts.get(0).payload();
         PlayerState from = s.player(victim);
+        // ЯЧЕЙКА У ВОРА ДОЛЖНА БЫТЬ СВОБОДНА: положить украденную карту некуда —
+        // кража не происходит, у жертвы карта остаётся.
+        if (!kelium.engine.Storage.arsenalCellFree(s, s.player(seat))) {
+            return Map.of("stolen", 0, "reason", "у вора нет свободной ячейки");
+        }
         String card = from.arsenalHand.remove(s.rng.nextInt(from.arsenalHand.size()));
         s.player(seat).arsenalHand.add(card);
         return Map.of("stolen", 1, "from_seat", victim, "card", card);

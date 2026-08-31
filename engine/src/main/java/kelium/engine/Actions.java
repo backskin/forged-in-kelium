@@ -2897,7 +2897,10 @@ public final class Actions {
                 opts.add(new Choice("sci_exchange", ex,
                     "2 trophy разом -> " + (2 + pairBonus) + " coin"));
             }
-            if (pool >= 2) {
+            // ЗА КАРТУ НЕ ПЛАТЯТ, ЕСЛИ ЕЁ НЕКУДА ПОЛОЖИТЬ: ячейки под планшетом
+            // заняты — обмен не предлагается вовсе. Иначе трофеи уходят, а карта
+            // не приходит.
+            if (pool >= 2 && kelium.engine.Storage.arsenalCellFree(state, player)) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "draw_arsenal");
                 ex.put("give", 2);
@@ -2980,6 +2983,10 @@ public final class Actions {
      * кончились бы за столом.
      */
     static String takeFromArsenalDisplay(GameState state, PlayerState player, Agent agent) {
+        // ЯЧЕЙКИ ПОД ПЛАНШЕТОМ ЗАНЯТЫ — брать некуда, и витрину трогать незачем.
+        if (!kelium.engine.Storage.arsenalCellFree(state, player)) {
+            return null;
+        }
         if (state.arsenalDisplay.isEmpty()) {
             kelium.engine.Setup.refillArsenalDisplay(state);
         }
