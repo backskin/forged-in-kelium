@@ -850,12 +850,12 @@ public final class Setup {
                     }
                 }
                 case "containers" -> {
-                    for (String v : new String[]{"a", "b"}) {
-                        Map<String, Object> var = (Map<String, Object>) card.get(v);
-                        if (var != null && !Effects.isImplemented((String) var.get("effect"))) {
-                            bad = "variant " + v + " effect " + var.get("effect");
-                            break;
-                        }
+                    // ПРОВЕРЯЕТСЯ ТОЛЬКО НАПЕЧАТАННАЯ СТОРОНА: выбора у
+                    // контейнера нет, вторая сторона старых наборов в игру не
+                    // идёт, и отсеивать по ней карту было бы неверно.
+                    Map<String, Object> var = (Map<String, Object>) card.get("a");
+                    if (var != null && !Effects.isImplemented((String) var.get("effect"))) {
+                        bad = "variant a effect " + var.get("effect");
                     }
                 }
                 case "market" -> {

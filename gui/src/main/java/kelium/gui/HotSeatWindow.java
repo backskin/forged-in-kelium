@@ -122,6 +122,11 @@ public final class HotSeatWindow {
     FieldView field;
     private BoardsPanel boards;
     private BoardSheet sheet;
+
+    /** Планшет смотрящего места — для прогонщиков и тестов. */
+    BoardSheet sheetForTest() {
+        return sheet;
+    }
     /** Кнопки выбора места в ящике «Планшет» — их приходится запирать. */
     private final Map<Integer, JToggleButton> sheetSeatBtns = new LinkedHashMap<>();
     private JScrollPane sheetScroll;
@@ -154,7 +159,7 @@ public final class HotSeatWindow {
     HandPanel hands;
     ActionBar actionBar;
     PromptOverlay prompt;
-    private ZoomCard zoom;
+    ZoomCard zoom;
     kelium.gui.kp.ConfirmDialog confirm;
     kelium.gui.kp.CardChoiceOverlay ceremony;
     /** Шторка передачи устройства — только когда за столом больше одного живого. */
@@ -267,7 +272,9 @@ public final class HotSeatWindow {
         frame.add(buildPlayerZone(), BorderLayout.SOUTH);
 
         zoom = new ZoomCard();
-        zoom.setSize(Theme.px(236), Theme.px(348));
+        // Выше прежнего: под лицом карты теперь помещается весь печатный текст
+        // (условие, награда, усиленная награда, утиль), а не одна строка.
+        zoom.setSize(Theme.px(300), Theme.px(420));
         zoom.setVisible(false);
         frame.getLayeredPane().add(zoom, JLayeredPane.POPUP_LAYER);
 
@@ -743,6 +750,11 @@ public final class HotSeatWindow {
         return zone;
     }
 
+    /** Показать увеличенную карту — для прогонщиков и тестов. */
+    void showZoomForTest(CardTile tile, String group) {
+        showZoom(tile, group);
+    }
+
     private void showZoom(CardTile tile, String group) {
         if ("Приказы".equals(group) && tile.orderFaceInfo() != null) {
             zoom.showOrder(tile.orderFaceInfo(), tile.cardName(), orderDesc(tile.cardId));
@@ -750,25 +762,40 @@ public final class HotSeatWindow {
             return;
         }
         String type;
-        String detail = "";
+        String detail;
         double progress = -1;
         if ("Задания".equals(group)) {
             type = "Задание";
+            StringBuilder t = new StringBuilder();
             try {
                 var card = kelium.engine.cards.CardRegistry.objective(tile.cardId);
                 GameState s = liveState;
                 if (card != null && s != null) {
                     var ctx = new kelium.engine.cards.EngineCardContext(s, viewedSeat);
                     progress = card.progress(ctx);
-                    detail = String.valueOf(card.needed(ctx));
+                    t.append(card.needed(ctx));
                 }
             } catch (RuntimeException ignore) {
                 // прогресс — украшение подсказки; без него карта всё равно видна
             }
+            добавить(t, "", objectiveText(tile.cardId));
+            добавить(t, "НАГРАДА: ", objectiveReward(tile.cardId));
+            добавить(t, "УСИЛЕННАЯ: ", objectiveBonus(tile.cardId));
+            добавить(t, "УТИЛЬ (сжечь): ", objectiveTop(tile.cardId));
+            detail = t.toString();
         } else if ("Приказы".equals(group)) {
             type = "Приказ";
+            detail = orderDesc(tile.cardId);
         } else {
+            // АРСЕНАЛ ПОКАЗЫВАЛСЯ ПУСТЫМ: у карты бралось одно имя, а обе
+            // половины — что она делает установленной и что даёт, если её
+            // сжечь, — не показывались нигде, кроме меню карт.
             type = "Арсенал";
+            StringBuilder t = new StringBuilder();
+            добавить(t, "", cardText(tile.cardId));
+            добавить(t, "РАБОТАЕТ: ", arsenalLabel(tile.cardId, "bottom"));
+            добавить(t, "УТИЛЬ (сжечь): ", arsenalLabel(tile.cardId, "top"));
+            detail = t.toString();
         }
         zoom.show(tile.cardName(), type, tile.bandColor(), detail, progress);
         placeZoom(tile);
@@ -864,9 +891,40 @@ public final class HotSeatWindow {
             if (stopped) {
                 return;      // окно уже закрыто, жаловаться некому
             }
+            // ОБОРВАННАЯ ПАРТИЯ — НЕ ТУПИК. Журнал пишется (дизайнеру он нужен
+            // именно от сломанной партии), поломка называется вслух, и из окна
+            // есть выход: раньше оставалась мёртвая доска, где нечего нажать.
+            saveJournal(rec, "-ошибка");
+            StringBuilder где = new StringBuilder();
+            for (StackTraceElement el : t.getStackTrace()) {
+                if (el.getClassName().startsWith("kelium.")) {
+                    где.append(el.getClassName()).append('.').append(el.getMethodName())
+                        .append(" (строка ").append(el.getLineNumber()).append(')');
+                    break;
+                }
+            }
             SwingUtilities.invokeLater(() -> {
-                turnLabel.setText("Партия прервана ошибкой");
-                feedLine(null, String.valueOf(t));
+                finished = true;
+                clearDecision();
+                turnLabel.setText("Партия оборвалась ошибкой");
+                turnLabel.setForeground(Theme.bad());
+                endBtn.setTexts("Партия оборвана", "");
+                endBtn.setState(KpButton.State.DISABLED);
+                feedLine(null, "ОШИБКА: " + t);
+                List<String> подробности = new ArrayList<>();
+                подробности.add(String.valueOf(t));
+                if (где.length() > 0) {
+                    подробности.add("оборвалось в " + где);
+                }
+                подробности.add("Журнал партии сохранён — по нему видно, "
+                    + "до какого места дошло");
+                confirm.open("Партия оборвалась ошибкой",
+                    "Доиграть эту партию нельзя — движок остановился посреди хода",
+                    подробности,
+                    List.of(new kelium.gui.kp.ConfirmDialog.Option("Выйти в меню",
+                        "собрать стол заново", this::closeToMenu)),
+                    new kelium.gui.kp.ConfirmDialog.Option("Остаться в окне",
+                        "посмотреть доску и ленту", () -> confirm.close()));
             });
             return;
         }
@@ -906,6 +964,11 @@ public final class HotSeatWindow {
             }
         }
         return found;
+    }
+
+    /** Строка состояния партии — для прогонщиков и тестов. */
+    String turnLabelForTest() {
+        return turnLabel == null ? null : turnLabel.getText();
     }
 
     /** Вид ожидаемого решения — для прогонщиков и тестов. */
@@ -1627,6 +1690,54 @@ public final class HotSeatWindow {
         clearDecision();
     }
 
+    /** Дописать кусок текста карты — пустые молча пропускаются. */
+    /** Виды решений «выбери карту» и набор, откуда брать её текст. */
+    private static final Map<String, String> CARD_PICKS = Map.of(
+        "super_pick", "super_objectives",
+        "start_objective_pick", "objectives");
+
+    /**
+     * ВЕСЬ ПЕЧАТНЫЙ ТЕКСТ КАРТЫ — то же, что показывает увеличенная карта при
+     * наведении: игрок выбирает по содержанию, а не по имени.
+     */
+    private String cardFullText(String набор, String id) {
+        StringBuilder t = new StringBuilder();
+        Object печатный = cardField(набор, id, "текст_карты");
+        добавить(t, "", печатный == null ? null : String.valueOf(печатный));
+        Object описание = cardField(набор, id, "описание");
+        добавить(t, "", описание == null ? null : String.valueOf(описание));
+        if ("objectives".equals(набор)) {
+            добавить(t, "НАГРАДА: ", objectiveReward(id));
+            добавить(t, "УСИЛЕННАЯ: ", objectiveBonus(id));
+            добавить(t, "УТИЛЬ (сжечь): ", objectiveTop(id));
+        }
+        return t.toString();
+    }
+
+    /** Разделитель абзацев в тексте карты — ровно один символ. */
+    private static final char ПЕРЕВОД = (char) 10;
+
+    private static void добавить(StringBuilder куда, String подпись, String текст) {
+        if (текст == null || текст.isBlank()) {
+            return;
+        }
+        if (куда.length() > 0) {
+            // ПЕРЕВОД СТРОКИ РОВНО ОДИН СИМВОЛ: увеличенная карта режет текст
+            // по нему, а System.lineSeparator() на Windows это два знака, и
+            // лишний возврат каретки оставался внутри абзаца.
+            куда.append(ПЕРЕВОД).append(ПЕРЕВОД);
+        }
+        куда.append(подпись).append(текст);
+    }
+
+    /** Усиленная награда задания — короткой строкой, либо null. */
+    private String objectiveBonus(String id) {
+        // КЛЮЧ НАБОРА — special_reward: усиленная награда за выполнение
+        // усиленного условия.
+        Object r = cardField("objectives", id, "special_reward");
+        return r instanceof Map<?, ?> m ? rewardWords(m) : null;
+    }
+
     /** Печатный текст карты задания. */
     private String objectiveText(String id) {
         Object t = cardField("objectives", id, "описание");
@@ -1778,6 +1889,40 @@ public final class HotSeatWindow {
                 frame.toFront();
                 return;
             }
+        }
+
+        // ВЫБОР КАРТЫ ПОДГОТОВКИ — ВЕЕРОМ ПО ЦЕНТРУ, С ЗАТЕНЕНИЕМ, как выбор
+        // карты круга (просьба дизайнера 31.08.2026). Прежде супер-задание и
+        // стартовое задание выбирались двумя плашками с ОДНИМ ИМЕНЕМ карты:
+        // игрок выбирал вслепую, не видя ни условия, ни награды.
+        if (CARD_PICKS.containsKey(kind)
+                && options.stream().allMatch(c -> c.payload() instanceof String)
+                && !options.isEmpty()) {
+            actionBar.idle("не сейчас");
+            endBtn.setTexts("Сначала решение", KIND_LABELS.getOrDefault(kind, kind));
+            endBtn.setState(KpButton.State.DISABLED);
+            zoom.setVisible(false);
+            String набор = CARD_PICKS.get(kind);
+            List<kelium.gui.kp.CardChoiceOverlay.Card> cards = new ArrayList<>();
+            for (int i = 0; i < options.size(); i++) {
+                String id = (String) options.get(i).payload();
+                int idx = i;
+                cards.add(new kelium.gui.kp.CardChoiceOverlay.Card(id, null,
+                    cardName(id), cardFullText(набор, id), () -> {
+                        ceremony.close();
+                        agent.submitIndex(idx);
+                        clearDecision();
+                    }));
+            }
+            boolean супер = "super_pick".equals(kind);
+            ceremony.open(
+                супер ? "Выберите супер-задание" : "Выберите стартовое задание",
+                супер ? "Оно лежит открытым всю партию: соперники видят, к чему вы идёте"
+                    : "Задание отправится к вам в руку",
+                cards);
+            refreshSteps();
+            frame.toFront();
+            return;
         }
 
         // ВЫБОР ДУГИ СЕКТОРОВ (концепт §4): движок уже назвал гекс и варианты,
@@ -2143,9 +2288,57 @@ public final class HotSeatWindow {
     }
 
     /** Печатное «описание» карты приказа — как она играется. */
+    /**
+     * ПРИКАЗ СЛОВАМИ — то, что во всплывашке заменило картинку карты: какие
+     * действия даёт верхняя половина, какие нижняя и когда та открывается.
+     * Одного «описания» было мало — по нему нельзя было понять даже, что
+     * играешь.
+     */
     private String orderDesc(String id) {
         Map<String, Object> d = orderData(id);
-        Object t = d == null ? null : d.get("описание");
-        return t == null ? "" : String.valueOf(t);
+        if (d == null) {
+            return "";
+        }
+        StringBuilder t = new StringBuilder();
+        if (Boolean.TRUE.equals(d.get("joker"))) {
+            добавить(t, "БЕЗОПАСНОСТЬ: ", "любые два РАЗНЫХ действия игры из восьми. "
+                + "Нижнего приказа нет; правилу совпадения карта не подчиняется");
+        } else {
+            добавить(t, "ВЕРХНИЙ ПРИКАЗ: ", половинаСловами(d.get("top"),
+                "оба действия ваши; если тот же приказ вскрыли раньше вас "
+                    + "в этом круге — только одно на выбор"));
+            добавить(t, "НИЖНИЙ ПРИКАЗ: ", половинаСловами(d.get("bottom"),
+                "одно действие, и только если этот приказ сверху вскрыл кто-то, "
+                    + "чья очередь в круге прошла раньше вашей"));
+        }
+        if (Boolean.TRUE.equals(d.get("maneuver"))) {
+            добавить(t, "МАНЁВР: ", "СПЕЦ-действие — переместить один свой жетон "
+                + "войска на его скорость. Не открывает Операцию и не тратит боеприпасы");
+        }
+        Object о = d.get("описание");
+        добавить(t, "", о == null ? null : String.valueOf(о));
+        return t.toString();
+    }
+
+    /** «ОПЕРАЦИЯ — манёвр, бой; <как играется>» либо null, если половины нет. */
+    private String половинаСловами(Object код, String какИграется) {
+        if (!(код instanceof String cat) || cat.isBlank()) {
+            return null;
+        }
+        StringBuilder t = new StringBuilder(kelium.gui.kp.ActionIcons.categoryRu(cat));
+        List<String> действия = kelium.gui.kp.ActionIcons.CATEGORY_ACTIONS
+            .getOrDefault(cat, List.of());
+        if (!действия.isEmpty()) {
+            t.append(" — ");
+            for (int i = 0; i < действия.size(); i++) {
+                if (i > 0) {
+                    t.append(", ");
+                }
+                t.append(ActionBar.ACTIONS.getOrDefault(действия.get(i), действия.get(i))
+                    .toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        t.append(". ").append(какИграется);
+        return t.toString();
     }
 }

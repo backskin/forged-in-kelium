@@ -37,6 +37,12 @@ public final class CardChoiceOverlay extends JComponent {
     private final Anim anim = new Anim();
     private int hoverIdx = -1;
 
+    /** Навести на карту — для прогонщиков и тестов. */
+    public void hoverForTest(int i) {
+        hoverIdx = i;
+        repaint();
+    }
+
     public CardChoiceOverlay() {
         setOpaque(false);
         setVisible(false);
@@ -204,12 +210,31 @@ public final class CardChoiceOverlay extends JComponent {
         if (c.description() == null || c.description().isBlank()) {
             return;
         }
-        int w = Math.min(Theme.px(640), getWidth() - Theme.px(60));
+        int w = Math.min(Theme.px(680), getWidth() - Theme.px(60));
         int x = (getWidth() - w) / 2;
         int y = getHeight() / 2 + cardH() / 2 + Theme.px(4);
         g.setFont(Theme.font(12, Font.PLAIN));
         var fm = g.getFontMetrics();
-        List<String> lines = CardTile.wrap(c.description(), fm, w - Theme.px(24), 6);
+        // ТЕКСТ КАРТЫ ИДЁТ АБЗАЦАМИ: печатный текст, награда, усиленная,
+        // утиль. Слепить их в один ком нельзя — «НАГРАДА» прочтётся
+        // продолжением условия.
+        List<String> lines = new ArrayList<>();
+        int влезет = Math.max(4, (getHeight() - y - Theme.px(40)) / fm.getHeight());
+        for (String абзац : c.description().split(String.valueOf((char) 10))) {
+            if (абзац.isBlank()) {
+                continue;
+            }
+            if (!lines.isEmpty()) {
+                lines.add("");
+            }
+            lines.addAll(CardTile.wrap(абзац, fm, w - Theme.px(24), 12));
+            if (lines.size() >= влезет) {
+                break;
+            }
+        }
+        if (lines.size() > влезет) {
+            lines = new ArrayList<>(lines.subList(0, влезет));
+        }
         int h = lines.size() * fm.getHeight() + Theme.px(30);
         g.setColor(new Color(0x1B, 0x1F, 0x26, 235));
         g.fillRoundRect(x, y, w, h, Theme.px(10), Theme.px(10));

@@ -193,6 +193,18 @@ public final class HandPanel extends JPanel {
         return List.copyOf(tiles);
     }
 
+    /** В какой группе лежит плитка (для прогонщиков/тестов); null — ни в какой. */
+    public String groupOf(CardTile t) {
+        for (var e : rows.entrySet()) {
+            for (var c : e.getValue().getComponents()) {
+                if (c == t) {
+                    return e.getKey();
+                }
+            }
+        }
+        return null;
+    }
+
     /** Рисованная подпись группы: значок + имя + число карт. */
     private static final class GroupCaption extends JComponent {
         private final String name;

@@ -411,6 +411,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     /** Заполняется при отрисовке; читается подсказкой. */
     private final Map<Rectangle, ModuleSpot> moduleSpots = new LinkedHashMap<>();
 
+    /** Прямоугольники мест под модули — для прогонщиков и тестов. */
+    public java.util.List<Rectangle> moduleSpotsForTest() {
+        return java.util.List.copyOf(moduleSpots.keySet());
+    }
+
     /** То же для жетонов, лежащих на ПЕЧАТНОМ планшете. */
     private final Map<Rectangle, Object[]> printedSpots = new LinkedHashMap<>();
 

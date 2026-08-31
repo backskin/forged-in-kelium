@@ -404,7 +404,7 @@ public final class GameEngine {
         }
         GameState s = state;
         if (s.rng.nextDouble() < rate
-                && p.arsenalHand.size() + p.arsenalInstalled.size() < 3) {
+                && Storage.arsenalCellFree(s, p)) {
             String c = s.decks.get("arsenal").draw(s.rng);
             if (c != null) {
                 p.arsenalHand.add(c);
@@ -1034,28 +1034,14 @@ public final class GameEngine {
         }
         Map<String, Object> card = Ctx.cards(s, "containers").byId(cid);
         Map<String, Object> a = (Map<String, Object>) card.get("a");
-        Map<String, Object> b = (Map<String, Object>) card.get("b");
-        // I3: решение «открывать ли» уже принято (СПЕЦ/выбор в mass_open);
-        // увидев карту, игрок ОБЯЗАН выбрать вариант — бесплатного подглядывания
-        // с отказом (и утечки карты в сброс) больше нет.
-        // ВЫБОР ЕСТЬ НЕ У КАЖДОГО КОНТЕЙНЕРА (правило дизайнера 17.08.2026):
-        // ровно половина колоды несёт две стороны, вторая половина — один
-        // напечатанный эффект. Карта без стороны b применяется сразу, без
-        // предложения выбора: спрашивать «выбери из одного» бессмысленно и за
-        // столом, и в движке.
-        Object[] payload;
-        if (b == null) {
-            payload = new Object[]{"a", a};
-        } else {
-            List<Choice> opts = new ArrayList<>();
-            opts.add(new Choice("container_variant", new Object[]{"a", a},
-                card.getOrDefault("name", "") + ":" + a.getOrDefault("label", "")));
-            opts.add(new Choice("container_variant", new Object[]{"b", b},
-                card.getOrDefault("name", "") + ":" + b.getOrDefault("label", "")));
-            Choice ch = agents.get(p.seat).choose(s, opts,
-                ev("kind", "open_container", "card", cid));
-            payload = (Object[]) ch.payload();
-        }
+        // КОНТЕЙНЕР — БЕЗВЫБОРНЫЙ БОНУС (правило дизайнера 31.08.2026): что
+        // напечатано на карте, то и выдаётся. Вскрыл — получил.
+        //
+        // Прежде карта с напечатанной второй стороной предлагала выбрать одну
+        // из двух; играющие наборы (4.0.0 и 5.0.0) второй стороны не несут
+        // вовсе, но старые её несут, и молча вернуть по ним выбор нельзя.
+        // Сторона «b» игнорируется: применяется всегда напечатанная «a».
+        Object[] payload = new Object[]{"a", a};
         Map<String, Object> variant = (Map<String, Object>) payload[1];
         p.containers -= 1;
         Map<String, Object> got;

@@ -56,7 +56,7 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-call mvn -q -o -pl gui dependency:build-classpath -Dmdep.outputFile=deps.txt
+call mvn -q -o -pl gui dependency:build-classpath -Dmdep.outputFile="%~dp0deps.txt"
 echo Пересобрано.
 echo.
 goto run
@@ -73,8 +73,19 @@ if not exist "gui\target\classes\kelium\gui\StartMenuWindow.class" (
     )
 )
 
+rem СПИСОК БИБЛИОТЕК ПЕРЕСОБИРАЕТСЯ КАЖДЫЙ ЗАПУСК, а не только когда файла нет.
+rem Протухший список — это молча пропавшая библиотека: список от 17.08.2026 не
+rem знал про onnxruntime, и бот уровня «гроссмейстер» валил партию посреди хода
+rem с NoClassDefFoundError. Пара секунд на запуске дешевле такой поломки.
+rem
+rem Путь ОБЯЗАТЕЛЬНО абсолютный: с относительным плагин пишет gui\deps.txt,
+rem а читается корневой — именно так и разъехались эти два файла.
+call mvn -q -o -pl gui dependency:build-classpath -Dmdep.outputFile="%~dp0deps.txt"
 if not exist "deps.txt" (
-    call mvn -q -o -pl gui dependency:build-classpath -Dmdep.outputFile=deps.txt
+    echo.
+    echo ОШИБКА: не удалось собрать список библиотек.
+    pause
+    exit /b 1
 )
 set /p CP=<deps.txt
 
