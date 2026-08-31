@@ -39,16 +39,22 @@ class BlocksPrintTest {
     }
 
     /**
-     * ЖЁЛТАЯ ЯЧЕЙКА есть на КАЖДОМ гексе набора, всегда наземная и никогда не
-     * та же, что контейнерная. Это главное, ради чего картон перепечатан.
+     * ЖЁЛТАЯ ЯЧЕЙКА идёт В ПАРЕ с контейнером (набор 1.4.0): на пустых гексах
+     * нет ни того, ни другого, на несущих — есть оба, жёлтая всегда наземная
+     * и никогда не та же, что контейнерная.
      */
     @Test
-    void everyHexOfTheSetCarriesAGroundEnergyCellApartFromTheContainer() {
+    void energyCellsPairWithContainersAndNeverCollide() {
         int hexes = 0;
         for (BlockStamp.Face f : faces()) {
             for (BlockStamp.Cell c : f.cells()) {
                 hexes++;
                 String where = "сторона " + f.blockId() + f.side();
+                if (c.container() < 0) {
+                    assertEquals(-1, c.energy(),
+                        where + ": пустой гекс не несёт и жёлтой ячейки");
+                    continue;
+                }
                 assertTrue(c.energy() >= 0 && c.energy() < 6,
                     where + ": жёлтая ячейка обязана быть наземной (0..5), а не " + c.energy());
                 assertTrue(c.container() != c.energy(),
@@ -58,7 +64,7 @@ class BlocksPrintTest {
         assertEquals(110, hexes, "в наборе 5×5×2 + 5×6×2 = 110 гексов");
     }
 
-    /** Контейнеры набора: по 4 на малой стороне и по 5 на большой, ровно один воздушный. */
+    /** Контейнеры набора 1.4.0: по 3 на малой стороне и по 4 на большой, ровно один воздушный. */
     @Test
     void containersPerFaceMatchTheRules() {
         for (BlockStamp.Face f : faces()) {
@@ -73,7 +79,7 @@ class BlocksPrintTest {
                 }
             }
             String where = "сторона " + f.blockId() + f.side();
-            assertEquals("small".equals(f.kind()) ? 4 : 5, containers,
+            assertEquals("small".equals(f.kind()) ? 3 : 4, containers,
                 where + ": контейнеров на стороне");
             assertEquals(1, air, where + ": ровно один контейнер в воздушной ячейке");
         }
@@ -89,7 +95,9 @@ class BlocksPrintTest {
         int[] bySide = new int[6];
         for (BlockStamp.Face f : faces()) {
             for (BlockStamp.Cell c : f.cells()) {
-                bySide[c.energy()]++;
+                if (c.energy() >= 0) {      // пустые гексы 1.4.0 ячейки не несут
+                    bySide[c.energy()]++;
+                }
             }
         }
         int min = Integer.MAX_VALUE;

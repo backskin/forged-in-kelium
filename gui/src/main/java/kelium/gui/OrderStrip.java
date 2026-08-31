@@ -168,7 +168,7 @@ public final class OrderStrip extends JPanel {
         return out;
     }
 
-    /** Достать код действия из строки лога вида «   ▪ СБОРКА: …». */
+    /** Достать код действия из строки лога вида «   ▪ СНАРЯЖЕНИЕ: …». */
     private static String actionOf(String log) {
         if (log == null) {
             return null;
@@ -183,7 +183,7 @@ public final class OrderStrip extends JPanel {
     }
 
     private static final java.util.Map<String, String> RU = java.util.Map.ofEntries(
-        java.util.Map.entry("assembly", "сборка"),
+        java.util.Map.entry("assembly", "снаряжение"),
         java.util.Map.entry("mining", "добыча"),
         java.util.Map.entry("build", "стройка"),
         java.util.Map.entry("energy_swap", "энергия"),

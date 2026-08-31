@@ -78,7 +78,7 @@ public final class Shapes {
                 out.add(new Node(u.hexId, -1));
                 continue;
             }
-            addCellsOf(s, u.hexId, u.uid, out);
+            addUnitCells(s, u, out);
         }
         for (BuildingToken b : p.buildings) {
             if (b.hexId == null || !b.alive()) {
@@ -87,6 +87,26 @@ public final class Shapes {
             addCellsOf(s, b.hexId, b.uid, out);
         }
         return out;
+    }
+
+    /**
+     * СЕКТОРЫ ОДНОГО ВОЙСКА. Берутся из раскладки {@link СекторыВойск}: разметка
+     * гекса ({@code sideOwner}) хранит только здания и стенки нейтралов, а
+     * наземные войска раскладываются по свободным секторам выводом из состояния.
+     *
+     * <p>ПОЧЕМУ ОТДЕЛЬНЫЙ ПУТЬ ДЛЯ ВОЙСК. До 25.08.2026 войска шли тем же
+     * {@code addCellsOf}, что и здания, — то есть искали свой uid в sideOwner,
+     * куда их никто не писал. Узлов не появлялось вовсе, и все пять карт про
+     * непрерывное соседство были невыполнимы: 451 раздача, ноль выполнений.
+     */
+    private static void addUnitCells(GameState s, UnitToken u, Set<Node> out) {
+        List<Integer> секторы = СекторыВойск.секторыЖетона(s, u);
+        if (секторы == null) {
+            return;
+        }
+        for (int i : секторы) {
+            out.add(new Node(u.hexId, i));
+        }
     }
 
     /**
@@ -401,7 +421,7 @@ public final class Shapes {
                 if (u.type == UnitType.AIRCRAFT) {
                     out.add(new Node(u.hexId, -1));
                 } else {
-                    addCellsOf(s, u.hexId, u.uid, out);
+                    addUnitCells(s, u, out);
                 }
             }
         } else {

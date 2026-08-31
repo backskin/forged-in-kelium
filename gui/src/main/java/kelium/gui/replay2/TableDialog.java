@@ -53,6 +53,7 @@ public final class TableDialog {
      */
     public static boolean show(Component parent, String rulesetId, int players,
                                @SuppressWarnings("rawtypes") JComboBox[] characterBoxes,
+                               @SuppressWarnings("rawtypes") JComboBox[] levelBoxes,
                                JComboBox<String>[] facingBoxes, SeatChip[] chips,
                                java.util.function.IntConsumer randomCharacter) {
         List<String> decks = decks(rulesetId);
@@ -62,10 +63,13 @@ public final class TableDialog {
         JPanel form = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets " + Theme.px(10) + ", gapx " + Theme.px(10)
                 + ", gapy " + Theme.px(8),
-            "[]" + Theme.px(6) + "[]" + Theme.px(6) + "[]" + Theme.px(4) + "[]"
-                + Theme.px(6) + "[]" + Theme.px(6) + "[]"));
+            "[]" + Theme.px(6) + "[]" + Theme.px(6) + "[]" + Theme.px(6) + "[]"
+                + Theme.px(4) + "[]" + Theme.px(6) + "[]" + Theme.px(6) + "[]"));
         form.add(new JLabel(), "");
         form.add(caption("характер бота"));
+        // УРОВЕНЬ ОТДЕЛЬНЫМ СТОЛБЦОМ (заказ дизайнера 25.08.2026): кем играет
+        // соперник и насколько он силён — два разных вопроса.
+        form.add(caption("уровень"));
         form.add(caption("поворот ЦУ"), "span 2");
         form.add(caption("колода приказов"));
         form.add(caption("планшет войск"));
@@ -86,6 +90,7 @@ public final class TableDialog {
             // слушатели (обновить расстановку сразу) никуда не делись, они
             // просто теперь стоят в этом окне, а не в отдельной строке снаружи.
             form.add(characterBoxes[seat], "growx");
+            form.add(levelBoxes[seat], "growx");
             form.add(dice(() -> randomCharacter.accept(seatFinal)));
             form.add(facingBoxes[seat], "growx");
 

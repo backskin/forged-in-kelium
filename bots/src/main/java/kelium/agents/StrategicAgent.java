@@ -526,7 +526,8 @@ public class StrategicAgent extends HeuristicAgent {
         if (base == null) {
             return null;
         }
-        // ПОВЕРХ любой оценки — надбавка за то, что выбор двигает текущий план.
+        // ПОВЕРХ любой оценки — надбавка за то, что выбор двигает текущий план,
+        // и надбавка за то, что он приближает карту задания в руке.
         return (s, o) -> base.apply(s, o) + planBonus(s, kind, o, ctx);
     }
 
@@ -751,7 +752,11 @@ public class StrategicAgent extends HeuristicAgent {
      * живого игрока начатый манёвр стоит дороже равноценной альтернативы.
      */
     private Plan reconsiderPlan(GameState state) {
-        java.util.List<Plan> all = Plan.candidates(state, seat, genome);
+        // УДЕРЖИВАЕМАЯ ЦЕЛЬ передаётся в построение планов: только так среди
+        // кандидатов окажется план на ПРЕЖНЮЮ жертву, и сравнение «менять ли
+        // курс» получает второй аргумент.
+        java.util.List<Plan> all = Plan.candidates(state, seat, genome,
+            plan == null ? null : plan.targetHex);
         Plan refreshed = null;
         Plan best = null;
         double bestScore = Double.NEGATIVE_INFINITY;
@@ -792,7 +797,7 @@ public class StrategicAgent extends HeuristicAgent {
             case SELL, ECONOMY -> "market";
             case TECH -> "science";
             case ARMY -> "assembly";
-            case STRIKE -> "combat";       // финал набега — удар
+            case STRIKE, WAR_WIN -> "combat";   // финал набега и добивания — удар
             case OBJECTIVE -> null;
         };
     }
@@ -1320,11 +1325,24 @@ public class StrategicAgent extends HeuristicAgent {
             return base;
         }
         Map<String, Object> spec = o.payload() instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-        String label = String.valueOf(spec.getOrDefault("label", ""));
+        // ТИП ЗДАНИЯ — ИЗ ДАННЫХ ВАРИАНТА. Здесь, как и в эвристическом слое,
+        // стояло сравнение с ПОДПИСЬЮ варианта, а движок дописывает к ней цену
+        // («factory (2 мон)»). Ни одно сравнение не совпадало, и весь
+        // стратегический голос за ударные здания и за экономику молчал.
+        // Найдено 28.08.2026 печатью подписей: боты строили просто самое
+        // дешёвое, отчего к концу партии на столе не было ни техники, ни авиации.
+        BuildingType bt = spec.get("btype") instanceof BuildingType t ? t : null;
         PlayerState me = state.player(seat);
         int spare = spareEnergy(state, me);
-        if ((label.equals("factory") || label.equals("airbase"))) {
-            int need = "factory".equals(label) ? 2 : 3;
+        if (bt == BuildingType.FACTORY || bt == BuildingType.AIRBASE) {
+            // Сколько ячеек энергии просит здание — из данных игры, а не
+            // зашитым числом: у авиабазы их два, а не три, с 13.08.2026.
+            int need;
+            try {
+                need = state.tokenStats.buildingEnergySlots(bt, null);
+            } catch (RuntimeException e) {
+                need = 2;
+            }
             // считаем ударные здания, что уже есть
             int strikeBld = 0;
             for (BuildingToken b : me.buildingsOnField()) {
@@ -1340,7 +1358,7 @@ public class StrategicAgent extends HeuristicAgent {
             // авиации нечем бить здания, и война выключается целиком. Свободной
             // энергии не бывает почти никогда — но здание можно запитать
             // МОНЕТАМИ (замена энергии), поэтому энергетический замок не ждём.
-            if (strikeBld == 0 && "factory".equals(label)) {
+            if (strikeBld == 0 && bt == BuildingType.FACTORY) {
                 // ПЕРВОЕ ударное здание — из ГЕНОМА, без ручной константы.
                 // Экономика и военка спорят за один и тот же ранний ход, и
                 // подкручивание константы просто перекидывало качели: то нет
@@ -1352,9 +1370,9 @@ public class StrategicAgent extends HeuristicAgent {
         // прибавку ТОЛЬКО военным зданиям, поэтому добытчики строил один лишь
         // «голубь» (у него занижена агрессия). Келемий конечен: кто первым
         // поставил добытчик к жиле — тот её и выберет.
-        if (label.startsWith("miner") || label.startsWith("plant")) {
+        if (bt == BuildingType.MINER || bt == BuildingType.POWER_PLANT) {
             double econ = g("eval.economy");
-            if (label.startsWith("miner")) {
+            if (bt == BuildingType.MINER) {
                 // сколько келемия реально можно достать: считаем ближайшие жилы
                 int reachable = 0;
                 for (var h : state.field.hexes.values()) {
@@ -1418,10 +1436,10 @@ public class StrategicAgent extends HeuristicAgent {
         }
         // ПОД СОСТАВ ВРАГА: военное здание ценнее, если его род войск способен
         // убивать то, что реально стоит на поле у противников.
-        UnitType ut = switch (label) {
-            case "barracks" -> UnitType.INFANTRY;
-            case "factory" -> UnitType.VEHICLE;
-            case "airbase" -> UnitType.AIRCRAFT;
+        UnitType ut = bt == null ? null : switch (bt) {
+            case BARRACKS -> UnitType.INFANTRY;
+            case FACTORY -> UnitType.VEHICLE;
+            case AIRBASE -> UnitType.AIRCRAFT;
             default -> null;
         };
         if (ut != null) {

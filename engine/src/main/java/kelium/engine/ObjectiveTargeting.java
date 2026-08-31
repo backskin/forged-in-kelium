@@ -3,6 +3,7 @@ package kelium.engine;
 import java.util.function.Consumer;
 
 import kelium.core.GameState;
+import kelium.core.Token;
 import kelium.core.PlayerState;
 import kelium.core.TurnJournal;
 import kelium.engine.cards.CardRegistry;
@@ -203,5 +204,111 @@ public final class ObjectiveTargeting {
             f.unitsProduced += 1;
             f.producedByType.merge(kind, 1, Integer::sum);
         });
+    }
+
+    /**
+     * УДАРИТЬ ПО ЖЕТОНУ {@code victim}: повредить, а при {@code kill} — добить.
+     *
+     * <p>ЗАЧЕМ ЭТО ПОЯВИЛОСЬ. Наведение по заданиям было подключено только к
+     * стройке и найму, а бой его не видел вовсе — при том что боевые карты как
+     * раз и не выполнялись. Замер 150 партий: «Пристрелка» (два РАЗНЫХ чужих
+     * здания под уроном за ход), «Подранки» (двое раненых и никого добитого),
+     * «Трофейный обоз» — ни одного выполнения на 60–90 приходов карты в руку.
+     * Условия эти закрываются выбором ЦЕЛИ, а выбор цели про задания не знал.
+     *
+     * <p>Считается по журналу хода: боевые условия каталога — происшествия
+     * ({@code type: incident}), они и живут в фактах хода, а не на поле.
+     *
+     * @param victim жетон, по которому придётся удар (войско или здание)
+     * @param kill   добьёт ли удар цель (иначе только урон)
+     */
+    public static double gainFromAttack(GameState s, int seat, Token victim, boolean kill) {
+        if (victim == null) {
+            return 0.0;
+        }
+        boolean building = victim instanceof kelium.core.BuildingToken;
+        int uid = victim instanceof kelium.core.BuildingToken b ? b.uid
+            : victim instanceof kelium.core.UnitToken u ? u.uid : -1;
+        int owner = victim.owner();
+        String kindCode = victim.category() == null ? null : victim.category().code;
+        return gain(s, seat, f -> {
+            f.enemyTokensDamaged.add(uid);
+            if (building) {
+                f.enemyBuildingsDamaged.add(uid);
+                f.enemyBuildingHits += 1;
+            }
+            if (kill) {
+                f.enemyTokensDestroyed += 1;
+                f.destroyedOwners.add(owner);
+                if (kindCode != null) {
+                    f.destroyedTypes.add(kindCode);
+                }
+            }
+        });
+    }
+
+    /**
+     * ПЕРЕСТАВИТЬ СВОЙ ЖЕТОН на гекс {@code dest} — насколько это приближает руку.
+     *
+     * <p>Здесь гипотеза другого рода. Позиционные условия каталога — состояния
+     * ({@code type: state}): «три жетона вне своих гексов», «цепочка соединяет
+     * противоположные стороны». Они читают ПОЛЕ, а не журнал хода, поэтому
+     * подмена журнала для них бесполезна — и до сих пор ни одна такая карта не
+     * наводилась вовсе.
+     *
+     * <p>Поле правится НА МЕСТЕ и возвращается обратно в {@code finally}. Копия
+     * всего состояния была бы честнее, но эта оценка вызывается на каждый
+     * вариант хода каждого жетона — копирование партии здесь стоит дороже, чем
+     * весь остальной ход бота. Меняется ровно одно поле жетона, чтение условий
+     * побочных эффектов не имеет, а восстановление гарантировано.
+     */
+    public static double gainFromUnitAt(GameState s, int seat,
+                                        kelium.core.UnitToken unit, String dest) {
+        if (s == null || unit == null || dest == null || dest.equals(unit.hexId)) {
+            return 0.0;
+        }
+        PlayerState me = s.player(seat);
+        if (me == null || me.objectiveHand.isEmpty()) {
+            return 0.0;
+        }
+        java.util.List<ObjectiveCard> cards = new java.util.ArrayList<>();
+        for (String cid : me.objectiveHand) {
+            ObjectiveCard oc = CardRegistry.objective(cid);
+            if (oc != null) {
+                cards.add(oc);
+            }
+        }
+        if (cards.isEmpty()) {
+            return 0.0;
+        }
+        double before = sumProgress(s, seat, cards);
+        if (before >= cards.size()) {
+            return 0.0;
+        }
+        String was = unit.hexId;
+        double after;
+        try {
+            unit.hexId = dest;
+            after = sumProgress(s, seat, cards);
+        } finally {
+            unit.hexId = was;
+        }
+        double gain = Math.max(0.0, after - before);
+        if (gain > 0) {
+            HITS.incrementAndGet();
+            GAIN_MILLI.addAndGet(Math.round(gain * 1000));
+        }
+        // Движение — ещё и факт хода: «жетон вышел из гекса», «жетон двигался».
+        // Складывать нельзя, иначе одно и то же условие посчитается дважды, —
+        // берём лучшее из двух гипотез.
+        String from = was;
+        double byJournal = gain(s, seat, f -> {
+            f.unitsMoved += 1;
+            f.movedUids.add(unit.uid);
+            if (from != null) {
+                f.movedFromHexes.add(from);
+            }
+        });
+        return Math.max(gain, byJournal);
     }
 }

@@ -218,11 +218,16 @@ public final class RuleWords {
             // ---------- Действия ----------
             case "actions.spec_per_turn" -> "спец-действий за ход";
             case "actions.coincidence_rule_enabled" -> "правило совпадения приказов";
+            case "actions.top_actions_per_turn" -> "действий с верхнего приказа за ход";
             case "actions.empty_energy_slot_coin_cost" ->
                 "монет за работу здания с пустой ячейкой энергии";
             case "actions.build.surcharge_coins" ->
                 "надбавка монетами за каждую лишнюю стройку в одном действии";
             case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
+            case "actions.build.demolish_cu_allowed" ->
+                "своё ЦУ можно снести в запас, как любое здание";
+            case "actions.build.one_op_per_building" ->
+                "над одним зданием за действие Стройка только одна операция";
             case "actions.build.move_cost_coins" ->
                 "монет за перенос любого стоящего на поле здания";
             case "actions.build.move_building_repays_full_price" ->
@@ -233,14 +238,23 @@ public final class RuleWords {
             // Подпись нужна, пока эти версии лежат в наборах правил.
             case "actions.build.cu_free_move_per_turn" ->
                 "бесплатных переносов центра управления за ход";
+            // Пары ОСН/ВТР остались только у планшетов 1.0.x — их всё ещё
+            // можно поставить в content_versions.boards.
             case "actions.combat.primary_row_ammo_cost" ->
-                "боеприпасов за выстрел из первого ряда";
+                "боеприпасов за выстрел из первого ряда (старые планшеты)";
             case "actions.combat.secondary_row_ammo_cost" ->
-                "боеприпасов за выстрел из второго ряда";
-            // БОЙ 2.0 (ruleset 1.15.0, черновой): цена универсальной ячейки —
-            // любая цель, есть у каждого рода войск на досках с dual_cell.
+                "боеприпасов за выстрел из второго ряда (старые планшеты)";
+            // ДВЕ АТАКИ (диктовка 24.08.2026): у каждого рода войск
+            // универсальная по любому типу и специальная по одному типу, и
+            // только специальную улучшает жетон модуля атаки.
             case "actions.combat.universal_ammo_cost" ->
                 "боеприпасов за универсальную атаку (любая цель)";
+            case "actions.combat.specialized_ammo_cost" ->
+                "боеприпасов за специальную атаку (один тип цели)";
+            case "actions.combat.tower_specialized_free" ->
+                "специальная атака вышки бесплатна";
+            case "actions.combat.module_on_universal" ->
+                "жетон модуля кладётся на универсальную атаку, а не на специальную";
             case "actions.combat.open_battle_surcharge_ammo" ->
                 "надбавка боеприпасами за начало боя";
             case "actions.combat.retaliation_enabled" -> "ответный удар разрешён";
@@ -269,6 +283,12 @@ public final class RuleWords {
             case "command_center.respawns" -> "снесённый центр управления возвращается в игру";
             case "command_center.returns_to_reserve" ->
                 "снесённый центр управления уходит в личный запас";
+            case "command_center.must_replace_cu_with_spec" ->
+                "ЦУ из запаса обязано вернуться на поле спец-действием";
+            case "command_center.cu_buildable_by_build_action" ->
+                "ЦУ можно поставить и обычным действием Стройка";
+            case "command_center.destruction_token_seals_cell" ->
+                "жетон уничтожения ЦУ лежит на планшете и закрывает ячейку атаки";
             case "command_center.destruction_token_vp" ->
                 "победных очков тому, кто снёс центр управления";
             case "command_center.own_token_vp_if_cu_never_destroyed" ->
@@ -326,12 +346,24 @@ public final class RuleWords {
             case "tech.step_capacity" -> "сколько игроков влезает на шаг";
             case "tech.step_cost_trophy" -> "трофеев/обломков за шаг (тратится общий пул)";
             case "tech.step_vp_cumulative" -> "победные очки по шагам, накопительно";
+            case "tech.step_rewards" -> "награды шагов трека (перебивает доску)";
             case "tech.science_exchanges" -> "постоянные обмены научного отдела";
             case "tech.science_one_step_per_track_per_action" ->
                 "за одно действие — не больше шага на трек";
             case "tech.tracks_per_action" ->
                 "сколько РАЗНЫХ треков берёт одно действие Науки";
+            case "tech.pay_with_debris_only" ->
+                "за науку платят только обломками, трофейный жетон не сдаётся";
+            case "actions.combat.as_spec_ammo" ->
+                "боеприпасов за Бой спец-действием (0 — так нельзя)";
+            case "economy.vp_per_kill" ->
+                "победных очков за каждый уничтоженный чужой жетон";
+            case "economy.vp_per_installed_arsenal" ->
+                "победных очков за каждую установленную карту арсенала";
+            case "economy.vp_per_installed_super_arsenal" ->
+                "победных очков за каждую установленную карту супер-арсенала";
             case "tech.pair_bonus_coin" -> "монет за парный обмен науки";
+            case "tech.gild_trophy_cost" -> "обломков за позолоту модуля";
 
             // ---------- Конец раунда ----------
             case "return_step.return_destroyed_tokens" ->

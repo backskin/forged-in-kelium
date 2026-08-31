@@ -113,7 +113,14 @@ public final class Deck {
             if ("[3+]".equals(mark) && numPlayers >= 3) {
                 continue;
             }
-            kept.add((String) e.get("id"));
+            // КОПИИ (заказ дизайнера 28.08.2026): востребованная карта арсенала
+            // кладётся в колоду НЕСКОЛЬКО раз, чтобы преимущество не было
+            // монополией одного игрока. Поле copies в данных карты; нет поля —
+            // одна копия, как раньше.
+            int copies = e.get("copies") instanceof Number n ? n.intValue() : 1;
+            for (int i = 0; i < copies; i++) {
+                kept.add((String) e.get("id"));
+            }
         }
         return kept;
     }

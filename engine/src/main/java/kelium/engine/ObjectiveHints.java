@@ -422,7 +422,7 @@ public final class ObjectiveHints {
         TurnJournal.TurnFacts f = j.of(seat);
 
         switch (pid) {
-            // ---- НАЙМ И СБОРКА ----
+            // ---- НАЙМ И СНАРЯЖЕНИЕ ----
             case "hired_distinct_kinds" -> {
                 int have = 0;
                 Set<String> forbid = codes(p.get("forbid_kinds"));
@@ -598,9 +598,10 @@ public final class ObjectiveHints {
                         + " разное предложение планшета технологий");
             }
             case "science_trophies_spent" -> {
-                int need = num(p, "count", 2) - f.scienceTrophiesSpent;
+                int need = num(p, "count", 2) - f.sciencePaidUnits;
                 return new Gap(need, List.of("science"),
-                    "в этот ход сдать в Науку ещё " + Math.max(need, 0) + " трофейный жетон");
+                    "в этот ход заплатить в Науку ещё " + Math.max(need, 0)
+                        + " обломок");
             }
             case "tech_step_reached", "tracks_occupied" -> {
                 return new Gap(1, List.of("science"),

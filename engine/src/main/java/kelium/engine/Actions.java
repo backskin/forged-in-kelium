@@ -435,6 +435,9 @@ public final class Actions {
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
             int ammoMade = 0;
             int unitsMade = 0;
+            // Сколько войск КАЖДОГО рода сделано этим действием — уходит в
+            // телеметрию: по ней мерится, какие рода игрок вообще производит.
+            Map<String, Integer> madeByType = new HashMap<>();
             int[] paid = {0, 0};
             // ПРЕДЕЛ С КАРТЫ: бесплатная Сборка бывает «не более чем N зданиями».
             int buildingLimit = ctx.objectLimit(name());
@@ -560,6 +563,13 @@ public final class Actions {
                                 continue;
                             }
                             unitsMade++;
+                            // РАЗБИВКА ПО РОДАМ В ТЕЛЕМЕТРИИ: без неё нельзя
+                            // измерить, КАКИЕ войска игрок производит, а вопрос
+                            // «почему на поле нет техники и авиации» без этого
+                            // числа решается только домыслами. Журнал знает то же
+                            // (producedByType), но журнал живёт один ход и в
+                            // события не попадает.
+                            madeByType.merge(unitType.code, 1, Integer::sum);
                             // журнал: набор уникальных зданий, произведших юнитов
                             // (задание «Конвейер» усиление «3 разных здания»).
                             jf.unitsProducedBuildings.add(b.uid);
@@ -576,6 +586,7 @@ public final class Actions {
             ctx.actionsPlayed.add(name());
             Map<String, Object> tel = new HashMap<>();
             tel.put("units", unitsMade);
+            tel.put("units_by_type", madeByType);
             tel.put("power_coins", paid[0]);
             tel.put("power_offers", paid[1]);
             tel.put("ammo", ammoMade);
@@ -768,12 +779,16 @@ public final class Actions {
             int coinsSpent = 0;
             // ПРЕДЕЛ С КАРТЫ: бесплатная Стройка бывает «одна операция».
             int opLimit = ctx.objectLimit(name());
+            // ОДНА ОПЕРАЦИЯ НА ОДНО ЗДАНИЕ ЗА ДЕЙСТВИЕ (заказ дизайнера
+            // 25.08.2026, ключ actions.build.one_op_per_building). Иначе то же
+            // здание можно поставить и тут же снять, доя монету за снос.
+            java.util.Set<Integer> тронутые = new java.util.HashSet<>();
             StringBuilder detail = new StringBuilder();
             while (true) {
                 if (ops >= opLimit) {
                     break;
                 }
-                ActionResult one = performOneOp(player, ctx, agent);
+                ActionResult one = performOneOp(player, ctx, agent, тронутые);
                 if (one == null) {
                     break;   // пас или ничего доступного
                 }
@@ -803,7 +818,8 @@ public final class Actions {
 
         /** Одна операция стройки/переноса; null = пас или нет доступного. */
         @SuppressWarnings("unchecked")
-        private ActionResult performOneOp(PlayerState player, TurnContext ctx, Agent agent) {
+        private ActionResult performOneOp(PlayerState player, TurnContext ctx, Agent agent,
+                                          java.util.Set<Integer> тронутые) {
             // УДОРОЖАНИЕ КАСАЕТСЯ ТОЛЬКО РАЗМЕЩЕНИЯ ИЗ ЗАПАСА (правило дизайнера
             // 17.08.2026). У Стройки три операции: разместить здание из запаса на
             // поле, вернуть здание с поля в запас, переместить здание по полю
@@ -827,6 +843,13 @@ public final class Actions {
             List<Map<String, Object>> menu = ctx.buildMovesOnly
                 ? new ArrayList<>() : buildable(player, surcharge, ctx.buildFree);
             List<Map<String, Object>> moveMenu = movable(player, ctx);
+            // ОДНА ОПЕРАЦИЯ НА ЗДАНИЕ. Уже тронутое этим действием здание из меню
+            // уходит: иначе его можно переставлять и сносить по кругу.
+            boolean одноНаЗдание = rs.getBool("actions.build.one_op_per_building", false);
+            if (одноНаЗдание && !тронутые.isEmpty()) {
+                moveMenu.removeIf(m -> m.get("uid") instanceof Number n
+                    && тронутые.contains(n.intValue()));
+            }
             if (menu.isEmpty() && moveMenu.isEmpty()) {
                 return null;
             }
@@ -840,8 +863,17 @@ public final class Actions {
             // B10: снос — любое своё здание на поле убирается в резерв за возврат
             // demolish_refund_coins монет (ЦУ не сносится — только переносится).
             int refund = rs.getInt("actions.build.demolish_refund_coins");
+            // СНОС СВОЕГО ЦУ (заказ дизайнера 25.08.2026, ключ
+            // actions.build.demolish_cu_allowed). Прежде ЦУ из меню исключалось
+            // всегда. Теперь его можно разобрать и получить монету — это выход
+            // из тупика, когда строить не на что; расплата в том, что в свой ход
+            // игрок ОБЯЗАН вернуть ЦУ на поле спец-действием.
+            boolean цуМожноСносить = rs.getBool("actions.build.demolish_cu_allowed", false);
             for (BuildingToken b : player.buildingsOnField()) {
-                if (b.type == BuildingType.COMMAND_CENTER) {
+                if (b.type == BuildingType.COMMAND_CENTER && !цуМожноСносить) {
+                    continue;
+                }
+                if (одноНаЗдание && тронутые.contains(b.uid)) {
                     continue;
                 }
                 opts.add(new Choice("demolish_pick", b.uid,
@@ -853,9 +885,14 @@ public final class Actions {
                 return null;
             }
             if ("move_pick".equals(pick.kind())) {
-                return performMove(player, ctx, agent, (Map<String, Object>) pick.payload());
+                Map<String, Object> mv = (Map<String, Object>) pick.payload();
+                if (mv.get("uid") instanceof Number n) {
+                    тронутые.add(n.intValue());
+                }
+                return performMove(player, ctx, agent, mv);
             }
             if ("demolish_pick".equals(pick.kind())) {
+                тронутые.add(((Number) pick.payload()).intValue());
                 return performDemolish(player, ctx, ((Number) pick.payload()).intValue(), refund);
             }
             Map<String, Object> spec = (Map<String, Object>) pick.payload();
@@ -2019,9 +2056,15 @@ public final class Actions {
                 boolean did = resolver.runBattle(player.seat, agent);
                 if (!did) {
                     // бой не состоялся (пас/нет целей): вернуть наценку — право
-                    // не было использовано
+                    // не было использовано.
+                    //
+                    // ВОЗВРАТ ИДЁТ ЧЕРЕЗ СКЛАД. Казалось бы, возвращаем своё же и
+                    // переполнить не можем — но между платой и возвратом успевает
+                    // пройти бой, а в бою сносят здания: закрылись ячейки, и
+                    // прежнее количество боеприпасов уже не помещается. Поймано
+                    // сторожем StorageNeverOverflowsTest на одной партии из девяти.
                     if (surcharge > 0) {
-                        player.resources.add(Resource.AMMO, surcharge);
+                        Storage.addAmmoCapped(state, player, surcharge);
                     }
                     break;
                 }
@@ -2427,7 +2470,11 @@ public final class Actions {
             int spentTotal = 0;
             StringBuilder detail = new StringBuilder();
             while (steppedTracks.size() < tracksAllowed) {
-                int pool = player.trophySpacePoints() + player.resources.debris();
+                // ЧЕМ ПЛАТИМ, ТЕМ И СЧИТАЕМ КАРМАН (см. payTrophy): при
+                // tech.pay_with_debris_only жетоны в оплату не идут, значит и
+                // предлагать шаги «по карману из жетонов» нельзя — иначе игрок
+                // увидел бы вариант, который не может оплатить.
+                int pool = сколькоМожемЗаплатить(player);
                 List<Choice> opts = new ArrayList<>();
                 for (String track : tech.tracks) {
                     if (steppedTracks.contains(track)) {
@@ -2481,14 +2528,17 @@ public final class Actions {
                 for (int to = step + 1; to <= target; to++) {
                     cost += sciStepCost(player, costs, to - 1, stepsMade);
                 }
-                // o39 «Сдача» и o34 «Научный отдел»: считаем СДАННЫЕ ЖЕТОНЫ (а не
-                // трофейные очки) и то, на какие треки они ушли. Жетоны уходят
-                // внутри payTrophy, поэтому меряем размер трофейного пространства
-                // до и после — другого места, где это видно, нет.
-                int trophiesBefore = player.trophySpace.size();
-                payTrophy(player, cost, agent);
+                // o39 «Сдача»: считаем ЕДИНИЦЫ ОПЛАТЫ, ушедшие в науку.
+                //
+                // ПОЧЕМУ НЕ РАЗМЕР ТРОФЕЙНОГО МЕСТА, как было до 25.08.2026.
+                // Тот замер работал, только пока наука брала целые жетоны. С
+                // ключом tech.pay_with_debris_only жетоны в оплату не идут,
+                // трофейное место не уменьшается — и счётчик застыл на нуле,
+                // сделав условие o39 невыполнимым. Платёж знает сам payTrophy,
+                // поэтому он и возвращает уплаченное.
+                int paid = payTrophy(player, cost, agent);
                 TurnJournal.TurnFacts sf = journal(state).of(player.seat);
-                sf.scienceTrophiesSpent += Math.max(0, trophiesBefore - player.trophySpace.size());
+                sf.sciencePaidUnits += paid;
                 sf.scienceTracksUsed.add(track);
                 sf.scienceOffersUsed.add("track:" + track);
                 player.techSteps.put(track, target);
@@ -2547,6 +2597,15 @@ public final class Actions {
                     }
                 }
                 rewards = (List<Object>) te.get("step_rewards");
+            }
+            // СВОД ПЕРЕБИВАЕТ ДОСКУ. Лестница шагов — настраиваемая величина
+            // (цена, очки, ёмкость шагов уже живут в своде), и когда вариант
+            // правил меняет ЧИСЛО шагов, список наград обязан меняться вместе с
+            // ними. Держать его только на доске значило бы плодить копию всего
+            // набора планшетов ради одной строки.
+            if (cfg.ruleset.get("tech.step_rewards", null) instanceof List<?> rl
+                    && !rl.isEmpty()) {
+                rewards = new ArrayList<>(rl);
             }
             // Награда шага берётся из данных step_rewards[reached-1], чтобы правка
             // числа шагов не требовала менять код. Возможные значения:
@@ -2611,7 +2670,7 @@ public final class Actions {
                 //   синий трек    → синий модуль (сборка);
                 //   зелёный трек  → ПОЗОЛОТА одного своего модуля.
                 // Зелёный трек своих жетонов не производит (он про хранилище), и
-                // позолота — ровно то, что он и продаёт за 3 трофея вечным
+                // позолота — ровно то, что он и продаёт за два обломка вечным
                 // курсом. Десять монет здесь были бы вдвое слабее: 10 МОН это
                 // 2 ПО, а вершина стоит четырёх трофеев.
                 if (!kelium.engine.Setup.expansionOn(rs, "super_arsenal")) {
@@ -2652,7 +2711,7 @@ public final class Actions {
          * </ul>
          *
          * <p>Зелёный трек своих жетонов не печатает, и позолота — ровно тот приз,
-         * который он и продаёт вечным курсом за 3 трофея. Десять монет здесь были
+         * который он и продаёт вечным курсом за два обломка. Десять монет здесь были
          * бы вдвое слабее: 10 МОН это 2 ПО, а вершина стоит четырёх трофеев.
          *
          * @param kind род модулей трека из данных доски: red | blue | storage
@@ -2671,9 +2730,29 @@ public final class Actions {
             }
         }
 
+        /**
+         * СКОЛЬКО ИГРОК МОЖЕТ ЗАПЛАТИТЬ ЗА НАУКУ — тем же счётом, каким платит.
+         *
+         * <p>Иначе меню и оплата расходятся: предложение считалось по жетонам с
+         * обломками, а оплата (при новом правиле) берёт только обломки, и игрок
+         * видел бы шаги, за которые ему нечем платить.
+         */
+        private int сколькоМожемЗаплатить(PlayerState player) {
+            return rs.getBool("tech.pay_with_debris_only", false)
+                ? player.resources.debris()
+                : player.trophySpacePoints() + player.resources.debris();
+        }
+
         private void payTrophy(PlayerState player, int cost) {
             payTrophy(player, cost, null);
         }
+
+        /*
+         * ВОЗВРАЩАЕТ УПЛАЧЕННОЕ. Ровно этого числа не хватало заданию o39: чем
+         * платят за науку, зависит от свода (обломки или жетоны), и мерить это
+         * снаружи — через размер трофейного места — можно только для одного из
+         * двух правил. Кто платит, тот и знает сумму.
+         */
 
         /**
          * Стоимость шага науки. Пассив science_first_step_discount (стартовая
@@ -2695,8 +2774,45 @@ public final class Actions {
          * СНИЗУ (минимизация потерь). B4: сданные жетоны ВОЗВРАЩАЮТСЯ владельцам
          * (правило §5.2), а не уничтожаются.
          */
-        private void payTrophy(PlayerState player, int cost, Agent agent) {
+        private int payTrophy(PlayerState player, int cost, Agent agent) {
             int remaining = cost;
+            // ПЛАТЯТ ОБЛОМКАМИ, А НЕ ЦЕЛЫМИ ЖЕТОНАМИ (уточнение дизайнера
+            // 21.08.2026, ключ tech.pay_with_debris_only).
+            //
+            // Правило целиком: снесённый жетон уезжает к тебе на трофейное место,
+            // а в Возврат ВСЕ трофеи конвертируются в обломки 1:1 (это уже
+            // работает, см. GameEngine.returnStep). Обломок и есть монета науки.
+            // Движок же до сих пор позволял сдать в науку сам ЖЕТОН, минуя
+            // конвертацию, — то есть тратить трофей в тот же ход, когда он взят.
+            // Это меняло темп: война оплачивала науку немедленно, без раунда
+            // ожидания, и «трофей» с «обломком» становились одним и тем же.
+            //
+            // Ключа нет — работает как раньше (жетоны, потом обломки), поэтому
+            // старые своды и замеры воспроизводятся без правок.
+            if (rs.getBool("tech.pay_with_debris_only", false)) {
+                // ТОЧКА ПРАВИЛ СПРАШИВАЕТСЯ ЗАРАНЕЕ И ВСЕГДА — ровно по той же
+                // причине, что и в ветке ниже: если спрашивать её только когда
+                // обломков не хватило, точка молчит почти всегда, и «способность
+                // подключена» становится правдой лишь иногда. Это поймал сторож
+                // AbilityFrameworkTest, а не партия.
+                boolean keliumOkHere = kelium.engine.ability.RuleQuery
+                    .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
+                    .base(0).ask() >= 1.0;
+                int pay = Math.min(remaining, player.resources.debris());
+                if (pay > 0) {
+                    player.resources.pay(Resource.DEBRIS, pay);
+                    remaining -= pay;
+                }
+                if (remaining > 0 && keliumOkHere) {
+                    // «Научный подряд» по-прежнему разрешает келемий.
+                    int keliumPay = Math.min(remaining, player.resources.kelium());
+                    if (keliumPay > 0) {
+                        player.resources.pay(Resource.KELIUM, keliumPay);
+                        remaining -= keliumPay;
+                    }
+                }
+                return cost - remaining;
+            }
             // ТОЧКА ПРАВИЛ спрашивается ЗАРАНЕЕ и всегда: иначе она срабатывала бы
             // только в редкой ветке «трофеев не хватило», и объявление «точка
             // подключена» было бы правдой лишь иногда.
@@ -2749,14 +2865,18 @@ public final class Actions {
                 int pay = Math.min(remaining, player.resources.kelium());
                 if (pay > 0) {
                     player.resources.pay(Resource.KELIUM, pay);
+                    remaining -= pay;
                 }
             }
+            // Жетон мог стоить больше остатка (трофейное очко неделимо), поэтому
+            // остаток бывает отрицательным — переплата в счёт не идёт.
+            return cost - Math.max(0, remaining);
         }
 
         /** Предложить вечные обмены. Вернуть id взятого обмена или null. */
         @SuppressWarnings("unchecked")
         private String maybeExchange(PlayerState player, Agent agent) {
-            int pool = player.trophySpacePoints() + player.resources.debris();
+            int pool = сколькоМожемЗаплатить(player);
             List<Choice> opts = new ArrayList<>();
             if (pool >= 1) {
                 Map<String, Object> ex = new HashMap<>();
@@ -2783,11 +2903,18 @@ public final class Actions {
                 ex.put("give", 2);
                 opts.add(new Choice("sci_exchange", ex, "2 trophy -> draw 2 arsenal, keep 1"));
             }
-            if (pool >= 3 && (player.redModules + player.blueModules) > player.goldModules) {
+            // ЦЕНА ПОЗОЛОТЫ — из свода, а не из кода (решение дизайнера
+            // 28.08.2026: два обломка вместо трёх). Старым сводам, где ключа
+            // нет, остаётся прежняя тройка — числа сыгранных партий не должны
+            // меняться задним числом.
+            int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();
+            if (pool >= gildCost
+                    && (player.redModules + player.blueModules) > player.goldModules) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "gild");
-                ex.put("give", 3);
-                opts.add(new Choice("sci_exchange", ex, "3 trophy -> gild a module"));
+                ex.put("give", gildCost);
+                opts.add(new Choice("sci_exchange", ex,
+                    gildCost + " trophy -> gild a module"));
             }
             // Вечный курс: 1 трофей -> 1 перемещение модуля (перестановка
             // посреди раунда, не дожидаясь Смены модулей в Обновление).

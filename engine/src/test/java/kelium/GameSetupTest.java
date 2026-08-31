@@ -27,14 +27,21 @@ class GameSetupTest {
             assertEquals(n, s.numPlayers(), "число игроков");
             assertTrue(s.field.size() > 0, "поле не пустое");
             for (PlayerState p : s.players) {
-                // СВОД-старт (ruleset 1.5.0): ЦУ + 2 энергии + 1 пехота, 5 МОН,
+                // СВОД-старт: ЦУ + энергия + 1 пехота, монеты ПО СВОДУ,
                 // стартового добытчика НЕТ (решение дизайнера 2026-08-11).
                 assertTrue(p.hasCommandCenter(), "у игрока " + p.seat + " есть ЦУ");
                 boolean hasMiner = p.buildingsOnField().stream()
                     .anyMatch(b -> b.type == BuildingType.MINER);
                 assertTrue(!hasMiner, "у игрока " + p.seat + " НЕТ стартового добытчика (СВОД)");
-                assertEquals(5, p.resources.get(kelium.core.Resource.COIN),
-                    "стартовые монеты = 5 (СВОД)");
+                // МОНЕТЫ БЕРУТСЯ ИЗ СВОДА, А НЕ ЗАШИТЫ ЧИСЛОМ. Раньше здесь
+                // стояла пятёрка, и правка экономики (заказ 25.08.2026: три
+                // монеты на старте) ломала тест, хотя игра работала верно.
+                // Сторож должен проверять СОГЛАСИЕ подготовки со сводом, а не
+                // помнить чью-то старую цифру.
+                int поСводу = kelium.dataio.Ctx.rules(s)
+                    .getIntList("setup.start_coins").get(p.seat);
+                assertEquals(поСводу, p.resources.get(kelium.core.Resource.COIN),
+                    "стартовые монеты обязаны совпадать со сводом");
                 assertEquals(1, p.unitsOnField().size(), "1 стартовая пехота");
                 assertNotNull(p.startHex, "стартовый гекс задан");
                 // С правил 1.6.0 подготовка РАЗДАЁТ карты супер задания, а выбор

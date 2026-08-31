@@ -216,7 +216,7 @@ public final class Commentator implements Consumer<Map<String, Object>> {
 
     private static String actRu(String a) {
         return switch (a) {
-            case "assembly" -> "Сборка";
+            case "assembly" -> "Снаряжение";
             case "mining" -> "Добыча";
             case "build" -> "Стройка";
             case "energy_swap" -> "Смена энергии";

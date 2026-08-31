@@ -167,8 +167,31 @@ public final class Modules {
     public static void moduleSwap(GameState s, int seat, Agent agent,
                                   Consumer<Map<String, Object>> emit) {
         PlayerState p = s.player(seat);
+        // ГЛУХОЙ ЖЕТОН УНИЧТОЖЕНИЯ ЦУ ПЕРЕЖИВАЕТ ПЕРЕКЛАДКУ.
+        //
+        // НАЙДЕНО ЗАМЕРОМ 25.08.2026: у 470 игроков из 600 жетона к концу партии
+        // не было вовсе, хотя ЦУ снесли только в 0.27 партии. Причина здесь:
+        // Обновление стирает раскладку целиком и собирает её заново из
+        // ВЫТЯНУТЫХ жетонов, а глухой в мешке не лежит и в руке не числится —
+        // значит каждый раунд он молча пропадал.
+        //
+        // Он остаётся НА ТОМ ЖЕ РОДЕ: бесплатная перекладка каждое Обновление
+        // была бы щедрее правила. По правилу его двигают за плату — обменом на
+        // планшете науки за обломок или утилем карты задания (moveOneModule).
+        // Заодно занятый им род не предлагается под другие модули: он и так
+        // занят, как любая занятая ячейка.
+        Map.Entry<UnitType, Map<String, Object>> глухой = null;
+        for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
+            if (Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                глухой = e;
+                break;
+            }
+        }
         p.redPlacements.clear();
         p.bluePlacements.clear();
+        if (глухой != null) {
+            p.redPlacements.put(глухой.getKey(), глухой.getValue());
+        }
 
         // Красные: у игрока комплект из 4 УНИКАЛЬНЫХ жетонов (М1-М4); выдано
         // (доступно) redModules штук — игрок сам выбирает, КАКИЕ из четырёх

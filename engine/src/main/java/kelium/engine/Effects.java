@@ -211,6 +211,29 @@ public final class Effects {
             }
             got.put("arsenal", drawn);
         }
+        // КАРТА АРСЕНАЛА С ВИТРИНЫ, А НЕ ВСЛЕПУЮ (правило дизайнера 21.08.2026).
+        //
+        // Отличие принципиальное и в цене, и в ощущении: слепая тяга даёт
+        // случайную карту, а витрина — ВЫБОР из двух открытых, то есть награда
+        // всегда по делу. Поэтому это отдельный ключ: дорогая награда за трудное
+        // задание, а не тот же самый «arsenal».
+        //
+        // Витрина — часть стола: взятая карта немедленно заменяется новой с верха
+        // колоды (см. Actions.takeFromArsenalDisplay). Если колода и сброс
+        // исчерпаны, награда не приходит — законный конец колоды, а не ошибка.
+        if (p.containsKey("arsenal_from_display")) {
+            int want = asInt(p.get("arsenal_from_display"));
+            int taken = 0;
+            Agent ag = agentFor(s, seat);
+            for (int i = 0; i < want; i++) {
+                String c = Actions.takeFromArsenalDisplay(s, pl, ag);
+                if (c == null) {
+                    break;
+                }
+                taken++;
+            }
+            got.put("arsenal_from_display", taken);
+        }
         Object module = p.get("module");
         if ("attack".equals(module)) {
             // «Модули 2.0»: с мешками жетон тянется случайно, а не выбирается

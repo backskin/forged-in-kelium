@@ -164,6 +164,7 @@ public final class GameEngine {
 
         emit(ev("type", "game_start", "players", s.numPlayers(), "ruleset", rs.id));
         dealStart();
+        offerSealChoice();
         offerSuperPick();
         offerStartObjectivePick();
         loop(1, 1, true);
@@ -542,6 +543,8 @@ public final class GameEngine {
                 "on_field", TokenContainers.onField(s)));
         }
         moduleSwapAll();
+        // Накопитель «Штабной игры» (супер-задания 5.0): раунды первым игроком.
+        s.player(s.firstPlayer).super5RoundsFirst += 1;
         emit(ev("type", "refresh", "round", rnd, "first_player", s.firstPlayer));
     }
 
@@ -717,7 +720,11 @@ public final class GameEngine {
         }
 
         if (isJoker) {
-            playActions(p, ctx, Actions.ALL_NAMES, 2, true);
+            // Джокер даёт столько же действий, сколько верх обычной карты: иначе
+            // в варианте «одно действие за ход» БЕЗОПАСНОСТЬ станет вдвое сильнее
+            // всех остальных карт руки.
+            int jokerA = rs.getInt("actions.top_actions_per_turn", 2);
+            playActions(p, ctx, Actions.ALL_NAMES, jokerA, true);
             // БАГ (найден дизайнером 14.08.2026): карта БЕЗОПАСНОСТЬ (джокер) не
             // шлёт turn_orders вовсе — только у неё есть этот код, у обычных
             // приказов событие ниже. Проигрыватель ждёт именно turn_orders, чтобы
@@ -728,7 +735,7 @@ public final class GameEngine {
             // важен, поэтому TurnContext.actionsPlayed — LinkedHashSet).
             emit(ev("type", "turn_orders", "seat", seat, "card", cardId,
                 "top", "joker", "top_actions", new ArrayList<>(ctx.actionsPlayed),
-                "top_allowed", 2, "coincided", false,
+                "top_allowed", jokerA, "coincided", false,
                 "bottom", null, "bottom_open", false, "bottom_actions", List.of(),
                 "maneuver", false));
         } else {
@@ -736,7 +743,19 @@ public final class GameEngine {
             boolean coincided = rs.getBool("actions.coincidence_rule_enabled", true)
                 && orderCounts.getOrDefault(top, 0) > 1;
             List<String> names = List.of(Order.ORDER_ACTIONS.get(top));
-            int maxA = coincided ? 1 : 2;
+            // ТОЧКА ПРАВИЛ: сколько действий даёт ВЕРХНИЙ приказ.
+            //
+            // По действующему своду приказ даёт ОБА своих действия, а совпадение
+            // приказов срезает их до одного — это и есть «блок». Это КЛАССИКА и
+            // единственный живой вариант: значение по умолчанию 2.
+            //
+            // Ключ остался ради одного отклонённого опыта — «одно действие
+            // сверху, блока нет» (data/_archive/rulesets/1.23.0-приказ1.yaml).
+            // Замер 24.08.2026 его похоронил: ход стал короче лишь на 2% времени
+            // партии на четверых, зато боёв стало на 39–64% меньше. Новых
+            // вариантов розыгрыша действий не заводим.
+            int topA = rs.getInt("actions.top_actions_per_turn", 2);
+            int maxA = coincided ? Math.min(1, topA) : topA;
             // Признак блокировки нужен способностям карт («Резервный штаб»
             // обходит её за келемий): OptionSource видит состояние партии, но не
             // ход, поэтому флаг живёт в журнале хода.
@@ -1144,6 +1163,12 @@ public final class GameEngine {
                 opts.add(new Choice("spec_arsenal_use", cid, "SPEC " + passive + " (" + cid + ")"));
             }
         }
+        // СУПЕР-ЗАДАНИЕ 5.0: сжечь свою карту ради суперутиля. Один раз за
+        // партию, в любой момент между действиями — как всякий СПЕЦ.
+        if (p.super5Card != null && !p.super5Burned && Super5.on(s)) {
+            opts.add(new Choice("spec_super5_burn", p.super5Card,
+                "СУПЕРУТИЛЬ " + p.super5Card));
+        }
         // СПОСОБНОСТИ АРСЕНАЛА сами кладут свои варианты в меню СПЕЦ: движок не
         // знает про карты, он спрашивает «что добавить?». Так карта даёт НОВОЕ
         // спец-действие без правки движка (13.08.2026).
@@ -1197,6 +1222,11 @@ public final class GameEngine {
             case "spec_symbol_reveal" -> revealSymbol(p, (String) ch.payload());
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
+            case "spec_super5_burn" -> {
+                Map<String, Object> got = Super5.burn(s, p, agents.get(p.seat), this::emit);
+                emit(ev("type", "super5_burn", "seat", p.seat,
+                    "card", ch.payload(), "got", got));
+            }
             case "spec_combat" -> {
                 // Плата вперёд, и только потом бой: не хватило — предложения бы и
                 // не было (см. проверку выше), а порядок важен для журнала.
@@ -1379,6 +1409,54 @@ public final class GameEngine {
         }
     }
 
+    /**
+     * РАЗДАЧА ГЛУХИХ ЖЕТОНОВ — жеребьёвкой, без единого решения (правило
+     * дизайнера 25.08.2026).
+     *
+     * <p>Жетон уничтожения ЦУ — тёмный жетон размером с красный модуль атаки, и
+     * работает он как модуль: ложится на ячейку специальной атаки. Только он
+     * ГЛУХОЙ — ничего не открывает, а закрывает: род с ним бьёт лишь
+     * универсальной за 2 боеприпаса.
+     *
+     * <p>РУБАШКИ У ВСЕХ ЧЕТЫРЁХ ОДИНАКОВЫЕ (оборот — 3 победных очка тому, кто
+     * снёс чужое ЦУ), ЛИЦА РАЗНЫЕ: на каждом нарисован род войск. В подготовку
+     * жетоны мешают лицом вниз, и каждый берёт один наугад — так у стола
+     * появляется асимметрия без единого решения игрока, а на четверых каждый род
+     * закрыт ровно один раз.
+     *
+     * <p>ДАЛЬШЕ ЖЕТОН ДВИГАЕТСЯ КАК ЛЮБОЙ МОДУЛЬ: обменом на планшете науки за
+     * обломок, утилем карты задания. Нарисованный род — это МЕСТО, ОТКУДА он
+     * начинает, а не клетка навсегда: игрок переставляет его туда, где ему сейчас
+     * не нужна дешёвая атака.
+     *
+     * <p>Снесли твоё ЦУ — жетон уехал к захватчику, запись пропала, ячейка
+     * открылась (см. CombatResolver.destroyCu).
+     */
+    private void offerSealChoice() {
+        GameState s = state;
+        if (!rs().getBool("command_center.destruction_token_seals_cell", false)) {
+            return;
+        }
+        List<UnitType> мешок = new ArrayList<>();
+        for (UnitType t : UnitType.values()) {
+            if (s.player(0).board.troop.specializedTarget(t) != null) {
+                мешок.add(t);
+            }
+        }
+        Collections.shuffle(мешок, s.rng);
+        for (PlayerState p : s.players) {
+            if (мешок.isEmpty()) {
+                break;      // игроков больше, чем жетонов — остальные без него
+            }
+            UnitType род = мешок.remove(0);
+            Map<String, Object> жетон = new HashMap<>();
+            жетон.put("id", PlayerState.CU_MODULE);
+            жетон.put("blocks", true);
+            p.redPlacements.put(род, жетон);
+            emit(ev("type", "seal_unit", "seat", p.seat, "unit", род.code));
+        }
+    }
+
     /** Включено ли правило «вскрытие подложенной карты = СПЕЦ-действие». */
     private boolean revealIsSpec(PlayerState p) {
         return !p.tucked.isEmpty() && Boolean.TRUE.equals(Ctx.rules(state)
@@ -1544,9 +1622,54 @@ public final class GameEngine {
             }
         }
         if (p.arsenalInstalled.size() >= 3) {
-            String dropped = p.arsenalInstalled.remove(0);
+            // ПЛАНШЕТ ПОЛОН — ЭТО РЕШЕНИЕ ИГРОКА, А НЕ АВТОМАТИЗМ (правило
+            // дизайнера 21.08.2026).
+            //
+            // Прежде движок молча выбрасывал САМУЮ СТАРУЮ карту: игрока не
+            // спрашивали ни какую снять, ни хочет ли он вообще менять. То есть
+            // установка четвёртой карты могла выбросить работающую способность
+            // против воли игрока — а за столом так не бывает: карту сперва
+            // читают, потом решают, стоит ли она места.
+            //
+            // Теперь предлагается снять любую из трёх ИЛИ отказаться. Отказ
+            // возвращает карту в руку: она никуда не делась, просто не встала.
+            String dropped = p.arsenalInstalled.get(0);
+            if (agent != null) {
+                List<Choice> opts = new ArrayList<>();
+                for (String уже : p.arsenalInstalled) {
+                    opts.add(new Choice("arsenal_replace", уже,
+                        "снять " + уже + " ради " + cid));
+                }
+                opts.add(new Choice("pass", null,
+                    "оставить планшет как есть, карту не устанавливать"));
+                Choice pick = agent.choose(s, opts,
+                    Map.of("kind", "arsenal_replace", "card", cid,
+                        "installed", List.copyOf(p.arsenalInstalled)));
+                if (pick == null || pick.payload() == null) {
+                    // МЕСТА НЕ НАШЛОСЬ, И ИГРОК НЕ СТАЛ ОСВОБОЖДАТЬ — карта
+                    // остаётся в руке. Отдельное событие: без него «карта не
+                    // влезла» ничем не отличить от «карту не захотели».
+                    p.arsenalHand.add(cid);
+                    emit(ev("type", "arsenal_no_room", "seat", p.seat, "card", cid,
+                        "installed", List.copyOf(p.arsenalInstalled)));
+                    return;
+                }
+                dropped = String.valueOf(pick.payload());
+            }
+            p.arsenalInstalled.remove(dropped);
             applyHpPassive(p, dropped, -1);   // B7: снять бонус вытесненной карты
             s.decks.get("arsenal").discard(dropped);
+            // СНЯТАЯ КАРТА МОГЛА ДАВАТЬ ЯЧЕЙКИ СКЛАДА («+1 ячейка боеприпаса»,
+            // «+2 ячейки под обломки»). Со снятием ячейки закрываются, и то, что
+            // в них лежало, обязано сгореть — ровно как при возврате здания на
+            // планшет. Без этого склад оставался переполненным: поймано
+            // сторожем StorageNeverOverflowsTest, не партией.
+            //
+            // Выбор игрока (ownTurnChoice=true): это его собственное действие в
+            // его ход, значит и решать, что сгорит, ему.
+            Storage.evictOnBuildingReturn(s, p, true);
+            emit(ev("type", "arsenal_replaced", "seat", p.seat, "card", cid,
+                "dropped", dropped));
         }
         p.arsenalInstalled.add(cid);
         applyHpPassive(p, cid, +1);           // B7: вшить бонус HP в жетоны
@@ -1769,9 +1892,19 @@ public final class GameEngine {
                     }
                 }
                 p.trophySpace.clear();
-            }
-            for (int ownerSeat : ownersToReconcile) {
-                Storage.forceEvictOnBuildingReturn(s, s.player(ownerSeat));
+                // СЖИГАЕМ ИЗЛИШЕК СРАЗУ, А НЕ ПОСЛЕ ВСЕГО ЦИКЛА.
+                //
+                // Итог тот же, но по ходу дела состояние остаётся согласованным. С
+                // отложенным сжиганием получалось так: игрок 0 вернул сопернику
+                // добытчик, ячейки соседа закрылись — а сжигание ждало конца
+                // цикла, и в это окно попадал СНИМОК ЗАПИСИ (кадр
+                // «трофеи в обломки» следующего игрока). Запись показывала
+                // «занято 4 при 3 ячейках», хотя партия к концу шага была в
+                // порядке. Поймано сторожем StorageNeverOverflowsTest.
+                for (int ownerSeat : ownersToReconcile) {
+                    Storage.forceEvictOnBuildingReturn(s, s.player(ownerSeat));
+                }
+                ownersToReconcile.clear();
             }
             emit(ev("type", "tokens_returned", "round", s.round, "count", returned));
         }
