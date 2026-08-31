@@ -8,14 +8,14 @@ package kelium.core;
  *   <li>{@link #COIN} — монета (МОН): деньги; 5 монет = 1 ПО.</li>
  *   <li>{@link #KELIUM} — келемий (КЕЛ): самый очковый ресурс; 1 = 1 ПО.</li>
  *   <li>{@link #AMMO} — боеприпас (БПР): тратится на атаки и лишние ходы.</li>
- *   <li>{@link #DEBRIS} — обломок (ОБЛ): чёрные кубики в хранилище, идут на
+ *   <li>{@link #TROPHY} — трофей (ОБЛ): чёрные кубики в хранилище, идут на
  *       треки. Не путать с «трофеем» ({@link PlayerState#trophySpace}) —
  *       перевёрнутым жетоном уничтожения на отложенной карте приказа; трофей
- *       конвертируется в обломки 1:1 в конце раунда (см. {@code returnStep}).</li>
+ *       конвертируется в трофеи 1:1 в конце раунда (см. {@code returnStep}).</li>
  * </ul>
  */
 public enum Resource {
-    COIN("coin"), KELIUM("kelium"), AMMO("ammo"), DEBRIS("debris");
+    COIN("coin"), KELIUM("kelium"), AMMO("ammo"), TROPHY("debris");
 
     /** Строковый код, как в YAML-контенте. */
     public final String code;

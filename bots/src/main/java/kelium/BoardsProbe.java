@@ -150,7 +150,7 @@ public final class BoardsProbe {
         return switch (id) {
             case "trophy_to_coin" -> "трофей → монета";
             case "draw_arsenal" -> "2 трофея → 2 карты арсенала, одну оставить";
-            case "gild" -> "2 обломка → позолотить модуль";
+            case "gild" -> "2 трофея → позолотить модуль";
             case "move_module" -> "трофей → переместить модуль";
             default -> id;
         };

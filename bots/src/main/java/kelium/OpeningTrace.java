@@ -104,7 +104,7 @@ public final class OpeningTrace {
     private static String resources(PlayerState p) {
         return String.format("МОН=%d КЕЛ=%d БПР=%d ТРФ=%d КОНТ=%d",
             p.resources.coin(), p.resources.kelium(), p.resources.ammo(),
-            p.resources.debris(), p.containers);
+            p.resources.trophy(), p.containers);
     }
 
     private static String assets(GameState s, PlayerState p) {

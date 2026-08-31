@@ -267,7 +267,7 @@ public final class Lookahead {
         h = mix(h, p.resources.coin());
         h = mix(h, p.resources.kelium());
         h = mix(h, p.resources.ammo());
-        h = mix(h, p.resources.debris());
+        h = mix(h, p.resources.trophy());
         h = mix(h, p.trophySpacePoints());
         h = mix(h, p.containers);
         h = mix(h, p.objectiveHand.size());

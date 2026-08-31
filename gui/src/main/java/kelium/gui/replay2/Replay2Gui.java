@@ -619,7 +619,7 @@ public final class Replay2Gui {
         Chart.Metric m = switch (metric) {
             case "kelium" -> Chart.Metric.KELIUM;
             case "coin" -> Chart.Metric.COIN;
-            case "debris" -> Chart.Metric.DEBRIS;
+            case "debris" -> Chart.Metric.TROPHY;
             case "vp" -> Chart.Metric.VP;
             default -> null;
         };

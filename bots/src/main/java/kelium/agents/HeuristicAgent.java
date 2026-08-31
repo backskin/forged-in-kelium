@@ -1011,7 +1011,7 @@ public class HeuristicAgent extends Agent {
 
     /** Трофейный пул игрока = очки жетонов на трофейном поле + чёрные кубы. */
     private static int trophyPool(PlayerState me) {
-        return me.trophySpacePoints() + me.resources.debris();
+        return me.trophySpacePoints() + me.resources.trophy();
     }
 
     // ================= выбор действия ===================================
@@ -2025,11 +2025,11 @@ public class HeuristicAgent extends Agent {
                 int per = ((Number) econ.get("kelium_per_vp")).intValue();
                 yield per > 0 ? 1.0 / per : 0.0;
             }
-            case DEBRIS -> {
+            case TROPHY -> {
                 // ЛИБО-ЛИБО, КАК В Scoring.scorePlayer — не оба курса сразу.
                 // Найдено и исправлено 18.08.2026 вместе с тем же дублированием
                 // в самом подсчёте очков: бот складывал 1/trophy_per_vp И
-                // debris_storage_vp_per_unit, оценивая обломок в 1.333 ПО вместо
+                // debris_storage_vp_per_unit, оценивая трофей в 1.333 ПО вместо
                 // одного курса (0.333 или 0.5, смотря какой ключ считается).
                 if (econ.containsKey("debris_storage_vp_per_unit")) {
                     yield ((Number) econ.get("debris_storage_vp_per_unit")).doubleValue();
@@ -2039,7 +2039,7 @@ public class HeuristicAgent extends Agent {
             }
             // Боеприпас не даёт очков напрямую, но нужен для боя/лишних ходов —
             // небольшая утилитарная цена вместо нуля, чтобы не выбрасывался
-            // бездумно первым же при равенстве с обесцененным келемием/обломком.
+            // бездумно первым же при равенстве с обесцененным келемием/трофеем.
             case AMMO -> 0.2 * wget("aggression");
             default -> 0.0;
         };
@@ -2177,7 +2177,7 @@ public class HeuristicAgent extends Agent {
      */
     private double scoreSciExchange(GameState state, Choice o) {
         PlayerState me = state.player(seat);
-        int pool = me.trophySpacePoints() + me.resources.debris();
+        int pool = me.trophySpacePoints() + me.resources.trophy();
         int cheapest = cheapestNextStepCost(state, me);
         boolean stepAffordable = cheapest > 0 && pool >= cheapest;
         // ТРОФЕИ, КОТОРЫЕ ТОЧНО ПРОПАДУТ: только ЖЕТОНЫ на трофейном поле
@@ -2239,7 +2239,7 @@ public class HeuristicAgent extends Agent {
             // Теперь конкурирует, если карт мало.
             return switch (id) {
                 case "gild", "draw_arsenal" -> base;
-                // Перенос жетона стоит обломок и разово, зато открывает дешёвую
+                // Перенос жетона стоит трофей и разово, зато открывает дешёвую
                 // атаку на всю оставшуюся партию — он обязан конкурировать с
                 // пасом, а не отбрасываться правилом «трек важнее всего».
                 case "move_module" -> выгодаПереноса(state) > 0.15 ? base : 0.2;

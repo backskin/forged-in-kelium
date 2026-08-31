@@ -119,7 +119,7 @@ public class ArsenalCardBase extends BaseCard implements ArsenalCard {
         value += need(ctx, Resource.COIN) * num(params, "coin") * 0.10;
         value += need(ctx, Resource.AMMO) * num(params, "ammo") * 0.15;
         value += need(ctx, Resource.KELIUM) * num(params, "kelium") * 0.10;
-        value += need(ctx, Resource.DEBRIS) * num(params, "debris") * 0.20;
+        value += need(ctx, Resource.TROPHY) * num(params, "debris") * 0.20;
         value += num(params, "objective_cards") * 0.20;
         return clamp(value);
     }
@@ -145,7 +145,7 @@ public class ArsenalCardBase extends BaseCard implements ArsenalCard {
                 yield scarcity(idle, 3);
             }
             case REACH, DEFENCE -> ctx.me().unitsOnField().isEmpty() ? 0.2 : 0.8;
-            case TROPHY -> scarcity(ctx.have(Resource.DEBRIS), 4);
+            case TROPHY -> scarcity(ctx.have(Resource.TROPHY), 4);
             case ACTIONS, VP -> 0.9;     // действий и очков не хватает всегда
         };
     }

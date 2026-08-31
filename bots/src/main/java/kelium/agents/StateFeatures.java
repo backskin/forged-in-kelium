@@ -113,7 +113,7 @@ public final class StateFeatures {
         f[2] = me.resources.coin();
         f[3] = me.resources.kelium();
         f[4] = me.resources.ammo();
-        f[5] = me.trophySpacePoints() + me.resources.debris();
+        f[5] = me.trophySpacePoints() + me.resources.trophy();
 
         java.util.Set<String> live = Plan.liveTileHexes(s);
         int minersWorking = 0;

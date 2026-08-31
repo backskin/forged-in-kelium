@@ -20,12 +20,12 @@ public final class Resources {
     }
 
     /** Создать кошелёк с заданными начальными значениями. */
-    public Resources(int coin, int kelium, int ammo, int debris) {
+    public Resources(int coin, int kelium, int ammo, int trophy) {
         this();
         bag.put(Resource.COIN, coin);
         bag.put(Resource.KELIUM, kelium);
         bag.put(Resource.AMMO, ammo);
-        bag.put(Resource.DEBRIS, debris);
+        bag.put(Resource.TROPHY, trophy);
     }
 
     /** Текущее количество ресурса {@code r}. */
@@ -60,19 +60,19 @@ public final class Resources {
     public int coin()   { return bag.get(Resource.COIN); }
     public int kelium() { return bag.get(Resource.KELIUM); }
     public int ammo()   { return bag.get(Resource.AMMO); }
-    public int debris() { return bag.get(Resource.DEBRIS); }
+    public int trophy() { return bag.get(Resource.TROPHY); }
 
     public void setKelium(int v) { bag.put(Resource.KELIUM, v); }
     public void setAmmo(int v)   { bag.put(Resource.AMMO, v); }
 
     /** Копия кошелька (для снимков состояния). */
     public Resources copy() {
-        return new Resources(coin(), kelium(), ammo(), debris());
+        return new Resources(coin(), kelium(), ammo(), trophy());
     }
 
     @Override
     public String toString() {
         return "Res(coin=" + coin() + ", kel=" + kelium()
-             + ", ammo=" + ammo() + ", debris=" + debris() + ")";
+             + ", ammo=" + ammo() + ", trophy=" + trophy() + ")";
     }
 }

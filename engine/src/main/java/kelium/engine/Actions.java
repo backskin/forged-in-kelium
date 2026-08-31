@@ -298,7 +298,7 @@ public final class Actions {
                     journal(state).of(player.seat).spawnTileClaimedNonStart = true;
                 }
             }
-            Storage.addDebrisCapped(state, player, trophy);
+            Storage.addTrophyCapped(state, player, trophy);
             journal(state).of(player.seat).tookLastKeliumFromGrid = true;
             if (!tile.isStart) {
                 journal(state).of(player.seat).lastKeliumNonStart = true;
@@ -2441,7 +2441,7 @@ public final class Actions {
             // «пользуются ли боты вечными обменами науки», а он балансовый.
             // ОБМЕНОВ ЗА ОДНО ДЕЙСТВИЕ МОЖНО НЕСКОЛЬКО, включая повтор ОДНОГО И
             // ТОГО ЖЕ печатного обмена (уточнение 2026-08-15) — ограничен только
-            // пулом трофеев/обломков, не количеством использований.
+            // пулом трофеев/трофеев, не количеством использований.
             List<String> usedExchanges = new ArrayList<>();
             String exchange = null;
             while (true) {
@@ -2670,7 +2670,7 @@ public final class Actions {
                 //   синий трек    → синий модуль (сборка);
                 //   зелёный трек  → ПОЗОЛОТА одного своего модуля.
                 // Зелёный трек своих жетонов не производит (он про хранилище), и
-                // позолота — ровно то, что он и продаёт за два обломка вечным
+                // позолота — ровно то, что он и продаёт за два трофея вечным
                 // курсом. Десять монет здесь были бы вдвое слабее: 10 МОН это
                 // 2 ПО, а вершина стоит четырёх трофеев.
                 if (!kelium.engine.Setup.expansionOn(rs, "super_arsenal")) {
@@ -2711,7 +2711,7 @@ public final class Actions {
          * </ul>
          *
          * <p>Зелёный трек своих жетонов не печатает, и позолота — ровно тот приз,
-         * который он и продаёт вечным курсом за два обломка. Десять монет здесь были
+         * который он и продаёт вечным курсом за два трофея. Десять монет здесь были
          * бы вдвое слабее: 10 МОН это 2 ПО, а вершина стоит четырёх трофеев.
          *
          * @param kind род модулей трека из данных доски: red | blue | storage
@@ -2734,13 +2734,13 @@ public final class Actions {
          * СКОЛЬКО ИГРОК МОЖЕТ ЗАПЛАТИТЬ ЗА НАУКУ — тем же счётом, каким платит.
          *
          * <p>Иначе меню и оплата расходятся: предложение считалось по жетонам с
-         * обломками, а оплата (при новом правиле) берёт только обломки, и игрок
+         * трофеями, а оплата (при новом правиле) берёт только трофеи, и игрок
          * видел бы шаги, за которые ему нечем платить.
          */
         private int сколькоМожемЗаплатить(PlayerState player) {
             return rs.getBool("tech.pay_with_debris_only", false)
-                ? player.resources.debris()
-                : player.trophySpacePoints() + player.resources.debris();
+                ? player.resources.trophy()
+                : player.trophySpacePoints() + player.resources.trophy();
         }
 
         private void payTrophy(PlayerState player, int cost) {
@@ -2749,7 +2749,7 @@ public final class Actions {
 
         /*
          * ВОЗВРАЩАЕТ УПЛАЧЕННОЕ. Ровно этого числа не хватало заданию o39: чем
-         * платят за науку, зависит от свода (обломки или жетоны), и мерить это
+         * платят за науку, зависит от свода (трофеи или жетоны), и мерить это
          * снаружи — через размер трофейного места — можно только для одного из
          * двух правил. Кто платит, тот и знает сумму.
          */
@@ -2780,27 +2780,27 @@ public final class Actions {
             // 21.08.2026, ключ tech.pay_with_debris_only).
             //
             // Правило целиком: снесённый жетон уезжает к тебе на трофейное место,
-            // а в Возврат ВСЕ трофеи конвертируются в обломки 1:1 (это уже
-            // работает, см. GameEngine.returnStep). Обломок и есть монета науки.
+            // а в Возврат ВСЕ трофеи конвертируются в трофеи 1:1 (это уже
+            // работает, см. GameEngine.returnStep). Трофей и есть монета науки.
             // Движок же до сих пор позволял сдать в науку сам ЖЕТОН, минуя
             // конвертацию, — то есть тратить трофей в тот же ход, когда он взят.
             // Это меняло темп: война оплачивала науку немедленно, без раунда
-            // ожидания, и «трофей» с «обломком» становились одним и тем же.
+            // ожидания, и «трофей» с «трофеем» становились одним и тем же.
             //
-            // Ключа нет — работает как раньше (жетоны, потом обломки), поэтому
+            // Ключа нет — работает как раньше (жетоны, потом трофеи), поэтому
             // старые своды и замеры воспроизводятся без правок.
             if (rs.getBool("tech.pay_with_debris_only", false)) {
                 // ТОЧКА ПРАВИЛ СПРАШИВАЕТСЯ ЗАРАНЕЕ И ВСЕГДА — ровно по той же
                 // причине, что и в ветке ниже: если спрашивать её только когда
-                // обломков не хватило, точка молчит почти всегда, и «способность
+                // трофеев не хватило, точка молчит почти всегда, и «способность
                 // подключена» становится правдой лишь иногда. Это поймал сторож
                 // AbilityFrameworkTest, а не партия.
                 boolean keliumOkHere = kelium.engine.ability.RuleQuery
                     .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                     .base(0).ask() >= 1.0;
-                int pay = Math.min(remaining, player.resources.debris());
+                int pay = Math.min(remaining, player.resources.trophy());
                 if (pay > 0) {
-                    player.resources.pay(Resource.DEBRIS, pay);
+                    player.resources.pay(Resource.TROPHY, pay);
                     remaining -= pay;
                 }
                 if (remaining > 0 && keliumOkHere) {
@@ -2854,8 +2854,8 @@ public final class Actions {
                 }
             }
             if (remaining > 0) {
-                int pay = Math.min(remaining, player.resources.debris());
-                player.resources.pay(Resource.DEBRIS, pay);
+                int pay = Math.min(remaining, player.resources.trophy());
+                player.resources.pay(Resource.TROPHY, pay);
                 remaining -= pay;
             }
             // ТОЧКА ПРАВИЛ: чем ещё можно платить за шаги науки. Карта арсенала
@@ -2904,7 +2904,7 @@ public final class Actions {
                 opts.add(new Choice("sci_exchange", ex, "2 trophy -> draw 2 arsenal, keep 1"));
             }
             // ЦЕНА ПОЗОЛОТЫ — из свода, а не из кода (решение дизайнера
-            // 28.08.2026: два обломка вместо трёх). Старым сводам, где ключа
+            // 28.08.2026: два трофея вместо трёх). Старым сводам, где ключа
             // нет, остаётся прежняя тройка — числа сыгранных партий не должны
             // меняться задним числом.
             int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();

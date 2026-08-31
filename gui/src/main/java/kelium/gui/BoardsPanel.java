@@ -331,8 +331,8 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                 // ЦЕНА ШАГА — ОБЛОМКИ (ревью дизайнера 17.08.2026, п.3): подпись
                 // «N ТРФ» заменена на шестерёнку (тот же размер, что у звёзд
                 // ПО) — печатная цена по-прежнему в трофейных очках (движок
-                // принимает трофеи/обломки/келемий, см. Actions.payTrophy), но
-                // на столе её платят чаще всего именно обломками, и «шестерёнка»
+                // принимает трофеи/трофеи/келемий, см. Actions.payTrophy), но
+                // на столе её платят чаще всего именно трофеями, и «шестерёнка»
                 // читается как «расходный ресурс», а не «карта победных очков».
                 gearIcon(g, textX + 8, ry + 40, 8.0);
                 g.setFont(plain(10));
@@ -436,7 +436,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             for (Object e : list) {
                 if (e instanceof Map<?, ?> m) {
                     if (pair > 0 && "trophy_to_coin".equals(String.valueOf(m.get("id")))) {
-                        out.add(new Object[]{"1 / 2", "@gear", "обломка   →",
+                        out.add(new Object[]{"1 / 2", "@gear", "трофея   →",
                             "1 / " + (2 + pair), "@coin", "монеты"});
                     } else {
                         out.add(scienceParts(m));
@@ -459,14 +459,14 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             // монеты, а не две (замечание дизайнера 13.08.2026). Диапазон убран,
             // пара живёт своей строкой.
             case "trophy_to_coin" -> new Object[]{first(m.get("give_trophy")), "@gear",
-                "обломок   →", first(m.get("get_coin")), "@coin", "монета"};
-            case "move_module" -> new Object[]{give, "@gear", "обломка   →", "@module_pair",
+                "трофей   →", first(m.get("get_coin")), "@coin", "монета"};
+            case "move_module" -> new Object[]{give, "@gear", "трофея   →", "@module_pair",
                 "переставить свой модуль на планшете"};
-            case "draw_arsenal" -> new Object[]{give, "@gear", "обломка   →", "@card",
+            case "draw_arsenal" -> new Object[]{give, "@gear", "трофея   →", "@card",
                 "взять 2 карты арсенала, оставить 1"};
-            case "gild_module" -> new Object[]{give, "@gear", "обломка   →", "@module_pair",
+            case "gild_module" -> new Object[]{give, "@gear", "трофея   →", "@module_pair",
                 "позолотить модуль"};
-            default -> new Object[]{give, "@gear", "обломка   →", "обмен не описан"};
+            default -> new Object[]{give, "@gear", "трофея   →", "обмен не описан"};
         };
     }
 
@@ -727,7 +727,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
     }
 
     /**
-     * ШЕСТЕРЁНКА — значок цены шага в обломках (ревью дизайнера 17.08.2026,
+     * ШЕСТЕРЁНКА — значок цены шага в трофеях (ревью дизайнера 17.08.2026,
      * п.3): тёмно-серая заливка, толстая чёрная обводка, размер сопоставим со
      * звездой ПО ({@code r} — тот же параметр, что у {@link #starRow}).
      */

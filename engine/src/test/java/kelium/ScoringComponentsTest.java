@@ -167,19 +167,19 @@ class ScoringComponentsTest {
     }
 
     /**
-     * Обломки конвертируются РОВНО ОДНИМ курсом, остаток не считается.
+     * Трофеи конвертируются РОВНО ОДНИМ курсом, остаток не считается.
      *
      * <p>ЛИБО-ЛИБО, НЕ ОБА СРАЗУ (баг-фикс 18.08.2026). Действующий свод задаёт
      * оба ключа: {@code trophy_per_vp} (целочисленный, устаревший запасной путь)
      * и {@code debris_storage_vp_per_unit} (дробный, действующий). Раньше они
-     * СКЛАДЫВАЛИСЬ — обломок стоил 1/3 + 1.0 = 1.333 ПО вместо одного курса, что
-     * и обнаружил дизайнер по замеру партий («как будто 1.33 ПО за 1 обломок»).
+     * СКЛАДЫВАЛИСЬ — трофей стоил 1/3 + 1.0 = 1.333 ПО вместо одного курса, что
+     * и обнаружил дизайнер по замеру партий («как будто 1.33 ПО за 1 трофей»).
      * Тест читает АКТИВНЫЙ курс тем же способом, что и {@link Scoring}, и
      * проверяет остаток на нём — а не на устаревшем trophy_per_vp, который при
      * наличии дробного ключа движком уже не читается.
      */
     @Test
-    void debrisConvertsAtTheRate() {
+    void trophyConvertsAtTheRate() {
         GameState s = Fix.game();
         PlayerState p = s.player(0);
         var econ = ((kelium.dataio.GameConfig) s.config).ruleset.economy();
@@ -187,7 +187,7 @@ class ScoringComponentsTest {
             "тест проверяет действующий курс — в своде должен быть дробный ключ");
         double rate = ((Number) econ.get("debris_storage_vp_per_unit")).doubleValue();
         // 5 кубиков по ставке 0.5 = 2.5 -> пол 2, остаток не считается.
-        p.resources.add(Resource.DEBRIS, 5);
+        p.resources.add(Resource.TROPHY, 5);
         assertEquals((int) Math.floor(5 * rate), vp(s, 0, "debris"),
             "остаток сверх полного курса очков не даёт");
     }
@@ -197,14 +197,14 @@ class ScoringComponentsTest {
      *
      * <p>Свод "1.7.1-debris-vp" держит ОБА ключа сразу (trophy_per_vp: 3,
      * debris_storage_vp_per_unit: 1.0) — именно на такой записи и жил баг
-     * двойного учёта. До баг-фикса 18.08.2026 три обломка стоили 1 (от
+     * двойного учёта. До баг-фикса 18.08.2026 три трофея стоили 1 (от
      * trophy_per_vp) + 3 (от debris_storage_vp_per_unit) = 4 очка в отдельной
-     * строке "debris_storage_vp" ПОВЕРХ строки "debris". Теперь строка одна:
-     * "debris", посчитанная ТОЛЬКО по дробному курсу, — три обломка стоят
+     * строке "trophy_storage_vp" ПОВЕРХ строки "debris". Теперь строка одна:
+     * "debris", посчитанная ТОЛЬКО по дробному курсу, — три трофея стоят
      * ровно 3 очка, а второй строки в разбивке больше нет вовсе.
      */
     @Test
-    void debrisVpVariantZeroesKeliumAndUsesOnlyFractionalRate() {
+    void trophyVpVariantZeroesKeliumAndUsesOnlyFractionalRate() {
         GameState s = Setup.buildGame(
             kelium.dataio.GameConfig.buildCached("1.7.1-debris-vp", 4, 1L, null, null));
         List<Agent> agents = new ArrayList<>();
@@ -217,18 +217,18 @@ class ScoringComponentsTest {
         p.resources.setKelium(50);
         assertEquals(0, vp(s, 0, "kelium"), "вариант: келемий в хранилище очков не даёт");
 
-        p.resources.add(Resource.DEBRIS, 3);
+        p.resources.add(Resource.TROPHY, 3);
         Map<String, Integer> breakdown = Scoring.scorePlayer(s, 0);
         assertEquals(3, breakdown.getOrDefault("debris", 0),
-            "3 обломка по дробному курсу 1.0 — ровно 3 очка, без двойного учёта");
-        assertFalse(breakdown.containsKey("debris_storage_vp"),
-            "отдельной добавочной строки поверх \"debris\" быть не должно — "
+            "3 трофея по дробному курсу 1.0 — ровно 3 очка, без двойного учёта");
+        assertFalse(breakdown.containsKey("trophy_storage_vp"),
+            "отдельной добавочной строки поверх \"trophy\" быть не должно — "
                 + "это и была двойная учётка");
 
         int totalBefore = breakdown.get("total");
-        p.resources.add(Resource.DEBRIS, 1);   // теперь 4 обломка
+        p.resources.add(Resource.TROPHY, 1);   // теперь 4 трофея
         int totalAfter4 = Scoring.scorePlayer(s, 0).get("total");
         assertEquals(totalBefore + 1, totalAfter4,
-            "четвёртый обломок при ставке 1.0 добавляет ровно одно очко");
+            "четвёртый трофей при ставке 1.0 добавляет ровно одно очко");
     }
 }

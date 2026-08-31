@@ -43,7 +43,7 @@ public final class PlayerZone extends JPanel {
 
     /** Порядок и подписи блоков; ключ — внутреннее имя. */
     private static final String[][] BLOCKS = {
-        {"res", "Ресурсы", "Монеты, келемий, боеприпасы и обломки (чёрные кубики) на руках."},
+        {"res", "Ресурсы", "Монеты, келемий, боеприпасы и трофеи (чёрные кубики) на руках."},
         {"store", "Склад", "Ячейки склада открываются постройкой добытчиков и "
             + "энергостанций. Показано «занято из открытого» и запас контейнеров."},
         {"buildings", "Здания", "Здания на поле: код, номер (уровень), прочность и энергия. "
@@ -141,7 +141,7 @@ public final class PlayerZone extends JPanel {
         scroll.getViewport().setBackground(getBackground());
 
         set("res", "монеты " + p.coin + " · келемий " + p.kelium
-            + " · боеприпасы " + p.ammo + " · обломки " + p.debris
+            + " · боеприпасы " + p.ammo + " · трофеи " + p.trophy
             + (p.trophyTokens > 0 ? " (жетонов-трофеев " + p.trophyTokens
                 + " на " + p.trophyPoints + " очк., ещё не сданы)" : ""));
 
@@ -295,7 +295,7 @@ public final class PlayerZone extends JPanel {
         return switch (key) {
             case "kelium" -> "келемий";
             case "coins" -> "монеты";
-            case "debris" -> "обломки";
+            case "debris" -> "трофеи";
             case "buildings_on_field" -> "здания";
             case "units_on_field" -> "войска";
             case "tech" -> "наука";

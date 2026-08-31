@@ -232,7 +232,7 @@ public final class Commentator implements Consumer<Map<String, Object>> {
         return switch (s) {
             case "kelium" -> "запас келемия";
             case "coins" -> "монеты";
-            case "debris" -> "обломки";
+            case "debris" -> "трофеи";
             case "buildings_on_field" -> "сеть зданий";
             case "units_on_field" -> "армия на поле";
             case "tech" -> "треки науки";

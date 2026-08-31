@@ -463,7 +463,7 @@ public final class Session {
             case "kelium" -> p.kelium;
             case "coin" -> p.coin;
             case "ammo" -> p.ammo;
-            case "debris" -> p.debris;
+            case "debris" -> p.trophy;
             case "tech" -> p.tech.values().stream().mapToInt(Integer::intValue).sum();
             default -> 0;
         };

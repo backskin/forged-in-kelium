@@ -484,8 +484,8 @@ public final class ResultsPanel extends JComponent {
             ? shown.label.toUpperCase(java.util.Locale.ROOT)
                 + " — жирная линия: сколько на руках · пунктир: сколько потрачено за партию"
             : shown.label.toUpperCase(java.util.Locale.ROOT) + " по ходу партии";
-        if (shown == Metrics.Kind.DEBRIS) {
-            legend += "   (в счёт входят и обломки на складе, и очки с жетонов "
+        if (shown == Metrics.Kind.TROPHY) {
+            legend += "   (в счёт входят и трофеи на складе, и очки с жетонов "
                 + "на карте трофеев, ещё не сданных — наука платит и тем, и другим)";
         }
         g.drawString(legend, x, top - Theme.px(8));

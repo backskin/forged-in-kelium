@@ -147,7 +147,7 @@ public final class Effects {
             got.put("coin", n);
         }
         if (p.containsKey("debris")) {
-            got.put("debris", Storage.addDebrisCapped(s, pl, asInt(p.get("debris"))));
+            got.put("debris", Storage.addTrophyCapped(s, pl, asInt(p.get("debris"))));
         }
         if (p.containsKey("kelium")) {
             got.put("kelium", Storage.addKeliumCapped(s, pl, asInt(p.get("kelium"))));
@@ -368,7 +368,7 @@ public final class Effects {
             return got;
         }
         // ПОДАРОК К ДЕЙСТВИЮ — те же параметры, что у обычного gain: «бесплатная
-        // Наука и сверху 1 обломок» (Лицензия), «бесплатный Бой и 1 боеприпас в
+        // Наука и сверху 1 трофей» (Лицензия), «бесплатный Бой и 1 боеприпас в
         // его начале» (Внезапный удар), «бесплатная Смена энергии и 2 монеты»
         // (Перекоммутация).
         //
@@ -426,8 +426,8 @@ public final class Effects {
         if (p.get("free_miner_moves") instanceof Number mm) {
             ctx.freeMinerMoves = mm.intValue();
         }
-        if (Boolean.TRUE.equals(p.get("debris_to_coin"))) {
-            ctx.scienceDebrisToCoin = true;
+        if (Boolean.TRUE.equals(p.get("trophy_to_coin"))) {
+            ctx.scienceTrophyToCoin = true;
         }
         var res = Actions.create(name, s).perform(s.player(seat), ctx, agent);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
@@ -761,7 +761,7 @@ public final class Effects {
         // решает он, а не карта. Предлагаются только выполнимые пары: платить
         // надо тем, что есть, а получать то, для чего есть место на складе.
         if (Boolean.TRUE.equals(p.get("any"))) {
-            Resource[] all = {Resource.COIN, Resource.AMMO, Resource.KELIUM, Resource.DEBRIS};
+            Resource[] all = {Resource.COIN, Resource.AMMO, Resource.KELIUM, Resource.TROPHY};
             List<Choice> opts = new ArrayList<>();
             for (Resource from : all) {
                 if (!pl.resources.canPay(from, amount)) {
@@ -803,7 +803,7 @@ public final class Effects {
         pl.resources.pay(from, amount);
         int got = switch (to) {
             case AMMO -> Storage.addAmmoCapped(s, pl, amount);
-            case DEBRIS -> Storage.addDebrisCapped(s, pl, amount);
+            case TROPHY -> Storage.addTrophyCapped(s, pl, amount);
             case KELIUM -> Storage.addKeliumCapped(s, pl, amount);
             default -> {
                 pl.resources.add(to, amount);
@@ -876,7 +876,7 @@ public final class Effects {
     }
 
     /**
-     * ОБМЕН ПО ПЕЧАТНОЙ ТАБЛИЦЕ — «1 обломок на 2 монеты ИЛИ 2 обломка на 5».
+     * ОБМЕН ПО ПЕЧАТНОЙ ТАБЛИЦЕ — «1 трофей на 2 монеты ИЛИ 2 трофея на 5».
      *
      * <p>Отличие от {@link #convert}: там курс один и линейный, а на картах
      * встречается ЛЕСТНИЦА, где второй обмен выгоднее первого. Строку выбирает
@@ -926,7 +926,7 @@ public final class Effects {
         int got = switch (to) {
             case AMMO -> Storage.addAmmoCapped(s, pl, deal[1]);
             case KELIUM -> Storage.addKeliumCapped(s, pl, deal[1]);
-            case DEBRIS -> Storage.addDebrisCapped(s, pl, deal[1]);
+            case TROPHY -> Storage.addTrophyCapped(s, pl, deal[1]);
             default -> {
                 pl.resources.add(to, deal[1]);
                 yield deal[1];
@@ -1039,7 +1039,7 @@ public final class Effects {
         int got = switch (what) {
             case KELIUM -> Storage.addKeliumCapped(s, me, took);
             case AMMO -> Storage.addAmmoCapped(s, me, took);
-            case DEBRIS -> Storage.addDebrisCapped(s, me, took);
+            case TROPHY -> Storage.addTrophyCapped(s, me, took);
             default -> {
                 me.resources.add(what, took);
                 yield took;

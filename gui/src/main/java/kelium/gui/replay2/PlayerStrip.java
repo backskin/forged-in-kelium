@@ -160,8 +160,8 @@ public final class PlayerStrip extends JComponent {
             "Келемий на складе и предел его хранения."));
         out.add(new Tile("ammo", "AMMO", Theme.ink2(), p.ammo, p.ammoCap,
             "Боеприпасы и предел их хранения."));
-        out.add(new Tile("debris", "DEBRIS", Theme.debris(), p.debris, p.debrisCap,
-            "Обломки: чёрные кубики склада, ими платят за шаги науки."));
+        out.add(new Tile("debris", "TROPHY", Theme.trophy(), p.trophy, p.trophyCap,
+            "Трофеи: чёрные кубики склада, ими платят за шаги науки."));
         out.add(new Tile("containers", "CONTAINER", Theme.container(), p.containers,
             p.containerCap, "Контейнеры на складе."));
         return out;
@@ -736,7 +736,7 @@ public final class PlayerStrip extends JComponent {
             case "coin" -> p.coin;
             case "kelium" -> p.kelium;
             case "ammo" -> p.ammo;
-            case "debris" -> p.debris;
+            case "debris" -> p.trophy;
             case "containers" -> p.containers;
             case "vp" -> p.vp.getOrDefault("total", 0);
             default -> 0;

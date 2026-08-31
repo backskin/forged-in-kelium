@@ -42,11 +42,11 @@ class StorageNeverOverflowsTest {
                         continue;
                     }
                     for (ReplayRecord.Player p : f.snapshot.players) {
-                        int busy = p.kelium + p.ammo + p.debris;
+                        int busy = p.kelium + p.ammo + p.trophy;
                         if (busy > p.storeCap) {
                             bad.add("сид " + seed + ", кадр " + i + ", место " + p.seat
                                 + ": занято " + busy + " при " + p.storeCap + " ячейках"
-                                + " (к" + p.kelium + " б" + p.ammo + " о" + p.debris + ")"
+                                + " (к" + p.kelium + " б" + p.ammo + " о" + p.trophy + ")"
                                 + " — " + f.type);
                         }
                     }

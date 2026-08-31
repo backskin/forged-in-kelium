@@ -27,9 +27,9 @@ public final class Names {
      *
      * <p>НАЙДЕНО 18.08.2026: словарь и {@link kelium.engine.Scoring} разошлись —
      * ключ {@code "trophy"} здесь стоял годами, а сам подсчёт очков ни разу его
-     * не выставлял (ресурс переименован в обломки, ключ разбивки — {@code
+     * не выставлял (ресурс переименован в трофеи, ключ разбивки — {@code
      * "debris"}); плюс {@code objective_card_vp} и {@code arsenal_vp} появились в
-     * Scoring позже словаря. Из-за этого КАЖДАЯ партия с обломками или очками
+     * Scoring позже словаря. Из-за этого КАЖДАЯ партия с трофеями или очками
      * задания/арсенала честно, но бесполезно писала в итогах «не описано».
      * Список сверен построчно с {@code Scoring.scorePlayer} — там, где строка
      * попадает в {@code breakdown}, здесь обязана быть подпись.
@@ -38,7 +38,7 @@ public final class Names {
         return switch (key) {
             case "kelium" -> "келемий";
             case "coins" -> "монеты";
-            case "debris" -> "обломки";
+            case "debris" -> "трофеи";
             case "buildings_on_field" -> "здания";
             case "units_on_field" -> "войска";
             case "tech" -> "наука";
@@ -278,9 +278,9 @@ public final class Names {
             case "place_on_energy_cell" -> "поставить кубик в ячейку энергии";
             case "noop" -> "ничего не даёт";
             // ОБМЕНЫ НАУЧНОГО ОТДЕЛА: «отдал столько — получил столько».
-            case "give_trophy" -> "отдать обломков: " + v;
+            case "give_trophy" -> "отдать трофеев: " + v;
             case "get_coin" -> "получить монет: " + v;
-            case "trophy_to_coin" -> "обломки в монеты";
+            case "trophy_to_coin" -> "трофеи в монеты";
             case "move_module" -> "переставить модуль";
             case "draw_arsenal", "draw2_keep1" -> "взять две карты арсенала, оставить одну";
             case "gild_module" -> "озолотить модуль";

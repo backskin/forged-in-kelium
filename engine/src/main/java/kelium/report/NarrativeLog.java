@@ -320,8 +320,8 @@ public final class NarrativeLog {
         String item = md ? "  - " : "│      ";
         List<String> out = new ArrayList<>();
         out.add(head);
-        out.add(String.format("%sресурсы: мон=%d кел=%d бпр=%d обломки=%d",
-            item, p.resources.coin(), p.resources.kelium(), p.resources.ammo(), p.resources.debris()));
+        out.add(String.format("%sресурсы: мон=%d кел=%d бпр=%d трофеи=%d",
+            item, p.resources.coin(), p.resources.kelium(), p.resources.ammo(), p.resources.trophy()));
         StringBuilder bld = new StringBuilder(item + "здания: ");
         for (BuildingToken b : p.buildingsOnField()) {
             bld.append(bldRu(b)).append("@").append(b.hexId).append(" ");
@@ -334,8 +334,8 @@ public final class NarrativeLog {
             anyUnit = true;
         }
         out.add(anyUnit ? un.toString().stripTrailing() : item + "войска: —");
-        out.add(String.format("%sтрофеи: жетонов=%d (очков %d) + обломки=%d",
-            item, p.trophySpace.size(), p.trophySpacePoints(), p.resources.debris()));
+        out.add(String.format("%sтрофеи: жетонов=%d (очков %d) + трофеи=%d",
+            item, p.trophySpace.size(), p.trophySpacePoints(), p.resources.trophy()));
         out.add(item + "приказы(" + p.orderColor + "): " + p.orderHand
             + "   задания: " + p.objectiveHand);
         out.add(item + "арсенал: рука" + p.arsenalHand + " установлено" + p.arsenalInstalled);

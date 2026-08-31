@@ -206,10 +206,10 @@ public final class ReplayRecord {
         public int coin;
         public int kelium;
         public int ammo;
-        /** Обломки (бывшие «трофейные очки») в хранилище — черные кубики. */
-        public int debris;
-        /** Вместимость обломков на складе (см. {@code Storage.debrisMax}). */
-        public int debrisCap;
+        /** Трофеи (бывшие «трофейные очки») в хранилище — черные кубики. */
+        public int trophy;
+        /** Вместимость трофеев на складе (см. {@code Storage.trophyMax}). */
+        public int trophyCap;
         /** Жетонов на трофейном месте и суммарная их ценность. */
         /**
          * КАКИЕ ЯЧЕЙКИ СКЛАДА ОТКРЫВАЕТ КАЖДОЕ СКЛАДСКОЕ ЗДАНИЕ. Ключ — «miner-2»
@@ -659,8 +659,8 @@ public final class ReplayRecord {
         v.coin = p.resources.coin();
         v.kelium = p.resources.kelium();
         v.ammo = p.resources.ammo();
-        v.debris = p.resources.debris();
-        v.debrisCap = kelium.engine.Storage.debrisMax(s, p);
+        v.trophy = p.resources.trophy();
+        v.trophyCap = kelium.engine.Storage.trophyMax(s, p);
         v.trophyTokens = p.trophySpace.size();
         v.trophyPoints = p.trophySpacePoints();
         // Сами жетоны на карте трофеев: их надо показать «как на столе»
@@ -689,8 +689,8 @@ public final class ReplayRecord {
         // ПРЕДЕЛЫ СКЛАДА СЧИТАЮТСЯ С ПАРТИЕЙ В РУКАХ, как их считает движок:
         // способности арсенала добавляют ячейки, и без них запись показывала
         // меньший склад, чем игра разрешала. В проигрывателе это выглядело как
-        // «занято 13 из 11», а предел обломков (он-то считался правильно, через
-        // partию) уходил в минус: «обломки 0 из −2».
+        // «занято 13 из 11», а предел трофеев (он-то считался правильно, через
+        // partию) уходил в минус: «трофеи 0 из −2».
         v.keliumCap = Storage.keliumMax(s, p);
         v.ammoCap = Storage.ammoMax(s, p);
         v.storeCap = Storage.totalMax(s, p);
@@ -1025,8 +1025,8 @@ public final class ReplayRecord {
         o.put("coin", p.coin);
         o.put("kelium", p.kelium);
         o.put("ammo", p.ammo);
-        o.put("debris", p.debris);
-        o.put("debrisCap", p.debrisCap);
+        o.put("debris", p.trophy);
+        o.put("debrisCap", p.trophyCap);
         o.put("storageCells", p.storageCells);
         o.put("trophyTokens", p.trophyTokens);
         o.put("trophyPoints", p.trophyPoints);
@@ -1340,8 +1340,8 @@ public final class ReplayRecord {
         p.coin = Json.i(o, "coin");
         p.kelium = Json.i(o, "kelium");
         p.ammo = Json.i(o, "ammo");
-        p.debris = Json.i(o, "debris");
-        p.debrisCap = Json.i(o, "debrisCap");
+        p.trophy = Json.i(o, "debris");
+        p.trophyCap = Json.i(o, "debrisCap");
         Map<String, Object> cells = Json.map(o, "storageCells");
         if (cells != null) {
             for (Map.Entry<String, Object> e : cells.entrySet()) {

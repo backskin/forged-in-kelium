@@ -105,7 +105,7 @@ public final class EngineCardContext implements CardContext {
         switch (r) {
             case KELIUM -> Storage.addKeliumCapped(state, me(), amount);
             case AMMO -> Storage.addAmmoCapped(state, me(), amount);
-            case DEBRIS -> Storage.addDebrisCapped(state, me(), amount);
+            case TROPHY -> Storage.addTrophyCapped(state, me(), amount);
             case COIN -> me().resources.add(Resource.COIN, amount);
         }
     }

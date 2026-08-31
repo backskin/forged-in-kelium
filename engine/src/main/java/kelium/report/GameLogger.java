@@ -245,7 +245,7 @@ public final class GameLogger {
             case "raze_neutral" -> line("      " + (ru ? "снос нейтральной постройки" : "razed neutral")
                 + (Boolean.TRUE.equals(event.get("big")) ? (ru ? " (большой)" : " (big)") : "")
                 + " @ " + event.get("target") + " (" + seat(event.get("seat")) + ") +"
-                + event.getOrDefault("debris", 1) + (ru ? "обломок " : "debris ")
+                + event.getOrDefault("debris", 1) + (ru ? "трофей " : "trophy ")
                 + "+" + event.getOrDefault("containers", 1) + (ru ? "контейнер" : "cont"));
             case "damage_neutral" -> line("      " + (ru ? "урон нейтралу" : "damaged neutral")
                 + " @ " + event.get("target") + " (" + seat(event.get("seat")) + "), "
@@ -342,9 +342,9 @@ public final class GameLogger {
 
     private String fmtRes(Resources r) {
         if (ru) {
-            return "мон=" + r.coin() + " кел=" + r.kelium() + " бпр=" + r.ammo() + " обл=" + r.debris();
+            return "мон=" + r.coin() + " кел=" + r.kelium() + " бпр=" + r.ammo() + " обл=" + r.trophy();
         }
-        return "coin=" + r.coin() + " kel=" + r.kelium() + " ammo=" + r.ammo() + " debris=" + r.debris();
+        return "coin=" + r.coin() + " kel=" + r.kelium() + " ammo=" + r.ammo() + " trophy=" + r.trophy();
     }
 
     /** Уникальное имя файла лога на партию: игроки + сид + метка времени. */

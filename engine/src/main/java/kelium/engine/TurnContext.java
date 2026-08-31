@@ -179,6 +179,6 @@ public final class TurnContext {
      */
     public int freeMinerMoves = 0;
 
-    /** Наука: разрешён обмен обломков на монеты по печатному курсу утиля. */
-    public boolean scienceDebrisToCoin = false;
+    /** Наука: разрешён обмен трофеев на монеты по печатному курсу утиля. */
+    public boolean scienceTrophyToCoin = false;
 }

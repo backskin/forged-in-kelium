@@ -14,15 +14,15 @@ import kelium.core.StorageSide;
 import kelium.dataio.Ctx;
 
 /**
- * Вместимость хранилища — предел склада на келемий, боеприпасы и обломки.
+ * Вместимость хранилища — предел склада на келемий, боеприпасы и трофеи.
  *
  * <p>У склада ограниченное число ЯЧЕЕК, общих под все три кубика. Ячейка бывает
  * трёх типов: U (универсальная — под келемий ИЛИ боеприпас), K (только келемий),
- * A (только боеприпас). Обломок — особый случай: он занимает ЛЮБУЮ из трёх
+ * A (только боеприпас). Трофей — особый случай: он занимает ЛЮБУЮ из трёх
  * (K/A/U), но всегда ровно одну, поэтому у него нет своего типизированного
  * подпредела, только доля в общем бюджете. Отсюда:
  * <pre>
- *   kelium ≤ K + U ; ammo ≤ A + U ; kelium + ammo + debris ≤ K + A + U
+ *   kelium ≤ K + U ; ammo ≤ A + U ; kelium + ammo + trophy ≤ K + A + U
  * </pre>
  * Именно из-за этого «18 келемия» невозможно — экономика упирается в склад.
  *
@@ -44,7 +44,7 @@ import kelium.dataio.Ctx;
  * игрок МОЖЕТ освободить ячейки, выбросив в общий запас сколько угодно кубиков
  * любого из трёх типов, прежде чем что-то поступит в хранилище. В движке хук
  * ({@link #offerStorageDiscard}) задаётся реактивно, прямо перед
- * {@link #addKeliumCapped}/{@link #addAmmoCapped}/{@link #addDebrisCapped} — но
+ * {@link #addKeliumCapped}/{@link #addAmmoCapped}/{@link #addTrophyCapped} — но
  * СПРАШИВАЕТСЯ только тогда, когда без выброса поступление всё равно обрежется
  * нехваткой места (room &lt; amount). Это не сужение права игрока: расклад по
  * ячейкам ни на что не влияет, кроме вместимости при следующем поступлении, так
@@ -54,7 +54,7 @@ import kelium.dataio.Ctx;
  * ошибочно выбросить то, что выбрасывать незачем. Спрашивать только «когда
  * реально надо» устраняет этот ложный стимул, не убирая право игрока.
  * Перестановка между ячейками уважает тип ячейки: келемий и боеприпас можно
- * класть ТОЛЬКО в K/U и A/U соответственно, обломок — в любую; в этой модели
+ * класть ТОЛЬКО в K/U и A/U соответственно, трофей — в любую; в этой модели
  * (агрегированные счётчики, а не индивидуальные ячейки) это ограничение уже
  * встроено в формулы {@link #keliumMax}/{@link #ammoMax} выше — переставлять
  * физически «конкретный кубик в конкретную ячейку» отдельно моделировать не нужно.
@@ -269,7 +269,7 @@ public final class Storage {
         return c.a + c.u + abilityCells(s, p);
     }
 
-    /** Общее число открытых ячеек склада (келемий, боеприпасы и обломки делят их). */
+    /** Общее число открытых ячеек склада (келемий, боеприпасы и трофеи делят их). */
     public static int totalMax(PlayerState p) {
         return totalMax(null, p);
     }
@@ -281,24 +281,24 @@ public final class Storage {
     }
 
     /**
-     * Предел обломков на складе. Обломок не привязан к типу ячейки (K/A/U все
+     * Предел трофеев на складе. Трофей не привязан к типу ячейки (K/A/U все
      * подходят), поэтому у него нет типизированного подпредела — только общий
      * бюджет за вычетом уже занятого келемием и боеприпасом.
      */
-    public static int debrisMax(kelium.core.GameState s, PlayerState p) {
+    public static int trophyMax(kelium.core.GameState s, PlayerState p) {
         return totalMax(s, p) - p.resources.kelium() - p.resources.ammo();
     }
 
 
     /**
      * Правило 4: перед добавлением ЛЮБОГО кубика в хранилище (келемий,
-     * боеприпас, обломок) спросить агента, не хочет ли он сначала переставить/
+     * боеприпас, трофей) спросить агента, не хочет ли он сначала переставить/
      * выбросить содержимое хранилища. «Переставить между ячейками» не имеет
      * отдельного игрового эффекта в этой модели (ячейки взаимозаменяемы в
      * пределах формул выше, конкретная ячейка для конкретного кубика не
      * отслеживается) — значимое действие тут одно: добровольно выбросить любое
      * число кубиков любого типа в общий запас ДО расчёта вместимости. Вызывается
-     * из {@link #addKeliumCapped}/{@link #addAmmoCapped}/{@link #addDebrisCapped}
+     * из {@link #addKeliumCapped}/{@link #addAmmoCapped}/{@link #addTrophyCapped}
      * — единственных каналов пополнения склада, так что все действия движка
      * покрываются автоматически без правки мест вызова. Вызывающий код спрашивает
      * это ТОЛЬКО когда без выброса поступление обрежется нехваткой места (см.
@@ -336,9 +336,9 @@ public final class Storage {
                 opts.add(new Choice("storage_discard", Resource.AMMO,
                     "выбросить 1 боеприпас из хранилища"));
             }
-            if (player.resources.debris() > 0) {
-                opts.add(new Choice("storage_discard", Resource.DEBRIS,
-                    "выбросить 1 обломок из хранилища"));
+            if (player.resources.trophy() > 0) {
+                opts.add(new Choice("storage_discard", Resource.TROPHY,
+                    "выбросить 1 трофей из хранилища"));
             }
             if (opts.size() == 1) {
                 return;   // хранилище пусто — нечего выбрасывать
@@ -384,7 +384,7 @@ public final class Storage {
         return switch (what) {
             case KELIUM -> keliumRoom(s, player);
             case AMMO -> ammoRoom(s, player);
-            case DEBRIS -> debrisRoom(s, player);
+            case TROPHY -> trophyRoom(s, player);
             default -> Integer.MAX_VALUE;      // монеты и очки склад не занимают
         };
     }
@@ -392,7 +392,7 @@ public final class Storage {
     private static int keliumRoom(kelium.core.GameState s, PlayerState player) {
         int curK = player.resources.kelium();
         int curA = player.resources.ammo();
-        int curD = player.resources.debris();
+        int curD = player.resources.trophy();
         int roomTyped = keliumMax(s, player) - curK;
         int roomTotal = totalMax(s, player) - (curK + curA + curD);
         return Math.max(0, Math.min(roomTyped, roomTotal));
@@ -421,40 +421,40 @@ public final class Storage {
     private static int ammoRoom(kelium.core.GameState s, PlayerState player) {
         int curK = player.resources.kelium();
         int curA = player.resources.ammo();
-        int curD = player.resources.debris();
+        int curD = player.resources.trophy();
         int roomTyped = ammoMax(s, player) - curA;
         int roomTotal = totalMax(s, player) - (curK + curA + curD);
         return Math.max(0, Math.min(roomTyped, roomTotal));
     }
 
-    /** Добавить обломки в пределах вместимости; вернуть фактически добавленное. */
-    public static int addDebrisCapped(PlayerState player, int amount) {
-        return addDebrisCapped(null, player, amount);
+    /** Добавить трофеи в пределах вместимости; вернуть фактически добавленное. */
+    public static int addTrophyCapped(PlayerState player, int amount) {
+        return addTrophyCapped(null, player, amount);
     }
 
     /**
-     * Добавить обломки в пределах вместимости, зная партию. Обломок не имеет
-     * типизированного подпредела (см. {@link #debrisMax}) — ограничение только
+     * Добавить трофеи в пределах вместимости, зная партию. Трофей не имеет
+     * типизированного подпредела (см. {@link #trophyMax}) — ограничение только
      * по общему бюджету ячеек.
      */
-    public static int addDebrisCapped(kelium.core.GameState s, PlayerState player, int amount) {
+    public static int addTrophyCapped(kelium.core.GameState s, PlayerState player, int amount) {
         if (amount <= 0) {
             return 0;
         }
-        int room = debrisRoom(s, player);
+        int room = trophyRoom(s, player);
         if (room < amount) {
             offerStorageDiscard(s, player, amount - room);
-            room = debrisRoom(s, player);
+            room = trophyRoom(s, player);
         }
         int add = Math.min(amount, room);
-        player.resources.add(Resource.DEBRIS, add);
+        player.resources.add(Resource.TROPHY, add);
         return add;
     }
 
-    private static int debrisRoom(kelium.core.GameState s, PlayerState player) {
+    private static int trophyRoom(kelium.core.GameState s, PlayerState player) {
         int curK = player.resources.kelium();
         int curA = player.resources.ammo();
-        int curD = player.resources.debris();
+        int curD = player.resources.trophy();
         return Math.max(0, totalMax(s, player) - (curK + curA + curD));
     }
 
@@ -498,11 +498,11 @@ public final class Storage {
             player.resources.pay(Resource.AMMO, ammoOver);
         }
         int totalOver = (player.resources.kelium() + player.resources.ammo()
-            + player.resources.debris()) - totalMax(s, player);
+            + player.resources.trophy()) - totalMax(s, player);
         if (totalOver > 0 && ownTurnChoice) {
             totalOver = offerBurnChoice(s, player, totalOver);
         }
-        for (Resource r : new Resource[] {Resource.DEBRIS, Resource.AMMO, Resource.KELIUM}) {
+        for (Resource r : new Resource[] {Resource.TROPHY, Resource.AMMO, Resource.KELIUM}) {
             if (totalOver <= 0) {
                 break;
             }
@@ -543,9 +543,9 @@ public final class Storage {
                 opts.add(new Choice("storage_burn_choice", Resource.AMMO,
                     "сжечь 1 боеприпас из хранилища (ячейка закрылась)"));
             }
-            if (player.resources.debris() > 0) {
-                opts.add(new Choice("storage_burn_choice", Resource.DEBRIS,
-                    "сжечь 1 обломок из хранилища (ячейка закрылась)"));
+            if (player.resources.trophy() > 0) {
+                opts.add(new Choice("storage_burn_choice", Resource.TROPHY,
+                    "сжечь 1 трофей из хранилища (ячейка закрылась)"));
             }
             if (opts.isEmpty()) {
                 return needed;

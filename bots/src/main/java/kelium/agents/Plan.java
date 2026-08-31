@@ -315,7 +315,7 @@ public final class Plan {
     /** Цепочка науки: есть трофеи → сыграть Науку. */
     private static Plan tech(GameState s, int seat, Genome g) {
         PlayerState me = s.player(seat);
-        int pool = me.resources.debris() + me.trophySpacePoints();
+        int pool = me.resources.trophy() + me.trophySpacePoints();
         if (pool <= 0) {
             return null;
         }
@@ -383,7 +383,7 @@ public final class Plan {
         PlayerState me = s.player(seat);
         // Курсы очков берутся ИЗ СВОДА: иначе цели набега снова отстанут от
         // правил, как отстала прежняя формула.
-        double debrisVp = ((Number) kelium.dataio.Ctx.rules(s)
+        double trophyVp = ((Number) kelium.dataio.Ctx.rules(s)
             .get("economy.debris_storage_vp_per_unit", 0.5)).doubleValue();
         double cuTokenVp = kelium.dataio.Ctx.rules(s)
             .getInt("command_center.destruction_token_vp", 3);
@@ -417,11 +417,11 @@ public final class Plan {
                 // ставила добытчик №1 за один трофей ВЫШЕ авиабазы за четыре, а
                 // завод и авиабазу — в «прочее». То есть бот целился не туда,
                 // где очки, а туда, куда решил автор формулы. Теперь считается
-                // ровно то, что игрок получит: трофей жетона по курсу обломка,
+                // ровно то, что игрок получит: трофей жетона по курсу трофея,
                 // а у ЦУ — напечатанные на жетоне уничтожения очки.
                 double value = b.type == BuildingType.COMMAND_CENTER
                     ? cuTokenVp
-                    : b.trophyValue() * debrisVp;
+                    : b.trophyValue() * trophyVp;
                 // Жетон уходит с поля: владелец теряет ещё и свою четверть очка
                 // за «здания на поле», а с добытчика или станции — производство.
                 value += 0.25;
@@ -847,7 +847,7 @@ public final class Plan {
             case "coin" -> p.resources.coin();
             case "kelium" -> p.resources.kelium();
             case "ammo" -> p.resources.ammo();
-            case "debris" -> p.resources.debris();
+            case "debris" -> p.resources.trophy();
             default -> Integer.MAX_VALUE;   // позиционные жертвы здесь не считаем
         };
         return have >= amt ? null : code;

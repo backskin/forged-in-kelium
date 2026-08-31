@@ -62,7 +62,7 @@ public final class Scoring {
         // написано в комментарии), но реализован был как ДОБАВКА поверх старого
         // курса, а не замена. В действующих сводах 1.8.0-1.13.0 оба ключа стояли
         // одновременно (trophy_per_vp: 3, debris_storage_vp_per_unit: 1.0), и
-        // обломок стоил 1/3 + 1.0 = 1.333 ПО вместо задуманного одного курса —
+        // трофей стоил 1/3 + 1.0 = 1.333 ПО вместо задуманного одного курса —
         // почти вчетверо дороже. Теперь как у kelium_per_vp чуть выше: НАЛИЧИЕ
         // ключа debris_storage_vp_per_unit ПОЛНОСТЬЮ ЗАМЕНЯЕТ курс trophy_per_vp,
         // а не складывается с ним. Старые своды без этого ключа (архив, версии
@@ -71,16 +71,16 @@ public final class Scoring {
         // Подсчёт очков идёт ТОЛЬКО в момент истинного конца партии — а тогда
         // Возврат жетонов не делается (см. GameEngine.returnStep(gameEnding=true)),
         // и трофеи, ещё лежащие у игрока НЕСДАННЫМИ, считаются по ПОЛНОЙ печатной
-        // ценности наравне с обломками (не флат-1, как при мидгейм-конвертации).
-        int debrisPool = p.resources.debris() + p.trophySpacePoints();
-        int debrisVp;
+        // ценности наравне с трофеями (не флат-1, как при мидгейм-конвертации).
+        int trophyPool = p.resources.trophy() + p.trophySpacePoints();
+        int trophyVp;
         if (econ.containsKey("debris_storage_vp_per_unit")) {
-            debrisVp = (int) Math.floor(debrisPool
+            trophyVp = (int) Math.floor(trophyPool
                 * ((Number) econ.get("debris_storage_vp_per_unit")).doubleValue());
         } else {
-            debrisVp = debrisPool / asInt(econ.get("trophy_per_vp"));
+            trophyVp = trophyPool / asInt(econ.get("trophy_per_vp"));
         }
-        breakdown.put("debris", debrisVp);
+        breakdown.put("debris", trophyVp);
         breakdown.put("buildings_on_field", p.buildingsOnField().size() / perBuilding);
         breakdown.put("units_on_field", p.unitsOnField().size() / perUnit);
 
@@ -220,9 +220,9 @@ public final class Scoring {
         // economy.debris_storage_vp_per_unit теперь применяется РОВНО ОДИН РАЗ,
         // выше, в строке "debris" breakdown'а (либо он, либо старый trophy_per_vp
         // — не оба сразу). Раньше здесь начислялась ЕЩЁ ОДНА, отдельная порция
-        // очков по той же паре (debris + trophySpacePoints) с тем же курсом —
+        // очков по той же паре (trophy + trophySpacePoints) с тем же курсом —
         // при trophy_per_vp:3 и debris_storage_vp_per_unit:1.0 (действующий свод)
-        // обломок стоил 1/3 + 1.0 = 1.333 ПО вместо одного курса.
+        // трофей стоил 1/3 + 1.0 = 1.333 ПО вместо одного курса.
         // ТОЧКА ПРАВИЛ: правка УЖЕ СУЩЕСТВУЮЩЕГО итога («улучшить существующий
         // критерий»). Спрашивается после суммы, поэтому карта видит полный счёт.
         total = kelium.engine.ability.RuleQuery
@@ -242,7 +242,7 @@ public final class Scoring {
      *       (деревянная золотая пятиконечная звезда) и кладёт перед собой:
      *       выработал оборот тайла зарождения, выполнил задание с очками,
      *       сдал первую часть супер задания. Очко уже никуда не денется.</li>
-     *   <li><b>В конце</b> — очки считаются по столу: монеты, келемий, обломки,
+     *   <li><b>В конце</b> — очки считаются по столу: монеты, келемий, трофеи,
      *       здания и войска на поле, шаги треков, карты-цели. Жетонов за это не
      *       выдают: пока партия идёт, эти очки ещё можно потерять.</li>
      * </ul>
@@ -408,7 +408,7 @@ public final class Scoring {
                 yield n;
             }
             case "units_on_field" -> p.unitsOnField().size();
-            case "debris" -> p.resources.debris();
+            case "debris" -> p.resources.trophy();
             case "cu_tokens" -> p.cuDestructionTokens;
             case "unit_kinds" -> {
                 java.util.Set<kelium.core.UnitType> kinds =

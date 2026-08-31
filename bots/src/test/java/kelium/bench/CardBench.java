@@ -151,8 +151,8 @@ public final class CardBench {
         return ресурс(seat, Resource.KELIUM, n);
     }
 
-    public CardBench обломки(int seat, int n) {
-        return ресурс(seat, Resource.DEBRIS, n);
+    public CardBench трофеи(int seat, int n) {
+        return ресурс(seat, Resource.TROPHY, n);
     }
 
     /** Ровно {@code n} этого ресурса в хранилище, не «плюс n». */

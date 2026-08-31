@@ -379,11 +379,11 @@ public final class Objectives {
                     int addedC = Storage.addContainersCapped(s, p, n, "награда задания");
                     into.merge("container", addedC, (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
                 }
-                // НАЧАЛЬНЫЕ ЗАДАНИЯ 10.0 платят обломком и картой задания, а
+                // НАЧАЛЬНЫЕ ЗАДАНИЯ 10.0 платят трофеем и картой задания, а
                 // усиления у них нет вовсе — значит эта награда лежит в БАЗОВОЙ и
                 // выдаваться должна отсюда.
                 case "debris" -> {
-                    int addedD = Storage.addDebrisCapped(s, p, n);
+                    int addedD = Storage.addTrophyCapped(s, p, n);
                     into.merge("debris", addedD, (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
                 }
                 case "objective_card", "objective_cards" -> {
@@ -416,7 +416,7 @@ public final class Objectives {
                     into.put("kelium", added);
                 }
                 case "debris" -> {
-                    int added = Storage.addDebrisCapped(s, p, n);
+                    int added = Storage.addTrophyCapped(s, p, n);
                     into.put("debris", added);
                 }
                 case "module" -> {

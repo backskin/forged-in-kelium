@@ -689,7 +689,7 @@ public final class CombatResolver {
                     nh.freeSidesByToken(nb.uid);   // §12.3: стенки нейтрала освобождаются
                     int tro = nb.trophyReward();
                     int con = nb.containerReward();
-                    Storage.addDebrisCapped(s, p, tro);
+                    Storage.addTrophyCapped(s, p, tro);
                     Storage.addContainersCapped(s, p, con, "снос нейтрала");
                     emit("type", "raze_neutral", "seat", attackerSeat, "target", target,
                         "debris", tro, "containers", con,
@@ -1349,7 +1349,7 @@ public final class CombatResolver {
         }
         int bonusTrophy = Passives.bonusTrophyOnKill(s, attackerSeat);
         if (bonusTrophy > 0) {
-            Storage.addDebrisCapped(s, attacker, bonusTrophy);
+            Storage.addTrophyCapped(s, attacker, bonusTrophy);
         }
     }
 

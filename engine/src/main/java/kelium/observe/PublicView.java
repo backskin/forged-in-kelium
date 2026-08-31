@@ -112,10 +112,10 @@ public final class PublicView {
         public int coin;
         public int kelium;
         public int ammo;
-        public int debris;
+        public int trophy;
         public int keliumCap;
         public int ammoCap;
-        public int debrisCap;
+        public int trophyCap;
         public int storeCap;
         /** Занятость ячеек склада: ячейка → что в ней лежит. */
         public final Map<String, String> storageCells = new LinkedHashMap<>();
@@ -261,10 +261,10 @@ public final class PublicView {
         st.coin = p.coin;
         st.kelium = p.kelium;
         st.ammo = p.ammo;
-        st.debris = p.debris;
+        st.trophy = p.trophy;
         st.keliumCap = p.keliumCap;
         st.ammoCap = p.ammoCap;
-        st.debrisCap = p.debrisCap;
+        st.trophyCap = p.trophyCap;
         st.storeCap = p.storeCap;
         st.storageCells.putAll(p.storageCells);
         st.storageTokens.addAll(p.storageTokens);
@@ -455,10 +455,10 @@ public final class PublicView {
         o.put("coin", st.coin);
         o.put("kelium", st.kelium);
         o.put("ammo", st.ammo);
-        o.put("debris", st.debris);
+        o.put("debris", st.trophy);
         o.put("keliumCap", st.keliumCap);
         o.put("ammoCap", st.ammoCap);
-        o.put("debrisCap", st.debrisCap);
+        o.put("debrisCap", st.trophyCap);
         o.put("storeCap", st.storeCap);
         o.put("storageCells", st.storageCells);
         o.put("storageTokens", st.storageTokens);

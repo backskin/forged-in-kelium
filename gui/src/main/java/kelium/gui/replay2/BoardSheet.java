@@ -30,7 +30,7 @@ import kelium.report.ReplayRecord;
  * осталось в запасе по родам; модули и какой стороной они лежат; арсенал и
  * контейнеры; планшет хранилища с открытыми ячейками; отложенную рубашкой карту
  * приказа; и карту трофеев, на которой вразнобой валяются снесённые жетоны с
- * напечатанной ценностью и чёрные кубики — сколько обломков даст возврат.
+ * напечатанной ценностью и чёрные кубики — сколько трофеев даст возврат.
  *
  * <p>Здания рисуются ТЕМИ ЖЕ силуэтами, что на поле ({@link FieldGeometry}), —
  * так планшет и поле читаются как одна игра, а не как две разные программы.
@@ -421,10 +421,10 @@ public final class BoardSheet extends JComponent {
             }
         }
         // ОБЛОМКИ ИДУТ ПОСЛЕДНИМИ И В ЛЮБУЮ СВОБОДНУЮ ЯЧЕЙКУ. У них нет своего
-        // типа ячейки: обломок занимает ровно одну любую — универсальную,
+        // типа ячейки: трофей занимает ровно одну любую — универсальную,
         // келемиевую или боеприпасную. Раскладываем после келемия и боеприпасов,
         // чтобы не занять именную ячейку у того, кому она предназначена.
-        int d = Math.max(0, p.debris);
+        int d = Math.max(0, p.trophy);
         for (int i = 0; i < types.size() && d > 0; i++) {
             if (holders.get(i)[idx.get(i)[0]] != 0) {
                 continue;
@@ -438,7 +438,7 @@ public final class BoardSheet extends JComponent {
     private static String cellIcon(char has) {
         return switch (has) {
             case 'K' -> "KELIUM";
-            case 'D' -> "DEBRIS";
+            case 'D' -> "TROPHY";
             default -> "AMMO";
         };
     }
@@ -447,7 +447,7 @@ public final class BoardSheet extends JComponent {
     private static Color cellIconColour(char has) {
         return switch (has) {
             case 'K' -> Theme.kelium();
-            case 'D' -> Theme.debris();
+            case 'D' -> Theme.trophy();
             default -> Theme.ink2();
         };
     }
@@ -654,7 +654,7 @@ public final class BoardSheet extends JComponent {
             }
             cellZones.put(new Rectangle(cx, cy, cell, cell), on
                 ? "ЯЧЕЙКА ОТ ЖЕТОНА ХРАНИЛИЩА\n\nОткрыта: жетон положен стороной "
-                    + "«склад». Годится под келемий, боеприпасы и обломки."
+                    + "«склад». Годится под келемий, боеприпасы и трофеи."
                 : "ЯЧЕЙКА ОТ ЖЕТОНА ХРАНИЛИЩА\n\nПока закрыта. Откроется, когда "
                     + "игрок положит сюда жетон модуля хранилища стороной «склад» "
                     + "(жетоны приходят только с зелёного трека науки).");
@@ -700,25 +700,25 @@ public final class BoardSheet extends JComponent {
         // ПЕРЕПОЛНЕНИЕ НАЗЫВАЕТСЯ СЛОВАМИ. Склад умеет сжиматься: здание вернулось
         // на планшет и накрыло ячейки, на которых лежали кубики. Само «занято 13
         // из 11» читается как ошибка вида, поэтому причина написана рядом.
-        int busy = p.kelium + p.ammo + p.debris;
+        int busy = p.kelium + p.ammo + p.trophy;
         g.setColor(busy > p.storeCap ? Theme.bad() : Theme.ink2());
         g.drawString("занято " + busy + " из " + p.storeCap
             + (busy > p.storeCap ? " — сверх места, ячейки закрылись" : "")
             + "  ·  келемий ≤ " + p.keliumCap + ", боеприпасы ≤ " + p.ammoCap
-            + ", обломки в любую ячейку", x, cy + px(10));
+            + ", трофеи в любую ячейку", x, cy + px(10));
         cy += px(16);
         // ОБЛОМКИ ОТДЕЛЬНОЙ СТРОКОЙ: по ячейкам они разложены выше, но пересчитать
         // чёрные кубики глазами по всему планшету тяжело — поэтому ещё и числом.
-        int dn = Math.max(0, p.debris);
+        int dn = Math.max(0, p.trophy);
         for (int i = 0; i < dn && i < 12; i++) {
-            MarkIcons.paint(g, "DEBRIS", x + px(9) + i * px(20), cy + px(9), px(16),
-                Theme.debris());
+            MarkIcons.paint(g, "TROPHY", x + px(9) + i * px(20), cy + px(9), px(16),
+                Theme.trophy());
         }
         g.setColor(Theme.ink2());
         // ПРЕДЕЛ НЕ БЫВАЕТ ОТРИЦАТЕЛЬНЫМ: когда склад переполнен, места под
-        // обломки просто нет — так и написано, а не «из −2».
-        g.drawString("обломки " + p.debris
-                + (p.debrisCap < 0 ? " — места нет" : " из " + p.debrisCap),
+        // трофеи просто нет — так и написано, а не «из −2».
+        g.drawString("трофеи " + p.trophy
+                + (p.trophyCap < 0 ? " — места нет" : " из " + p.trophyCap),
             x + px(9) + Math.min(dn, 12) * px(20) + px(6), cy + px(13));
         cy += px(24);
         cy = paintStorageTokens(g, p, x, cy);
@@ -1454,7 +1454,7 @@ public final class BoardSheet extends JComponent {
             double angle = ((t.uid * 73) % 60) - 30;
             paintTrophyToken(g, t, cx, cy, px(40), angle);
         }
-        // чёрные кубики: сколько обломков даст возврат (флат, 1 за жетон)
+        // чёрные кубики: сколько трофеев даст возврат (флат, 1 за жетон)
         int cubes = Math.max(0, p.trophyTokens);
         int side = px(12);
         int bx = x + px(12);
