@@ -864,9 +864,40 @@ public final class HotSeatWindow {
             if (stopped) {
                 return;      // окно уже закрыто, жаловаться некому
             }
+            // ОБОРВАННАЯ ПАРТИЯ — НЕ ТУПИК. Журнал пишется (дизайнеру он нужен
+            // именно от сломанной партии), поломка называется вслух, и из окна
+            // есть выход: раньше оставалась мёртвая доска, где нечего нажать.
+            saveJournal(rec, "-ошибка");
+            StringBuilder где = new StringBuilder();
+            for (StackTraceElement el : t.getStackTrace()) {
+                if (el.getClassName().startsWith("kelium.")) {
+                    где.append(el.getClassName()).append('.').append(el.getMethodName())
+                        .append(" (строка ").append(el.getLineNumber()).append(')');
+                    break;
+                }
+            }
             SwingUtilities.invokeLater(() -> {
-                turnLabel.setText("Партия прервана ошибкой");
-                feedLine(null, String.valueOf(t));
+                finished = true;
+                clearDecision();
+                turnLabel.setText("Партия оборвалась ошибкой");
+                turnLabel.setForeground(Theme.bad());
+                endBtn.setTexts("Партия оборвана", "");
+                endBtn.setState(KpButton.State.DISABLED);
+                feedLine(null, "ОШИБКА: " + t);
+                List<String> подробности = new ArrayList<>();
+                подробности.add(String.valueOf(t));
+                if (где.length() > 0) {
+                    подробности.add("оборвалось в " + где);
+                }
+                подробности.add("Журнал партии сохранён — по нему видно, "
+                    + "до какого места дошло");
+                confirm.open("Партия оборвалась ошибкой",
+                    "Доиграть эту партию нельзя — движок остановился посреди хода",
+                    подробности,
+                    List.of(new kelium.gui.kp.ConfirmDialog.Option("Выйти в меню",
+                        "собрать стол заново", this::closeToMenu)),
+                    new kelium.gui.kp.ConfirmDialog.Option("Остаться в окне",
+                        "посмотреть доску и ленту", () -> confirm.close()));
             });
             return;
         }
@@ -906,6 +937,11 @@ public final class HotSeatWindow {
             }
         }
         return found;
+    }
+
+    /** Строка состояния партии — для прогонщиков и тестов. */
+    String turnLabelForTest() {
+        return turnLabel == null ? null : turnLabel.getText();
     }
 
     /** Вид ожидаемого решения — для прогонщиков и тестов. */

@@ -1584,11 +1584,41 @@ public class StrategicAgent extends HeuristicAgent {
         if (net != null) {
             return net.value(state, seat);
         }
-        ValueNetOnnx onnx = ValueNetOnnx.active();
-        if (onnx != null) {
-            return onnx.value(state, seat);
+        if (onnxРядом()) {
+            ValueNetOnnx onnx = ValueNetOnnx.active();
+            if (onnx != null) {
+                return onnx.value(state, seat);
+            }
         }
         return linearEvaluate(state, seat, genome);
+    }
+
+    /**
+     * ЕСТЬ ЛИ РЯДОМ ONNX RUNTIME. Библиотека нужна только запасной сети оценки,
+     * а живёт она отдельным jar-ом — и когда его нет в списке библиотек, само
+     * УПОМИНАНИЕ {@link ValueNetOnnx} валит ход NoClassDefFoundError: у класса в
+     * полях типы из этой библиотеки, и JVM пытается их разрешить.
+     *
+     * <p>Так партия и умирала посреди хода бота: список библиотек запуска
+     * отстал от кода, onnxruntime в нём не было, и вместо линейной оценки игрок
+     * получал оборванную партию. Оценка без сети работает — значит и отсутствие
+     * библиотеки не повод ронять игру.
+     */
+    private static volatile Boolean onnxРядом;
+
+    private static boolean onnxРядом() {
+        Boolean б = onnxРядом;
+        if (б == null) {
+            try {
+                Class.forName("ai.onnxruntime.OrtEnvironment", false,
+                    StrategicAgent.class.getClassLoader());
+                б = Boolean.TRUE;
+            } catch (Throwable t) {
+                б = Boolean.FALSE;
+            }
+            onnxРядом = б;
+        }
+        return б;
     }
 
     /** Линейная (читаемая) оценка позиции — базовая версия и запасной вариант. */
