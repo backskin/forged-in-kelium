@@ -122,6 +122,11 @@ public final class HotSeatWindow {
     FieldView field;
     private BoardsPanel boards;
     private BoardSheet sheet;
+
+    /** Планшет смотрящего места — для прогонщиков и тестов. */
+    BoardSheet sheetForTest() {
+        return sheet;
+    }
     /** Кнопки выбора места в ящике «Планшет» — их приходится запирать. */
     private final Map<Integer, JToggleButton> sheetSeatBtns = new LinkedHashMap<>();
     private JScrollPane sheetScroll;
@@ -154,7 +159,7 @@ public final class HotSeatWindow {
     HandPanel hands;
     ActionBar actionBar;
     PromptOverlay prompt;
-    private ZoomCard zoom;
+    ZoomCard zoom;
     kelium.gui.kp.ConfirmDialog confirm;
     kelium.gui.kp.CardChoiceOverlay ceremony;
     /** Шторка передачи устройства — только когда за столом больше одного живого. */
@@ -267,7 +272,9 @@ public final class HotSeatWindow {
         frame.add(buildPlayerZone(), BorderLayout.SOUTH);
 
         zoom = new ZoomCard();
-        zoom.setSize(Theme.px(236), Theme.px(348));
+        // Выше прежнего: под лицом карты теперь помещается весь печатный текст
+        // (условие, награда, усиленная награда, утиль), а не одна строка.
+        zoom.setSize(Theme.px(250), Theme.px(400));
         zoom.setVisible(false);
         frame.getLayeredPane().add(zoom, JLayeredPane.POPUP_LAYER);
 
@@ -743,6 +750,11 @@ public final class HotSeatWindow {
         return zone;
     }
 
+    /** Показать увеличенную карту — для прогонщиков и тестов. */
+    void showZoomForTest(CardTile tile, String group) {
+        showZoom(tile, group);
+    }
+
     private void showZoom(CardTile tile, String group) {
         if ("Приказы".equals(group) && tile.orderFaceInfo() != null) {
             zoom.showOrder(tile.orderFaceInfo(), tile.cardName(), orderDesc(tile.cardId));
@@ -750,25 +762,40 @@ public final class HotSeatWindow {
             return;
         }
         String type;
-        String detail = "";
+        String detail;
         double progress = -1;
         if ("Задания".equals(group)) {
             type = "Задание";
+            StringBuilder t = new StringBuilder();
             try {
                 var card = kelium.engine.cards.CardRegistry.objective(tile.cardId);
                 GameState s = liveState;
                 if (card != null && s != null) {
                     var ctx = new kelium.engine.cards.EngineCardContext(s, viewedSeat);
                     progress = card.progress(ctx);
-                    detail = String.valueOf(card.needed(ctx));
+                    t.append(card.needed(ctx));
                 }
             } catch (RuntimeException ignore) {
                 // прогресс — украшение подсказки; без него карта всё равно видна
             }
+            добавить(t, "", objectiveText(tile.cardId));
+            добавить(t, "НАГРАДА: ", objectiveReward(tile.cardId));
+            добавить(t, "УСИЛЕННАЯ: ", objectiveBonus(tile.cardId));
+            добавить(t, "УТИЛЬ (сжечь): ", objectiveTop(tile.cardId));
+            detail = t.toString();
         } else if ("Приказы".equals(group)) {
             type = "Приказ";
+            detail = orderDesc(tile.cardId);
         } else {
+            // АРСЕНАЛ ПОКАЗЫВАЛСЯ ПУСТЫМ: у карты бралось одно имя, а обе
+            // половины — что она делает установленной и что даёт, если её
+            // сжечь, — не показывались нигде, кроме меню карт.
             type = "Арсенал";
+            StringBuilder t = new StringBuilder();
+            добавить(t, "", cardText(tile.cardId));
+            добавить(t, "РАБОТАЕТ: ", arsenalLabel(tile.cardId, "bottom"));
+            добавить(t, "УТИЛЬ (сжечь): ", arsenalLabel(tile.cardId, "top"));
+            detail = t.toString();
         }
         zoom.show(tile.cardName(), type, tile.bandColor(), detail, progress);
         placeZoom(tile);
@@ -1661,6 +1688,31 @@ public final class HotSeatWindow {
         pendingBakeName = "СПЕЦ-действие";
         agent.submitIndex(index);
         clearDecision();
+    }
+
+    /** Дописать кусок текста карты — пустые молча пропускаются. */
+    /** Разделитель абзацев в тексте карты — ровно один символ. */
+    private static final char ПЕРЕВОД = (char) 10;
+
+    private static void добавить(StringBuilder куда, String подпись, String текст) {
+        if (текст == null || текст.isBlank()) {
+            return;
+        }
+        if (куда.length() > 0) {
+            // ПЕРЕВОД СТРОКИ РОВНО ОДИН СИМВОЛ: увеличенная карта режет текст
+            // по нему, а System.lineSeparator() на Windows это два знака, и
+            // лишний возврат каретки оставался внутри абзаца.
+            куда.append(ПЕРЕВОД).append(ПЕРЕВОД);
+        }
+        куда.append(подпись).append(текст);
+    }
+
+    /** Усиленная награда задания — короткой строкой, либо null. */
+    private String objectiveBonus(String id) {
+        // КЛЮЧ НАБОРА — special_reward: усиленная награда за выполнение
+        // усиленного условия.
+        Object r = cardField("objectives", id, "special_reward");
+        return r instanceof Map<?, ?> m ? rewardWords(m) : null;
     }
 
     /** Печатный текст карты задания. */
