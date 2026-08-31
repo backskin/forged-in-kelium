@@ -168,8 +168,31 @@ public final class Modules {
     public static void moduleSwap(GameState s, int seat, Agent agent,
                                   Consumer<Map<String, Object>> emit) {
         PlayerState p = s.player(seat);
+        // ГЛУХОЙ ЖЕТОН УНИЧТОЖЕНИЯ ЦУ ПЕРЕЖИВАЕТ ПЕРЕКЛАДКУ.
+        //
+        // НАЙДЕНО ЗАМЕРОМ 25.08.2026: у 470 игроков из 600 жетона к концу партии
+        // не было вовсе, хотя ЦУ снесли только в 0.27 партии. Причина здесь:
+        // Обновление стирает раскладку целиком и собирает её заново из
+        // ВЫТЯНУТЫХ жетонов, а глухой в мешке не лежит и в руке не числится —
+        // значит каждый раунд он молча пропадал.
+        //
+        // Он остаётся НА ТОМ ЖЕ РОДЕ: бесплатная перекладка каждое Обновление
+        // была бы щедрее правила. По правилу его двигают за плату — обменом на
+        // планшете науки за обломок или утилем карты задания (moveOneModule).
+        // Заодно занятый им род не предлагается под другие модули: он и так
+        // занят, как любая занятая ячейка.
+        Map.Entry<UnitType, Map<String, Object>> глухой = null;
+        for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
+            if (Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                глухой = e;
+                break;
+            }
+        }
         p.redPlacements.clear();
         p.bluePlacements.clear();
+        if (глухой != null) {
+            p.redPlacements.put(глухой.getKey(), глухой.getValue());
+        }
 
         // ЖЕТОН-ЗАГЛУШКА КЛАДЁТСЯ ПЕРВЫМ (правило дизайнера 27.08.2026): он
         // такой же красный жетон, как остальные, и ячейку занимает
@@ -371,54 +394,73 @@ public final class Modules {
      * «В» и «Г»: старые планшеты не должны менять поведение.
      */
     /**
-     * ЖЕТОН-ЗАГЛУШКА НА ЭТОЙ ЯЧЕЙКЕ? Пока он у игрока, ячейка занята, и рабочий
+     * ГЛУХОЙ ЖЕТОН НА ЭТОЙ ЯЧЕЙКЕ? Пока он у игрока, ячейка занята, и рабочий
      * красный модуль туда не положить. Уехал к захватчику за снесённое ЦУ —
      * место освободилось.
+     *
+     * <p>Жетон живёт в {@link PlayerState#redPlacements} рядом с обычными
+     * модулями и помечен флагом {@code blocks}: он и есть такой же красный
+     * жетон, только ничего не открывает.
      */
     public static boolean sealSits(GameState s, PlayerState p, UnitType type) {
-        return sealActive(s, p) && p.sealedUnit == type;
+        Map<String, Object> м = p.redPlacements.get(type);
+        return sealActive(s, p) && м != null && Boolean.TRUE.equals(м.get("blocks"));
     }
 
-    /** Лежит ли у игрока жетон-заглушка (и включено ли правило вообще). */
+    /** Лежит ли у игрока глухой жетон (и включено ли правило вообще). */
     public static boolean sealActive(GameState s, PlayerState p) {
-        return p.sealedUnit != null && p.ownCuTokenAvailable
-            && Ctx.rules(s).getBool("command_center.destruction_token_seals_cell", false);
+        if (!p.ownCuTokenAvailable
+                || !Ctx.rules(s).getBool("command_center.destruction_token_seals_cell", false)) {
+            return false;
+        }
+        return sealUnit(p) != null;
+    }
+
+    /** Род войск, чью ячейку сейчас закрывает глухой жетон, или null. */
+    private static UnitType sealUnit(PlayerState p) {
+        for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
+            if (Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                return e.getKey();
+            }
+        }
+        return null;
     }
 
     /**
-     * ПЕРЕЛОЖИТЬ ЖЕТОН-ЗАГЛУШКУ (правило дизайнера 27.08.2026).
+     * ПЕРЕЛОЖИТЬ ГЛУХОЙ ЖЕТОН (правило дизайнера 27.08.2026).
      *
-     * <p>Заглушка — обычный красный жетон, и переносится по тем же правилам:
-     * в Обновление игрок раскладывает красные заново, и её тоже. Род войск,
+     * <p>Он — обычный красный жетон и переносится по тем же правилам: в
+     * Обновление игрок раскладывает красные заново, и его тоже. Род войск,
      * нарисованный на лице, значил ТОЛЬКО стартовое положение при подготовке —
-     * после того как жетон лёг, картинка не значит ничего, и держать заглушку
-     * на своём роде игрок не обязан.
+     * после того как жетон лёг, картинка не значит ничего, и держать его на
+     * своём роде игрок не обязан.
      */
     private static void moveSealToken(GameState s, PlayerState p, Agent agent,
                                       Consumer<Map<String, Object>> emit) {
         if (!sealActive(s, p)) {
             return;
         }
+        UnitType был = sealUnit(p);
         List<Choice> opts = new ArrayList<>();
         for (UnitType t : UnitType.values()) {
             if (redSlotsFor(p, t) > 0) {
-                opts.add(new Choice("seal_slot", t, "заглушка -> " + t.code));
+                opts.add(new Choice("seal_slot", t, "глухой жетон -> " + t.code));
             }
         }
         if (opts.size() <= 1) {
             return;             // класть некуда, кроме как обратно
         }
         Choice ch = agent.choose(s, opts, Map.of("kind", "seal_move"));
-        if (!(ch.payload() instanceof UnitType picked) || picked == p.sealedUnit) {
+        if (!(ch.payload() instanceof UnitType picked) || picked == был) {
             return;
         }
-        UnitType was = p.sealedUnit;
-        p.sealedUnit = picked;
+        Map<String, Object> жетон = p.redPlacements.remove(был);
+        p.redPlacements.put(picked, жетон);
         if (emit != null) {
             Map<String, Object> ev = new HashMap<>();
             ev.put("type", "seal_move");
             ev.put("seat", p.seat);
-            ev.put("from", was.code);
+            ev.put("from", был.code);
             ev.put("unit", picked.code);
             emit.accept(ev);
         }

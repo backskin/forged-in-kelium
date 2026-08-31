@@ -779,12 +779,16 @@ public final class Actions {
             int coinsSpent = 0;
             // ПРЕДЕЛ С КАРТЫ: бесплатная Стройка бывает «одна операция».
             int opLimit = ctx.objectLimit(name());
+            // ОДНА ОПЕРАЦИЯ НА ОДНО ЗДАНИЕ ЗА ДЕЙСТВИЕ (заказ дизайнера
+            // 25.08.2026, ключ actions.build.one_op_per_building). Иначе то же
+            // здание можно поставить и тут же снять, доя монету за снос.
+            java.util.Set<Integer> тронутые = new java.util.HashSet<>();
             StringBuilder detail = new StringBuilder();
             while (true) {
                 if (ops >= opLimit) {
                     break;
                 }
-                ActionResult one = performOneOp(player, ctx, agent);
+                ActionResult one = performOneOp(player, ctx, agent, тронутые);
                 if (one == null) {
                     break;   // пас или ничего доступного
                 }
@@ -814,7 +818,8 @@ public final class Actions {
 
         /** Одна операция стройки/переноса; null = пас или нет доступного. */
         @SuppressWarnings("unchecked")
-        private ActionResult performOneOp(PlayerState player, TurnContext ctx, Agent agent) {
+        private ActionResult performOneOp(PlayerState player, TurnContext ctx, Agent agent,
+                                          java.util.Set<Integer> тронутые) {
             // УДОРОЖАНИЕ КАСАЕТСЯ ТОЛЬКО РАЗМЕЩЕНИЯ ИЗ ЗАПАСА (правило дизайнера
             // 17.08.2026). У Стройки три операции: разместить здание из запаса на
             // поле, вернуть здание с поля в запас, переместить здание по полю
@@ -838,6 +843,13 @@ public final class Actions {
             List<Map<String, Object>> menu = ctx.buildMovesOnly
                 ? new ArrayList<>() : buildable(player, surcharge, ctx.buildFree);
             List<Map<String, Object>> moveMenu = movable(player, ctx);
+            // ОДНА ОПЕРАЦИЯ НА ЗДАНИЕ. Уже тронутое этим действием здание из меню
+            // уходит: иначе его можно переставлять и сносить по кругу.
+            boolean одноНаЗдание = rs.getBool("actions.build.one_op_per_building", false);
+            if (одноНаЗдание && !тронутые.isEmpty()) {
+                moveMenu.removeIf(m -> m.get("uid") instanceof Number n
+                    && тронутые.contains(n.intValue()));
+            }
             if (menu.isEmpty() && moveMenu.isEmpty()) {
                 return null;
             }
@@ -851,8 +863,17 @@ public final class Actions {
             // B10: снос — любое своё здание на поле убирается в резерв за возврат
             // demolish_refund_coins монет (ЦУ не сносится — только переносится).
             int refund = rs.getInt("actions.build.demolish_refund_coins");
+            // СНОС СВОЕГО ЦУ (заказ дизайнера 25.08.2026, ключ
+            // actions.build.demolish_cu_allowed). Прежде ЦУ из меню исключалось
+            // всегда. Теперь его можно разобрать и получить монету — это выход
+            // из тупика, когда строить не на что; расплата в том, что в свой ход
+            // игрок ОБЯЗАН вернуть ЦУ на поле спец-действием.
+            boolean цуМожноСносить = rs.getBool("actions.build.demolish_cu_allowed", false);
             for (BuildingToken b : player.buildingsOnField()) {
-                if (b.type == BuildingType.COMMAND_CENTER) {
+                if (b.type == BuildingType.COMMAND_CENTER && !цуМожноСносить) {
+                    continue;
+                }
+                if (одноНаЗдание && тронутые.contains(b.uid)) {
                     continue;
                 }
                 opts.add(new Choice("demolish_pick", b.uid,
@@ -864,9 +885,14 @@ public final class Actions {
                 return null;
             }
             if ("move_pick".equals(pick.kind())) {
-                return performMove(player, ctx, agent, (Map<String, Object>) pick.payload());
+                Map<String, Object> mv = (Map<String, Object>) pick.payload();
+                if (mv.get("uid") instanceof Number n) {
+                    тронутые.add(n.intValue());
+                }
+                return performMove(player, ctx, agent, mv);
             }
             if ("demolish_pick".equals(pick.kind())) {
+                тронутые.add(((Number) pick.payload()).intValue());
                 return performDemolish(player, ctx, ((Number) pick.payload()).intValue(), refund);
             }
             Map<String, Object> spec = (Map<String, Object>) pick.payload();
@@ -2572,6 +2598,15 @@ public final class Actions {
                 }
                 rewards = (List<Object>) te.get("step_rewards");
             }
+            // СВОД ПЕРЕБИВАЕТ ДОСКУ. Лестница шагов — настраиваемая величина
+            // (цена, очки, ёмкость шагов уже живут в своде), и когда вариант
+            // правил меняет ЧИСЛО шагов, список наград обязан меняться вместе с
+            // ними. Держать его только на доске значило бы плодить копию всего
+            // набора планшетов ради одной строки.
+            if (cfg.ruleset.get("tech.step_rewards", null) instanceof List<?> rl
+                    && !rl.isEmpty()) {
+                rewards = new ArrayList<>(rl);
+            }
             // Награда шага берётся из данных step_rewards[reached-1], чтобы правка
             // числа шагов не требовала менять код. Возможные значения:
             // prize_cube / module / permanent_ability / super_arsenal_card.
@@ -2635,7 +2670,7 @@ public final class Actions {
                 //   синий трек    → синий модуль (сборка);
                 //   зелёный трек  → ПОЗОЛОТА одного своего модуля.
                 // Зелёный трек своих жетонов не производит (он про хранилище), и
-                // позолота — ровно то, что он и продаёт за 3 трофея вечным
+                // позолота — ровно то, что он и продаёт за два обломка вечным
                 // курсом. Десять монет здесь были бы вдвое слабее: 10 МОН это
                 // 2 ПО, а вершина стоит четырёх трофеев.
                 if (!kelium.engine.Setup.expansionOn(rs, "super_arsenal")) {
@@ -2676,7 +2711,7 @@ public final class Actions {
          * </ul>
          *
          * <p>Зелёный трек своих жетонов не печатает, и позолота — ровно тот приз,
-         * который он и продаёт вечным курсом за 3 трофея. Десять монет здесь были
+         * который он и продаёт вечным курсом за два обломка. Десять монет здесь были
          * бы вдвое слабее: 10 МОН это 2 ПО, а вершина стоит четырёх трофеев.
          *
          * @param kind род модулей трека из данных доски: red | blue | storage
@@ -2868,11 +2903,18 @@ public final class Actions {
                 ex.put("give", 2);
                 opts.add(new Choice("sci_exchange", ex, "2 trophy -> draw 2 arsenal, keep 1"));
             }
-            if (pool >= 3 && (player.redModules + player.blueModules) > player.goldModules) {
+            // ЦЕНА ПОЗОЛОТЫ — из свода, а не из кода (решение дизайнера
+            // 28.08.2026: два обломка вместо трёх). Старым сводам, где ключа
+            // нет, остаётся прежняя тройка — числа сыгранных партий не должны
+            // меняться задним числом.
+            int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();
+            if (pool >= gildCost
+                    && (player.redModules + player.blueModules) > player.goldModules) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "gild");
-                ex.put("give", 3);
-                opts.add(new Choice("sci_exchange", ex, "3 trophy -> gild a module"));
+                ex.put("give", gildCost);
+                opts.add(new Choice("sci_exchange", ex,
+                    gildCost + " trophy -> gild a module"));
             }
             // Вечный курс: 1 трофей -> 1 перемещение модуля (перестановка
             // посреди раунда, не дожидаясь Смены модулей в Обновление).

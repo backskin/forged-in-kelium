@@ -263,27 +263,42 @@ public final class CombatResolver {
                                                 UnitToken unit) {
         List<AttackRow> rows = new ArrayList<>();
         int universalCost = rs.getInt("actions.combat.universal_ammo_cost");
-        for (Target t : Target.values()) {
-            rows.add(new AttackRow("universal", universalCost, t));
+
+        // КУДА КЛАДЁТСЯ ЖЕТОН МОДУЛЯ — ТОЧКА ПРАВИЛ (предложение дизайнера
+        // 25.08.2026, ключ actions.combat.module_on_universal).
+        //
+        // ПО УМОЛЧАНИЮ модуль накрывает СПЕЦИАЛЬНУЮ ячейку: печатная цель
+        // меняется на две, цена та же. Это чистая прибавка — отказываться не от
+        // чего, и решения в прокачке нет.
+        //
+        // ВАРИАНТ: модуль накрывает УНИВЕРСАЛЬНУЮ. Тогда прокачка — размен:
+        // получаешь ещё одну дешёвую цель (из двух на жетоне), но теряешь
+        // «достану любого за 2 боеприпаса». Появляется слепое пятно — род, до
+        // которого этот жетон не дотянется вовсе, — и вместе с ним контр-игра.
+        boolean модульНаУниверсальной =
+            rs.getBool("actions.combat.module_on_universal", false);
+        Map<String, Object> накладка =
+            Modules.redModuleOn(state.player(seat), unit.type);
+        boolean глухой = накладка != null
+            && Boolean.TRUE.equals(накладка.get("blocks"));
+        boolean универсальнаяЗакрыта = модульНаУниверсальной && накладка != null;
+
+        if (!универсальнаяЗакрыта) {
+            for (Target t : Target.values()) {
+                rows.add(new AttackRow("universal", universalCost, t));
+            }
         }
 
         Target base = side.specializedTarget(unit.type);
         if (base == null) {
             return rows;
         }
-        // ЗАПЕЧАТАННАЯ ЯЧЕЙКА (решение дизайнера 25.08.2026). Собственный жетон
-        // разрушения ЦУ лежит лицом на планшете владельца и ЗАВАРИВАЕТ ячейку
-        // специальной атаки одного рода: он бьёт только универсальной за 2
-        // боеприпаса. Печать держится ровно до тех пор, пока жетон у владельца:
-        // снесли ЦУ — жетон уехал к захватчику, ячейка распечаталась.
-        //
-        // Проверяется ДО модуля: заваренную ячейку модулем не открыть, иначе
-        // печать снималась бы обычной наградой, а она снимается только войной.
-        PlayerState me = state.player(seat);
-        if (me.sealedUnit == unit.type && me.ownCuTokenAvailable
-                && rs.getBool("command_center.destruction_token_seals_cell", false)) {
-            return rows;
-        }
+        // ГЛУХОЙ ЖЕТОН ЗАКРЫВАЕТ ЯЧЕЙКУ (решение дизайнера 25.08.2026).
+        // Собственный жетон уничтожения ЦУ — такой же жетон модуля атаки, только
+        // он ничего не открывает: род с ним бьёт лишь универсальной за 2
+        // боеприпаса. Лежит он в общей раскладке модулей, поэтому и двигается
+        // как все — обменом на планшете науки или утилем карты; игрок сам решает,
+        // каким родом сейчас не воевать.
         // ЦЕНА СПЕЦИАЛЬНОЙ АТАКИ — ОДНА ДЛЯ ВСЕХ РОДОВ (диктовка дизайнера
         // 24.08.2026): 1 боеприпас, и у вышки тоже. Прежний черновик «Бой 2.0»
         // (18.08.2026) давал вышке спец-атаку бесплатно; ключ оставлен, чтобы
@@ -294,7 +309,24 @@ public final class CombatResolver {
             : rs.getInt("actions.combat.specialized_ammo_cost",
                 rs.getInt("actions.combat.secondary_row_ammo_cost"));
 
-        Map<String, Object> mod = Modules.redModuleOn(state.player(seat), unit.type);
+        if (глухой) {
+            // Глухой жетон закрывает ТУ ячейку, на которой лежит. Если модули
+            // кладутся на универсальную, то род теряет именно её — а печатная
+            // дешёвая атака остаётся. Без этой ветки род с глухим жетоном
+            // оставался бы вообще без единой атаки.
+            if (модульНаУниверсальной) {
+                rows.add(new AttackRow("specialized", specCost, base));
+            }
+            return rows;
+        }
+
+        Map<String, Object> mod = накладка;
+        if (модульНаУниверсальной) {
+            // Печатная специальная цель НЕ перекрывается: жетон лёг на
+            // универсальную ячейку. Значит она остаётся у рода навсегда, и
+            // распределение целей по сторонам планшета работает всю партию.
+            rows.add(new AttackRow("specialized", specCost, base));
+        }
         Object rawTargets = mod == null ? null : mod.get("targets");
         String[] tcodes = rawTargets instanceof String[] arr ? arr : null;
         Target t0 = null;
@@ -308,7 +340,9 @@ public final class CombatResolver {
             }
         }
         if (mod == null || t0 == null) {
-            rows.add(new AttackRow("specialized", specCost, base));
+            if (!модульНаУниверсальной) {
+                rows.add(new AttackRow("specialized", specCost, base));
+            }
         } else {
             int modCost = mod.get("ammo") instanceof Number n ? n.intValue() : specCost;
             if (t1 == null) {
@@ -723,11 +757,28 @@ public final class CombatResolver {
             journal().noteCombatHit(attackerSeat, owner, uidOf(victim), vtype, destroyed, isRetaliation);
             TurnJournal.TurnFacts af = journal().of(attackerSeat);
             enemyDamagedThisBattle = true;
+            // ЧУЖИЕ ЖЕТОНЫ ПОД УРОНОМ И ДОБИТЫЕ — общий счёт хода.
+            //
+            // НАЙДЕНО 28.08.2026 ЗАМЕРОМ БЛИЗОСТИ. Оба поля журнала читались
+            // картами и предикатами, но не заполнялись НИКЕМ: бой писал только
+            // здания (enemyBuildingsDamaged) и убийства по жетонам-убийцам.
+            // Из-за этого «Подранки» (двое раненых, никого добитого) держали
+            // близость РОВНО НОЛЬ во всех 58 попаданиях карты в руку за 60
+            // партий — условие было невыполнимо в принципе, а выглядело как
+            // тупость ботов. Той же дырой болели предикаты
+            // damaged_distinct_no_kills, damaged_distinct и destroyed_count.
+            af.enemyTokensDamaged.add(uidOf(victim));
+            // o43 «Охота на сильного» считает прогресс по РАНЕНОМУ лидеру, а не
+            // только по добитому — поэтому признак ставится здесь, на уроне.
+            if (owner == leadingRivalOf(attackerSeat)) {
+                af.damagedLeader = true;
+            }
             if (victim instanceof BuildingToken) {
                 af.enemyBuildingHits += 1;   // o25 в прежней редакции
                 af.enemyBuildingsDamaged.add(uidOf(victim));   // o45 «Пристрелка»
             }
             if (destroyed) {
+                af.enemyTokensDestroyed += 1;
                 af.minKillAmmoCost = Math.min(af.minKillAmmoCost, ammo);
                 if (af.movedUids.contains(unit.uid)) {
                     af.movedAndKilledSameUnit = true;
@@ -1238,6 +1289,10 @@ public final class CombatResolver {
         {
             TurnJournal.TurnFacts j = s.journal.of(attackerSeat);
             j.destroyedOwners.add(victim.owner());
+            // ПОТЕРИ ЖЕРТВЫ — в её собственный журнал. Поле читалось (условие
+            // «без потерь» и ответный бой), но не заполнялось ничем: та же дыра,
+            // что была у destroyedTypes.
+            s.journal.of(victim.owner()).lostOwnThisTurn += 1;
             if (victim instanceof UnitToken u) {
                 j.destroyedTypes.add(u.type.code);
             } else if (victim instanceof BuildingToken b) {
@@ -1326,9 +1381,23 @@ public final class CombatResolver {
         int need = ((Number) rs.get("command_center.cu_tokens_for_military_win", 2))
             .intValue();
         boolean heldForeignToken = attacker.cuDestructionTokens >= need - 1;
+        // Супер-задания 5.0: «Трофейный обоз» и «Тень штаба» смотрят, разрушалось
+        // ли ЦУ игрока ХОТЬ РАЗ за партию.
+        owner.super5CuEverLost = true;
+        // «Тень штаба»: глухой жетон изъят из игры навсегда — за снос этого ЦУ
+        // захватчик не получает НИЧЕГО: ни оборота, ни шага к военной победе.
+        if (owner.super5SealRemoved) {
+            owner.ownCuTokenAvailable = false;
+        }
         if (owner.ownCuTokenAvailable) {
             owner.ownCuTokenAvailable = false;
             attacker.cuDestructionTokens += 1;
+            // ЖЕТОН УЕХАЛ — ЯЧЕЙКА ОТКРЫЛАСЬ. Он лежал на планшете жертвы глухим
+            // модулем; теперь он у захватчика перевёрнутым, и жертва снова бьёт
+            // этим родом дёшево. Так снос ЦУ перестаёт быть чистой потерей: чем
+            // сильнее тебя бьют, тем свободнее твой планшет.
+            owner.redPlacements.entrySet().removeIf(e ->
+                Boolean.TRUE.equals(e.getValue().get("blocks")));
         }
 
         // ЦУ — в запас владельца: с поля долой, урон снят, энергия обнулена

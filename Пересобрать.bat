@@ -2,20 +2,40 @@
 setlocal
 cd /d "%~dp0"
 
-echo Rebuilding all four exe files (Constructor, Replay2, Runner, Help)...
-echo This takes a minute or two - jlink + jpackage run for each app.
+rem КОДИРОВКА ЭТОГО ФАЙЛА - CP866 (OEM-кириллица), И ЭТО ВАЖНО.
+rem cmd.exe разбирает bat в кодовой странице консоли, а по умолчанию на
+rem русской Windows это 866. Файл, сохранённый в UTF-8, ломается не только
+rem видом: многобайтные буквы разваливаются на куски, и cmd пытается
+rem выполнить обрывки слов как команды (проверено 30.08.2026). Длинного тире
+rem в CP866 нет вовсе - только обычный дефис.
+
+echo Пересборка четырёх exe:
+echo   KeliumConstructor.exe - конструктор раскладок
+echo                           вкладки: Конструктор, Сборка из блоков, Каталог блоков
+echo   KeliumRunner.exe      - прогоны симуляций
+echo   KeliumReplay2.exe     - разбор партии
+echo   KeliumHelp.exe        - справочник: правила и все карты
 echo.
+echo Занимает пару минут: mvn package, затем jlink и jpackage.
+echo.
+
+where mvn >nul 2>nul
+if errorlevel 1 (
+    echo ОШИБКА: не найден mvn. Установи Maven или добавь его в PATH.
+    pause
+    exit /b 1
+)
 
 powershell -NoProfile -ExecutionPolicy Bypass -File make-exe.ps1
 
 if errorlevel 1 (
     echo.
-    echo BUILD FAILED - see the error above.
-    echo Common cause: an app is still running - close all Kelium*.exe windows and retry.
+    echo СБОРКА НЕ ПРОШЛА - смотри ошибку выше.
+    echo Частая причина: приложение ещё запущено. Закрой окна Kelium*.exe и повтори.
     pause
     exit /b 1
 )
 
 echo.
-echo Done. Files are in dist\ - see the list above for exact time and fingerprint.
+echo Готово. Файлы в dist\ - точное время и отпечаток в списке выше.
 pause

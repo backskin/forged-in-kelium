@@ -30,7 +30,7 @@ import kelium.dataio.Ctx;
 public final class GameLogger {
 
     private static final Map<String, String> ACTIONS_RU = Map.of(
-        "assembly", "Сборка", "mining", "Добыча", "build", "Стройка",
+        "assembly", "Снаряжение", "mining", "Добыча", "build", "Стройка",
         "energy_swap", "Смена энергии", "movement", "Движение", "combat", "Бой",
         "market", "Маркет", "science", "Наука");
     private static final Map<String, String> ORDERS_RU = Map.of(

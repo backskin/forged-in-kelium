@@ -548,7 +548,10 @@ public final class Setup {
         // Начальные задания (kind: starting) в любом режиме изымаются из ОБЩЕЙ
         // колоды заданий: это отдельный модуль старта, а не обычные карты.
         int deal = Math.max(1, ((Number) ruleset.get("super_objectives.deal", 1)).intValue());
-        if (expansionOn(ruleset, "super_objectives")) {
+        // СУПЕР-ЗАДАНИЯ 5.0 (mode: solo5): по ОДНОЙ карте втайне, без вскрытия
+        // и счётчика; раздачу делает Super5 ниже, когда GameState уже собран.
+        boolean solo5 = "solo5".equals(String.valueOf(ruleset.get("super_objectives.mode", "")));
+        if (!solo5 && expansionOn(ruleset, "super_objectives")) {
             List<String> superIds = new ArrayList<>(content.get("super_objectives").ids());
             Collections.shuffle(superIds, rng);
             int at = 0;
@@ -798,6 +801,15 @@ public final class Setup {
                 }
             } catch (RuntimeException e) {
                 // контента может не быть в старых версиях правил — играем без вершин
+            }
+        }
+        // СУПЕР-ЗАДАНИЯ 5.0: по одной карте втайне каждому. Каталог 5.0.0 несёт
+        // ровно двенадцать карт s5_01..s5_12; их эффекты и накопители — Super5.
+        if ("solo5".equals(String.valueOf(ruleset.get("super_objectives.mode", "")))) {
+            try {
+                Super5.deal(s, content.get("super_objectives").ids(), rng);
+            } catch (RuntimeException e) {
+                // каталога нет — режим включён зря; играем без карт
             }
         }
         return s;

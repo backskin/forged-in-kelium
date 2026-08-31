@@ -224,6 +224,10 @@ public final class RuleWords {
             case "actions.build.surcharge_coins" ->
                 "надбавка монетами за каждую лишнюю стройку в одном действии";
             case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
+            case "actions.build.demolish_cu_allowed" ->
+                "своё ЦУ можно снести в запас, как любое здание";
+            case "actions.build.one_op_per_building" ->
+                "над одним зданием за действие Стройка только одна операция";
             case "actions.build.move_cost_coins" ->
                 "монет за перенос любого стоящего на поле здания";
             case "actions.build.move_building_repays_full_price" ->
@@ -249,6 +253,8 @@ public final class RuleWords {
                 "боеприпасов за специальную атаку (один тип цели)";
             case "actions.combat.tower_specialized_free" ->
                 "специальная атака вышки бесплатна";
+            case "actions.combat.module_on_universal" ->
+                "жетон модуля кладётся на универсальную атаку, а не на специальную";
             case "actions.combat.open_battle_surcharge_ammo" ->
                 "надбавка боеприпасами за начало боя";
             case "actions.combat.retaliation_enabled" -> "ответный удар разрешён";
@@ -277,6 +283,10 @@ public final class RuleWords {
             case "command_center.respawns" -> "снесённый центр управления возвращается в игру";
             case "command_center.returns_to_reserve" ->
                 "снесённый центр управления уходит в личный запас";
+            case "command_center.must_replace_cu_with_spec" ->
+                "ЦУ из запаса обязано вернуться на поле спец-действием";
+            case "command_center.cu_buildable_by_build_action" ->
+                "ЦУ можно поставить и обычным действием Стройка";
             case "command_center.destruction_token_vp" ->
                 "победных очков тому, кто снёс центр управления";
             case "command_center.own_token_vp_if_cu_never_destroyed" ->
@@ -288,15 +298,7 @@ public final class RuleWords {
             case "command_center.destruction_token_seals_cell" ->
                 "жетон-заглушка занимает ячейку красного модуля и закрывает собой "
                     + "ту спец-атаку, на которой лежит";
-            case "command_center.must_replace_cu_with_spec" ->
-                "центр управления в запасе обязан вернуться на поле спец-действием";
-            case "command_center.cu_buildable_by_build_action" ->
-                "центр управления можно поставить и обычной Стройкой";
 
-            case "actions.build.demolish_cu_allowed" ->
-                "своё здание можно снести в запас, получив монету — в том числе ЦУ";
-            case "actions.build.one_op_per_building" ->
-                "над одним зданием за действие Стройка ровно одна операция";
 
             // ---------- Контейнеры за снос ----------
             case "building_compensation_containers.barracks" -> "контейнеров за казарму";
@@ -346,6 +348,7 @@ public final class RuleWords {
             case "tech.step_capacity" -> "сколько игроков влезает на шаг";
             case "tech.step_cost_trophy" -> "трофеев/обломков за шаг (тратится общий пул)";
             case "tech.step_vp_cumulative" -> "победные очки по шагам, накопительно";
+            case "tech.step_rewards" -> "награды шагов трека (перебивает доску)";
             case "tech.science_exchanges" -> "постоянные обмены научного отдела";
             case "tech.science_one_step_per_track_per_action" ->
                 "за одно действие — не больше шага на трек";
@@ -362,6 +365,7 @@ public final class RuleWords {
             case "economy.vp_per_installed_super_arsenal" ->
                 "победных очков за каждую установленную карту супер-арсенала";
             case "tech.pair_bonus_coin" -> "монет за парный обмен науки";
+            case "tech.gild_trophy_cost" -> "обломков за позолоту модуля";
 
             // ---------- Конец раунда ----------
             case "return_step.return_destroyed_tokens" ->

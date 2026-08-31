@@ -65,7 +65,17 @@ public final class Plan {
          * огромном ветвлении искать надо не по атомарным ходам, а по ЦЕПОЧКАМ
          * с предусловиями.
          */
-        STRIKE("провести набег");
+        STRIKE("провести набег"),
+        /**
+         * ВОЕННАЯ ПОБЕДА: чужой жетон уничтожения ЦУ уже на руках, значит
+         * следующий снесённый ЦУ заканчивает партию победой немедленно.
+         *
+         * <p>Заведена 24.08.2026. Прежде эта ситуация ничем не отличалась от
+         * обычного набега: ЦУ получало плоскую надбавку в выборе цели, и бот
+         * мог спокойно пойти сносить добытчик, имея на руках победу в один удар.
+         * Самое ценное действие в игре не было представлено целью вовсе.
+         */
+        WAR_WIN("добить ЦУ и выиграть");
 
         public final String ru;
 
@@ -203,6 +213,16 @@ public final class Plan {
      * ТЕКУЩЕГО плана — сравнить их и решить, стоит ли смена курса своей цены.
      */
     public static List<Plan> candidates(GameState s, int seat, Genome g) {
+        return candidates(s, seat, g, null);
+    }
+
+    /**
+     * То же, но с УДЕРЖИВАЕМОЙ целью набега {@code heldHex}: в список попадает
+     * ещё и план на прежнюю жертву, чтобы агенту было с чем сравнивать новый
+     * курс. Без этого кандидата «прежняя цель» всегда выглядела мёртвой, и
+     * набег разворачивался на полпути.
+     */
+    public static List<Plan> candidates(GameState s, int seat, Genome g, String heldHex) {
         List<Plan> all = new ArrayList<>();
         all.add(kelium(s, seat, g));
         all.add(sell(s, seat, g));
@@ -211,6 +231,10 @@ public final class Plan {
         all.add(economy(s, seat, g));
         all.add(objective(s, seat, g));
         all.add(strike(s, seat, g));
+        if (heldHex != null) {
+            all.add(strike(s, seat, g, heldHex));
+        }
+        all.add(warWin(s, seat, g));
         return all;
     }
 
@@ -339,7 +363,30 @@ public final class Plan {
      * цель. Дальняя цель дешевле: план должен успеть сложиться за партию.
      */
     private static Plan strike(GameState s, int seat, Genome g) {
+        return strike(s, seat, g, null);
+    }
+
+    /**
+     * То же, но с УДЕРЖАНИЕМ ЦЕЛИ: если {@code heldHex} задан и там всё ещё
+     * стоит чужое здание, план строится ИМЕННО на эту цель.
+     *
+     * <p>Зачем понадобилось. Набег занимает три-четыре хода, а план
+     * пересчитывается каждый ход заново. На втором ходу рядом оказывалась цель
+     * подешевле и поближе — формула {@code цена / (1 + расстояние)} честно
+     * переключала бота на неё, войско разворачивалось, дорога проделывалась
+     * впустую. Удержание цели даёт агенту то, что он умеет: сравнить прежний
+     * курс с новым и сменить его только если новый ЗАМЕТНО лучше
+     * ({@code plan.commit}). Без кандидата на прежнюю цель этому сравнению
+     * просто нечего было сравнивать.
+     */
+    private static Plan strike(GameState s, int seat, Genome g, String heldHex) {
         PlayerState me = s.player(seat);
+        // Курсы очков берутся ИЗ СВОДА: иначе цели набега снова отстанут от
+        // правил, как отстала прежняя формула.
+        double debrisVp = ((Number) kelium.dataio.Ctx.rules(s)
+            .get("economy.debris_storage_vp_per_unit", 0.5)).doubleValue();
+        double cuTokenVp = kelium.dataio.Ctx.rules(s)
+            .getInt("command_center.destruction_token_vp", 3);
 
         // --- цель: лучшая по цене/дистанции среди чужих зданий ---
         List<String> myUnitHexes = new ArrayList<>();
@@ -364,11 +411,35 @@ public final class Plan {
                 if (dist < 0) {
                     continue;                    // недостижимо вовсе
                 }
-                double value = 1.0 + b.damage
-                    + (b.type == BuildingType.COMMAND_CENTER ? 3.0 : 0.0)
-                    + (b.type == BuildingType.MINER
-                        || b.type == BuildingType.POWER_PLANT ? 1.5 : 0.5);
+                // ЦЕНА ЦЕЛИ — В ПОБЕДНЫХ ОЧКАХ ПО КУРСУ СВОДА (24.08.2026).
+                //
+                // Прежняя формула («добытчик и станция 1.5, прочее 0.5, ЦУ +3»)
+                // ставила добытчик №1 за один трофей ВЫШЕ авиабазы за четыре, а
+                // завод и авиабазу — в «прочее». То есть бот целился не туда,
+                // где очки, а туда, куда решил автор формулы. Теперь считается
+                // ровно то, что игрок получит: трофей жетона по курсу обломка,
+                // а у ЦУ — напечатанные на жетоне уничтожения очки.
+                double value = b.type == BuildingType.COMMAND_CENTER
+                    ? cuTokenVp
+                    : b.trophyValue() * debrisVp;
+                // Жетон уходит с поля: владелец теряет ещё и свою четверть очка
+                // за «здания на поле», а с добытчика или станции — производство.
+                value += 0.25;
+                // Добить начатое дешевле, чем начать: накопленный урон — это уже
+                // вложенные боеприпасы.
+                value += 0.5 * b.damage;
                 double sc = value * (0.4 + riv.damageValue(other.seat)) / (1.0 + dist);
+                // УДЕРЖАНИЕ: заданная цель побеждает любую другую, но только
+                // пока она жива. Выбор «менять ли курс» остаётся за агентом.
+                if (heldHex != null) {
+                    if (heldHex.equals(b.hexId)) {
+                        bestScore = sc;
+                        target = b.hexId;
+                        targetDist = dist;
+                        break;
+                    }
+                    continue;
+                }
                 if (sc > bestScore) {
                     bestScore = sc;
                     target = b.hexId;
@@ -406,7 +477,18 @@ public final class Plan {
         // с порогом в один боеприпас бот шёл в набег, стрелял одиночным, царапал
         // цель с двумя прочностями и возвращался за патроном — уничтожения УПАЛИ
         // с 7.25 до 2.91 за партию. Залп по настоящей цели стоит 2-3 боеприпаса.
-        boolean haveAmmo = me.resources.ammo() >= 3;
+        // БОЕПРИПАСОВ — ПО ПРОЧНОСТИ ЦЕЛИ, А НЕ КОНСТАНТОЙ ТРИ (24.08.2026).
+        //
+        // Порог 3 ставился, когда каждая атака стоила один боеприпас. По своду
+        // 1.24.0 у жетона две атаки: универсальная за 2 и специальная за 1, то
+        // есть один жетон наносит 2 урона за 3 боеприпаса — примерно полтора
+        // боеприпаса за единицу прочности. Для казармы (прочность 1) хватает
+        // трёх, а на ЦУ (прочность 3) с тремя боеприпасами бот шёл
+        // недозаряженным: царапал цель и уходил. Ровно на этом провалился
+        // первый замер цепочки, только тогда число было другим.
+        int нужноУрона = Math.max(1, целевоеЗдоровье(s, target) );
+        int нужноБпр = Math.max(3, (int) Math.ceil(1.5 * нужноУрона));
+        boolean haveAmmo = me.resources.ammo() >= нужноБпр;
         boolean inPlace = targetDist <= 1;
 
         List<Step> steps = new ArrayList<>();
@@ -415,8 +497,8 @@ public final class Plan {
         steps.add(new Step("оно запитано", haveUnit || (mil != null && mil.powered()),
             "energy_swap", mil != null ? mil.uid : null, null));
         steps.add(Step.of("войско собрано", haveUnit, "assembly"));
-        steps.add(Step.of("боеприпасы на залп (" + me.resources.ammo() + " из 3)",
-            haveAmmo, "assembly"));
+        steps.add(Step.of("боеприпасы на залп (" + me.resources.ammo() + " из "
+            + нужноБпр + ")", haveAmmo, "assembly"));
         steps.add(Step.of("войско у цели (осталось " + Math.max(0, targetDist - 1)
             + " шагов)", inPlace, "movement"));
         steps.add(Step.of("кулак собран (" + nearTarget + " из " + Math.max(1, fistWant)
@@ -456,6 +538,84 @@ public final class Plan {
             }
         }
         return -1;
+    }
+
+    /**
+     * Сколько прочности осталось у самого крепкого чужого здания на гексе цели:
+     * именно его придётся продавить, чтобы залп не ушёл впустую.
+     */
+    private static int целевоеЗдоровье(GameState s, String hex) {
+        int max = 1;
+        for (PlayerState p : s.players) {
+            for (BuildingToken b : p.buildingsOnField()) {
+                if (hex.equals(b.hexId)) {
+                    max = Math.max(max, Math.max(1, b.hp - b.damage));
+                }
+            }
+        }
+        return max;
+    }
+
+    /**
+     * ЦЕПОЧКА ВОЕННОЙ ПОБЕДЫ: чужой жетон уничтожения ЦУ на руках — значит
+     * следующий снесённый ЦУ заканчивает партию.
+     *
+     * <p>Это не «набег покрупнее», а другая цель: цена её не в очках, а в самой
+     * партии, поэтому она обязана перевешивать всё остальное, пока выполнима.
+     * Цель фиксирована — ближайшее достижимое чужое ЦУ.
+     */
+    private static Plan warWin(GameState s, int seat, Genome g) {
+        PlayerState me = s.player(seat);
+        if (me.cuDestructionTokens < 1) {
+            return null;                      // побеждать пока нечем
+        }
+        List<String> myUnitHexes = new ArrayList<>();
+        for (kelium.core.UnitToken u : me.unitsOnField()) {
+            if (u.hexId != null) {
+                myUnitHexes.add(u.hexId);
+            }
+        }
+        String target = null;
+        int best = Integer.MAX_VALUE;
+        for (PlayerState other : s.players) {
+            if (other.seat == seat) {
+                continue;
+            }
+            for (BuildingToken b : other.buildingsOnField()) {
+                if (b.type != BuildingType.COMMAND_CENTER || b.hexId == null) {
+                    continue;
+                }
+                int dist = myUnitHexes.isEmpty() ? 6 : bfs(s, myUnitHexes, b.hexId);
+                if (dist >= 0 && dist < best) {
+                    best = dist;
+                    target = b.hexId;
+                }
+            }
+        }
+        if (target == null) {
+            return null;
+        }
+        int нужноБпр = Math.max(4, (int) Math.ceil(1.5 * целевоеЗдоровье(s, target)));
+        boolean haveUnit = !myUnitHexes.isEmpty();
+        int nearTarget = 0;
+        for (String h : myUnitHexes) {
+            int d = bfs(s, java.util.List.of(h), target);
+            if (d >= 0 && d <= 1) {
+                nearTarget++;
+            }
+        }
+        List<Step> steps = new ArrayList<>();
+        steps.add(Step.of("войско есть", haveUnit, "assembly"));
+        steps.add(Step.of("боеприпасы на снос ЦУ (" + me.resources.ammo()
+            + " из " + нужноБпр + ")", me.resources.ammo() >= нужноБпр, "assembly"));
+        steps.add(Step.of("войско у чужого ЦУ (осталось " + Math.max(0, best - 1)
+            + " шагов)", best <= 1, "movement"));
+        steps.add(Step.of("кулак у ЦУ (" + nearTarget + " из 2)",
+            nearTarget >= Math.min(2, Math.max(1, myUnitHexes.size())), "movement"));
+        steps.add(Step.of("сыграть Бой и выиграть партию", false, "combat"));
+        // Цена — сама партия. Ген оставлен, чтобы отбор мог решить, насколько
+        // рано бот бросает всё ради добивания.
+        return new Plan(Goal.WAR_WIN, target, steps, g.get("plan.value.war_win", 30.0));
     }
 
     /** Цепочка экономики: нет денег → нужна стройка источников дохода. */

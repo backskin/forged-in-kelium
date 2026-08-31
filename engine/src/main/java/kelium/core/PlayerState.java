@@ -240,22 +240,20 @@ public final class PlayerState {
     // первым разрушит его ЦУ. После отдачи повторное разрушение не даёт ничего.
     public boolean ownCuTokenAvailable = true;
     /**
-     * КАКОЙ РОД ВОЙСК ЗАПЕЧАТАН СОБСТВЕННЫМ ЖЕТОНОМ (решение дизайнера
-     * 25.08.2026). Жетон разрушения ЦУ — это КРАСНЫЙ жетон, и лицом он лежит на
-     * планшете владельца, ЗАВАРИВАЯ ячейку специальной атаки одного рода: этот
-     * род бьёт только универсальной за 2 боеприпаса.
+     * ГЛУХОЙ ЖЕТОН — ИД СОБСТВЕННОГО ЖЕТОНА УНИЧТОЖЕНИЯ ЦУ в раскладке красных
+     * модулей (решение дизайнера 25.08.2026).
      *
-     * <p>ЗАЧЕМ ТАК. Во-первых, компонентов не прибавляется: жетон разрушения и
-     * так нужен, а теперь он с первого раунда объясняет игроку саму механику
-     * ячейки под модуль — её видно на своём планшете, а не когда-нибудь потом.
-     * Во-вторых, снос ЦУ перестаёт быть только потерей: жетон уезжает к
-     * захватчику, и ячейка РАСПЕЧАТЫВАЕТСЯ — чем сильнее тебя бьют, тем
-     * свободнее твой планшет.
+     * <p>Жетон уничтожения ЦУ — не отдельная сущность и не «пломба намертво». Это
+     * ТАКОЙ ЖЕ жетон модуля атаки, только глухой: он закрывает ячейку и ничего
+     * не открывает. Значит он и живёт там же, где остальные модули — в
+     * {@link #redPlacements}, — и двигается теми же средствами (обмен на планшете
+     * науки за обломок, утиль карт заданий). Игрок переставляет его на тот род,
+     * которым сейчас не воюет.
      *
-     * <p>Печать снимается сама: она действует, только пока
-     * {@link #ownCuTokenAvailable} истинно.
+     * <p>Снесли твоё ЦУ — жетон уезжает к захватчику (3 ПО), запись из раскладки
+     * пропадает, и ячейка открывается сама.
      */
-    public UnitType sealedUnit = null;
+    public static final String CU_MODULE = "cu";
 
     /** Сколько тайлов зарождения выработано ДО КОНЦА (оборот) — всего. */
     public int claimedSpawnTiles = 0;
@@ -295,6 +293,20 @@ public final class PlayerState {
      * меняется, пока его явно не включат в опыте.
      */
     public int killsTotal = 0;
+
+    // === СУПЕР-ЗАДАНИЯ 5.0 («суперутиль или накопитель», черновик 25.08.2026) ===
+    /** Карта 5.0, розданная втайне при подготовке; null — режим выключен. */
+    public String super5Card = null;
+    /** Сожжена ли карта ради суперутиля (накопитель тогда пропал). */
+    public boolean super5Burned = false;
+    /** Сколько раундов игрок начинал первым (накопитель «Штабной игры»). */
+    public int super5RoundsFirst = 0;
+    /** Разрушалось ли ЦУ игрока хоть раз («Трофейный обоз», «Тень штаба»). */
+    public boolean super5CuEverLost = false;
+    /** Глухой жетон изъят из игры навсегда («Тень штаба»): снос ЦУ не даёт оборота. */
+    public boolean super5SealRemoved = false;
+    /** Выполнено заданий за партию (накопитель «Архива штаба»). */
+    public int objectivesCompleted = 0;
 
     public PlayerState(int seat, PlayerBoard board, Resources resources, String startHex) {
         this.seat = seat;
@@ -373,7 +385,6 @@ public final class PlayerState {
         p.mandateContainers = mandateContainers;
         p.cuDestructionTokens = cuDestructionTokens;
         p.ownCuTokenAvailable = ownCuTokenAvailable;
-        p.sealedUnit = sealedUnit;
         p.claimedSpawnTiles = claimedSpawnTiles;
         p.claimedStartTiles = claimedStartTiles;
         p.claimedNormalTiles = claimedNormalTiles;
@@ -382,6 +393,12 @@ public final class PlayerState {
         p.warTrackVp = warTrackVp;
         p.cuKills = cuKills;
         p.killsTotal = killsTotal;
+        p.super5Card = super5Card;
+        p.super5Burned = super5Burned;
+        p.super5RoundsFirst = super5RoundsFirst;
+        p.super5CuEverLost = super5CuEverLost;
+        p.super5SealRemoved = super5SealRemoved;
+        p.objectivesCompleted = objectivesCompleted;
         return p;
     }
 
