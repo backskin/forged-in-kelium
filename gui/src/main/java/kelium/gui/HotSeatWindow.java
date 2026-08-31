@@ -274,7 +274,7 @@ public final class HotSeatWindow {
         zoom = new ZoomCard();
         // Выше прежнего: под лицом карты теперь помещается весь печатный текст
         // (условие, награда, усиленная награда, утиль), а не одна строка.
-        zoom.setSize(Theme.px(250), Theme.px(400));
+        zoom.setSize(Theme.px(300), Theme.px(420));
         zoom.setVisible(false);
         frame.getLayeredPane().add(zoom, JLayeredPane.POPUP_LAYER);
 
@@ -1691,6 +1691,29 @@ public final class HotSeatWindow {
     }
 
     /** Дописать кусок текста карты — пустые молча пропускаются. */
+    /** Виды решений «выбери карту» и набор, откуда брать её текст. */
+    private static final Map<String, String> CARD_PICKS = Map.of(
+        "super_pick", "super_objectives",
+        "start_objective_pick", "objectives");
+
+    /**
+     * ВЕСЬ ПЕЧАТНЫЙ ТЕКСТ КАРТЫ — то же, что показывает увеличенная карта при
+     * наведении: игрок выбирает по содержанию, а не по имени.
+     */
+    private String cardFullText(String набор, String id) {
+        StringBuilder t = new StringBuilder();
+        Object печатный = cardField(набор, id, "текст_карты");
+        добавить(t, "", печатный == null ? null : String.valueOf(печатный));
+        Object описание = cardField(набор, id, "описание");
+        добавить(t, "", описание == null ? null : String.valueOf(описание));
+        if ("objectives".equals(набор)) {
+            добавить(t, "НАГРАДА: ", objectiveReward(id));
+            добавить(t, "УСИЛЕННАЯ: ", objectiveBonus(id));
+            добавить(t, "УТИЛЬ (сжечь): ", objectiveTop(id));
+        }
+        return t.toString();
+    }
+
     /** Разделитель абзацев в тексте карты — ровно один символ. */
     private static final char ПЕРЕВОД = (char) 10;
 
@@ -1866,6 +1889,40 @@ public final class HotSeatWindow {
                 frame.toFront();
                 return;
             }
+        }
+
+        // ВЫБОР КАРТЫ ПОДГОТОВКИ — ВЕЕРОМ ПО ЦЕНТРУ, С ЗАТЕНЕНИЕМ, как выбор
+        // карты круга (просьба дизайнера 31.08.2026). Прежде супер-задание и
+        // стартовое задание выбирались двумя плашками с ОДНИМ ИМЕНЕМ карты:
+        // игрок выбирал вслепую, не видя ни условия, ни награды.
+        if (CARD_PICKS.containsKey(kind)
+                && options.stream().allMatch(c -> c.payload() instanceof String)
+                && !options.isEmpty()) {
+            actionBar.idle("не сейчас");
+            endBtn.setTexts("Сначала решение", KIND_LABELS.getOrDefault(kind, kind));
+            endBtn.setState(KpButton.State.DISABLED);
+            zoom.setVisible(false);
+            String набор = CARD_PICKS.get(kind);
+            List<kelium.gui.kp.CardChoiceOverlay.Card> cards = new ArrayList<>();
+            for (int i = 0; i < options.size(); i++) {
+                String id = (String) options.get(i).payload();
+                int idx = i;
+                cards.add(new kelium.gui.kp.CardChoiceOverlay.Card(id, null,
+                    cardName(id), cardFullText(набор, id), () -> {
+                        ceremony.close();
+                        agent.submitIndex(idx);
+                        clearDecision();
+                    }));
+            }
+            boolean супер = "super_pick".equals(kind);
+            ceremony.open(
+                супер ? "Выберите супер-задание" : "Выберите стартовое задание",
+                супер ? "Оно лежит открытым всю партию: соперники видят, к чему вы идёте"
+                    : "Задание отправится к вам в руку",
+                cards);
+            refreshSteps();
+            frame.toFront();
+            return;
         }
 
         // ВЫБОР ДУГИ СЕКТОРОВ (концепт §4): движок уже назвал гекс и варианты,
@@ -2231,9 +2288,57 @@ public final class HotSeatWindow {
     }
 
     /** Печатное «описание» карты приказа — как она играется. */
+    /**
+     * ПРИКАЗ СЛОВАМИ — то, что во всплывашке заменило картинку карты: какие
+     * действия даёт верхняя половина, какие нижняя и когда та открывается.
+     * Одного «описания» было мало — по нему нельзя было понять даже, что
+     * играешь.
+     */
     private String orderDesc(String id) {
         Map<String, Object> d = orderData(id);
-        Object t = d == null ? null : d.get("описание");
-        return t == null ? "" : String.valueOf(t);
+        if (d == null) {
+            return "";
+        }
+        StringBuilder t = new StringBuilder();
+        if (Boolean.TRUE.equals(d.get("joker"))) {
+            добавить(t, "БЕЗОПАСНОСТЬ: ", "любые два РАЗНЫХ действия игры из восьми. "
+                + "Нижнего приказа нет; правилу совпадения карта не подчиняется");
+        } else {
+            добавить(t, "ВЕРХНИЙ ПРИКАЗ: ", половинаСловами(d.get("top"),
+                "оба действия ваши; если тот же приказ вскрыли раньше вас "
+                    + "в этом круге — только одно на выбор"));
+            добавить(t, "НИЖНИЙ ПРИКАЗ: ", половинаСловами(d.get("bottom"),
+                "одно действие, и только если этот приказ сверху вскрыл кто-то, "
+                    + "чья очередь в круге прошла раньше вашей"));
+        }
+        if (Boolean.TRUE.equals(d.get("maneuver"))) {
+            добавить(t, "МАНЁВР: ", "СПЕЦ-действие — переместить один свой жетон "
+                + "войска на его скорость. Не открывает Операцию и не тратит боеприпасы");
+        }
+        Object о = d.get("описание");
+        добавить(t, "", о == null ? null : String.valueOf(о));
+        return t.toString();
+    }
+
+    /** «ОПЕРАЦИЯ — манёвр, бой; <как играется>» либо null, если половины нет. */
+    private String половинаСловами(Object код, String какИграется) {
+        if (!(код instanceof String cat) || cat.isBlank()) {
+            return null;
+        }
+        StringBuilder t = new StringBuilder(kelium.gui.kp.ActionIcons.categoryRu(cat));
+        List<String> действия = kelium.gui.kp.ActionIcons.CATEGORY_ACTIONS
+            .getOrDefault(cat, List.of());
+        if (!действия.isEmpty()) {
+            t.append(" — ");
+            for (int i = 0; i < действия.size(); i++) {
+                if (i > 0) {
+                    t.append(", ");
+                }
+                t.append(ActionBar.ACTIONS.getOrDefault(действия.get(i), действия.get(i))
+                    .toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        t.append(". ").append(какИграется);
+        return t.toString();
     }
 }

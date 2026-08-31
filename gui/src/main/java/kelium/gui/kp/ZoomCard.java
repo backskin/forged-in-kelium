@@ -14,15 +14,17 @@ import javax.swing.JComponent;
 import kelium.gui.replay2.Theme;
 
 /**
- * УВЕЛИЧЕННАЯ КАРТА ПРИ НАВЕДЕНИИ (приём Hearthstone): миниатюра в руке мелкая,
- * полный текст всплывает рядом — НЕ под курсором, чтобы не перекрывать руку.
- * Живёт в POPUP-слое окна.
+ * КАРТА ПОД КУРСОРОМ — РАЗБОРЧИВЫМ ТЕКСТОМ. Всплывает рядом с рукой, не под
+ * курсором, чтобы не перекрывать карты. Живёт в POPUP-слое окна.
  *
- * <p>РАМКА ОДНА. Прежде увеличенный приказ рисовался картой ВНУТРИ карты:
- * подложка со своей цветной шапкой и обводкой, а в ней — настоящее лицо карты
- * со своей шапкой и обводкой (дизайнер 31.08.2026: «че за глупая шапка дважды —
- * карта, а внутри как будто ещё карта»). Теперь у приказа лицо карты и ЕСТЬ
- * подложка, а печатное описание лежит под ним на общем листе.
+ * <p>КАРТИНКИ КАРТЫ ЗДЕСЬ НЕТ. Сама карта уже нарисована в руке, и повторять её
+ * во всплывашке — значит отдать всё место второму экземпляру того же рисунка и
+ * ужать текст до нечитаемого (дизайнер 31.08.2026: «зачем в приказе popup
+ * копировать карту, если можно укрупнить текст и убрать эту карту — просто
+ * текстом подробно описать»). Всё окно отдано тексту, и текст крупный.
+ *
+ * <p>ПУСТОЙ ЭТА КАРТОЧКА БЫТЬ НЕ МОЖЕТ: не нашлось ни строчки — так и написано,
+ * потому что молчащая белая карточка неотличима от поломки.
  */
 public final class ZoomCard extends JComponent {
 
@@ -31,13 +33,11 @@ public final class ZoomCard extends JComponent {
     private Color band = Theme.border();
     private String detail = "";
     private double progress = -1;
-    private OrderCardFace.Info orderInfo;
     private final Anim fade = new Anim();
 
     public void show(String name, String typeLabel, Color band, String detail, double progress) {
-        this.orderInfo = null;
-        this.name = name;
-        this.typeLabel = typeLabel;
+        this.name = name == null ? "" : name;
+        this.typeLabel = typeLabel == null ? "" : typeLabel;
         this.band = band;
         this.detail = detail == null ? "" : detail;
         this.progress = progress;
@@ -46,21 +46,10 @@ public final class ZoomCard extends JComponent {
         fade.play(1, 120, v -> repaint(), null);
     }
 
-    /** Увеличенный ПРИКАЗ: настоящее лицо карты + печатное описание. */
+    /** Приказ — тем же текстом, что и остальные карты. */
     public void showOrder(OrderCardFace.Info info, String name, String description) {
-        this.name = name;
-        this.typeLabel = "Приказ";
-        this.band = ActionIcons.deckColor(info == null ? null : info.deck());
-        this.detail = description == null ? "" : description;
-        this.progress = -1;
-        // ЛИЦО НАЗНАЧАЕТСЯ ДО ПОКАЗА. Раньше showOrder звал show(), который
-        // обнулял лицо, и только потом ставил его обратно — первый кадр
-        // появления успевал нарисоваться обычной карточкой, и поверх листа
-        // оставалась её цветная шапка.
-        this.orderInfo = info;
-        setVisible(true);
-        fade.snap(0);
-        fade.play(1, 120, v -> repaint(), null);
+        show(name, "Приказ", ActionIcons.deckColor(info == null ? null : info.deck()),
+            description, -1);
     }
 
     @Override
@@ -73,72 +62,82 @@ public final class ZoomCard extends JComponent {
         int w = getWidth() - Theme.px(6);
         int h = getHeight() - Theme.px(8);
         int arc = Theme.px(12);
-        int pad = Theme.px(12);
+        int pad = Theme.px(14);
 
         g.setColor(new Color(0, 0, 0, 110));
         g.fillRoundRect(Theme.px(4), Theme.px(6), w, h, arc, arc);
         g.setColor(Theme.tile());
         g.fillRoundRect(0, 0, w, h, arc, arc);
+        g.setColor(band);
+        g.fillRoundRect(0, 0, w, Theme.px(18), arc, arc);
+        g.fillRect(0, Theme.px(10), w, Theme.px(8));
 
-        int y;
-        if (orderInfo != null) {
-            // ЛИЦО КАРТЫ И ЕСТЬ ПОДЛОЖКА, и лежит оно ВРОВЕНЬ с краем: у карты
-            // своя шапка и своя обводка, и всякая рамка вокруг читается второй
-            // картой («карта, а внутри как будто ещё карта»). Видимый край
-            // ровно один — край самой карты.
-            int faceH = Math.min((int) (w * 1.30), (int) (h * 0.66));
-            OrderCardFace.paint(g, orderInfo, 0, 0, w, faceH, false);
-            y = faceH + Theme.px(8);
-        } else {
-            g.setColor(band);
-            g.fillRoundRect(0, 0, w, Theme.px(16), arc, arc);
-            g.fillRect(0, Theme.px(9), w, Theme.px(7));
-            y = Theme.px(24);
-            g.setFont(Theme.font(10, Font.BOLD));
-            g.setColor(Theme.ink3());
-            g.drawString(typeLabel.toUpperCase(java.util.Locale.ROOT), pad, y + Theme.px(4));
-            y += Theme.px(14);
-            g.setFont(Theme.font(14.5, Font.BOLD));
-            g.setColor(Theme.ink());
-            FontMetrics fm = g.getFontMetrics();
-            for (String line : CardTile.wrap(name, fm, w - pad * 2, 3)) {
-                y += fm.getHeight();
-                g.drawString(line, pad, y);
-            }
-            if (progress >= 0) {
-                y += Theme.px(14);
-                int barW = w - pad * 2;
-                int barH = Theme.px(8);
-                g.setColor(Theme.bg());
-                g.fillRoundRect(pad, y, barW, barH, barH, barH);
-                g.setColor(Theme.kelium());
-                g.fillRoundRect(pad, y, (int) Math.round(barW * Math.min(1, progress)),
-                    barH, barH, barH);
-                g.setColor(Theme.border());
-                g.drawRoundRect(pad, y, barW, barH, barH, barH);
-                y += barH + Theme.px(6);
-            }
-            y += Theme.px(8);
+        int y = Theme.px(32);
+        g.setFont(Theme.font(10.5, Font.BOLD));
+        g.setColor(Theme.ink3());
+        g.drawString(typeLabel.toUpperCase(java.util.Locale.ROOT), pad, y);
+        y += Theme.px(8);
+
+        g.setFont(Theme.font(17, Font.BOLD));
+        g.setColor(Theme.ink());
+        FontMetrics fm = g.getFontMetrics();
+        for (String line : CardTile.wrap(name, fm, w - pad * 2, 3)) {
+            y += fm.getHeight();
+            g.drawString(line, pad, y);
         }
 
-        paintDetail(g, pad, y, w - pad * 2, h - pad);
-
-        if (orderInfo == null) {
+        if (progress >= 0) {
+            y += Theme.px(12);
+            int barW = w - pad * 2;
+            int barH = Theme.px(9);
+            g.setColor(Theme.bg());
+            g.fillRoundRect(pad, y, barW, barH, barH, barH);
+            g.setColor(Theme.kelium());
+            g.fillRoundRect(pad, y, (int) Math.round(barW * Math.min(1, progress)),
+                barH, barH, barH);
             g.setColor(Theme.border());
-            g.setStroke(new BasicStroke(Theme.pxf(1.2)));
-            g.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
+            g.drawRoundRect(pad, y, barW, barH, barH, barH);
+            y += barH;
+            g.setFont(Theme.font(10, Font.PLAIN));
+            g.setColor(Theme.ink3());
+            y += g.getFontMetrics().getHeight();
+            g.drawString("выполнено " + Math.round(progress * 100) + "%", pad, y);
         }
+
+        y += Theme.px(10);
+        g.setColor(Theme.divider());
+        g.fillRect(pad, y, w - pad * 2, 1);
+        y += Theme.px(4);
+
+        paintDetail(g, pad, y, w - pad * 2, h - Theme.px(8));
+
+        g.setColor(Theme.border());
+        g.setStroke(new BasicStroke(Theme.pxf(1.2)));
+        g.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
         g.dispose();
     }
 
+    /** Начинается ли подпись абзаца словом из ЗАГЛАВНЫХ («НАГРАДА», «УТИЛЬ»). */
+    private static boolean заглавноеСлово(String подпись) {
+        String обрезанная = подпись.trim();
+        int пробел = обрезанная.indexOf(' ');
+        String первое = пробел < 0 ? обрезанная : обрезанная.substring(0, пробел);
+        return первое.length() >= 3
+            && первое.equals(первое.toUpperCase(java.util.Locale.ROOT));
+    }
+
     /**
-     * ТЕКСТ КАРТЫ АБЗАЦАМИ. Куски приходят разделёнными пустой строкой —
-     * условие, награда, усиленная награда, утиль, — и слипаться им нельзя:
-     * иначе «НАГРАДА» читается как продолжение условия. Подписи-заголовки
-     * («НАГРАДА:», «УТИЛЬ (сжечь):») выделяются отдельной строкой.
+     * ТЕКСТ КАРТЫ АБЗАЦАМИ. Куски приходят разделёнными переводом строки —
+     * условие, печатный текст, награда, усиленная награда, утиль, — и слипаться
+     * им нельзя: иначе «НАГРАДА» читается как продолжение условия. Подпись
+     * абзаца («НАГРАДА:», «УТИЛЬ (сжечь):») выносится отдельной строкой.
      */
     private void paintDetail(Graphics2D g, int x, int y, int w, int bottom) {
         if (detail.isBlank()) {
+            g.setFont(Theme.italic());
+            g.setColor(Theme.ink3());
+            g.drawString("текста карты нет в наборе партии",
+                x, y + g.getFontMetrics().getHeight());
             return;
         }
         for (String кусок : detail.split(String.valueOf((char) 10))) {
@@ -147,24 +146,26 @@ public final class ZoomCard extends JComponent {
             }
             String абзац = кусок;
             int двоеточие = абзац.indexOf(": ");
-            boolean заголовок = двоеточие > 0 && двоеточие < 20
-                && абзац.substring(0, двоеточие).equals(
-                    абзац.substring(0, двоеточие).toUpperCase(java.util.Locale.ROOT));
+            // ЗАГОЛОВОК УЗНАЁТСЯ ПО ПЕРВОМУ СЛОВУ. Сравнивать с ЗАГЛАВНЫМИ всю
+            // подпись нельзя: «УТИЛЬ (сжечь)» заглавным целиком не является и
+            // заголовком не считался.
+            boolean заголовок = двоеточие > 0 && двоеточие < 22
+                && заглавноеСлово(абзац.substring(0, двоеточие));
             if (заголовок) {
-                g.setFont(Theme.font(9.5, Font.BOLD));
-                g.setColor(Theme.ink3());
+                g.setFont(Theme.font(10, Font.BOLD));
+                g.setColor(Theme.accent());
                 FontMetrics hf = g.getFontMetrics();
-                y += hf.getHeight();
+                y += hf.getHeight() + Theme.px(2);
                 if (y > bottom) {
                     return;
                 }
                 g.drawString(абзац.substring(0, двоеточие), x, y);
                 абзац = абзац.substring(двоеточие + 2);
             }
-            g.setFont(Theme.font(11, Font.PLAIN));
+            g.setFont(Theme.font(12.5, Font.PLAIN));
             g.setColor(заголовок ? Theme.ink() : Theme.ink2());
             FontMetrics fm = g.getFontMetrics();
-            List<String> строки = CardTile.wrap(абзац, fm, w, 8);
+            List<String> строки = CardTile.wrap(абзац, fm, w, 14);
             for (String line : строки) {
                 y += fm.getHeight();
                 if (y > bottom) {
@@ -172,7 +173,7 @@ public final class ZoomCard extends JComponent {
                 }
                 g.drawString(line, x, y);
             }
-            y += Theme.px(6);
+            y += Theme.px(8);
         }
     }
 }
