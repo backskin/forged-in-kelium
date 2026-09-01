@@ -90,7 +90,7 @@ public final class OrderCardFace {
             w - 2 * pad, half - pad, Theme.ink3(), true);
 
         if (info.maneuver()) {
-            paintManeuverPlate(g, x, y, w, h, dim);
+            paintManeuverPlate(g, x, y, w, h, arc, dim);
         }
     }
 
@@ -150,11 +150,16 @@ public final class OrderCardFace {
 
     /** Плашка манёвра — печатный уголок со стрелкой (спец-ход одним жетоном). */
     private static void paintManeuverPlate(Graphics2D g, int x, int y, int w, int h,
-                                            boolean dim) {
+                                            int arc, boolean dim) {
         int pw = Math.max(14, w / 3);
         int ph = Math.max(9, h / 10);
-        int px = x + w - pw - 3;
-        int py = y + h - ph - 3;
+        // ОТСТУП ОТ УГЛА СЧИТАЕТСЯ ОТ РАДИУСА СКРУГЛЕНИЯ САМОЙ КАРТЫ, а не
+        // фиксированными 3px: у крупных карт (маленький кегль веера) arc растёт
+        // быстрее плашки, и жёсткий отступ выпускал плашку за скруглённый угол
+        // (снято на ревью «Командного пункта» — плашка торчала за рамку карты).
+        int margin = Math.max(3, arc / 2);
+        int px = x + w - pw - margin;
+        int py = y + h - ph - margin;
         g.setColor(dim ? Theme.hover() : Theme.alpha(Theme.kelium(), 0.25));
         g.fillRoundRect(px, py, pw, ph, ph, ph);
         g.setColor(dim ? Theme.border() : Theme.kelium());
