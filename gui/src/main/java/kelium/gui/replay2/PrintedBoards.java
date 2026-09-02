@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.Map;
@@ -161,6 +162,9 @@ final class PrintedBoards {
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
         g.drawImage(art, x, y, width, h, null);
+        // Рамки ячеек КАЖДОГО складского здания: по ним ляжет сам жетон, если он
+        // ещё на планшете (см. ниже, жетонПоверхЯчеек).
+        Map<String, Rectangle> зоны = new java.util.LinkedHashMap<>();
         int seen = 0;
         int lastLevel = -1;
         String lastGroup = "";
@@ -184,21 +188,74 @@ final class PrintedBoards {
             }
             seen++;
             if (!open) {
-                // Ячейка накрыта своим жетоном — в игре её нет. Затемняем ЛЕГКО:
-                // печатная ячейка должна остаться узнаваемой, иначе планшет
-                // превращается в поле чёрных квадратов.
-                g.setColor(Theme.alpha(Theme.ink(), 0.28));
-                g.fill(new RoundRectangle2D.Double(box.x, box.y, box.width, box.height,
-                    box.width * 0.22, box.width * 0.22));
-                g.setColor(Theme.alpha(Color.WHITE, 0.9));
-                g.setStroke(new BasicStroke(Math.max(1.2f, (float) (box.width * 0.045))));
-                int pad = (int) (box.width * 0.26);
-                g.drawLine(box.x + pad, box.y + pad,
-                    box.x + box.width - pad, box.y + box.height - pad);
+                // ЯЧЕЙКА НАКРЫТА СВОИМ ЖЕТОНОМ — и жетон мы сейчас на неё и
+                // положим, поэтому здесь только запоминаем рамки. Раньше на
+                // месте накрытых ячеек стоял серый крестик, а сам жетон
+                // рисовался ОТДЕЛЬНОЙ группой ниже: одно и то же здание было на
+                // листе дважды (жалоба дизайнера 02.09.2026).
+                String key = ("miner".equals(c.group()) ? "miner-" : "plant-") + c.level();
+                зоны.merge(key, box, PrintedBoards::объединить);
             } else if (has != 0) {
                 cube(g, box, has);
             }
         }
+        for (var e : зоны.entrySet()) {
+            жетонПоверхЯчеек(g, e.getKey(), e.getValue(), p.seat);
+        }
+    }
+
+    private static Rectangle объединить(Rectangle a, Rectangle b) {
+        return a.union(b);
+    }
+
+    /**
+     * ЖЕТОН ЗДАНИЯ ПОВЕРХ СВОИХ ПЕЧАТНЫХ ЯЧЕЕК — так, как он лежит на столе.
+     *
+     * <p>Пока здание не построено, его жетон лежит на планшете и закрывает собой
+     * ячейки хранилища. Показывать это крестиком было и скучно, и неправдиво:
+     * игрок за столом видит НАСТОЯЩИЙ силуэт добытчика или энергостанции.
+     *
+     * <p>ПОВОРОТ выбирается по форме места: если рамка ячеек лежит вдоль, а
+     * силуэт вытянут поперёк (или наоборот), жетон кладётся на 90°. Плюс
+     * небольшой наклон в 8° — жетон на столе никогда не лежит идеально ровно, и
+     * именно наклон отличает «положили» от «нарисовали».
+     */
+    private static void жетонПоверхЯчеек(Graphics2D g, String key, Rectangle box, int seat) {
+        String code = key.startsWith("miner") ? "miner" : "power_plant";
+        kelium.report.FieldGeometry.Shape sh;
+        try {
+            sh = kelium.report.FieldGeometry.buildingByCode(code);
+        } catch (RuntimeException e) {
+            return;
+        }
+        boolean боком = (box.width >= box.height) != (sh.vbW() >= sh.vbH());
+        double уголГрад = (боком ? 90 : 0) + 8;
+        double угол = Math.toRadians(уголГрад);
+        // Габарит силуэта ПОСЛЕ поворота — иначе повёрнутый жетон вылезает за
+        // свои ячейки ровно на столько, на сколько его развернули.
+        double cos = Math.abs(Math.cos(угол));
+        double sin = Math.abs(Math.sin(угол));
+        double wRot = sh.vbW() * cos + sh.vbH() * sin;
+        double hRot = sh.vbW() * sin + sh.vbH() * cos;
+        double k = Math.min(box.width * 0.94 / wRot, box.height * 0.94 / hRot);
+        AffineTransform at = new AffineTransform();
+        at.translate(box.getCenterX(), box.getCenterY());
+        at.rotate(угол);
+        at.scale(k, k);
+        at.translate(-sh.vbW() / 2.0, -sh.vbH() / 2.0);
+        java.awt.Shape path = at.createTransformedShape(sh.path());
+
+        // Тень под жетоном: без неё силуэт читается как печать, а не как
+        // положенный сверху картонный жетон.
+        AffineTransform тень = new AffineTransform();
+        тень.translate(Math.max(1.5, k * 6), Math.max(1.5, k * 6));
+        g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.28));
+        g.fill(тень.createTransformedShape(path));
+        g.setColor(Theme.seat(seat));
+        g.fill(path);
+        g.setColor(Theme.seatStroke(seat));
+        g.setStroke(new BasicStroke(Math.max(1.2f, (float) (k * 3))));
+        g.draw(path);
     }
 
     /** Кубик ресурса в напечатанной ячейке: тем же значком, что и везде. */

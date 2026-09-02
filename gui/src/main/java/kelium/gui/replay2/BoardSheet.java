@@ -238,7 +238,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             y = paintTroops(g, f, p, pad, y, full) + px(12);
         }
 
-        int yLeft = paintBuildings(g, f, p, pad, y, leftW);
+        int yLeft = paintBuildings(g, f, p, pad, y, leftW, printed);
         if (printed) {
             // Планшет хранилища идёт ПОСЛЕ зданий: ячейки на нём открывают
             // именно они, и читается это сверху вниз, как на столе. Ширина —
@@ -248,7 +248,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 cellFill, startFill, coveredCells(buildingsOf(f, p.seat)));
             yLeft += px(10) + PrintedBoards.storageHeight(p.side, sw) + px(6);
         }
-        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW);
+        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
 
         int yRight = paintModulesAndCards(g, p, rightX, y, rightW);
         int cardH = px(180);
@@ -281,7 +281,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * работает на столе.
      */
     private int paintBuildings(Graphics2D g, ReplayRecord.Frame f, ReplayRecord.Player p,
-                               int x, int y, int w) {
+                               int x, int y, int w, boolean печатный) {
         buildingSpots.clear();
         moduleSpots.clear();
         storeTokenSpots.clear();
@@ -294,12 +294,23 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             slot("command_center", null), slot("barracks", null),
             slot("factory", null), slot("airbase", null)), x, y, w, cell, gap,
             Under.BLUE_MODULE);
-        y = paintGroup(g, p, "ДОБЫТЧИКИ", roster(all,
-            slot("miner", 1), slot("miner", 2), slot("miner", 3), slot("miner", 4)),
-            x, y, w, cell, gap, Under.STORAGE_CELLS);
-        y = paintGroup(g, p, "ЭНЕРГОСТАНЦИИ", roster(all,
-            slot("power_plant", 1), slot("power_plant", 2), slot("power_plant", 3),
-            slot("power_plant", 4)), x, y, w, cell, gap, Under.STORAGE_CELLS);
+        // ДОБЫТЧИКИ И ЭНЕРГОСТАНЦИИ — ТОЛЬКО НА ПЕЧАТНОМ ПЛАНШЕТЕ, если он есть
+        // (жалоба дизайнера 02.09.2026: «нахуя дублируется инфа о зданиях и
+        // ячейках»). Их жетоны лежат прямо на картинке планшета хранилища
+        // поверх своих ячеек, повёрнутые, как на столе, — рисовать те же
+        // четыре добытчика ещё раз отдельной группой, да ещё с копией их
+        // ячеек, значило бы показывать одно и то же дважды.
+        //
+        // Военные здания остаются здесь: на планшете войск их жетонов нет, там
+        // только колонки родов и места под синие модули.
+        if (!печатный) {
+            y = paintGroup(g, p, "ДОБЫТЧИКИ", roster(all,
+                slot("miner", 1), slot("miner", 2), slot("miner", 3), slot("miner", 4)),
+                x, y, w, cell, gap, Under.STORAGE_CELLS);
+            y = paintGroup(g, p, "ЭНЕРГОСТАНЦИИ", roster(all,
+                slot("power_plant", 1), slot("power_plant", 2), slot("power_plant", 3),
+                slot("power_plant", 4)), x, y, w, cell, gap, Under.STORAGE_CELLS);
+        }
         return y;
     }
 
@@ -738,8 +749,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * ячейках ПОД СВОИМИ ЗДАНИЯМИ выше — рисовать его ещё раз отдельной линией
      * значит показывать одно и то же дважды (замечание дизайнера 13.08.2026).
      */
-    private int paintStorage(Graphics2D g, ReplayRecord.Player p, int x, int y, int w) {
-        caption(g, "ХРАНИЛИЩЕ", x, y);
+    private int paintStorage(Graphics2D g, ReplayRecord.Player p, int x, int y, int w,
+                             boolean печатный) {
+        // ПЕЧАТНЫЕ ЯЧЕЙКИ НЕ ПОВТОРЯЕМ. Свои ячейки склада уже нарисованы на
+        // картинке планшета хранилища вместе с тем, что в них лежит; здесь
+        // остаётся только то, чего на печати нет: ячейки от жетонов модуля и
+        // площадка под свободные кубики энергии.
+        caption(g, печатный ? "ХРАНИЛИЩЕ: ЖЕТОНЫ МОДУЛЯ И СВОБОДНАЯ ЭНЕРГИЯ"
+            : "ХРАНИЛИЩЕ", x, y);
         y += px(14);
         int cell = px(26);
         int gap = px(6);
@@ -752,15 +769,17 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // по нему нельзя было понять, что даёт жетон и куда кладут лишние кубики.
         g.setFont(font(10, Font.PLAIN));
         g.setColor(Theme.ink3());
-        g.drawString("свои ячейки:", x, cy + px(16));
-        cx = x + g.getFontMetrics().stringWidth("свои ячейки:") + px(8);
-        for (int i = 0; i < startFill.length; i++) {
-            paintSquareCell(g, cx, cy, cell, true);
-            if (startFill[i] != 0) {
-                MarkIcons.paint(g, cellIcon(startFill[i]), cx + cell / 2.0,
-                    cy + cell / 2.0, cell * 0.62, cellIconColour(startFill[i]));
+        if (!печатный) {
+            g.drawString("свои ячейки:", x, cy + px(16));
+            cx = x + g.getFontMetrics().stringWidth("свои ячейки:") + px(8);
+            for (int i = 0; i < startFill.length; i++) {
+                paintSquareCell(g, cx, cy, cell, true);
+                if (startFill[i] != 0) {
+                    MarkIcons.paint(g, cellIcon(startFill[i]), cx + cell / 2.0,
+                        cy + cell / 2.0, cell * 0.62, cellIconColour(startFill[i]));
+                }
+                cx += cell + gap;
             }
-            cx += cell + gap;
         }
 
         // ---- ЯЧЕЙКИ ОТ ЖЕТОНОВ МОДУЛЯ: их ровно две, и каждая открывается своим
