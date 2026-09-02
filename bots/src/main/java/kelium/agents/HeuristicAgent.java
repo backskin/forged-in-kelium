@@ -2368,7 +2368,14 @@ public class HeuristicAgent extends Agent {
      * ровно симптом отсутствия этого сравнения.
      */
     private double scoreObjectiveBurn(GameState state, String cid) {
-        double base = 1.5;   // утиль верха — печатное значение не переоценивается заново
+        // ЦЕНА ВЕРХА СПРАШИВАЕТСЯ У САМОГО ВЕРХА (правка 02.09.2026). Раньше
+        // здесь стояла плоская 1.5 с прямой оговоркой «печатное значение не
+        // переоценивается заново» - то есть щит без войск под ударом, атака без
+        // цели и Рынок без келемия стоили ровно столько же, сколько нужный
+        // утиль. Ровно та же ошибка была на стороне арсенала, и там правка дала
+        // сожжений 1.70 -> 1.39 при установках 0.50 -> 0.68. Шкала сохранена:
+        // прежняя середина 1.5 приходится на середину оценки.
+        double base = 0.6 + 1.8 * ценаВерхаЗадания(state, cid);
         if (cid != null && state.journal != null) {
             kelium.engine.ObjectiveHints.Hint h =
                 kelium.engine.ObjectiveHints.forCard(state, seat, state.journal, cid, List.of(), 0);
@@ -2406,6 +2413,27 @@ public class HeuristicAgent extends Agent {
             }
         }
         return base;
+    }
+
+    /**
+     * Сколько стоит ВЕРХ карты задания прямо сейчас — общей оценкой утиля
+     * ({@link kelium.engine.cards.TopValue}), той же, что у карт арсенала.
+     */
+    private double ценаВерхаЗадания(GameState state, String cid) {
+        if (cid == null) {
+            return 0.5;
+        }
+        try {
+            var card = Ctx.cards(state, "objectives").byId(cid);
+            Object top = card.get("top");
+            if (!(top instanceof Map<?, ?> m)) {
+                return 0.5;
+            }
+            return kelium.engine.cards.TopValue.of(
+                new kelium.engine.cards.EngineCardContext(state, seat), m);
+        } catch (RuntimeException e) {
+            return 0.5;      // карты нет в наборе — прежняя середина
+        }
     }
 
     /** Ценность варианта, пришедшего от способности, по её собственной подсказке. */
