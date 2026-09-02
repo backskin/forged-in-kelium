@@ -59,7 +59,7 @@ public final class StateFeatures {
         "tech_peaks",          // вершины треков, занятые мной
         "objectives_hand",     // карт заданий в руке
         "super_progress",      // прогресс супер-задания
-        "arsenal_installed",   // установленных карт арсенала
+        "arsenal_installed",   // сила установленных карт арсенала (не их число)
         "containers",          // контейнеров на руках
         "cu_tokens",           // жетонов разрушения ЦУ (2 = мгновенная победа)
         "enemy_cu_damage",     // урон, накопленный на чужих ЦУ (осада идёт)
@@ -203,7 +203,7 @@ public final class StateFeatures {
         f[17] = peaks;
         f[18] = me.objectiveHand.size();
         f[19] = kelium.engine.SuperWeapon.progress(s, me);
-        f[20] = me.arsenalInstalled.size();
+        f[20] = силаУстановленных(s, me);
         f[21] = me.containers;
         f[22] = me.cuDestructionTokens;
 
@@ -297,6 +297,43 @@ public final class StateFeatures {
             out[i] = Math.max(-2.0, Math.min(2.0, v));
         }
         return out;
+    }
+
+
+    /**
+     * СИЛА УСТАНОВЛЕННЫХ КАРТ АРСЕНАЛА — сумма самооценок их способностей.
+     *
+     * <p>ЗАЧЕМ НЕ ЧИСЛО КАРТ. Признак считал ШТУКИ: карта, меняющая партию, и
+     * карта почти бесполезная стоили в оценке позиции одинаково, по весу
+     * {@code eval.arsenal_installed} за штуку. А сжигание карты на утиль
+     * попадает в признаки монет, боеприпасов и келемия с их собственными
+     * весами — и почти всегда перебивало эту единицу. Отсюда и замер: жгут в
+     * 3.4 раза чаще, чем ставят, какой бы колода ни была. Раскладка половин тут
+     * ни при чём: бот просто не видел, что именно он ставит.
+     *
+     * <p>Самооценку способность объявляет сама ({@code Ability.hint().strength()}):
+     * это уже написанное знание о том, насколько способность расшивает узкое
+     * место. Способность без подсказки считается за единицу — как раньше
+     * считалась любая.
+     */
+    private static double силаУстановленных(GameState s, PlayerState me) {
+        double сумма = 0;
+        for (String cid : me.allInstalledArsenal()) {
+            String пассивка = null;
+            try {
+                var card = kelium.dataio.Ctx.cards(s, "arsenal").byId(cid);
+                if (card.get("bottom") instanceof java.util.Map<?, ?> bm) {
+                    пассивка = String.valueOf(bm.get("passive"));
+                }
+            } catch (RuntimeException e) {
+                пассивка = null;
+            }
+            var ability = пассивка == null ? null
+                : kelium.engine.ability.Abilities.byId(пассивка);
+            var hint = ability == null ? null : ability.hint();
+            сумма += hint == null ? 1.0 : Math.max(0.2, hint.strength());
+        }
+        return сумма;
     }
 
     /** Ключ веса генома для признака {@code i} — {@code eval.<имя>}. */
