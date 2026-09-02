@@ -746,19 +746,9 @@ public final class FieldView extends JComponent {
 
     /** Человеческая подпись способа победы для итоговой таблицы. */
     private String winCondition() {
-        String c = record.condition == null ? "" : record.condition;
-        return switch (c) {
-            case "victory_points" -> "победа по победным очкам";
-            case "military" -> "ВОЕННАЯ победа: уничтожено второе ЦУ";
-            case "super_objective" -> "победа по СУПЕР ЗАДАНИЮ: проект развёрнут";
-            // Мирные концы: партия дошла до предела, победитель — по очкам.
-            case "all_peaks_occupied" -> "конец по науке: заняты все три вершины треков "
-                + "· победа по очкам";
-            case "last_spawn_tile" -> "конец по келемию: на поле остался последний тайл "
-                + "зарождения · победа по очкам";
-            case "" -> "партия завершена";
-            default -> "условие конца: " + c;
-        };
+        // Один текст на всю программу — см. kelium.gui.replay2.Names.
+        return kelium.gui.replay2.Names.conditionLong(
+            record.condition, record.spawnLeft, record.spawnThreshold);
     }
 
     /**

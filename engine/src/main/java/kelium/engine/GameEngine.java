@@ -266,11 +266,15 @@ public final class GameEngine {
             }
         }
         s.finished = true;
-        emit(ev("type", "game_end", "winner", s.winner, "condition", s.winCondition, "scores", scores));
+        emit(ev("type", "game_end", "winner", s.winner, "condition", s.winCondition,
+            "spawn_left", s.spawnLeftAtEnd, "spawn_threshold", s.spawnThreshold,
+            "scores", scores));
 
         Map<String, Object> result = new HashMap<>();
         result.put("winner", s.winner);
         result.put("condition", s.winCondition);
+        result.put("spawn_left", s.spawnLeftAtEnd);
+        result.put("spawn_threshold", s.spawnThreshold);
         result.put("scores", scores);
         result.put("rounds", s.round);
         return result;
@@ -2044,6 +2048,8 @@ public final class GameEngine {
             .intValue();
         if (!spawnTiles.isEmpty() && lastTile >= 0 && remaining <= lastTile) {
             s.winCondition = "last_spawn_tile";
+            s.spawnLeftAtEnd = remaining;
+            s.spawnThreshold = lastTile;
             return true;
         }
         return false;

@@ -122,7 +122,7 @@ public final class ResultsPanel extends JComponent {
         y += Theme.px(42);
         gg.setFont(Theme.note(17));
         gg.setColor(Theme.ink2());
-        gg.drawString(Names.conditionLong(rec.condition), pad, y + Theme.px(18));
+        gg.drawString(Names.conditionLong(rec.condition, rec.spawnLeft, rec.spawnThreshold), pad, y + Theme.px(18));
         y += Theme.px(38);
 
         // ---- пьедестал

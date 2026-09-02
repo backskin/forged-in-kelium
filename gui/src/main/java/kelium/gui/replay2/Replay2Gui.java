@@ -1217,7 +1217,7 @@ public final class Replay2Gui {
         // ИТОГ В ЗАГОЛОВКЕ — это спойлер. По просьбе его можно выключить.
         if (rec.winner != null && !spoilerFree) {
             sb.append("   ·   победил ").append(rec.playerName(rec.winner))
-              .append(" (").append(Names.condition(rec.condition)).append(')');
+              .append(" (").append(Names.condition(rec.condition, rec.spawnLeft, rec.spawnThreshold)).append(')');
         }
         frame.setTitle(sb.toString());
     }

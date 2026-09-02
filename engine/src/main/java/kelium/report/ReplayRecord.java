@@ -87,6 +87,14 @@ public final class ReplayRecord {
     public final Map<String, Boolean> expansions = new LinkedHashMap<>();
     public Integer winner;
     public String condition = "";
+    /**
+     * Если партия кончилась по келемию — сколько источников на поле осталось и
+     * какой порог стоял в своде. Нужно, чтобы подпись конца не врала про
+     * «кончился келемий», когда по правилам порог выше единицы. −1 у старых
+     * записей и у партий, кончившихся иначе.
+     */
+    public int spawnLeft = -1;
+    public int spawnThreshold = -1;
     public int rounds;
     /**
      * ПЕЧАТНЫЙ ЛИЧНЫЙ ЗАПАС: сколько жетонов КАЖДОГО вида войск у игрока всего.
@@ -885,6 +893,8 @@ public final class ReplayRecord {
         m.put("seatColors", seatColors);
         m.put("winner", winner);
         m.put("condition", condition);
+        m.put("spawnLeft", spawnLeft);
+        m.put("spawnThreshold", spawnThreshold);
         m.put("rounds", rounds);
         m.put("unitStock", unitStock);
         m.put("cardNames", cardNames);
@@ -1210,6 +1220,10 @@ public final class ReplayRecord {
         }
         r.winner = Json.io(m, "winner");
         r.condition = orEmpty(Json.s(m, "condition"));
+        // Старые записи этих полей не несут: Json.i вернёт 0, а «ноль
+        // источников» - осмысленное значение, поэтому отсутствие читаем как -1.
+        r.spawnLeft = m.containsKey("spawnLeft") ? Json.i(m, "spawnLeft") : -1;
+        r.spawnThreshold = m.containsKey("spawnThreshold") ? Json.i(m, "spawnThreshold") : -1;
         r.rounds = Json.i(m, "rounds");
         // старые записи этого поля не несут — тогда печатный запас по правилам (4)
         Map<String, Object> stock = Json.map(m, "unitStock");

@@ -199,6 +199,9 @@ public final class GameRecorder {
 
         rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
         rec.condition = String.valueOf(result.get("condition"));
+        rec.spawnLeft = result.get("spawn_left") instanceof Number sl ? sl.intValue() : -1;
+        rec.spawnThreshold =
+            result.get("spawn_threshold") instanceof Number st ? st.intValue() : -1;
         rec.rounds = result.get("rounds") instanceof Number n ? n.intValue() : state.round;
         if (note != null) {
             note.accept("Партия сыграна: шагов " + rec.frames.size()
@@ -278,6 +281,9 @@ public final class GameRecorder {
 
         rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
         rec.condition = String.valueOf(result.get("condition"));
+        rec.spawnLeft = result.get("spawn_left") instanceof Number sl ? sl.intValue() : -1;
+        rec.spawnThreshold =
+            result.get("spawn_threshold") instanceof Number st ? st.intValue() : -1;
         rec.rounds = result.get("rounds") instanceof Number n ? n.intValue() : state.round;
         if (note != null) {
             note.accept("Партия сыграна: шагов " + rec.frames.size()
@@ -927,13 +933,18 @@ public final class GameRecorder {
                     return "--- конец раунда " + ev.get("round");
                 case "game_end": {
                     Integer w = ev.get("winner") instanceof Number n ? n.intValue() : null;
-                    String cond = switch (String.valueOf(ev.get("condition"))) {
+                    String code = String.valueOf(ev.get("condition"));
+                    String cond = switch (code) {
                         case "victory_points" -> "по победным очкам";
                         case "super_objective" -> "развёрнутым супер-заданием";
                         case "all_peaks_occupied" -> "заняты все вершины треков";
-                        case "last_spawn_tile" -> "кончился келемий на поле";
+                        // Числа по келемию — чтобы подпись не врала при пороге
+                        // свода выше единицы (см. Names).
+                        case "last_spawn_tile" -> kelium.gui.replay2.Names.condition(code,
+                            ev.get("spawn_left") instanceof Number sl ? sl.intValue() : -1,
+                            ev.get("spawn_threshold") instanceof Number st ? st.intValue() : -1);
                         case "military" -> "военная победа (второе ЦУ)";
-                        default -> String.valueOf(ev.get("condition"));
+                        default -> code;
                     };
                     return "КОНЕЦ ПАРТИИ — победил " + (w == null ? "никто" : rec.playerName(w))
                         + " (" + cond + ")";
