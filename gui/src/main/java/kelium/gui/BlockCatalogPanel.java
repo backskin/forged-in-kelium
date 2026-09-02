@@ -109,7 +109,8 @@ public final class BlockCatalogPanel extends JPanel {
         }
     }
 
-    private final Map<String, Version> versions = new TreeMap<>();
+    private final Map<String, Version> versions =
+        new TreeMap<>(kelium.dataio.VersionOrder.ASC);
     /**
      * ВЫБОР ПО КОМБИНАЦИИ ПАРАМЕТРОВ, А НЕ ПО ОДНОМУ СПИСКУ ВЕРСИЙ (заказ
      * дизайнера 18.08.2026). Версия набора блоков и так задаётся ДВУМЯ
@@ -297,7 +298,10 @@ public final class BlockCatalogPanel extends JPanel {
         }
         try (var stream = Files.list(dir)) {
             for (Path f : stream.filter(p -> p.getFileName().toString().startsWith("blocks.")
-                    && p.getFileName().toString().endsWith(".yaml")).sorted().toList()) {
+                    && p.getFileName().toString().endsWith(".yaml"))
+                    .sorted((a, b) -> kelium.dataio.VersionOrder.compare(
+                        a.getFileName().toString(), b.getFileName().toString()))
+                    .toList()) {
                 Map<String, Object> doc;
                 try (var in = Files.newInputStream(f)) {
                     doc = new org.yaml.snakeyaml.Yaml().load(in);

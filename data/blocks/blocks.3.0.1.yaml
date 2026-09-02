@@ -1,0 +1,397 @@
+# CONTENT: blocks  version 3.0.1
+# СГЕНЕРИРОВАНО tools/сгенерить-наборы-блоков.py.
+# На каждое сочетание контейнеров и жёлтых ячеек - три
+# раскладки (заказ дизайнера 02.09.2026); вариант 1 - блоки разведены друг от друга как можно дальше.
+# Геометрия сторон взята из авторского набора 1.4.0 и не
+# менялась - это физический картон.
+# контейнеры 5/5 и 6/6, энергия без жёлтых ячеек
+# разброс: малые: наименьшее 4, среднее 4.64; большие: наименьшее 5, среднее 5.53
+meta:
+  id: 3.0.1
+  type: blocks
+  seed: 20261003
+  вариант: 1
+  описание: контейнеры 5/5 и 6/6, энергия без жёлтых ячеек
+  разброс: 'малые: наименьшее 4, среднее 4.64; большие: наименьшее 5, среднее 5.53'
+  сгенерировано: tools/сгенерить-наборы-блоков.py
+blocks:
+- id: М1
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 1
+    - q: 1
+      r: 0
+      cell: 3
+    - q: 2
+      r: 0
+      cell: 4
+    - q: 0
+      r: 1
+      cell: 0
+    - q: 1
+      r: 1
+      cell: 6
+    B:
+    - q: 0
+      r: 0
+      cell: 6
+    - q: 1
+      r: 0
+      cell: 2
+    - q: 2
+      r: 0
+      cell: 3
+    - q: 0
+      r: 1
+      cell: 5
+    - q: 1
+      r: 1
+      cell: 0
+- id: М2
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 2
+    - q: 1
+      r: 0
+      cell: 6
+    - q: 2
+      r: 0
+      cell: 1
+    - q: 0
+      r: 1
+      cell: 4
+    - q: 1
+      r: 1
+      cell: 5
+    B:
+    - q: 0
+      r: 0
+      cell: 3
+    - q: 1
+      r: 0
+      cell: 4
+    - q: 2
+      r: 0
+      cell: 6
+    - q: 0
+      r: 1
+      cell: 2
+    - q: 1
+      r: 1
+      cell: 1
+- id: М3
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 0
+    - q: 1
+      r: 0
+      cell: 5
+    - q: 2
+      r: 0
+      cell: 2
+    - q: 0
+      r: 1
+      cell: 6
+    - q: 1
+      r: 1
+      cell: 4
+    B:
+    - q: 0
+      r: 0
+      cell: 6
+    - q: 1
+      r: 0
+      cell: 0
+    - q: 2
+      r: 0
+      cell: 5
+    - q: 0
+      r: 1
+      cell: 1
+    - q: 1
+      r: 1
+      cell: 3
+- id: М4
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 5
+    - q: 1
+      r: 0
+      cell: 2
+    - q: 2
+      r: 0
+      cell: 0
+    - q: 0
+      r: 1
+      cell: 1
+    - q: 1
+      r: 1
+      cell: 6
+    B:
+    - q: 0
+      r: 0
+      cell: 5
+    - q: 1
+      r: 0
+      cell: 6
+    - q: 2
+      r: 0
+      cell: 4
+    - q: 0
+      r: 1
+      cell: 3
+    - q: 1
+      r: 1
+      cell: 2
+- id: М5
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 4
+    - q: 1
+      r: 0
+      cell: 1
+    - q: 2
+      r: 0
+      cell: 6
+    - q: 0
+      r: 1
+      cell: 3
+    - q: 1
+      r: 1
+      cell: 0
+    B:
+    - q: 0
+      r: 0
+      cell: 6
+    - q: 1
+      r: 0
+      cell: 3
+    - q: 2
+      r: 0
+      cell: 0
+    - q: 0
+      r: 1
+      cell: 2
+    - q: 1
+      r: 1
+      cell: 4
+- id: Б1
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 0
+    - q: 1
+      r: 0
+      cell: 5
+    - q: 2
+      r: 0
+      cell: 6
+    - q: 0
+      r: 1
+      cell: 4
+    - q: 1
+      r: 1
+      cell: 3
+    - q: 1
+      r: -1
+      cell: 1
+    B:
+    - q: 0
+      r: 0
+      cell: 4
+    - q: 1
+      r: 0
+      cell: 0
+    - q: 2
+      r: 0
+      cell: 5
+    - q: 0
+      r: 1
+      cell: 6
+    - q: 1
+      r: 1
+      cell: 1
+    - q: 1
+      r: -1
+      cell: 2
+- id: Б2
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 1
+    - q: 1
+      r: 0
+      cell: 6
+    - q: 2
+      r: 0
+      cell: 4
+    - q: 0
+      r: 1
+      cell: 5
+    - q: 1
+      r: 1
+      cell: 2
+    - q: 1
+      r: -1
+      cell: 3
+    B:
+    - q: 0
+      r: 0
+      cell: 6
+    - q: 1
+      r: 0
+      cell: 2
+    - q: 2
+      r: 0
+      cell: 1
+    - q: 0
+      r: 1
+      cell: 0
+    - q: 1
+      r: 1
+      cell: 5
+    - q: 1
+      r: -1
+      cell: 3
+- id: Б3
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 2
+    - q: 1
+      r: 0
+      cell: 4
+    - q: 2
+      r: 0
+      cell: 0
+    - q: 0
+      r: 1
+      cell: 3
+    - q: 1
+      r: 1
+      cell: 5
+    - q: 1
+      r: -1
+      cell: 6
+    B:
+    - q: 0
+      r: 0
+      cell: 5
+    - q: 1
+      r: 0
+      cell: 1
+    - q: 2
+      r: 0
+      cell: 6
+    - q: 0
+      r: 1
+      cell: 2
+    - q: 1
+      r: 1
+      cell: 4
+    - q: 1
+      r: -1
+      cell: 0
+- id: Б4
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 3
+    - q: 1
+      r: 0
+      cell: 1
+    - q: 2
+      r: 0
+      cell: 5
+    - q: 0
+      r: 1
+      cell: 0
+    - q: 1
+      r: 1
+      cell: 6
+    - q: 1
+      r: -1
+      cell: 4
+    B:
+    - q: 0
+      r: 0
+      cell: 4
+    - q: 1
+      r: 0
+      cell: 3
+    - q: 2
+      r: 0
+      cell: 1
+    - q: 0
+      r: 1
+      cell: 2
+    - q: 1
+      r: 1
+      cell: 0
+    - q: 1
+      r: -1
+      cell: 6
+- id: Б5
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 6
+    - q: 1
+      r: 0
+      cell: 3
+    - q: 2
+      r: 0
+      cell: 0
+    - q: 0
+      r: 1
+      cell: 1
+    - q: 1
+      r: 1
+      cell: 2
+    - q: 1
+      r: -1
+      cell: 5
+    B:
+    - q: 0
+      r: 0
+      cell: 4
+    - q: 1
+      r: 0
+      cell: 5
+    - q: 2
+      r: 0
+      cell: 2
+    - q: 0
+      r: 1
+      cell: 1
+    - q: 1
+      r: 1
+      cell: 6
+    - q: 1
+      r: -1
+      cell: 3
