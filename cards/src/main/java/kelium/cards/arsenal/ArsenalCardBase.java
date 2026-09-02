@@ -100,28 +100,168 @@ public class ArsenalCardBase extends BaseCard implements ArsenalCard {
         return clamp(0.15 + 0.85 * norm(h.strength()) * pressure * horizon);
     }
 
-    /** Ценность утиля: разовая выдача против текущей нехватки. */
+    /**
+     * ЦЕНОСТЬ УТИЛЯ: что верх выдаст ЗДЕСЬ И СЕЙЧАС.
+     *
+     * <p>ПОЧЕМУ ЭТО ПЕРЕПИСАНО (замер 02.09.2026). Раньше сторона утиля была
+     * КОНСТАНТОЙ: любое бесплатное действие стоило 0.70, любой прочий эффект —
+     * 0.50, и карта свой верх фактически не оценивала. Установка при этом
+     * считалась по-настоящему — сила способности на давление узкого места на
+     * остаток партии. Сравнение шло «живое число против плоских 0.7», и всякий
+     * раз, когда установка слабее, карта уходила в костёр независимо от того,
+     * что она делает. Отсюда замер: жгут в 3.4 раза чаще, чем ставят, и не
+     * меняется от пересборки колоды.
+     *
+     * <p>Теперь верх спрашивают то же, что и низ: пригодится ли ты сейчас.
+     * Бесплатный Бой без цели и без боеприпасов не стоит ничего; кража
+     * установленной карты у того, у кого её нет, не стоит ничего; десант при
+     * пустом запасе войск — тоже. Пустой утиль обязан быть дешевле установки,
+     * иначе бот сжигает карту «просто потому что можно».
+     */
     protected double burnValue(CardContext ctx) {
         if (!(data().get("top") instanceof Map<?, ?> top)) {
             return 0.0;
         }
         String effect = String.valueOf(top.get("effect"));
         Map<?, ?> params = top.get("params") instanceof Map<?, ?> p ? p : Map.of();
-        // Бесплатное действие — это ход, а ход в этой игре самый дорогой ресурс:
-        // их всего около двадцати четырёх на партию.
-        if ("free_action".equals(effect)) {
-            return 0.7;
-        }
-        if (!"gain".equals(effect)) {
-            return 0.5;                  // лечение, перемещение и прочее — середина
-        }
+        return switch (effect) {
+            case "gain" -> ценаВыдачи(ctx, params);
+            case "free_action" -> ценаДействия(ctx, String.valueOf(params.get("action")))
+                + ценаВыдачи(ctx, params) * 0.5;
+            // КРАЖИ И СНОС: цена ровно в том, есть ли у кого брать.
+            case "steal_arsenal_card" -> есть(ctx, чужиеКартыАрсенала(ctx)) ? 0.65 : 0.05;
+            case "discard_enemy_arsenal" -> есть(ctx, чужиеУстановленные(ctx)) ? 0.7 : 0.05;
+            case "steal_objective_cards" -> есть(ctx, чужиеЗадания(ctx)) ? 0.6 : 0.05;
+            case "steal_resource" -> 0.45;
+            // Позолота без разложенных жетонов модуля невозможна.
+            case "gild_module" -> ctx.me().redPlacements.size()
+                + ctx.me().bluePlacements.size() > ctx.me().goldModules ? 0.75 : 0.05;
+            // Десант ставит войска из ЗАПАСА: запас пуст — ставить нечего.
+            case "landing", "deploy_units" -> запасВойск(ctx) > 0
+                ? 0.35 + 0.5 * pressureOn(ctx, Hint.Bottleneck.UNITS) : 0.05;
+            case "grab_first_player" -> ctx.state().firstPlayer == ctx.seat() ? 0.1 : 0.6;
+            case "market_card_from_discard" -> ctx.have(Resource.KELIUM) > 0 ? 0.5 : 0.05;
+            case "unlimited_spec" -> 0.3 + 0.5 * pressureOn(ctx, Hint.Bottleneck.ACTIONS);
+            case "swap_order_card" -> 0.45;
+            case "heal_one", "heal_all_own", "heal_hex" -> ранены(ctx) ? 0.6 : 0.05;
+            case "move_unit" -> ctx.me().unitsOnField().isEmpty() ? 0.05 : 0.45;
+            default -> 0.5;              // незнакомый эффект — прежняя середина
+        };
+    }
+
+    /** Цена разовой выдачи ресурсов: сколько дают и насколько это нужно. */
+    private double ценаВыдачи(CardContext ctx, Map<?, ?> params) {
         double value = 0;
         value += need(ctx, Resource.COIN) * num(params, "coin") * 0.10;
         value += need(ctx, Resource.AMMO) * num(params, "ammo") * 0.15;
         value += need(ctx, Resource.KELIUM) * num(params, "kelium") * 0.10;
         value += need(ctx, Resource.DEBRIS) * num(params, "debris") * 0.20;
         value += num(params, "objective_cards") * 0.20;
+        value += num(params, "containers") * 0.15;
         return clamp(value);
+    }
+
+    /**
+     * ЦЕНА БЕСПЛАТНОГО ДЕЙСТВИЯ. Ход — самый дорогой ресурс игры (их около
+     * двадцати четырёх на партию), поэтому даровое действие дорого САМО ПО СЕБЕ.
+     * Но только то, которое можно сыграть с толком: Бой без цели, Добыча без
+     * досягаемого келемия и Рынок без келемия не стоят ничего.
+     */
+    private double ценаДействия(CardContext ctx, String action) {
+        return switch (action == null ? "" : action) {
+            case "combat" -> ctx.enemyTokensOnField().isEmpty() ? 0.05
+                : 0.35 + 0.45 * pressureOn(ctx, Hint.Bottleneck.AMMO);
+            case "mining" -> 0.3 + 0.5 * pressureOn(ctx, Hint.Bottleneck.KELIUM);
+            case "assembly" -> запитанныеВоенные(ctx) > 0
+                ? 0.3 + 0.45 * pressureOn(ctx, Hint.Bottleneck.AMMO) : 0.1;
+            case "build" -> ctx.have(Resource.COIN) > 0 ? 0.6 : 0.15;
+            case "movement" -> ctx.me().unitsOnField().isEmpty() ? 0.05 : 0.55;
+            case "market" -> ctx.have(Resource.KELIUM) > 0 ? 0.6 : 0.05;
+            case "science" -> ctx.have(Resource.DEBRIS) > 0
+                || ctx.have(Resource.KELIUM) > 0 ? 0.6 : 0.1;
+            case "energy_swap" -> голодныеЗдания(ctx) > 0 ? 0.55 : 0.15;
+            default -> 0.5;
+        };
+    }
+
+    private static boolean есть(CardContext ctx, int сколько) {
+        return сколько > 0;
+    }
+
+    private static int чужиеКартыАрсенала(CardContext ctx) {
+        int n = 0;
+        for (var p : ctx.state().players) {
+            if (p.seat != ctx.seat()) {
+                n += p.arsenalHand.size();
+            }
+        }
+        return n;
+    }
+
+    private static int чужиеУстановленные(CardContext ctx) {
+        int n = 0;
+        for (var p : ctx.state().players) {
+            if (p.seat != ctx.seat()) {
+                n += p.arsenalInstalled.size();
+            }
+        }
+        return n;
+    }
+
+    private static int чужиеЗадания(CardContext ctx) {
+        int n = 0;
+        for (var p : ctx.state().players) {
+            if (p.seat != ctx.seat()) {
+                n += p.objectiveHand.size();
+            }
+        }
+        return n;
+    }
+
+    private static int запасВойск(CardContext ctx) {
+        int n = 0;
+        for (var u : ctx.me().units) {
+            if (u.hexId == null && u.alive()) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    private static int запитанныеВоенные(CardContext ctx) {
+        int n = 0;
+        for (var b : ctx.me().buildingsOnField()) {
+            boolean военное = b.type == kelium.core.BuildingType.BARRACKS
+                || b.type == kelium.core.BuildingType.FACTORY
+                || b.type == kelium.core.BuildingType.AIRBASE
+                || b.type == kelium.core.BuildingType.COMMAND_CENTER;
+            if (военное && b.powered()) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    private static int голодныеЗдания(CardContext ctx) {
+        int n = 0;
+        for (var b : ctx.me().buildingsOnField()) {
+            if (b.energySlots > b.energyPlaced) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    private static boolean ранены(CardContext ctx) {
+        for (var t : ctx.myTokensOnField()) {
+            if (t instanceof kelium.core.UnitToken u && u.damage > 0) {
+                return true;
+            }
+            if (t instanceof kelium.core.BuildingToken b && b.damage > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
