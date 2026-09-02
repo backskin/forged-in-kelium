@@ -178,7 +178,7 @@ public final class GameConfig {
      * одинаковых замера для трёх разных сводов и чуть не сделал из этого вывод.
      */
     public static final String DEFAULT_RULESET =
-        System.getProperty("kelium.ruleset", "1.26.0");
+        System.getProperty("kelium.ruleset", "1.33.0");
 
     // Кэш «правила + контент» по (версия, каталог данных): YAML читается один раз,
     // а не на каждую партию (на батче в тысячи партий это была главная статья
@@ -307,7 +307,7 @@ public final class GameConfig {
             try (var s = Files.list(dir)) {
                 s.filter(p -> p.getFileName().toString().endsWith(".yaml"))
                  .map(p -> p.getFileName().toString().replace(".yaml", ""))
-                 .sorted()
+                 .sorted(VersionOrder.ASC)
                  .forEach(out::add);
             } catch (java.io.IOException ignored) {
                 // каталог нечитаем — вернём пустой список, вызывающий подставит дефолт

@@ -97,7 +97,9 @@ public final class FieldFile {
             try (var s = Files.list(dir)) {
                 s.filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)
                         .endsWith("." + ext))
-                    .sorted()
+                    // По-человечески: «Поле 2» раньше «Поле 10» (VersionOrder).
+                    .sorted((a, b) -> VersionOrder.compare(
+                        a.getFileName().toString(), b.getFileName().toString()))
                     .forEach(out::add);
             } catch (java.io.IOException e) {
                 return out;

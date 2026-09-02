@@ -138,24 +138,9 @@ public final class ContentSet {
         return out;
     }
 
-    /** Сравнение версий по числам: «1.10.0» новее «1.9.0», а не наоборот. */
+    /** Сравнение версий — общий порядок программы, см. {@link VersionOrder}. */
     private static int compareVersions(String a, String b) {
-        String[] x = a.split("[._-]");
-        String[] y = b.split("[._-]");
-        for (int i = 0; i < Math.max(x.length, y.length); i++) {
-            String xi = i < x.length ? x[i] : "0";
-            String yi = i < y.length ? y[i] : "0";
-            int c;
-            if (xi.matches("\\d+") && yi.matches("\\d+")) {
-                c = Integer.compare(Integer.parseInt(xi), Integer.parseInt(yi));
-            } else {
-                c = xi.compareTo(yi);
-            }
-            if (c != 0) {
-                return c;
-            }
-        }
-        return 0;
+        return VersionOrder.compare(a, b);
     }
 
     /**

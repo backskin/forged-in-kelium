@@ -105,7 +105,9 @@ public final class LayoutLibrary {
                     // .yaml), иначе в набор полезет README и прочее соседнее.
                     files = s.filter(p -> Files.isRegularFile(p)
                             && kelium.dataio.FieldFile.isField(p))
-                        .sorted().toList();
+                        .sorted((a, b) -> kelium.dataio.VersionOrder.compare(
+                            a.getFileName().toString(), b.getFileName().toString()))
+                        .toList();
                 } catch (java.io.IOException ignored) {
                     continue;
                 }
@@ -205,7 +207,9 @@ public final class LayoutLibrary {
                 // свой формат .kmap и старые .yaml — см. kelium.dataio.FieldFile
                 s.filter(p -> Files.isRegularFile(p)
                         && kelium.dataio.FieldFile.isField(p))
-                    .sorted().forEach(files::add);
+                    .sorted((a, b) -> kelium.dataio.VersionOrder.compare(
+                        a.getFileName().toString(), b.getFileName().toString()))
+                    .forEach(files::add);
             } catch (java.io.IOException e) {
                 if (problems != null) {
                     problems.add("папка не читается: " + dir);
