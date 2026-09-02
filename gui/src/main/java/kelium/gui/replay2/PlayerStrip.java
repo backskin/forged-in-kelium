@@ -525,6 +525,15 @@ public final class PlayerStrip extends JComponent {
         String key();
     }
 
+    /** Влезает ли весь ряд в одну строку при минимальных отступах. */
+    private boolean влезает(Graphics2D g, java.util.List<Item> items, int w) {
+        int need = 0;
+        for (int i = 0; i < items.size(); i++) {
+            need += items.get(i).width(g) + (i == 0 ? 0 : Theme.px(10));
+        }
+        return need <= w;
+    }
+
     /**
      * РАЗЛОЖИТЬ РЯД ПОКАЗАТЕЛЕЙ ПО ШИРИНЕ. Сначала считаются собственные ширины,
      * потом остаток делится на отступы: просторно — держим полный отступ, тесно —
@@ -574,11 +583,31 @@ public final class PlayerStrip extends JComponent {
 
     /** Показатель «значок + число»: они читаются как одно целое и стоят вплотную. */
     private Item markItem(String key, String icon, String value, Color colour) {
+        return markItem(key, icon, value, colour, value);
+    }
+
+    /**
+     * ШИРИНА ПОКАЗАТЕЛЯ НЕ ЗАВИСИТ ОТ ЧИСЛА В НЁМ (жалоба дизайнера 02.09.2026:
+     * «нижняя полоса шатается, кружки приказов улетают на новую строчку»).
+     *
+     * <p>Ширина мерилась по ТЕКУЩЕМУ значению: пока зданий было «1·0·4», ряд
+     * влезал в одну строку, а на «1·0·10» он становился шире и последний
+     * показатель — кружки приказов — переносился вниз. Полоса дёргалась на
+     * ровном месте, хотя ничего, кроме одной цифры, не менялось.
+     *
+     * <p>Теперь ширина считается по ОБРАЗЦУ — строке из нулей той формы, какую
+     * показатель вообще может принять. Ряд получает постоянную ширину, и его
+     * раскладка меняется только от ширины окна.
+     */
+    private Item markItem(String key, String icon, String value, Color colour,
+                          String образец) {
         int tie = Theme.px(9);
         int mark = Theme.px(15);
         return new Item() {
             @Override public int width(Graphics2D g) {
-                return mark + tie - Theme.px(6) + g.getFontMetrics().stringWidth(value);
+                java.awt.FontMetrics fm = g.getFontMetrics();
+                return mark + tie - Theme.px(6)
+                    + Math.max(fm.stringWidth(value), fm.stringWidth(образец));
             }
 
             @Override public void draw(Graphics2D g, int x, int y) {
@@ -609,19 +638,29 @@ public final class PlayerStrip extends JComponent {
         // и туда — не рисуется вовсе, а не вылезает за край полосы.
         java.util.List<Item> items = new ArrayList<>();
         items.add(techItem(p));
+        // Образцы — самая широкая форма каждого показателя, а не сегодняшнее
+        // число: см. markItem(..., образец).
         items.add(markItem("buildings", "BUILDING", b[0] + "·" + b[1] + "·" + b[2],
-            Theme.ink2()));
-        items.add(markItem("units", "UNIT", u[0] + "/" + u[1], Theme.ink2()));
+            Theme.ink2(), "0·0·00"));
+        items.add(markItem("units", "UNIT", u[0] + "/" + u[1], Theme.ink2(), "00/00"));
         items.add(markItem("objectives", "CARD",
-            String.valueOf(p.objectiveHand.size()), Theme.ink3()));
+            String.valueOf(p.objectiveHand.size()), Theme.ink3(), "00"));
         items.add(markItem("arsenal", "ARSENAL",
-            p.arsenalHand.size() + "+" + p.arsenalInstalled.size(), Theme.ink3()));
+            p.arsenalHand.size() + "+" + p.arsenalInstalled.size(), Theme.ink3(), "00+00"));
         items.add(ordersItem(played));
         if (p.superObjective != null) {
             items.add(markItem("super", "SUPER", String.valueOf(p.superProgress),
-                p.superComplete ? Theme.points() : Theme.ink3()));
+                p.superComplete ? Theme.points() : Theme.ink3(), "00"));
         }
 
+        // ОДНА СТРОКА ВАЖНЕЕ СЛОВА «НАУКА». Если ряд со словом в строку не
+        // помещается, он пересобирается без него — это отыгрывает сорок
+        // пикселей и возвращает кружки приказов на свою строку. Решение
+        // зависит только от ширины окна, а не от чисел на кадре, поэтому
+        // раскладка при проигрывании больше не дёргается.
+        if (!влезает(g, items, w)) {
+            items.set(0, techItem(p, false));
+        }
         int done = layoutRow(g, items, x, y, w, lineH);
         // Второй ряд — только если высота полосы его позволяет.
         if (done < items.size() && getHeight() >= Theme.px(Theme.H_STRIP)) {
@@ -631,18 +670,33 @@ public final class PlayerStrip extends JComponent {
 
     /** Наука: подпись и три микро-шкалы цветами треков. */
     private Item techItem(ReplayRecord.Player p) {
+        return techItem(p, true);
+    }
+
+    /**
+     * Наука: три микро-шкалы цветами треков, при {@code подпись} — со словом
+     * «наука». Слово стоит сорок пикселей, и в узкой полосе именно из-за него
+     * ряд не влезал в строку; шкалы читаются и без него, а что это наука,
+     * говорит подсказка при наведении.
+     */
+    private Item techItem(ReplayRecord.Player p, boolean подпись) {
         String[] tracks = {"left", "middle", "right"};
         Color[] colours = {new Color(0xC0392B), new Color(0x278B3E), new Color(0x2C62A8)};
         return new Item() {
+            private int отступПодписи(Graphics2D g) {
+                return подпись ? g.getFontMetrics().stringWidth("наука") + Theme.px(6) : 0;
+            }
+
             @Override public int width(Graphics2D g) {
-                return g.getFontMetrics().stringWidth("наука") + Theme.px(6)
-                    + 3 * Theme.px(38) - Theme.px(8);
+                return отступПодписи(g) + 3 * Theme.px(38) - Theme.px(8);
             }
 
             @Override public void draw(Graphics2D g, int x, int y) {
-                g.setColor(Theme.ink3());
-                g.drawString("наука", x, y + Theme.px(10));
-                int sx = x + g.getFontMetrics().stringWidth("наука") + Theme.px(6);
+                if (подпись) {
+                    g.setColor(Theme.ink3());
+                    g.drawString("наука", x, y + Theme.px(10));
+                }
+                int sx = x + отступПодписи(g);
                 for (int i = 0; i < 3; i++) {
                     int steps = p.tech.getOrDefault(tracks[i], 0);
                     for (int k = 0; k < 4; k++) {
