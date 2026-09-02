@@ -72,6 +72,28 @@ public final class TechBoard {
         }
     }
 
+    /**
+     * ВЫЛОЖИТЬ НОВЫЙ КУБИК на шаг: прежние ячейки игрока НЕ освобождаются
+     * (заказ дизайнера 02.09.2026, ключ свода {@code tech.cubes_are_permanent}).
+     * Стартовой ячейки «на нуле» нет — кубики лежат в личном запасе игрока, и
+     * каждый купленный шаг забирает из запаса один кубик навсегда. Поэтому
+     * ячейки на треке больше не освобождаются, и трек становится гонкой за
+     * места, а запас кубиков — пределом всей науки за партию.
+     *
+     * <p>{@link #moveCube} оставлен для сводов до 1.33.0: там кубик один на
+     * трек и он переставляется.
+     */
+    public void placeCube(String track, int seat, int step) {
+        List<List<Integer>> perStep = occupancy.get(track);
+        if (perStep == null || step < 1 || step > perStep.size()) {
+            return;
+        }
+        perStep.get(step - 1).add(seat);
+        if (step == 1) {
+            stepOneArrivals.merge(track, 1, Integer::sum);
+        }
+    }
+
     /** Каким по счёту игрок пришёл на шаг 1 этого трека (1 = первым). */
     public int stepOneRank(String track) {
         return stepOneArrivals.getOrDefault(track, 0);

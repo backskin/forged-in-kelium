@@ -579,6 +579,21 @@ public final class Effects {
         PlayerState pl = s.player(seat);
         Agent agent = agentFor(s, seat);
         int count = p.containsKey("count") ? asInt(p.get("count")) : 2;
+        // ДЕСАНТ ОДНОГО РОДА (заказ дизайнера 01.09.2026, контейнеры) — {@code
+        // types} сужает предложение до названных родов. Нужно контейнерам
+        // "1 пехота"/"1 техника": там высаживается ровно один заранее известный
+        // род, а не выбор из всех.
+        java.util.Set<UnitType> allowedTypes = null;
+        if (p.get("types") instanceof List<?> l) {
+            allowedTypes = java.util.EnumSet.noneOf(UnitType.class);
+            for (Object o : l) {
+                try {
+                    allowedTypes.add(UnitType.fromCode(String.valueOf(o)));
+                } catch (RuntimeException ignored) {
+                    // род, которого нет в игре, просто не предлагается
+                }
+            }
+        }
         java.util.Set<UnitType> used = java.util.EnumSet.noneOf(UnitType.class);
         int placed = 0;
         // ТОЛЬКО СВОЯ ЗОНА СТРОЙКИ (решение дизайнера 20.08.2026).
@@ -633,6 +648,9 @@ public final class Effects {
             List<Choice> opts = new ArrayList<>();
             for (UnitType ut : UnitType.values()) {
                 if (used.contains(ut) || pl.unitsOfKind(ut) >= s.tokenStats.unitStock(ut)) {
+                    continue;
+                }
+                if (allowedTypes != null && !allowedTypes.contains(ut)) {
                     continue;
                 }
                 for (String hid : zone) {

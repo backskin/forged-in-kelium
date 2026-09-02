@@ -94,8 +94,20 @@ public final class Fix {
      * вызывать действия и бой.
      */
     public static GameState game(int players, long seed) {
+        return game(GameConfig.DEFAULT_RULESET, players, seed);
+    }
+
+    /**
+     * То же, но на НАЗВАННОМ своде.
+     *
+     * <p>Нужно тестам, которые сторожат конкретную редакцию содержимого, а не
+     * сегодняшние правила: свод по умолчанию переезжает на новые колоды, и такой
+     * тест иначе падал бы не потому, что сломался код, а потому что проверяемой
+     * редакции в игре больше нет. Сторож редакции обязан называть её сам.
+     */
+    public static GameState game(String rulesetId, int players, long seed) {
         GameState s = Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, players, seed, null, null));
+            GameConfig.buildCached(rulesetId, players, seed, null, null));
         List<Agent> agents = new ArrayList<>();
         for (int seat = 0; seat < players; seat++) {
             agents.add(new FirstChoiceAgent(seat));

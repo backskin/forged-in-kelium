@@ -29,6 +29,15 @@ import kelium.support.Fix;
  */
 class SuperObjectiveTest {
 
+    /**
+     * СВОД, В КОТОРОМ ЖИВЁТ ПРОВЕРЯЕМАЯ РЕДАКЦИЯ супер-заданий (4.0.0: четыре
+     * ячейки взносов, вскрытие за очки, жетон супероружия). Действующая
+     * редакция другая (6.0.0: множитель в финале и жёсткое требование), и её
+     * карты этих полей не несут вовсе — поэтому сторож называет свод сам, а не
+     * идёт за сводом по умолчанию.
+     */
+    private static final String СВОД = "1.26.0";
+
     private static ContentSet cards(GameState s) {
         return ((GameConfig) s.config).content.get("super_objectives");
     }
@@ -40,7 +49,7 @@ class SuperObjectiveTest {
      */
     @Test
     void everyPlayerGetsHisOwnProject() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         List<String> given = new ArrayList<>();
         for (PlayerState p : s.players) {
             List<String> mine = new ArrayList<>(p.superObjectiveOffer);
@@ -62,7 +71,7 @@ class SuperObjectiveTest {
      */
     @Test
     void уКаждойКартыЧетыреПонятныеЯчейки() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         java.util.Set<String> known = java.util.Set.of(
             "coin", "ammo", "kelium", "debris",
             "enemy_unit_token", "enemy_building_token", "enemy_token",
@@ -96,7 +105,7 @@ class SuperObjectiveTest {
      */
     @Test
     void очкиЗаВскрытиеОдинаковыеУВсех() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         java.util.Set<Integer> vps = new java.util.LinkedHashSet<>();
         for (Map<String, Object> card : cards(s).entries) {
             assertTrue(card.get("vp_on_reveal") instanceof Number,
@@ -113,7 +122,7 @@ class SuperObjectiveTest {
      */
     @Test
     void родыСупероружияРазложеныПоровну() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Map<String, Integer> byUnit = new java.util.LinkedHashMap<>();
         for (Map<String, Object> card : cards(s).entries) {
             Object u = card.get("weapon_unit");
@@ -134,7 +143,7 @@ class SuperObjectiveTest {
      */
     @Test
     void требуемыйСимволЕстьВРазметке() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         java.util.Set<String> forms =
             new java.util.HashSet<>(kelium.engine.Symbols.of(s).glyphs().keySet());
         List<String> bad = new ArrayList<>();

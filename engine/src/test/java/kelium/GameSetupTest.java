@@ -46,8 +46,13 @@ class GameSetupTest {
                 assertNotNull(p.startHex, "стартовый гекс задан");
                 // С правил 1.6.0 подготовка РАЗДАЁТ карты супер задания, а выбор
                 // делает игрок в начале партии (super_objectives.deal = 2).
-                assertTrue(p.superObjective != null || !p.superObjectiveOffer.isEmpty(),
-                    "супер-задание назначено или предложено на выбор");
+                // Где лежит карта, зависит от РЕЖИМА супер-заданий: в старых
+                // режимах это superObjective/superObjectiveOffer, в режимах
+                // «одна карта втайне» (solo5/solo6) — super5Card. Сторож
+                // проверяет, что карта РАЗДАНА, а не в каком она поле.
+                assertTrue(p.superObjective != null || !p.superObjectiveOffer.isEmpty()
+                        || p.super5Card != null,
+                    "супер-задание назначено, предложено на выбор или роздано втайне");
             }
         }
     }

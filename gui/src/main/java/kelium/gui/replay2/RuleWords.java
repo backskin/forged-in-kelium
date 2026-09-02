@@ -369,6 +369,8 @@ public final class RuleWords {
                 "победных очков за каждую установленную карту супер-арсенала";
             case "tech.pair_bonus_coin" -> "монет за парный обмен науки";
             case "tech.gild_trophy_cost" -> "обломков за позолоту модуля";
+            case "tech.cubes_are_permanent" -> "кубик занимает ячейку навсегда";
+            case "tech.cube_supply" -> "кубиков науки в запасе игрока";
 
             // ---------- Конец раунда ----------
             case "return_step.return_destroyed_tokens" ->

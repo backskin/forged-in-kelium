@@ -2465,11 +2465,19 @@ public final class Actions {
             // всем трекам). Ключа нет — работает как раньше, по одному шагу на
             // каждом треке, поэтому старые своды читаются без правок.
             int tracksAllowed = rs.getInt("tech.tracks_per_action", tech.tracks.size());
+            // КУБИКИ НАВСЕГДА (свод 1.33.0 и новее): каждый шаг выкладывает НОВЫЙ
+            // кубик из личного запаса игрока, прежние ячейки за ним остаются.
+            // Кончился запас — шаги больше не предлагаются вовсе, сколько бы
+            // трофеев ни лежало в хранилище.
+            boolean кубикиНавсегда = rs.getBool("tech.cubes_are_permanent", false);
             java.util.Set<String> steppedTracks = new java.util.HashSet<>();
             int stepsMade = 0;
             int spentTotal = 0;
             StringBuilder detail = new StringBuilder();
             while (steppedTracks.size() < tracksAllowed) {
+                if (кубикиНавсегда && player.techCubesLeft <= 0) {
+                    break;
+                }
                 // ЧЕМ ПЛАТИМ, ТЕМ И СЧИТАЕМ КАРМАН (см. payTrophy): при
                 // tech.pay_with_debris_only жетоны в оплату не идут, значит и
                 // предлагать шаги «по карману из жетонов» нельзя — иначе игрок
@@ -2542,10 +2550,17 @@ public final class Actions {
                 sf.scienceTracksUsed.add(track);
                 sf.scienceOffersUsed.add("track:" + track);
                 player.techSteps.put(track, target);
-                // КУБИК ПЕРЕСТАВЛЯЕТСЯ, а не ставится новый: игрок освобождает
-                // прежний шаг (уточнение дизайнера 12.08.2026). Раньше он оставался
-                // во всех пройденных ячейках, и шаги «забивались» им же одним.
-                tech.moveCube(track, player.seat, step, target);
+                if (кубикиНавсегда) {
+                    // НОВЫЙ КУБИК НА НОВУЮ ЯЧЕЙКУ, прежние остаются за игроком
+                    // (заказ дизайнера 02.09.2026). Ячейки на треке больше не
+                    // освобождаются, а запас кубиков тает.
+                    tech.placeCube(track, player.seat, target);
+                    player.techCubesLeft -= 1;
+                } else {
+                    // Своды до 1.33.0: кубик у игрока ОДИН на трек, он
+                    // покидает прежний шаг (уточнение дизайнера 12.08.2026).
+                    tech.moveCube(track, player.seat, step, target);
+                }
                 // Награда — ТОЛЬКО за ячейку, куда встал: бонусы перепрыгнутых
                 // ячеек не достаются никому.
                 techStepReward(player, track, target, agent);

@@ -36,9 +36,16 @@ import kelium.engine.Setup;
  */
 class StartModesAndBagsTest {
 
+    /**
+     * СВОД С РЕЖИМОМ «ВЫБОР СУПЕР-ЗАДАНИЯ ИЗ ДВУХ» — именно он здесь и
+     * проверяется. Действующий свод раздаёт ОДНУ карту втайне (solo6), и
+     * предложения на выбор в нём нет; сторож режима называет свод сам.
+     */
+    private static final String СВОД = "1.26.0";
+
     private static GameState game(String mode, int players, long seed) {
         GameConfig cfg = GameConfig.buildCached(
-            GameConfig.DEFAULT_RULESET, players, seed, null, null);
+            СВОД, players, seed, null, null);
         // ДОПОЛНЕНИЯ — ТРИ НЕЗАВИСИМЫХ ТУМБЛЕРА (17.08.2026). Прежний трёхзначный
         // режим отменён: супер задания и начальные задания больше не исключают
         // друг друга. Сцены теста задают тумблеры напрямую.
@@ -91,7 +98,7 @@ class StartModesAndBagsTest {
      */
     @Test
     void обаДополненияМогутБытьВключеныРазом() {
-        GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 25L, null, null);
+        GameConfig cfg = GameConfig.buildCached(СВОД, 4, 25L, null, null);
         cfg.ruleset.override("expansions.super_objectives", true);
         cfg.ruleset.override("expansions.starting_objectives", true);
         GameState s = Setup.buildGame(cfg);

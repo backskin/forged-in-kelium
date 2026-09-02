@@ -21,6 +21,14 @@ import kelium.report.ReplayRecord;
 class BoardsTabsTest {
 
     /**
+     * СВОД С РЕЖИМОМ «ВЫБОР СУПЕР-ЗАДАНИЯ ИЗ ДВУХ» и картами супер-арсенала на
+     * треках: именно это здесь и проверяется. Действующий свод раздаёт одну
+     * карту втайне, супер-арсенал на треки не выкладывает, и сторож режима
+     * обязан называть свод сам.
+     */
+    private static final String СВОД = "1.26.0";
+
+    /**
      * ДОПОЛНЕНИЯ ЗАДАЮТСЯ ЯВНО, А НЕ БЕРУТСЯ ИЗ НАСТРОЕК ПРИЛОЖЕНИЯ.
      *
      * <p>БАГ-ФИКС 20.08.2026. Тест проверяет супер-задания, а {@code
@@ -48,7 +56,7 @@ class BoardsTabsTest {
     }
 
     private static ReplayRecord game() {
-        return GameRecorder.play(GameConfig.DEFAULT_RULESET, 4, 4242,
+        return GameRecorder.play(СВОД, 4, 4242,
             List.of("strat:hawk", "strat:dove", "strat:balanced", "strat:opportunist"), null);
     }
 
@@ -86,7 +94,7 @@ class BoardsTabsTest {
         ReplayRecord.Snapshot last = rec.frames.get(rec.frames.size() - 1).snapshot;
 
         GameConfig cfg = GameConfig.buildCached(
-            GameConfig.DEFAULT_RULESET, 4, 0L, null, null);
+            СВОД, 4, 0L, null, null);
 
         BoardsPanel boards = new BoardsPanel();
         boards.setRules(cfg.ruleset, cfg.content);
