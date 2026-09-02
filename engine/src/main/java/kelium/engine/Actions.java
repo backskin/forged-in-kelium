@@ -200,6 +200,35 @@ public final class Actions {
     }
 
     /** Имена всех 8 действий (порядок как в Python ACTION_CLASSES). */
+    /**
+     * ЕСТЬ ЛИ ТАКОЙ ОБМЕН НА ПЛАНШЕТЕ — по списку из свода.
+     *
+     * <p>Печатные обмены рынка и научного отдела были ВПИСАНЫ В КОД, а свод
+     * держал только их курсы. Из-за этого правка 02.09.2026 («на планшете рынка
+     * два обмена вместо четырёх, на планшете науки три вместо четырёх») не
+     * дошла до игры вовсе: движок продолжал предлагать все четыре, потому что
+     * ни разу не спрашивал, перечислены ли они. Теперь спрашивает.
+     *
+     * <p>Ключа в своде НЕТ — считаем, что обмен есть: старые своды не должны
+     * задним числом лишаться того, чем в них играли.
+     *
+     * @param dotted ключ списка ({@code market.base_exchanges} или
+     *               {@code tech.science_exchanges})
+     * @param id     идентификатор обмена в этом списке
+     */
+    static boolean обменНаПланшете(Ruleset rs, String dotted, String id) {
+        Object raw = rs.get(dotted, null);
+        if (!(raw instanceof List<?> list)) {
+            return true;
+        }
+        for (Object o : list) {
+            if (o instanceof Map<?, ?> m && id.equals(String.valueOf(m.get("id")))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static final List<String> ALL_NAMES = List.of(
         "assembly", "mining", "build", "energy_swap",
         "movement", "combat", "market", "science");
@@ -2192,24 +2221,35 @@ public final class Actions {
             // (правило дизайнера 13.08.2026). Величина — из правил, не из кода.
             int pairBonus = ((Number) rs.get("market.pair_bonus_coin", 0)).intValue();
 
+            // КАКИЕ ОБМЕНЫ НАПЕЧАТАНЫ НА ПЛАНШЕТЕ — из свода (см. обменНаПланшете).
+            boolean наКоин = обменНаПланшете(rs, "market.base_exchanges", "kelium_to_coin");
+            boolean наБпр = обменНаПланшете(rs, "market.base_exchanges", "kelium_to_ammo");
+            boolean наЗад = обменНаПланшете(rs, "market.base_exchanges",
+                "kelium_to_objective");
+            boolean наЭнр = обменНаПланшете(rs, "market.base_exchanges",
+                "kelium_to_energy");
             while (player.resources.kelium() >= 1) {
                 List<Choice> opts = new ArrayList<>();
                 // ---- постоянные обмены: доступны СКОЛЬКО УГОДНО раз ----
-                opts.add(new Choice("market_rate", rate("coin", coinRate),
-                    "1 КЕЛ -> " + coinRate + " МОН"));
-                if (pairBonus > 0 && player.resources.kelium() >= 2) {
-                    Map<String, Object> pair = rate("coin", 2 * coinRate + pairBonus);
-                    pair.put("kelium", 2);
-                    opts.add(new Choice("market_rate", pair,
-                        "2 КЕЛ разом -> " + (2 * coinRate + pairBonus) + " МОН"));
+                if (наКоин) {
+                    opts.add(new Choice("market_rate", rate("coin", coinRate),
+                        "1 КЕЛ -> " + coinRate + " МОН"));
+                    if (pairBonus > 0 && player.resources.kelium() >= 2) {
+                        Map<String, Object> pair = rate("coin", 2 * coinRate + pairBonus);
+                        pair.put("kelium", 2);
+                        opts.add(new Choice("market_rate", pair,
+                            "2 КЕЛ разом -> " + (2 * coinRate + pairBonus) + " МОН"));
+                    }
                 }
-                if (Storage.ammoMax(state, player) > player.resources.ammo()) {
+                if (наБпр && Storage.ammoMax(state, player) > player.resources.ammo()) {
                     opts.add(new Choice("market_rate", rate("ammo", ammoRate),
                         "1 КЕЛ -> " + ammoRate + " БПР"));
                 }
-                opts.add(new Choice("market_rate", rate("objective_cards", cardRate),
-                    "1 КЕЛ -> " + cardRate + " карты задания"));
-                BuildingToken needsEnergy = firstHungryBuilding(player);
+                if (наЗад) {
+                    opts.add(new Choice("market_rate", rate("objective_cards", cardRate),
+                        "1 КЕЛ -> " + cardRate + " карты задания"));
+                }
+                BuildingToken needsEnergy = наЭнр ? firstHungryBuilding(player) : null;
                 if (needsEnergy != null) {
                     opts.add(new Choice("market_rate", rate("energy", 1),
                         "1 КЕЛ -> кубик НАВСЕГДА в ячейку " + needsEnergy.type.code));
@@ -2893,7 +2933,18 @@ public final class Actions {
         private String maybeExchange(PlayerState player, Agent agent) {
             int pool = сколькоМожемЗаплатить(player);
             List<Choice> opts = new ArrayList<>();
-            if (pool >= 1) {
+            // ЧТО НАПЕЧАТАНО НА ПЛАНШЕТЕ НАУКИ — из свода (см. обменНаПланшете).
+            // Обмен трофеев на монеты снят с планшета 02.09.2026 и переехал на
+            // карту арсенала; до этой правки движок предлагал его всё равно.
+            boolean вМонеты = обменНаПланшете(rs, "tech.science_exchanges",
+                "trophy_to_coin");
+            boolean арсенал = обменНаПланшете(rs, "tech.science_exchanges",
+                "draw_arsenal");
+            boolean позолота = обменНаПланшете(rs, "tech.science_exchanges",
+                "gild_module");
+            boolean переставить = обменНаПланшете(rs, "tech.science_exchanges",
+                "move_module");
+            if (вМонеты && pool >= 1) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "trophy_to_coin");
                 ex.put("give", 1);
@@ -2904,7 +2955,7 @@ public final class Actions {
             // трофея, сданные разом, дают на одну монету больше. Величина — из
             // правил, тем же ключом, что и на рынке.
             int pairBonus = ((Number) rs.get("tech.pair_bonus_coin", 0)).intValue();
-            if (pairBonus > 0 && pool >= 2) {
+            if (вМонеты && pairBonus > 0 && pool >= 2) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "trophy_to_coin");
                 ex.put("give", 2);
@@ -2915,7 +2966,8 @@ public final class Actions {
             // ЗА КАРТУ НЕ ПЛАТЯТ, ЕСЛИ ЕЁ НЕКУДА ПОЛОЖИТЬ: ячейки под планшетом
             // заняты — обмен не предлагается вовсе. Иначе трофеи уходят, а карта
             // не приходит.
-            if (pool >= 2 && kelium.engine.Storage.arsenalCellFree(state, player)) {
+            if (арсенал && pool >= 2
+                    && kelium.engine.Storage.arsenalCellFree(state, player)) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "draw_arsenal");
                 ex.put("give", 2);
@@ -2926,7 +2978,7 @@ public final class Actions {
             // нет, остаётся прежняя тройка — числа сыгранных партий не должны
             // меняться задним числом.
             int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();
-            if (pool >= gildCost
+            if (позолота && pool >= gildCost
                     && (player.redModules + player.blueModules) > player.goldModules) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "gild");
@@ -2936,7 +2988,7 @@ public final class Actions {
             }
             // Вечный курс: 1 трофей -> 1 перемещение модуля (перестановка
             // посреди раунда, не дожидаясь Смены модулей в Обновление).
-            if (pool >= 1
+            if (переставить && pool >= 1
                     && (!player.redPlacements.isEmpty() || !player.bluePlacements.isEmpty())) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "move_module");

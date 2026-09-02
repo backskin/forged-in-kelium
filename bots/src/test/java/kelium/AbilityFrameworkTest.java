@@ -217,7 +217,11 @@ class AbilityFrameworkTest {
         // Одна партия для такого предусловия — это привязка к случайности.
         GameState s = null;
         int seat = -1;
-        for (long seedShift = 0; seedShift < 6 && seat < 0; seedShift++) {
+        // ПАРТИЙ БОЛЬШЕ, ЧЕМ ШЕСТЬ (правка 02.09.2026). Со сводом 1.33.0 партия
+        // идёт 5-6 раундов вместо восьми: позиций, где вообще есть кого бить,
+        // стало встречаться реже, и шести партий на предусловие перестало
+        // хватать. Проверяемая способность при этом не менялась.
+        for (long seedShift = 0; seedShift < 24 && seat < 0; seedShift++) {
             s = Setup.buildGame(GameConfig.buildCached(
                 GameConfig.DEFAULT_RULESET, 4, 4242L + seedShift * 101L, null, null));
             java.util.List<kelium.core.Agent> agents = new java.util.ArrayList<>();
@@ -225,7 +229,7 @@ class AbilityFrameworkTest {
                 agents.add(kelium.agents.Bots.create("hawk", i, new java.util.Random(i), 4));
             }
             var engine = new kelium.engine.GameEngine(s, agents, null);
-            for (int round = 3; round <= 10 && seat < 0 && !s.finished; round++) {
+            for (int round = 2; round <= 10 && seat < 0 && !s.finished; round++) {
                 engine.runToRound(round);
                 for (int i = 0; i < 4; i++) {
                     if (((kelium.engine.CombatResolver) s.combat).anyAttackPossible(i)) {
@@ -237,8 +241,16 @@ class AbilityFrameworkTest {
         }
         assertTrue(seat >= 0, "ни в одной из шести партий не нашлось позиции с целью");
 
-        assertTrue(Abilities.options(s, seat, slot).isEmpty(),
-            "без установленной карты нового спец-действия в меню нет");
+        // БЕЗ КАРТЫ В МЕНЮ НЕТ ЕЁ СПЕЦ-ДЕЙСТВИЯ — а не «меню пусто вовсе».
+        // Пустоты требовать нельзя: к середине партии бот успевает установить
+        // свои карты арсенала, и в меню законно оказываются ЧУЖИЕ способности
+        // (тот же довод уже записан ниже, у проверки появления опции). Со
+        // сводом 1.33.0, где партия короче, такая позиция стала обычной, и
+        // абсолютная проверка падала, ничего не проверив.
+        for (Choice o : Abilities.options(s, seat, slot)) {
+            assertFalse("unit_makes_one_attack".equals(o.payload()),
+                "спец-действие карты появилось в меню, хотя карта не установлена");
+        }
 
         // Пробуем ВСЕХ, у кого есть цель: бот вправе от удара отказаться (это его
         // решение, а не поломка карты), поэтому требуем, чтобы удар состоялся хотя
