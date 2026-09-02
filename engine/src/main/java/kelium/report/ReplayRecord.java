@@ -294,6 +294,14 @@ public final class ReplayRecord {
         public int ammoCap;
         public int storeCap;
         public final Map<String, Integer> tech = new LinkedHashMap<>();
+        /**
+         * КУБИКИ НАУКИ, ОСТАВШИЕСЯ В ЛИЧНОМ ЗАПАСЕ. В сводах, где кубик занимает
+         * ячейку навсегда, это главное число трека: сколько шагов игрок вообще
+         * ещё может купить. −1 — свод играет по-старому (кубик один на трек и
+         * переставляется), и в проигрывателе вместо запаса рисуется стартовая
+         * зона, как раньше.
+         */
+        public int techCubes = -1;
         public int redModules;
         public int blueModules;
         public int goldModules;
@@ -772,6 +780,7 @@ public final class ReplayRecord {
         v.ammoCap = Storage.ammoMax(s, p);
         v.storeCap = Storage.totalMax(s, p);
         v.tech.putAll(new TreeMap<>(p.techSteps));
+        v.techCubes = p.techCubesLeft;
         v.redModules = p.redModules;
         v.blueModules = p.blueModules;
         v.goldModules = p.goldModules;
@@ -1156,6 +1165,7 @@ public final class ReplayRecord {
         o.put("ammoCap", p.ammoCap);
         o.put("storeCap", p.storeCap);
         o.put("tech", p.tech);
+        o.put("techCubes", p.techCubes);
         o.put("red", p.redModules);
         o.put("blue", p.blueModules);
         o.put("gold", p.goldModules);
@@ -1502,6 +1512,9 @@ public final class ReplayRecord {
         p.ammoCap = Json.i(o, "ammoCap");
         p.storeCap = Json.i(o, "storeCap");
         p.tech.putAll(Json.ints(o, "tech"));
+        // Старые записи поля не несут, и ноль там означал бы «кубиков не
+        // осталось» — то есть враньё. Отсутствие читаем как −1.
+        p.techCubes = o.containsKey("techCubes") ? Json.i(o, "techCubes") : -1;
         p.redModules = Json.i(o, "red");
         p.blueModules = Json.i(o, "blue");
         p.goldModules = Json.i(o, "gold");

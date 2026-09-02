@@ -156,6 +156,13 @@ public final class PublicView {
         // --- наука и модули ---
         /** Трек → достигнутый шаг. */
         public final Map<String, Integer> tech = new LinkedHashMap<>();
+        /**
+         * КУБИКИ НАУКИ В ЗАПАСЕ — публично. Кубики выкладываются на общую доску
+         * и остаются на ней навсегда, значит за столом видно, сколько их у
+         * каждого ещё осталось: это прямо говорит, сколько шагов науки соперник
+         * ещё может купить. −1 в сводах, где кубик один на трек.
+         */
+        public int techCubes = -1;
         public int redModules;
         public int blueModules;
         public int goldModules;
@@ -323,6 +330,7 @@ public final class PublicView {
         }
 
         st.tech.putAll(p.tech);
+        st.techCubes = p.techCubes;
         st.redModules = p.redModules;
         st.blueModules = p.blueModules;
         st.goldModules = p.goldModules;
@@ -532,6 +540,7 @@ public final class PublicView {
         o.put("tuckedCount", st.tuckedCount);
         o.put("tuckedRevealed", st.tuckedRevealed);
         o.put("tech", st.tech);
+        o.put("techCubes", st.techCubes);
         o.put("redModules", st.redModules);
         o.put("blueModules", st.blueModules);
         o.put("goldModules", st.goldModules);
