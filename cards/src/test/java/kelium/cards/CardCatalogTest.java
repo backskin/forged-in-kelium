@@ -40,6 +40,15 @@ class CardCatalogTest {
         return cfg.content.get(family).entries;
     }
 
+    /**
+     * СУПЕР-ЗАДАНИЯ «ОДНА КАРТА ВТАЙНЕ» КЛАССОВ НЕ ИМЕЮТ: их половины
+     * разыгрывает {@code kelium.engine.Super5}, разбирая номер карты. Отличаем
+     * их по полям, которых нет ни у одной другой формы супер-задания.
+     */
+    private static boolean втайне(Map<String, Object> card) {
+        return card.containsKey("multiplier") || card.containsKey("stockpile");
+    }
+
     @Test
     void каждойКартеИзДанныхЕстьКод() {
         bindAll();
@@ -48,13 +57,31 @@ class CardCatalogTest {
                 + String.join(", ", CardRegistry.missing()));
     }
 
+    /**
+     * ...А У СУПЕР-ЗАДАНИЙ «ВТАЙНЕ» — ВЕТКА В ДВИЖКЕ. Класса у них нет, но
+     * молча ничего не делающая карта — беда та же, поэтому сторожим отдельно.
+     */
+    @Test
+    void каждоеСуперЗаданиеВтайнеДвижокЗнает() {
+        java.util.List<String> нет = new java.util.ArrayList<>();
+        for (Map<String, Object> card : entries("super_objectives")) {
+            if (втайне(card) && !kelium.engine.Super5.знает(String.valueOf(card.get("id")))) {
+                нет.add(String.valueOf(card.get("id")));
+            }
+        }
+        assertTrue(нет.isEmpty(),
+            "супер-задания есть в данных, но движок их не разыгрывает: " + нет);
+    }
+
     /** Связать ВСЕ переехавшие семейства: иначе часть карт останется без данных. */
     private static void bindAll() {
         CardRegistry.bindAll("objectives", entries("objectives"));
         CardRegistry.bindAll("arsenal", entries("arsenal"));
         CardRegistry.bindAll("containers", entries("containers"));
         CardRegistry.bindAll("market", entries("market"));
-        CardRegistry.bindAll("super_objectives", entries("super_objectives"));
+        // Карты «втайне» связывать не с чем — классов у них нет по устройству.
+        CardRegistry.bindAll("super_objectives", entries("super_objectives").stream()
+            .filter(c -> !втайне(c)).toList());
         CardRegistry.bindAll("super_arsenal", entries("super_arsenal"));
     }
 
@@ -87,17 +114,34 @@ class CardCatalogTest {
         }
     }
 
+    /**
+     * У КАЖДОЙ КАРТЫ ДАННЫХ КОД НАШЁЛСЯ ИМЕННО ПО ЕЁ НОМЕРУ.
+     *
+     * <p>Раньше здесь сравнивались ЧИСЛА: сколько карт в данных и сколько
+     * классов в реестре. Такая проверка держалась только пока колоды не
+     * версионировались: классы выбывших карт живут в дереве и дальше, потому что
+     * старые версии наборов должны читаться как были, — и стоило колоде
+     * похудеть, как «в коде 162, в данных 137» валило сборку, хотя не сломано
+     * ничего. Сторожить надо не равенство чисел, а то, что каждая карта
+     * ДЕЙСТВУЮЩЕЙ колоды нашла свой класс и подхватила из него имя.
+     */
     @Test
-    void номераКартВКодеИВДанныхСовпадают() {
+    void каждаяКартаДанныхНашлаСвойКласс() {
         bindAll();
-        // СЧИТАЕМ ПО СЕМЕЙСТВАМ. Реестр общий на все карты, поэтому сравнивать
-        // его размер с одним набором данных нельзя: подключили арсенал — и
-        // проверка заданий начала врать.
-        int inData = entries("objectives").size() + entries("arsenal").size()
-            + entries("containers").size() + entries("market").size()
-            + entries("super_objectives").size() + entries("super_arsenal").size();
-        assertEquals(inData, CardRegistry.all().size(),
-            "число карт в коде и в данных разошлось: в данных " + inData
-                + ", в коде " + CardRegistry.all().size());
+        java.util.List<String> плохие = new java.util.ArrayList<>();
+        for (String family : java.util.List.of("objectives", "arsenal", "market",
+                "super_arsenal")) {
+            for (Map<String, Object> entry : entries(family)) {
+                String id = String.valueOf(entry.get("id"));
+                Card c = CardRegistry.find(id);
+                if (c == null) {
+                    плохие.add(family + "/" + id + ": класса нет");
+                } else if (!String.valueOf(entry.get("name")).equals(c.name())) {
+                    плохие.add(family + "/" + id + ": имя в данных «" + entry.get("name")
+                        + "», а в коде «" + c.name() + "»");
+                }
+            }
+        }
+        assertTrue(плохие.isEmpty(), "карты данных и код разошлись: " + плохие);
     }
 }

@@ -63,7 +63,13 @@ class CardDescriptionsSingleSourceTest {
         Ruleset rs = Ruleset.loadById(GameConfig.DEFAULT_RULESET, root.resolve("rulesets"));
         ContentLibrary content = ContentLibrary.forRuleset(rs, root);
 
-        String id = "b01";
+        // НОМЕР БЕРЁТСЯ ИЗ КОЛОДЫ, А НЕ ВПИСАН РУКАМИ. Раньше здесь стоял
+        // «b01», и сторож падал, как только пересборка колоды вывела эту карту
+        // из набора: он проверяет ПУТЬ (описание приходит из класса, а не из
+        // YAML), а не конкретную карту.
+        String id = String.valueOf(content.get("arsenal").entries.stream()
+            .filter(e -> CardRegistry.arsenal(String.valueOf(e.get("id"))) != null)
+            .findFirst().orElseThrow().get("id"));
         Map<String, Object> запись = content.get("arsenal").byId(id);
         var карта = CardRegistry.arsenal(id);
         assertNotNull(карта, "карта " + id + " обязана быть кодом");

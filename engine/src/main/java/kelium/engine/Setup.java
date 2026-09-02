@@ -395,20 +395,18 @@ public final class Setup {
         var content = config.content;
         int n = config.numPlayers;
 
-        // ПРИВЯЗАТЬ ДАННЫЕ К КАРТАМ-ОБЪЕКТАМ (заказ дизайнера 15.08.2026, модуль
-        // cards). ГЛАВНАЯ ТОЧКА ПРИВЯЗКИ ТЕПЕРЬ — {@code ContentLibrary.forRuleset}
-        // (18.08.2026): она же используется внешним и внутренним справочником,
-        // так что оба видят класс-версию, а не сырой YAML. Вызовы здесь оставлены
-        // как страховка — bindAll идемпотентен на одном и том же списке записей,
-        // повторный вызов ничего не портит.
-        kelium.engine.cards.CardRegistry.bindAll("objectives", content.get("objectives").entries);
-        kelium.engine.cards.CardRegistry.bindAll("arsenal", content.get("arsenal").entries);
-        kelium.engine.cards.CardRegistry.bindAll("containers", content.get("containers").entries);
-        kelium.engine.cards.CardRegistry.bindAll("market", content.get("market").entries);
-        kelium.engine.cards.CardRegistry.bindAll("super_objectives",
-            content.get("super_objectives").entries);
-        kelium.engine.cards.CardRegistry.bindAll("super_arsenal",
-            content.get("super_arsenal").entries);
+        // ПРИВЯЗКИ КАРТ ЗДЕСЬ НЕТ И БЫТЬ НЕ ДОЛЖНО. Единственная точка —
+        // ContentLibrary.forRuleset: её же читают оба справочника, поэтому все
+        // видят одни и те же карты.
+        //
+        // ЗАЧЕМ ЭТО СКАЗАНО ОТДЕЛЬНО. Здесь стоял «страховочный» повторный
+        // bindAll по всем семействам, В ТОМ ЧИСЛЕ ПО КОНТЕЙНЕРАМ. А контейнеры
+        // из привязки исключены нарочно (18.08.2026): они вернулись к чистым
+        // данным, классы-контейнеры остались в дереве от прежней редакции.
+        // Страховка исключение отменяла: каждая партия накрывала свежий набор
+        // контейнеров выгрузкой СТАРЫХ классов, и в игре раздавалась редакция
+        // 3.0 независимо от того, что называл свод. Добавлять сюда bindAll
+        // снова нельзя ни под каким видом.
 
         List<Map<String, Object>> boardsEntries = content.get("boards").entries;
         // Запись о жетонах — печатная, если опыт не подменил её копией с правками
@@ -469,6 +467,12 @@ public final class Setup {
             Resources res = new Resources(startCoins, startKelium, startAmmo, 0);
             String startHex = startHexes.get(seat);
             PlayerState ps = new PlayerState(seat, board, res, startHex);
+            // КУБИКИ НАУКИ В ЗАПАС (свод 1.33.0 и новее): их конечное число и
+            // есть предел науки за партию. Ключа нет - остаётся -1, и наука
+            // играет по-старому: кубик один на трек, он переставляется.
+            if (ruleset.getBool("tech.cubes_are_permanent", false)) {
+                ps.techCubesLeft = ruleset.getInt("tech.cube_supply", 8);
+            }
             Hex sh = field.get(startHex);
 
             // ЦУ (2 смежные стороны, +2 энергии), добытчик №1 (1 сторона), 1 пехота.

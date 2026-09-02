@@ -87,9 +87,29 @@ public final class ContentLibrary {
                 "market", "super_objectives", "super_arsenal")) {
             ContentSet cs = sets.get(type);
             if (cs != null) {
-                kelium.engine.cards.CardRegistry.bindAll(type, cs.entries);
+                kelium.engine.cards.CardRegistry.bindAll(type, безКлассов(cs.entries));
             }
         }
+    }
+
+    /**
+     * ОТБРОСИТЬ КАРТЫ, У КОТОРЫХ КЛАССА НЕТ ПО УСТРОЙСТВУ.
+     *
+     * <p>Супер-задания семейства «одна карта втайне» (поля {@code multiplier} и
+     * {@code stockpile}) разыгрывает {@code kelium.engine.Super5}, разбирая
+     * номер карты: классов-карт у них нет и не задумывалось. Просить реестр
+     * связать их значило бы записать их в «карты без кода» — и сторож, который
+     * ищет НАСТОЯЩИЕ пропуски кода, начинал бы врать на каждой партии.
+     */
+    private static java.util.List<Map<String, Object>> безКлассов(
+            java.util.List<Map<String, Object>> entries) {
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (Map<String, Object> e : entries) {
+            if (!e.containsKey("multiplier") && !e.containsKey("stockpile")) {
+                out.add(e);
+            }
+        }
+        return out;
     }
 
     /** Краткая сводка по каждому типу контента: версия и число записей. */
