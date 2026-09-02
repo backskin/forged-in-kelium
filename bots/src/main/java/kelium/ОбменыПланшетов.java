@@ -40,6 +40,7 @@ public final class ОбменыПланшетов {
 
         Map<String, Integer> рынок = new LinkedHashMap<>();
         Map<String, Integer> наука = new LinkedHashMap<>();
+        Map<String, Integer> карты = new LinkedHashMap<>();
         for (int i = 0; i < партий; i++) {
             GameConfig cfg = LayoutLibrary.configFor(игроков, 500L + i);
             GameState s = Setup.buildGame(cfg);
@@ -63,6 +64,22 @@ public final class ОбменыПланшетов {
                         рынок.merge(k.substring("deal_".length()), n.intValue(), Integer::sum);
                     }
                 }
+                // Предложения КАРТ рынка: какую половину брали. Заодно видно,
+                // не отказывает ли новый эффект: отказ движок пишет словом.
+                Object sides = m.get("offer_sides");
+                if (sides != null) {
+                    for (String side : String.valueOf(sides).split(",")) {
+                        if (!side.isBlank()) {
+                            карты.merge("взято:" + side.trim(), 1, Integer::sum);
+                        }
+                    }
+                }
+                for (var e : m.entrySet()) {
+                    String k = String.valueOf(e.getKey());
+                    if (k.startsWith("offer_result")) {
+                        карты.merge("итог:" + e.getValue(), 1, Integer::sum);
+                    }
+                }
                 Object ex = m.get("exchange");
                 if (ex != null && !String.valueOf(ex).isBlank()) {
                     for (String part : String.valueOf(ex).split("\\+")) {
@@ -77,6 +94,8 @@ public final class ОбменыПланшетов {
         печать(рынок);
         System.out.println("НАУКА — печатные обмены:");
         печать(наука);
+        System.out.println("КАРТЫ РЫНКА — предложения:");
+        печать(карты);
     }
 
     private static void печать(Map<String, Integer> m) {

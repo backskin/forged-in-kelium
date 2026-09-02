@@ -2150,6 +2150,12 @@ public final class Actions {
     static final class MarketAction extends Action {
 
         /** Источник «кубика с маркета»: он не двигается и в игру не возвращается. */
+        /**
+         * Особый источник кубика энергии, купленного келемием: его нет на поле,
+         * поэтому Смена энергии его не снимает, а при сносе он не возвращается.
+         * Тот же uid ставит и эффект карты (Effects.placeOnEnergyCell) - жетон
+         * по смыслу один и тот же, откуда бы он ни пришёл.
+         */
         static final int MARKET_KELIUM_UID = -2;
 
         /**
@@ -2269,7 +2275,16 @@ public final class Actions {
                             // предложения две ячейки, вторая открыта только при
                             // 3–4 игроках. Все ячейки заняты — предложение
                             // недоступно, как и за столом.
-                            if (freeMarketCell(s, side) < 0) {
+                            // ПОМЕТКА «БЕЗ ЯЧЕЙКИ» (карты рынка 2.0, заказ
+                            // 02.09.2026) — предложение ячейки не занимает и
+                            // потому не кончается: его может взять каждый и
+                            // сколько угодно раз за раунд. Такие предложения
+                            // нарочно мелкие (келемий вместо энергии, келемий за
+                            // монету) и держат планшет живым, когда обе ячейки
+                            // крупных предложений уже разобрали.
+                            boolean безЯчейки = card.get(side) instanceof Map<?, ?> om
+                                && Boolean.TRUE.equals(om.get("no_cell"));
+                            if (!безЯчейки && freeMarketCell(s, side) < 0) {
                                 continue;
                             }
                             // КАЖДАЯ ПОЛОВИНА — ПО ОДНОМУ РАЗУ. «Обе половины»
@@ -2380,7 +2395,8 @@ public final class Actions {
                 // КУБИК КЕЛЕМИЯ ЛОЖИТСЯ В ЯЧЕЙКУ предложения: он и есть плата за
                 // ячейку (келемий за сделку уже списан выше), и по нему за столом
                 // видно, кто предложение занял.
-                int cell = freeMarketCell(s, String.valueOf(pl.get("side")));
+                int cell = Boolean.TRUE.equals(offer.get("no_cell"))
+                    ? -1 : freeMarketCell(s, String.valueOf(pl.get("side")));
                 if (cell >= 0) {
                     s.marketCells["right".equals(pl.get("side")) ? 1 : 0][cell] = player.seat;
                 }
@@ -2522,7 +2538,9 @@ public final class Actions {
                 // tech.pay_with_debris_only жетоны в оплату не идут, значит и
                 // предлагать шаги «по карману из жетонов» нельзя — иначе игрок
                 // увидел бы вариант, который не может оплатить.
-                int pool = сколькоМожемЗаплатить(player);
+                // ВИРТУАЛЬНЫЕ ОБЛОМКИ КАРТЫ идут в пул, но не в хранилище:
+                // ими можно оплатить шаг, и после действия они исчезают.
+                int pool = сколькоМожемЗаплатить(player) + ctx.scienceVirtualDebris;
                 List<Choice> opts = new ArrayList<>();
                 for (String track : tech.tracks) {
                     if (steppedTracks.contains(track)) {
@@ -2584,7 +2602,11 @@ public final class Actions {
                 // трофейное место не уменьшается — и счётчик застыл на нуле,
                 // сделав условие o39 невыполнимым. Платёж знает сам payTrophy,
                 // поэтому он и возвращает уплаченное.
-                int paid = payTrophy(player, cost, agent);
+                // Сперва тратятся ВИРТУАЛЬНЫЕ обломки: они всё равно исчезнут
+                // с концом действия, а настоящие останутся игроку.
+                int мнимых = Math.min(ctx.scienceVirtualDebris, cost);
+                ctx.scienceVirtualDebris -= мнимых;
+                int paid = мнимых + payTrophy(player, cost - мнимых, agent);
                 TurnJournal.TurnFacts sf = journal(state).of(player.seat);
                 sf.sciencePaidUnits += paid;
                 sf.scienceTracksUsed.add(track);
