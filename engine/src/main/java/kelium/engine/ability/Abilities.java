@@ -46,6 +46,7 @@ public final class Abilities {
         // способностей, либо новая механика.
         Arsenal2Abilities.install();
         Arsenal3Abilities.install();
+        Arsenal5Abilities.install();
     }
 
     /** Зарегистрировать способность (обычно из статического блока набора). */

@@ -123,6 +123,29 @@ public final class Fix {
         return game(4, 7L);
     }
 
+    /**
+     * НОМЕР КАРТЫ АРСЕНАЛА ПО ЕЁ СПОСОБНОСТИ, а не вписанный руками.
+     *
+     * <p>Номера живут в версии колоды и меняются вместе с ней: карта
+     * «Аварийное питание» была b20 в арсенале 3.0.0 и стала a5_32 в 5.0.0.
+     * Тест, вписавший номер, проверяет не правило, а номер — и падает от смены
+     * колоды, ничего не проверив. Способность же живёт в движке и переезжает
+     * вместе с картой.
+     *
+     * @return номер карты действующей колоды или {@code null}, если носителя в
+     *         ней нет вовсе (тогда проверять правило нечем)
+     */
+    @SuppressWarnings("unchecked")
+    public static String картаСоСпособностью(GameState s, String passiveId) {
+        for (var card : kelium.dataio.Ctx.cards(s, "arsenal").entries) {
+            if (card.get("bottom") instanceof java.util.Map<?, ?> bm
+                    && passiveId.equals(String.valueOf(bm.get("passive")))) {
+                return String.valueOf(card.get("id"));
+            }
+        }
+        return null;
+    }
+
     /** Поставить игроку здание на гекс (занимает столько сторон, сколько положено). */
     public static BuildingToken building(GameState s, int seat, BuildingType type,
                                          String hexId, Integer level) {

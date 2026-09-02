@@ -1915,6 +1915,16 @@ public final class GameEngine {
                     int gained = Storage.addDebrisCapped(s, p, flatCount);
                     emit(ev("type", "trophy_to_debris", "seat", p.seat,
                         "tokens", flatCount, "gained", gained, "round", s.round));
+                    // КАРТА АРСЕНАЛА «трофей за каждый возвращённый жетон врага»
+                    // (5.0): к обычному обломку за жетон добавляется второй.
+                    // Считаются ровно те жетоны, что возвращаются с ЭТОГО
+                    // трофейного места, то есть плата за удержанное поле.
+                    if (Passives.hasPassive(s, p.seat, "trophy_per_returned_enemy")) {
+                        int extra = Storage.addDebrisCapped(s, p, flatCount);
+                        emit(ev("type", "ability_reaction", "seat", p.seat,
+                            "ability", "trophy_per_returned_enemy",
+                            "tokens", flatCount, "gained", extra, "round", s.round));
+                    }
                 }
                 for (Token tok : new ArrayList<>(p.trophySpace)) {
                     tok.setCapturedBy(null);

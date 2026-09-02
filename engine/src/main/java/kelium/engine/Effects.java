@@ -99,6 +99,7 @@ public final class Effects {
             case "buy_kelium" -> buyKelium(s, seat, p);
             case "swap_module_from_bag" -> swapModuleFromBag(s, seat, p);
             case "replace_building_with_neutral" -> replaceBuildingWithNeutral(s, seat, p);
+            case "steal_objective_cards" -> stealObjectiveCards(s, seat, p);
             case "exchange_table" -> exchangeTable(s, seat, p);
             case "noop" -> Map.of("noop", p.getOrDefault("note", "unimplemented"));
             // ПУСТОЙ КОНТЕЙНЕР (заказ дизайнера 18.08.2026, контейнеры 4.0) —
@@ -142,6 +143,7 @@ public final class Effects {
                  // арсенала 5.0, что делятся с ними механикой.
                  "place_on_energy_cell", "module_swap", "buy_kelium",
                  "swap_module_from_bag", "replace_building_with_neutral",
+                 "steal_objective_cards",
                  "empty" -> true;   // пустой контейнер (18.08.2026) — реализован, не заглушка
             default -> false;   // включая "noop" — карта-заглушка не должна попасть в колоду
         };
@@ -443,6 +445,15 @@ public final class Effects {
         }
         if (p.get("virtual_debris") instanceof Number vd) {
             ctx.scienceVirtualDebris = vd.intValue();
+        }
+        if (Boolean.TRUE.equals(p.get("pay_with_coin"))) {
+            ctx.sciencePayWithCoin = true;
+        }
+        if (p.get("free_deals") instanceof Number fd) {
+            ctx.marketFreeDeals = fd.intValue();
+        }
+        if (p.get("fixed_price") instanceof Number fp) {
+            ctx.buildFixedPrice = fp.intValue();
         }
         var res = Actions.create(name, s).perform(s.player(seat), ctx, agent);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
@@ -1057,6 +1068,48 @@ public final class Effects {
         }
         return Map.of("replaced", 1, "hex", hex, "sectors", sectors.size(),
             "owner", owner.seat);
+    }
+
+    /**
+     * ЗАБРАТЬ У ПРОТИВНИКА ДО N КАРТ ЗАДАНИЙ. Карты уходят из руки жертвы в руку
+     * вора, вслепую: выбирает не вор, а случай, — иначе кража превращалась бы в
+     * просмотр чужой руки, а рука заданий закрыта.
+     *
+     * <p>Жертву выбирает игрок: у кого карт больше, у того и берут охотнее, и
+     * это осмысленное решение. Рука вора не должна переполниться - лишние карты
+     * просто не берутся, предел руки в игре общий.
+     */
+    static Map<String, Object> stealObjectiveCards(GameState s, int seat, Map<String, Object> p) {
+        PlayerState me = s.player(seat);
+        int сколько = p.get("count") instanceof Number n ? n.intValue() : 1;
+        Agent agent = agentFor(s, seat);
+        List<Choice> opts = new ArrayList<>();
+        for (PlayerState other : s.players) {
+            if (other.seat != seat && !other.objectiveHand.isEmpty()) {
+                opts.add(new Choice("steal_objectives", other.seat,
+                    "забрать задания у места " + other.seat
+                        + " (в руке " + other.objectiveHand.size() + ")"));
+            }
+        }
+        if (opts.isEmpty()) {
+            return Map.of("stolen", 0, "reason", "ни у кого нет карт заданий");
+        }
+        Choice ch = agent != null
+            ? agent.choose(s, opts, Map.of("kind", "steal_objectives")) : opts.get(0);
+        int место = ch != null && ch.payload() instanceof Integer i ? i
+            : (Integer) opts.get(0).payload();
+        PlayerState жертва = s.player(место);
+        int предел = ((Number) kelium.dataio.Ctx.rules(s)
+            .get("objective_hand_limit", 99)).intValue();
+        int взято = 0;
+        while (взято < сколько && !жертва.objectiveHand.isEmpty()
+                && me.objectiveHand.size() < предел) {
+            String card = жертва.objectiveHand.remove(
+                s.rng.nextInt(жертва.objectiveHand.size()));
+            me.objectiveHand.add(card);
+            взято++;
+        }
+        return Map.of("stolen", взято, "from", место);
     }
 
     static Map<String, Object> combo(GameState s, int seat, Map<String, Object> p) {

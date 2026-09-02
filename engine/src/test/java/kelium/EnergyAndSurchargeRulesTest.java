@@ -3,6 +3,7 @@ package kelium;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -59,7 +60,11 @@ class EnergyAndSurchargeRulesTest {
             "и ни одной монеты за отказ списывать нельзя");
 
         // Право на доплату даёт РОВНО ОДНА карта арсенала — «Аварийное питание».
-        p.arsenalInstalled.add("b20");
+        // ПО СПОСОБНОСТИ, А НЕ ПО НОМЕРУ: номер карты меняется с версией
+        // колоды (b20 в арсенале 3.0.0, a5_32 в 5.0.0), а проверяем мы правило.
+        String карта = kelium.support.Fix.картаСоСпособностью(s, "pay_energy_with_coin");
+        assertNotNull(карта, "в действующей колоде есть карта «Аварийное питание»");
+        p.arsenalInstalled.add(карта);
         Ruleset rs = kelium.dataio.Ctx.rules(s);
         int rate = rs.getInt("actions.empty_energy_slot_coin_cost", -1);
         assertEquals(1, rate, "цена ячейки для карты: 1 МОН за ячейку");

@@ -1101,6 +1101,22 @@ public final class CombatResolver {
             if (owner < 0 || owner >= state.numPlayers()) {
                 continue;
             }
+            // РАНЕНАЯ ПЕХОТА УХОДИТ В ЗАПАС (арсенал 5.0): карта даёт пехоте
+            // пережить удар, но не остаться на месте. Проверяется здесь же, где
+            // и щит экономики: событие одно - конец боя.
+            if (Passives.hasPassive(state, owner, "infantry_hp2_returns_on_damage")) {
+                PlayerState ip = state.player(owner);
+                for (UnitToken u : new java.util.ArrayList<>(ip.unitsOnField())) {
+                    if (u.type != UnitType.INFANTRY || u.damage <= 0) {
+                        continue;
+                    }
+                    u.hexId = null;
+                    u.resetDamage();
+                    emit("type", "ability_reaction", "seat", owner,
+                        "ability", "infantry_hp2_returns_on_damage",
+                        "returned_unit", u.type.code);
+                }
+            }
             if (!Passives.hasPassive(state, owner, "economy_plus1_hp_returns_on_damage")) {
                 continue;
             }
@@ -1269,6 +1285,22 @@ public final class CombatResolver {
         if (victim instanceof BuildingToken bt && bt.type == BuildingType.COMMAND_CENTER) {
             destroyCu(bt, attackerSeat);
             return;
+        }
+
+        // КОНТЕЙНЕР ЗА ПОТЕРЮ ЗДАНИЯ (арсенал 5.0, «если твоё здание уничтожили
+        // — получи 1 контейнер из запаса»). Утешение владельцу, а не награда
+        // убийце: карта смотрит на потерю, а не на виновника, поэтому считается
+        // любое уничтожение своего здания — в том числе своим же ядерным
+        // ударом. ЦУ сюда не попадает: у него своя развязка (destroyCu).
+        if (victim instanceof BuildingToken потеря
+                && Passives.hasPassive(s, потеря.owner, "container_on_own_building_lost")) {
+            PlayerState хозяин = s.player(потеря.owner);
+            int взято = Storage.addContainersCapped(s, хозяин, 1);
+            if (взято > 0) {
+                emit("type", "ability_reaction", "seat", потеря.owner,
+                    "ability", "container_on_own_building_lost",
+                    "building", потеря.type.code, "containers", взято);
+            }
         }
 
         // Нарастающий счётчик уничтожений (в отличие от трофеев, он не сбрасывается

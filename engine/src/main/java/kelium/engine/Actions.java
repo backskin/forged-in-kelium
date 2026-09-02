@@ -871,6 +871,20 @@ public final class Actions {
             surcharge -= Math.max(0, ctx.buildDiscountCoins);
             List<Map<String, Object>> menu = ctx.buildMovesOnly
                 ? new ArrayList<>() : buildable(player, surcharge, ctx.buildFree);
+            // ЗДАНИЕ ЗА НАЗВАННУЮ ЦЕНУ (верх арсенала 5.0 «построй любое здание
+            // за 1 монету»). Цена ЗАМЕНЯЕТ всю арифметику стройки - и печатную
+            // цену, и надбавку за операцию: карта обещает ровно одну монету, и
+            // складывать её с надбавкой значило бы обещание не сдержать.
+            if (ctx.buildFixedPrice >= 0) {
+                for (Map<String, Object> m : menu) {
+                    m.put("cost", ctx.buildFixedPrice);
+                    String был = String.valueOf(m.get("label"));
+                    int скобка = был.lastIndexOf(" (");
+                    m.put("label", (скобка > 0 ? был.substring(0, скобка) : был)
+                        + " (" + ctx.buildFixedPrice + " мон)");
+                }
+                menu.removeIf(m -> ctx.buildFixedPrice > player.resources.coin());
+            }
             List<Map<String, Object>> moveMenu = movable(player, ctx);
             // ОДНА ОПЕРАЦИЯ НА ЗДАНИЕ. Уже тронутое этим действием здание из меню
             // уходит: иначе его можно переставлять и сносить по кругу.
@@ -2028,7 +2042,13 @@ public final class Actions {
             // Само правило живёт в Passability — им же пользуется Бой. Второй
             // копии правила быть не должно: пока Бой считал соседей сам, он стрелял
             // сквозь стенки (пойманo дизайнером в проигрывателе).
-            if (!Passability.groundEdgeOpen(state, unit.hexId, hexId, seat)) {
+            // КАРТА СНИМАЕТ СТЕНКУ (арсенал 5.0, «в Маневре наземные войска
+            // игнорируют здания как препятствие»): проход перестаёт закрываться
+            // стенками зданий и нейтралов. МЕСТО НА ГЕКСЕ по-прежнему нужно -
+            // карта отменяет стенку, а не законы физики, поэтому проверка
+            // упаковки ниже остаётся.
+            if (!Passives.hasPassive(state, seat, "ground_ignores_buildings_in_maneuver")
+                    && !Passability.groundEdgeOpen(state, unit.hexId, hexId, seat)) {
                 return false;
             }
             // УМНАЯ проверка стоянки: войска НЕ приколочены к ячейкам — считаем,
@@ -2321,7 +2341,15 @@ public final class Actions {
                         && pm.get("kelium") instanceof Number kn) {
                     keliumCost = Math.max(1, kn.intValue());
                 }
-                player.resources.pay(Resource.KELIUM, keliumCost);
+                // ОДНА СДЕЛКА БЕЗ КЕЛЕМИЯ (верх арсенала 5.0). Бесплатны ровно
+                // столько сделок, сколько дала карта; остальные платятся как всегда.
+                if (ctx.marketFreeDeals > 0) {
+                    ctx.marketFreeDeals--;
+                    keliumCost = 0;
+                }
+                if (keliumCost > 0) {
+                    player.resources.pay(Resource.KELIUM, keliumCost);
+                }
                 keliumSpent += keliumCost;
                 deals++;
                 f.usedMarket = true;
@@ -2540,7 +2568,7 @@ public final class Actions {
                 // увидел бы вариант, который не может оплатить.
                 // ВИРТУАЛЬНЫЕ ОБЛОМКИ КАРТЫ идут в пул, но не в хранилище:
                 // ими можно оплатить шаг, и после действия они исчезают.
-                int pool = сколькоМожемЗаплатить(player) + ctx.scienceVirtualDebris;
+                int pool = сколькоМожемЗаплатить(player, ctx) + ctx.scienceVirtualDebris;
                 List<Choice> opts = new ArrayList<>();
                 for (String track : tech.tracks) {
                     if (steppedTracks.contains(track)) {
@@ -2606,7 +2634,17 @@ public final class Actions {
                 // с концом действия, а настоящие останутся игроку.
                 int мнимых = Math.min(ctx.scienceVirtualDebris, cost);
                 ctx.scienceVirtualDebris -= мнимых;
-                int paid = мнимых + payTrophy(player, cost - мнимых, agent);
+                int остаток = cost - мнимых;
+                int paid;
+                if (ctx.sciencePayWithCoin) {
+                    int монетами = Math.min(остаток, player.resources.coin());
+                    if (монетами > 0) {
+                        player.resources.pay(Resource.COIN, монетами);
+                    }
+                    paid = мнимых + монетами;
+                } else {
+                    paid = мнимых + payTrophy(player, остаток, agent);
+                }
                 TurnJournal.TurnFacts sf = journal(state).of(player.seat);
                 sf.sciencePaidUnits += paid;
                 sf.scienceTracksUsed.add(track);
@@ -2814,6 +2852,18 @@ public final class Actions {
          * обломками, а оплата (при новом правиле) берёт только обломки, и игрок
          * видел бы шаги, за которые ему нечем платить.
          */
+        /**
+         * НАУКА ЗА МОНЕТЫ (верх арсенала 5.0): кошелёк подменяется, курс
+         * остаётся один к одному. Знамя живёт одно разрешение действия, поэтому
+         * и пул, и сама оплата спрашивают его в одном месте.
+         */
+        private int сколькоМожемЗаплатить(PlayerState player, TurnContext ctx) {
+            if (ctx != null && ctx.sciencePayWithCoin) {
+                return player.resources.coin();
+            }
+            return сколькоМожемЗаплатить(player);
+        }
+
         private int сколькоМожемЗаплатить(PlayerState player) {
             return rs.getBool("tech.pay_with_debris_only", false)
                 ? player.resources.debris()
@@ -2958,8 +3008,13 @@ public final class Actions {
             // ЧТО НАПЕЧАТАНО НА ПЛАНШЕТЕ НАУКИ — из свода (см. обменНаПланшете).
             // Обмен трофеев на монеты снят с планшета 02.09.2026 и переехал на
             // карту арсенала; до этой правки движок предлагал его всё равно.
+            // КАРТА ВОЗВРАЩАЕТ СНЯТЫЙ ОБМЕН. Обмен трофеев на монеты снят с
+            // планшета 02.09.2026 и напечатан на карте арсенала: у кого карта
+            // установлена, тот обменивает по прежнему курсу, включая скидку за
+            // пару, а у остальных обмена нет вовсе.
             boolean вМонеты = обменНаПланшете(rs, "tech.science_exchanges",
-                "trophy_to_coin");
+                "trophy_to_coin")
+                || Passives.hasPassive(state, player.seat, "science_trophy_to_coin");
             boolean арсенал = обменНаПланшете(rs, "tech.science_exchanges",
                 "draw_arsenal");
             boolean позолота = обменНаПланшете(rs, "tech.science_exchanges",
