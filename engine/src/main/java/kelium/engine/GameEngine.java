@@ -1605,7 +1605,13 @@ public final class GameEngine {
             ? (Map<String, Object>) t : Map.of();
         Map<String, Object> got;
         kelium.engine.cards.ObjectiveCard код = kelium.engine.cards.CardRegistry.objective(cid);
-        if (код != null && код.burn(new kelium.engine.cards.EngineCardContext(s, p.seat))) {
+        if (код != null) {
+            // КАРТА В КОДЕ ОТВЕЧАЕТ ЗА СВОЙ ВЕРХ ЦЕЛИКОМ — падать отсюда в реестр
+            // эффектов нельзя. Запись {@code top.effect} у таких карт есть, но она
+            // ЧИТАЕМАЯ ФОРМА верха, а не второй способ его сыграть: провалившийся
+            // щит («некого прикрывать») сыграл бы себя вторым заходом уже через
+            // данные. Пустой ответ здесь и значит «верх не сложился».
+            код.burn(new kelium.engine.cards.EngineCardContext(s, p.seat));
             got = new HashMap<>();
         } else {
             try {

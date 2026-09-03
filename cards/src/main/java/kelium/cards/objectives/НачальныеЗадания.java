@@ -45,14 +45,8 @@ public final class НачальныеЗадания {
         }
 
         /** Одноразовый эффект: монета или боеприпас — больше у начальных нет. */
-        @Override
-        public final boolean burn(CardContext ctx) {
-            ctx.gain(монетой ? Resource.COIN : Resource.AMMO, 1);
-            return true;
-        }
-
-        final String верх() {
-            return монетой ? "+1 монета" : "+1 боеприпас";
+        final Утиль верх() {
+            return монетой ? Утиль.МОНЕТА : Утиль.БОЕПРИПАС;
         }
 
         /** Собрать лицо карты, подставив общую награду и общий верх. */

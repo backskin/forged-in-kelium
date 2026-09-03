@@ -66,6 +66,10 @@ public final class TopValue {
             case "shield" -> ctx.me().unitsOnField().isEmpty() ? 0.05
                 : 0.25 + 0.45 * давление(ctx, Hint.Bottleneck.DEFENCE);
             case "convert", "exchange_table" -> 0.4;
+            // Смена энергии или модулей: цена в том, сколько зданий стоит голодными.
+            case "energy_or_modules" -> голодные(ctx) > 0 ? 0.55 : 0.15;
+            // Скорость нужна только тем, кому есть чем ехать.
+            case "speed_boost" -> ctx.me().unitsOnField().isEmpty() ? 0.05 : 0.4;
             case "empty" -> 0.0;
             default -> 0.5;              // незнакомый эффект — середина, как раньше
         };
