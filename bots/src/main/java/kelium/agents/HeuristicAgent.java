@@ -593,7 +593,6 @@ public class HeuristicAgent extends Agent {
             // не бесплатное по смыслу: карта арсенала уходит из руки, контейнер
             // не будет вскрыт ради содержимого. Значит подсовывать стоит только
             // под требование своего супер задания.
-            case "tuck" -> (s, o) -> scoreTuck(s, o);
             case "mass_open" -> (s, o) -> scoreSpec(s, o);   // те же виды опций
             default -> null;
         };
@@ -2331,7 +2330,6 @@ public class HeuristicAgent extends Agent {
             // приближает ли символ требование карты. Без этой оценки механика
             // мертва: боты не вскрывали НИ РАЗУ, и супер задания перестали
             // закрываться вовсе (замер 13.08.2026).
-            case "spec_symbol_reveal" -> scoreSymbolReveal(state, (String) o.payload());
             case "spec_super_check" -> 8.0;
             // ВАРИАНТ ОТ КАРТЫ АРСЕНАЛА. Бот не знает, что это за карта, и знать не
             // должен: он спрашивает у самой способности, какое узкое место она
@@ -2453,89 +2451,6 @@ public class HeuristicAgent extends Agent {
      * поэтому за них есть конкуренция со сжиганием.
      */
     @SuppressWarnings("unchecked")
-    /**
-     * СТОИТ ЛИ ПОДСУНУТЬ карту под планшет. Смотрим на требование своего супер
-     * задания: нужен ли ещё хоть один символ. Символ карты арсенала известен, а
-     * контейнер подсовывается «не глядя» — там ставка на удачу, и цена ниже.
-     */
-    private double scoreTuck(GameState s, Choice o) {
-        if (o.payload() == null) {
-            return 0.5;                      // «ничего не подсовывать»
-        }
-        var p = s.player(seat);
-        if (p.superObjective == null) {
-            return 0.1;
-        }
-        java.util.List<String> need = kelium.engine.Symbols.required(s, p.superObjective);
-        if (need.isEmpty()) {
-            return 0.1;
-        }
-        java.util.List<String> open = kelium.engine.Symbols.revealed(s, p);
-        java.util.List<String> hidden = kelium.engine.Symbols.hiddenForms(s, p);
-        // Чего ещё не хватает с учётом уже подложенного (открытого и закрытого).
-        java.util.Map<String, Integer> have = new java.util.HashMap<>();
-        for (String f : open) {
-            have.merge(f, 1, Integer::sum);
-        }
-        for (String f : hidden) {
-            have.merge(f, 1, Integer::sum);
-        }
-        java.util.Map<String, Integer> want = new java.util.HashMap<>();
-        for (String f : need) {
-            want.merge(f, 1, Integer::sum);
-        }
-        int missing = 0;
-        for (var e : want.entrySet()) {
-            missing += Math.max(0, e.getValue() - have.getOrDefault(e.getKey(), 0));
-        }
-        if (missing == 0) {
-            return 0.2;                      // набор уже собран, беречь карты
-        }
-        if ("tuck_container".equals(o.kind())) {
-            return 1.6;                      // ставка не глядя: символ может не подойти
-        }
-        var marking = kelium.engine.Symbols.of(s);
-        String form = marking.ofArsenal(String.valueOf(o.payload()));
-        if (form == null) {
-            return 0.2;
-        }
-        int stillNeed = want.getOrDefault(form, 0) - have.getOrDefault(form, 0);
-        return stillNeed > 0 ? 4.0 : 0.3;
-    }
-
-    /**
-     * НАСКОЛЬКО ПОЛЕЗНО ВСКРЫТЬ подложенную карту: если её символ нужен супер
-     * заданию и такого символа ещё не хватает — очень полезно, иначе почти нет.
-     *
-     * <p>Символы — сет-коллекшн: вскрывать без надобности значит потратить СПЕЦ
-     * и ничего не получить, поэтому оценка смотрит именно на НЕДОСТАЮЩЕЕ.
-     */
-    private double scoreSymbolReveal(GameState s, String cardId) {
-        var p = s.player(seat);
-        if (p.superObjective == null) {
-            return 0.3;
-        }
-        java.util.List<String> need = kelium.engine.Symbols.required(s, p.superObjective);
-        if (need.isEmpty()) {
-            return 0.3;
-        }
-        var marking = kelium.engine.Symbols.of(s);
-        String form = null;
-        for (var t : p.tucked) {
-            if (t.cardId.equals(cardId) && !t.revealed) {
-                form = "container".equals(t.kind) ? marking.ofContainer(t.cardId)
-                    : marking.ofArsenal(t.cardId);
-            }
-        }
-        if (form == null) {
-            return 0.3;
-        }
-        java.util.List<String> open = kelium.engine.Symbols.revealed(s, p);
-        long have = open.stream().filter(form::equals).count();
-        long want = need.stream().filter(form::equals).count();
-        return want > have ? 6.0 : 0.4;
-    }
-
     /**
      * СПРОСИТЬ САМУ КАРТУ, чего она стоит — установка или утиль (21.08.2026).
      *

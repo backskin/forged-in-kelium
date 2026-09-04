@@ -868,9 +868,12 @@ public final class GameEngine {
         // читают индикаторы заданий, когда строят план на этот ход.
         ctx.orderActions.addAll(actionNames);
         ctx.allowedActions = Math.max(ctx.allowedActions, maxActions);
-        // СУПЕР ЗАДАНИЯ 2.0: подсунуть карты под планшет ради символов — не
-        // действие и не СПЕЦ, поэтому предлагается один раз перед ходом.
-        offerTuck(p);
+        // ЗДЕСЬ БЫЛО ЕДИНСТВЕННОЕ В ХОДУ, ЧТО НЕ ДЕЙСТВИЕ И НЕ СПЕЦ, —
+        // подсовывание карт под планшет ради символа. Снесено 03.09.2026: на
+        // картах арсенала символов больше не печатают, а свод, который эту
+        // механику включал, уже вёл партии без неё (60 партий на 1.33.0 — ни
+        // одного подсовывания). Ход игрока теперь СОСТОИТ из розыгрыша
+        // основных и спец-действий, без исключений, и это правило рулбука.
         // Счётчик сыгранных действий живёт в КОНТЕКСТЕ хода, а не в локальной
         // переменной: откат безопасного действия (концепт «Командный пункт» §5)
         // возвращает его вместе с actionsPlayed через памятку TurnUndo — иначе
@@ -1153,17 +1156,6 @@ public final class GameEngine {
             opts.add(new Choice("spec_super_launch", p.superObjective,
                 "ЗАПУСК: снять ячейку супероружия (осталось " + p.superCells + ")"));
         }
-        // Вскрыть ОДНУ карту под планшетом — СПЕЦ-действие. Правило «открой всех
-        // одним СПЕЦ» отменено дизайнером 12.08.2026 (иконка спец-действия теперь
-        // на рубашке каждой карты).
-        if (revealIsSpec(p)) {
-            for (PlayerState.TuckedCard t : p.tucked) {
-                if (!t.revealed) {
-                    opts.add(new Choice("spec_symbol_reveal", t.cardId,
-                        "вскрыть символ (" + t.cardId + ")"));
-                }
-            }
-        }
         // Вскрытие контейнеров/арсенала: разом — только если правила это разрешают
         // (containers_storage.mass_open; в 1.6.0 выключено).
         if (containersOpenIsSpec() && (p.containers > 0 || !p.arsenalHand.isEmpty())) {
@@ -1247,7 +1239,6 @@ public final class GameEngine {
             case "spec_mandate_containers" -> mandateAllocateContainers(p, (Integer) ch.payload());
             case "spec_super_reveal" -> revealSuper(p);
             case "spec_super_launch" -> launchSuper(p);
-            case "spec_symbol_reveal" -> revealSymbol(p, (String) ch.payload());
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
             case "spec_super6_claim" -> {
@@ -1493,72 +1484,6 @@ public final class GameEngine {
         }
     }
 
-    /** Включено ли правило «вскрытие подложенной карты = СПЕЦ-действие». */
-    private boolean revealIsSpec(PlayerState p) {
-        return !p.tucked.isEmpty() && Boolean.TRUE.equals(Ctx.rules(state)
-            .get("symbols.reveal_is_spec", Boolean.FALSE));
-    }
-
-    /** Вскрыть одну подложенную карту — её символ становится открытым. */
-    private void revealSymbol(PlayerState p, String cardId) {
-        for (PlayerState.TuckedCard t : p.tucked) {
-            if (!t.revealed && t.cardId.equals(cardId)) {
-                t.revealed = true;
-                Symbols.Marking m = Symbols.of(state);
-                String form = "container".equals(t.kind) ? m.ofContainer(t.cardId)
-                    : m.ofArsenal(t.cardId);
-                emit(ev("type", "symbol_reveal", "seat", p.seat, "card", cardId,
-                    "symbol", form, "by", "spec"));
-                return;
-            }
-        }
-    }
-
-    /** Подложить карту под планшет ради символа — свободное решение, не действие. */
-    private void offerTuck(PlayerState p) {
-        GameState s = state;
-        if (!Boolean.TRUE.equals(Ctx.rules(s).get("symbols.tuck_is_free", Boolean.FALSE))
-                || p.superObjective == null) {
-            return;
-        }
-        Symbols.Marking m = Symbols.of(s);
-        while (true) {
-            List<Choice> opts = new ArrayList<>();
-            if (p.containers > 0) {
-                // Конкретную карту контейнера игрок не выбирает: контейнеры лежат
-                // рубашкой вверх, символ на рубашке не виден. Берём верхний из
-                // колоды — это и есть «подсунуть не глядя».
-                opts.add(new Choice("tuck_container", "container", "подсунуть контейнер под планшет"));
-            }
-            for (String cid : new ArrayList<>(p.arsenalHand)) {
-                if (m.ofArsenal(cid) != null) {
-                    opts.add(new Choice("tuck_arsenal", cid, "подсунуть арсенал " + cid));
-                }
-            }
-            if (opts.isEmpty()) {
-                return;
-            }
-            opts.add(new Choice("pass", null, "ничего не подсовывать"));
-            Choice ch = agents.get(p.seat).choose(s, opts, ev("kind", "tuck"));
-            if (ch.payload() == null) {
-                return;
-            }
-            if ("tuck_container".equals(ch.kind())) {
-                String cid = s.decks.get("containers").draw(s.rng);
-                if (cid == null) {
-                    return;
-                }
-                p.containers -= 1;
-                p.tucked.add(new PlayerState.TuckedCard("container", cid));
-                emit(ev("type", "tuck", "seat", p.seat, "kind", "container", "card", cid));
-            } else {
-                String cid = (String) ch.payload();
-                p.arsenalHand.remove(cid);
-                p.tucked.add(new PlayerState.TuckedCard("arsenal", cid));
-                emit(ev("type", "tuck", "seat", p.seat, "kind", "arsenal", "card", cid));
-            }
-        }
-    }
 
 
 
