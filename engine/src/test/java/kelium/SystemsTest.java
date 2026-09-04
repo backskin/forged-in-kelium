@@ -81,29 +81,29 @@ class SystemsTest {
     }
 
     /**
-     * Обломок (правило 2026-08-15) занимает ЛЮБУЮ ячейку склада, но делит
-     * ОБЩИЙ бюджет с келемием/боеприпасом — kelium+ammo+debris ≤ totalMax.
+     * Трофей (правило 2026-08-15) занимает ЛЮБУЮ ячейку склада, но делит
+     * ОБЩИЙ бюджет с келемием/боеприпасом — kelium+ammo+trophy ≤ totalMax.
      */
     @Test
-    void debrisSharesTotalBudgetWithKeliumAndAmmo() {
+    void trophySharesTotalBudgetWithKeliumAndAmmo() {
         GameState s = build();
         PlayerState p = s.player(0);
         p.resources.setKelium(0);
         p.resources.setAmmo(0);
-        p.resources.add(Resource.DEBRIS, -p.resources.debris());
+        p.resources.add(Resource.TROPHY, -p.resources.trophy());
         int total = Storage.totalMax(s, p);
         assertTrue(total > 0, "у свежего игрока есть хоть какая-то вместимость склада");
 
-        int addedD = Storage.addDebrisCapped(s, p, total);
-        assertEquals(total, addedD, "с пустым складом обломок занимает весь бюджет");
+        int addedD = Storage.addTrophyCapped(s, p, total);
+        assertEquals(total, addedD, "с пустым складом трофей занимает весь бюджет");
         int addedKAfter = Storage.addKeliumCapped(s, p, 5);
         assertEquals(0, addedKAfter,
-            "склад полностью занят обломками — келемию места не осталось");
+            "склад полностью занят трофеями — келемию места не осталось");
 
-        p.resources.add(Resource.DEBRIS, -p.resources.debris());
+        p.resources.add(Resource.TROPHY, -p.resources.trophy());
         Storage.addKeliumCapped(s, p, total);
-        int room = Storage.debrisMax(s, p);
-        assertEquals(0, room, "склад занят под завязку келемием — под обломок места нет");
+        int room = Storage.trophyMax(s, p);
+        assertEquals(0, room, "склад занят под завязку келемием — под трофей места нет");
     }
 
     @Test

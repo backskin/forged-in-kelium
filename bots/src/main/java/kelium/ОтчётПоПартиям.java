@@ -85,7 +85,7 @@ public final class ОтчётПоПартиям {
         double[] поле = new double[8];      // здания, войска и запасы к концу
         long трофеевВзято = 0;
         long трофеевСдано = 0;
-        long трофеевВОбломки = 0;
+        long жетоновВТрофеи = 0;
         long переполнений = 0;
         long партийБезБоёв = 0;
         long игроковБезЗаданий = 0;
@@ -184,7 +184,7 @@ public final class ОтчётПоПартиям {
                 if (заданияМеста[i] == 0) {
                     игроковБезЗаданий++;
                 }
-                int склад = p.resources.kelium() + p.resources.ammo() + p.resources.debris();
+                int склад = p.resources.kelium() + p.resources.ammo() + p.resources.trophy();
                 if (склад > kelium.engine.Storage.totalMax(s, p)) {
                     переполнений++;
                 }
@@ -211,13 +211,13 @@ public final class ОтчётПоПартиям {
                     }
                 }
                 поле[7] += склад;
-                трофеевВзято += p.trophySpace.size();
+                трофеевВзято += p.destroyedTokens.size();
             }
             // СЧЁТЧИК СОБЫТИЙ — ОБЩИЙ НА ПРОГОН, а не на партию: прибавлять его
             // к сумме на каждой партии значит складывать одно и то же снова и
             // снова. В отчёте выходило «203 конвертации трофеев за партию» при
             // четырёх игроках — то есть число росло с номером партии.
-            трофеевВОбломки = событий.getOrDefault("trophy_to_debris", 0L);
+            жетоновВТрофеи = событий.getOrDefault("trophy_to_trophy", 0L);
             трофеевСдано = событий.getOrDefault("trophy_released", 0L);
 
             double лучш = -1;
@@ -322,10 +322,10 @@ public final class ОтчётПоПартиям {
         b.append("\nКто кого бьёт (уничтожений за партию):\n\n| бил → жертва | за партию |\n|---|---:|\n");
         сортПоЗначению(ктоПоКому).limit(12).forEach(e -> b.append("| ").append(e.getKey())
             .append(" | ").append(округл(e.getValue() / (double) games)).append(" |\n"));
-        b.append("\nТрофеи: лежит на трофейном месте к концу партии ")
+        b.append("\nТрофеи: лежит на месте уничтоженных жетонов к концу партии ")
             .append(округл(трофеевВзято / (double) мест)).append(" жетонов на игрока; ")
-            .append("конвертаций «трофеи в обломки» ")
-            .append(округл(трофеевВОбломки / (double) games)).append(" за партию.\n");
+            .append("конвертаций «жетоны на место уничтоженных жетонов» ")
+            .append(округл(жетоновВТрофеи / (double) games)).append(" за партию.\n");
 
         // ---------- 6. ПОЛЕ ----------
         b.append("\n## 6. Что стоит на поле к концу партии (на игрока)\n\n");
@@ -401,7 +401,7 @@ public final class ОтчётПоПартиям {
         return switch (ключ) {
             case "kelium" -> "келемий в хранилище";
             case "coins" -> "монеты";
-            case "debris" -> "обломки";
+            case "trophy" -> "трофеи";
             case "buildings_on_field" -> "здания на поле";
             case "units_on_field" -> "войска на поле";
             case "tech" -> "шаги науки";

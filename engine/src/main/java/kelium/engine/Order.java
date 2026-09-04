@@ -12,7 +12,7 @@ import kelium.core.Resource;
  *   development (разработка)        -> сборка, добыча
  *   infrastructure (инфраструктура) -> стройка, смена энергии
  *   operation (операция)            -> движение, бой
- *   acquisitions (приобретения)     -> маркет, наука
+ *   acquisitions (приобретения)     -> рынок, наука
  * </pre>
  */
 public enum Order {

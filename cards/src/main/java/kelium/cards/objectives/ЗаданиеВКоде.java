@@ -335,7 +335,7 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
         return true;
     }
 
-    protected static boolean свободныйМаркет(CardContext ctx) {
+    protected static boolean свободныйРынок(CardContext ctx) {
         ctx.freeAction("market");
         return true;
     }

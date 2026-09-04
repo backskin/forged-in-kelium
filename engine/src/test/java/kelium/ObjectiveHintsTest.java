@@ -128,7 +128,7 @@ class ObjectiveHintsTest {
         hand(s, "n3");
         s.player(0).resources.setAmmo(0);
 
-        // Боеприпасы даёт Сборка и Маркет. Вскрыт приказ, где нет ни того, ни
+        // Боеприпасы даёт Сборка и Рынок. Вскрыт приказ, где нет ни того, ни
         // другого — врать про достижимость нельзя.
         ObjectiveHints.Hint h = hint(s, "n3", Set.of("combat", "movement"), 2);
         assertFalse(h.reachable(),
@@ -172,9 +172,9 @@ class ObjectiveHintsTest {
 
     @Test
     void ценаНаградыСчитаетсяПоДаннымКарты() {
-        // 3 монеты = 3.0; 2 обломка = 3.0; карта задания = 2.0.
+        // 3 монеты = 3.0; 2 трофея = 3.0; карта задания = 2.0.
         assertEquals(3.0, ObjectiveHints.rewardValue(Map.of("coin", 3)), 1e-9);
-        assertEquals(5.0, ObjectiveHints.rewardValue(Map.of("debris", 2, "objective_card", 1)), 1e-9);
+        assertEquals(5.0, ObjectiveHints.rewardValue(Map.of("trophy", 2, "objective_card", 1)), 1e-9);
         // «module: attack» — не число: один жетон, но самый дорогой в игре.
         assertTrue(ObjectiveHints.rewardValue(Map.of("module", "attack")) >= 5.0);
         assertEquals(0.0, ObjectiveHints.rewardValue(null), 1e-9);

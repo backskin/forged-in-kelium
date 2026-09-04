@@ -34,8 +34,8 @@ public enum Утиль {
     БОЙ("СВОБОДНЫЙ БОЙ", "combat"),
     /** Свободный обмен в Научном отделе. */
     НАУКА("СВОБОДНАЯ НАУКА", "science"),
-    /** Свободный обмен на Маркете. */
-    МАРКЕТ("СВОБОДНЫЙ МАРКЕТ", "market"),
+    /** Свободный обмен на Рынке. */
+    РЫНОК("СВОБОДНЫЙ РЫНОК", "market"),
     /** Свободная добыча келемия. */
     ДОБЫЧА("СВОБОДНАЯ ДОБЫЧА", "mining"),
 
@@ -117,12 +117,12 @@ public enum Утиль {
             return ctx.shield(List.of("infantry", "aircraft"));
         }
     },
-    /** Обменять свой келемий на обломок один к одному. */
-    КОНВЕРСИЯ("КОНВЕРСИЯ: 1 келемий -> 1 обломок", "convert",
-        Map.of("from", "kelium", "to", "debris", "amount", 1)) {
+    /** Обменять свой келемий на трофей один к одному. */
+    КОНВЕРСИЯ("КОНВЕРСИЯ: 1 келемий -> 1 трофей", "convert",
+        Map.of("from", "kelium", "to", "trophy", "amount", 1)) {
         @Override
         public boolean сыграть(CardContext ctx) {
-            return ctx.convert(Resource.KELIUM, Resource.DEBRIS, 1);
+            return ctx.convert(Resource.KELIUM, Resource.TROPHY, 1);
         }
     };
 

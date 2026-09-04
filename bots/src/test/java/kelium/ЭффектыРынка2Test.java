@@ -152,28 +152,28 @@ class ЭффектыРынка2Test {
     }
 
     /**
-     * НАУКА «КАК БУДТО НА ОБЛОМОК БОЛЬШЕ» — обломок ВИРТУАЛЬНЫЙ: шаг он
+     * НАУКА «КАК БУДТО НА ТРОФЕЙ БОЛЬШЕ» — трофей ВИРТУАЛЬНЫЙ: шаг он
      * оплачивает, но в хранилище не появляется и после действия не остаётся.
-     * Первый шаг трека стоит один обломок, поэтому игрок с пустым складом
+     * Первый шаг трека стоит один трофей, поэтому игрок с пустым складом
      * обязан на него встать — и остаться с пустым складом.
      */
     @Test
-    void наукаСВиртуальнымОбломком() {
+    void наукаСВиртуальнымТрофеем() {
         GameState s = партия();
         PlayerState p = s.player(0);
-        while (p.resources.debris() > 0) {
-            p.resources.pay(Resource.DEBRIS, 1);
+        while (p.resources.trophy() > 0) {
+            p.resources.pay(Resource.TROPHY, 1);
         }
         int шаговБыло = p.techSteps.values().stream().mapToInt(Integer::intValue).sum();
 
         Effects.apply("free_action", s, 0,
-            Map.of("action", "science", "virtual_debris", 1));
+            Map.of("action", "science", "virtual_trophy", 1));
 
         int шаговСтало = p.techSteps.values().stream().mapToInt(Integer::intValue).sum();
         assertTrue(шаговСтало > шаговБыло,
-            "виртуальный обломок обязан оплатить первый шаг трека");
-        assertEquals(0, p.resources.debris(),
-            "виртуальный обломок в хранилище не появляется");
+            "виртуальный трофей обязан оплатить первый шаг трека");
+        assertEquals(0, p.resources.trophy(),
+            "виртуальный трофей в хранилище не появляется");
     }
 
     @Test

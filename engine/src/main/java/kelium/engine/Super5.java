@@ -370,7 +370,7 @@ public final class Super5 {
         return made;
     }
 
-    /** s5_09: уничтожить чужое здание (кроме ЦУ) без боя и забрать в трофеи. */
+    /** s5_09: уничтожить чужое здание (кроме ЦУ) без боя и забрать на место уничтоженных жетонов. */
     private static String трофейныйОбоз(GameState s, PlayerState p, Agent agent) {
         List<Choice> opts = new ArrayList<>();
         for (PlayerState враг : s.players) {

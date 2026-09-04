@@ -108,10 +108,10 @@ class CombatTest {
         CombatResolver cr = (CombatResolver) s.combat;
         boolean did = cr.runBattle(0, (Agent) s.agents.get(0));
         assertTrue(did, "бой состоялся");
-        // пехота 1 HP -> уничтожена; жетон на трофейном поле атакующего.
+        // пехота 1 HP -> уничтожена; жетон на месте уничтоженных жетонов атакующего.
         assertFalse(p1.units.contains(victim) && victim.hexId != null && victim.alive(),
             "жертва уничтожена/захвачена");
-        assertTrue(p0.trophySpace.contains(victim), "жертва на трофейном поле p0");
+        assertTrue(p0.destroyedTokens.contains(victim), "жертва на месте уничтоженных жетонов p0");
     }
 
     @Test

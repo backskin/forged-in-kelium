@@ -73,7 +73,7 @@ class SuperObjectiveTest {
     void уКаждойКартыЧетыреПонятныеЯчейки() {
         GameState s = Fix.game(СВОД, 4, 7L);
         java.util.Set<String> known = java.util.Set.of(
-            "coin", "ammo", "kelium", "debris",
+            "coin", "ammo", "kelium", "trophy",
             "enemy_unit_token", "enemy_building_token", "enemy_token",
             "own_building", "own_miner", "own_power_plant", "own_unit");
         List<String> bad = new ArrayList<>();

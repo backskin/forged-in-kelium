@@ -39,7 +39,7 @@
 #    прежде контейнер стоял на каждой карте и обесценивал и себя, и карту.
 #
 #  ПРАВИЛО 7. НАЧАЛЬНЫЕ ЗАДАНИЯ. Усиления у них нет ни у одного. Награда у всех
-#    одна и та же: 1 обломок и 1 карта задания. Утиль есть у всех: у половины
+#    одна и та же: 1 трофей и 1 карта задания. Утиль есть у всех: у половины
 #    +1 монета, у половины +1 боеприпас.
 #
 #  ПРАВИЛО 8. УТИЛЬ (одноразовый эффект вместо выполнения) — по ревью
@@ -49,12 +49,12 @@
 #    с пределом: «одним зданием», «двумя зданиями», «одна строительная
 #    операция» — без предела утиль был сильнее выполненного задания, и карту
 #    выгоднее было сжечь, чем выполнить. Утиль вида «+1 монета», «+1 боеприпас»,
-#    «+1 обломок», «+1 контейнер», «+1 келемий», «+1 карта арсенала» с обычных
+#    «+1 трофей», «+1 контейнер», «+1 келемий», «+1 карта арсенала» с обычных
 #    карт убран целиком: это либо пустышка, либо имба, третьего не выходит.
 #    Взамен заведены пять эффектов: ЩИТ (снимает первое попадание по жетонам
 #    выбранного рода), ДЕСАНТ (размести до двух войск разных родов), +1 К
 #    СКОРОСТИ рода до конца хода, СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ на выбор,
-#    КОНВЕРСИЯ (келемий в боеприпас или в обломок).
+#    КОНВЕРСИЯ (келемий в боеприпас или в трофей).
 #
 #  СОСТАВ: 40 обычных карт (ровно 20 про войну и давление, 20 про экономику,
 #  науку, жертвы и рисунки) + 12 начальных.
@@ -119,9 +119,9 @@ objectives:
     requirement: {predicate: built_bordering_enemy, params: {enemy: units}}
     enhanced:    {predicate: built_bordering_enemy, params: {enemy: building}}
     base_reward: {ammo: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: movement}, label: "СВОБОДНОЕ ДВИЖЕНИЕ"}
-    описание: "В ЭТОТ ХОД построй своё здание на гексе, соседнем с гексом, где есть войска противника, — награда 3 боеприпаса. Построй его на гексе, соседнем с гексом, где есть здание противника, и условие усилено: 2 обломка и карта задания. Передовая база строится под огнём — потому и платит."
+    описание: "В ЭТОТ ХОД построй своё здание на гексе, соседнем с гексом, где есть войска противника, — награда 3 боеприпаса. Построй его на гексе, соседнем с гексом, где есть здание противника, и условие усилено: 2 трофея и карта задания. Передовая база строится под огнём — потому и платит."
 
   - id: o12
     name: "Наглая стройка"
@@ -144,9 +144,9 @@ objectives:
     requirement: {predicate: buildings_ring_around_hex, params: {count: 2, enemy_building_on_center: true}}
     enhanced:    {predicate: buildings_ring_around_hex, params: {count: 3, enemy_building_on_center: true}}
     base_reward: {ammo: 3}
-    special_reward: {module: attack, debris: 2}
+    special_reward: {module: attack, trophy: 2}
     top: {effect: shield, params: {types: [vehicle, aircraft]}, label: "ЩИТ: техника или авиация"}
-    описание: "Имей свои здания на двух гексах, соседних с одним и тем же гексом, где стоит здание противника, — награда 3 боеприпаса. Замкни кольцо с трёх сторон, и условие усилено: жетон модуля атаки и 2 обломка. Осада стоит дорого, поэтому и платит крупно."
+    описание: "Имей свои здания на двух гексах, соседних с одним и тем же гексом, где стоит здание противника, — награда 3 боеприпаса. Замкни кольцо с трёх сторон, и условие усилено: жетон модуля атаки и 2 трофея. Осада стоит дорого, поэтому и платит крупно."
 
   - id: o17
     name: "Штаб на передовой"
@@ -158,9 +158,9 @@ objectives:
     requirement: {predicate: cu_placed_near_enemy_cu, params: {distance: 2}}
     enhanced:    {predicate: cu_placed_near_enemy_cu, params: {distance: 2, adjacent_enemy_building: true}}
     base_reward: {coin: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: assembly, buildings: 1}, label: "СБОРКА ОДНИМ ЗДАНИЕМ"}
-    описание: "В ЭТОТ ХОД построй или перенеси своё ЦУ так, чтобы от него до гекса с ЦУ противника осталось не больше 2 гексов, — награда 3 монеты. Поставь его так, чтобы оно примыкало к зданию противника, и условие усилено: 2 обломка и карта задания. Штаб, придвинутый к чужому, экономит каждое перемещение."
+    описание: "В ЭТОТ ХОД построй или перенеси своё ЦУ так, чтобы от него до гекса с ЦУ противника осталось не больше 2 гексов, — награда 3 монеты. Поставь его так, чтобы оно примыкало к зданию противника, и условие усилено: 2 трофея и карта задания. Штаб, придвинутый к чужому, экономит каждое перемещение."
 
   - id: o21
     name: "Первая кровь"
@@ -178,16 +178,16 @@ objectives:
     name: "Зачистка"
     kind: regular
     type: state
-    # ЖЕРТВА ТРОФЕЯМИ. Базовое требование — состояние (в трофеях лежит чужое
+    # ЖЕРТВА ТРОФЕЯМИ. Базовое требование — состояние (среди уничтоженных жетонов лежит чужое
     # здание), плата — вернуть его владельцу; усиление — вернуть ещё один
-    # трофейный жетон. Возврат идёт мимо Науки: трофей уходит, очков не дав.
-    requirement: {predicate: trophy_contains, params: {building: 1}}
+    # уничтоженный жетон. Возврат идёт мимо Науки: трофей уходит, очков не дав.
+    requirement: {predicate: destroyed_contains, params: {building: 1}}
     sacrifice: {resource: trophies, amount: 1}
     enhanced:  {predicate: sacrifice_enhanced, params: {resource: trophies, amount: 2}}
     base_reward: {coin: 3, ammo: 2}
     special_reward: {objective_card: 1}
     top: {effect: free_action, params: {action: science}, label: "СВОБОДНАЯ НАУКА"}
-    описание: "Имей в трофеях здание противника и верни его владельцу — награда 3 монеты и 2 боеприпаса. Верни владельцу ещё один трофейный жетон, и условие усилено: карта задания. Отданный трофей очков не приносит: за это и платят."
+    описание: "Имей среди уничтоженных жетонов здание противника и верни его владельцу — награда 3 монеты и 2 боеприпаса. Верни владельцу ещё один уничтоженный жетон, и условие усилено: карта задания. Отданный уничтоженный жетон очков не приносит: за это и платят."
 
   - id: o23
     name: "Подранки"
@@ -196,9 +196,9 @@ objectives:
     requirement: {predicate: damaged_distinct_no_kills, params: {count: 2}}
     enhanced:    {predicate: damaged_distinct_no_kills, params: {count: 3}}
     base_reward: {ammo: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: speed_boost, params: {}, label: "+1 К СКОРОСТИ ОДНОГО РОДА ДО КОНЦА ХОДА"}
-    описание: "В ЭТОТ ХОД нанеси урон двум разным жетонам противника — войскам, зданиям, как выйдет — и не уничтожь ни одного. Награда: 3 боеприпаса. Рань так три жетона, и условие усилено: 2 обломка и карта задания. Подранков добивают позже и дешевле."
+    описание: "В ЭТОТ ХОД нанеси урон двум разным жетонам противника — войскам, зданиям, как выйдет — и не уничтожь ни одного. Награда: 3 боеприпаса. Рань так три жетона, и условие усилено: 2 трофея и карта задания. Подранков добивают позже и дешевле."
 
   - id: o45
     name: "Пристрелка"
@@ -209,9 +209,9 @@ objectives:
     requirement: {predicate: damaged_distinct_enemy_buildings, params: {count: 2}}
     enhanced:    {predicate: damaged_distinct_enemy_buildings, params: {count: 3}}
     base_reward: {coin: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: shield, params: {types: [infantry, aircraft]}, label: "ЩИТ: пехота или авиация"}
-    описание: "В ЭТОТ ХОД нанеси урон двум разным зданиям противника — награда 3 монеты. Достань три разных здания, и условие усилено: 2 обломка и карта задания. Пристрелка не сносит стену, но показывает, где она тонкая."
+    описание: "В ЭТОТ ХОД нанеси урон двум разным зданиям противника — награда 3 монеты. Достань три разных здания, и условие усилено: 2 трофея и карта задания. Пристрелка не сносит стену, но показывает, где она тонкая."
 
   - id: o25
     name: "Осада"
@@ -219,12 +219,12 @@ objectives:
     type: state
     # БЫЛО «нанеси удар за один ход» — «удар за два хода» не бывает, приписка
     # была пустой. СТАЛО: проверяемое состояние трофейного пространства.
-    requirement: {predicate: trophy_contains, params: {building: 1}}
-    enhanced:    {predicate: trophy_contains, params: {building_types: [miner]}}
+    requirement: {predicate: destroyed_contains, params: {building: 1}}
+    enhanced:    {predicate: destroyed_contains, params: {building_types: [miner]}}
     base_reward: {objective_card: 2}
     special_reward: {module: attack}
     top: {effect: free_action, params: {action: assembly, buildings: 1}, label: "СБОРКА ОДНИМ ЗДАНИЕМ"}
-    описание: "Имей в трофеях здание противника — награда 2 карты задания. Если среди твоих трофеев есть добытчик противника, условие усилено: жетон модуля атаки. Снесённая экономика соседа стоит дороже снесённой казармы."
+    описание: "Имей среди уничтоженных жетонов здание противника — награда 2 карты задания. Если среди твоих трофеев есть добытчик противника, условие усилено: жетон модуля атаки. Снесённая экономика соседа стоит дороже снесённой казармы."
 
   - id: o26
     name: "Блицкриг"
@@ -247,9 +247,9 @@ objectives:
     requirement: {predicate: unit_on_hex_with_enemy_units, params: {count: 1}}
     enhanced:    {predicate: unit_on_hex_with_enemy_units, params: {count: 2}}
     base_reward: {ammo: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: assembly, buildings: 2}, label: "СБОРКА ДВУМЯ ЗДАНИЯМИ"}
-    описание: "Имей своё войско на гексе, где есть войска противника, — награда 3 боеприпаса. Имей на одном таком гексе два своих войска, и условие усилено: 2 обломка и карта задания. Гекс никому не принадлежит — но стоять на нём вдвоём неудобно обоим."
+    описание: "Имей своё войско на гексе, где есть войска противника, — награда 3 боеприпаса. Имей на одном таком гексе два своих войска, и условие усилено: 2 трофея и карта задания. Гекс никому не принадлежит — но стоять на нём вдвоём неудобно обоим."
 
   - id: o28
     name: "Клещи"
@@ -270,9 +270,9 @@ objectives:
     requirement: {predicate: units_off_own_hexes, params: {count: 3}}
     enhanced:    {predicate: units_off_own_hexes, params: {count: 3, distinct_hexes: true}}
     base_reward: {coin: 4}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: assembly, buildings: 2}, label: "СБОРКА ДВУМЯ ЗДАНИЯМИ"}
-    описание: "Имей три своих войска вне гексов, где стоят твои здания, — награда 4 монеты. Если все три стоят на разных гексах, условие усилено: 2 обломка и карта задания. Двор пустеет ровно тогда, когда фронт наконец поехал."
+    описание: "Имей три своих войска вне гексов, где стоят твои здания, — награда 4 монеты. Если все три стоят на разных гексах, условие усилено: 2 трофея и карта задания. Двор пустеет ровно тогда, когда фронт наконец поехал."
 
   - id: o31
     name: "Господство в небе"
@@ -307,9 +307,9 @@ objectives:
     requirement: {predicate: destroyed_enemy_economy, params: {count: 1}}
     enhanced:    {predicate: destroyed_enemy_economy, params: {count: 1, powered: true}}
     base_reward: {coin: 3}
-    special_reward: {debris: 3, objective_card: 1}
+    special_reward: {trophy: 3, objective_card: 1}
     top: {effect: gain, params: {coin: 2}, label: "2 монеты"}
-    описание: "В ЭТОТ ХОД уничтожь добытчик противника — награда 3 монеты. Если этот добытчик был запитан, условие усилено: 3 обломка и карта задания. Отнятый добытчик стоит сопернику всех оставшихся раундов добычи."
+    описание: "В ЭТОТ ХОД уничтожь добытчик противника — награда 3 монеты. Если этот добытчик был запитан, условие усилено: 3 трофея и карта задания. Отнятый добытчик стоит сопернику всех оставшихся раундов добычи."
 
   - id: o43
     name: "Охота на сильного"
@@ -330,12 +330,12 @@ objectives:
     name: "Трофейный обоз"
     kind: regular
     type: state
-    requirement: {predicate: trophy_distinct_kinds, params: {count: 3}}
-    enhanced:    {predicate: trophy_distinct_kinds, params: {count: 4}}
+    requirement: {predicate: destroyed_distinct_kinds, params: {count: 3}}
+    enhanced:    {predicate: destroyed_distinct_kinds, params: {count: 4}}
     base_reward: {coin: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: science}, label: "СВОБОДНАЯ НАУКА"}
-    описание: "Имей в трофеях жетоны трёх разных видов — пехота, техника, авиация, вышка и каждый тип здания считаются отдельно. Награда: 3 монеты. Собери четыре разных вида, и условие усилено: 2 обломка и карта задания. Обоз показывает не силу удара, а широту фронта."
+    описание: "Имей среди уничтоженных жетонов жетоны трёх разных видов — пехота, техника, авиация, вышка и каждый тип здания считаются отдельно. Награда: 3 монеты. Собери четыре разных вида, и условие усилено: 2 трофея и карта задания. Обоз показывает не силу удара, а широту фронта."
 
   # ============ ЭКОНОМИКА, НАУКА, ЖЕРТВЫ И РИСУНКИ (20 карт) ============
 
@@ -361,9 +361,9 @@ objectives:
     requirement: {predicate: hired_distinct_kinds, params: {count: 2}}
     enhanced:    {predicate: hired_distinct_kinds, params: {count: 2, require_kinds: [aircraft], forbid_kinds: [tower]}}
     base_reward: {ammo: 2}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: energy_or_modules, params: {}, label: "СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ"}
-    описание: "В ЭТОТ ХОД найми два войска разных родов — награда 2 боеприпаса. Если среди нанятых есть авиация и нет ни одной вышки, условие усилено: 2 обломка и карта задания. Авиабаза требует трёх кубиков энергии — конвейер до неё ещё надо дотянуть."
+    описание: "В ЭТОТ ХОД найми два войска разных родов — награда 2 боеприпаса. Если среди нанятых есть авиация и нет ни одной вышки, условие усилено: 2 трофея и карта задания. Авиабаза требует трёх кубиков энергии — конвейер до неё ещё надо дотянуть."
 
   - id: o04
     name: "Жила"
@@ -374,9 +374,9 @@ objectives:
     requirement: {predicate: powered_miners_distinct_spawns, params: {count: 2}}
     enhanced:    {predicate: powered_miners_distinct_spawns, params: {count: 2, nonstart_all: true}}
     base_reward: {coin: 3}
-    special_reward: {debris: 1, objective_card: 1}
+    special_reward: {trophy: 1, objective_card: 1}
     top: {effect: free_action, params: {action: movement}, label: "СВОБОДНОЕ ДВИЖЕНИЕ"}
-    описание: "Имей запитанными два своих добытчика, примыкающих к разным тайлам зарождения, — награда 3 монеты. Если оба примыкают к нестартовым тайлам зарождения, условие усилено: обломок и карта задания. Своё зарождение вырабатывают все, чужое — только те, кто дотянулся."
+    описание: "Имей запитанными два своих добытчика, примыкающих к разным тайлам зарождения, — награда 3 монеты. Если оба примыкают к нестартовым тайлам зарождения, условие усилено: трофей и карта задания. Своё зарождение вырабатывают все, чужое — только те, кто дотянулся."
 
   - id: o05
     name: "Выработка"
@@ -399,7 +399,7 @@ objectives:
     enhanced:    {predicate: miner_took_container, params: {no_kelium: true}}
     base_reward: {coin: 2, ammo: 2}
     special_reward: {module: assembly}
-    top: {effect: convert, params: {from: kelium, to: debris, amount: 1}, label: "КОНВЕРСИЯ: 1 келемий -> 1 обломок"}
+    top: {effect: convert, params: {from: kelium, to: trophy, amount: 1}, label: "КОНВЕРСИЯ: 1 келемий -> 1 трофей"}
     описание: "В ЭТОТ ХОД забери печатный контейнер добытчиком — награда 2 монеты и 2 боеприпаса. Если при этом за весь ход ты не добыл ни одного келемия, условие усилено: жетон модуля сборки. Каждый добытчик в Добыче выбирает одно: келемий или контейнер."
 
   - id: o15
@@ -411,9 +411,9 @@ objectives:
     requirement: {predicate: build_ops_on_nonadjacent_hexes, params: {count: 2}}
     enhanced:    {predicate: build_ops_on_nonadjacent_hexes, params: {count: 3}}
     base_reward: {ammo: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: combat}, label: "СВОБОДНЫЙ БОЙ"}
-    описание: "В ЭТОТ ХОД выполни две строительные операции на двух гексах, не соседних между собой, — награда 3 боеприпаса. Выполни три операции на трёх попарно несоседних гексах, и условие усилено: 2 обломка и карта задания. Зона стройки растёт от твоих стенок, поэтому разъехаться дороже, чем прирасти."
+    описание: "В ЭТОТ ХОД выполни две строительные операции на двух гексах, не соседних между собой, — награда 3 боеприпаса. Выполни три операции на трёх попарно несоседних гексах, и условие усилено: 2 трофея и карта задания. Зона стройки растёт от твоих стенок, поэтому разъехаться дороже, чем прирасти."
 
   - id: o16
     name: "Переезд"
@@ -424,9 +424,9 @@ objectives:
     requirement: {predicate: moved_buildings_this_turn, params: {count: 2}}
     enhanced:    {predicate: moved_buildings_this_turn, params: {count: 2, include_cu: true}}
     base_reward: {coin: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: energy_or_modules, params: {}, label: "СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ"}
-    описание: "В ЭТОТ ХОД перенеси два своих здания на другие гексы — награда 3 монеты. Если одно из перенесённых — твоё ЦУ, условие усилено: 2 обломка и карта задания. ЦУ переносится не чаще раза за ход, так что второе здание придётся подгадать."
+    описание: "В ЭТОТ ХОД перенеси два своих здания на другие гексы — награда 3 монеты. Если одно из перенесённых — твоё ЦУ, условие усилено: 2 трофея и карта задания. ЦУ переносится не чаще раза за ход, так что второе здание придётся подгадать."
 
   - id: o18
     name: "Полная нагрузка"
@@ -474,9 +474,9 @@ objectives:
     requirement: {predicate: market_offers_used, params: {count: 3}}
     enhanced:    {predicate: market_offers_used, params: {count: 4}}
     base_reward: {coin: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: movement}, label: "СВОБОДНОЕ ДВИЖЕНИЕ"}
-    описание: "В ЭТОТ ХОД оплати три разных предложения на планшете маркета — напечатанные курсы и предложения карт сделок считаются по отдельности. Награда: 3 монеты. Оплати четыре разных предложения, и условие усилено: 2 обломка и карта задания. Биржа берёт объёмом, а не одной удачной сделкой."
+    описание: "В ЭТОТ ХОД оплати три разных предложения на планшете рынка — напечатанные курсы и предложения карт сделок считаются по отдельности. Награда: 3 монеты. Оплати четыре разных предложения, и условие усилено: 2 трофея и карта задания. Биржа берёт объёмом, а не одной удачной сделкой."
 
   - id: o34
     name: "Научный отдел"
@@ -488,7 +488,7 @@ objectives:
     enhanced:    {predicate: science_offers_used, params: {count: 4}}
     base_reward: {ammo: 2, objective_card: 1}
     special_reward: {coin: 4, objective_card: 1}
-    top: {effect: free_action, params: {action: market}, label: "СВОБОДНЫЙ МАРКЕТ"}
+    top: {effect: free_action, params: {action: market}, label: "СВОБОДНЫЙ РЫНОК"}
     описание: "В ЭТОТ ХОД воспользуйся тремя разными предложениями планшета технологий — каждый трек и каждый вечный курс считаются отдельным предложением. Награда: 2 боеприпаса и карта задания. Возьми четыре разных предложения, и условие усилено: 4 монеты и ещё карта задания. Больше одного шага на трек за действие не сделать — значит придётся идти вширь."
 
   - id: o36
@@ -510,8 +510,8 @@ objectives:
     enhanced:    {predicate: science_trophies_spent, params: {count: 2, same_track: true}}
     base_reward: {coin: 3}
     special_reward: {objective_card: 3}
-    top: {effect: convert, params: {from: kelium, to: debris, amount: 1}, label: "КОНВЕРСИЯ: 1 келемий -> 1 обломок"}
-    описание: "В ЭТОТ ХОД действием Наука сдай не меньше двух трофейных жетонов — награда 3 монеты. Если оба ушли на один и тот же трек, условие усилено: 3 карты задания. Один шаг на трек за действие — вот почему «оба на один трек» стоит дороже, чем кажется."
+    top: {effect: convert, params: {from: kelium, to: trophy, amount: 1}, label: "КОНВЕРСИЯ: 1 келемий -> 1 трофей"}
+    описание: "В ЭТОТ ХОД действием Наука сдай не меньше двух уничтоженных жетонов — награда 3 монеты. Если оба ушли на один и тот же трек, условие усилено: 3 карты задания. Один шаг на трек за действие — вот почему «оба на один трек» стоит дороже, чем кажется."
 
   - id: o40
     name: "Ва-банк"
@@ -532,9 +532,9 @@ objectives:
     sacrifice: {resource: container, amount: 2}
     enhanced:  {predicate: sacrifice_enhanced, params: {resource: container, amount: 3}}
     base_reward: {coin: 4}
-    special_reward: {debris: 2, objective_card: 1}
-    top: {effect: free_action, params: {action: market}, label: "СВОБОДНЫЙ МАРКЕТ"}
-    описание: "Сдай два своих неоткрытых контейнера — награда 4 монеты. Сдай третий, и условие усилено: 2 обломка и карта задания. Контейнер стоит ровно столько, сколько в нём лежит, а лежит в нём неизвестно что."
+    special_reward: {trophy: 2, objective_card: 1}
+    top: {effect: free_action, params: {action: market}, label: "СВОБОДНЫЙ РЫНОК"}
+    описание: "Сдай два своих неоткрытых контейнера — награда 4 монеты. Сдай третий, и условие усилено: 2 трофея и карта задания. Контейнер стоит ровно столько, сколько в нём лежит, а лежит в нём неизвестно что."
 
   - id: o10
     name: "Разоружение"
@@ -557,9 +557,9 @@ objectives:
     requirement: {predicate: chain_connects, params: {what: "unit:any", anchors: own_miner_hexes, anchor_count: 2}}
     enhanced:    {predicate: chain_connects, params: {what: "unit:any", anchors: own_miner_hexes, anchor_count: 2, forbid_kinds: [tower]}}
     base_reward: {ammo: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: movement}, label: "СВОБОДНОЕ ДВИЖЕНИЕ"}
-    описание: "Твои войска образуют непрерывное соседство, связывающее два разных гекса, где стоят твои добытчики, — награда 3 боеприпаса. Если в этом соседстве не участвует ни одна вышка, условие усилено: 2 обломка и карта задания. Вышка стоит даром и не двигается — линия без вышек означает, что ты держишь её живыми войсками."
+    описание: "Твои войска образуют непрерывное соседство, связывающее два разных гекса, где стоят твои добытчики, — награда 3 боеприпаса. Если в этом соседстве не участвует ни одна вышка, условие усилено: 2 трофея и карта задания. Вышка стоит даром и не двигается — линия без вышек означает, что ты держишь её живыми войсками."
 
   - id: o53
     name: "Промышленный узел"
@@ -568,9 +568,9 @@ objectives:
     requirement: {predicate: chain_connects, params: {what: "building:any", anchors: straight_line, anchor_count: 3}}
     enhanced:    {predicate: chain_connects, params: {what: "building:any", anchors: straight_line, anchor_count: 3, require_types: [airbase], require_count: 2}}
     base_reward: {coin: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: build, ops: 1}, label: "ОДНА СТРОИТЕЛЬНАЯ ОПЕРАЦИЯ"}
-    описание: "Твои здания образуют непрерывное соседство, связывающее три гекса, лежащих по прямой, — награда 3 монеты. Если в этом соседстве участвуют две твои авиабазы, условие усилено: 2 обломка и карта задания. Авиабаза просит три кубика энергии, и две подряд — это уже вся сеть."
+    описание: "Твои здания образуют непрерывное соседство, связывающее три гекса, лежащих по прямой, — награда 3 монеты. Если в этом соседстве участвуют две твои авиабазы, условие усилено: 2 трофея и карта задания. Авиабаза просит три кубика энергии, и две подряд — это уже вся сеть."
 
   - id: o54
     name: "Заслон"
@@ -585,7 +585,7 @@ objectives:
 
   # ==================== НАЧАЛЬНЫЕ (12 карт) ====================
   # У начальных заданий НЕТ усиления ни у одного. Награда у всех одна:
-  # 1 обломок и 1 карта задания. Утиль есть у всех: у шести +1 монета,
+  # 1 трофей и 1 карта задания. Утиль есть у всех: у шести +1 монета,
   # у шести +1 боеприпас.
 
   - id: n1
@@ -593,27 +593,27 @@ objectives:
     kind: starting
     type: state
     requirement: {predicate: buildings_on_field_count, params: {count: 3}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {coin: 1}, label: "+1 монета"}
-    описание: "Имей на поле не меньше трёх своих зданий, считая ЦУ, — награда обломок и карта задания."
+    описание: "Имей на поле не меньше трёх своих зданий, считая ЦУ, — награда трофей и карта задания."
 
   - id: n2
     name: "Первый боец"
     kind: starting
     type: incident
     requirement: {predicate: hired_distinct_kinds, params: {count: 1, forbid_kinds: [tower]}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {ammo: 1}, label: "+1 боеприпас"}
-    описание: "В ЭТОТ ХОД найми войско любого рода, кроме вышки, — награда обломок и карта задания."
+    описание: "В ЭТОТ ХОД найми войско любого рода, кроме вышки, — награда трофей и карта задания."
 
   - id: n3
     name: "Патроны"
     kind: starting
     type: state
     requirement: {predicate: resource_at_least, params: {resource: ammo, amount: 3}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {coin: 1}, label: "+1 монета"}
-    описание: "Имей не меньше трёх боеприпасов — награда обломок и карта задания."
+    описание: "Имей не меньше трёх боеприпасов — награда трофей и карта задания."
 
   - id: n4
     needs_expansion: market_cards   # без карт рынка условие невыполнимо
@@ -621,81 +621,81 @@ objectives:
     kind: starting
     type: incident
     requirement: {predicate: used_market_card_offer, params: {}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {ammo: 1}, label: "+1 боеприпас"}
-    описание: "В ЭТОТ ХОД воспользуйся предложением карты сделок на рынке — награда обломок и карта задания."
+    описание: "В ЭТОТ ХОД воспользуйся предложением карты сделок на рынке — награда трофей и карта задания."
 
   - id: n5
     name: "Коммутация"
     kind: starting
     type: state
     requirement: {predicate: powered_building_off_cu_hex, params: {}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {coin: 1}, label: "+1 монета"}
-    описание: "Имей на поле запитанное здание, стоящее не на гексе с твоим ЦУ, — награда обломок и карта задания."
+    описание: "Имей на поле запитанное здание, стоящее не на гексе с твоим ЦУ, — награда трофей и карта задания."
 
   - id: n6
     name: "Выход"
     kind: starting
     type: state
     requirement: {predicate: unit_at_distance_from_cu, params: {distance: 2}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {ammo: 1}, label: "+1 боеприпас"}
-    описание: "Имей на поле своё войско на расстоянии двух и больше гексов от гекса с твоим ЦУ — награда обломок и карта задания."
+    описание: "Имей на поле своё войско на расстоянии двух и больше гексов от гекса с твоим ЦУ — награда трофей и карта задания."
 
   - id: n7
     name: "Жила"
     kind: starting
     type: state
     requirement: {predicate: resource_at_least, params: {resource: kelium, amount: 3}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {coin: 1}, label: "+1 монета"}
-    описание: "Имей не меньше трёх келемия — награда обломок и карта задания."
+    описание: "Имей не меньше трёх келемия — награда трофей и карта задания."
 
   - id: n8
     name: "Находка"
     kind: starting
     type: state
     requirement: {predicate: has_unopened_container, params: {count: 2}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {ammo: 1}, label: "+1 боеприпас"}
-    описание: "Имей у себя не меньше двух неоткрытых контейнеров — награда обломок и карта задания."
+    описание: "Имей у себя не меньше двух неоткрытых контейнеров — награда трофей и карта задания."
 
   - id: n9
     name: "Первый шаг"
     kind: starting
     type: state
     requirement: {predicate: tech_step_reached, params: {step: 1, tracks: 1}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {coin: 1}, label: "+1 монета"}
-    описание: "Продвинься хотя бы на один шаг на любом треке технологий — награда обломок и карта задания."
+    описание: "Продвинься хотя бы на один шаг на любом треке технологий — награда трофей и карта задания."
 
   - id: n10
     name: "Первый трофей"
     kind: starting
     type: state
-    requirement: {predicate: trophy_contains, params: {any: 1}}
-    base_reward: {debris: 1, objective_card: 1}
+    requirement: {predicate: destroyed_contains, params: {any: 1}}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {ammo: 1}, label: "+1 боеприпас"}
-    описание: "Имей в трофеях хотя бы один жетон — награда обломок и карта задания."
+    описание: "Имей среди уничтоженных жетонов хотя бы один жетон — награда трофей и карта задания."
 
   - id: n11
     name: "Второй заход"
     kind: starting
     type: incident
     requirement: {predicate: lower_order_open_this_turn, params: {}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {coin: 1}, label: "+1 монета"}
-    описание: "В ЭТОТ ХОД получи действие с нижнего приказа своей карты приказа — награда обломок и карта задания."
+    описание: "В ЭТОТ ХОД получи действие с нижнего приказа своей карты приказа — награда трофей и карта задания."
 
   - id: n12
     name: "В унисон"
     kind: starting
     type: incident
     requirement: {predicate: order_coincided_this_turn, params: {}}
-    base_reward: {debris: 1, objective_card: 1}
+    base_reward: {trophy: 1, objective_card: 1}
     top: {effect: gain, params: {ammo: 1}, label: "+1 боеприпас"}
-    описание: "В ЭТОТ ХОД сыграй верхом тот же приказ, что и другой игрок, — награда обломок и карта задания."
+    описание: "В ЭТОТ ХОД сыграй верхом тот же приказ, что и другой игрок, — награда трофей и карта задания."
 
 # ============================================================================
 #  СКАМЕЙКА — готовые карты сверх сорока. В раздачу не попадают (движок читает
@@ -737,9 +737,9 @@ objectives:
     requirement: {predicate: chain_connects, params: {what: "any", anchors: field_edge_cells, anchor_count: 2}}
     enhanced:    {predicate: chain_connects, params: {what: "any", anchors: field_edge_cells, anchor_count: 2, require_types: [airbase], require_count: 1}}
     base_reward: {coin: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: build, ops: 1}, label: "ОДНА СТРОИТЕЛЬНАЯ ОПЕРАЦИЯ"}
-    описание: "Твои жетоны образуют непрерывное соседство, связывающее два гекса у края поля — гекса, у которого хотя бы одно ребро не имеет соседнего гекса. Награда: 3 монеты. Если в этом соседстве участвует твоя авиабаза, условие усилено: 2 обломка и карта задания."
+    описание: "Твои жетоны образуют непрерывное соседство, связывающее два гекса у края поля — гекса, у которого хотя бы одно ребро не имеет соседнего гекса. Награда: 3 монеты. Если в этом соседстве участвует твоя авиабаза, условие усилено: 2 трофея и карта задания."
 
   - id: o56
     name: "Прорыв"
@@ -768,7 +768,7 @@ objectives:
     requirement: {predicate: chain_connects, params: {what: "unit:any", anchors: field_edge_cells, anchor_count: 2}}
     enhanced:    {predicate: chain_connects, params: {what: "unit:any", anchors: field_edge_cells, anchor_count: 2, forbid_kinds: [tower]}}
     base_reward: {ammo: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: speed_boost, params: {}, label: "+1 К СКОРОСТИ ОДНОГО РОДА ДО КОНЦА ХОДА"}
 
   - id: o59
@@ -787,7 +787,7 @@ objectives:
     type: state
     requirement: {predicate: chain_connects, params: {what: "any", anchors: own_and_enemy_building, anchor_count: 2, forbid_kinds: [aircraft]}}
     enhanced:    {predicate: chain_connects, params: {what: "any", anchors: own_and_enemy_building, anchor_count: 2, forbid_kinds: [aircraft], require_unit_kinds: [infantry, vehicle]}}
-    base_reward: {ammo: 2, debris: 2}
+    base_reward: {ammo: 2, trophy: 2}
     special_reward: {module: attack, objective_card: 1}
     top: {effect: shield, params: {kinds: [infantry, vehicle]}, label: "ЩИТ: пехота или техника"}
 
@@ -808,7 +808,7 @@ objectives:
     requirement: {predicate: chain_connects, params: {what: "any", anchors: opposite_around_spawn, anchor_count: 2}}
     enhanced:    {predicate: chain_connects, params: {what: "any", anchors: opposite_around_spawn, anchor_count: 2, min_hexes: 5}}
     base_reward: {coin: 2, kelium: 1}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: free_action, params: {action: mining}, label: "СВОБОДНАЯ ДОБЫЧА"}
 
 bench:
@@ -830,9 +830,9 @@ bench:
     requirement: {predicate: powered_miners_count, params: {count: 2}}
     enhanced:    {predicate: powered_miners_count, params: {count: 4}}
     base_reward: {coin: 3, ammo: 2}
-    special_reward: {debris: 3}
+    special_reward: {trophy: 3}
     top: {effect: free_action, params: {action: combat}, label: "СВОБОДНЫЙ БОЙ"}
-    описание: "Имей запитанными два своих добытчика — награда 3 монеты и 2 боеприпаса. Доведи число запитанных добытчиков до четырёх, и условие усилено: 3 обломка."
+    описание: "Имей запитанными два своих добытчика — награда 3 монеты и 2 боеприпаса. Доведи число запитанных добытчиков до четырёх, и условие усилено: 3 трофея."
 
   - id: o30
     name: "Мародёр"
@@ -876,9 +876,9 @@ bench:
     requirement: {predicate: arsenal_cards_held, params: {count: 3}}
     enhanced:    {predicate: arsenal_cards_held, params: {count: 3, all_face_down: true}}
     base_reward: {coin: 3}
-    special_reward: {debris: 2, objective_card: 1}
+    special_reward: {trophy: 2, objective_card: 1}
     top: {effect: convert, params: {from: kelium, to: ammo, amount: 1}, label: "КОНВЕРСИЯ: 1 келемий -> 1 боеприпас"}
-    описание: "Имей у себя три карты арсенала — награда 3 монеты. Если все три лежат рубашкой вверх и ни одна не установлена, условие усилено: 2 обломка и карта задания."
+    описание: "Имей у себя три карты арсенала — награда 3 монеты. Если все три лежат рубашкой вверх и ни одна не установлена, условие усилено: 2 трофея и карта задания."
 
   - id: o49
     name: "Схрон"
@@ -888,6 +888,6 @@ bench:
     enhanced:    {predicate: has_unopened_container, params: {count: 5}}
     base_reward: {coin: 3, ammo: 2}
     special_reward: {objective_card: 1}
-    top: {effect: free_action, params: {action: market}, label: "СВОБОДНЫЙ МАРКЕТ"}
+    top: {effect: free_action, params: {action: market}, label: "СВОБОДНЫЙ РЫНОК"}
     описание: "Имей у себя четыре контейнера — награда 3 монеты и 2 боеприпаса. Держи пять, и условие усилено: карта задания. Вскрытый контейнер сразу уходит, поэтому уточнять «неоткрытых» не нужно."
 

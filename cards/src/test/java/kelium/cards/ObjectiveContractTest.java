@@ -142,7 +142,7 @@ class ObjectiveContractTest {
                 }
                 check(ctx, reward, "coin", Resource.COIN, card);
                 check(ctx, reward, "ammo", Resource.AMMO, card);
-                check(ctx, reward, "debris", Resource.DEBRIS, card);
+                check(ctx, reward, "trophy", Resource.TROPHY, card);
                 check(ctx, reward, "kelium", Resource.KELIUM, card);
             }));
         }
@@ -169,7 +169,7 @@ class ObjectiveContractTest {
         int room = switch (res) {
             case AMMO -> kelium.engine.Storage.ammoMax(ctx.state(), ctx.me());
             case KELIUM -> kelium.engine.Storage.keliumMax(ctx.state(), ctx.me());
-            case DEBRIS -> kelium.engine.Storage.debrisMax(ctx.state(), ctx.me());
+            case TROPHY -> kelium.engine.Storage.trophyMax(ctx.state(), ctx.me());
             case COIN -> Integer.MAX_VALUE;       // монеты склад не занимают
         };
         int expected = Math.min(promised, Math.max(0, room));

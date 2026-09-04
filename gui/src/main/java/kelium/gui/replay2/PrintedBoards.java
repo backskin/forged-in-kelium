@@ -268,11 +268,11 @@ final class PrintedBoards {
             s * 1.24, s * 1.24));
         MarkIcons.paint(g, switch (has) {
             case 'K' -> "KELIUM";
-            case 'D' -> "DEBRIS";
+            case 'D' -> "TROPHY";
             default -> "AMMO";
         }, cx, cy, s, switch (has) {
             case 'K' -> Theme.kelium();
-            case 'D' -> Theme.debris();
+            case 'D' -> Theme.trophy();
             default -> Theme.ink2();
         });
     }

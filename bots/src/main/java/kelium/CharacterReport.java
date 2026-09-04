@@ -316,17 +316,17 @@ public final class CharacterReport {
             md.append(String.format(Locale.ROOT, " | **%.1f** |%n", t.vp / t.games));
         }
 
-        // «Военный трек» — ЭКСПЕРИМЕНТАЛЬНЫЙ рычаг economy.leftover_trophy_vp_per.
+        // «Военный трек» — ЭКСПЕРИМЕНТАЛЬНЫЙ рычаг economy.leftover_destroyed_vp_per.
         // Ключа нет ни в одном ruleset → дефолт 0 → источник выключен и столбец
         // структурно нулевой. Без этой пометки нули читаются как поломка
         // (вопрос дизайнера 12.08.2026).
         int warPer = ((Number) kelium.dataio.GameConfig
             .buildCached(kelium.dataio.GameConfig.DEFAULT_RULESET, players, 1L, null, null)
-            .ruleset.get("economy.leftover_trophy_vp_per", 0)).intValue();
+            .ruleset.get("economy.leftover_destroyed_vp_per", 0)).intValue();
         md.append(warPer > 0
             ? "\n«Военный трек» ВКЛЮЧЁН: 1 ПО за каждые " + warPer
-              + " трофейных очков, оставшихся под трофеями к концу раунда.\n"
-            : "\n«Военный трек» ВЫКЛЮЧЕН (`economy.leftover_trophy_vp_per` = 0), "
+              + " трофеев, оставшихся под трофеями к концу раунда.\n"
+            : "\n«Военный трек» ВЫКЛЮЧЕН (`economy.leftover_destroyed_vp_per` = 0), "
               + "поэтому столбец нулевой у всех — это не поломка, а неактивный "
               + "экспериментальный рычаг.\n");
 

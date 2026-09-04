@@ -25,7 +25,7 @@ public final class OpponentStrip extends JComponent {
 
     public record Row(int seat, String name, boolean me, int vp, int coin,
                        int kelium, int ammo, int orderCards, int objectiveCards,
-                       int arsenalCards, int trophyPoints) {
+                       int arsenalCards, int destroyedValue) {
     }
 
     private final List<Row> rows = new ArrayList<>();
@@ -44,7 +44,7 @@ public final class OpponentStrip extends JComponent {
     @Override
     public String getToolTipText(java.awt.event.MouseEvent e) {
         return "Открытый счёт всех мест: очки · монеты · келемий · БПР · "
-            + "карты в руках (приказы/задания/арсенал) · трофейные очки. "
+            + "карты в руках (приказы/задания/арсенал) · трофеи. "
             + "Полный планшет — в ящике «Планшет»";
     }
 
@@ -89,7 +89,7 @@ public final class OpponentStrip extends JComponent {
             cx = stat(g, cx, cy, "AMMO", Theme.energy(), String.valueOf(r.ammo()));
             cx = stat(g, cx, cy, "CARD", Theme.neutral(),
                 r.orderCards() + "·" + r.objectiveCards() + "·" + r.arsenalCards());
-            cx = stat(g, cx, cy, "TROPHY", Theme.trophy(), String.valueOf(r.trophyPoints()));
+            cx = stat(g, cx, cy, "DESTROYED", Theme.destroyed(), String.valueOf(r.destroyedValue()));
 
             x += cardW + Theme.px(8);
         }
@@ -105,7 +105,7 @@ public final class OpponentStrip extends JComponent {
         String cards = r.orderCards() + "·" + r.objectiveCards() + "·" + r.arsenalCards();
         for (String v : List.of(String.valueOf(r.vp()), String.valueOf(r.coin()),
                 String.valueOf(r.kelium()), String.valueOf(r.ammo()), cards,
-                String.valueOf(r.trophyPoints()))) {
+                String.valueOf(r.destroyedValue()))) {
             w += Theme.px(15) + fm.stringWidth(v) + Theme.px(7);
         }
         return w + Theme.px(6);

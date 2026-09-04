@@ -263,7 +263,7 @@ public class StrategicAgent extends HeuristicAgent {
             return null;
         }
         PlayerState me = state.player(seat);
-        int pool = me.trophySpacePoints() + me.resources.debris();
+        int pool = me.destroyedValue() + me.resources.trophy();
         return Phrasebook.pick("действие." + what + "." + actionGrade(state, name), rng,
             "n", String.valueOf(pool), "келемий", String.valueOf(me.resources.kelium()));
     }
@@ -332,7 +332,7 @@ public class StrategicAgent extends HeuristicAgent {
                 yield kel >= 3 ? СИЛЬНО : (kel >= 1 ? НОРМА : СЛАБО);
             }
             case "science" -> {
-                int pool = me.trophySpacePoints() + me.resources.debris();
+                int pool = me.destroyedValue() + me.resources.trophy();
                 yield pool >= 3 ? СИЛЬНО : (pool >= 1 ? НОРМА : СЛАБО);
             }
             default -> НОРМА;
@@ -604,7 +604,7 @@ public class StrategicAgent extends HeuristicAgent {
                 if (step != null && name.equals(step.action)) {
                     return k * 6.0;
                 }
-                // цель уже собрана — играем действие-развязку (Добыча/Маркет/...)
+                // цель уже собрана — играем действие-развязку (Добыча/Рынок/...)
                 if (step == null && name.equals(finalAction(plan))) {
                     return k * 8.0;
                 }

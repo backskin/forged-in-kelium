@@ -41,7 +41,7 @@ super_objectives:
     win_pattern: {id: sp_chain_three_miners_bordering_grids}
   - id: yadro
     name: "Ядро"
-    assembly: {parts: [{kind: debris, amount: 6}]}
+    assembly: {parts: [{kind: trophy, amount: 6}]}
     win_pattern: {id: sp_three_unit_hexes_adjacent_one_enemy_hex}
   - id: roy
     name: "Рой"

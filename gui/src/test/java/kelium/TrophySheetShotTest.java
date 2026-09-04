@@ -17,13 +17,13 @@ import kelium.gui.replay2.Session;
 import kelium.report.ReplayRecord;
 
 /**
- * Снимок ПЛАНШЕТА ИГРОКА: обломки обязаны попадать в ячейки хранилища и рисоваться
+ * Снимок ПЛАНШЕТА ИГРОКА: трофеи обязаны попадать в ячейки хранилища и рисоваться
  * своим значком. Картинки кладутся в {@code target/sheet-shots} — посмотреть глазами.
  */
-class DebrisSheetShotTest {
+class TrophySheetShotTest {
 
     @Test
-    void debrisLandsInStorageCells() throws Exception {
+    void trophyLandsInStorageCells() throws Exception {
         ReplayRecord rec = GameRecorder.play(GameConfig.DEFAULT_RULESET, 4, 4242,
             List.of("strat:hawk", "strat:dove", "explorer", "chaos"), null);
         Session s = new Session();
@@ -32,29 +32,29 @@ class DebrisSheetShotTest {
         Path dir = Path.of("target", "sheet-shots");
         Files.createDirectories(dir);
 
-        // кадр, где у кого-то из игроков реально есть обломки
+        // кадр, где у кого-то из игроков реально есть трофеи
         int best = rec.frames.size() - 1;
         int bestSeat = 0;
-        int bestDebris = -1;
+        int bestTrophy = -1;
         for (int i = 0; i < rec.frames.size(); i++) {
             for (ReplayRecord.Player p : rec.frames.get(i).snapshot.players) {
-                if (p.debris > bestDebris) {
-                    bestDebris = p.debris;
+                if (p.trophy > bestTrophy) {
+                    bestTrophy = p.trophy;
                     best = i;
                     bestSeat = p.seat;
                 }
             }
         }
-        System.out.println("[sheet] максимум обломков " + bestDebris
+        System.out.println("[sheet] максимум трофеев " + bestTrophy
             + " у места " + bestSeat + " на кадре " + best + " из " + rec.frames.size());
 
-        // партия обязана дойти до обломков — иначе снимок ничего не проверяет
-        org.junit.jupiter.api.Assertions.assertTrue(bestDebris > 0,
-            "в записи нет ни одного обломка — снимок хранилища бессмыслен");
+        // партия обязана дойти до трофеев — иначе снимок ничего не проверяет
+        org.junit.jupiter.api.Assertions.assertTrue(bestTrophy > 0,
+            "в записи нет ни одного трофея — снимок хранилища бессмыслен");
 
-        shoot(s, best, bestSeat, dir.resolve("sheet-debris.png"));
+        shoot(s, best, bestSeat, dir.resolve("sheet-trophy.png"));
 
-        // ВТОРОЙ СНИМОК — С РАЗЛОЖЕННЫМИ МОДУЛЯМИ. Кадр с максимумом обломков и
+        // ВТОРОЙ СНИМОК — С РАЗЛОЖЕННЫМИ МОДУЛЯМИ. Кадр с максимумом трофеев и
         // кадр с максимумом модулей — как правило разные, а места под жетоны надо
         // увидеть занятыми, а не только пустыми.
         int modBest = 0;

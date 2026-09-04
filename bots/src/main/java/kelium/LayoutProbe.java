@@ -94,7 +94,7 @@ public final class LayoutProbe {
         out.add("# Зонд раскладок — сравнение полей между собой"
             + (noSuper ? " (СУПЕР-ЗАДАНИЯ ВЫКЛЮЧЕНЫ)" : "")
             + (warTrackPer > 0
-                ? " (ВОЕННЫЙ ТРЕК: 1 ПО за " + warTrackPer + " несданных трофейных очка)"
+                ? " (ВОЕННЫЙ ТРЕК: 1 ПО за " + warTrackPer + " несданных трофея)"
                 : ""));
         out.add("");
         out.add(String.format(Locale.ROOT,
@@ -102,7 +102,7 @@ public final class LayoutProbe {
             + "характеры ротируются по сидам).%s%s", gamesPer,
             noSuper ? " Супер-задания: **выключены**." : "",
             warTrackPer > 0
-                ? " Военный трек: **1 ПО за " + warTrackPer + " оставшихся трофейных очка** в Возврат."
+                ? " Военный трек: **1 ПО за " + warTrackPer + " оставшихся трофея** в Возврат."
                 : ""));
         out.add("");
 
@@ -128,7 +128,7 @@ public final class LayoutProbe {
                         cfg.ruleset.override("super_objectives.enabled", Boolean.FALSE);
                     }
                     if (warTrackPer > 0) {
-                        cfg.ruleset.override("economy.leftover_trophy_vp_per", warTrackPer);
+                        cfg.ruleset.override("economy.leftover_destroyed_vp_per", warTrackPer);
                     }
                     GameState s = Setup.buildGame(cfg);
                     String[] seatProfiles = seatProfiles(players, seed);

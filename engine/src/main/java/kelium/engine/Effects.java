@@ -19,7 +19,7 @@ import kelium.core.Agent;
 import kelium.core.Choice;
 
 /**
- * Реестр немедленных эффектов карт (контейнеры/маркет/арсенал/задания).
+ * Реестр немедленных эффектов карт (контейнеры/рынок/арсенал/задания).
  *
  * <p>Порт из forge/engine/effects.py. Эффект — это операция, изменяющая
  * состояние игрока/поля и возвращающая небольшую карту телеметрии. Эффекты,
@@ -158,8 +158,8 @@ public final class Effects {
             pl.resources.add(Resource.COIN, n);
             got.put("coin", n);
         }
-        if (p.containsKey("debris")) {
-            got.put("debris", Storage.addDebrisCapped(s, pl, asInt(p.get("debris"))));
+        if (p.containsKey("trophy")) {
+            got.put("trophy", Storage.addTrophyCapped(s, pl, asInt(p.get("trophy"))));
         }
         if (p.containsKey("kelium")) {
             got.put("kelium", Storage.addKeliumCapped(s, pl, asInt(p.get("kelium"))));
@@ -382,7 +382,7 @@ public final class Effects {
             return got;
         }
         // ПОДАРОК К ДЕЙСТВИЮ — те же параметры, что у обычного gain: «бесплатная
-        // Наука и сверху 1 обломок» (Лицензия), «бесплатный Бой и 1 боеприпас в
+        // Наука и сверху 1 трофей» (Лицензия), «бесплатный Бой и 1 боеприпас в
         // его начале» (Внезапный удар), «бесплатная Смена энергии и 2 монеты»
         // (Перекоммутация).
         //
@@ -440,11 +440,11 @@ public final class Effects {
         if (p.get("free_miner_moves") instanceof Number mm) {
             ctx.freeMinerMoves = mm.intValue();
         }
-        if (Boolean.TRUE.equals(p.get("debris_to_coin"))) {
-            ctx.scienceDebrisToCoin = true;
+        if (Boolean.TRUE.equals(p.get("trophy_to_coin"))) {
+            ctx.scienceTrophyToCoin = true;
         }
-        if (p.get("virtual_debris") instanceof Number vd) {
-            ctx.scienceVirtualDebris = vd.intValue();
+        if (p.get("virtual_trophy") instanceof Number vd) {
+            ctx.scienceVirtualTrophy = vd.intValue();
         }
         if (Boolean.TRUE.equals(p.get("pay_with_coin"))) {
             ctx.sciencePayWithCoin = true;
@@ -805,7 +805,7 @@ public final class Effects {
         // решает он, а не карта. Предлагаются только выполнимые пары: платить
         // надо тем, что есть, а получать то, для чего есть место на складе.
         if (Boolean.TRUE.equals(p.get("any"))) {
-            Resource[] all = {Resource.COIN, Resource.AMMO, Resource.KELIUM, Resource.DEBRIS};
+            Resource[] all = {Resource.COIN, Resource.AMMO, Resource.KELIUM, Resource.TROPHY};
             List<Choice> opts = new ArrayList<>();
             for (Resource from : all) {
                 if (!pl.resources.canPay(from, amount)) {
@@ -847,7 +847,7 @@ public final class Effects {
         pl.resources.pay(from, amount);
         int got = switch (to) {
             case AMMO -> Storage.addAmmoCapped(s, pl, amount);
-            case DEBRIS -> Storage.addDebrisCapped(s, pl, amount);
+            case TROPHY -> Storage.addTrophyCapped(s, pl, amount);
             case KELIUM -> Storage.addKeliumCapped(s, pl, amount);
             default -> {
                 pl.resources.add(to, amount);
@@ -901,7 +901,7 @@ public final class Effects {
      * своего здания и остаётся в ней НАВСЕГДА.
      *
      * <p>Это была печатная сделка планшета рынка ({@code kelium_to_energy}), и
-     * своего эффекта у неё не было: механика жила прямо в действии Маркета.
+     * своего эффекта у неё не было: механика жила прямо в действии Рынка.
      * Заказ 02.09.2026 снял сделку с планшета и отдал её КАРТЕ рынка, а тот же
      * низ достался карте арсенала — значит нужен эффект.
      *
@@ -1006,7 +1006,7 @@ public final class Effects {
 
     /**
      * ЗАМЕНИТЬ ЧУЖОЕ ЗДАНИЕ НЕЙТРАЛЬНЫМ. Чужой жетон уходит владельцу в ЗАПАС
-     * (не в трофеи и не в лом — его можно отстроить заново), а его секторы
+     * (не на место уничтоженных жетонов и не в лом — его можно отстроить заново), а его секторы
      * занимает нейтрал.
      *
      * <p>Отличие от {@code build_neutral}: там игрок выбирает СЕКТОРЫ и может
@@ -1136,7 +1136,7 @@ public final class Effects {
     }
 
     /**
-     * ОБМЕН ПО ПЕЧАТНОЙ ТАБЛИЦЕ — «1 обломок на 2 монеты ИЛИ 2 обломка на 5».
+     * ОБМЕН ПО ПЕЧАТНОЙ ТАБЛИЦЕ — «1 трофей на 2 монеты ИЛИ 2 трофея на 5».
      *
      * <p>Отличие от {@link #convert}: там курс один и линейный, а на картах
      * встречается ЛЕСТНИЦА, где второй обмен выгоднее первого. Строку выбирает
@@ -1150,7 +1150,7 @@ public final class Effects {
         Resource from;
         Resource to;
         try {
-            from = Resource.fromCode(String.valueOf(p.getOrDefault("from", "debris")));
+            from = Resource.fromCode(String.valueOf(p.getOrDefault("from", "trophy")));
             to = Resource.fromCode(String.valueOf(p.getOrDefault("to", "coin")));
         } catch (RuntimeException e) {
             return Map.of("exchanged", 0);
@@ -1186,7 +1186,7 @@ public final class Effects {
         int got = switch (to) {
             case AMMO -> Storage.addAmmoCapped(s, pl, deal[1]);
             case KELIUM -> Storage.addKeliumCapped(s, pl, deal[1]);
-            case DEBRIS -> Storage.addDebrisCapped(s, pl, deal[1]);
+            case TROPHY -> Storage.addTrophyCapped(s, pl, deal[1]);
             default -> {
                 pl.resources.add(to, deal[1]);
                 yield deal[1];
@@ -1227,7 +1227,7 @@ public final class Effects {
         got.put("per", per);
         got.put("counted", count);
         int max = p.containsKey("max") ? asInt(p.get("max")) : Integer.MAX_VALUE;
-        for (String key : new String[]{"coin", "ammo", "kelium", "debris"}) {
+        for (String key : new String[]{"coin", "ammo", "kelium", "trophy"}) {
             if (!p.containsKey(key)) {
                 continue;
             }
@@ -1299,7 +1299,7 @@ public final class Effects {
         int got = switch (what) {
             case KELIUM -> Storage.addKeliumCapped(s, me, took);
             case AMMO -> Storage.addAmmoCapped(s, me, took);
-            case DEBRIS -> Storage.addDebrisCapped(s, me, took);
+            case TROPHY -> Storage.addTrophyCapped(s, me, took);
             default -> {
                 me.resources.add(what, took);
                 yield took;
@@ -1436,7 +1436,7 @@ public final class Effects {
         return Map.of("unlimited_spec", true);
     }
 
-    /** ВЕРНУТЬ НА МАРКЕТ сброшенную карту сделок на рынке. */
+    /** ВЕРНУТЬ НА РЫНОК сброшенную карту сделок на рынке. */
     static Map<String, Object> marketCardFromDiscard(GameState s, int seat, Map<String, Object> p) {
         var deck = s.decks.get("market");
         if (deck == null) {

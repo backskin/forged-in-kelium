@@ -222,7 +222,7 @@ public final class Commentator implements Consumer<Map<String, Object>> {
             case "energy_swap" -> "Смена энергии";
             case "movement" -> "Движение";
             case "combat" -> "Бой";
-            case "market" -> "Маркет";
+            case "market" -> "Рынок";
             case "science" -> "Наука";
             default -> a;
         };
@@ -232,7 +232,7 @@ public final class Commentator implements Consumer<Map<String, Object>> {
         return switch (s) {
             case "kelium" -> "запас келемия";
             case "coins" -> "монеты";
-            case "debris" -> "обломки";
+            case "trophy" -> "трофеи";
             case "buildings_on_field" -> "сеть зданий";
             case "units_on_field" -> "армия на поле";
             case "tech" -> "треки науки";

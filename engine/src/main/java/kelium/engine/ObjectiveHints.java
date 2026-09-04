@@ -93,7 +93,7 @@ public final class ObjectiveHints {
     //  ЦЕНА НАГРАДЫ
     // ======================================================================
     //  Калибровка дизайнера (шапка каталога контейнеров): монета 1, боеприпас 1,
-    //  обломок 1.5, карта задания 2, контейнер 1.5. Дописаны вещи, которых в той
+    //  трофей 1.5, карта задания 2, контейнер 1.5. Дописаны вещи, которых в той
     //  калибровке нет, по их месту в игре: келемий равен победному очку (5
     //  монет), модуль удваивает базу сборки или атаки и потому дороже всего.
 
@@ -102,7 +102,7 @@ public final class ObjectiveHints {
     static {
         PRICE.put("coin", 1.0);
         PRICE.put("ammo", 1.0);
-        PRICE.put("debris", 1.5);
+        PRICE.put("trophy", 1.5);
         PRICE.put("container", 1.5);
         PRICE.put("objective_card", 2.0);
         PRICE.put("objective_cards", 2.0);
@@ -393,7 +393,7 @@ public final class ObjectiveHints {
      * ПАКЕТНЫЕ ДЕЙСТВИЯ закрывают несколько единиц разрыва за один розыгрыш:
      * Сборка производит всеми запитанными зданиями сразу, Добыча — всеми
      * добытчиками, Стройка делает несколько операций, Наука шагает по всем трём
-     * трекам, Маркет заключает несколько сделок. Бой и Движение считаются
+     * трекам, Рынок заключает несколько сделок. Бой и Движение считаются
      * штучными: бой бьёт один соседний гекс, и второй жетон противника — это,
      * как правило, второй бой.
      */
@@ -580,16 +580,16 @@ public final class ObjectiveHints {
                     "дотянуть непрерывное соседство своих жетонов до нужных гексов");
             }
 
-            // ---- МАРКЕТ И НАУКА ----
+            // ---- РЫНОК И НАУКА ----
             case "market_offers_used" -> {
                 int need = num(p, "count", 3) - f.marketOffersUsed.size();
                 return new Gap(need, List.of("market"),
                     "в этот ход оплатить ещё " + Math.max(need, 0)
-                        + " разное предложение планшета маркета");
+                        + " разное предложение планшета рынка");
             }
             case "used_market_card_offer", "used_market_this_turn" -> {
                 return new Gap(f.usedMarketCardOffer || f.usedMarket ? 0 : 1, List.of("market"),
-                    "в этот ход воспользоваться предложением на планшете маркета");
+                    "в этот ход воспользоваться предложением на планшете рынка");
             }
             case "science_offers_used" -> {
                 int need = num(p, "count", 3) - f.scienceOffersUsed.size();
@@ -601,7 +601,7 @@ public final class ObjectiveHints {
                 int need = num(p, "count", 2) - f.sciencePaidUnits;
                 return new Gap(need, List.of("science"),
                     "в этот ход заплатить в Науку ещё " + Math.max(need, 0)
-                        + " обломок");
+                        + " трофей");
             }
             case "tech_step_reached", "tracks_occupied" -> {
                 return new Gap(1, List.of("science"),
@@ -630,9 +630,9 @@ public final class ObjectiveHints {
             }
 
             // ---- ТРОФЕИ ----
-            case "trophy_contains", "trophy_distinct_kinds" -> {
+            case "destroyed_contains", "destroyed_distinct_kinds" -> {
                 return new Gap(1, List.of("combat"),
-                    "уничтожить жетон противника, чтобы он лёг в трофеи");
+                    "уничтожить жетон противника, чтобы он лёг на место уничтоженных жетонов");
             }
 
             case "has_unopened_container" -> {

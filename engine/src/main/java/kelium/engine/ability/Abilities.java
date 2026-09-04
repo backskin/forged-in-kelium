@@ -95,7 +95,7 @@ public final class Abilities {
         Hook.ATTACK_RANGE,              // CombatResolver: дальность выбора цели
         Hook.TOKEN_HP,                  // Passives.effectiveHp: прочность жетона
         Hook.MOVEMENT_JUMP_OVER,
-        Hook.RETURN_KEEP_TROPHY,
+        Hook.RETURN_KEEP_DESTROYED,
         // Точка спрашивается в Power.payMissingEnergyWithCoin, а в этом списке
         // её не было — из-за одной строки карта b20 «Оборотный капитал» считалась
         // нереализованной, хотя способность написана и зарегистрирована.

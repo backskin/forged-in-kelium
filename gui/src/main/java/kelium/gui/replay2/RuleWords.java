@@ -90,7 +90,7 @@ public final class RuleWords {
             case "coin", "coins" -> "монеты";
             case "ammo" -> "боеприпасы";
             case "kelium" -> "келемий";
-            case "debris" -> "обломки";
+            case "trophy" -> "трофеи";
             case "container", "containers" -> "контейнеры";
             case "objective_card", "objective_cards" -> "карты заданий";
             case "vp" -> "победные очки";
@@ -170,24 +170,24 @@ public final class RuleWords {
 
             // ---------- Экономика ----------
             case "economy.coins_per_vp" -> "монет за одно победное очко";
-            case "economy.trophy_per_vp" -> "обломков за одно победное очко";
+            case "economy.trophy_per_vp" -> "трофеев за одно победное очко";
             case "economy.kelium_per_vp" ->
                 "кубов келемия в хранилище за одно победное очко (0 = вариант правил: очков не даёт)";
             case "economy.kelium_value_coins" -> "во сколько монет ценим келемий при расчётах";
             case "economy.kelium_value_ue" -> "цена келемия в условных единицах карт";
-            case "economy.trophy_value_coins_via_kelium" -> "цена обломка в монетах";
-            case "economy.debris_storage_vp_per_unit" ->
-                "победных очков за каждый обломок в хранилище (вариант правил, дробное число)";
+            case "economy.trophy_value_coins_via_kelium" -> "цена трофея в монетах";
+            case "economy.trophy_storage_vp_per_unit" ->
+                "победных очков за каждый трофей в хранилище (вариант правил, дробное число)";
             case "economy.buildings_per_vp" -> "зданий на поле за одно победное очко";
             case "economy.units_per_vp" -> "войск на поле за одно победное очко";
             case "economy.spawn_face_trophy_big" ->
-                "обломков за исчерпанное лицо большого тайла зарождения";
+                "трофеев за исчерпанное лицо большого тайла зарождения";
             case "economy.spawn_face_trophy_small" ->
-                "обломков за исчерпанное лицо малого тайла зарождения";
+                "трофеев за исчерпанное лицо малого тайла зарождения";
             case "economy.spawn_back_trophy_big" ->
-                "обломков за исчерпанный оборот большого тайла";
+                "трофеев за исчерпанный оборот большого тайла";
             case "economy.spawn_back_trophy_small" ->
-                "обломков за исчерпанный оборот малого тайла";
+                "трофеев за исчерпанный оборот малого тайла";
             case "economy.spawn_back_vp_big" -> "победных очков за оборот большого тайла";
             case "economy.spawn_back_vp_small" -> "победных очков за оборот малого тайла";
             case "economy.spawn_flip_normal_vp" ->
@@ -347,7 +347,7 @@ public final class RuleWords {
             case "tech.steps_per_track" -> "шагов на треке";
             case "tech.step_cells" -> "ячеек на шагах";
             case "tech.step_capacity" -> "сколько игроков влезает на шаг";
-            case "tech.step_cost_trophy" -> "трофеев/обломков за шаг (тратится общий пул)";
+            case "tech.step_cost_trophy" -> "трофеев за шаг (тратится общий пул)";
             case "tech.step_vp_cumulative" -> "победные очки по шагам, накопительно";
             case "tech.step_rewards" -> "награды шагов трека (перебивает доску)";
             case "end_conditions.last_spawn_tile_threshold" ->
@@ -357,8 +357,8 @@ public final class RuleWords {
                 "за одно действие — не больше шага на трек";
             case "tech.tracks_per_action" ->
                 "сколько РАЗНЫХ треков берёт одно действие Науки";
-            case "tech.pay_with_debris_only" ->
-                "за науку платят только обломками, трофейный жетон не сдаётся";
+            case "tech.pay_with_trophy_only" ->
+                "за науку платят только трофеями, уничтоженный жетон не сдаётся";
             case "actions.combat.as_spec_ammo" ->
                 "боеприпасов за Бой спец-действием (0 — так нельзя)";
             case "economy.vp_per_kill" ->
@@ -368,7 +368,7 @@ public final class RuleWords {
             case "economy.vp_per_installed_super_arsenal" ->
                 "победных очков за каждую установленную карту супер-арсенала";
             case "tech.pair_bonus_coin" -> "монет за парный обмен науки";
-            case "tech.gild_trophy_cost" -> "обломков за позолоту модуля";
+            case "tech.gild_trophy_cost" -> "трофеев за позолоту модуля";
             case "tech.cubes_are_permanent" -> "кубик занимает ячейку навсегда";
             case "tech.cube_supply" -> "кубиков науки в запасе игрока";
 
@@ -378,7 +378,7 @@ public final class RuleWords {
             case "return_step.refill_objectives_to_limit" ->
                 "задания добираются до предела руки";
             case "return_step.trophy_to_upgrade_exchange_enabled" ->
-                "трофеи/обломки можно обменять на улучшение";
+                "трофеи можно обменять на улучшение";
 
             // ---------- Супер-задания ----------
             case "expansions.super_objectives" ->

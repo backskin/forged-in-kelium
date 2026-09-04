@@ -46,7 +46,7 @@ public final class StorageSide {
         return ((Number) prices.get(level - 1)).intValue();
     }
 
-    /** Уровень склада, дающий трофейные очки (звезду); по умолчанию 4. */
+    /** Уровень склада, дающий трофеи (звезду); по умолчанию 4. */
     public int vpStarLevel() {
         Object v = raw.get("vp_star_level");
         return v != null ? ((Number) v).intValue() : 4;

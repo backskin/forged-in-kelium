@@ -30,7 +30,7 @@ import kelium.engine.LayoutLibrary;
  *
  * <p>Вопросы (13.08.2026), под которые он и написан:
  * <ul>
- *   <li>доходят ли трофейные очки уничтоженных жетонов до карты приказа
+ *   <li>доходят ли трофеи уничтоженных жетонов до карты приказа
  *       победителя, и приходит ли контейнер-компенсация тому, кому снесли
  *       здание — то есть работают ли эти механики ТОЧНО;</li>
  *   <li>сколько карт заданий проходит через руку игрока, как часто задания
@@ -89,8 +89,8 @@ public final class RevisionProbe {
         double maxHandSeen = 0;
         Map<String, Integer> doneBy = new TreeMap<>();
         Map<String, Integer> drawnBy = new TreeMap<>();
-        double trophyPointsEnd = 0;    // ТО на картах приказа к концу партии
-        double trophyPointsEarned = 0; // ТО, реально положенные на карту за партию
+        double destroyedValueEnd = 0;    // ТО на картах приказа к концу партии
+        double destroyedValueEarned = 0; // ТО, реально положенные на карту за партию
         double killsUnits = 0;
         double killsBuildings = 0;
         double compContainers = 0;     // контейнеров-компенсаций выдано
@@ -201,7 +201,7 @@ public final class RevisionProbe {
             killsUnits += acc[4];
             keliumMined += acc[5];
             marketObjectivePairs += acc[6];
-            trophyPointsEarned += acc[8];
+            destroyedValueEarned += acc[8];
             sciCoinExchanges += acc[7];
             maxHandSeen = Math.max(maxHandSeen, maxHand[0]);
             if (maxHand[0] > 3) {
@@ -211,7 +211,7 @@ public final class RevisionProbe {
 
             for (PlayerState p : s.players) {
                 handEnd += p.objectiveHand.size();
-                trophyPointsEnd += p.trophySpacePoints();
+                destroyedValueEnd += p.destroyedValue();
                 keliumEnd += p.resources.kelium();
                 coinsEnd += p.resources.coin();
                 cuKills += p.cuKills;
@@ -281,8 +281,8 @@ public final class RevisionProbe {
             + "| контейнеров-компенсаций выдано за партию | %.2f |%n"
             + "| сносов ЦУ за партию | %.2f |%n"
             + "| игроков, добравшихся до ДВУХ жетонов уничтожения ЦУ | %.0f из %d |%n",
-            killsUnits * perGame, killsBuildings * perGame, trophyPointsEarned * perGame,
-            trophyPointsEnd * perPlayer,
+            killsUnits * perGame, killsBuildings * perGame, destroyedValueEarned * perGame,
+            destroyedValueEnd * perPlayer,
             compContainers * perGame, cuKills * perGame, cuDouble, games * players));
         md.append("\nВыдачи контейнеров по источникам за весь прогон: ")
           .append(containerSources).append("\n");

@@ -252,11 +252,11 @@ public final class NarrativeLog {
         }
     }
 
-    /** Отложенный приказ под трофеи — какую карту каждый убрал рубашкой вверх. */
+    /** Отложенный приказ под уничтоженные жетоны — какую карту каждый убрал рубашкой вверх. */
     public void blindDiscard(Map<Integer, String> setAside) {
         if (md) {
             line("");
-            line("**🃏 Отложенный приказ под трофеи** (рубашкой вверх, не разыгрывается; тайна для остальных, но не для себя):");
+            line("**🃏 Отложенный приказ под уничтоженные жетоны** (рубашкой вверх, не разыгрывается; тайна для остальных, но не для себя):");
             for (int seat = 0; seat < state.numPlayers(); seat++) {
                 String cid = setAside.get(seat);
                 line("- " + who(seat) + ": отложил " + (cid != null ? cardName(cid) : "—"));
@@ -264,7 +264,7 @@ public final class NarrativeLog {
             return;
         }
         line("│");
-        line("│  🃏 СЛЕПОЙ СБРОС под трофеи (карта уходит рубашкой вверх, не разыгрывается):");
+        line("│  🃏 СЛЕПОЙ СБРОС под уничтоженные жетоны (карта уходит рубашкой вверх, не разыгрывается):");
         for (int seat = 0; seat < state.numPlayers(); seat++) {
             String cid = setAside.get(seat);
             line("│    " + who(seat) + ": отложил " + (cid != null ? cardName(cid) : "—"));
@@ -320,8 +320,8 @@ public final class NarrativeLog {
         String item = md ? "  - " : "│      ";
         List<String> out = new ArrayList<>();
         out.add(head);
-        out.add(String.format("%sресурсы: мон=%d кел=%d бпр=%d обломки=%d",
-            item, p.resources.coin(), p.resources.kelium(), p.resources.ammo(), p.resources.debris()));
+        out.add(String.format("%sресурсы: мон=%d кел=%d бпр=%d трофеи=%d",
+            item, p.resources.coin(), p.resources.kelium(), p.resources.ammo(), p.resources.trophy()));
         StringBuilder bld = new StringBuilder(item + "здания: ");
         for (BuildingToken b : p.buildingsOnField()) {
             bld.append(bldRu(b)).append("@").append(b.hexId).append(" ");
@@ -334,8 +334,8 @@ public final class NarrativeLog {
             anyUnit = true;
         }
         out.add(anyUnit ? un.toString().stripTrailing() : item + "войска: —");
-        out.add(String.format("%sтрофеи: жетонов=%d (очков %d) + обломки=%d",
-            item, p.trophySpace.size(), p.trophySpacePoints(), p.resources.debris()));
+        out.add(String.format("%sтрофеи: жетонов=%d (очков %d) + трофеи=%d",
+            item, p.destroyedTokens.size(), p.destroyedValue(), p.resources.trophy()));
         out.add(item + "приказы(" + p.orderColor + "): " + p.orderHand
             + "   задания: " + p.objectiveHand);
         out.add(item + "арсенал: рука" + p.arsenalHand + " установлено" + p.arsenalInstalled);

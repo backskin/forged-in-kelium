@@ -916,7 +916,7 @@ public final class GameRecorder {
                     return who(ev.get("seat")) + " переставил модули";
                 case "war_track":
                     return who(ev.get("seat")) + " получил " + ev.get("vp")
-                        + " ПО за несданные трофеи (" + ev.get("points") + ")";
+                        + " ПО за несданные уничтоженные жетоны (" + ev.get("points") + ")";
                 case "turn_end": {
                     Object r = ev.get("resources");
                     String res = "";

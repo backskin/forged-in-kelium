@@ -118,7 +118,7 @@ public final class HotSeatWindow {
     private ChipLabel chipCoin;
     private ChipLabel chipKelium;
     private ChipLabel chipAmmo;
-    private ChipLabel chipDebris;
+    private ChipLabel chipTrophy;
     FieldView field;
     private BoardsPanel boards;
     private BoardSheet sheet;
@@ -641,8 +641,8 @@ public final class HotSeatWindow {
         chipKelium.setToolTipText("Келемий: на складе / потолок склада");
         chipAmmo = new ChipLabel("AMMO", Theme.energy(), "БПР");
         chipAmmo.setToolTipText("Боеприпасы: на складе / потолок склада");
-        chipDebris = new ChipLabel("DEBRIS", Theme.neutral(), "обломки");
-        chipDebris.setToolTipText("Обломки: на складе / потолок");
+        chipTrophy = new ChipLabel("TROPHY", Theme.neutral(), "трофеи");
+        chipTrophy.setToolTipText("Трофеи: на складе / потолок");
         JPanel me = new JPanel();
         me.setOpaque(false);
         me.setLayout(new BoxLayout(me, BoxLayout.Y_AXIS));
@@ -651,7 +651,7 @@ public final class HotSeatWindow {
         JPanel chipsRow = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets 0, wrap 3, gapx " + Theme.px(5) + ", gapy " + Theme.px(4)));
         chipsRow.setOpaque(false);
-        for (ChipLabel c : List.of(chipVp, chipCoin, chipKelium, chipAmmo, chipDebris)) {
+        for (ChipLabel c : List.of(chipVp, chipCoin, chipKelium, chipAmmo, chipTrophy)) {
             chipsRow.add(c);
         }
         chipsRow.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -1200,7 +1200,7 @@ public final class HotSeatWindow {
             chipCoin.set(String.valueOf(p.coin), null);
             chipKelium.set(String.valueOf(p.kelium), String.valueOf(p.keliumCap));
             chipAmmo.set(String.valueOf(p.ammo), String.valueOf(p.ammoCap));
-            chipDebris.set(String.valueOf(p.debris), String.valueOf(p.debrisCap));
+            chipTrophy.set(String.valueOf(p.trophy), String.valueOf(p.trophyCap));
         }
         if (f.snapshot != null) {
             List<kelium.gui.kp.OpponentStrip.Row> rows = new ArrayList<>();
@@ -1208,7 +1208,7 @@ public final class HotSeatWindow {
                 rows.add(new kelium.gui.kp.OpponentStrip.Row(p.seat, seatName(p.seat),
                     p.seat == mySeat, vpTotal(p), p.coin, p.kelium, p.ammo,
                     p.orderHand.size(), p.objectiveHand.size(), p.arsenalHand.size(),
-                    p.trophyPoints));
+                    p.destroyedValue));
             }
             opponents.update(rows);
         }
@@ -1535,7 +1535,7 @@ public final class HotSeatWindow {
     private String curtainReason(String kind) {
         return switch (kind) {
             case "reveal_order" -> "вскрываем приказ круга";
-            case "blind_discard" -> "отложите приказ под трофеи";
+            case "blind_discard" -> "отложите приказ под уничтоженные жетоны";
             case "combat_victim", "neutral_victim" -> "по вам ударили — выберите жертву";
             case "action" -> "ваш ход";
             default -> KIND_LABELS.getOrDefault(kind, "ваш ход");
@@ -1801,7 +1801,7 @@ public final class HotSeatWindow {
                 case "ammo" -> "боеприпасов";
                 case "kelium" -> "келемия";
                 case "coin", "coins" -> "монет";
-                case "debris" -> "обломков";
+                case "trophy" -> "трофеев";
                 case "vp" -> "ПО";
                 case "arsenal", "arsenal_card" -> "карта арсенала";
                 case "objective", "objective_card" -> "карта задания";
@@ -1811,8 +1811,8 @@ public final class HotSeatWindow {
                 case "tech", "tech_step" -> "шаг науки";
                 default -> k;
             };
-            // Число ПОСЛЕ слова: так не надо согласовывать окончание («1 обломок»,
-            // «2 обломка», «5 обломков») — и не будет уродливого «1 обломков».
+            // Число ПОСЛЕ слова: так не надо согласовывать окончание («1 трофей»,
+            // «2 трофея», «5 трофеев») — и не будет уродливого «1 трофеев».
             boolean безЧисла = слово.startsWith("карта") || слово.startsWith("шаг")
                 || слово.endsWith("модуль");
             parts.add(безЧисла ? слово : слово + " " + e.getValue());

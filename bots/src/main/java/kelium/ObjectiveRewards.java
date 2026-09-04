@@ -22,7 +22,7 @@ import kelium.engine.Setup;
  * ЧТО ИГРОКИ РЕАЛЬНО ПОЛУЧАЮТ ЗА ЗАДАНИЯ.
  *
  * <p>Вопрос дизайнера 15.08.2026: как часто задания выполняются, как часто
- * выполняются УСИЛЕННО, и сколько за это приходит обломков и жетонов модулей.
+ * выполняются УСИЛЕННО, и сколько за это приходит трофеев и жетонов модулей.
  *
  * <p>До сих пор считалось только «выполнено / сожжено». Награда — вторая
  * половина карты, и без неё нельзя понять, окупается ли усиленная ветка: она
@@ -48,7 +48,7 @@ public final class ObjectiveRewards {
         double done = 0;
         double doneEnhanced = 0;
         double burned = 0;
-        double debris = 0;
+        double trophy = 0;
         double modулesRed = 0;
         double modulesBlue = 0;
         double objectiveCards = 0;
@@ -94,7 +94,7 @@ public final class ObjectiveRewards {
                             }
                         }
                         {
-                            if (gr.get("debris") instanceof Number n) {
+                            if (gr.get("trophy") instanceof Number n) {
                                 a[4] += n.intValue();
                             }
                             if (gr.get("kelium") instanceof Number n) {
@@ -122,7 +122,7 @@ public final class ObjectiveRewards {
             done += a[1];
             doneEnhanced += a[2];
             burned += a[3];
-            debris += a[4];
+            trophy += a[4];
             modулesRed += a[5];
             modulesBlue += a[6];
             objectiveCards += a[7];
@@ -157,7 +157,7 @@ public final class ObjectiveRewards {
 
         md.append("\n## Что получено за задания (на игрока за партию)\n\n");
         out.println("\nполучено за задания (на игрока за партию):");
-        row(out, md, "ОБЛОМКОВ (трофейных кубиков)", debris / perPlayer);
+        row(out, md, "ТРОФЕЕВ (трофейных кубиков)", trophy / perPlayer);
         row(out, md, "жетонов модулей АТАКИ (красных)", modулesRed / perPlayer);
         row(out, md, "жетонов модулей СНАРЯЖЕНИЯ (синих)", modulesBlue / perPlayer);
         row(out, md, "жетонов хранилища", storageTokens / perPlayer);

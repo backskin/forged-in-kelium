@@ -187,7 +187,7 @@ class CombatRulesTest {
             "модуль обязан добавить свои цели: было " + plain + ", стало " + withModule);
     }
 
-    /** Уничтоженный жетон попадает на трофейное место убийцы. */
+    /** Уничтоженный жетон попадает на место уничтоженных жетонов убийцы. */
     @Test
     void aDestroyedTokenBecomesATrophy() {
         GameState s = Fix.game(2, 42L);
@@ -201,8 +201,8 @@ class CombatRulesTest {
 
         combat(s).runBattle(0, new Fix.AimingAgent(0, spot));
         if (!victim.alive()) {
-            assertTrue(s.player(0).trophySpace.contains(victim),
-                "убитый жетон обязан лечь на трофейное место убийцы");
+            assertTrue(s.player(0).destroyedTokens.contains(victim),
+                "убитый жетон обязан лечь на место уничтоженных жетонов убийцы");
         }
     }
 }

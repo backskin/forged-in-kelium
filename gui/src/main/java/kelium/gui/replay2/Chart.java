@@ -34,7 +34,7 @@ public final class Chart extends JComponent {
         VP("vp", "победные очки"),
         KELIUM("kelium", "келемий"),
         COIN("coin", "монеты"),
-        DEBRIS("debris", "обломки"),
+        TROPHY("trophy", "трофеи"),
         TECH("tech", "шаги науки");
 
         public final String key;

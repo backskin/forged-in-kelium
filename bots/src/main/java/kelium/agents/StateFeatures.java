@@ -44,7 +44,7 @@ public final class StateFeatures {
         "coin",                // монеты (топливо стройки)
         "kelium",              // келемий (и очко, и товар)
         "ammo",                // боеприпасы (топливо войны)
-        "trophy_pool",         // трофеи: жетоны под трофеи + чёрные кубы
+        "trophy_pool",         // трофеи: жетоны под уничтоженные жетоны + чёрные кубы
         "miners_working",      // запитанные добытчики У ЖИВОЙ жилы
         "kelium_reachable",    // келемий на жилах, до которых я дотягиваюсь
         "storage_room",        // свободное место в хранилище
@@ -113,7 +113,7 @@ public final class StateFeatures {
         f[2] = me.resources.coin();
         f[3] = me.resources.kelium();
         f[4] = me.resources.ammo();
-        f[5] = me.trophySpacePoints() + me.resources.debris();
+        f[5] = me.destroyedValue() + me.resources.trophy();
 
         java.util.Set<String> live = Plan.liveTileHexes(s);
         int minersWorking = 0;

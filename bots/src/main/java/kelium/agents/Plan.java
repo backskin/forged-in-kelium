@@ -40,9 +40,9 @@ public final class Plan {
 
     /** Вид цели — крупная линия развития, к которой бот сейчас идёт. */
     public enum Goal {
-        /** Добыть келемий: он же победное очко, он же товар для маркета. */
+        /** Добыть келемий: он же победное очко, он же товар для рынка. */
         KELIUM("добыть келемий"),
-        /** Продать келемий на маркете: превратить очко в темп (деньги/патроны). */
+        /** Продать келемий на рынке: превратить очко в темп (деньги/патроны). */
         SELL("продать келемий за ресурсы"),
         /** Поднять шаг технологического трека: самый крупный источник ПО. */
         TECH("поднять трек науки"),
@@ -286,7 +286,7 @@ public final class Plan {
         steps.add(Step.of("в хранилище есть место под келемий", room, "market"));
         steps.add(Step.of("сыграть Добычу", false, "mining"));
 
-        // келемий = 1 ПО за штуку, плюс товар на маркете; чем меньше его у нас,
+        // келемий = 1 ПО за штуку, плюс товар на рынке; чем меньше его у нас,
         // тем ценнее первый (склад не резиновый — ценность убывает)
         double v = g.get("plan.value.kelium", 9.0) - 0.6 * me.resources.kelium();
         if (anyMiner != null && adjMiner == null) {
@@ -295,7 +295,7 @@ public final class Plan {
         return new Plan(Goal.KELIUM, steps, Math.max(2.0, v));
     }
 
-    /** Цепочка продажи: есть келемий → сыграть Маркет. */
+    /** Цепочка продажи: есть келемий → сыграть Рынок. */
     private static Plan sell(GameState s, int seat, Genome g) {
         PlayerState me = s.player(seat);
         int kel = me.resources.kelium();
@@ -304,7 +304,7 @@ public final class Plan {
         }
         List<Step> steps = new ArrayList<>();
         steps.add(Step.of("келемий в хранилище есть", true, null));
-        steps.add(Step.of("сыграть Маркет", false, "market"));
+        steps.add(Step.of("сыграть Рынок", false, "market"));
         // Продавать стоит, когда денег в обрез: келемий сам по себе даёт ПО,
         // поэтому размен оправдан только под конкретную нужду.
         double full = g.get("plan.value.sell", 6.0);
@@ -315,7 +315,7 @@ public final class Plan {
     /** Цепочка науки: есть трофеи → сыграть Науку. */
     private static Plan tech(GameState s, int seat, Genome g) {
         PlayerState me = s.player(seat);
-        int pool = me.resources.debris() + me.trophySpacePoints();
+        int pool = me.resources.trophy() + me.destroyedValue();
         if (pool <= 0) {
             return null;
         }
@@ -323,7 +323,7 @@ public final class Plan {
         steps.add(Step.of("трофеи есть", true, null));
         steps.add(Step.of("сыграть Науку", false, "science"));
         // Захваченные жетоны вернутся владельцам в конце раунда — сдать СЕЙЧАС.
-        double urgency = me.trophySpacePoints() > 0 ? 5.0 : 0.0;
+        double urgency = me.destroyedValue() > 0 ? 5.0 : 0.0;
         return new Plan(Goal.TECH, steps,
             g.get("plan.value.tech", 6.0) + Math.min(pool, 6) + urgency);
     }
@@ -383,8 +383,8 @@ public final class Plan {
         PlayerState me = s.player(seat);
         // Курсы очков берутся ИЗ СВОДА: иначе цели набега снова отстанут от
         // правил, как отстала прежняя формула.
-        double debrisVp = ((Number) kelium.dataio.Ctx.rules(s)
-            .get("economy.debris_storage_vp_per_unit", 0.5)).doubleValue();
+        double trophyVp = ((Number) kelium.dataio.Ctx.rules(s)
+            .get("economy.trophy_storage_vp_per_unit", 0.5)).doubleValue();
         double cuTokenVp = kelium.dataio.Ctx.rules(s)
             .getInt("command_center.destruction_token_vp", 3);
 
@@ -417,11 +417,11 @@ public final class Plan {
                 // ставила добытчик №1 за один трофей ВЫШЕ авиабазы за четыре, а
                 // завод и авиабазу — в «прочее». То есть бот целился не туда,
                 // где очки, а туда, куда решил автор формулы. Теперь считается
-                // ровно то, что игрок получит: трофей жетона по курсу обломка,
+                // ровно то, что игрок получит: трофей жетона по курсу трофея,
                 // а у ЦУ — напечатанные на жетоне уничтожения очки.
                 double value = b.type == BuildingType.COMMAND_CENTER
                     ? cuTokenVp
-                    : b.trophyValue() * debrisVp;
+                    : b.trophyValue() * trophyVp;
                 // Жетон уходит с поля: владелец теряет ещё и свою четверть очка
                 // за «здания на поле», а с добытчика или станции — производство.
                 value += 0.25;
@@ -847,7 +847,7 @@ public final class Plan {
             case "coin" -> p.resources.coin();
             case "kelium" -> p.resources.kelium();
             case "ammo" -> p.resources.ammo();
-            case "debris" -> p.resources.debris();
+            case "trophy" -> p.resources.trophy();
             default -> Integer.MAX_VALUE;   // позиционные жертвы здесь не считаем
         };
         return have >= amt ? null : code;

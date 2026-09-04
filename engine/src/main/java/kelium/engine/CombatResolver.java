@@ -689,10 +689,10 @@ public final class CombatResolver {
                     nh.freeSidesByToken(nb.uid);   // §12.3: стенки нейтрала освобождаются
                     int tro = nb.trophyReward();
                     int con = nb.containerReward();
-                    Storage.addDebrisCapped(s, p, tro);
+                    Storage.addTrophyCapped(s, p, tro);
                     Storage.addContainersCapped(s, p, con, "снос нейтрала");
                     emit("type", "raze_neutral", "seat", attackerSeat, "target", target,
-                        "debris", tro, "containers", con,
+                        "trophy", tro, "containers", con,
                         "big", Boolean.valueOf(nb.big),
                         "left", nh.neutrals.size());
                     journal().of(attackerSeat).neutralsRazed += 1;   // o22 «Зачистка»
@@ -791,7 +791,7 @@ public final class CombatResolver {
                 // o21 «Первая кровь» 10.0: усиление платит за толстую цель.
                 af.maxDestroyedHp = Math.max(af.maxDestroyedHp, Passives.effectiveHp(s, victim));
             }
-            // ТРОФЕЙНЫЕ ОЧКИ убитого — в событие: без этого поля трофейную
+            // ТРОФЕИ убитого — в событие: без этого поля трофейную
             // экономику нечем мерить, а она половина смысла боя. Ценность
             // напечатана на КОНКРЕТНОМ жетоне (у пехоты четвёртый жетон стоит 2 ТО,
             // у техники и авиации — два жетона из четырёх).
@@ -1087,7 +1087,7 @@ public final class CombatResolver {
      * пережила попадание — и СРАЗУ ПОСЛЕ БОЯ уходит владельцу в запас.
      *
      * <p>Карта не спасает здание, а меняет ФОРМУ его потери. Без щита такое
-     * здание сносится с одного удара, идёт атакующему в трофеи и приносит ему
+     * здание сносится с одного удара, идёт атакующему на место уничтоженных жетонов и приносит ему
      * очки; со щитом атакующий тратит боеприпас и не получает ничего, а
      * владелец теряет постройку и место на поле. Это и есть та формулировка,
      * которую просил дизайнер вместо прежнего безусловного «+1 всем зданиям».
@@ -1251,7 +1251,7 @@ public final class CombatResolver {
 
     /**
      * Уничтожить жертву: ЦУ обрабатывается отдельно, прочие переходят на
-     * трофейное поле убийцы; владельцу зданий выдаётся компенсация контейнерами,
+     * место уничтоженных жетонов убийцы; владельцу зданий выдаётся компенсация контейнерами,
      * уничтожение энергостанции снимает выданную ею энергию; применяются пассивы
      * арсенала (доп. боеприпас/ТО за убийство).
      */
@@ -1343,10 +1343,10 @@ public final class CombatResolver {
 
         if (victim instanceof UnitToken ut) {
             ut.trophyValue = scaledUnitTrophy(attackerSeat, ut.type);
-            ut.setHexId(null);   // уходит в трофеи — и из здания, если был внутри
+            ut.setHexId(null);   // уходит на место уничтоженных жетонов — и из здания, если был внутри
             ut.damage = 0;
             ut.capturedBy = attackerSeat;
-            attacker.trophySpace.add(ut);
+            attacker.destroyedTokens.add(ut);
         } else {
             BuildingToken bt = (BuildingToken) victim;
             // Войско, стоявшее ВНУТРИ этого здания, теряет укрытие и остаётся на
@@ -1358,14 +1358,14 @@ public final class CombatResolver {
             bt.hexId = null;
             bt.damage = 0;
             bt.capturedBy = attackerSeat;
-            // K3: сначала вернуть кубики жетона на их источники (в трофеи
+            // K3: сначала вернуть кубики жетона на их источники (на место уничтоженных жетонов
             // жетон уезжает БЕЗ энергии), затем — если это источник — снять
             // его кубики со всех потребителей.
             returnConsumerEnergy(bt);
             if (bt.type == BuildingType.POWER_PLANT) {
                 removeSourceEnergy(bt.owner, bt.uid);
             }
-            attacker.trophySpace.add(bt);
+            attacker.destroyedTokens.add(bt);
             int comp = buildingCompensation(bt);
             if (comp > 0) {
                 Storage.addContainersCapped(s, s.player(bt.owner), comp,
@@ -1381,7 +1381,7 @@ public final class CombatResolver {
         }
         int bonusTrophy = Passives.bonusTrophyOnKill(s, attackerSeat);
         if (bonusTrophy > 0) {
-            Storage.addDebrisCapped(s, attacker, bonusTrophy);
+            Storage.addTrophyCapped(s, attacker, bonusTrophy);
         }
     }
 
@@ -1468,7 +1468,7 @@ public final class CombatResolver {
     private int scaledUnitTrophy(int attackerSeat, UnitType unitType) {
         List<Integer> vals = state.tokenStats.unitTrophyList(unitType);
         int already = 0;
-        for (Token t : state.player(attackerSeat).trophySpace) {
+        for (Token t : state.player(attackerSeat).destroyedTokens) {
             if (t instanceof UnitToken u && u.type == unitType) {
                 already++;
             }

@@ -26,7 +26,7 @@ arsenal:
   - {id: as2, container_slot: true, name: "Старатели", kind: starting,
      top: {effect: gain, params: {coin: 2, ammo: 1}, label: "2 coin + 1 ammo"},
      bottom: {kind: POST, passive: extraction_flip_bonus_trophy, label: "POST: +1 trophy on extraction flip"},
-     описание: "Утиль сразу приносит 2 монеты и 1 боеприпас — быстрый разгон в начале партии. Пока карта установлена, каждый переворот добычи на трофейной стороне даёт дополнительное трофейное очко. На открытой карте нарисована ячейка под контейнер, так что держать её на планшете выгодно вдвойне."}
+     описание: "Утиль сразу приносит 2 монеты и 1 боеприпас — быстрый разгон в начале партии. Пока карта установлена, каждый переворот добычи на трофейной стороне даёт дополнительное трофей. На открытой карте нарисована ячейка под контейнер, так что держать её на планшете выгодно вдвойне."}
   - {id: as3, name: "Окопы", kind: starting,
      top: {effect: heal_hex, params: {}, label: "heal all own in one hex"},
      bottom: {kind: POST, passive: buildings_plus1_hp, label: "POST: your buildings +1 HP"},
@@ -58,13 +58,13 @@ arsenal:
      bottom: {kind: POST, passive: no_second_battle_surcharge, label: "POST: no 2nd-battle surcharge"},
      описание: "Утиль даёт бесплатное действие боя, в котором можно провести два боя подряд без надбавки за второй. Пока карта установлена, второй бой в действии всегда обходится без обычной надбавки. Карта для тех, кто строит игру на сериях атак."}
   - {id: a06, container_slot: true, name: "Трофейная бригада", cull: "[3+]",
-     top: {effect: gain, params: {debris: 2}, label: "2 trophy"},
+     top: {effect: gain, params: {trophy: 2}, label: "2 trophy"},
      bottom: {kind: POST, passive: bonus_trophy_on_kill, label: "POST: +1 trophy per token destroyed"},
-     описание: "Утиль сразу приносит 2 трофейных очка. Пока карта установлена, за каждый уничтоженный жетон вы получаете 1 дополнительное трофейное очко. На открытой карте нарисована ячейка под контейнер, так что держать её на планшете выгодно вдвойне."}
+     описание: "Утиль сразу приносит 2 трофея. Пока карта установлена, за каждый уничтоженный жетон вы получаете 1 дополнительное трофей. На открытой карте нарисована ячейка под контейнер, так что держать её на планшете выгодно вдвойне."}
   - {id: a07, name: "Перекупщик",
      top: {effect: gain, params: {coin: 4}, label: "4 coin"},
      bottom: {kind: POST, passive: market_second_kelium_full, label: "POST: 2nd kelium in a market deal pays full"},
-     описание: "Утиль сразу приносит 4 монеты. Пока карта установлена, второй келемий в одной сделке на маркете обходится по полной цене — скидка за объём не действует. Подходит тому, кто ценит быстрые деньги здесь и сейчас больше, чем выгодную торговлю."}
+     описание: "Утиль сразу приносит 4 монеты. Пока карта установлена, второй келемий в одной сделке на рынке обходится по полной цене — скидка за объём не действует. Подходит тому, кто ценит быстрые деньги здесь и сейчас больше, чем выгодную торговлю."}
   - {id: a08, name: "Геологи",
      top: {effect: free_action, params: {action: mining}, label: "free Mining"},
      bottom: {kind: SPEC, passive: miner_takes_container, label: "SPEC: a powered miner takes a container"},
@@ -76,7 +76,7 @@ arsenal:
   - {id: a10, container_slot: true, name: "Лаборатория",
      top: {effect: free_action, params: {action: science}, label: "free Science"},
      bottom: {kind: SPEC, passive: commit_1_trophy_to_track, label: "SPEC: put 1 trophy on any track"},
-     описание: "Утиль даёт бесплатное действие науки без расхода приказа. Пока карта установлена, спец-действием можно отложить 1 трофейное очко на любой трек науки, а на открытой карте нарисована ячейка под контейнер. Удобный способ продвигаться по трекам мелкими шагами."}
+     описание: "Утиль даёт бесплатное действие науки без расхода приказа. Пока карта установлена, спец-действием можно отложить 1 трофей на любой трек науки, а на открытой карте нарисована ячейка под контейнер. Удобный способ продвигаться по трекам мелкими шагами."}
   - {id: a11, name: "Глубокое бурение", cull: "[4]",
      top: {effect: free_action, params: {action: mining}, label: "free Mining x2"},
      bottom: {kind: POST, passive: miner_takes_kelium_and_container, label: "POST: each miner takes kelium AND container"},

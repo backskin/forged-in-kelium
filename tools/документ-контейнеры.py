@@ -30,7 +30,7 @@ from docx.shared import Cm, Pt, RGBColor
 РЕСУРСЫ = {
     "ammo": "боеприпас",
     "coin": "монета",
-    "debris": "обломок",
+    "trophy": "трофей",
     "kelium": "келемий",
     "objective_cards": "карта задания",
     "arsenal": "карта арсенала",
@@ -42,7 +42,7 @@ from docx.shared import Cm, Pt, RGBColor
 КУРС = {
     "ammo": 1.0,
     "coin": 1.0,
-    "debris": 1.5,
+    "trophy": 1.5,
     "kelium": 1.5,
     "objective_cards": 2.0,
     "arsenal": 2.5,
@@ -137,7 +137,7 @@ def main():
     doc.add_heading("Формы карт и сколько их в колоде", level=1)
     сер(doc.add_paragraph(),
         "«Ценность» — по курсу сверки самого набора: монета 1, боеприпас 1, "
-        "обломок 1.5, келемий 1.5, карта задания 2, карта арсенала 2.5.", 9)
+        "трофей 1.5, келемий 1.5, карта задания 2, карта арсенала 2.5.", 9)
     строки = []
     for имя, g in sorted(группы.items(), key=lambda kv: (-len(kv[1]["карты"]), kv[0])):
         n = len(g["карты"])

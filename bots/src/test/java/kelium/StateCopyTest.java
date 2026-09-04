@@ -77,10 +77,10 @@ class StateCopyTest {
         // продублирует, движок при возврате «оживит» не тот жетон.
         UnitToken victim = s.player(1).units.get(0);
         victim.setCapturedBy(0);
-        s.player(0).trophySpace.add(victim);
+        s.player(0).destroyedTokens.add(victim);
 
         GameState c = s.deepCopy(99L);
-        Token inTrophy = c.player(0).trophySpace.get(0);
+        Token inTrophy = c.player(0).destroyedTokens.get(0);
         assertNotSame(victim, inTrophy, "в копии должен лежать НОВЫЙ объект");
         assertEquals(victim.uid(), inTrophy.uid());
 
@@ -91,7 +91,7 @@ class StateCopyTest {
             }
         }
         assertSame(inTrophy, sameInOwnerList,
-            "жетон в трофеях и жетон в списке владельца — ОДИН объект");
+            "жетон среди уничтоженных жетонов и жетон в списке владельца — ОДИН объект");
     }
 
     @Test

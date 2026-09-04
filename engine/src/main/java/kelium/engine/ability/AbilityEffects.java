@@ -133,7 +133,7 @@ public final class AbilityEffects {
 
     // ---- поле ----
 
-    /** Уничтожить чужой жетон: он уходит в трофейное место разрушителя. */
+    /** Уничтожить чужой жетон: он уходит в место уничтоженных жетонов разрушителя. */
     public static boolean destroy(GameState s, int bySeat, Token victim) {
         if (victim == null || victim.hexId() == null) {
             return false;
@@ -144,7 +144,7 @@ public final class AbilityEffects {
         }
         victim.setHexId(null);
         victim.setCapturedBy(bySeat);
-        s.player(bySeat).trophySpace.add(victim);
+        s.player(bySeat).destroyedTokens.add(victim);
         return true;
     }
 

@@ -651,10 +651,10 @@ public final class Drawer extends JPanel {
         sb.append("<div>").append(esc(setupLine(p))).append("</div><br>");
         sb.append(row("Очки", describeVp(p)));
         sb.append(row("Ресурсы", "монеты " + p.coin + " · келемий " + p.kelium
-            + " · боеприпасы " + p.ammo + " · обломки " + p.debris));
-        sb.append(row("Склад", "занято " + (p.kelium + p.ammo + p.debris) + " из " + p.storeCap
+            + " · боеприпасы " + p.ammo + " · трофеи " + p.trophy));
+        sb.append(row("Склад", "занято " + (p.kelium + p.ammo + p.trophy) + " из " + p.storeCap
             + " (келемий ≤ " + p.keliumCap + ", боеприпасы ≤ " + p.ammoCap
-            + ", обломок — любая ячейка)"
+            + ", трофей — любая ячейка)"
             + " · контейнеры " + p.containers
             + (p.containerCap >= 0 ? " из " + p.containerCap : "")));
         sb.append(row("Здания", buildings(f, sheetSeat)));

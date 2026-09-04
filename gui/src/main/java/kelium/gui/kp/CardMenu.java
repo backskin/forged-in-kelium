@@ -378,7 +378,7 @@ public final class CardMenu extends JComponent {
             fy = footerLine(g, r, pad, fy, c.rewardLabel(), c.reward(), Theme.points());
         }
         if (c.util() != null && !c.util().isBlank()) {
-            footerLine(g, r, pad, fy, "УТИЛЬ", c.util(), Theme.debris());
+            footerLine(g, r, pad, fy, "УТИЛЬ", c.util(), Theme.trophy());
         }
     }
 

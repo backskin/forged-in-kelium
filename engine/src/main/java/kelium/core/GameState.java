@@ -55,7 +55,7 @@ public final class GameState {
      * <p>Флаг одноразовый: Обновление, пропустив передачу, сразу его снимает.
      */
     public boolean firstPlayerHeld = false;
-    public String marketActive = null;        // id активной карты маркета
+    public String marketActive = null;        // id активной карты рынка
     // Карты супер-арсенала, выложенные В ОТКРЫТУЮ на вершинах треков при
     // подготовке: {trackId -> cardId}. Забираются на шаге 4 (по одной).
     public final Map<String, String> superArsenalOffer = new java.util.HashMap<>();
@@ -153,9 +153,9 @@ public final class GameState {
         // Второй проход: трофейное пространство держит ЧУЖИЕ жетоны — берём их
         // копии из общего реестра по uid, чтобы объект был ровно один.
         for (int i = 0; i < players.size(); i++) {
-            for (Token t : players.get(i).trophySpace) {
+            for (Token t : players.get(i).destroyedTokens) {
                 Token c = registry.get(t.uid());
-                ps.get(i).trophySpace.add(c != null ? c : t);
+                ps.get(i).destroyedTokens.add(c != null ? c : t);
             }
         }
         Map<String, Deck> dk = new HashMap<>();

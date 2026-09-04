@@ -29,7 +29,7 @@ import kelium.dataio.Ctx;
  * <p>Структура раунда (источник истины §2):
  * <ol>
  *   <li>Обновление (пропускается в 1-м раунде): передать жетон первого игрока,
- *       заменить карту маркета, восстановить грядки, снять урон, разложить
+ *       заменить карту рынка, восстановить грядки, снять урон, разложить
  *       контейнеры.</li>
  *   <li>Отложенный приказ: каждый игрок откладывает 1 из 5 карт приказов
  *       рубашкой вверх — тайна для остальных, но не для себя.</li>
@@ -393,7 +393,7 @@ public final class GameEngine {
      * ключ {@code training.card_flood_rate} (0..1, по умолчанию 0 — в обычной
      * партии ничего не происходит) — вероятность в Обновление бесплатно
      * получить 1 карту арсенала и 1 карту задания, минуя обычную добычу
-     * (науку/маркет). Цель НЕ в правиле игры, а в обучении: боты должны часто
+     * (науку/рынок). Цель НЕ в правиле игры, а в обучении: боты должны часто
      * видеть карты и решать, что с ними делать (ставить/жечь/сбрасывать),
      * прежде чем веса оценки карт начнут значить что-то осмысленное — иначе
      * они почти не встречаются в обучающих партиях и отбор их не проверяет
@@ -580,7 +580,7 @@ public final class GameEngine {
 
     private void blindDiscard() {
         GameState s = state;
-        // Собираем, какую карту каждый игрок отложил под трофеи (для лога).
+        // Собираем, какую карту каждый игрок отложил под уничтоженные жетоны (для лога).
         Map<Integer, String> setAside = new TreeMap<>();
         for (int seat = 0; seat < s.numPlayers(); seat++) {
             PlayerState p = s.player(seat);
@@ -1450,7 +1450,7 @@ public final class GameEngine {
      * закрыт ровно один раз.
      *
      * <p>ДАЛЬШЕ ЖЕТОН ДВИГАЕТСЯ КАК ЛЮБОЙ МОДУЛЬ: обменом на планшете науки за
-     * обломок, утилем карты задания, перекладыванием в Смену модулей
+     * трофей, утилем карты задания, перекладыванием в Смену модулей
      * ({@link Modules#moveSealToken}). Нарисованный род — это МЕСТО, ОТКУДА он
      * начинает, а не клетка навсегда: после того как жетон лёг, картинка не
      * значит ничего до конца партии, и игрок переставляет его туда, где ему
@@ -1627,7 +1627,7 @@ public final class GameEngine {
             applyHpPassive(p, dropped, -1);   // B7: снять бонус вытесненной карты
             s.decks.get("arsenal").discard(dropped);
             // СНЯТАЯ КАРТА МОГЛА ДАВАТЬ ЯЧЕЙКИ СКЛАДА («+1 ячейка боеприпаса»,
-            // «+2 ячейки под обломки»). Со снятием ячейки закрываются, и то, что
+            // «+2 ячейки под уничтоженные жетоны»). Со снятием ячейки закрываются, и то, что
             // в них лежало, обязано сгореть — ровно как при возврате здания на
             // планшет. Без этого склад оставался переполненным: поймано
             // сторожем StorageNeverOverflowsTest, не партией.
@@ -1771,25 +1771,25 @@ public final class GameEngine {
      * партии; если это ПОСЛЕДНИЙ Возврат игры (мирный конец наступает СЕЙЧАС,
      * либо это конец последнего разрешённого раунда), возврат жетонов вообще НЕ
      * делается — трофеи остаются лежать у игроков, и в подсчёт очков идёт их
-     * ПОЛНАЯ печатная ценность (см. Scoring — trophySpacePoints() приплюсован к
-     * обломкам), а не флат-1-за-жетон, как в обычном Возврате мидгейма. Мгновенная
+     * ПОЛНАЯ печатная ценность (см. Scoring — destroyedValue() приплюсован к
+     * трофеям), а не флат-1-за-жетон, как в обычном Возврате мидгейма. Мгновенная
      * победа (I4, {@code s.finished} уже true до вызова) отдельно пропускает
      * returnStep() целиком — сюда даже не заходит.
      */
     private void returnStep(boolean gameEnding) {
         GameState s = state;
         Ruleset rs = rs();
-        // ЭКСПЕРИМЕНТ «военный трек» (economy.leftover_trophy_vp_per = N, 0=выкл,
+        // ЭКСПЕРИМЕНТ «военный трек» (economy.leftover_destroyed_vp_per = N, 0=выкл,
         // и таким и остаётся во всех живых рулсетах) — устарел с правилом 2026-08-15
-        // «в Возврат ВСЕ трофеи конвертируются в обломки» ниже: раньше это был
-        // единственный способ утилизировать несданные трофеи очками, теперь их
+        // «в Возврат ВСЕ уничтоженные жетоны конвертируются в трофеи» ниже: раньше это был
+        // единственный способ утилизировать несданные уничтоженные жетоны очками, теперь их
         // просто конвертирует правило. Ключ не удалён (обратная совместимость
-        // балансовых прогонов), но комбинировать его с обломками не нужно — он
+        // балансовых прогонов), но комбинировать его с трофеями не нужно — он
         // не мешает (отдельный аддитивный канал war_track_vp), но и не нужен.
-        int per = ((Number) rs.get("economy.leftover_trophy_vp_per", 0)).intValue();
+        int per = ((Number) rs.get("economy.leftover_destroyed_vp_per", 0)).intValue();
         if (per > 0 && !gameEnding) {
             for (PlayerState p : s.players) {
-                int pts = p.trophySpacePoints();
+                int pts = p.destroyedValue();
                 int gained = pts / per;
                 if (gained > 0) {
                     p.warTrackVp += gained;
@@ -1798,8 +1798,8 @@ public final class GameEngine {
                 }
             }
         }
-        // ПРАВИЛО 2 (2026-08-15): в Возврат ВСЕ трофеи со стола игрока
-        // конвертируются в обломки 1:1 (заменяет старое «обменять ещё ровно один
+        // ПРАВИЛО 2 (2026-08-15): в Возврат ВСЕ уничтоженные жетоны со стола игрока
+        // конвертируются в трофеи 1:1 (заменяет старое «обменять ещё ровно один
         // жетон, остальное возвращается владельцам без конвертации» — то правило
         // так и не было реализовано в движке; здесь оно реализуется впервые, уже
         // в новом виде). Сами жетоны возвращаются исходным владельцам как раньше;
@@ -1812,52 +1812,52 @@ public final class GameEngine {
             // ТРОФЕЙНЫЙ СКЛАД (карта арсенала b13, правило дизайнера 15.08.2026).
             // Сначала освобождаем ячейки: жетон, пролежавший на карте раунд,
             // уходит владельцу. Потом игрок выбирает, какой трофей задержать —
-            // он не вернётся владельцу ещё раунд и не даст обломок.
+            // он не вернётся владельцу ещё раунд и не даст трофей.
             for (PlayerState p : s.players) {
-                for (Token held : new ArrayList<>(p.trophyHeldOnCards)) {
+                for (Token held : new ArrayList<>(p.destroyedOnCards)) {
                     held.setCapturedBy(null);
                     held.resetDamage();
                     held.setHexId(null);
                     emit(ev("type", "trophy_released", "seat", p.seat,
                         "owner", held.owner(), "round", s.round));
                 }
-                p.trophyHeldOnCards.clear();
+                p.destroyedOnCards.clear();
                 int slots = kelium.engine.ability.RuleQuery
-                    .of(s, p.seat, kelium.engine.ability.Hook.RETURN_KEEP_TROPHY)
+                    .of(s, p.seat, kelium.engine.ability.Hook.RETURN_KEEP_DESTROYED)
                     .base(0).ask();
-                for (int i = 0; i < slots && !p.trophySpace.isEmpty(); i++) {
-                    Token keep = chooseTrophyToHold(p);
+                for (int i = 0; i < slots && !p.destroyedTokens.isEmpty(); i++) {
+                    Token keep = chooseDestroyedToHold(p);
                     if (keep == null) {
                         break;
                     }
-                    p.trophySpace.remove(keep);
-                    p.trophyHeldOnCards.add(keep);
+                    p.destroyedTokens.remove(keep);
+                    p.destroyedOnCards.add(keep);
                     emit(ev("type", "trophy_held", "seat", p.seat,
                         "owner", keep.owner(), "round", s.round));
                 }
             }
             for (PlayerState p : s.players) {
                 // ФЛАТ, не печатная ценность (уточнение 2026-08-15): несданный в
-                // Науку жетон даёт РОВНО 1 обломок, независимо от trophyValue()
+                // Науку жетон даёт РОВНО 1 трофей, независимо от trophyValue()
                 // (техника ценностью 2 всё равно даёт 1, а не 2) — штраф за
                 // хранение трофея до конца раунда вместо его активной траты.
-                int flatCount = p.trophySpace.size();
+                int flatCount = p.destroyedTokens.size();
                 if (flatCount > 0) {
-                    int gained = Storage.addDebrisCapped(s, p, flatCount);
-                    emit(ev("type", "trophy_to_debris", "seat", p.seat,
+                    int gained = Storage.addTrophyCapped(s, p, flatCount);
+                    emit(ev("type", "trophy_to_trophy", "seat", p.seat,
                         "tokens", flatCount, "gained", gained, "round", s.round));
                     // КАРТА АРСЕНАЛА «трофей за каждый возвращённый жетон врага»
-                    // (5.0): к обычному обломку за жетон добавляется второй.
+                    // (5.0): к обычному трофею за жетон добавляется второй.
                     // Считаются ровно те жетоны, что возвращаются с ЭТОГО
-                    // трофейного места, то есть плата за удержанное поле.
+                    // места уничтоженных жетонов, то есть плата за удержанное поле.
                     if (Passives.hasPassive(s, p.seat, "trophy_per_returned_enemy")) {
-                        int extra = Storage.addDebrisCapped(s, p, flatCount);
+                        int extra = Storage.addTrophyCapped(s, p, flatCount);
                         emit(ev("type", "ability_reaction", "seat", p.seat,
                             "ability", "trophy_per_returned_enemy",
                             "tokens", flatCount, "gained", extra, "round", s.round));
                     }
                 }
-                for (Token tok : new ArrayList<>(p.trophySpace)) {
+                for (Token tok : new ArrayList<>(p.destroyedTokens)) {
                     tok.setCapturedBy(null);
                     tok.resetDamage();
                     tok.setHexId(null);
@@ -1868,14 +1868,14 @@ public final class GameEngine {
                         ownersToReconcile.add(tok.owner());
                     }
                 }
-                p.trophySpace.clear();
+                p.destroyedTokens.clear();
                 // СЖИГАЕМ ИЗЛИШЕК СРАЗУ, А НЕ ПОСЛЕ ВСЕГО ЦИКЛА.
                 //
                 // Итог тот же, но по ходу дела состояние остаётся согласованным. С
                 // отложенным сжиганием получалось так: игрок 0 вернул сопернику
                 // добытчик, ячейки соседа закрылись — а сжигание ждало конца
                 // цикла, и в это окно попадал СНИМОК ЗАПИСИ (кадр
-                // «трофеи в обломки» следующего игрока). Запись показывала
+                // «жетоны на место уничтоженных жетонов» следующего игрока). Запись показывала
                 // «занято 4 при 3 ячейках», хотя партия к концу шага была в
                 // порядке. Поймано сторожем StorageNeverOverflowsTest.
                 for (int ownerSeat : ownersToReconcile) {
@@ -1929,16 +1929,16 @@ public final class GameEngine {
      * <p>Спрашиваем игрока: выбор осмысленный, а не механический. Задержать
      * выгоднее тот жетон, который противнику нужнее всего — тогда он не сможет
      * выставить его заново (личный запас у каждого ровно по четыре на род).
-     * Отказаться тоже можно: задержанный трофей не конвертируется в обломок,
+     * Отказаться тоже можно: задержанный уничтоженный жетон не конвертируется в трофей,
      * то есть за отказ платят одним очком экономики.
      */
-    private Token chooseTrophyToHold(PlayerState p) {
+    private Token chooseDestroyedToHold(PlayerState p) {
         GameState s = state;
         if (agents == null || p.seat >= agents.size() || agents.get(p.seat) == null) {
-            return p.trophySpace.get(0);
+            return p.destroyedTokens.get(0);
         }
         List<kelium.core.Choice> opts = new ArrayList<>();
-        for (Token t : p.trophySpace) {
+        for (Token t : p.destroyedTokens) {
             opts.add(new kelium.core.Choice("trophy_hold", t,
                 "задержать жетон игрока " + t.owner()
                     + " (ценность " + t.trophyValue() + ")"));
@@ -2001,7 +2001,7 @@ public final class GameEngine {
         m.put("coin", p.resources.coin());
         m.put("kelium", p.resources.kelium());
         m.put("ammo", p.resources.ammo());
-        m.put("debris", p.resources.debris());
+        m.put("trophy", p.resources.trophy());
         return m;
     }
 

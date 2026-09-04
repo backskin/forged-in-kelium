@@ -81,7 +81,7 @@ public final class TopValue {
         value += нужда(ctx, Resource.COIN) * число(params, "coin") * 0.10;
         value += нужда(ctx, Resource.AMMO) * число(params, "ammo") * 0.15;
         value += нужда(ctx, Resource.KELIUM) * число(params, "kelium") * 0.10;
-        value += нужда(ctx, Resource.DEBRIS) * число(params, "debris") * 0.20;
+        value += нужда(ctx, Resource.TROPHY) * число(params, "trophy") * 0.20;
         value += число(params, "objective_cards") * 0.20;
         value += число(params, "containers") * 0.15;
         return clamp(value);
@@ -103,7 +103,7 @@ public final class TopValue {
             case "build" -> ctx.have(Resource.COIN) > 0 ? 0.6 : 0.15;
             case "movement" -> ctx.me().unitsOnField().isEmpty() ? 0.05 : 0.55;
             case "market" -> ctx.have(Resource.KELIUM) > 0 ? 0.6 : 0.05;
-            case "science" -> ctx.have(Resource.DEBRIS) > 0
+            case "science" -> ctx.have(Resource.TROPHY) > 0
                 || ctx.have(Resource.KELIUM) > 0 ? 0.6 : 0.1;
             case "energy_swap" -> голодные(ctx) > 0 ? 0.55 : 0.15;
             default -> 0.5;
@@ -129,7 +129,7 @@ public final class TopValue {
                 yield нехватка(idle, 3);
             }
             case REACH, DEFENCE -> ctx.me().unitsOnField().isEmpty() ? 0.2 : 0.8;
-            case TROPHY -> нехватка(ctx.have(Resource.DEBRIS), 4);
+            case TROPHY -> нехватка(ctx.have(Resource.TROPHY), 4);
             case ACTIONS, VP -> 0.9;     // действий и очков не хватает всегда
         };
     }
