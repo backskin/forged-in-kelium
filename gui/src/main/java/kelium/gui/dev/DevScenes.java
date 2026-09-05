@@ -1,5 +1,6 @@
 package kelium.gui.dev;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -136,18 +137,44 @@ public final class DevScenes {
      */
     private static Scene энергия() {
         Scene s = Scene.of(4).title("энергия: жёлтый сектор, кубики, простой");
+        // ГЕКСЫ БЕРУТСЯ ИЗ ПОЛЯ, А НЕ ПО ИМЕНИ. Раскладка зависит от свода и
+        // зерна, и «h0_0» в ней может не оказаться вовсе — сцена тогда падала
+        // на разыменовании пустого гекса (поймано StartMenuTest после смены
+        // свода по умолчанию). Берём размеченные гексы: у них по определению
+        // есть жёлтый сектор, ради которого сцена и существует.
+        List<String> hs = размеченныеГексы(s, 3);
+        String hex = hs.get(0);
+        int yellow = s.state().field.get(hex).energyCell;
         // Жёлтый сектор у каждого гекса свой — ставим станцию ИМЕННО на него и
         // такую же на соседний сектор, чтобы разницу было видно рядом.
-        String hex = "h0_0";
-        Integer yellow = s.state().field.get(hex).energyCell;
-        s.building(0, hex, BuildingType.POWER_PLANT, 4, yellow == null ? 0 : yellow)
-            .idleEnergy(3);
-        s.building(0, hex, BuildingType.POWER_PLANT, 4,
-                yellow == null ? 2 : (yellow + 2) % 6)
-            .idleEnergy(1);
-        s.building(0, "h1_0", BuildingType.AIRBASE, null, 0).energy(3);
-        s.building(0, "h0_1", BuildingType.FACTORY, null, 0).energy(1);
+        s.building(0, hex, BuildingType.POWER_PLANT, 4, yellow).idleEnergy(3);
+        s.building(0, hex, BuildingType.POWER_PLANT, 4, (yellow + 2) % 6).idleEnergy(1);
+        s.building(0, hs.get(1), BuildingType.AIRBASE, null, 0).energy(3);
+        s.building(0, hs.get(2), BuildingType.FACTORY, null, 0).energy(1);
         return s.round(4, 1);
+    }
+
+    /**
+     * ПЕРВЫЕ {@code n} РАЗМЕЧЕННЫХ ГЕКСОВ поля в порядке имён. Размеченный —
+     * значит с напечатанным жёлтым сектором, то есть заведомо играбельный и не
+     * накрытый грядой зарождения. Порядок по имени, а не по обходу карты, чтобы
+     * сцена не менялась от прогона к прогону.
+     */
+    private static List<String> размеченныеГексы(Scene s, int n) {
+        List<String> out = new ArrayList<>();
+        for (var e : new java.util.TreeMap<>(s.state().field.hexes).entrySet()) {
+            if (e.getValue().energyCell >= 0) {
+                out.add(e.getKey());
+            }
+            if (out.size() == n) {
+                break;
+            }
+        }
+        if (out.size() < n) {
+            throw new IllegalStateException(
+                "в поле меньше " + n + " размеченных гексов: " + out);
+        }
+        return out;
     }
 
     /**

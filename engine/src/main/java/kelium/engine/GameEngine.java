@@ -1842,14 +1842,43 @@ public final class GameEngine {
                 // (техника ценностью 2 всё равно даёт 1, а не 2) — штраф за
                 // хранение трофея до конца раунда вместо его активной траты.
                 int flatCount = p.destroyedTokens.size();
-                if (flatCount > 0) {
-                    int gained = Storage.addTrophyCapped(s, p, flatCount);
+                // ИКОНКА ТРОФЕЯ НА МЕСТЕ УНИЧТОЖЕННЫХ ЖЕТОНОВ (правило дизайнера
+                // 05.09.2026). Место уничтоженных жетонов — отложенная рубашкой
+                // вверх карта приказа, и на её рубашке напечатана иконка трофея.
+                // Лежащие жетоны её НЕ перекрывают: иконка ПРИБАВЛЯЕТСЯ к ним.
+                // Место платит 1 кубик само по себе и ещё по кубику за каждый
+                // возвращаемый жетон.
+                //
+                // Почему прибавляется, а не перекрывается. Перекрытие («пусто —
+                // возьми кубик, занято — не бери») уравнивало пацифиста с тем,
+                // кто воевал и успел спустить жетоны в Науку, и обесценивало
+                // убийство в последнем круге: жетон приезжал на место, но сдать
+                // его было уже нечем, и он вдобавок отнимал кубик за иконку.
+                // Прибавление снимает оба перекоса разом: базовый доход у всех
+                // одинаков, и каждый снесённый жетон всегда стоит на кубик
+                // больше — когда бы его ни снесли.
+                int icon = rs.getInt("return_step.trophy_icon_income", 0);
+                int income = flatCount + icon;
+                if (income > 0) {
+                    int gained = Storage.addTrophyCapped(s, p, income);
                     emit(ev("type", "trophy_to_trophy", "seat", p.seat,
-                        "tokens", flatCount, "gained", gained, "round", s.round));
-                    // КАРТА АРСЕНАЛА «трофей за каждый возвращённый жетон врага»
-                    // (5.0): к обычному трофею за жетон добавляется второй.
-                    // Считаются ровно те жетоны, что возвращаются с ЭТОГО
+                        "tokens", flatCount, "icon", icon, "gained", gained,
+                        "round", s.round));
+                }
+                if (flatCount > 0) {
+                    // КАРТА АРСЕНАЛА «монета за каждый возвращённый жетон врага»
+                    // (5.0). Считаются ровно те жетоны, что возвращаются с ЭТОГО
                     // места уничтоженных жетонов, то есть плата за удержанное поле.
+                    // Прежняя редакция платила трофеями; после того как трофей за
+                    // возврат стал базовым правилом, карта удваивала базу и
+                    // перестала быть выбором — теперь она меняет валюту, а не
+                    // множит ту же самую.
+                    if (Passives.hasPassive(s, p.seat, "coin_per_returned_enemy")) {
+                        p.resources.add(kelium.core.Resource.COIN, flatCount);
+                        emit(ev("type", "ability_reaction", "seat", p.seat,
+                            "ability", "coin_per_returned_enemy",
+                            "tokens", flatCount, "gained", flatCount, "round", s.round));
+                    }
                     if (Passives.hasPassive(s, p.seat, "trophy_per_returned_enemy")) {
                         int extra = Storage.addTrophyCapped(s, p, flatCount);
                         emit(ev("type", "ability_reaction", "seat", p.seat,

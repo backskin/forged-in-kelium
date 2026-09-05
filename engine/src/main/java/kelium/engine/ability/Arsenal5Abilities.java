@@ -50,6 +50,7 @@ public final class Arsenal5Abilities {
         Abilities.register(new GroundIgnoresBuildings());
         Abilities.register(new ScienceTrophyToCoin());
         Abilities.register(new TrophyPerReturnedEnemy());
+        Abilities.register(new CoinPerReturnedEnemy());
         Abilities.register(new ContainerOnOwnBuildingLost());
         Abilities.register(new SpecNuclearStrikeBurn());
     }
@@ -363,6 +364,41 @@ public final class Arsenal5Abilities {
         }
     }
 
+
+    /**
+     * В ФАЗУ ВОЗВРАТА — МОНЕТА ЗА КАЖДЫЙ ВОЗВРАЩЁННЫЙ ЖЕТОН ВРАГА (редакция
+     * 05.09.2026). Считаются чужие жетоны, УШЕДШИЕ ВЛАДЕЛЬЦАМ С ТВОИХ ГЕКСОВ:
+     * карта платит за то, что ты держал поле.
+     *
+     * <p>ПОЧЕМУ НЕ ТРОФЕЙ. Трофей за возвращённый жетон стал базовым правилом
+     * (иконка на месте уничтоженных жетонов), и карта в прежнем виде просто
+     * удваивала базу — то есть переставала быть решением: её эффект ничем не
+     * отличался от «повоюй ещё немного». Смена валюты возвращает ей выбор:
+     * монета кормит Разработку и Инфраструктуру, а не тот же трек, который и
+     * так кормят снесённые жетоны.
+     *
+     * <p>Свой номер, а не правка старой способности: {@code
+     * trophy_per_returned_enemy} стоит в колодах, на которых сыграны замеры.
+     */
+    private static final class CoinPerReturnedEnemy implements Ability {
+
+        @Override public String id() {
+            return "coin_per_returned_enemy";
+        }
+
+        @Override public Trigger trigger() {
+            return Trigger.PASSIVE;
+        }
+
+        @Override public Set<Hook> hooks() {
+            return EnumSet.noneOf(Hook.class);
+        }
+
+        @Override public Hint hint() {
+            return new Hint(Bottleneck.COINS, 2.0, Horizon.REST_OF_GAME, null,
+                "чужие жетоны на твоих гексах превращаются в монеты", false);
+        }
+    }
 
     /**
      * ЯДЕРНЫЙ УДАР 5.0 — редакция заказа 02.09.2026. Три отличия от прежнего:

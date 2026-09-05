@@ -222,6 +222,8 @@ public final class RuleWords {
             case "actions.top_actions_per_turn" -> "действий с верхнего приказа за ход";
             case "actions.empty_energy_slot_coin_cost" ->
                 "монет за работу здания с пустой ячейкой энергии";
+            case "actions.build.ops_per_military_building" ->
+                "сколько операций Стройки даёт каждое военное здание";
             case "actions.build.surcharge_coins" ->
                 "надбавка монетами за каждую лишнюю стройку в одном действии";
             case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
@@ -269,6 +271,10 @@ public final class RuleWords {
                 "боеприпасов за каждое лишнее перемещение";
             case "actions.movement.escalating_surcharge_ammo" ->
                 "растущая надбавка боеприпасами за перемещения";
+            case "actions.energy_swap.activations_per_source" ->
+                "сколько раз за действие активируется один источник энергии";
+            case "actions.energy_swap.take_back_must_fill_source" ->
+                "забрать энергию на источник можно только до полного";
             case "actions.energy_swap.surcharge_coins" ->
                 "надбавка монетами за лишние обмены энергии";
 
@@ -373,6 +379,8 @@ public final class RuleWords {
             case "tech.cube_supply" -> "кубиков науки в запасе игрока";
 
             // ---------- Конец раунда ----------
+            case "return_step.trophy_icon_income" ->
+                "трофеи по иконке места уничтоженных жетонов, сверх жетонов на нём";
             case "return_step.return_destroyed_tokens" ->
                 "уничтоженные жетоны возвращаются в запас";
             case "return_step.refill_objectives_to_limit" ->

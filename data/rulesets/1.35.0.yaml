@@ -542,6 +542,11 @@ return_step:
   trophy_to_upgrade_exchange_enabled: false
   return_destroyed_tokens: true
   refill_objectives_to_limit: true
+  # ИКОНКА ТРОФЕЯ на месте уничтоженных жетонов (дизайнер, 05.09.2026): место
+  # платит владельцу этот кубик САМО ПО СЕБЕ, сверх кубика за каждый
+  # возвращаемый жетон. Лежащие жетоны иконку не перекрывают — она прибавляется.
+  # 0 в прежних сводах: правила там иконку не читали.
+  trophy_icon_income: 1
 
 # ----------------------------------------------------------------------------
 #  Contested cards (backlog E12/E13/E14) — legal only if toggled on.

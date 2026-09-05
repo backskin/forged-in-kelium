@@ -746,7 +746,7 @@ public final class Actions {
         if (b.type != BuildingType.POWER_PLANT) {
             return;
         }
-        int now = Power.plantOutput(state, b);
+        int now = Power.sourceCubes(state, b);
         int had = b.energyIdle;
         for (BuildingToken c : player.buildingsOnField()) {
             had += c.energyBySource.getOrDefault(b.uid, 0);
@@ -814,7 +814,7 @@ public final class Actions {
             java.util.Set<Integer> тронутые = new java.util.HashSet<>();
             StringBuilder detail = new StringBuilder();
             while (true) {
-                if (ops >= opLimit) {
+                if (ops >= opLimit || ops >= militaryOpBudget(player)) {
                     break;
                 }
                 ActionResult one = performOneOp(player, ctx, agent, тронутые);
@@ -845,6 +845,41 @@ public final class Actions {
             return ActionResult.ok(detail.toString().trim(), tel);
         }
 
+        /** Свод 1.35.0 и новее: операции от военных зданий вместо надбавки. */
+        private boolean newBuildRule() {
+            return rs.get("actions.build.ops_per_military_building", null) != null;
+        }
+
+        /**
+         * СКОЛЬКО ОПЕРАЦИЙ ДАЁТ СТРОЙКА (правило дизайнера 04.09.2026): по одной
+         * за каждое ВОЕННОЕ здание на поле — казарма, завод, авиабаза, ЦУ.
+         *
+         * <p>Считается ЗАНОВО на каждом витке цикла, и это не оптимизация, а само
+         * правило: построенная казарма немедленно даёт ещё одну операцию, и
+         * потратить её можно прямо сейчас. Так вся военная цепочка собирается за
+         * один розыгрыш — ЦУ даёт первую, казарма вторую, завод третью, авиабаза
+         * четвёртую. Потолок 4 задан набором компонентов, а не числом в правилах.
+         *
+         * <p>Добытчики и энергостанции операций не дают: их этими операциями и
+         * строят. Надбавка за второе и следующее размещение при этом снята
+         * целиком — она проверялась в игровой ячейке и оказалась неинтуитивной.
+         *
+         * <p>На старых сводах, где ключа нет, лимит не действует и работает
+         * прежняя надбавка.
+         */
+        private int militaryOpBudget(PlayerState player) {
+            if (!newBuildRule()) {
+                return Integer.MAX_VALUE;
+            }
+            int n = 0;
+            for (BuildingToken b : player.buildingsOnField()) {
+                if (ASSEMBLY_UNIT.containsKey(b.type)) {   // казарма, завод, авиабаза, ЦУ
+                    n++;
+                }
+            }
+            return n;
+        }
+
         /** Одна операция стройки/переноса; null = пас или нет доступного. */
         @SuppressWarnings("unchecked")
         private ActionResult performOneOp(PlayerState player, TurnContext ctx, Agent agent,
@@ -861,7 +896,7 @@ public final class Actions {
             List<Integer> schedule = rs.getIntList("actions.build.surcharge_coins");
             // ПОДРЯД НА СТРОЙКУ (карта рынка «Инженерная контора»): второе и
             // третье здание ставятся по печатной цене, без надбавки.
-            int surcharge = ctx.noSurcharge.contains("build_place")
+            int surcharge = ctx.noSurcharge.contains("build_place") || newBuildRule()
                 ? 0 : ctx.nextOpSurcharge("build_place", schedule);
             // СКИДКА И БЕСПЛАТНОСТЬ ОТ УТИЛЯ (21.08.2026) идут ЧЕРЕЗ ТУ ЖЕ
             // надбавку, которой считается удорожание: цена постройки в одном
@@ -1010,7 +1045,7 @@ public final class Actions {
                 // ПОСЛЕ occupySides: выработка станции зависит от того, накрыл
                 // ли её след ЖЁЛТУЮ ЯЧЕЙКУ гекса (см. Power.plantOutput), а до
                 // занятия ячеек этот вопрос ещё не имеет ответа.
-                b.energyIdle = Power.plantOutput(state, b);
+                b.energyIdle = Power.sourceCubes(state, b);
             }
             // ПЕЧАТНЫЙ КОНТЕЙНЕР: если след здания накрыл ячейку с
             // напечатанным контейнером — владелец берёт карту из запаса.
@@ -1485,319 +1520,157 @@ public final class Actions {
 
         @Override
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
-            // K3 (§3.2 свода): выбери ОДИН свой гекс и перераспредели энергию,
-            // ВЫТЕКАЮЩУЮ ИЗ НЕГО (кубики источников этого гекса — где бы они
-            // сейчас ни стояли). Каждый следующий гекс-исход в том же действии
-            // оплачивается наценкой (actions.energy_swap.surcharge_coins).
-            // «Вечный кубик» жетона хранилища — источник вне поля, доступен в
-            // любой Смене энергии без наценки за гекс.
-            // ПЕРЕКОММУТАЦИЯ: когда наценки сняты со всех гексов, пошаговый выбор
-            // «взял гекс — разложил — взял следующий» становится выбором БЕЗ
-            // СИГНАЛА. Обычно шаги ограничивает цена: второй гекс стоит монету, и
-            // потому есть смысл решать по одному. Здесь цены нет, гексов бывает
-            // пять, кубиков восемь, и число разных последовательностей уходит в
-            // тысячи — а результат зависит только от ИТОГОВОЙ раскладки, не от
-            // порядка. Поэтому здесь предлагается сразу ГОТОВАЯ РАСКЛАДКА целиком.
-            if (ctx.noSurcharge.contains("energy_swap")) {
-                ActionResult whole = rewireEverything(player, ctx, agent);
-                if (whole != null) {
-                    return whole;
-                }
-            }
-            List<Integer> schedule = rs.getIntList("actions.energy_swap.surcharge_coins");
+            // ПРАВИЛО 04.09.2026. Выбора гекса больше нет. Активируй каждый свой
+            // ИСТОЧНИК не больше одного раза за действие, и каждая активация —
+            // одно из двух:
+            //
+            //   ОТДАТЬ  — снять с источника его простаивающие кубики и разложить
+            //             по своим зданиям;
+            //   ЗАБРАТЬ — вернуть кубики этого источника с потребителей обратно
+            //             на него, но ТОЛЬКО до полного заполнения. Не набирается
+            //             полностью — активация невозможна.
+            //
+            // НЕИДЕМПОТЕНТНОСТЬ держится на лимите активаций, а не на цене: лимит
+            // живёт внутри действия, поэтому второй розыгрыш даёт каждому
+            // источнику вторую активацию — и источник успевает и отдать, и
+            // забрать, чего один розыгрыш не умеет. Ни одной монеты доплаты в
+            // действии больше нет.
+            //
+            // Жетон хранилища отдельным источником быть перестал: он поднимает
+            // выработку ЦУ (Power.plantOutput), и активируется вместе с ним.
+            // КАРТА АРСЕНАЛА КАК ИСТОЧНИК («Полевой генератор»): она не стоит на
+            // поле, но кубики даёт, значит и активируется как всякий источник —
+            // один раз за действие, отдать или забрать. Сколько кубиков карты
+            // сейчас лежит на зданиях, считается по метке источника, поэтому
+            // отдельного счётчика ей не нужно.
+            int cardEnergy = kelium.engine.ability.RuleQuery
+                .of(state, player.seat, kelium.engine.ability.Hook.ENERGY_SOURCES)
+                .base(0).ask();
+            java.util.Set<Integer> used = new java.util.HashSet<>();
             int placedTotal = 0;
-            int hexesDone = 0;
-            boolean storageDone = false;
-            boolean cardSourceDone = false;
-            java.util.Set<String> doneHexes = new java.util.HashSet<>();
+            int taken = 0;
+            int activations = 0;
             while (true) {
-                // ПЕРЕКОММУТАЦИЯ (карта рынка «Инженерная контора»): энергия
-                // переставляется с любых своих гексов и полностью бесплатно —
-                // надбавки за второй и последующие гексы-исходы нет.
-                //
-                // ЗАЦИКЛИТЬСЯ ЗДЕСЬ НЕЛЬЗЯ, хотя цена и снята: каждый гекс-исход
-                // попадает в doneHexes и из меню уходит, поэтому выбор кончается
-                // сам, когда кончились гексы с источниками.
-                int surcharge = ctx.noSurcharge.contains("energy_swap")
-                    ? 0 : ctx.nextOpSurcharge("energy_swap", schedule);
-                // ТОЧКА ПРАВИЛ: карта арсенала может сделать второй гекс бесплатным
-                // («Ваше второе перемещение энергии тоже бесплатно»).
-                surcharge = (int) Math.round(kelium.engine.ability.RuleQuery
-                    .of(state, player.seat, kelium.engine.ability.Hook.ENERGY_SWAP_COST)
-                    .about(hexesDone + 1).base(surcharge).ask());
+                int cardPlaced = 0;
+                for (BuildingToken c : player.buildingsOnField()) {
+                    cardPlaced += c.energyBySource.getOrDefault(ARSENAL_CARD_SOURCE_UID, 0);
+                }
                 List<Choice> opts = new ArrayList<>();
-                // гексы-исходы: свои гексы, где стоит хоть один источник (ЭС/ЦУ)
-                java.util.Set<String> srcHexes = new java.util.LinkedHashSet<>();
-                for (BuildingToken b : player.buildingsOnField()) {
-                    if (isSource(b) && !doneHexes.contains(b.hexId)) {
-                        srcHexes.add(b.hexId);
+                if (cardEnergy > 0 && !used.contains(ARSENAL_CARD_SOURCE_UID)) {
+                    if (cardEnergy - cardPlaced > 0) {
+                        opts.add(new Choice("energy_give",
+                            String.valueOf(ARSENAL_CARD_SOURCE_UID),
+                            "отдать " + (cardEnergy - cardPlaced) + " с карты арсенала"));
+                    }
+                    if (cardPlaced > 0) {
+                        opts.add(new Choice("energy_take",
+                            String.valueOf(ARSENAL_CARD_SOURCE_UID),
+                            "забрать кубики карты арсенала обратно"));
                     }
                 }
-                for (String hid : srcHexes) {
-                    opts.add(new Choice("energy_hex", hid,
-                        "swap @" + hid + (surcharge > 0 ? " (+" + surcharge + " МОН)" : "")));
-                }
-                if (!storageDone && storageEnergyTokens(player) > 0) {
-                    opts.add(new Choice("energy_storage", null, "кубик жетона хранилища"));
-                }
-                // ТОЧКА ПРАВИЛ: карта арсенала может САМА быть источником энергии
-                // («Полевой генератор» даёт 1 кубик). Источник вне поля, наценки
-                // за гекс не платит — как жетон хранилища.
-                int cardEnergy = kelium.engine.ability.RuleQuery
-                    .of(state, player.seat, kelium.engine.ability.Hook.ENERGY_SOURCES)
-                    .base(0).ask();
-                if (!cardSourceDone && cardEnergy > 0) {
-                    opts.add(new Choice("energy_card", null,
-                        "кубик карты арсенала (" + cardEnergy + ")"));
-                }
-                opts.add(new Choice("pass", null, "stop swapping"));
-                if (opts.size() == 1) {
-                    break;
-                }
-                Choice pick = agent.choose(state, opts, Map.of("kind", "energy_hex",
-                    "surcharge", surcharge));
-                if (pick.payload() == null && !"energy_storage".equals(pick.kind())
-                        && !"energy_card".equals(pick.kind())) {
-                    break;
-                }
-                if ("energy_card".equals(pick.kind())) {
-                    // кубики карты арсенала: снять и разложить заново, без наценки
-                    for (BuildingToken c : player.buildingsOnField()) {
-                        c.stripEnergyOf(ARSENAL_CARD_SOURCE_UID);
-                    }
-                    placedTotal += placeCubes(player, agent, ARSENAL_CARD_SOURCE_UID,
-                        cardEnergy, null);
-                    cardSourceDone = true;
-                    continue;
-                }
-                if ("energy_storage".equals(pick.kind())) {
-                    // кубики жетонов хранилища: снять и разложить заново, без наценки
-                    int pool = storageEnergyTokens(player);
-                    for (BuildingToken c : player.buildingsOnField()) {
-                        c.stripEnergyOf(STORAGE_SOURCE_UID);
-                    }
-                    placedTotal += placeCubes(player, agent, STORAGE_SOURCE_UID, pool, null);
-                    storageDone = true;
-                    continue;
-                }
-                String hid = (String) pick.payload();
-                if (surcharge > 0) {
-                    if (!player.resources.canPay(Resource.COIN, surcharge)) {
-                        break;
-                    }
-                    player.resources.pay(Resource.COIN, surcharge);
-                }
-                // собрать кубики всех источников выбранного гекса
                 for (BuildingToken src : player.buildingsOnField()) {
-                    if (!isSource(src) || !hid.equals(src.hexId)) {
+                    if (!isSource(src) || used.contains(src.uid)) {
                         continue;
                     }
-                    src.energyIdle = 0;
-                    for (BuildingToken c : player.buildingsOnField()) {
-                        c.stripEnergyOf(src.uid);
+                    if (src.energyIdle > 0) {
+                        opts.add(new Choice("energy_give", String.valueOf(src.uid),
+                            "отдать " + src.energyIdle + " с " + src.type));
                     }
-                    // Пул = выработка источника (+ пассив «+1 станциям»): модель
-                    // самовосстанавливается при появлении/уходе пассивки. Сама
-                    // выработка считается в Power.plantOutput — там же живёт
-                    // правило жёлтой ячейки.
-                    int pool = Power.plantOutput(state, src)
-                        + (src.type == BuildingType.POWER_PLANT
-                            ? Passives.plantEnergyBonus(state, player.seat) : 0);
-                    placedTotal += placeCubes(player, agent, src.uid, pool, src);
+                    if (canTakeBack(player, src)) {
+                        opts.add(new Choice("energy_take", String.valueOf(src.uid),
+                            "забрать всё обратно на " + src.type));
+                    }
                 }
-                doneHexes.add(hid);
-                hexesDone++;
-                journal(state).of(player.seat).energySwapSourceHexes.add(hid);
+                if (opts.isEmpty()) {
+                    break;
+                }
+                opts.add(new Choice("energy_done", null, "закончить"));
+                Choice pick = agent.choose(state, opts, Map.of("kind", "energy_activation"));
+                if (pick == null || pick.payload() == null) {
+                    break;
+                }
+                int uid = Integer.parseInt(String.valueOf(pick.payload()));
+                if (uid == ARSENAL_CARD_SOURCE_UID) {
+                    if ("energy_give".equals(pick.kind())) {
+                        placedTotal += placeCubes(player, agent, ARSENAL_CARD_SOURCE_UID,
+                            cardEnergy - cardPlaced, null);
+                    } else {
+                        for (BuildingToken c : player.buildingsOnField()) {
+                            taken += c.stripEnergyOf(ARSENAL_CARD_SOURCE_UID);
+                        }
+                    }
+                    used.add(ARSENAL_CARD_SOURCE_UID);
+                    activations++;
+                    ctx.recordOp("energy_swap");
+                    continue;
+                }
+                BuildingToken src = null;
+                for (BuildingToken t : player.buildingsOnField()) {
+                    if (t.uid == uid) {
+                        src = t;
+                        break;
+                    }
+                }
+                if (src == null) {
+                    break;
+                }
+                if ("energy_give".equals(pick.kind())) {
+                    // Кубики СНИМАЮТСЯ с источника и только потом раскладываются:
+                    // placeCubes вернёт на источник неразложенный остаток сам.
+                    int pool = src.energyIdle;
+                    src.energyIdle = 0;
+                    placedTotal += placeCubes(player, agent, src.uid, pool, src);
+                } else {
+                    taken += takeBack(player, src);
+                }
+                used.add(src.uid);
+                activations++;
+                if (src.hexId != null) {
+                    journal(state).of(player.seat).energySwapSourceHexes.add(src.hexId);
+                }
                 ctx.recordOp("energy_swap");
             }
-            if (hexesDone == 0 && placedTotal == 0) {
+            if (activations == 0) {
                 return ActionResult.fail("energy swap: nothing to do");
             }
             ctx.actionsPlayed.add(name());
             Map<String, Object> tel = new HashMap<>();
             tel.put("energy_placed", placedTotal);
-            tel.put("hexes", hexesDone);
-            return ActionResult.ok("energy swap: " + placedTotal + " cubes over "
-                + hexesDone + " hex(es)", tel);
+            tel.put("energy_taken", taken);
+            tel.put("activations", activations);
+            return ActionResult.ok("energy swap: " + activations + " activation(s), "
+                + placedTotal + " placed, " + taken + " taken back", tel);
         }
 
         /**
-         * ПЕРЕКОММУТАЦИЯ ЦЕЛИКОМ: снять со стола ВСЮ свою энергию и разложить её
-         * заново одним решением.
+         * МОЖНО ЛИ ЗАБРАТЬ ВСЁ ОБРАТНО НА ЭТОТ ИСТОЧНИК.
          *
-         * <p>Возвращает {@code null}, если раскладывать нечего — тогда действие
-         * идёт обычным пошаговым путём и честно сообщает «nothing to do».
-         *
-         * <p>ЧТО ТУТ ГЛАВНОЕ. Здание либо запитано целиком, либо не работает
-         * вовсе: кубик, положенный в здание, которому нужно два, не даёт ничего.
-         * Значит осмысленных раскладок немного — они отличаются тем, КОГО решили
-         * не питать. Поэтому игрок выбирает не кубик за кубиком, а ПОРЯДОК
-         * ВАЖНОСТИ, и раскладка достраивается по нему жадно: пока пула хватает
-         * закрыть здание целиком — закрываем, не хватает — идём к следующему.
-         * Для одинаковых кубиков это и есть оптимум по числу работающих зданий,
-         * когда порядок «сначала дешёвые».
-         *
-         * <p>Последний вариант — «разложить самому» — возвращает игрока к
-         * пошаговому выбору: живому человеку он нужен, боту нет.
+         * <p>Забрать разрешено только «до полного»: источник должен заполниться
+         * целиком, иначе активация не состоится. Считаем его кубики, лежащие
+         * сейчас на потребителях, и складываем с теми, что уже простаивают на нём
+         * самом. Не хватает — значит часть кубиков ушла из игры вместе с погибшим
+         * зданием, и вернуть источник в полный вид уже нечем.
          */
-        private ActionResult rewireEverything(PlayerState player, TurnContext ctx, Agent agent) {
-            // 1. СКОЛЬКО ВСЕГО ЭНЕРГИИ У ИГРОКА. Пул каждого источника считается
-            // через Power.plantOutput — там живёт правило жёлтого сектора.
-            java.util.Map<Integer, Integer> pools = new java.util.LinkedHashMap<>();
-            for (BuildingToken src : player.buildingsOnField()) {
-                if (!isSource(src)) {
-                    continue;
-                }
-                pools.put(src.uid, Power.plantOutput(state, src)
-                    + (src.type == BuildingType.POWER_PLANT
-                        ? Passives.plantEnergyBonus(state, player.seat) : 0));
+        private boolean canTakeBack(PlayerState player, BuildingToken src) {
+            int cap = Power.sourceCubes(state, src);
+            if (src.energyIdle >= cap) {
+                return false;                 // и так полон — забирать нечего
             }
-            int storage = storageEnergyTokens(player);
-            if (storage > 0) {
-                pools.put(STORAGE_SOURCE_UID, storage);
-            }
-            int cardEnergy = kelium.engine.ability.RuleQuery
-                .of(state, player.seat, kelium.engine.ability.Hook.ENERGY_SOURCES)
-                .base(0).ask();
-            if (cardEnergy > 0) {
-                pools.put(ARSENAL_CARD_SOURCE_UID, cardEnergy);
-            }
-            int total = 0;
-            for (int n : pools.values()) {
-                total += n;
-            }
-            List<BuildingToken> consumers = new ArrayList<>();
+            int away = 0;
             for (BuildingToken c : player.buildingsOnField()) {
-                if (c.energySlots > 0) {
-                    consumers.add(c);
-                }
+                away += c.energyBySource.getOrDefault(src.uid, 0);
             }
-            if (total == 0 || consumers.isEmpty()) {
-                return null;
-            }
+            return src.energyIdle + away >= cap;
+        }
 
-            // 2. ЧЕТЫРЕ ПОРЯДКА ВАЖНОСТИ. Это не «варианты алгоритма», а разные
-            // ответы на вопрос «что мне сейчас нужнее»: побольше работающих
-            // зданий, добыча, войска или самое крупное производство.
-            java.util.LinkedHashMap<String, java.util.Comparator<BuildingToken>> plans =
-                new java.util.LinkedHashMap<>();
-            plans.put("запитать как можно больше зданий",
-                java.util.Comparator.comparingInt((BuildingToken c) -> c.energySlots));
-            plans.put("сначала добыча",
-                java.util.Comparator.comparingInt((BuildingToken c) ->
-                    (c.type == BuildingType.MINER ? 0 : 1) * 100 + c.energySlots));
-            plans.put("сначала военные здания",
-                java.util.Comparator.comparingInt((BuildingToken c) ->
-                    (ASSEMBLY_UNIT.containsKey(c.type) ? 0 : 1) * 100 + c.energySlots));
-            plans.put("сначала крупные",
-                java.util.Comparator.comparingInt((BuildingToken c) -> -c.energySlots));
-
-            List<Choice> opts = new ArrayList<>();
-            java.util.Map<String, List<Integer>> layouts = new java.util.LinkedHashMap<>();
-            for (var e : plans.entrySet()) {
-                List<BuildingToken> order = new ArrayList<>(consumers);
-                order.sort(e.getValue());
-                List<Integer> uids = new ArrayList<>();
-                int left = total;
-                for (BuildingToken c : order) {
-                    if (c.energySlots <= left) {
-                        uids.add(c.uid);
-                        left -= c.energySlots;
-                    }
-                }
-                // Одинаковые по результату раскладки в меню не дублируются: две
-                // подписи на одно и то же — это выбор, которого нет.
-                if (layouts.containsValue(uids)) {
-                    continue;
-                }
-                layouts.put(e.getKey(), uids);
-                opts.add(new Choice("energy_layout", e.getKey(),
-                    e.getKey() + ": запитано " + uids.size() + " из " + consumers.size()));
-            }
-            opts.add(new Choice("energy_manual", null, "разложить кубики самому"));
-            Choice pick = agent.choose(state, opts,
-                Map.of("kind", "energy_layout", "cubes", total));
-            if (pick == null || pick.payload() == null) {
-                return null;            // «самому» — обычный пошаговый путь
-            }
-            List<Integer> chosen = layouts.get(String.valueOf(pick.payload()));
-            if (chosen == null) {
-                return null;
-            }
-
-            // 3. ПРИМЕНИТЬ ОДНИМ ДЕЙСТВИЕМ: снять всё и положить по раскладке.
+        /** Снять кубики источника с потребителей и вернуть их на него. */
+        private int takeBack(PlayerState player, BuildingToken src) {
+            int back = 0;
             for (BuildingToken c : player.buildingsOnField()) {
-                for (int srcUid : new ArrayList<>(c.energyBySource.keySet())) {
-                    c.stripEnergyOf(srcUid);
-                }
+                back += c.stripEnergyOf(src.uid);
             }
-            for (BuildingToken src : player.buildingsOnField()) {
-                if (isSource(src)) {
-                    src.energyIdle = 0;
-                }
-            }
-            java.util.Iterator<java.util.Map.Entry<Integer, Integer>> src = pools.entrySet().iterator();
-            java.util.Map.Entry<Integer, Integer> cur = src.hasNext() ? src.next() : null;
-            int placed = 0;
-            for (int uid : chosen) {
-                BuildingToken c = null;
-                for (BuildingToken t : player.buildingsOnField()) {
-                    if (t.uid == uid) {
-                        c = t;
-                        break;
-                    }
-                }
-                if (c == null) {
-                    continue;
-                }
-                int need = c.energySlots;
-                while (need > 0 && cur != null) {
-                    if (cur.getValue() <= 0) {
-                        cur = src.hasNext() ? src.next() : null;
-                        continue;
-                    }
-                    int take = Math.min(need, cur.getValue());
-                    c.addEnergyFrom(cur.getKey(), take);
-                    cur.setValue(cur.getValue() - take);
-                    need -= take;
-                    placed += take;
-                }
-            }
-            // ОСТАТОК ПРОСТАИВАЕТ НА СВОЁМ ИСТОЧНИКЕ — кубик из игры не исчезает.
-            while (cur != null) {
-                if (cur.getValue() > 0 && cur.getKey() >= 0) {
-                    for (BuildingToken s : player.buildingsOnField()) {
-                        if (s.uid == cur.getKey()) {
-                            s.energyIdle = cur.getValue();
-                            break;
-                        }
-                    }
-                }
-                cur = src.hasNext() ? src.next() : null;
-            }
-
-            // Все свои гексы-исходы пошли в дело — журнал должен видеть каждый:
-            // на этом стоят задания про Смену энергии («Перекоммутация» o20).
-            int hexes = 0;
-            java.util.Set<String> hexIds = new java.util.LinkedHashSet<>();
-            for (BuildingToken s : player.buildingsOnField()) {
-                if (isSource(s) && s.hexId != null) {
-                    hexIds.add(s.hexId);
-                }
-            }
-            for (String hid : hexIds) {
-                journal(state).of(player.seat).energySwapSourceHexes.add(hid);
-                ctx.recordOp("energy_swap");
-                hexes++;
-            }
-            ctx.actionsPlayed.add(name());
-            Map<String, Object> tel = new HashMap<>();
-            tel.put("energy_placed", placed);
-            tel.put("hexes", hexes);
-            tel.put("layout", String.valueOf(pick.payload()));
-            tel.put("powered", chosen.size());
-            return ActionResult.ok("перекоммутация целиком: " + placed + " кубиков, "
-                + chosen.size() + " зданий запитано (" + pick.payload() + ")", tel);
+            src.energyIdle += back;
+            return back;
         }
 
         /**
@@ -1850,18 +1723,12 @@ public final class Actions {
             return b.type == BuildingType.POWER_PLANT || b.type == BuildingType.COMMAND_CENTER;
         }
 
-        /** Сколько «вечных кубиков» дают жетоны хранилища игрока. */
-        private static int storageEnergyTokens(PlayerState player) {
-            int n = 0;
-            for (String tok : player.storageTokens) {
-                if ("+1_energy".equals(tok)) {
-                    n++;
-                }
-            }
-            return n;
-        }
-
-        /** Синтетический uid источника «жетон хранилища». */
+        /**
+         * Синтетический uid источника вне поля. Собственным источником жетон
+         * хранилища быть перестал (правило 04.09.2026 — он поднимает выработку
+         * ЦУ), но номер остаётся занят: им помечены кубики, которые кладут на
+         * здания карты арсенала, и снимать их надо отдельно от станционных.
+         */
         static final int STORAGE_SOURCE_UID = -1;
     }
 
@@ -1930,6 +1797,22 @@ public final class Actions {
                                 u.type.code + "->" + nb));
                         }
                     }
+                    // ВХОД В ГАРНИЗОН (СВОД §5.3, до правки 04.09.2026 в движке
+                    // отсутствовал вовсе: поле insideBuildingUid только читалось).
+                    // Вход внутрь своего военного здания ТОГО ЖЕ РОДА — это
+                    // перемещение, значит стоит шаг скорости и оплачивается как
+                    // обычный ход. Гарнизонов у игрока до ТРЁХ: по одному в
+                    // казарме, заводе и авиабазе. ЦУ гарнизона не имеет — вышка
+                    // внутрь не встаёт никогда.
+                    for (BuildingToken b : garrisonTargets(s, player, u)) {
+                        // «to» = свой же гекс: жетон никуда не едет, он заходит
+                        // внутрь здания на месте. Ключ обязателен — его читают
+                        // все оценщики перемещений, и без него выбор был бы
+                        // перемещением без адреса.
+                        opts.add(new Choice("garrison",
+                            Map.of("uid", u.uid, "b", b.uid, "to", u.hexId),
+                            u.type.code + " в " + b.type));
+                    }
                 }
                 if (opts.isEmpty()) {
                     break;
@@ -1966,6 +1849,16 @@ public final class Actions {
                         break;
                     }
                 }
+                if ("garrison".equals(pick.kind())) {
+                    // Гекса войско не меняет — значит печатный контейнер не
+                    // берётся: карту даёт только приход НА сектор, а гарнизон
+                    // сектора не занимает вовсе.
+                    unit.insideBuildingUid = ((Number) mp.get("b")).intValue();
+                    perUnitSteps.merge(uid, 1, Integer::sum);
+                    movesDone++;
+                    freeUsed = true;
+                    continue;
+                }
                 String dest = (String) mp.get("to");
                 String fromHex = unit.hexId;
                 // Признак «был гарнизоном» снимаем ДО хода: смена гекса выводит
@@ -1993,6 +1886,45 @@ public final class Actions {
             Map<String, Object> tel = new HashMap<>();
             tel.put("moves", movesDone);
             return ActionResult.ok("moved " + movesDone + " steps", tel);
+        }
+
+        /**
+         * СВОИ ЗДАНИЯ, В КОТОРЫЕ ЭТО ВОЙСКО МОЖЕТ ВОЙТИ ГАРНИЗОНОМ.
+         *
+         * <p>Правило (СВОД §5.3, лимит исправлен 04.09.2026): не больше одного
+         * войска в здание и только в здание СВОЕГО РОДА — казарма держит пехоту,
+         * завод технику, авиабаза авиацию. Значит гарнизонов у игрока может быть
+         * до трёх. У ЦУ гарнизона нет: вышка внутрь не встаёт никогда.
+         *
+         * <p>Прежде свод говорил «такое здание у игрока только одно», то есть
+         * защищённый жетон был один на всю партию. Это была ошибка записи.
+         */
+        private static List<BuildingToken> garrisonTargets(GameState s, PlayerState player,
+                                                           UnitToken u) {
+            List<BuildingToken> out = new ArrayList<>();
+            if (u.inside() || u.type == UnitType.TOWER || u.hexId == null) {
+                return out;
+            }
+            for (BuildingToken b : player.buildingsOnField()) {
+                if (!u.hexId.equals(b.hexId) || !b.alive()) {
+                    continue;
+                }
+                if (b.type == BuildingType.COMMAND_CENTER
+                        || ASSEMBLY_UNIT.get(b.type) != u.type) {
+                    continue;
+                }
+                boolean occupied = false;
+                for (UnitToken o : player.units) {
+                    if (o.inside() && o.insideBuildingUid != null && o.insideBuildingUid == b.uid) {
+                        occupied = true;
+                        break;
+                    }
+                }
+                if (!occupied) {
+                    out.add(b);
+                }
+            }
+            return out;
         }
 
         private boolean canEnter(UnitToken unit, String hexId, int seat) {
@@ -2049,6 +1981,20 @@ public final class Actions {
             // упаковки ниже остаётся.
             if (!Passives.hasPassive(state, seat, "ground_ignores_buildings_in_maneuver")
                     && !Passability.groundEdgeOpen(state, unit.hexId, hexId, seat)) {
+                return false;
+            }
+            // ЧУЖИЕ ВОЙСКА ЗАПИРАЮТ ГЕКС ЦЕЛИКОМ (правило дизайнера 04.09.2026).
+            // Прежде войска не мешали никому — стенкой были только здания. Теперь
+            // наземному нельзя ни ВСТАТЬ на гекс с чужими войсками, ни ПРОЙТИ его
+            // насквозь; проход закрывается сам, потому что перемещение идёт по
+            // одному гексу за шаг и каждый шаг проходит эту проверку.
+            //
+            // Ограничены вход и проход, но НЕ выход: уйти с занятого гекса можно
+            // свободно — здесь проверяется только пункт назначения.
+            //
+            // Карта «ракетные ранцы» снимает стенки ЗДАНИЙ, а не войск: её пассив
+            // проверен выше и сюда не распространяется.
+            if (Passability.enemyUnitsOn(state, hexId, seat)) {
                 return false;
             }
             // УМНАЯ проверка стоянки: войска НЕ приколочены к ячейкам — считаем,

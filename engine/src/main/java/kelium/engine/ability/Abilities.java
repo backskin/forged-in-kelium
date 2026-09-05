@@ -76,7 +76,11 @@ public final class Abilities {
         Hook.BUILD_PRICE,       // Actions: стройка и перенос здания
         Hook.STORAGE_CELLS,     // Storage.abilityCells — предел склада
         // Подключено 13.08.2026 вместе с новым арсеналом:
-        Hook.ENERGY_SWAP_COST,          // Actions: наценка за гекс в Смене энергии
+        // ENERGY_SWAP_COST ОТКЛЮЧЁН 05.09.2026 вместе с переписанной Сменой
+        // энергии: гексов в действии больше нет, платы за них тоже, и спросить
+        // цену стало негде. Точка оставлена в перечислении — способности,
+        // которые на неё смотрят, живы и ждут нового текста от дизайнера, — но
+        // объявлять её подключённой было бы враньём.
         Hook.REFRESH_INCOME,            // GameEngine.refresh: доход в Обновление
         Hook.ASSEMBLY_ENERGY_NEEDED,    // Power.usableForAction: сколько энергии нужно
         Hook.ORDER_SPEC_COUNT,          // GameEngine: сколько СПЕЦ за ход

@@ -434,7 +434,7 @@ public final class CombatResolver {
             if (u.hexId == null || !u.alive()) {
                 continue;
             }
-            for (String target : s.field.neighbors(u.hexId)) {
+            for (String target : targetHexesFrom(u.hexId)) {
                 if (!validTarget(target, attackerSeat, null)
                         || !Passability.canShootAcross(s, u, target)) {
                     continue;   // между гексами стена — этот жетон не достаёт
@@ -506,7 +506,7 @@ public final class CombatResolver {
             // ровно то, чего он не пробивает. Поэтому canAttack, а не соседство.
             boolean hadShot = false;
             for (String h : srcSet) {
-                for (String n : s.field.neighbors(h)) {
+                for (String n : targetHexesFrom(h)) {
                     if (validTarget(n, attackerSeat, restrictTargetOwner)
                             && canAttack(attackerSeat, h, n)) {
                         hadShot = true;
@@ -540,7 +540,7 @@ public final class CombatResolver {
             .of(s, attackerSeat, kelium.engine.ability.Hook.ATTACK_RANGE)
             .about(source).base(1).ask());
         List<String> targets = new ArrayList<>();
-        for (String h : s.field.neighbors(source)) {
+        for (String h : targetHexesFrom(source)) {
             if (validTarget(h, attackerSeat, restrictTargetOwner)
                     && anyCanShootAcross(attackerSeat, source, h)) {
                 targets.add(h);
@@ -969,7 +969,7 @@ public final class CombatResolver {
      */
     public double attackableValue(int attackerSeat, String source) {
         double v = 0;
-        for (String nb : state.field.neighbors(source)) {
+        for (String nb : targetHexesFrom(source)) {
             if (!validTarget(nb, attackerSeat, null) || !canAttack(attackerSeat, source, nb)) {
                 continue;
             }
@@ -986,6 +986,20 @@ public final class CombatResolver {
             }
         }
         return v;
+    }
+
+    /**
+     * ГЕКСЫ-ЦЕЛИ ДЛЯ БОЯ ИЗ {@code source}: сам гекс и его соседи.
+     *
+     * <p>Правило дизайнера 04.09.2026: целью боя может быть сам выбранный гекс —
+     * жетоны разных игроков стоят на одном гексе и стреляют друг в друга. Свой
+     * гекс идёт ПЕРВЫМ, чтобы бой в упор не терялся в хвосте меню.
+     */
+    private List<String> targetHexesFrom(String source) {
+        List<String> out = new ArrayList<>();
+        out.add(source);
+        out.addAll(state.field.neighbors(source));
+        return out;
     }
 
     private boolean validTarget(String hx, int attackerSeat, Integer restrictOwner) {
