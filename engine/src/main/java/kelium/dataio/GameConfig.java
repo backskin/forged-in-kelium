@@ -178,7 +178,7 @@ public final class GameConfig {
      * одинаковых замера для трёх разных сводов и чуть не сделал из этого вывод.
      */
     public static final String DEFAULT_RULESET =
-        System.getProperty("kelium.ruleset", "1.34.0");
+        System.getProperty("kelium.ruleset", "1.35.0");
 
     // Кэш «правила + контент» по (версия, каталог данных): YAML читается один раз,
     // а не на каждую партию (на батче в тысячи партий это была главная статья

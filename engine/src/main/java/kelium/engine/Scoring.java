@@ -54,7 +54,9 @@ public final class Scoring {
             keliumVp = p.resources.kelium() * asInt(econ.get("kelium_vp_each"));
         }
         breakdown.put("kelium", keliumVp);
-        breakdown.put("coins", p.resources.coin() / coinsPerVp);
+        // 1.35.0: курс 0 ОТКЛЮЧАЕТ источник целиком (очки за монеты переехали в
+        // супер-задание «Казна»). Ноль здесь означал бы деление на ноль.
+        breakdown.put("coins", coinsPerVp > 0 ? p.resources.coin() / coinsPerVp : 0);
         // ТРОФЕИ И НЕСДАННЫЕ УНИЧТОЖЕННЫЕ ЖЕТОНЫ СЧИТАЮТСЯ ОДНИМ ИЗ ДВУХ КУРСОВ, НЕ ОБОИМИ
         // СРАЗУ. Найден и исправлен 18.08.2026: economy.trophy_storage_vp_per_unit
         // задумывался как АЛЬТЕРНАТИВНЫЙ вариант курса trophy_per_vp («отсутствует/0
@@ -81,8 +83,12 @@ public final class Scoring {
             trophyVp = trophyPool / asInt(econ.get("trophy_per_vp"));
         }
         breakdown.put("trophy", trophyVp);
-        breakdown.put("buildings_on_field", p.buildingsOnField().size() / perBuilding);
-        breakdown.put("units_on_field", p.unitsOnField().size() / perUnit);
+        // Те же нули: застройка и армия на поле переехали в «Промышленный узел»
+        // и «Сводный полк».
+        breakdown.put("buildings_on_field",
+            perBuilding > 0 ? p.buildingsOnField().size() / perBuilding : 0);
+        breakdown.put("units_on_field",
+            perUnit > 0 ? p.unitsOnField().size() / perUnit : 0);
 
         int techVp = 0;
         List<Integer> stepVp = rs.getIntList("tech.step_vp_cumulative");

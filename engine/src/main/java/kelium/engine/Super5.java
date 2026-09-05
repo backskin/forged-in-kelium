@@ -107,7 +107,11 @@ public final class Super5 {
      */
     private static final java.util.Set<String> ИЗВЕСТНЫЕ = java.util.Set.of(
         "s5_01", "s5_02", "s5_03", "s5_04", "s5_05", "s5_06",
-        "s5_07", "s5_08", "s5_09", "s5_10", "s5_11", "s5_12");
+        "s5_07", "s5_08", "s5_09", "s5_10", "s5_11", "s5_12",
+        // 7.0.0 (04.09.2026): сюда переехали базовые источники очков. Низы у них
+        // ПОВТОРЯЮТ низы старых карт, поэтому требование и награда делегируются
+        // тем же веткам — новые только множители.
+        "s5_13", "s5_14", "s5_15", "s5_16", "s5_17");
 
     /** Умеет ли движок разыгрывать карту с этим номером. */
     public static boolean знает(String id) {
@@ -135,15 +139,15 @@ public final class Super5 {
                                               String id) {
         Map<String, Object> got = new HashMap<>();
         switch (id) {
-            case "s5_01" -> got.put("hired", смотрВойск(s, p));
-            case "s5_02" -> got.put("gathered", дальнийРубеж(s, p, agent));
+            case "s5_01", "s5_15" -> got.put("hired", смотрВойск(s, p));
+            case "s5_02", "s5_14" -> got.put("gathered", дальнийРубеж(s, p, agent));
             case "s5_03" -> got.put("built", раскинутаяСеть(s, p, agent));
-            case "s5_04" -> got.put("orders", гарнизоннаяСлужба(s, p, agent, 2));
+            case "s5_04", "s5_13" -> got.put("orders", гарнизоннаяСлужба(s, p, agent, 2));
             case "s5_05" -> got.put("cards", архивШтаба(s, p));
             case "s5_06" -> got.put("burned", оружейнаяПалата(s, p, emit));
-            case "s5_07" -> got.put("actions", золотаяЖила(s, p, agent));
+            case "s5_07", "s5_16" -> got.put("actions", золотаяЖила(s, p, agent));
             case "s5_08" -> got.put("steps", перваяЛиния(s, p, agent));
-            case "s5_09" -> got.put("razed", трофейныйОбоз(s, p, agent));
+            case "s5_09", "s5_17" -> got.put("razed", трофейныйОбоз(s, p, agent));
             case "s5_10" -> got.put("orders", штабнаяИгра(s, p, agent));
             case "s5_11" -> got.put("upgraded", неприкосновенныйЗапас(s, p, agent));
             case "s5_12" -> got.put("seal_gone", теньШтаба(p));
@@ -566,6 +570,20 @@ public final class Super5 {
                 }
                 yield Math.min(6, n);
             }
+            // ---- 7.0.0 (04.09.2026): базовые источники очков переехали сюда ----
+            case "s5_13" -> Math.min(6, p.resources.coin() / 2);
+            case "s5_14" -> Math.min(6, p.resources.trophy() + p.destroyedValue());
+            case "s5_15" -> Math.min(6, Math.max(0, p.buildingsOnField().size() - 2));
+            case "s5_16" -> Math.min(6, p.unitsOnField().size() / 2);
+            case "s5_17" -> {
+                int n = 0;
+                for (BuildingToken b : p.buildingsOnField()) {
+                    if (b.level != null && b.level == 4) {
+                        n++;
+                    }
+                }
+                yield Math.min(6, 3 * n);
+            }
             default -> 0;
         };
     }
@@ -591,6 +609,7 @@ public final class Super5 {
             return false;
         }
         switch (p.super5Card) {
+            case "s5_15":
             case "s5_01": {
                 // Три РАЗНЫХ рода на одном гексе — смотр в прямом смысле.
                 Map<String, java.util.Set<UnitType>> поГексам = new HashMap<>();
@@ -605,6 +624,7 @@ public final class Super5 {
                 }
                 return false;
             }
+            case "s5_14":
             case "s5_02": {
                 // Своё войско рядом с ЧУЖИМ ЦУ — самое опасное место на поле.
                 for (UnitToken u : p.unitsOnField()) {
@@ -632,6 +652,7 @@ public final class Super5 {
                 }
                 return гексы.size() >= 5;
             }
+            case "s5_13":
             case "s5_04": {
                 // Три гекса, где стоят одновременно здание и войско.
                 java.util.Set<String> зд = new java.util.HashSet<>();
@@ -650,6 +671,7 @@ public final class Super5 {
                 return p.objectivesCompleted >= 4;
             case "s5_06":
                 return p.allInstalledArsenal().size() >= 3;
+            case "s5_16":
             case "s5_07":
                 return p.resources.kelium() >= 5;
             case "s5_08": {
@@ -673,6 +695,7 @@ public final class Super5 {
                 }
                 return n >= 2;
             }
+            case "s5_17":
             case "s5_09":
                 return p.killsTotal >= 4 && !p.super5CuEverLost;
             case "s5_10":
