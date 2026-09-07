@@ -151,4 +151,101 @@ class ExportPaintTest {
         }
         assertTrue(diff > 0, "выключатель контейнеров ничего не меняет");
     }
+
+    // ======================================================================
+    //  ПОЛОТНО «СБОРКА ИЗ БЛОКОВ» — та же пара требований, что у конструктора
+    // ======================================================================
+
+    /**
+     * ТОЛЬКО ПОЛОТНО сборки в заданной теме, отрисованное КАК НА ЭКРАН.
+     *
+     * <p>Снимать вкладку целиком нельзя: кнопки и строка состояния — обычные
+     * компоненты FlatLaf, они перекрашиваются сами, и снимок вкладки различался
+     * бы в двух темах даже с белым полотном. Первая редакция этого сторожа так
+     * и прошла вхолостую на заведомо сломанном коде — проверено.
+     */
+    private static BufferedImage сборкаНаЭкране(boolean dark) {
+        boolean was = Theme.isDark();
+        try {
+            Theme.apply(dark);
+            AssemblyWindow вкладка = new AssemblyWindow(field());
+            вкладка.перекрасить();
+            javax.swing.JPanel полотно = вкладка.полотно();
+            полотно.setSize(420, 300);
+            полотно.doLayout();
+            BufferedImage img = new BufferedImage(420, 300, BufferedImage.TYPE_INT_RGB);
+            java.awt.Graphics2D g = img.createGraphics();
+            полотно.printAll(g);
+            g.dispose();
+            return img;
+        } finally {
+            Theme.apply(was);
+        }
+    }
+
+    /**
+     * ПОЛОТНО СБОРКИ ОБЯЗАНО ТЕМНЕТЬ ВМЕСТЕ С ОКНОМ (баг дизайнера 07.09.2026).
+     *
+     * <p>Оно рисовалось красками экспорта и жёсткими константами, а фон
+     * компонента стоял 0xF7F7F5 — цвет не из палитры, поэтому
+     * {@code Theme.restyleTree} его не подменял, и в тёмной теме вкладка
+     * оставалась белым листом посреди тёмного окна.
+     *
+     * <p>Проверка от противного: снимки в двух темах обязаны РАЗЛИЧАТЬСЯ. Ровно
+     * обратное тому, что требуется от выгрузки картинки (тест выше).
+     */
+    @Test
+    void полотноСборкиТемнеетВместеСОкном() {
+        BufferedImage light = сборкаНаЭкране(false);
+        BufferedImage dark = сборкаНаЭкране(true);
+        int diff = 0;
+        for (int y = 0; y < light.getHeight(); y++) {
+            for (int x = 0; x < light.getWidth(); x++) {
+                if (light.getRGB(x, y) != dark.getRGB(x, y)) {
+                    diff++;
+                }
+            }
+        }
+        int всего = light.getWidth() * light.getHeight();
+        assertTrue(diff > всего / 2,
+            "снимки ПОЛОТНА сборки в светлой и тёмной теме совпали на "
+                + (100 - diff * 100 / всего)
+                + "% — значит полотно не перекрашивается, как и было в баге");
+
+        // И явно: в тёмной теме фон обязан быть тёмным, а не бумажным.
+        int угол = dark.getRGB(3, 3);
+        int яркость = ((угол >> 16) & 255) + ((угол >> 8) & 255) + (угол & 255);
+        assertTrue(яркость < 300,
+            "фон полотна сборки в тёмной теме остался светлым: "
+                + String.format("#%06X", угол & 0xFFFFFF));
+    }
+
+    /**
+     * А ВЫГРУЗКА СЛОЯ БЛОКОВ — печатная в любой теме: этот слой уходит в
+     * слияние, то есть в файл, и краски темы к нему отношения не имеют.
+     */
+    @Test
+    void слойБлоковДляСлиянияНеЗависитОтТемы() {
+        BufferedImage light;
+        BufferedImage dark;
+        boolean was = Theme.isDark();
+        try {
+            Theme.apply(false);
+            light = new AssemblyWindow(field()).renderBlocksLayer(400, 280, 24, 200, 140);
+            Theme.apply(true);
+            dark = new AssemblyWindow(field()).renderBlocksLayer(400, 280, 24, 200, 140);
+        } finally {
+            Theme.apply(was);
+        }
+        int diff = 0;
+        for (int y = 0; y < light.getHeight(); y++) {
+            for (int x = 0; x < light.getWidth(); x++) {
+                if (light.getRGB(x, y) != dark.getRGB(x, y)) {
+                    diff++;
+                }
+            }
+        }
+        assertEquals(0, diff, "слой блоков для слияния потемнел вместе с темой на "
+            + diff + " пикселях");
+    }
 }

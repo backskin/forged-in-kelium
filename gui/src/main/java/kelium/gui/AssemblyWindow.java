@@ -16,6 +16,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import kelium.gui.replay2.Theme;
+
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JButton;
@@ -57,6 +59,34 @@ public final class AssemblyWindow extends JPanel {
     private final JSpinner blackCount = new JSpinner(new SpinnerNumberModel(8, 1, 16, 1));
     private final JLabel status = new JLabel(" ");
     private final View view = new View();
+
+    /**
+     * ПЕРЕКРАСИТЬ ПОЛОТНО ПОСЛЕ СМЕНЫ ТЕМЫ.
+     *
+     * <p>Вся отрисовка читает палитру во время рисования, поэтому хватило бы и
+     * одного {@code repaint()}. Отдельный метод нужен из-за ФОНА компонента:
+     * {@link Theme#restyleTree} подменяет цвета по палитре, а в светлой теме
+     * {@code paper()} и {@code panel()} — одна и та же краска, и по ней не
+     * различить, чем компонент был. Полотно конструктора чинится тем же
+     * способом, см. {@code LayoutEditor.applyTheme}.
+     */
+    public void перекрасить() {
+        view.setBackground(Theme.paper());
+        view.repaint();
+        repaint();
+    }
+
+    /**
+     * САМО ПОЛОТНО — для сторожа темы.
+     *
+     * <p>Нужен именно он, а не вся вкладка: кнопки и строка состояния — обычные
+     * компоненты FlatLaf и перекрашиваются сами, поэтому снимок ВКЛАДКИ
+     * различается в двух темах даже тогда, когда полотно осталось белым листом.
+     * На этом первая редакция сторожа и прошла вхолостую.
+     */
+    javax.swing.JPanel полотно() {
+        return view;
+    }
     private final Timer debounce = new Timer(250, e -> resolve());
     private SwingWorker<List<Result>, Void> worker;
 
@@ -220,7 +250,10 @@ public final class AssemblyWindow extends JPanel {
         int savedH = view.getHeight();
         view.setSize(w, h);
         if (hasResult()) {
-            view.drawBlocksOnly(g, monochrome);
+            // СЛОЙ ДЛЯ СЛИЯНИЯ — ТОЖЕ ФАЙЛ, а не экран: без этого флага контур
+            // блока брался бы из темы, и в тёмной теме выгруженная картинка
+            // получила бы светлый контур на белой бумаге.
+            ExportPaint.with(() -> view.drawBlocksOnly(g, monochrome));
         }
         view.setSize(savedW, savedH);
         g.dispose();
@@ -407,7 +440,11 @@ public final class AssemblyWindow extends JPanel {
         private int lastY;
 
         View() {
-            setBackground(new Color(0xF7F7F5));
+            // ФОН — ИЗ ПАЛИТРЫ, А НЕ КОНСТАНТОЙ. Здесь стоял 0xF7F7F5: цвет не
+            // из палитры темы, поэтому Theme.restyleTree его не подменял, и в
+            // тёмной теме полотно сборки оставалось белым листом посреди
+            // тёмного окна. Theme.paper() подменяется вместе со всем окном.
+            setBackground(Theme.paper());
             MouseAdapter ma = new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e) {
                     lastX = e.getX();
@@ -560,6 +597,77 @@ public final class AssemblyWindow extends JPanel {
             new Color(0xC8DEDF), new Color(0xE7CFCF), new Color(0xD5D8C4),
             new Color(0xDCCBD8)};
 
+
+        // ==================================================================
+        //  КРАСКИ ПОЛОТНА: на экране — тема, в файл — печатная палитра
+        // ==================================================================
+        //  Правило то же, что у полотна конструктора (LayoutEditor.baseFill):
+        //  экспорт уходит в печать, и тёмной темы там не бывает никогда,
+        //  поэтому при поднятом ExportPaint.active() краски берутся оттуда.
+
+        /** Заливка блока: в тёмной теме та же палитра, но приглушённая. */
+        private Color заливкаБлока(int i, boolean monochrome) {
+            if (ExportPaint.active() || monochrome) {
+                return ExportPaint.HEX_FILL;
+            }
+            Color base = palette[i % palette.length];
+            return Theme.isDark() ? Theme.darken(base, 0.62) : base;
+        }
+
+        /** Внутренний шов между гексами одного блока — едва заметный. */
+        private Color шовБлока() {
+            if (ExportPaint.active()) {
+                return new Color(0x00000022, true);
+            }
+            return Theme.alpha(Theme.ink(), 0.13);
+        }
+
+        /** Внешний контур блока — то, ради чего вся картинка и рисуется. */
+        private Color контурБлока(boolean monochrome) {
+            if (ExportPaint.active() || monochrome) {
+                return ExportPaint.HEX_EDGE;
+            }
+            return Theme.isDark() ? new Color(0x9AA4AF) : new Color(0x1F2933);
+        }
+
+        /** Заливка нарисованного гекса под блоками. */
+        private Color заливкаПоля(boolean forbidden) {
+            if (ExportPaint.active()) {
+                return forbidden ? ExportPaint.FORBIDDEN_FILL : ExportPaint.HEX_FILL;
+            }
+            if (Theme.isDark()) {
+                return forbidden ? new Color(0x1A1F26) : new Color(0x2A313B);
+            }
+            return forbidden ? new Color(0xE4E4E4) : Color.WHITE;
+        }
+
+        /** Контур нарисованного поля:強 — когда сборки нет и поле само себе вид. */
+        private Color контурПоля(boolean strong) {
+            if (ExportPaint.active()) {
+                return ExportPaint.GRID;
+            }
+            if (Theme.isDark()) {
+                return strong ? new Color(0x6B7682) : new Color(0x3D454F);
+            }
+            return strong ? new Color(0x9AA0A6) : new Color(0xD8D8D4);
+        }
+
+        /** Обводка чёрной накладки: сама накладка чёрная в любой теме. */
+        private Color обводкаНакладки() {
+            if (ExportPaint.active()) {
+                return new Color(0x5A6068);
+            }
+            return Theme.isDark() ? new Color(0x8A929B) : new Color(0x5A6068);
+        }
+
+        /** Бледная метка содержимого гекса поверх блоков. */
+        private Color меткаСодержимого() {
+            if (ExportPaint.active()) {
+                return new Color(0x33000000, true);
+            }
+            return Theme.alpha(Theme.ink(), 0.42);
+        }
+
         @Override protected void paintComponent(Graphics g0) {
             super.paintComponent(g0);
             Graphics2D g = (Graphics2D) g0;
@@ -567,7 +675,7 @@ public final class AssemblyWindow extends JPanel {
                 RenderingHints.VALUE_ANTIALIAS_ON);
 
             if (result == null) {
-                message(g, "Подбираю сборку…", new Color(0x666666));
+                message(g, "Подбираю сборку…", Theme.ink2());
                 return;
             }
             if (result.status() != BlockAssembler.Status.OK) {
@@ -612,20 +720,20 @@ public final class AssemblyWindow extends JPanel {
             for (int i = 0; i < blocks.size(); i++) {
                 Placement p = blocks.get(i);
                 Set<Cell> own = new HashSet<>(p.cells());
-                g.setColor(monochrome ? ExportPaint.HEX_FILL : palette[i % palette.length]);
+                g.setColor(заливкаБлока(i, monochrome));
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
                     g.fill(roundedCell(xy[0], xy[1], size * 0.99, c, own));
                 }
                 // тонкие внутренние швы между гексами одного блока
-                g.setColor(new Color(0x00000022, true));
+                g.setColor(шовБлока());
                 g.setStroke(new BasicStroke(1f));
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
                     g.draw(roundedCell(xy[0], xy[1], size * 0.99, c, own));
                 }
                 // внешний контур блока
-                g.setColor(monochrome ? ExportPaint.HEX_EDGE : new Color(0x1F2933));
+                g.setColor(контурБлока(monochrome));
                 g.setStroke(new BasicStroke(4.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 for (Cell c : p.cells()) {
                     double[] xy = center(c.q(), c.r());
@@ -661,7 +769,7 @@ public final class AssemblyWindow extends JPanel {
                     size * 0.82, kelium.report.FieldGeometry.TILE_ROUND);
                 g.setColor(new Color(0x14171A));
                 g.fill(tile);
-                g.setColor(new Color(0x5A6068));
+                g.setColor(обводкаНакладки());
                 g.setStroke(new BasicStroke(1.6f));
                 g.draw(tile);
             }
@@ -680,9 +788,9 @@ public final class AssemblyWindow extends JPanel {
                 var poly = roundedCell(xy[0], xy[1], size * 0.99,
                     new Cell(h.q, h.r), поле);
                 boolean forbidden = "forbidden".equals(h.content);
-                g.setColor(forbidden ? new Color(0xE4E4E4) : new Color(0xFFFFFF));
+                g.setColor(заливкаПоля(forbidden));
                 g.fill(poly);
-                g.setColor(strong ? new Color(0x9AA0A6) : new Color(0xD8D8D4));
+                g.setColor(контурПоля(strong));
                 g.setStroke(forbidden
                     ? new BasicStroke(1.4f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND,
                         0, new float[]{4, 4}, 0)
@@ -709,7 +817,7 @@ public final class AssemblyWindow extends JPanel {
                     continue;
                 }
                 double[] xy = center(h.q, h.r);
-                g.setColor(new Color(0x33000000, true));
+                g.setColor(меткаСодержимого());
                 var fm = g.getFontMetrics();
                 g.drawString(mark, (float) (xy[0] - fm.stringWidth(mark) / 2.0),
                     (float) (xy[1] + fm.getAscent() / 2.5));
@@ -718,7 +826,7 @@ public final class AssemblyWindow extends JPanel {
 
         private void legend(Graphics2D g) {
             g.setFont(getFont().deriveFont(11f));
-            g.setColor(new Color(0x555555));
+            g.setColor(ExportPaint.active() ? ExportPaint.LABEL : Theme.ink3());
             // ПОДСКАЗКА ПРО МЫШЬ — ТОЛЬКО НА ЭКРАНЕ: в печатной картинке колесо
             // и перетаскивание не значат ничего, а место занимают.
             String text = "жирная линия — граница физического блока";
@@ -741,9 +849,9 @@ public final class AssemblyWindow extends JPanel {
             int h = 116;
             int x = (getWidth() - w) / 2;
             int y = (getHeight() - h) / 2;
-            g.setColor(new Color(0xF2FFFFFF, true));
+            g.setColor(Theme.alpha(Theme.panel(), 0.95));
             g.fillRoundRect(x, y, w, h, 16, 16);
-            g.setColor(new Color(0xB00020));
+            g.setColor(Theme.bad());
             g.setStroke(new BasicStroke(2f));
             g.drawRoundRect(x, y, w, h, 16, 16);
 
@@ -752,11 +860,11 @@ public final class AssemblyWindow extends JPanel {
             g.drawString(head, x + (w - fm.stringWidth(head)) / 2, y + 46);
 
             g.setFont(getFont().deriveFont(13f));
-            g.setColor(new Color(0x444444));
+            g.setColor(Theme.ink2());
             fm = g.getFontMetrics();
             g.drawString(sub, x + (w - fm.stringWidth(sub)) / 2, y + 74);
 
-            g.setColor(new Color(0x777777));
+            g.setColor(Theme.ink3());
             String hint = "измени запас блоков сверху — сборка пересчитается сразу";
             fm = g.getFontMetrics();
             g.drawString(hint, x + (w - fm.stringWidth(hint)) / 2, y + 96);
