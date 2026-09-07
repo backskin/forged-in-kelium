@@ -21,6 +21,7 @@ import kelium.gui.replay2.Theme;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
@@ -102,6 +103,25 @@ public final class AssemblyWindow extends JPanel {
     private int orderPos = -1;
     private final java.util.Random shuffleRng = new java.util.Random(20260812L);
 
+    // ==================================================================
+    //  ПОКАЗ КОНКРЕТНЫХ КАРТОНОК (просьба дизайнера 07.09.2026)
+    // ==================================================================
+    //  Сборка сама по себе показывает только КОНТУРЫ: сборщик работает формами
+    //  и не знает, какая картонка легла. Чтобы увидеть поле так, как оно
+    //  выйдет на стол, нужен второй режим — с выбранным набором, с печатными
+    //  метками на своих местах и с номером каждого блока на выноске.
+    private final java.util.Map<String, НаборыБлоков.Версия> наборы =
+        НаборыБлоков.загрузить(kelium.dataio.GameConfig.resolveDataRoot(null));
+    private final JComboBox<String> контейнерыПикер = new JComboBox<>();
+    private final JComboBox<String> энергияПикер = new JComboBox<>();
+    private final JComboBox<String> версияПикер = new JComboBox<>();
+    private boolean обновляюПикеры;
+    /** Зерно раздачи картонок: его и перебрасывает «случайно: только блоки». */
+    private long зерноКартонок = 20260907L;
+    /** Показывать метки и номера блоков либо только контуры сборки. */
+    private final javax.swing.JToggleButton режимМеток =
+        new javax.swing.JToggleButton("Блоки с метками");
+
     public AssemblyWindow(Model model) {
         this.model = model;
         debounce.setRepeats(false);
@@ -145,8 +165,88 @@ public final class AssemblyWindow extends JPanel {
 
         status.setBorder(BorderFactory.createEmptyBorder(4, 8, 6, 8));
 
+        // ВТОРОЙ РЯД — выбор набора и режим показа. Отдельной строкой, а не в
+        // хвост первой: там уже три счётчика и две кнопки, и всё это в одну
+        // строку не влезает на узком окне.
+        JPanel второй = new JPanel();
+        второй.setLayout(new javax.swing.BoxLayout(второй, javax.swing.BoxLayout.X_AXIS));
+        второй.setBorder(BorderFactory.createEmptyBorder(0, 8, 6, 8));
+        второй.add(new JLabel("Набор блоков:   контейнеры:"));
+        второй.add(Box.createHorizontalStrut(4));
+        второй.add(контейнерыПикер);
+        второй.add(Box.createHorizontalStrut(10));
+        второй.add(new JLabel("энергия:"));
+        второй.add(Box.createHorizontalStrut(4));
+        второй.add(энергияПикер);
+        второй.add(Box.createHorizontalStrut(10));
+        второй.add(new JLabel("версия:"));
+        второй.add(Box.createHorizontalStrut(4));
+        второй.add(версияПикер);
+        второй.add(Box.createHorizontalStrut(16));
+
+        JButton всёСлучайно = new JButton("⚄ Случайно: всё");
+        всёСлучайно.setToolTipText("<html><div style='width:320px'>"
+            + "<b>Пересобрать и сборку, и картонки.</b><br>"
+            + "Берётся ДРУГОЙ вариант сборки того же поля, и картонки по нему "
+            + "раскладываются заново.</div></html>");
+        всёСлучайно.addActionListener(e -> {
+            зерноКартонок = System.nanoTime();
+            nextVariant();
+        });
+        второй.add(всёСлучайно);
+        второй.add(Box.createHorizontalStrut(8));
+
+        JButton толькоБлоки = new JButton("⚄ Случайно: только блоки");
+        толькоБлоки.setToolTipText("<html><div style='width:320px'>"
+            + "<b>Оставить сборку, поменять картонки.</b><br>"
+            + "Форма поля и разбиение на блоки не меняются — меняется только то, "
+            + "какой номер блока и какой его стороной лёг в каждое место.<br>"
+            + "<i>Так и бывает за столом: контур собрали, а картонки можно "
+            + "разложить иначе.</i></div></html>");
+        толькоБлоки.addActionListener(e -> {
+            зерноКартонок = System.nanoTime();
+            пересобратьКартонки();
+        });
+        второй.add(толькоБлоки);
+        второй.add(Box.createHorizontalStrut(12));
+
+        режимМеток.setToolTipText("<html><div style='width:320px'>"
+            + "<b>Что показывать.</b><br>"
+            + "Выключено — только контуры сборки: как поле разбито на блоки.<br>"
+            + "Включено — конкретные картонки выбранного набора: печатные "
+            + "контейнеры и жёлтые ячейки на своих местах, повёрнутые вместе с "
+            + "блоком, и номер каждого блока на выноске.</div></html>");
+        режимМеток.addActionListener(e -> {
+            пересобратьКартонки();
+            view.repaint();
+        });
+        второй.add(режимМеток);
+        второй.add(Box.createHorizontalGlue());
+
+        собратьПикеры();
+        контейнерыПикер.addActionListener(e -> {
+            if (!обновляюПикеры) {
+                обновитьЭнергию();
+            }
+        });
+        энергияПикер.addActionListener(e -> {
+            if (!обновляюПикеры) {
+                обновитьВерсии();
+            }
+        });
+        версияПикер.addActionListener(e -> {
+            if (!обновляюПикеры) {
+                пересобратьКартонки();
+                view.repaint();
+            }
+        });
+
+        JPanel шапка = new JPanel(new java.awt.GridLayout(2, 1));
+        шапка.add(top);
+        шапка.add(второй);
+
         setLayout(new BorderLayout());
-        add(top, BorderLayout.NORTH);
+        add(шапка, BorderLayout.NORTH);
         add(view, BorderLayout.CENTER);
         add(status, BorderLayout.SOUTH);
     }
@@ -155,6 +255,104 @@ public final class AssemblyWindow extends JPanel {
      * Пересчитать сборку под текущее состояние раскладки. Вызывается, когда
      * пользователь переключается на эту вкладку: поле могло измениться.
      */
+    // ==================================================================
+    //  ВЫБОР НАБОРА БЛОКОВ
+    // ==================================================================
+
+    /**
+     * ВЫБОР ПО СОЧЕТАНИЮ, А НЕ ПО ID ФАЙЛА — как в каталоге блоков. Набор и так
+     * задаётся двумя числами (сколько контейнеров и сколько энергии), и помнить,
+     * какая версия что содержит, дизайнеру незачем.
+     */
+    private void собратьПикеры() {
+        обновляюПикеры = true;
+        контейнерыПикер.removeAllItems();
+        for (String к : НаборыБлоков.посочетаниям(наборы).keySet()) {
+            контейнерыПикер.addItem(к);
+        }
+        обновляюПикеры = false;
+        if (контейнерыПикер.getItemCount() > 0) {
+            // ЭТАЛОН ПО УМОЛЧАНИЮ: это тот набор, которым играет действующий
+            // свод, и открывать вкладку логично на нём.
+            String эталон = String.valueOf(kelium.dataio.GameConfig
+                .buildCached(kelium.dataio.GameConfig.DEFAULT_RULESET, 4, 1L, null, null)
+                .ruleset.get("content_versions.blocks", ""));
+            НаборыБлоков.Версия v = наборы.get(эталон);
+            if (v != null) {
+                контейнерыПикер.setSelectedItem(v.подписьКонтейнеров());
+            }
+            обновитьЭнергию();
+            if (v != null) {
+                энергияПикер.setSelectedItem(v.подписьЭнергии());
+                обновитьВерсии();
+                версияПикер.setSelectedItem(v.id());
+            }
+        }
+    }
+
+    private void обновитьЭнергию() {
+        обновляюПикеры = true;
+        энергияПикер.removeAllItems();
+        var карта = НаборыБлоков.посочетаниям(наборы)
+            .get((String) контейнерыПикер.getSelectedItem());
+        if (карта != null) {
+            for (String э : карта.keySet()) {
+                энергияПикер.addItem(э);
+            }
+        }
+        обновляюПикеры = false;
+        обновитьВерсии();
+    }
+
+    private void обновитьВерсии() {
+        обновляюПикеры = true;
+        версияПикер.removeAllItems();
+        var карта = НаборыБлоков.посочетаниям(наборы)
+            .get((String) контейнерыПикер.getSelectedItem());
+        var список = карта == null ? null : карта.get((String) энергияПикер.getSelectedItem());
+        if (список != null) {
+            for (НаборыБлоков.Версия v : список) {
+                версияПикер.addItem(v.id());
+            }
+        }
+        обновляюПикеры = false;
+        пересобратьКартонки();
+        view.repaint();
+    }
+
+    /**
+     * ВКЛЮЧИТЬ РЕЖИМ КАРТОНОК ИЗВНЕ — для прогонщика снимков.
+     *
+     * <p>Проверять вид мышью нельзя (правило 30.08.2026: прогонщики не забирают
+     * фокус), поэтому снимок делается в памяти, и ему нужен способ включить
+     * режим без нажатия кнопки.
+     */
+    public void показыватьМетки(boolean включить) {
+        режимМеток.setSelected(включить);
+        пересобратьКартонки();
+    }
+
+    /** Выбранный набор либо {@code null}, если наборов нет вовсе. */
+    private НаборыБлоков.Версия выбранныйНабор() {
+        String id = (String) версияПикер.getSelectedItem();
+        return id == null ? null : наборы.get(id);
+    }
+
+    /**
+     * Разложить картонки по нынешней сборке. Зовётся при смене сборки, набора
+     * или зерна раздачи; сама сборка при этом не пересчитывается.
+     */
+    private void пересобратьКартонки() {
+        if (!режимМеток.isSelected() || !hasResult()) {
+            view.картонки = List.of();
+            view.repaint();
+            return;
+        }
+        view.картонки = ПривязкаБлоков.привязать(view.result.blocks(),
+            выбранныйНабор(), зерноКартонок);
+        view.repaint();
+    }
+
     public void refresh() {
         resolve();
     }
@@ -183,6 +381,7 @@ public final class AssemblyWindow extends JPanel {
     /** Отрисовать выбранный вариант и написать, какой он по счёту. */
     private void showVariant(Result r) {
         view.result = r;
+        пересобратьКартонки();
         view.repaint();
         int big = (Integer) bigCount.getValue();
         int small = (Integer) smallCount.getValue();
@@ -432,6 +631,8 @@ public final class AssemblyWindow extends JPanel {
     // ==================== холст просмотра ====================
     private final class View extends JPanel {
         Result result;
+        /** Уложенные картонки — пусто, если режим меток выключен. */
+        List<ПривязкаБлоков.Привязка> картонки = List.of();
         Set<Cell> playable = Set.of();
         double size = 44;
         double panX = 480;
@@ -699,6 +900,14 @@ public final class AssemblyWindow extends JPanel {
 
             // 4) приглушённое содержимое поверх блоков
             drawContentGhost(g);
+
+            // 5) РЕЖИМ КАРТОНОК: печатные метки на своих местах и номера блоков
+            //    на чертёжных выносках. Порядок важен: метки поверх блоков, а
+            //    выноски поверх меток — линия не должна прятаться под меткой.
+            if (!картонки.isEmpty()) {
+                рисоватьМетки(g);
+                рисоватьВыноски(g);
+            }
             legend(g);
         }
 
@@ -821,6 +1030,174 @@ public final class AssemblyWindow extends JPanel {
                 var fm = g.getFontMetrics();
                 g.drawString(mark, (float) (xy[0] - fm.stringWidth(mark) / 2.0),
                     (float) (xy[1] + fm.getAscent() / 2.5));
+            }
+        }
+
+        /**
+         * ПЕЧАТНЫЕ МЕТКИ КАРТОНОК на своих секторах.
+         *
+         * <p>Фигуры берутся у {@link kelium.report.FieldGeometry} — те же, что
+         * рисует каталог блоков и разбор партии. Иначе одна и та же ячейка
+         * выглядела бы в трёх приложениях по-разному, и сверять печать было бы
+         * нечем.
+         */
+        private void рисоватьМетки(Graphics2D g) {
+            // ПОД ЧЁРНОЙ НАКЛАДКОЙ ПЕЧАТИ НЕ ВИДНО. Блок лежит под накладкой
+            // целиком, но накладка — это физическая картонка поверх, и она
+            // закрывает и контейнер, и жёлтую ячейку. Рисовать их сквозь неё
+            // значило бы показывать то, чего за столом не увидишь.
+            Set<Cell> подНакладкой = new HashSet<>(result.blacks());
+            for (ПривязкаБлоков.Привязка п : картонки) {
+                for (ПривязкаБлоков.ГексНаПоле h : п.гексы()) {
+                    if (подНакладкой.contains(h.клетка())) {
+                        continue;
+                    }
+                    double[] xy = center(h.клетка().q(), h.клетка().r());
+                    double s = size * 0.99;
+                    if (h.естьЭнергия()) {
+                        float толщина = (float) Math.max(1.2, s * 0.055);
+                        g.setColor(Theme.energy());
+                        g.setStroke(new BasicStroke(толщина, BasicStroke.CAP_ROUND,
+                            BasicStroke.JOIN_ROUND));
+                        g.draw(kelium.report.FieldGeometry.path(
+                            kelium.report.FieldGeometry.energyCellOutline(
+                                xy[0], xy[1], s, h.энергия(), толщина)));
+                        double[] точка = kelium.report.FieldGeometry.energyCellSpot(
+                            xy[0], xy[1], s, h.энергия());
+                        g.fill(kelium.report.FieldGeometry.path(
+                            kelium.report.FieldGeometry.boltPolygon(
+                                точка[0], точка[1], s * 0.24)));
+                    }
+                    if (h.естьКонтейнер()) {
+                        var квадрат = kelium.report.FieldGeometry.path(
+                            kelium.report.FieldGeometry.containerCellQuad(
+                                xy[0], xy[1], s, h.контейнер(), s * 0.24));
+                        g.setColor(Theme.container());
+                        g.fill(квадрат);
+                        g.setColor(Theme.alpha(Theme.ink(), 0.45));
+                        g.setStroke(new BasicStroke(1.2f));
+                        g.draw(квадрат);
+                    }
+                }
+            }
+        }
+
+        /**
+         * ВЫНОСКИ С НОМЕРАМИ БЛОКОВ — по-чертёжному.
+         *
+         * <p>Линия идёт от середины блока наклонным участком к краю, там
+         * ломается и уходит ГОРИЗОНТАЛЬНО до полки, на которой лежит подпись.
+         * Подписи стоят двумя столбцами за пределами поля — слева и справа, — и
+         * разведены по высоте, чтобы не наезжали друг на друга.
+         *
+         * <p>Почему не подписывать прямо на блоке: блок — это пять-шесть гексов,
+         * и на них уже лежат печатные метки и бледное содержимое поля. Подпись
+         * поверх спорила бы с ними, а вынесенная за поле читается сразу и самой
+         * раскладке не мешает.
+         */
+        /**
+         * ВЫНОСКИ С НОМЕРАМИ БЛОКОВ — по-чертёжному.
+         *
+         * <p>От середины блока идёт наклонный участок, у края поля он ломается и
+         * уходит ГОРИЗОНТАЛЬНО до полки, на которой лежит подпись. Подписи
+         * стоят двумя столбцами сразу за полем — слева и справа, — и разведены
+         * по высоте, чтобы не наезжали.
+         *
+         * <p>ПОЧЕМУ У КРАЯ ПОЛЯ, А НЕ ОКНА. Полотно шире раскладки, и подписи,
+         * прижатые к краю окна, тянули за собой линии через весь холст — рисунок
+         * читался как паутина. Полки ставятся вплотную к рамке сборки: линия
+         * короткая, и видно, к какому блоку она идёт.
+         *
+         * <p>Почему подпись не на самом блоке: блок — это пять-шесть гексов, и
+         * на них уже лежат печатные метки и бледное содержимое поля. Подпись
+         * поверх спорила бы с ними.
+         */
+        private void рисоватьВыноски(Graphics2D g) {
+            g.setFont(Theme.font(11, Font.BOLD));
+            var fm = g.getFontMetrics();
+            int полка = Theme.px(14);          // длина полки за подписью
+            int зазор = Theme.px(18);          // от рамки поля до полки
+
+            // СЕРЕДИНА БЛОКА — по экранным центрам его гексов: осевые средние
+            // дробные, а перевод в экран берёт целые, и дробную середину
+            // пришлось бы считать второй формулой, которая бы и разошлась.
+            List<Object[]> все = new ArrayList<>();
+            double полеЛево = Double.MAX_VALUE;
+            double полеПраво = -Double.MAX_VALUE;
+            double серединаX = 0;
+            for (ПривязкаБлоков.Привязка п : картонки) {
+                double sx = 0;
+                double sy = 0;
+                for (ПривязкаБлоков.ГексНаПоле h : п.гексы()) {
+                    double[] c = center(h.клетка().q(), h.клетка().r());
+                    sx += c[0];
+                    sy += c[1];
+                    полеЛево = Math.min(полеЛево, c[0] - size);
+                    полеПраво = Math.max(полеПраво, c[0] + size);
+                }
+                double[] xy = {sx / п.гексы().size(), sy / п.гексы().size()};
+                все.add(new Object[]{п, xy});
+                серединаX += xy[0];
+            }
+            серединаX /= картонки.size();
+
+            List<Object[]> слева = new ArrayList<>();
+            List<Object[]> справа = new ArrayList<>();
+            for (Object[] пара : все) {
+                double[] xy = (double[]) пара[1];
+                (xy[0] < серединаX ? слева : справа).add(пара);
+            }
+            слева.sort((a, b) -> Double.compare(((double[]) a[1])[1], ((double[]) b[1])[1]));
+            справа.sort((a, b) -> Double.compare(((double[]) a[1])[1], ((double[]) b[1])[1]));
+
+            выноскиСтолбца(g, слева, true, fm, полка,
+                (int) Math.round(полеЛево - зазор));
+            выноскиСтолбца(g, справа, false, fm, полка,
+                (int) Math.round(полеПраво + зазор));
+        }
+
+        /**
+         * Один столбец подписей. {@code крайX} — та вертикаль, от которой
+         * начинаются полки: слева подписи прижаты к ней правым краем, справа —
+         * левым, чтобы текст всегда смотрел от поля наружу.
+         */
+        private void выноскиСтолбца(Graphics2D g, List<Object[]> столбец, boolean влево,
+                                    java.awt.FontMetrics fm, int полка, int крайX) {
+            if (столбец.isEmpty()) {
+                return;
+            }
+            int шаг = Math.max(fm.getHeight() + Theme.px(3), Theme.px(16));
+            int верх = Math.max(fm.getAscent() + Theme.px(6),
+                (getHeight() - шаг * столбец.size()) / 2);
+
+            for (int i = 0; i < столбец.size(); i++) {
+                ПривязкаБлоков.Привязка п = (ПривязкаБлоков.Привязка) столбец.get(i)[0];
+                double[] xy = (double[]) столбец.get(i)[1];
+                int yТекста = верх + шаг * i;
+                int yЛинии = yТекста + Theme.px(3);
+                String текст = п.сторона().подпись();
+                int ширина = fm.stringWidth(текст);
+
+                // Полка: под текстом, длиной с текст плюс хвостик к полю.
+                int xТекста = влево ? крайX - ширина : крайX;
+                int xПолкиОт = влево ? xТекста : крайX;
+                int xПолкиДо = влево ? крайX + полка : крайX + ширина + полка;
+                int xПерелома = влево ? крайX + полка : крайX - полка;
+
+                g.setColor(Theme.alpha(Theme.ink(), 0.6));
+                g.setStroke(new BasicStroke(1f, BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND));
+                g.drawLine(xПолкиОт, yЛинии, xПолкиДо, yЛинии);
+                // наклонный участок от перелома к середине блока
+                g.drawLine(xПерелома, yЛинии,
+                    (int) Math.round(xy[0]), (int) Math.round(xy[1]));
+                // точка на блоке — как в чертеже
+                double r = Theme.px(3) * 0.8;
+                g.fill(new java.awt.geom.Ellipse2D.Double(
+                    xy[0] - r, xy[1] - r, 2 * r, 2 * r));
+
+                g.setColor(Theme.ink());
+                g.drawString(текст, xТекста, yТекста);
             }
         }
 

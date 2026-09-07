@@ -41,16 +41,20 @@ public final class СнимокСборки {
             return;
         }
 
-        for (boolean dark : new boolean[]{false, true}) {
-            BufferedImage img = снимок(dark, w, h);
-            File out = new File(dir, "сборка-" + (dark ? "тёмная" : "светлая") + ".png");
-            ImageIO.write(img, "png", out);
-            System.out.println((dark ? "тёмная:  " : "светлая: ") + out.getPath()
-                + "   фон " + описатьЦвет(img.getRGB(w / 2, 40)));
+        for (boolean метки : new boolean[]{false, true}) {
+            for (boolean dark : new boolean[]{false, true}) {
+                BufferedImage img = снимок(dark, метки, w, h);
+                File out = new File(dir, "сборка-" + (метки ? "картонки-" : "контуры-")
+                    + (dark ? "тёмная" : "светлая") + ".png");
+                ImageIO.write(img, "png", out);
+                System.out.println(out.getName() + "   фон "
+                    + описатьЦвет(img.getRGB(w / 2, h - 60)));
+            }
         }
     }
 
-    private static BufferedImage снимок(boolean dark, int w, int h) throws Exception {
+    private static BufferedImage снимок(boolean dark, boolean метки, int w, int h)
+            throws Exception {
         final AssemblyWindow[] держатель = new AssemblyWindow[1];
         SwingUtilities.invokeAndWait(() -> {
             Theme.apply(dark);
@@ -65,6 +69,7 @@ public final class СнимокСборки {
             вкладка.setSize(w, h);
             вкладка.doLayout();
             вкладка.refresh();
+            вкладка.показыватьМетки(метки);
             держатель[0] = вкладка;
         });
         // Сборка считается в SwingWorker. Поле из десяти гексов подбирается за
