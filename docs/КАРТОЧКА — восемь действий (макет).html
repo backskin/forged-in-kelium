@@ -1,109 +1,155 @@
 <title>Карточка восьми действий</title>
 <style>
+  /* ================= ПЕЧАТНАЯ ГЕОМЕТРИЯ =================
+     Карта 70x120 мм. Всё считается в МИЛЛИМЕТРАХ и ПУНКТАХ, а не в пикселях:
+     dpi к вёрстке отношения не имеет — 300 dpi задаёт лишь размер растра
+     (827x1417 px) и потолок мелкой детали в пиктограммах, но не то, сколько
+     влезет текста. Влезает столько, сколько позволяет отношение кегля к
+     миллиметрам.
+
+     БЮДЖЕТ, посчитанный один раз и зашитый в переменные ниже:
+       живое поле (3 мм внутрь от реза)      64 x 114 мм
+       ряд                                   27.4 мм
+       колонка текста (минус рейка 7 мм)     54.6 мм
+       8 пт: em 2.82 мм, строка 3.39 мм  ->  37 знаков в строке
+       11 пт: заголовок, строка 4.46 мм
+       под текст в ряду остаётся 20.5 мм ->  6 строк по 8 пт
+
+     Значит на ряд: заголовок + суть в ДВЕ строки + ЧЕТЫРЕ строки уточнений,
+     и каждая строка не длиннее 37 знаков. Всё, что длиннее, переносится и
+     ряд распухает — ровно на этом резался прошлый макет.
+     ====================================================== */
   :root{
+    --карта-ш:70mm; --карта-в:120mm; --кромка:3mm;
+    --рейка:7mm; --отступ:1.2mm; --зазор:1.5mm;
     --бумага:#fffdf8; --поле:#f5f1e8; --тушь:#1d1a16; --серый:#6b6459; --линия:#d5ccbb;
     --разработка:#4a7c59; --инфраструктура:#a06a2c; --операция:#8c3a3a; --приобретения:#3a5f8c;
   }
   body{background:#2a2724;color:var(--тушь);
-       font:14px/1.45 "PT Sans",-apple-system,system-ui,sans-serif;
-       padding:22px;display:flex;flex-direction:column;align-items:center;gap:20px}
-  .подпись{color:#b8b0a4;font-size:13px;max-width:720px;text-align:center;line-height:1.5}
+       font:14px/1.5 "PT Sans",-apple-system,system-ui,sans-serif;
+       padding:22px;display:flex;flex-direction:column;align-items:center;gap:18px}
+  .подпись{color:#b8b0a4;font-size:13px;max-width:760px;line-height:1.55}
   .подпись b{color:#efe9dd}
-  .пары{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
+  .подпись code{background:#3a3632;padding:1px 4px;border-radius:3px;font-size:12px}
+  .лупа{transform:scale(2.4);transform-origin:top center;margin-bottom:calc(1.4 * 120mm)}
+  .пары{display:flex;gap:4mm;justify-content:center}
 
-  /* 70 x 120 мм при 3.78 px/мм = 265 x 454 */
-  .сторона{width:265px;height:454px;background:var(--поле);border-radius:9px;
-           box-shadow:0 8px 28px rgba(0,0,0,.45);padding:8px;
-           display:flex;flex-direction:column;gap:4px}
+  .сторона{width:var(--карта-ш);height:var(--карта-в);background:var(--поле);
+           border-radius:2mm;box-shadow:0 2px 8px rgba(0,0,0,.4);
+           padding:var(--кромка);display:flex;flex-direction:column;
+           gap:var(--зазор);box-sizing:border-box}
   .шапка{display:flex;justify-content:space-between;align-items:baseline;
-         font-size:7.4px;letter-spacing:.1em;text-transform:uppercase;color:var(--серый);
-         padding:0 1px}
-  .ряды{flex:1;display:flex;flex-direction:column;gap:4px;min-height:0}
+         font-size:5pt;letter-spacing:.09em;text-transform:uppercase;color:var(--серый);
+         line-height:1;height:2mm}
+  .ряды{flex:1;display:flex;flex-direction:column;gap:var(--зазор);min-height:0}
 
   .ряд{flex:1;min-height:0;display:flex;background:var(--бумага);
-       border:1px solid var(--линия);border-radius:6px;overflow:hidden}
-  .рейка{width:26px;flex:none;display:flex;align-items:center;justify-content:center;color:#fff}
-  .рейка .знак{font-size:15px;line-height:1}
-  .тело{flex:1;min-width:0;padding:4px 6px;display:flex;flex-direction:column;gap:1px}
-  h3{margin:0;font-size:10px;letter-spacing:.03em;line-height:1.15}
-  .суть{margin:0 0 1px;font-size:8.3px;line-height:1.22;font-weight:700}
-  ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:1px}
-  li{font-size:7.5px;line-height:1.2;color:#3a352d;display:flex;gap:3px}
-  li::before{content:"·";color:var(--серый);font-weight:700;line-height:1.1}
-  table{border-collapse:collapse;font-size:7.5px}
-  td{padding:0;vertical-align:top;line-height:1.22}
-  td:first-child{white-space:nowrap;padding-right:6px;color:var(--серый)}
+       border:.2mm solid var(--линия);border-radius:1.2mm;overflow:hidden}
+  .рейка{width:var(--рейка);flex:none;display:flex;align-items:center;
+         justify-content:center;color:#fff;font-size:13pt}
+  .тело{flex:1;min-width:0;padding:var(--отступ) 1.5mm;display:flex;
+        flex-direction:column;justify-content:flex-start}
+  h3{margin:0;font-size:11pt;line-height:1.15;letter-spacing:.02em}
+  .суть{margin:0;font-size:8pt;line-height:1.2;font-weight:700}
+  ul{margin:0;padding:0;list-style:none}
+  li{font-size:8pt;line-height:1.2;color:#3a352d;text-indent:-1.6mm;padding-left:1.6mm}
+  li::before{content:"· ";color:var(--серый);font-weight:700}
+  table{border-collapse:collapse;font-size:8pt}
+  td{padding:0;line-height:1.2;vertical-align:top}
+  td:first-child{white-space:nowrap;padding-right:1.5mm;color:var(--серый)}
   b{font-weight:700}
 
   .р .рейка{background:var(--разработка)} .р h3{color:var(--разработка)}
   .и .рейка{background:var(--инфраструктура)} .и h3{color:var(--инфраструктура)}
   .о .рейка{background:var(--операция)} .о h3{color:var(--операция)}
   .п .рейка{background:var(--приобретения)} .п h3{color:var(--приобретения)}
+
+  /* сторож переполнения — виден только когда есть что показать */
+  .ряд.лишнее{outline:.4mm solid #d33;outline-offset:-.4mm}
+  #отчёт{font-size:13px;color:#8fd28f;background:#1f2a1f;border:1px solid #33502f;
+         padding:10px 14px;border-radius:6px;max-width:760px}
+  #отчёт.плохо{color:#ffb3b3;background:#3a1f1f;border-color:#6b2f2f}
+
+  @media print{
+    body{background:#fff;padding:0;display:block}
+    .подпись,#отчёт{display:none}
+    .лупа{transform:none;margin:0}
+    .пары{gap:0}
+    .сторона{box-shadow:none;border-radius:0;page-break-after:always}
+    @page{size:70mm 120mm;margin:0}
+  }
 </style>
 
 <div class="подпись">
-  <b>Карточка восьми действий — 70×120 мм, по четыре ряда на сторону.</b>
-  Лицо — хозяйство, оборот — война и покупки. Цветная рейка слева: цвет приказа,
-  на ней место под пиктограмму. Жирная строка — «а, точно, это вот про что»,
-  ниже только то, что переспрашивают. Если что-то всё же режется — скажи, какая
-  строка, уберу её целиком, а не ужму шрифт.
+  <b>Карточка восьми действий — 70×120 мм, 8 пт мелкий, 11 пт заголовки.</b>
+  Свёрстано в миллиметрах и пунктах, поэтому на печати выйдет ровно так.
+  <b>300 dpi на вёрстку не влияет</b> — это размер растра (827×1417 px) и потолок
+  мелкой детали в пиктограммах, но не то, сколько влезет текста. Бюджет ряда
+  посчитан и зашит в шапку файла: колонка текста 54.6 мм, значит
+  <b>37 знаков в строке</b> при 8 пт, и <b>шесть строк</b> под текст после
+  заголовка. Отсюда правило: суть — не длиннее двух строк, уточнений — четыре,
+  каждое до 37 знаков. Ниже макет показан <b>×2.4 для чтения</b>, геометрия
+  истинная; печать через <code>Ctrl+P</code> даст точный размер.
 </div>
 
-<div class="пары">
+<div id="отчёт">сторож переполнения ещё не отработал</div>
+
+<div class="лупа"><div class="пары">
 
 <div class="сторона">
   <div class="шапка"><span>Кристаллы Раздора</span><span>лицо · хозяйство</span></div>
   <div class="ряды">
 
     <div class="ряд и">
-      <div class="рейка"><span class="знак">⚒</span></div>
+      <div class="рейка">⚒</div>
       <div class="тело">
         <h3>СТРОЙКА</h3>
         <p class="суть">Трать монеты: ставь и сноси свои здания</p>
         <ul>
-          <li>поставить — цена здания, снести — 1 монета</li>
-          <li>строить в своих гексах и куда смотрит стенка</li>
-          <li>одно здание — одна операция за действие</li>
+          <li>поставить — цена, снести — 1 монета</li>
+          <li>в своих гексах и за своей стенкой</li>
+          <li>одно здание — одна операция</li>
           <li>ЦУ не сносится и не переносится</li>
         </ul>
       </div>
     </div>
 
     <div class="ряд и">
-      <div class="рейка"><span class="знак">⚡</span></div>
+      <div class="рейка">⚡</div>
       <div class="тело">
         <h3>СМЕНА ЭНЕРГИИ</h3>
-        <p class="суть">Активируй каждый свой источник — раз за действие</p>
+        <p class="суть">Активируй каждый источник — раз за действие</p>
         <ul>
-          <li><b>ОТДАТЬ</b> — снять с источника и разложить</li>
-          <li><b>ЗАБРАТЬ</b> — вернуть на него, только до полного</li>
-          <li>источники: энергостанции и ЦУ</li>
+          <li><b>ОТДАТЬ</b> — снять и разложить</li>
+          <li><b>ЗАБРАТЬ</b> — вернуть до полного</li>
+          <li>источники: станции и ЦУ</li>
         </ul>
       </div>
     </div>
 
     <div class="ряд р">
-      <div class="рейка"><span class="знак">⬢</span></div>
+      <div class="рейка">⬢</div>
       <div class="тело">
         <h3>СНАРЯЖЕНИЕ</h3>
-        <p class="суть">Каждое запитанное ВОЕННОЕ здание: войско ИЛИ боеприпас</p>
+        <p class="суть">Запитанное ВОЕННОЕ здание: войско или боеприпас</p>
         <ul>
-          <li>запитано = все ячейки энергии закрыты</li>
-          <li>войско — на гекс своего здания, техника 2 сектора</li>
-          <li>вышка — на любой гекс, где есть твоё здание</li>
+          <li>запитано = все ячейки закрыты</li>
+          <li>войско — на гекс своего здания</li>
+          <li>техника — 2 смежных сектора</li>
+          <li>вышка — на любой свой гекс</li>
         </ul>
       </div>
     </div>
 
     <div class="ряд р">
-      <div class="рейка"><span class="знак">⛏</span></div>
+      <div class="рейка">⛏</div>
       <div class="тело">
         <h3>ДОБЫЧА</h3>
-        <p class="суть">Каждый запитанный ДОБЫТЧИК: келемий ИЛИ контейнер</p>
+        <p class="суть">Запитанный ДОБЫТЧИК: келемий или контейнер</p>
         <ul>
-          <li>грядка и контейнер примыкают стенкой, не углом</li>
-          <li>добытчик №1–2 берёт 1 келемий, №3–4 берёт 2</li>
-          <li>контейнер открыт = на его секторе нет жетонов</li>
+          <li>примыкание стенкой, не углом</li>
+          <li>добытчик №1–2 → 1, №3–4 → 2</li>
+          <li>контейнер открыт = нет жетонов</li>
         </ul>
       </div>
     </div>
@@ -116,60 +162,90 @@
   <div class="ряды">
 
     <div class="ряд о">
-      <div class="рейка"><span class="знак">➜</span></div>
+      <div class="рейка">➜</div>
       <div class="тело">
         <h3>ДВИЖЕНИЕ</h3>
-        <p class="суть">Один свой гекс — даром. Дальше 1 боеприпас за перемещение</p>
+        <p class="суть">Один свой гекс — даром, дальше 1 БПР</p>
         <ul>
-          <li>дальность = скорость с планшета войск</li>
-          <li>нельзя через и НА гекс с чужими войсками</li>
-          <li>авиация этого не видит, кроме чужой авиации</li>
+          <li>дальность = скорость с планшета</li>
+          <li>нельзя на гекс с чужими войсками</li>
+          <li>и через него; уйти — можно</li>
+          <li>авиация не видит, кроме авиации</li>
         </ul>
       </div>
     </div>
 
     <div class="ряд о">
-      <div class="рейка"><span class="знак">⚔</span></div>
+      <div class="рейка">⚔</div>
       <div class="тело">
         <h3>БОЙ</h3>
-        <p class="суть">Один свой гекс бьёт даром. Дальше 1 боеприпас за жетон</p>
+        <p class="суть">Один свой гекс бьёт даром, дальше 1 БПР</p>
         <ul>
-          <li>цель — соседний гекс или свой же</li>
-          <li>строка атаки — 1 боеприпас, урон 1</li>
-          <li>чужое здание в гексе — бьёшь только здания</li>
+          <li>цель — соседний гекс или свой</li>
+          <li>атака — 1 БПР, урон 1</li>
+          <li>чужое здание — бьёшь здания</li>
           <li>ответа нет, урон не снимается</li>
         </ul>
       </div>
     </div>
 
     <div class="ряд п">
-      <div class="рейка"><span class="знак">⇄</span></div>
+      <div class="рейка">⇄</div>
       <div class="тело">
         <h3>РЫНОК</h3>
-        <p class="суть">Курсы планшета и ОДНО предложение активной карты</p>
+        <p class="суть">Курсы планшета и ОДНО предложение карты</p>
         <table>
           <tr><td>1 / 2 келемия</td><td>3 / <b>7</b> монет</td></tr>
-          <tr><td>1 / 2 келемия</td><td>2 / 4 карты задания</td></tr>
+          <tr><td>1 / 2 келемия</td><td>2 / 4 задания</td></tr>
         </table>
-        <ul><li>предложение: свой келемий в ячейку — их мало</li></ul>
+        <ul><li>келемий в ячейку — их мало</li></ul>
       </div>
     </div>
 
     <div class="ряд п">
-      <div class="рейка"><span class="знак">⚗</span></div>
+      <div class="рейка">⚗</div>
       <div class="тело">
         <h3>НАУКА</h3>
-        <p class="суть">Сдай трофеи — двигай свои фишки по трекам</p>
+        <p class="суть">Сдай трофеи — двигай фишки по трекам</p>
         <table>
           <tr><td>1 трофей</td><td>перенос модуля</td></tr>
-          <tr><td>2 трофея</td><td>2 карты арсенала, одну оставь</td></tr>
+          <tr><td>2 трофея</td><td>2 арсенала, одну оставь</td></tr>
           <tr><td>2 трофея</td><td>позолота модуля</td></tr>
         </table>
-        <ul><li>один шаг на каждом треке за действие</li></ul>
+        <ul><li>один шаг на трек за действие</li></ul>
       </div>
     </div>
 
   </div>
 </div>
 
-</div>
+</div></div>
+
+<script>
+  // СТОРОЖ ПЕРЕПОЛНЕНИЯ. Макет в миллиметрах врёт молча: текст, который не влез,
+  // просто обрезается рамкой ряда. Здесь каждый ряд сверяется с высотой своего
+  // содержимого, и не влезший обводится красным. Проверка нужна именно потому,
+  // что правило «37 знаков» соблюдать на глаз нельзя.
+  function проверить() {
+    const беда = [];
+    document.querySelectorAll('.ряд').forEach(ряд => {
+      const тело = ряд.querySelector('.тело');
+      const лишку = тело.scrollHeight - тело.clientHeight;
+      ряд.classList.toggle('лишнее', лишку > 1);
+      if (лишку > 1) {
+        беда.push(ряд.querySelector('h3').textContent + ' (+' + лишку.toFixed(0) + 'px)');
+      }
+    });
+    const о = document.getElementById('отчёт');
+    if (беда.length) {
+      о.className = 'плохо';
+      о.textContent = 'НЕ ВЛЕЗЛО в ' + беда.length + ' ряд(ах): ' + беда.join(', ')
+        + '. Убирай строку целиком, а не ужимай кегль — 8 пт это уже пол.';
+    } else {
+      о.className = '';
+      о.textContent = 'Всё влезло: восемь рядов, ни одного переполнения при 8 пт.';
+    }
+  }
+  document.fonts ? document.fonts.ready.then(проверить) : проверить();
+  window.addEventListener('resize', проверить);
+</script>
