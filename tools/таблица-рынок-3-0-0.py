@@ -130,6 +130,35 @@ from openpyxl.utils import get_column_letter
 ОБЫЧНЫЙ = 'FFEFF3FB'
 
 
+def род_эффекта(текст):
+    """Грубая разметка предложения по роду. Нужна не ради красоты, а чтобы
+    видеть перекос набора: сколько в нём свободных действий, сколько выдач
+    ресурса, сколько работы по полю. Разбор идёт по НАЧАЛУ строки — все
+    предложения написаны по одному образцу «НАЗВАНИЕ: что делает»."""
+    т = текст.lower()
+    if 'свободное действие' in т:
+        return 'свободное действие'
+    if 'тяни' in т:
+        return 'карта в личную зону'
+    if 'боеприпас' in т and '→' not in т:
+        return 'ресурс'
+    if '→' in т:
+        return 'размен'
+    if 'монет' in т and 'заплат' not in т:
+        return 'ресурс'
+    if 'трофе' in т:
+        return 'ресурс'
+    if 'жетон первого игрока' in т:
+        return 'очерёдность'
+    if 'урон' in т or 'собери' in т:
+        return 'работа по полю'
+    if 'перенеси' in т or 'замени' in т or 'встаёт на ячейку' in т:
+        return 'работа по полю'
+    if 'задани' in т:
+        return 'карты заданий'
+    return 'прочее'
+
+
 def main():
     финишных = sum(1 for r in К if r[1])
     if финишных != 3:
@@ -180,8 +209,82 @@ def main():
 
     ws.freeze_panes = 'A2'
     ws.auto_filter.ref = f'A1:H{len(К) + 1}'
+
+    # ---- ВТОРОЙ ЛИСТ: каждое предложение отдельной строкой -----------------
+    # На карте две половины, и работать с набором приходится именно по
+    # половинам: «сколько в наборе свободных действий», «где боеприпас».
+    # В простыне это не видно, потому что строка там — карта, а не предложение.
+    ws2 = wb.create_sheet('Предложения — сводка')
+    заг2 = ['№ карты', 'карта', 'финиш', 'сторона', 'предложение', 'род эффекта',
+            'нехватка']
+    шир2 = [8, 22, 8, 10, 52, 24, 16]
+    ws2.append(заг2)
+    for i, (з, ш) in enumerate(zip(заг2, шир2), start=1):
+        c = ws2.cell(row=1, column=i)
+        c.font = Font(bold=True, color='FFFFFFFF')
+        c.fill = PatternFill('solid', fgColor='FF3C3160')
+        c.alignment = Alignment(vertical='center', wrap_text=True)
+        c.border = РАМКА
+        ws2.column_dimensions[get_column_letter(i)].width = ш
+    ws2.row_dimensions[1].height = 30
+
+    строка = 1
+    роды = {}
+    for n, (имя, флаг, нехватка, лево, право, _кто, _разбор) in enumerate(К, start=1):
+        for сторона, текст in (('левое', лево), ('правое', право)):
+            род = род_эффекта(текст)
+            роды.setdefault(род, []).append(n)
+            ws2.append([n, имя, флаг, сторона, текст, род, нехватка])
+            строка += 1
+            for i in range(1, len(заг2) + 1):
+                c = ws2.cell(row=строка, column=i)
+                c.alignment = Alignment(vertical='top', wrap_text=True)
+                c.border = РАМКА
+    ws2.freeze_panes = 'A2'
+
+    # ---- ТРЕТИЙ ЛИСТ: чего в наборе сколько --------------------------------
+    ws3 = wb.create_sheet('Разрезы')
+    заг3 = ['разрез', 'значение', 'предложений', 'номера карт']
+    шир3 = [18, 30, 14, 34]
+    ws3.append(заг3)
+    for i, (з, ш) in enumerate(zip(заг3, шир3), start=1):
+        c = ws3.cell(row=1, column=i)
+        c.font = Font(bold=True, color='FFFFFFFF')
+        c.fill = PatternFill('solid', fgColor='FF3C3160')
+        c.alignment = Alignment(vertical='center', wrap_text=True)
+        c.border = РАМКА
+        ws3.column_dimensions[get_column_letter(i)].width = ш
+    р = 1
+    for род, номера in sorted(роды.items(), key=lambda x: -len(x[1])):
+        ws3.append(['род эффекта', род, len(номера),
+                    ', '.join(str(x) for x in номера)])
+        р += 1
+    ws3.append([])
+    р += 1
+    нехватки = {}
+    финиши = []
+    for n, (имя, флаг, нехватка, *_) in enumerate(К, start=1):
+        нехватки.setdefault(нехватка, []).append(n)
+        if флаг:
+            финиши.append(n)
+    for нехватка, номера in нехватки.items():
+        ws3.append(['нехватка', нехватка, len(номера) * 2,
+                    ', '.join(str(x) for x in номера)])
+        р += 1
+    ws3.append([])
+    р += 1
+    ws3.append(['флажок ФИНИША', 'карт с флажком', len(финиши),
+                ', '.join(str(x) for x in финиши)])
+    р += 1
+    for row in ws3.iter_rows(min_row=2, max_row=р):
+        for c in row:
+            c.alignment = Alignment(vertical='top', wrap_text=True)
+            c.border = РАМКА
+    ws3.freeze_panes = 'A2'
+
     wb.save(ЦЕЛЬ)
-    print(f'готово: {ЦЕЛЬ}, карт {len(К)}, из них с флажком финиша {финишных}')
+    print(f'готово: {ЦЕЛЬ}, карт {len(К)}, предложений {len(К) * 2}, '
+          f'с флажком финиша {финишных}, листов {len(wb.sheetnames)}')
 
 
 if __name__ == '__main__':
