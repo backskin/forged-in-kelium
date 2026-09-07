@@ -842,6 +842,13 @@ public final class Actions {
             Map<String, Object> tel = new HashMap<>();
             tel.put("ops", ops);
             tel.put("coin_spent", coinsSpent);
+            // ЧТО ИМЕННО ОСТАНОВИЛО СТРОЙКУ — наряды или деньги. Вопрос
+            // дизайнера 06.09.2026: ограничение по нарядам стоит абзаца правил,
+            // и надо знать, СВЯЗЫВАЕТ ли оно вообще. Если игрок почти всегда
+            // упирается в монеты, наряды - правило без работы.
+            tel.put("op_budget", militaryOpBudget(player));
+            tel.put("stopped_by_ops", ops >= militaryOpBudget(player));
+            tel.put("coins_left", player.resources.coin());
             return ActionResult.ok(detail.toString().trim(), tel);
         }
 
@@ -871,13 +878,18 @@ public final class Actions {
             if (!newBuildRule()) {
                 return Integer.MAX_VALUE;
             }
+            // Значение ключа — МНОЖИТЕЛЬ, а не флажок: столько нарядов даёт одно
+            // военное здание. Прежде оно читалось только на «есть/нет», и
+            // балансовый стенд, поставивший 99, получал ровно то же поведение,
+            // что и 1 (поймано 06.09.2026 при замере «а что даёт потолок»).
+            int заЗдание = rs.getInt("actions.build.ops_per_military_building", 1);
             int n = 0;
             for (BuildingToken b : player.buildingsOnField()) {
                 if (ASSEMBLY_UNIT.containsKey(b.type)) {   // казарма, завод, авиабаза, ЦУ
                     n++;
                 }
             }
-            return n;
+            return n * заЗдание;
         }
 
         /** Одна операция стройки/переноса; null = пас или нет доступного. */
