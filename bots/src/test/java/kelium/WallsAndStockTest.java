@@ -118,16 +118,25 @@ class WallsAndStockTest {
                 if (!"combat_hit".equals(String.valueOf(ev.get("type")))) {
                     return;
                 }
-                if (!(ev.get("source") instanceof String from)
+                // ГЕКС СТРЕЛЯВШЕГО — «from», а не «source». В грамматике С1
+                // (04.09.2026) «source» это ВЫБРАННЫЙ гекс действия, который бьёт
+                // даром, а стрелять может жетон с любого другого за доплату.
+                // Сверять путь надо от того, кто стрелял.
+                if (!(ev.get("from") instanceof String from)
                         || !(ev.get("target") instanceof String to)) {
                     return;
                 }
                 int seat = ev.get("seat") instanceof Number n ? n.intValue() : 0;
                 counters[0]++;
-                // Бил кто-то из жетонов гекса-источника. Нарушение — если НИ ОДИН из
-                // них не мог дотянуться: авиация дотягивается всегда, наземные —
-                // только через открытое ребро. Это то же условие, что стоит в движке.
+                // Нарушение — если стрелявший не мог дотянуться: авиация
+                // дотягивается всегда, наземные — только через открытое ребро.
+                // Это то же условие, что стоит в движке.
+                Integer uid = ev.get("attacker_uid") instanceof Number an
+                    ? an.intValue() : null;
                 for (UnitToken u : s.player(seat).units) {
+                    if (uid != null && u.uid != uid) {
+                        continue;
+                    }
                     if (from.equals(u.hexId) && Passability.canShootAcross(s, u, to)) {
                         return;
                     }

@@ -2135,6 +2135,13 @@ public final class Actions {
             // C1: за одно действие Бой можно провести НЕСКОЛЬКО боёв; второй и
             // далее — с наценкой (open_battle_surcharge_ammo), платится ДО боя
             // (C2). Телеметрия battlesOpened — только по состоявшимся (C3).
+            // ГРАММАТИКА С1 «БЛИЗНЕЦ ДВИЖЕНИЯ» (свод 1.35.0 и новее): единицы
+            // «бой» не существует. Одно действие — один розыгрыш: выбранный гекс
+            // бьёт даром, дальше любой свой жетон доплачивает за право
+            // выстрелить. Лесенка за право следующего боя не взимается вовсе, и
+            // цикл по боям не крутится: всё решается внутри одного вызова.
+            boolean близнец = "per_token".equals(
+                rs.getStr("actions.combat.surcharge_model", "right_to_battle"));
             List<Integer> schedule = rs.getIntList("actions.combat.open_battle_surcharge_ammo");
             CombatResolver resolver = (CombatResolver) state.combat;
             // Было ли вообще кого бить В МОМЕНТ РОЗЫГРЫША — по этому признаку
@@ -2144,7 +2151,10 @@ public final class Actions {
             int killsBefore = player.killsTotal;
             int battles = 0;
             while (true) {
-                int surcharge = ctx.nextOpSurcharge("combat", schedule);
+                if (близнец && battles > 0) {
+                    break;      // одно действие — один розыгрыш, второго нет
+                }
+                int surcharge = близнец ? 0 : ctx.nextOpSurcharge("combat", schedule);
                 if (Passives.noSecondBattleSurcharge(state, player.seat)) {
                     surcharge = 0;
                 }
