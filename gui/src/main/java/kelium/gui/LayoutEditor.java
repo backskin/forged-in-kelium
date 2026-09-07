@@ -486,6 +486,10 @@ public final class LayoutEditor {
         // Подложка поля — явно: в светлой палитре она белая, как и панель, и по
         // одной краске их не различить (см. Theme.counterpart).
         canvas.setBackground(Theme.paper());
+        // Полотно сборки из блоков — та же беда с фоном, что у canvas выше.
+        if (assemblyTab != null) {
+            assemblyTab.перекрасить();
+        }
         restyleTitles(frame.getContentPane());
         refreshJournal();          // цвета строк журнала лежат в его документе
         if (darkMenuItem != null) {

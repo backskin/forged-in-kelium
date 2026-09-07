@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кристаллы Раздора — справочник правил</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <div class="brand">
+    <svg class="brand__mark" width="30" height="34" viewBox="0 0 30 34" aria-hidden="true">
+      <path d="M15 1 L28.9 9 L28.9 25 L15 33 L1.1 25 L1.1 9 Z"
+            fill="none" stroke="var(--accent)" stroke-width="2"/>
+      <path d="M15 9 L21.9 13 L21.9 21 L15 25 L8.1 21 L8.1 13 Z" fill="var(--accent)" opacity=".55"/>
+    </svg>
+    <div class="brand__text">
+      <div class="brand__title">Кристаллы Раздора</div>
+      <div class="brand__sub">справочник правил</div>
+    </div>
+  </div>
+
+  <div class="topbar">
+    <button class="btn burger" id="burger" title="Оглавление">☰</button>
+    <div class="search">
+      <span class="search__icon">⌕</span>
+      <input id="q" type="text" placeholder="Поиск по всему справочнику…" autocomplete="off" spellcheck="false">
+      <span class="search__hint">/</span>
+      <div class="results" id="results"></div>
+    </div>
+    <div class="tools">
+      <div class="seg" id="players" title="Число игроков меняет числа и пометки там, где они от него зависят">
+        <button data-n="2">2и</button><button data-n="3">3и</button><button data-n="4">4и</button>
+      </div>
+      <button class="btn" id="theme">Светлая тема</button>
+      <button class="btn" id="print">Печать</button>
+    </div>
+  </div>
+
+  <nav class="toc" id="toc"></nav>
+  <main id="main"></main>
+
+</div>
+
+<!-- Данные, собранные из simulator/data скриптом tools/gen_content.py -->
+<script src="content/data.js"></script>
+<script src="content/tokens.js"></script>
+<script src="content/cards-text.js"></script>
+
+<!-- Помощники и интерактивные элементы -->
+<script src="lib.js"></script>
+<script src="widgets.js"></script>
+
+<!-- Разделы справочника -->
+<script src="content/sec-intro.js"></script>
+<script src="content/sec-round.js"></script>
+<script src="content/sec-actions.js"></script>
+<script src="content/sec-field.js"></script>
+<script src="content/sec-combat.js"></script>
+<script src="content/sec-cards.js"></script>
+<script src="content/sec-end.js"></script>
+<script src="content/sec-disputed.js"></script>
+
+<!-- Оболочка запускается последней: к этому моменту все разделы зарегистрированы -->
+<script src="app.js"></script>
+
+</body>
+</html>

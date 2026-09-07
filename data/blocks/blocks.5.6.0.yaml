@@ -1,0 +1,529 @@
+# CONTENT: blocks  version 5.6.0
+# Сочетание из сетки 5.* — правила и цели те же.
+# Собран tools/наборы-блоков-5.py, зерно 26260908.
+#
+# РАВНОМЕРНОЕ РАСПРЕДЕЛЕНИЕ — то, ради чего семейство 5.* и сделано.
+# Каждый боковой сектор занят энергией примерно поровну, и контейнером
+# тоже; то же самое отдельно на КАЖДОМ по счёту гексе стороны; и «только
+# контейнер», «только энергия», «и то и то» разложены по местам поровну.
+# Замеренные размахи — в meta.равномерность ниже.
+#
+# Пустых гексов нет ни одного. Энергия 3 из 5 (малый) и 4 из 6 (большой);
+# контейнеры 4 из 5 и 5 из 6, один из них — в ячейке авиации (сектор 6).
+# Расположение энергии и контейнеров у любой пары сторон одного размера
+# совпадает не больше чем на одном гексе.
+#
+# Геометрия сторон взята из авторского набора 1.4.0 и не менялась —
+# это физический картон.
+meta:
+  id: 5.6.0
+  type: blocks
+  seed: 26260908
+  описание: энергия 3/5 и 4/6, контейнеры 4/5 и 5/6, один в ячейке авиации
+  пустых_гексов: 0
+  предел_совпадений_на_пару: 1
+  равномерность:
+    большие:
+      секторы энергии, размах: 1
+      секторы контейнеров, размах: 1
+      секторы по месту гекса, наибольший размах: энергия 1, контейнеры 1
+      что на гексе, размах по местам: только контейнер 1, только энергия 1, оба 0
+      ячейка авиации по местам, размах: 1
+    малые:
+      секторы энергии, размах: 0
+      секторы контейнеров, размах: 0
+      секторы по месту гекса, наибольший размах: энергия 0, контейнеры 0
+      что на гексе, размах по местам: только контейнер 0, только энергия 0, оба 0
+      ячейка авиации по местам, размах: 0
+  сгенерировано: tools/наборы-блоков-5.py
+blocks:
+- id: М1
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 2
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 6
+      energy: 0
+    - q: 2
+      r: 0
+      cell: 4
+      energy: -1
+    - q: 0
+      r: 1
+      cell: 5
+      energy: 3
+    - q: 1
+      r: 1
+      cell: -1
+      energy: 5
+    B:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 5
+    - q: 1
+      r: 0
+      cell: 5
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 6
+      energy: 3
+    - q: 0
+      r: 1
+      cell: 1
+      energy: 4
+    - q: 1
+      r: 1
+      cell: 3
+      energy: -1
+- id: М2
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 6
+      energy: 1
+    - q: 1
+      r: 0
+      cell: 1
+      energy: 2
+    - q: 2
+      r: 0
+      cell: 5
+      energy: -1
+    - q: 0
+      r: 1
+      cell: -1
+      energy: 5
+    - q: 1
+      r: 1
+      cell: 0
+      energy: -1
+    B:
+    - q: 0
+      r: 0
+      cell: 4
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 0
+      energy: 5
+    - q: 2
+      r: 0
+      cell: 6
+      energy: 0
+    - q: 0
+      r: 1
+      cell: 3
+      energy: -1
+    - q: 1
+      r: 1
+      cell: -1
+      energy: 2
+- id: М3
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 3
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 4
+      energy: -1
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 1
+    - q: 0
+      r: 1
+      cell: 6
+      energy: 2
+    - q: 1
+      r: 1
+      cell: 5
+      energy: 3
+    B:
+    - q: 0
+      r: 0
+      cell: 0
+      energy: -1
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 3
+    - q: 2
+      r: 0
+      cell: 1
+      energy: 4
+    - q: 0
+      r: 1
+      cell: 6
+      energy: 1
+    - q: 1
+      r: 1
+      cell: 4
+      energy: -1
+- id: М4
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 4
+    - q: 1
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 3
+      energy: 5
+    - q: 0
+      r: 1
+      cell: 2
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 1
+      energy: 0
+    B:
+    - q: 0
+      r: 0
+      cell: 6
+      energy: 0
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 4
+    - q: 2
+      r: 0
+      cell: 0
+      energy: -1
+    - q: 0
+      r: 1
+      cell: 4
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 2
+      energy: 1
+- id: М5
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 1
+      energy: 2
+    - q: 1
+      r: 0
+      cell: 3
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 2
+      energy: -1
+    - q: 0
+      r: 1
+      cell: -1
+      energy: 0
+    - q: 1
+      r: 1
+      cell: 6
+      energy: 4
+    B:
+    - q: 0
+      r: 0
+      cell: 5
+      energy: 3
+    - q: 1
+      r: 0
+      cell: 2
+      energy: 1
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 2
+    - q: 0
+      r: 1
+      cell: 0
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 6
+      energy: -1
+- id: Б1
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 3
+      energy: 0
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 1
+    - q: 2
+      r: 0
+      cell: 4
+      energy: 5
+    - q: 0
+      r: 1
+      cell: 2
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 5
+      energy: -1
+    - q: 1
+      r: -1
+      cell: 6
+      energy: 2
+    B:
+    - q: 0
+      r: 0
+      cell: 2
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 1
+      energy: 5
+    - q: 2
+      r: 0
+      cell: 6
+      energy: 4
+    - q: 0
+      r: 1
+      cell: 0
+      energy: -1
+    - q: 1
+      r: 1
+      cell: -1
+      energy: 2
+    - q: 1
+      r: -1
+      cell: 5
+      energy: 3
+- id: Б2
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 5
+    - q: 1
+      r: 0
+      cell: 6
+      energy: 0
+    - q: 2
+      r: 0
+      cell: 3
+      energy: 1
+    - q: 0
+      r: 1
+      cell: 4
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 0
+      energy: 4
+    - q: 1
+      r: -1
+      cell: 2
+      energy: -1
+    B:
+    - q: 0
+      r: 0
+      cell: 0
+      energy: 3
+    - q: 1
+      r: 0
+      cell: 5
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 0
+      r: 1
+      cell: -1
+      energy: 5
+    - q: 1
+      r: 1
+      cell: 4
+      energy: 1
+    - q: 1
+      r: -1
+      cell: 2
+      energy: 4
+- id: Б3
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 5
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 3
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 0
+      energy: 3
+    - q: 0
+      r: 1
+      cell: 1
+      energy: 4
+    - q: 1
+      r: 1
+      cell: 6
+      energy: 0
+    - q: 1
+      r: -1
+      cell: -1
+      energy: 1
+    B:
+    - q: 0
+      r: 0
+      cell: 1
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 6
+      energy: 2
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 0
+    - q: 0
+      r: 1
+      cell: 5
+      energy: 1
+    - q: 1
+      r: 1
+      cell: 4
+      energy: 3
+    - q: 1
+      r: -1
+      cell: 3
+      energy: -1
+- id: Б4
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 4
+      energy: 5
+    - q: 1
+      r: 0
+      cell: 0
+      energy: -1
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 4
+    - q: 0
+      r: 1
+      cell: 6
+      energy: 1
+    - q: 1
+      r: 1
+      cell: 2
+      energy: -1
+    - q: 1
+      r: -1
+      cell: 1
+      energy: 0
+    B:
+    - q: 0
+      r: 0
+      cell: 6
+      energy: 1
+    - q: 1
+      r: 0
+      cell: 2
+      energy: 4
+    - q: 2
+      r: 0
+      cell: 1
+      energy: 2
+    - q: 0
+      r: 1
+      cell: -1
+      energy: 3
+    - q: 1
+      r: 1
+      cell: 3
+      energy: -1
+    - q: 1
+      r: -1
+      cell: 0
+      energy: -1
+- id: Б5
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 6
+      energy: 2
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 3
+    - q: 2
+      r: 0
+      cell: 5
+      energy: -1
+    - q: 0
+      r: 1
+      cell: 3
+      energy: 0
+    - q: 1
+      r: 1
+      cell: 1
+      energy: 5
+    - q: 1
+      r: -1
+      cell: 4
+      energy: -1
+    B:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 4
+    - q: 1
+      r: 0
+      cell: 4
+      energy: 0
+    - q: 2
+      r: 0
+      cell: 2
+      energy: -1
+    - q: 0
+      r: 1
+      cell: 6
+      energy: 2
+    - q: 1
+      r: 1
+      cell: 5
+      energy: -1
+    - q: 1
+      r: -1
+      cell: 0
+      energy: 5
