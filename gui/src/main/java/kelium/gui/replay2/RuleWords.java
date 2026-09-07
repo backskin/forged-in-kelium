@@ -228,6 +228,8 @@ public final class RuleWords {
                 "устаревший ключ: надбавки за объём в Стройке нет";
             case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
             case "actions.build.demolish_cost_coins" -> "сколько стоит снос своего здания";
+            case "actions.build.move_enabled" ->
+                "базовая Стройка умеет переносить здания (снято 06.09.2026)";
             case "economy.vp_per_level4_building" ->
                 "победные очки за каждое своё здание 4 уровня на поле";
             case "actions.build.repair_enabled" ->
