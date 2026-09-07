@@ -813,8 +813,24 @@ public final class Actions {
             // здание можно поставить и тут же снять, доя монету за снос.
             java.util.Set<Integer> тронутые = new java.util.HashSet<>();
             StringBuilder detail = new StringBuilder();
+            // ПОТОЛКА ОПЕРАЦИЙ НЕТ ВОВСЕ (решение дизайнера 06.09.2026). Ни
+            // надбавки за объём, ни нарядов от военных зданий: строй столько,
+            // на сколько хватит монет. Единственный предел — тот, что приносит
+            // карта («бесплатная Стройка одной операцией»).
+            //
+            // Почему сняли. Наряды связывали (54-58% Строек упирались в них),
+            // но платой были три вещи: ритуальный первый ход (с тремя монетами
+            // и одним нарядом единственный неглупый розыгрыш — поставить самое
+            // дешёвое военное здание ради второго наряда), спираль против
+            // отстающего (снесли здания — меньше нарядов — хуже отстраиваешься)
+            // и лишний счёт за столом. Ограничивают теперь ДЕНЬГИ и ГЕОМЕТРИЯ:
+            // строить можно только в своих гексах и в гексе, на который здание
+            // смотрит стенкой, и в гексе не больше одного здания каждого типа.
+            // Это то же по природе ограничение, что ячейки предложений рынка —
+            // нехватка РАЗНЫХ возможностей, а не потолок количества: она видна
+            // на столе и не требует счёта.
             while (true) {
-                if (ops >= opLimit || ops >= militaryOpBudget(player)) {
+                if (ops >= opLimit) {
                     break;
                 }
                 ActionResult one = performOneOp(player, ctx, agent, тронутые);
@@ -842,54 +858,19 @@ public final class Actions {
             Map<String, Object> tel = new HashMap<>();
             tel.put("ops", ops);
             tel.put("coin_spent", coinsSpent);
-            // ЧТО ИМЕННО ОСТАНОВИЛО СТРОЙКУ — наряды или деньги. Вопрос
-            // дизайнера 06.09.2026: ограничение по нарядам стоит абзаца правил,
-            // и надо знать, СВЯЗЫВАЕТ ли оно вообще. Если игрок почти всегда
-            // упирается в монеты, наряды - правило без работы.
-            tel.put("op_budget", militaryOpBudget(player));
-            tel.put("stopped_by_ops", ops >= militaryOpBudget(player));
             tel.put("coins_left", player.resources.coin());
             return ActionResult.ok(detail.toString().trim(), tel);
         }
 
-        /** Свод 1.35.0 и новее: операции от военных зданий вместо надбавки. */
+        /**
+         * НАДБАВКА ЗА ОБЪЁМ ОТМЕНЕНА (04.09.2026), и потолка операций тоже нет
+         * (06.09.2026). Метод остался ради СТАРЫХ СВОДОВ: там, где ключа
+         * {@code ops_per_military_building} нет, продолжает работать прежняя
+         * лесенка надбавки, и партии на тех сводах играются ровно так, как на
+         * них играли.
+         */
         private boolean newBuildRule() {
             return rs.get("actions.build.ops_per_military_building", null) != null;
-        }
-
-        /**
-         * СКОЛЬКО ОПЕРАЦИЙ ДАЁТ СТРОЙКА (правило дизайнера 04.09.2026): по одной
-         * за каждое ВОЕННОЕ здание на поле — казарма, завод, авиабаза, ЦУ.
-         *
-         * <p>Считается ЗАНОВО на каждом витке цикла, и это не оптимизация, а само
-         * правило: построенная казарма немедленно даёт ещё одну операцию, и
-         * потратить её можно прямо сейчас. Так вся военная цепочка собирается за
-         * один розыгрыш — ЦУ даёт первую, казарма вторую, завод третью, авиабаза
-         * четвёртую. Потолок 4 задан набором компонентов, а не числом в правилах.
-         *
-         * <p>Добытчики и энергостанции операций не дают: их этими операциями и
-         * строят. Надбавка за второе и следующее размещение при этом снята
-         * целиком — она проверялась в игровой ячейке и оказалась неинтуитивной.
-         *
-         * <p>На старых сводах, где ключа нет, лимит не действует и работает
-         * прежняя надбавка.
-         */
-        private int militaryOpBudget(PlayerState player) {
-            if (!newBuildRule()) {
-                return Integer.MAX_VALUE;
-            }
-            // Значение ключа — МНОЖИТЕЛЬ, а не флажок: столько нарядов даёт одно
-            // военное здание. Прежде оно читалось только на «есть/нет», и
-            // балансовый стенд, поставивший 99, получал ровно то же поведение,
-            // что и 1 (поймано 06.09.2026 при замере «а что даёт потолок»).
-            int заЗдание = rs.getInt("actions.build.ops_per_military_building", 1);
-            int n = 0;
-            for (BuildingToken b : player.buildingsOnField()) {
-                if (ASSEMBLY_UNIT.containsKey(b.type)) {   // казарма, завод, авиабаза, ЦУ
-                    n++;
-                }
-            }
-            return n * заЗдание;
         }
 
         /** Одна операция стройки/переноса; null = пас или нет доступного. */
@@ -950,9 +931,19 @@ public final class Actions {
             for (Map<String, Object> spec : moveMenu) {
                 opts.add(new Choice("move_pick", spec, (String) spec.get("label")));
             }
-            // B10: снос — любое своё здание на поле убирается в резерв за возврат
-            // demolish_refund_coins монет (ЦУ не сносится — только переносится).
-            int refund = rs.getInt("actions.build.demolish_refund_coins");
+            // СНОС СТОИТ МОНЕТУ, А НЕ ДАЁТ ЕЁ (решение дизайнера 06.09.2026).
+            // Прежде снос своего здания приносил монету и служил «краем» против
+            // софтлока. Край оказался дороже пользы: он же был и дойной коровой
+            // (поставил-снял), из-за чего пришлось заводить правило «одна
+            // операция на здание». Теперь снос — обычная операция за монету, и
+            // подпорка не нужна.
+            //
+            // demolish_cost_coins есть только в новых сводах; где его нет,
+            // работает прежний demolish_refund_coins и снос по-прежнему платит.
+            Integer сносЦена = rs.get("actions.build.demolish_cost_coins", null)
+                instanceof Number n ? n.intValue() : null;
+            int refund = сносЦена != null ? 0 : rs.getInt("actions.build.demolish_refund_coins");
+            int сносСтоит = сносЦена != null ? сносЦена : 0;
             // СНОС СВОЕГО ЦУ (заказ дизайнера 25.08.2026, ключ
             // actions.build.demolish_cu_allowed). Прежде ЦУ из меню исключалось
             // всегда. Теперь его можно разобрать и получить монету — это выход
@@ -966,8 +957,38 @@ public final class Actions {
                 if (одноНаЗдание && тронутые.contains(b.uid)) {
                     continue;
                 }
+                if (сносСтоит > 0 && !player.resources.canPay(Resource.COIN, сносСтоит)) {
+                    continue;                       // нечем платить за снос
+                }
                 opts.add(new Choice("demolish_pick", b.uid,
-                    "снести " + b.type.code + "@" + b.hexId + " (+" + refund + " мон)"));
+                    "снести " + b.type.code + "@" + b.hexId
+                        + (сносСтоит > 0 ? " (-" + сносСтоит + " мон)" : " (+" + refund + " мон)")));
+            }
+            // ЧЕТВЁРТАЯ ОПЕРАЦИЯ — РЕМОНТ (решение дизайнера 06.09.2026): снять
+            // ВЕСЬ урон с одного своего здания за его НАПЕЧАТАННУЮ цену.
+            //
+            // Осевое правило «урон сам не проходит» этим не отменяется, а
+            // уточняется: урон не снимается ДАРОМ. Раньше снять его мог только
+            // эффект карты; теперь есть и штатный путь, и он дорогой ровно
+            // настолько, насколько дорого само здание. Это же и первый крупный
+            // сток монеты в игре: ремонт под осадой прямо конкурирует с
+            // расширением, а до сих пор монету было почти некуда девать.
+            for (BuildingToken b : player.buildingsOnField()) {
+                if (b.damage <= 0) {
+                    continue;
+                }
+                int цена = printedPrice(player, b);
+                if (цена < 0 || !player.resources.canPay(Resource.COIN, цена)) {
+                    continue;
+                }
+                Map<String, Object> чинить = new HashMap<>();
+                чинить.put("uid", b.uid);
+                чинить.put("cost", цена);
+                чинить.put("hex", b.hexId);
+                чинить.put("damage", b.damage);
+                чинить.put("label", "починить " + b.type.code + "@" + b.hexId
+                    + " (урон " + b.damage + ", " + цена + " мон)");
+                opts.add(new Choice("repair_pick", чинить, (String) чинить.get("label")));
             }
             opts.add(new Choice("pass", null, "stop building"));
             Choice pick = agent.choose(state, opts, Map.of("kind", "build_pick"));
@@ -983,7 +1004,14 @@ public final class Actions {
             }
             if ("demolish_pick".equals(pick.kind())) {
                 тронутые.add(((Number) pick.payload()).intValue());
-                return performDemolish(player, ctx, ((Number) pick.payload()).intValue(), refund);
+                return performDemolish(player, ctx, ((Number) pick.payload()).intValue(),
+                    refund, сносСтоит);
+            }
+            if ("repair_pick".equals(pick.kind())) {
+                Map<String, Object> rp = (Map<String, Object>) pick.payload();
+                int uid = ((Number) rp.get("uid")).intValue();
+                тронутые.add(uid);
+                return performRepair(player, ctx, uid, ((Number) rp.get("cost")).intValue());
             }
             Map<String, Object> spec = (Map<String, Object>) pick.payload();
             BuildingType btype = (BuildingType) spec.get("btype");
@@ -1132,7 +1160,63 @@ public final class Actions {
          * гекса освобождаются, энергия корректно снимается, игрок получает возврат
          * монет. Считается операцией стройки (наценка на следующие операции).
          */
-        private ActionResult performDemolish(PlayerState player, TurnContext ctx, int uid, int refund) {
+        /**
+         * НАПЕЧАТАННАЯ ЦЕНА ЗДАНИЯ — та же, по которой его ставят из запаса.
+         * Военные берутся с планшета войск (у каждой фракции свои), добытчики и
+         * энергостанции — с планшета хранилища по номеру, ЦУ — из свода.
+         * Возвращает −1, если цену взять неоткуда: тогда ремонт не предлагается.
+         */
+        private int printedPrice(PlayerState player, BuildingToken b) {
+            return switch (b.type) {
+                case BARRACKS -> player.board.troop.buildingPrice("barracks");
+                case FACTORY -> player.board.troop.buildingPrice("factory");
+                case AIRBASE -> player.board.troop.buildingPrice("airbase");
+                case MINER -> b.level == null ? -1 : state.tokenStats.minerCost(b.level);
+                case POWER_PLANT -> b.level == null ? -1 : state.tokenStats.plantCost(b.level);
+                case COMMAND_CENTER ->
+                    ((Number) rs.get("command_center.build_price_coins", 2)).intValue();
+                default -> -1;
+            };
+        }
+
+        /**
+         * РЕМОНТ: снять ВЕСЬ урон с одного своего здания за его напечатанную
+         * цену. Не «по кубику за монету» — целиком и сразу: у здания на поле
+         * решение одно, стоит оно чинить или нет, и дробить его на кубики
+         * значило бы завести счёт там, где его быть не должно.
+         */
+        private ActionResult performRepair(PlayerState player, TurnContext ctx, int uid,
+                                           int цена) {
+            BuildingToken b = null;
+            for (BuildingToken x : player.buildingsOnField()) {
+                if (x.uid == uid) {
+                    b = x;
+                    break;
+                }
+            }
+            if (b == null || b.damage <= 0) {
+                return ActionResult.fail("repair: чинить нечего");
+            }
+            if (!player.resources.canPay(Resource.COIN, цена)) {
+                return ActionResult.fail("repair: нечем платить");
+            }
+            int было = b.damage;
+            player.resources.pay(Resource.COIN, цена);
+            b.resetDamage();
+            TurnJournal.TurnFacts f = journal(state).of(player.seat);
+            f.buildOps += 1;
+            f.buildOpHexes.add(b.hexId);
+            ctx.recordOp("build");
+            Map<String, Object> tel = new HashMap<>();
+            tel.put("repaired", было);
+            tel.put("coin_spent", цена);
+            tel.put("hex", b.hexId);
+            return ActionResult.ok("repaired " + b.type.code + " @ " + b.hexId
+                + " (-" + было + " урона, -" + цена + " мон)", tel);
+        }
+
+        private ActionResult performDemolish(PlayerState player, TurnContext ctx, int uid,
+                                             int refund, int цена) {
             BuildingToken b = null;
             for (BuildingToken x : player.buildingsOnField()) {
                 if (x.uid == uid) {
@@ -1143,8 +1227,14 @@ public final class Actions {
             if (b == null) {
                 return ActionResult.fail("demolish: здание не найдено");
             }
+            if (цена > 0 && !player.resources.canPay(Resource.COIN, цена)) {
+                return ActionResult.fail("demolish: нечем заплатить за снос");
+            }
             String hex = b.hexId;
             returnOwnBuildingToReserve(state, player, b, true);
+            if (цена > 0) {
+                player.resources.pay(Resource.COIN, цена);
+            }
             player.resources.add(Resource.COIN, refund);
             TurnJournal.TurnFacts f = journal(state).of(player.seat);
             f.buildOps += 1;

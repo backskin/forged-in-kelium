@@ -223,14 +223,17 @@ public final class RuleWords {
             case "actions.empty_energy_slot_coin_cost" ->
                 "монет за работу здания с пустой ячейкой энергии";
             case "actions.build.ops_per_military_building" ->
-                "сколько нарядов Стройки даёт каждое военное здание";
+                "устаревший ключ: потолок операций Стройки снят 06.09.2026";
             case "actions.build.surcharge_coins" ->
-                "надбавка монетами за каждый лишний наряд в одном действии (не берётся с 05.09.2026)";
+                "устаревший ключ: надбавки за объём в Стройке нет";
             case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
+            case "actions.build.demolish_cost_coins" -> "сколько стоит снос своего здания";
+            case "actions.build.repair_enabled" ->
+                "Стройкой можно снять весь урон со своего здания за его цену";
             case "actions.build.demolish_cu_allowed" ->
                 "своё ЦУ можно снести в запас, как любое здание";
             case "actions.build.one_op_per_building" ->
-                "над одним зданием за действие Стройка только один наряд";
+                "над одним зданием за действие Стройка только одна операция";
             case "actions.build.move_cost_coins" ->
                 "монет за перенос любого стоящего на поле здания";
             case "actions.build.move_building_repays_full_price" ->
