@@ -1,0 +1,152 @@
+<title>Карточка восьми действий</title>
+<style>
+  :root{
+    --бумага:#f5f1e8; --тушь:#1d1a16; --серый:#6b6459; --линия:#c9c0b0;
+    --разработка:#4a7c59; --инфраструктура:#a06a2c; --операция:#8c3a3a; --приобретения:#3a5f8c;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --бумага:#f5f1e8; --тушь:#1d1a16;
+  }}
+  body{background:#2a2724;color:var(--тушь);font:14px/1.45 "PT Sans",-apple-system,system-ui,sans-serif;
+       padding:24px;display:flex;flex-direction:column;align-items:center;gap:24px}
+  .подпись{color:#b8b0a4;font-size:13px;max-width:760px;text-align:center}
+  .подпись b{color:#efe9dd}
+
+  /* Карта 90×120 мм при 3.78 px/мм */
+  .сторона{width:340px;height:454px;background:var(--бумага);border-radius:10px;
+           box-shadow:0 8px 28px rgba(0,0,0,.45);padding:11px;display:flex;flex-direction:column;gap:7px}
+  .шапка{display:flex;justify-content:space-between;align-items:baseline;
+         font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--серый)}
+  .сетка{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:7px}
+
+  .плитка{border:1px solid var(--линия);border-radius:7px;padding:7px 8px;display:flex;
+          flex-direction:column;gap:4px;background:#fffdf8}
+  .плитка h3{margin:0;font-size:12.5px;letter-spacing:.02em;display:flex;align-items:center;gap:5px}
+  .знак{font-size:15px;line-height:1}
+  .суть{margin:0;font-size:9.6px;line-height:1.3;font-weight:700}
+  ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2.5px}
+  li{font-size:8.6px;line-height:1.28;color:#332f28;display:flex;gap:4px}
+  li::before{content:"·";color:var(--серый);font-weight:700}
+  .полоса{height:3px;border-radius:2px;margin:-7px -8px 3px;border-radius:6px 6px 0 0}
+  .р .полоса{background:var(--разработка)} .р h3{color:var(--разработка)}
+  .и .полоса{background:var(--инфраструктура)} .и h3{color:var(--инфраструктура)}
+  .о .полоса{background:var(--операция)} .о h3{color:var(--операция)}
+  .п .полоса{background:var(--приобретения)} .п h3{color:var(--приобретения)}
+  b{font-weight:700}
+  .пары{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+  table{border-collapse:collapse;font-size:8.4px;width:100%}
+  td{padding:.5px 0;vertical-align:top}
+  td:first-child{white-space:nowrap;padding-right:5px;color:var(--серый)}
+</style>
+
+<div class="подпись">
+  <b>Карточка восьми действий — двусторонняя, 90×120 мм.</b>
+  Лицо — экономика (Разработка и Инфраструктура), оборот — конфликт и покупки
+  (Операция и Приобретения). Крупная строка в каждой плитке — то, ради чего
+  игрок карточку и берёт: «а, точно, это вот про что». Три точки под ней — ровно
+  то, что переспрашивают чаще всего. Знаки ⬢⛏⚒⚡➜⚔⇄⚗ — места под пиктограммы.
+</div>
+
+<div class="пары">
+
+<div class="сторона">
+  <div class="шапка"><span>Кристаллы Раздора · действия</span><span>лицо · экономика</span></div>
+  <div class="сетка">
+
+    <div class="плитка р"><div class="полоса"></div>
+      <h3><span class="знак">⬢</span>СБОРКА</h3>
+      <p class="суть">Каждое запитанное ВОЕННОЕ здание даёт 1 войско ИЛИ 1 боеприпас</p>
+      <ul>
+        <li>запитано = все ячейки ⚡ закрыты; монетой не закрыть</li>
+        <li>войско встаёт на гекс своего здания; техника — 2 сектора</li>
+        <li>казарма→пехота · завод→техника · авиабаза→авиация · ЦУ→вышка</li>
+      </ul>
+    </div>
+
+    <div class="плитка р"><div class="полоса"></div>
+      <h3><span class="знак">⛏</span>ДОБЫЧА</h3>
+      <p class="суть">Каждый запитанный ДОБЫТЧИК берёт келемий ИЛИ открытый контейнер</p>
+      <ul>
+        <li>грядка примыкает <b>стенкой</b>, не углом</li>
+        <li>добытчик №1–2 → 1 келемий · №3–4 → 2</li>
+        <li>контейнер: 2 своих сектора + 1 напротив за ребром</li>
+      </ul>
+    </div>
+
+    <div class="плитка и"><div class="полоса"></div>
+      <h3><span class="знак">⚒</span>СТРОЙКА</h3>
+      <p class="суть">Трать монеты: ставь и сноси свои здания. Операций сколько угодно</p>
+      <ul>
+        <li>поставить — цена здания · снести — 1 монета</li>
+        <li>с одним зданием — <b>одна</b> операция за действие</li>
+        <li>строить в своих гексах и куда здание смотрит стенкой</li>
+      </ul>
+    </div>
+
+    <div class="плитка и"><div class="полоса"></div>
+      <h3><span class="знак">⚡</span>СМЕНА ЭНЕРГИИ</h3>
+      <p class="суть">Активируй каждый свой источник — не больше раза за действие</p>
+      <ul>
+        <li><b>ОТДАТЬ</b> — сними с источника и разложи по своим зданиям</li>
+        <li><b>ЗАБРАТЬ</b> — верни на него, но только до полного</li>
+        <li>источники — энергостанции и ЦУ; энергия не тратится</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="сторона">
+  <div class="шапка"><span>Кристаллы Раздора · действия</span><span>оборот · война и рынок</span></div>
+  <div class="сетка">
+
+    <div class="плитка о"><div class="полоса"></div>
+      <h3><span class="знак">➜</span>ДВИЖЕНИЕ</h3>
+      <p class="суть">Один свой гекс двигается даром. Дальше 1 боеприпас за перемещение</p>
+      <ul>
+        <li>дальность = скорость с планшета войск</li>
+        <li>нельзя <b>через</b> и <b>на</b> гекс с чужими войсками; уйти — можно</li>
+        <li>авиация это игнорирует, кроме гексов с чужой авиацией</li>
+      </ul>
+    </div>
+
+    <div class="плитка о"><div class="полоса"></div>
+      <h3><span class="знак">⚔</span>БОЙ</h3>
+      <p class="суть">Один свой гекс бьёт даром. Дальше 1 боеприпас за жетон</p>
+      <ul>
+        <li>цель — соседний гекс или свой же; строка атаки 1 БПР, урон 1</li>
+        <li>чужое здание в гексе — бьёшь только здания и вышки</li>
+        <li><b>ответа нет</b>; урон не снимается</li>
+      </ul>
+    </div>
+
+    <div class="плитка п"><div class="полоса"></div>
+      <h3><span class="знак">⇄</span>РЫНОК</h3>
+      <p class="суть">Курсы планшета и ОДНО предложение активной карты</p>
+      <table>
+        <tr><td>1 / 2 келемия</td><td>3 / <b>7</b> монет</td></tr>
+        <tr><td>1 / 2 келемия</td><td>2 / 4 карты задания</td></tr>
+      </table>
+      <ul>
+        <li>предложение: свой келемий в свободную ячейку — их мало</li>
+      </ul>
+    </div>
+
+    <div class="плитка п"><div class="полоса"></div>
+      <h3><span class="знак">⚗</span>НАУКА</h3>
+      <p class="суть">Сдай трофеи — двигай свои фишки по трекам</p>
+      <table>
+        <tr><td>1 трофей</td><td>перенос модуля</td></tr>
+        <tr><td>2 трофея</td><td>2 карты арсенала, одну оставь</td></tr>
+        <tr><td>2 трофея</td><td>позолота модуля</td></tr>
+      </table>
+      <ul>
+        <li>один шаг на каждом треке за действие</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+</div>
