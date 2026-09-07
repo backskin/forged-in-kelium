@@ -27,12 +27,25 @@
   }
   body{background:#2a2724;color:var(--тушь);
        font:14px/1.5 "PT Sans",-apple-system,system-ui,sans-serif;
-       padding:22px;display:flex;flex-direction:column;align-items:center;gap:18px}
+       padding:12px;display:flex;flex-direction:column;align-items:center;gap:14px;
+       overflow-x:hidden}
+  @media (min-width:700px){ body{padding:22px;gap:18px} }
   .подпись{color:#b8b0a4;font-size:13px;max-width:760px;line-height:1.55}
+  #отчёт{max-width:100%;box-sizing:border-box}
   .подпись b{color:#efe9dd}
   .подпись code{background:#3a3632;padding:1px 4px;border-radius:3px;font-size:12px}
-  .лупа{transform:scale(2.4);transform-origin:top center;margin-bottom:calc(1.4 * 120mm)}
-  .пары{display:flex;gap:4mm;justify-content:center}
+  /* ПРЕДПРОСМОТР. Карта свёрстана в миллиметрах и на экране выходит крошечной,
+     поэтому её увеличивают. Увеличение делается НЕ margin-хаком: коробка
+     .окно имеет настоящий размер увеличенной карты, а карта внутри неё
+     масштабируется от левого верхнего угла. Иначе на узком экране (телефон)
+     увеличенная карта вылезала за вьюпорт и обрезалась.
+     Коэффициент --к считает скрипт по ширине окна: на телефоне карта займёт
+     всю доступную ширину, на большом экране остановится на 2.4. */
+  .пары{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+  .окно{position:relative;width:calc(var(--карта-ш) * var(--к, 1));
+        height:calc(var(--карта-в) * var(--к, 1));flex:none}
+  .окно > .сторона{position:absolute;top:0;left:0;
+        transform:scale(var(--к, 1));transform-origin:top left}
 
   .сторона{width:var(--карта-ш);height:var(--карта-в);background:var(--поле);
            border-radius:2mm;box-shadow:0 2px 8px rgba(0,0,0,.4);
@@ -80,8 +93,9 @@
   @media print{
     body{background:#fff;padding:0;display:block}
     .подпись,#отчёт{display:none}
-    .лупа{transform:none;margin:0}
-    .пары{gap:0}
+    .пары{gap:0;display:block}
+    .окно{width:auto;height:auto;position:static}
+    .окно > .сторона{position:static;transform:none}
     .сторона{box-shadow:none;border-radius:0;page-break-after:always}
     @page{size:70mm 120mm;margin:0}
   }
@@ -103,9 +117,9 @@
 
 <div id="отчёт">сторож переполнения ещё не отработал</div>
 
-<div class="лупа" lang="ru"><div class="пары">
+<div class="пары" lang="ru">
 
-<div class="сторона">
+<div class="окно"><div class="сторона">
   <div class="шапка"><span>Кристаллы Раздора</span><span>лицо · хозяйство</span></div>
   <div class="ряды">
 
@@ -166,7 +180,9 @@
   </div>
 </div>
 
-<div class="сторона">
+</div>
+
+<div class="окно"><div class="сторона">
   <div class="шапка"><span>Кристаллы Раздора</span><span>оборот · война и рынок</span></div>
   <div class="ряды">
 
@@ -226,9 +242,9 @@
     </div>
 
   </div>
-</div>
-
 </div></div>
+
+</div>
 
 <script>
   // СТОРОЖ ПЕРЕПОЛНЕНИЯ. Макет в миллиметрах врёт молча: текст, который не влез,
@@ -255,6 +271,20 @@
       о.textContent = 'Всё влезло: восемь рядов, ни одного переполнения при 8 пт.';
     }
   }
-  document.fonts ? document.fonts.ready.then(проверить) : проверить();
-  window.addEventListener('resize', проверить);
+  // УВЕЛИЧЕНИЕ ПО ШИРИНЕ ОКНА. 70 мм в CSS-пикселях меряем настоящим элементом,
+  // а не считаем по 96 dpi: браузеры телефонов трактуют мм по-своему.
+  function увеличить() {
+    const проба = document.createElement('div');
+    проба.style.cssText = 'position:absolute;visibility:hidden;width:70mm';
+    document.body.appendChild(проба);
+    const ширМм = проба.getBoundingClientRect().width;
+    проба.remove();
+    const доступно = document.documentElement.clientWidth - 24;
+    const к = Math.max(1, Math.min(2.4, доступно / ширМм));
+    document.querySelectorAll('.окно').forEach(о => о.style.setProperty('--к', к));
+  }
+  function всё() { увеличить(); проверить(); }
+  document.fonts ? document.fonts.ready.then(всё) : всё();
+  window.addEventListener('resize', всё);
+  window.addEventListener('orientationchange', всё);
 </script>
