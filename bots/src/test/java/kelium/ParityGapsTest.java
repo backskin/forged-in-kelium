@@ -89,10 +89,17 @@ class ParityGapsTest {
     }
 
     // ---- 3. Перенос здания питает журнал movedBuilding (задание «Переезд» o16) ----
+    //
+    // ПЕРЕНОСА В БАЗОВОЙ СТРОЙКЕ БОЛЬШЕ НЕТ (решение дизайнера 06.09.2026): со
+    // зданием делают одно из двух, ставят или сносят. Механика переноса при
+    // этом жива — ею пользуются карты, которым можно то, чего нельзя базе, — и
+    // тест продолжает её сторожить, включая правило ключом. Заодно проверяется
+    // само снятие: на своде по умолчанию перенос в меню не предлагается.
     @Test
     void moveBuildingFeedsJournal() {
         GameState s = build();
         PlayerState p = s.player(0);
+        kelium.dataio.Ctx.rules(s).override("actions.build.move_enabled", true);
 
         // СВОД-старт (1.5.0) добытчик больше не кладёт — ставим его руками,
         // тест проверяет ПЕРЕНОС, а не сетап.
@@ -157,5 +164,47 @@ class ParityGapsTest {
         assertTrue(f.razedOwnHexes.contains(fromHex), "исходный гекс отмечен как снос");
         // Здание действительно сменило гекс.
         assertTrue(!fromHex.equals(miner.hexId), "добытчик стоит уже на другом гексе");
+    }
+
+    /** На своде по умолчанию Стройка переноса НЕ предлагает (06.09.2026). */
+    @Test
+    void базоваяСтройкаПереносНеПредлагает() {
+        GameState s = build();
+        PlayerState p = s.player(0);
+        BuildingToken miner = s.tokenStats.makeBuilding(BuildingType.MINER, 0, 9991, 1);
+        miner.hexId = p.startHex;
+        p.buildings.add(miner);
+        kelium.core.Hex h = s.field.get(p.startHex);
+        for (int side = 0; side < 6; side++) {
+            if (h.sideOwner[side] == null && h.neighborBySide[side] != null) {
+                h.occupySides(miner.uid, java.util.List.of(side));
+                break;
+            }
+        }
+        p.resources.add(kelium.core.Resource.COIN, 20);
+
+        java.util.List<String> виды = new java.util.ArrayList<>();
+        Agent agent = new Agent(0, "looker") {
+            @Override
+            public Choice choose(GameState st, List<Choice> options,
+                                 Map<String, Object> ctx) {
+                if ("build_pick".equals(String.valueOf(ctx.getOrDefault("kind", "")))) {
+                    for (Choice o : options) {
+                        виды.add(o.kind());
+                    }
+                }
+                for (Choice o : options) {
+                    if ("pass".equals(o.kind())) {
+                        return o;
+                    }
+                }
+                return options.get(options.size() - 1);
+            }
+        };
+        s.journal.startTurn(0);
+        Actions.create("build", s).perform(p, new TurnContext(0, 1), agent);
+        assertTrue(!виды.isEmpty(), "меню Стройки вообще показали");
+        assertTrue(!виды.contains("move_pick"),
+            "перенос убран из базовой Стройки, а в меню он есть: " + виды);
     }
 }
