@@ -14,7 +14,7 @@ import kelium.dataio.GameConfig;
 import kelium.engine.BlockStamp;
 
 /**
- * ЭТАЛОННЫЙ НАБОР БЛОКОВ 4.0.0 — спецификация дизайнера 07.09.2026.
+ * ЖЁСТКИЕ ПРАВИЛА НАБОРОВ БЛОКОВ 5.* — спецификация дизайнера 07.09.2026.
  *
  * <p>ЗАЧЕМ ОТДЕЛЬНЫЙ СТОРОЖ, если генератор проверяет себя сам. Потому что
  * проверять себя тем же кодом, которым генерировал, — не проверка: у прошлого
@@ -33,7 +33,7 @@ import kelium.engine.BlockStamp;
  */
 class ЭталонныйНаборБлоковTest {
 
-    private static final String ЭТАЛОН = "4.0.0";
+    private static final String ЭТАЛОН = "5.0.0";
 
     private static List<BlockStamp.Face> стороны() {
         BlockStamp.resetCache();
@@ -177,7 +177,7 @@ class ЭталонныйНаборБлоковTest {
     }
 
     /**
-     * СВОД 1.35.0 ИГРАЕТ ЭТАЛОН, а не авторский набор. Ключ
+     * СВОД ИГРАЕТ ЭТАЛОН, а не авторский набор. Ключ
      * {@code content_versions.blocks} — как у всякого прочего содержимого;
      * своды без него читают 1.4.0 и играются в точности как играли.
      */
@@ -199,14 +199,14 @@ class ЭталонныйНаборБлоковTest {
         List<String> out = new ArrayList<>();
         try (var поток = java.nio.file.Files.list(папка)) {
             поток.map(p -> p.getFileName().toString())
-                .filter(n -> n.startsWith("blocks.4.") && n.endsWith(".yaml"))
+                .filter(n -> n.startsWith("blocks.5.") && n.endsWith(".yaml"))
                 .map(n -> n.substring("blocks.".length(), n.length() - ".yaml".length()))
                 .sorted()
                 .forEach(out::add);
         } catch (java.io.IOException e) {
             throw new IllegalStateException("не прочитать папку блоков", e);
         }
-        assertTrue(!out.isEmpty(), "наборов семейства 4.* нет ни одного");
+        assertTrue(!out.isEmpty(), "наборов семейства 5.* нет ни одного");
         return out;
     }
 

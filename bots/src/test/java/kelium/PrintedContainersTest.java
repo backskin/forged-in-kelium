@@ -82,21 +82,53 @@ class PrintedContainersTest {
                 + air + " из " + printed);
     }
 
+
+    /**
+     * НЕТ ЛИ НА ГЕКСЕ ЖЕТОНОВ ИГРОКОВ. Именно этого требует правило выдачи
+     * («контейнер получает тот, кто пришёл на ЧИСТЫЙ гекс»), и именно этого не
+     * проверяет visibleContainer: он смотрит, чем ячейка НАКРЫТА, а войска
+     * ячеек не накрывают — они просто стоят на гексе.
+     */
+    private static boolean чистыйГекс(GameState s, Hex h) {
+        for (int seat = 0; seat < s.numPlayers(); seat++) {
+            PlayerState ps = s.player(seat);
+            for (kelium.core.UnitToken u : ps.unitsOnField()) {
+                if (h.id.equals(u.hexId)) {
+                    return false;
+                }
+            }
+            for (kelium.core.BuildingToken b : ps.buildingsOnField()) {
+                if (h.id.equals(b.hexId)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     @Test
     void groundUnitTakesGroundContainerAndAircraftTakesAirOne() {
         GameState s = game(23L);
         PlayerState p = s.player(0);
+        // ГЕКСЫ ОБЯЗАНЫ БЫТЬ СВОБОДНЫ. По правилу занятый сектор контейнера не
+        // отдаёт никому, а на стартовом гексе стоят ЦУ с пехотой: беря ПЕРВЫЙ
+        // подходящий гекс, тест держался на том, что в наборе 1.4.0 он случайно
+        // оказывался пустым. С набором 5.0.0 первым пошёл занятый — тест упал,
+        // и правильно упал.
         Hex ground = null;
         Hex sky = null;
         for (Hex h : s.field.hexes.values()) {
-            if (h.containerCell >= 0 && h.containerCell != BlockStamp.AIR && ground == null) {
+            if (!PrintedContainers.visibleContainer(s, h) || !чистыйГекс(s, h)) {
+                continue;
+            }
+            if (h.containerCell != BlockStamp.AIR && ground == null) {
                 ground = h;
             }
             if (h.containerCell == BlockStamp.AIR && sky == null) {
                 sky = h;
             }
         }
-        assertTrue(ground != null && sky != null, "нашлись оба вида ячеек");
+        assertTrue(ground != null && sky != null, "нашлись оба вида открытых ячеек");
 
         int before = p.containers;
         assertEquals(1, PrintedContainers.onUnitPlaced(s, p, ground.id, UnitType.INFANTRY),
@@ -123,7 +155,7 @@ class PrintedContainersTest {
         Hex ground = null;
         for (Hex h : s.field.hexes.values()) {
             if (h.containerCell >= 0 && h.containerCell != BlockStamp.AIR
-                    && PrintedContainers.visibleContainer(s, h)) {
+                    && PrintedContainers.visibleContainer(s, h) && чистыйГекс(s, h)) {
                 ground = h;
                 break;
             }
