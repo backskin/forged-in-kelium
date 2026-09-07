@@ -520,7 +520,37 @@ public final class Storage {
         }
         int add = Math.min(amount, room);
         player.resources.add(Resource.TROPHY, add);
+        учесть(add);
         return add;
+    }
+
+    /**
+     * ОТКУДА ПРИШЁЛ ТРОФЕЙ — учёт для балансового стенда, в игре молчит.
+     *
+     * <p>Трофеи приходят из ДЕВЯТНАДЦАТИ мест: Возврат, бой, задания, карты
+     * арсенала, эффекты, рынок. Пока их не сосчитали поимённо, спор «трофей это
+     * продукт войны или нет» упирается в мнения. Считать в каждом из
+     * девятнадцати мест по отдельности значило бы девятнадцать раз забыть; здесь
+     * одна точка, через которую проходит весь приход, и вызывающий определяется
+     * по стеку.
+     *
+     * <p>{@code null} — учёт выключен, и ни одной лишней инструкции не
+     * исполняется. Включает его стенд, присвоив пустую карту.
+     */
+    public static java.util.Map<String, Long> УЧЁТ_ТРОФЕЕВ = null;
+
+    private static void учесть(int add) {
+        if (УЧЁТ_ТРОФЕЕВ == null || add <= 0) {
+            return;
+        }
+        String откуда = StackWalker.getInstance().walk(кадры -> кадры
+            .map(к -> к.getClassName() + "." + к.getMethodName())
+            .filter(имя -> !имя.contains("Storage."))
+            .findFirst()
+            .orElse("?"));
+        int точка = откуда.lastIndexOf('.', откуда.lastIndexOf('.') - 1);
+        УЧЁТ_ТРОФЕЕВ.merge(точка > 0 ? откуда.substring(точка + 1) : откуда,
+            (long) add, Long::sum);
     }
 
     private static int trophyRoom(kelium.core.GameState s, PlayerState player) {
