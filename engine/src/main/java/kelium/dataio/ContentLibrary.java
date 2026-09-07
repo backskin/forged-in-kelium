@@ -49,6 +49,12 @@ public final class ContentLibrary {
             if ("modules".equals(ctype)) {
                 continue;
             }
+            // Набор картонных блоков — не колода, а ПЕЧАТЬ НА КАРТОНЕ: где на
+            // каждом гексе стоит контейнер и где жёлтая ячейка энергии. Читает
+            // kelium.engine.BlockStamp, ключ здесь только фиксирует версию.
+            if ("blocks".equals(ctype)) {
+                continue;
+            }
             String version = e.getValue().toString();
             sets.put(ctype, ContentSet.load(ctype, version, dataRoot));
         }

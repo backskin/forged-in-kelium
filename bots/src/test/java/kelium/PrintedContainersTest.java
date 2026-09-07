@@ -115,13 +115,20 @@ class PrintedContainersTest {
     void printedCellDoesNotBurnOut() {
         GameState s = game(24L);
         PlayerState p = s.player(0);
+        // ГЕКС ОБЯЗАН БЫТЬ ПУСТЫМ. Брать первый попавшийся с контейнером нельзя:
+        // по правилу занятый сектор контейнера не отдаёт никому, и на стартовом
+        // гексе стоят ЦУ с пехотой. Прежняя редакция теста брала первый и
+        // держалась на том, что в наборе 1.4.0 он случайно оказывался пустым —
+        // с эталонным набором 4.0.0 первым пошёл занятый, и тест упал.
         Hex ground = null;
         for (Hex h : s.field.hexes.values()) {
-            if (h.containerCell >= 0 && h.containerCell != BlockStamp.AIR) {
+            if (h.containerCell >= 0 && h.containerCell != BlockStamp.AIR
+                    && PrintedContainers.visibleContainer(s, h)) {
                 ground = h;
                 break;
             }
         }
+        assertTrue(ground != null, "на поле есть открытый наземный контейнер");
         // «Срабатывает каждый раз при заходе» — решение дизайнера
         assertEquals(1, PrintedContainers.onUnitPlaced(s, p, ground.id, UnitType.INFANTRY));
         assertEquals(1, PrintedContainers.onUnitPlaced(s, p, ground.id, UnitType.INFANTRY));
@@ -201,10 +208,17 @@ class PrintedContainersTest {
         assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, here));
 
         // стоя на соседнем — видит ТОЛЬКО через свою стенку (правило дизайнера)
+        // У СОСЕДА СВОЕГО КОНТЕЙНЕРА БЫТЬ НЕ ДОЛЖНО, иначе проверка бессмысленна:
+        // добытчик увидит контейнер на СВОЁМ гексе, и это правильный ответ, а не
+        // ошибка. Прежняя редакция брала первого соседа со свободной стенкой и
+        // держалась на удаче набора 1.4.0.
         Hex nbHex = null;
         int facing = -1;
         for (String nb : s.field.neighbors(withContainer.id)) {
             Hex cand = s.field.get(nb);
+            if (PrintedContainers.visibleContainer(s, cand)) {
+                continue;
+            }
             for (int i = 0; i < 6; i++) {
                 if (withContainer.id.equals(cand.neighborBySide[i])
                         && cand.sideOwner[i] == null) {
