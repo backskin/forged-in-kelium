@@ -194,14 +194,24 @@ public final class Scoring {
             breakdown.put("installed_super_arsenal", perSuper * p.superArsenalCards.size());
         }
 
-        int star = 0;
-        for (BuildingToken b : p.buildingsOnField()) {
-            if ((b.type == BuildingType.MINER || b.type == BuildingType.POWER_PLANT)
-                    && b.level != null && b.level == 4) {
-                star += 1;
+        // ЗВЕЗДА НА ЗДАНИИ 4 УРОВНЯ. Ключ заведён 06.09.2026, и вот зачем: до
+        // этого источник был ЗАШИТ, без ключа вовсе. Когда 04.09.2026 базовые
+        // источники очков резали до шести, обнулили тех, у кого ключ был —
+        // монеты, несданные трофеи, здания и войска на поле. Звезда ключа не
+        // имела и правку молча пережила, хотя в список шести не входит: замер
+        // «откуда очки» показал её 12% от всего счёта. Ноль в 1.35.0, единица в
+        // прежних сводах — там с ней играли.
+        int perStar = ((Number) rs.get("economy.vp_per_level4_building", 1)).intValue();
+        if (perStar != 0) {
+            int star = 0;
+            for (BuildingToken b : p.buildingsOnField()) {
+                if ((b.type == BuildingType.MINER || b.type == BuildingType.POWER_PLANT)
+                        && b.level != null && b.level == 4) {
+                    star += 1;
+                }
             }
+            breakdown.put("level4_stars", perStar * star);
         }
-        breakdown.put("level4_stars", star);
 
         // ТОЧКА ПРАВИЛ: НОВЫЙ источник победных очков от карты арсенала (заказ
         // дизайнера 13.08.2026 — «4 карты, меняющие подсчёт очков в конце партии
