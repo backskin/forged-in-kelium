@@ -984,29 +984,9 @@ public final class StartMenuWindow {
         return out;
     }
 
-    /**
-     * Сравнение сводов ПО ЧИСЛАМ версии: 1.9.0 меньше 1.10.0, 1.7.1 меньше всех
-     * двадцатых. Хвост после номера («1.24.0-пломба») идёт ПОСЛЕ чистой версии:
-     * это ответвление на замер, а не следующая редакция.
-     */
+    /** Сравнение сводов — общий порядок программы, см. {@link kelium.dataio.VersionOrder}. */
     static int compareVersions(String a, String b) {
-        String[] ap = a.split("-", 2);
-        String[] bp = b.split("-", 2);
-        int[] an = numbers(ap[0]);
-        int[] bn = numbers(bp[0]);
-        for (int i = 0; i < Math.max(an.length, bn.length); i++) {
-            int x = i < an.length ? an[i] : 0;
-            int y = i < bn.length ? bn[i] : 0;
-            if (x != y) {
-                return Integer.compare(x, y);
-            }
-        }
-        String at = ap.length > 1 ? ap[1] : "";
-        String bt = bp.length > 1 ? bp[1] : "";
-        if (at.isEmpty() != bt.isEmpty()) {
-            return at.isEmpty() ? 1 : -1;      // чистая версия выше ответвления
-        }
-        return at.compareTo(bt);
+        return kelium.dataio.VersionOrder.compare(a, b);
     }
 
     private static int[] numbers(String v) {

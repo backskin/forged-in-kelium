@@ -138,8 +138,8 @@ class SearchSystemTest {
         GameEngine.bind(s, agents, null);
         // Наука без единого трофея не может ничего изменить — это holostoy ход
         // по определению, и просчёт обязан это увидеть.
-        s.player(0).resources.add(Resource.DEBRIS, -s.player(0).resources.debris());
-        s.player(0).trophySpace.clear();
+        s.player(0).resources.add(Resource.TROPHY, -s.player(0).resources.trophy());
+        s.player(0).destroyedTokens.clear();
         Lookahead.ActionOutcome out = Lookahead.actionOutcome(s, 0, "science",
             Genome.defaults(), Genome.defaults(), 0, 42L);
         assertFalse(out.ok() && out.changed(),

@@ -68,6 +68,14 @@ public final class Passability {
      * ребро.
      */
     public static boolean canShootAcross(GameState state, UnitToken unit, String to) {
+        // БОЙ ВНУТРЬ СВОЕГО ГЕКСА (правило дизайнера 04.09.2026): жетоны разных
+        // игроков стоят вместе и стреляют друг в друга. Границу при этом никто не
+        // пересекает, значит и стену проверять не по чему. Закрытость гекса
+        // проверяется отдельно и как обычно — она про то, КОГО можно бить внутри,
+        // а не про то, дотягиваешься ли ты до гекса.
+        if (to.equals(unit.hexId)) {
+            return true;
+        }
         if (unit.type == UnitType.AIRCRAFT) {
             return true;
         }
@@ -80,6 +88,31 @@ public final class Passability {
             return true;
         }
         return groundEdgeOpen(state, unit.hexId, to, unit.owner);
+    }
+
+    /**
+     * СТОЯТ ЛИ НА ГЕКСЕ ЧУЖИЕ ВОЙСКА (правило дизайнера 04.09.2026).
+     *
+     * <p>Такой гекс наземному закрыт целиком: на него нельзя встать и его нельзя
+     * пройти насквозь. Войска — это все четыре рода, включая АВИАЦИЮ в небе:
+     * правило говорит «чужие войска» без изъятий, и вышка тоже войско.
+     *
+     * <p>Здания не считаются: их стенки живут в {@link #groundEdgeOpen} и
+     * закрывают сторону, а не гекс. Гарнизон внутри здания сектора не занимает и
+     * гекс не запирает — он и на поле-то целью не является, пока здание стоит.
+     */
+    public static boolean enemyUnitsOn(GameState state, String hexId, int seat) {
+        for (PlayerState p : state.players) {
+            if (p.seat == seat) {
+                continue;
+            }
+            for (UnitToken u : p.units) {
+                if (u.alive() && !u.inside() && hexId.equals(u.hexId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

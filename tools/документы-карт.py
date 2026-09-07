@@ -49,7 +49,7 @@ from docx.shared import Cm, Pt, RGBColor
 #  СЛОВАРИ: внутренние коды -> человеческие слова
 # --------------------------------------------------------------------------
 РЕСУРСЫ = {
-    "coin": "монета", "ammo": "боеприпас", "debris": "обломок",
+    "coin": "монета", "ammo": "боеприпас", "trophy": "трофей",
     "kelium": "келемий", "containers": "контейнер",
     "objective_cards": "карта задания", "objective_card": "карта задания",
     "arsenal": "карта арсенала", "vp": "победное очко",
@@ -67,7 +67,7 @@ from docx.shared import Cm, Pt, RGBColor
 РОДА = {"infantry": "пехота", "vehicle": "техника",
         "tower": "вышка", "aircraft": "авиация",
         "buildings_towers": "здания и вышки"}
-ЯЧЕЙКИ = {"kelium": "келемий", "ammo": "боеприпас", "debris": "обломок",
+ЯЧЕЙКИ = {"kelium": "келемий", "ammo": "боеприпас", "trophy": "трофей",
           "coin": "монета", "trophy": "трофей"}
 СИМВОЛЫ = {"circle": "круг", "square": "квадрат", "triangle": "треугольник",
            "rhomb": "ромб", "diamond": "ромб", "hourglass": "песочные часы"}
@@ -139,7 +139,7 @@ def как_работает_эффект(узел):
             ч.append("Постройка бесплатна.")
         if p.get("buildings"):
             ч.append(f"Зданий участвует: {p['buildings']}.")
-        for r in ("ammo", "debris"):
+        for r in ("ammo", "trophy"):
             if p.get(r):
                 ч.append(f"Плюс {количество(r, p[r])}.")
     elif код == "shield":

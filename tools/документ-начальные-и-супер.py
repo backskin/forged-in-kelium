@@ -30,7 +30,7 @@ from docx.shared import Cm, Pt, RGBColor
 НАГРАДЫ = {
     "coin": "монеты",
     "ammo": "боеприпасы",
-    "debris": "обломки",
+    "trophy": "трофеи",
     "kelium": "келемий",
     "objective_card": "карты задания",
     "arsenal": "карта арсенала",
@@ -50,7 +50,7 @@ from docx.shared import Cm, Pt, RGBColor
 ЯЧЕЙКИ = {
     "kelium": "келемий",
     "ammo": "боеприпас",
-    "debris": "обломок",
+    "trophy": "трофей",
     "coin": "монета",
     "trophy": "трофей",
 }

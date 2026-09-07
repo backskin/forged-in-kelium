@@ -221,7 +221,7 @@ public final class ArsenalAbilities {
         }
     }
 
-    /** «Можете использовать келемий вместо трофейных очков в действие Наука». */
+    /** «Можете использовать келемий вместо трофеев в действие Наука». */
     private static final class SciencePayWithKelium implements Ability {
 
         @Override public String id() {

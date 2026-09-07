@@ -24,7 +24,7 @@ import kelium.core.Resource;
  * <p>Теперь читаются ТЕ ЖЕ ключи, которыми награду раздаёт движок:
  *
  * <pre>
- *   base_reward:    {coin: 2, ammo: 1, debris: 1, kelium: 1, vp: 1}
+ *   base_reward:    {coin: 2, ammo: 1, trophy: 1, kelium: 1, vp: 1}
  *   special_reward: {coin: 4, vp: 2}
  * </pre>
  *
@@ -70,8 +70,11 @@ public final class CardRewards {
         give(ctx, reward, "coin", Resource.COIN);
         give(ctx, reward, "kelium", Resource.KELIUM);
         give(ctx, reward, "ammo", Resource.AMMO);
-        give(ctx, reward, "trophy", Resource.DEBRIS);
-        give(ctx, reward, "debris", Resource.DEBRIS);
+        // ОДНА СТРОКА, А НЕ ДВЕ. Здесь стояли give(..."trophy") и give(..."trophy")
+        // - псевдоним для наборов, писавших награду старым ключом. После
+        // переименования трофея в трофей оба ключа стали одним, и вторая строка
+        // выдавала награду ВТОРОЙ РАЗ. Поймано ObjectiveContractTest.
+        give(ctx, reward, "trophy", Resource.TROPHY);
         if (reward.get("vp") instanceof Number vp && vp.intValue() != 0) {
             ctx.grantVp(vp.intValue(), "objective:" + card.id());
         }

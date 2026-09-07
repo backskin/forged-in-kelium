@@ -166,7 +166,7 @@ public final class SuperWeapon {
     /** Сколько единиц такого вида у игрока сейчас есть. */
     private static int supply(GameState s, PlayerState p, String kind) {
         switch (kind) {
-            case "coin", "ammo", "kelium", "debris" -> {
+            case "coin", "ammo", "kelium", "trophy" -> {
                 try {
                     return p.resources.get(Resource.fromCode(kind));
                 } catch (RuntimeException e) {
@@ -202,7 +202,7 @@ public final class SuperWeapon {
 
     private static int countTrophies(PlayerState p, boolean units, boolean buildings) {
         int n = 0;
-        for (Token t : p.trophySpace) {
+        for (Token t : p.destroyedTokens) {
             if (t instanceof UnitToken ? units : buildings) {
                 n++;
             }
@@ -307,7 +307,7 @@ public final class SuperWeapon {
     /** Очередь оплаты: 0 — ресурсы, 1 — трофеи, 2 — жетоны с поля. */
     private static int payOrder(String kind) {
         return switch (kind) {
-            case "coin", "ammo", "kelium", "debris" -> 0;
+            case "coin", "ammo", "kelium", "trophy" -> 0;
             case "enemy_unit_token", "enemy_building_token", "enemy_token" -> 1;
             default -> 2;
         };
@@ -316,7 +316,7 @@ public final class SuperWeapon {
     /** Списать одну ячейку. Жетоны уходят ИЗ ИГРЫ — ни владельцу, ни в запас. */
     private static void pay(GameState s, PlayerState p, String kind, int amount) {
         switch (kind) {
-            case "coin", "ammo", "kelium", "debris" -> p.resources.pay(Resource.fromCode(kind), amount);
+            case "coin", "ammo", "kelium", "trophy" -> p.resources.pay(Resource.fromCode(kind), amount);
             case "enemy_unit_token" -> takeTrophies(p, amount, true, false);
             case "enemy_building_token" -> takeTrophies(p, amount, false, true);
             case "enemy_token" -> takeTrophies(p, amount, true, true);
@@ -340,12 +340,12 @@ public final class SuperWeapon {
 
     private static void takeTrophies(PlayerState p, int amount, boolean units, boolean buildings) {
         int left = amount;
-        for (Token t : new ArrayList<>(p.trophySpace)) {
+        for (Token t : new ArrayList<>(p.destroyedTokens)) {
             if (left == 0) {
                 break;
             }
             if (t instanceof UnitToken ? units : buildings) {
-                p.trophySpace.remove(t);   // из игры насовсем, владельцу не вернётся
+                p.destroyedTokens.remove(t);   // из игры насовсем, владельцу не вернётся
                 left--;
             }
         }

@@ -19,7 +19,7 @@ import kelium.core.Agent;
 import kelium.core.Choice;
 
 /**
- * Реестр немедленных эффектов карт (контейнеры/маркет/арсенал/задания).
+ * Реестр немедленных эффектов карт (контейнеры/рынок/арсенал/задания).
  *
  * <p>Порт из forge/engine/effects.py. Эффект — это операция, изменяющая
  * состояние игрока/поля и возвращающая небольшую карту телеметрии. Эффекты,
@@ -93,6 +93,13 @@ public final class Effects {
             case "refresh_arsenal_row" -> refreshArsenalRow(s, seat, p);
             case "gild_module" -> gildModule(s, seat, p);
             case "combo" -> combo(s, seat, p);
+            // === ЭФФЕКТЫ КАРТ РЫНКА 2.0 И АРСЕНАЛА 5.0 (заказ 02.09.2026) ===
+            case "place_on_energy_cell" -> placeOnEnergyCell(s, seat, p);
+            case "module_swap" -> moduleSwapEffect(s, seat, p);
+            case "buy_kelium" -> buyKelium(s, seat, p);
+            case "swap_module_from_bag" -> swapModuleFromBag(s, seat, p);
+            case "replace_building_with_neutral" -> replaceBuildingWithNeutral(s, seat, p);
+            case "steal_objective_cards" -> stealObjectiveCards(s, seat, p);
             case "exchange_table" -> exchangeTable(s, seat, p);
             case "noop" -> Map.of("noop", p.getOrDefault("note", "unimplemented"));
             // ПУСТОЙ КОНТЕЙНЕР (заказ дизайнера 18.08.2026, контейнеры 4.0) —
@@ -132,6 +139,11 @@ public final class Effects {
                  "gain_per", "steal_resource", "steal_arsenal_card",
                  "move_building_free", "refresh_arsenal_row", "gild_module",
                  "combo", "exchange_table",
+                 // Пять эффектов заказа 02.09.2026: карты рынка 2.0 и те низы
+                 // арсенала 5.0, что делятся с ними механикой.
+                 "place_on_energy_cell", "module_swap", "buy_kelium",
+                 "swap_module_from_bag", "replace_building_with_neutral",
+                 "steal_objective_cards",
                  "empty" -> true;   // пустой контейнер (18.08.2026) — реализован, не заглушка
             default -> false;   // включая "noop" — карта-заглушка не должна попасть в колоду
         };
@@ -146,8 +158,8 @@ public final class Effects {
             pl.resources.add(Resource.COIN, n);
             got.put("coin", n);
         }
-        if (p.containsKey("debris")) {
-            got.put("debris", Storage.addDebrisCapped(s, pl, asInt(p.get("debris"))));
+        if (p.containsKey("trophy")) {
+            got.put("trophy", Storage.addTrophyCapped(s, pl, asInt(p.get("trophy"))));
         }
         if (p.containsKey("kelium")) {
             got.put("kelium", Storage.addKeliumCapped(s, pl, asInt(p.get("kelium"))));
@@ -370,7 +382,7 @@ public final class Effects {
             return got;
         }
         // ПОДАРОК К ДЕЙСТВИЮ — те же параметры, что у обычного gain: «бесплатная
-        // Наука и сверху 1 обломок» (Лицензия), «бесплатный Бой и 1 боеприпас в
+        // Наука и сверху 1 трофей» (Лицензия), «бесплатный Бой и 1 боеприпас в
         // его начале» (Внезапный удар), «бесплатная Смена энергии и 2 монеты»
         // (Перекоммутация).
         //
@@ -428,8 +440,20 @@ public final class Effects {
         if (p.get("free_miner_moves") instanceof Number mm) {
             ctx.freeMinerMoves = mm.intValue();
         }
-        if (Boolean.TRUE.equals(p.get("debris_to_coin"))) {
-            ctx.scienceDebrisToCoin = true;
+        if (Boolean.TRUE.equals(p.get("trophy_to_coin"))) {
+            ctx.scienceTrophyToCoin = true;
+        }
+        if (p.get("virtual_trophy") instanceof Number vd) {
+            ctx.scienceVirtualTrophy = vd.intValue();
+        }
+        if (Boolean.TRUE.equals(p.get("pay_with_coin"))) {
+            ctx.sciencePayWithCoin = true;
+        }
+        if (p.get("free_deals") instanceof Number fd) {
+            ctx.marketFreeDeals = fd.intValue();
+        }
+        if (p.get("fixed_price") instanceof Number fp) {
+            ctx.buildFixedPrice = fp.intValue();
         }
         var res = Actions.create(name, s).perform(s.player(seat), ctx, agent);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
@@ -579,6 +603,21 @@ public final class Effects {
         PlayerState pl = s.player(seat);
         Agent agent = agentFor(s, seat);
         int count = p.containsKey("count") ? asInt(p.get("count")) : 2;
+        // ДЕСАНТ ОДНОГО РОДА (заказ дизайнера 01.09.2026, контейнеры) — {@code
+        // types} сужает предложение до названных родов. Нужно контейнерам
+        // "1 пехота"/"1 техника": там высаживается ровно один заранее известный
+        // род, а не выбор из всех.
+        java.util.Set<UnitType> allowedTypes = null;
+        if (p.get("types") instanceof List<?> l) {
+            allowedTypes = java.util.EnumSet.noneOf(UnitType.class);
+            for (Object o : l) {
+                try {
+                    allowedTypes.add(UnitType.fromCode(String.valueOf(o)));
+                } catch (RuntimeException ignored) {
+                    // род, которого нет в игре, просто не предлагается
+                }
+            }
+        }
         java.util.Set<UnitType> used = java.util.EnumSet.noneOf(UnitType.class);
         int placed = 0;
         // ТОЛЬКО СВОЯ ЗОНА СТРОЙКИ (решение дизайнера 20.08.2026).
@@ -633,6 +672,9 @@ public final class Effects {
             List<Choice> opts = new ArrayList<>();
             for (UnitType ut : UnitType.values()) {
                 if (used.contains(ut) || pl.unitsOfKind(ut) >= s.tokenStats.unitStock(ut)) {
+                    continue;
+                }
+                if (allowedTypes != null && !allowedTypes.contains(ut)) {
                     continue;
                 }
                 for (String hid : zone) {
@@ -763,7 +805,7 @@ public final class Effects {
         // решает он, а не карта. Предлагаются только выполнимые пары: платить
         // надо тем, что есть, а получать то, для чего есть место на складе.
         if (Boolean.TRUE.equals(p.get("any"))) {
-            Resource[] all = {Resource.COIN, Resource.AMMO, Resource.KELIUM, Resource.DEBRIS};
+            Resource[] all = {Resource.COIN, Resource.AMMO, Resource.KELIUM, Resource.TROPHY};
             List<Choice> opts = new ArrayList<>();
             for (Resource from : all) {
                 if (!pl.resources.canPay(from, amount)) {
@@ -805,7 +847,7 @@ public final class Effects {
         pl.resources.pay(from, amount);
         int got = switch (to) {
             case AMMO -> Storage.addAmmoCapped(s, pl, amount);
-            case DEBRIS -> Storage.addDebrisCapped(s, pl, amount);
+            case TROPHY -> Storage.addTrophyCapped(s, pl, amount);
             case KELIUM -> Storage.addKeliumCapped(s, pl, amount);
             default -> {
                 pl.resources.add(to, amount);
@@ -854,6 +896,222 @@ public final class Effects {
      * <p>Список пуст или не список — эффект ничего не делает и об этом сообщает:
      * молча возвращать «сработало» опаснее, чем показать пустую карту.
      */
+    /**
+     * КЕЛЕМИЙ ВМЕСТО ЭНЕРГИИ — кубик встаёт в свободную печатную ячейку энергии
+     * своего здания и остаётся в ней НАВСЕГДА.
+     *
+     * <p>Это была печатная сделка планшета рынка ({@code kelium_to_energy}), и
+     * своего эффекта у неё не было: механика жила прямо в действии Рынка.
+     * Заказ 02.09.2026 снял сделку с планшета и отдал её КАРТЕ рынка, а тот же
+     * низ достался карте арсенала — значит нужен эффект.
+     *
+     * <p>Кубик встаёт от особого источника, которого нет на поле: Смена энергии
+     * его не снимет, при сносе он не вернётся, победных очков за него нет. Тем
+     * же uid его ставит и планшет (Actions.MarketAction) — жетон один и тот же.
+     *
+     * @param p {@code pay_kelium} — брать ли келемий из хранилища. Карта
+     *          арсенала платит сама; сделке рынка келемий уже уплачен ходом.
+     */
+    static Map<String, Object> placeOnEnergyCell(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        boolean платим = Boolean.TRUE.equals(p.get("pay_kelium"));
+        if (платим && pl.resources.kelium() < 1) {
+            return Map.of("placed", 0, "reason", "нет келемия");
+        }
+        kelium.core.BuildingToken цель = null;
+        for (kelium.core.BuildingToken b : pl.buildingsOnField()) {
+            if (b.energySlots > b.energyPlaced) {
+                цель = b;
+                break;
+            }
+        }
+        if (цель == null) {
+            return Map.of("placed", 0, "reason", "нет здания со свободной ячейкой");
+        }
+        if (платим) {
+            pl.resources.pay(Resource.KELIUM, 1);
+        }
+        цель.addEnergyFrom(Actions.MarketAction.MARKET_KELIUM_UID, 1);
+        return Map.of("placed", 1, "building", цель.type.code);
+    }
+
+    /** СМЕНА МОДУЛЕЙ на планшете — то же, что в Обновление, но по карте. */
+    static Map<String, Object> moduleSwapEffect(GameState s, int seat, Map<String, Object> p) {
+        Modules.moduleSwap(s, seat, agentFor(s, seat), ev -> { });
+        return Map.of("module_swap", 1);
+    }
+
+    /**
+     * КУПИТЬ КЕЛЕМИЙ ЗА МОНЕТУ. Цена — из карты, а не из кода.
+     *
+     * <p>Купленный келемий ложится в хранилище на общих правилах: перелива через
+     * потолок склада в игре не бывает нигде, за этим стоит отдельный сторож, и
+     * карта исключением быть не может. Нет свободной ячейки — сделка не идёт, и
+     * монеты остаются у игрока.
+     */
+    static Map<String, Object> buyKelium(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        int цена = p.get("coin") instanceof Number n ? n.intValue() : 1;
+        if (pl.resources.coin() < цена) {
+            return Map.of("bought", 0, "reason", "нет монет");
+        }
+        if (Storage.keliumMax(s, pl) <= pl.resources.kelium()) {
+            return Map.of("bought", 0, "reason", "хранилище полно");
+        }
+        pl.resources.pay(Resource.COIN, цена);
+        pl.resources.add(Resource.KELIUM, 1);
+        return Map.of("bought", 1, "paid", цена);
+    }
+
+    /**
+     * ОБМЕН ОДНОГО МОДУЛЯ НА НОВЫЙ ИЗ МЕШКА. Свой жетон уходит в мешок, оттуда
+     * тянется другой — вслепую, как и всякая тяга модуля.
+     *
+     * <p>Мешок пуст или жетонов у игрока нет — сделка не идёт. Подменять тягу на
+     * «просто дай новый жетон» нельзя: карта печатала бы модули из воздуха, а
+     * мешок для этого и заведён конечным.
+     */
+    static Map<String, Object> swapModuleFromBag(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        Agent agent = agentFor(s, seat);
+        List<Choice> opts = new ArrayList<>();
+        for (String id : pl.redTokens) {
+            opts.add(new Choice("swap_module", new String[]{"red", id}, "красный " + id));
+        }
+        for (String id : pl.blueTokens) {
+            opts.add(new Choice("swap_module", new String[]{"blue", id}, "синий " + id));
+        }
+        if (opts.isEmpty()) {
+            return Map.of("swapped", 0, "reason", "нет жетонов модуля");
+        }
+        Choice ch = agent != null
+            ? agent.choose(s, opts, Map.of("kind", "swap_module")) : opts.get(0);
+        String[] pick = (String[]) (ch != null && ch.payload() != null
+            ? ch.payload() : opts.get(0).payload());
+        boolean red = "red".equals(pick[0]);
+        List<String> bag = red ? s.redBag : s.blueBag;
+        // Сперва СДАЁМ свой жетон в мешок, потом тянем: иначе можно вытянуть
+        // ровно то, что сдаёшь, и обмен окажется пустым.
+        (red ? pl.redTokens : pl.blueTokens).remove(pick[1]);
+        bag.add(pick[1]);
+        String drawn = ModuleSets.draw(bag, s.rng);
+        if (drawn == null) {
+            bag.remove(pick[1]);
+            (red ? pl.redTokens : pl.blueTokens).add(pick[1]);
+            return Map.of("swapped", 0, "reason", "мешок не отдал жетон");
+        }
+        (red ? pl.redTokens : pl.blueTokens).add(drawn);
+        return Map.of("swapped", 1, "gave", pick[1], "got", drawn);
+    }
+
+    /**
+     * ЗАМЕНИТЬ ЧУЖОЕ ЗДАНИЕ НЕЙТРАЛЬНЫМ. Чужой жетон уходит владельцу в ЗАПАС
+     * (не на место уничтоженных жетонов и не в лом — его можно отстроить заново), а его секторы
+     * занимает нейтрал.
+     *
+     * <p>Отличие от {@code build_neutral}: там игрок выбирает СЕКТОРЫ и может
+     * поставить стенку на пустое место, здесь выбирается ЗДАНИЕ, и нейтрал
+     * встаёт ровно на его секторы — сколько бы их ни было.
+     */
+    static Map<String, Object> replaceBuildingWithNeutral(GameState s, int seat,
+                                                          Map<String, Object> p) {
+        Agent agent = agentFor(s, seat);
+        List<Choice> opts = new ArrayList<>();
+        for (PlayerState other : s.players) {
+            if (other.seat == seat) {
+                continue;
+            }
+            for (kelium.core.BuildingToken b : other.buildingsOnField()) {
+                if (b.hexId == null) {
+                    continue;
+                }
+                opts.add(new Choice("replace_building", new Object[]{other.seat, b.uid},
+                    "нейтрал вместо " + b.type.code + " @" + b.hexId));
+            }
+        }
+        if (opts.isEmpty()) {
+            return Map.of("replaced", 0, "reason", "чужих зданий на поле нет");
+        }
+        Choice ch = agent != null
+            ? agent.choose(s, opts, Map.of("kind", "replace_building")) : opts.get(0);
+        Object[] pick = (Object[]) (ch != null && ch.payload() != null
+            ? ch.payload() : opts.get(0).payload());
+        PlayerState owner = s.player((Integer) pick[0]);
+        int uid = (Integer) pick[1];
+        kelium.core.BuildingToken цель = null;
+        for (kelium.core.BuildingToken b : new ArrayList<>(owner.buildingsOnField())) {
+            if (b.uid == uid) {
+                цель = b;
+                break;
+            }
+        }
+        if (цель == null || цель.hexId == null) {
+            return Map.of("replaced", 0, "reason", "здание уже ушло с поля");
+        }
+        kelium.core.Hex h = s.field.get(цель.hexId);
+        List<Integer> sectors = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            if (h.sideOwner[i] != null && h.sideOwner[i] == uid) {
+                sectors.add(i);
+            }
+        }
+        String hex = цель.hexId;
+        Actions.returnOwnBuildingToReserve(s, owner, цель, false);
+        if (sectors.isEmpty()) {
+            return Map.of("replaced", 1, "hex", hex, "sectors", 0);
+        }
+        // Отрицательные uid — соглашение движка для нейтралов (см. Scenario).
+        int nuid = -1000 - h.neutrals.size() - s.round;
+        h.neutrals.add(new kelium.core.Hex.NeutralBuilding(nuid, false, List.copyOf(sectors)));
+        for (Integer i : sectors) {
+            h.sideOwner[i] = -1;
+        }
+        return Map.of("replaced", 1, "hex", hex, "sectors", sectors.size(),
+            "owner", owner.seat);
+    }
+
+    /**
+     * ЗАБРАТЬ У ПРОТИВНИКА ДО N КАРТ ЗАДАНИЙ. Карты уходят из руки жертвы в руку
+     * вора, вслепую: выбирает не вор, а случай, — иначе кража превращалась бы в
+     * просмотр чужой руки, а рука заданий закрыта.
+     *
+     * <p>Жертву выбирает игрок: у кого карт больше, у того и берут охотнее, и
+     * это осмысленное решение. Рука вора не должна переполниться - лишние карты
+     * просто не берутся, предел руки в игре общий.
+     */
+    static Map<String, Object> stealObjectiveCards(GameState s, int seat, Map<String, Object> p) {
+        PlayerState me = s.player(seat);
+        int сколько = p.get("count") instanceof Number n ? n.intValue() : 1;
+        Agent agent = agentFor(s, seat);
+        List<Choice> opts = new ArrayList<>();
+        for (PlayerState other : s.players) {
+            if (other.seat != seat && !other.objectiveHand.isEmpty()) {
+                opts.add(new Choice("steal_objectives", other.seat,
+                    "забрать задания у места " + other.seat
+                        + " (в руке " + other.objectiveHand.size() + ")"));
+            }
+        }
+        if (opts.isEmpty()) {
+            return Map.of("stolen", 0, "reason", "ни у кого нет карт заданий");
+        }
+        Choice ch = agent != null
+            ? agent.choose(s, opts, Map.of("kind", "steal_objectives")) : opts.get(0);
+        int место = ch != null && ch.payload() instanceof Integer i ? i
+            : (Integer) opts.get(0).payload();
+        PlayerState жертва = s.player(место);
+        int предел = ((Number) kelium.dataio.Ctx.rules(s)
+            .get("objective_hand_limit", 99)).intValue();
+        int взято = 0;
+        while (взято < сколько && !жертва.objectiveHand.isEmpty()
+                && me.objectiveHand.size() < предел) {
+            String card = жертва.objectiveHand.remove(
+                s.rng.nextInt(жертва.objectiveHand.size()));
+            me.objectiveHand.add(card);
+            взято++;
+        }
+        return Map.of("stolen", взято, "from", место);
+    }
+
     static Map<String, Object> combo(GameState s, int seat, Map<String, Object> p) {
         Object raw = p.get("steps");
         if (!(raw instanceof List<?> steps) || steps.isEmpty()) {
@@ -878,7 +1136,7 @@ public final class Effects {
     }
 
     /**
-     * ОБМЕН ПО ПЕЧАТНОЙ ТАБЛИЦЕ — «1 обломок на 2 монеты ИЛИ 2 обломка на 5».
+     * ОБМЕН ПО ПЕЧАТНОЙ ТАБЛИЦЕ — «1 трофей на 2 монеты ИЛИ 2 трофея на 5».
      *
      * <p>Отличие от {@link #convert}: там курс один и линейный, а на картах
      * встречается ЛЕСТНИЦА, где второй обмен выгоднее первого. Строку выбирает
@@ -892,7 +1150,7 @@ public final class Effects {
         Resource from;
         Resource to;
         try {
-            from = Resource.fromCode(String.valueOf(p.getOrDefault("from", "debris")));
+            from = Resource.fromCode(String.valueOf(p.getOrDefault("from", "trophy")));
             to = Resource.fromCode(String.valueOf(p.getOrDefault("to", "coin")));
         } catch (RuntimeException e) {
             return Map.of("exchanged", 0);
@@ -928,7 +1186,7 @@ public final class Effects {
         int got = switch (to) {
             case AMMO -> Storage.addAmmoCapped(s, pl, deal[1]);
             case KELIUM -> Storage.addKeliumCapped(s, pl, deal[1]);
-            case DEBRIS -> Storage.addDebrisCapped(s, pl, deal[1]);
+            case TROPHY -> Storage.addTrophyCapped(s, pl, deal[1]);
             default -> {
                 pl.resources.add(to, deal[1]);
                 yield deal[1];
@@ -969,7 +1227,7 @@ public final class Effects {
         got.put("per", per);
         got.put("counted", count);
         int max = p.containsKey("max") ? asInt(p.get("max")) : Integer.MAX_VALUE;
-        for (String key : new String[]{"coin", "ammo", "kelium", "debris"}) {
+        for (String key : new String[]{"coin", "ammo", "kelium", "trophy"}) {
             if (!p.containsKey(key)) {
                 continue;
             }
@@ -1041,7 +1299,7 @@ public final class Effects {
         int got = switch (what) {
             case KELIUM -> Storage.addKeliumCapped(s, me, took);
             case AMMO -> Storage.addAmmoCapped(s, me, took);
-            case DEBRIS -> Storage.addDebrisCapped(s, me, took);
+            case TROPHY -> Storage.addTrophyCapped(s, me, took);
             default -> {
                 me.resources.add(what, took);
                 yield took;
@@ -1178,7 +1436,7 @@ public final class Effects {
         return Map.of("unlimited_spec", true);
     }
 
-    /** ВЕРНУТЬ НА МАРКЕТ сброшенную карту сделок на рынке. */
+    /** ВЕРНУТЬ НА РЫНОК сброшенную карту сделок на рынке. */
     static Map<String, Object> marketCardFromDiscard(GameState s, int seat, Map<String, Object> p) {
         var deck = s.decks.get("market");
         if (deck == null) {

@@ -100,28 +100,27 @@ public class ArsenalCardBase extends BaseCard implements ArsenalCard {
         return clamp(0.15 + 0.85 * norm(h.strength()) * pressure * horizon);
     }
 
-    /** Ценность утиля: разовая выдача против текущей нехватки. */
+    /**
+     * ЦЕНОСТЬ УТИЛЯ: что верх выдаст ЗДЕСЬ И СЕЙЧАС.
+     *
+     * <p>ПОЧЕМУ ЭТО ПЕРЕПИСАНО (замер 02.09.2026). Раньше сторона утиля была
+     * КОНСТАНТОЙ: любое бесплатное действие стоило 0.70, любой прочий эффект —
+     * 0.50, и карта свой верх фактически не оценивала. Установка при этом
+     * считалась по-настоящему — сила способности на давление узкого места на
+     * остаток партии. Сравнение шло «живое число против плоских 0.7», и всякий
+     * раз, когда установка слабее, карта уходила в костёр независимо от того,
+     * что она делает. Отсюда замер: жгут в 3.4 раза чаще, чем ставят, и не
+     * меняется от пересборки колоды.
+     *
+     * <p>Теперь верх спрашивают то же, что и низ: пригодится ли ты сейчас.
+     * Бесплатный Бой без цели и без боеприпасов не стоит ничего; кража
+     * установленной карты у того, у кого её нет, не стоит ничего; десант при
+     * пустом запасе войск — тоже. Пустой утиль обязан быть дешевле установки,
+     * иначе бот сжигает карту «просто потому что можно».
+     */
     protected double burnValue(CardContext ctx) {
-        if (!(data().get("top") instanceof Map<?, ?> top)) {
-            return 0.0;
-        }
-        String effect = String.valueOf(top.get("effect"));
-        Map<?, ?> params = top.get("params") instanceof Map<?, ?> p ? p : Map.of();
-        // Бесплатное действие — это ход, а ход в этой игре самый дорогой ресурс:
-        // их всего около двадцати четырёх на партию.
-        if ("free_action".equals(effect)) {
-            return 0.7;
-        }
-        if (!"gain".equals(effect)) {
-            return 0.5;                  // лечение, перемещение и прочее — середина
-        }
-        double value = 0;
-        value += need(ctx, Resource.COIN) * num(params, "coin") * 0.10;
-        value += need(ctx, Resource.AMMO) * num(params, "ammo") * 0.15;
-        value += need(ctx, Resource.KELIUM) * num(params, "kelium") * 0.10;
-        value += need(ctx, Resource.DEBRIS) * num(params, "debris") * 0.20;
-        value += num(params, "objective_cards") * 0.20;
-        return clamp(value);
+        return kelium.engine.cards.TopValue.of(ctx,
+            data().get("top") instanceof Map<?, ?> top ? top : null);
     }
 
     /**
@@ -132,22 +131,7 @@ public class ArsenalCardBase extends BaseCard implements ArsenalCard {
      * бесценна при пустом складе и почти бесполезна при полном.
      */
     protected double pressureOn(CardContext ctx, Hint.Bottleneck what) {
-        return switch (what) {
-            case AMMO -> scarcity(ctx.have(Resource.AMMO), 4);
-            case COINS -> scarcity(ctx.have(Resource.COIN), 6);
-            case KELIUM -> scarcity(ctx.have(Resource.KELIUM), 4);
-            case UNITS -> scarcity(ctx.me().unitsOnField().size(), 4);
-            case ENERGY -> {
-                int idle = 0;
-                for (var b : ctx.me().buildingsOnField()) {
-                    idle += b.energyIdle;
-                }
-                yield scarcity(idle, 3);
-            }
-            case REACH, DEFENCE -> ctx.me().unitsOnField().isEmpty() ? 0.2 : 0.8;
-            case TROPHY -> scarcity(ctx.have(Resource.DEBRIS), 4);
-            case ACTIONS, VP -> 0.9;     // действий и очков не хватает всегда
-        };
+        return kelium.engine.cards.TopValue.давление(ctx, what);
     }
 
     /** Чем меньше есть от нормы, тем сильнее жмёт. */

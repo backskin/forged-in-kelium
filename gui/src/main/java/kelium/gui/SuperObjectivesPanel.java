@@ -393,7 +393,7 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
             case "kelium" -> "келемий в проект";
             case "coin" -> "монеты в проект";
             case "ammo" -> "боеприпасы в проект";
-            case "trophy" -> "обломки в проект";
+            case "trophy" -> "трофеи в проект";
             case "enemy_unit_token" -> "захваченные жетоны чужих ВОЙСК";
             case "enemy_building_token" -> "захваченные жетоны чужих ЗДАНИЙ";
             case "own_miner_bordering_grid" -> "свои добытчики у грядки";

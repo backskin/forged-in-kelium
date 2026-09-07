@@ -47,13 +47,13 @@ from openpyxl.utils import get_column_letter
 }
 РОДА = {"infantry": "пехота", "vehicle": "техника",
         "tower": "вышка", "aircraft": "авиация"}
-ЯЧЕЙКИ = {"kelium": "келемий", "ammo": "боеприпас", "debris": "обломок",
+ЯЧЕЙКИ = {"kelium": "келемий", "ammo": "боеприпас", "trophy": "трофей",
           "coin": "монета", "trophy": "трофей"}
 СИМВОЛЫ = {"circle": "круг", "square": "квадрат", "triangle": "треугольник",
            "rhomb": "ромб", "diamond": "ромб", "hourglass": "песочные часы"}
 РЕДКОСТЬ = {"common": "обычный", "good": "хороший", "rare": "редкий"}
 НАГРАДЫ = {
-    "coin": "монеты", "ammo": "боеприпасы", "debris": "обломки",
+    "coin": "монеты", "ammo": "боеприпасы", "trophy": "трофеи",
     "kelium": "келемий", "objective_card": "карты задания",
     "arsenal": "карта арсенала",
     "arsenal_from_display": "карта арсенала НА ВЫБОР из открытых",

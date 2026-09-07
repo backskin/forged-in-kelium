@@ -328,11 +328,11 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                 g.setFont(bold(11));
                 g.setColor(ink());
                 g.drawString("шаг " + step + (step == steps ? " · вершина" : ""), textX, ry + 22);
-                // ЦЕНА ШАГА — ОБЛОМКИ (ревью дизайнера 17.08.2026, п.3): подпись
+                // ЦЕНА ШАГА — ТРОФЕИ (ревью дизайнера 17.08.2026, п.3): подпись
                 // «N ТРФ» заменена на шестерёнку (тот же размер, что у звёзд
-                // ПО) — печатная цена по-прежнему в трофейных очках (движок
-                // принимает трофеи/обломки/келемий, см. Actions.payTrophy), но
-                // на столе её платят чаще всего именно обломками, и «шестерёнка»
+                // ПО) — печатная цена по-прежнему среди уничтоженных жетонов (движок
+                // принимает трофеи или келемий, см. Actions.payTrophy), но
+                // на столе её платят чаще всего именно трофеями, и «шестерёнка»
                 // читается как «расходный ресурс», а не «карта победных очков».
                 gearIcon(g, textX + 8, ry + 40, 8.0);
                 g.setFont(plain(10));
@@ -369,22 +369,39 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                 }
             }
 
-            // ---- СТАРТОВАЯ ЗОНА (шаг 0): кубики, ещё не пошедшие по треку ----
+            // ---- НИЖНЯЯ СТРОКА ТРЕКА ----
+            //
+            // ЗАПАС КУБИКОВ ВМЕСТО СТАРТОВОЙ ЗОНЫ (правило дизайнера
+            // 02.09.2026). Стартовой ячейки «на нуле» больше нет: кубики лежат в
+            // ЛИЧНОМ запасе игрока, и каждый купленный шаг забирает один
+            // навсегда. Рисовать «старт» стало нечем — там всегда было бы пусто,
+            // а главное число трека (сколько шагов игрок ещё может купить)
+            // не показывалось вовсе.
+            //
+            // Запас один на все три трека, поэтому строка одинаковая под каждым
+            // из них — это не дубль, а напоминание рядом с местом решения.
+            // Своды до 1.33.0 и старые записи рисуются как раньше: там кубик
+            // один на трек, и стартовая зона осмысленна.
             int sy0 = gridTop + steps * rowH;
-            g.setColor(row());
-            g.fillRoundRect(cx, sy0, cw, rowH - 6, 8, 8);
-            g.setColor(line());
-            g.setStroke(new BasicStroke(1.0f));
-            g.drawRoundRect(cx, sy0, cw, rowH - 6, 8, 8);
-            g.setFont(bold(10.5));
-            g.setColor(ink3());
-            g.drawString("старт", cx + 10, sy0 + 22);
-            List<Integer> atStart = seatsAtStart(TRACKS[t]);
-            int cube0 = Math.min(18, rowH - 12);
-            int px0 = cx + cw - 8 - atStart.size() * (cube0 + 4);
-            for (int seat : atStart) {
-                cube(g, px0, sy0 + (rowH - 6 - cube0) / 2, cube0, FieldView.seatColor(seat));
-                px0 += cube0 + 4;
+            if (!кубикиНавсегда()) {
+                // Стартовая зона (шаг 0) осмысленна только там, где кубик один
+                // на трек и его переставляют.
+                g.setColor(row());
+                g.fillRoundRect(cx, sy0, cw, rowH - 6, 8, 8);
+                g.setColor(line());
+                g.setStroke(new BasicStroke(1.0f));
+                g.drawRoundRect(cx, sy0, cw, rowH - 6, 8, 8);
+                g.setFont(bold(10.5));
+                g.setColor(ink3());
+                g.drawString("старт", cx + 10, sy0 + 22);
+                int cube0 = Math.min(18, rowH - 12);
+                List<Integer> atStart = seatsAtStart(TRACKS[t]);
+                int px0 = cx + cw - 8 - atStart.size() * (cube0 + 4);
+                for (int seat : atStart) {
+                    cube(g, px0, sy0 + (rowH - 6 - cube0) / 2, cube0,
+                        FieldView.seatColor(seat));
+                    px0 += cube0 + 4;
+                }
             }
             // ---- призы первого шага ----
             // ПРИЗ ПЕРВОГО ШАГА — ВНУТРИ СВОЕЙ КОЛОНКИ, двумя строками. Одной
@@ -402,12 +419,47 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                 g.drawString(clip(g, prize, cw), cx + 2, py);
             }
         }
+        // ---- ЗАПАС КУБИКОВ: ОДНА ПОЛОСА НА ВЕСЬ ПЛАНШЕТ ----
+        //
+        // Стартовой ячейки «на нуле» больше нет: кубики лежат в ЛИЧНОМ запасе
+        // игрока, и запас ОДИН на все три трека. Значит и полоса одна: под
+        // каждым треком она была бы одним и тем же числом трижды.
+        if (кубикиНавсегда()) {
+            int sy0 = gridTop + steps * rowH;
+            int sw = colW * 3 - 12;
+            g.setColor(row());
+            g.fillRoundRect(x + 20, sy0, sw, rowH - 6, 8, 8);
+            g.setColor(line());
+            g.setStroke(new BasicStroke(1.0f));
+            g.drawRoundRect(x + 20, sy0, sw, rowH - 6, 8, 8);
+            g.setFont(bold(10.5));
+            g.setColor(ink3());
+            g.drawString("КУБИКИ В ЗАПАСЕ", x + 30, sy0 + 22);
+            int cube0 = Math.min(18, rowH - 12);
+            int pxq = x + 30;
+            int cy = sy0 + (rowH - 6) / 2 + 14;
+            for (ReplayRecord.Player p : snap.players) {
+                if (p.techCubes < 0) {
+                    continue;
+                }
+                cube(g, pxq, cy - cube0 + 4, cube0, FieldView.seatColor(p.seat));
+                g.setFont(bold(12));
+                g.setColor(ink());
+                String txt = p.techCubes + "/" + запасКубиков();
+                g.drawString(txt, pxq + cube0 + 4, cy);
+                pxq += cube0 + 6 + g.getFontMetrics().stringWidth(txt) + 18;
+            }
+        }
+
         g.setFont(note(10));
         g.setColor(ink3());
         // Строка КОРОЧЕ прежней: со сменой шрифта на Tektur (он шире системного)
         // прежняя не влезала в рамку планшета и обрезалась на правом краю.
-        g.drawString(clip(g, "кубик на трек ОДИН · пунктирная ячейка — "
-            + "только на большом составе", w - 40), x + 20, y + h - exchH - 12);
+        String правило = кубикиНавсегда()
+            ? "кубик занимает ячейку НАВСЕГДА · пунктирная ячейка — "
+                + "только на большом составе"
+            : "кубик на трек ОДИН · пунктирная ячейка — только на большом составе";
+        g.drawString(clip(g, правило, w - 40), x + 20, y + h - exchH - 12);
 
         // ---- ПОСТОЯННЫЕ ОБМЕНЫ НАУЧНОГО ОТДЕЛА ----
         int ey = y + h - exchH + 30;
@@ -436,7 +488,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             for (Object e : list) {
                 if (e instanceof Map<?, ?> m) {
                     if (pair > 0 && "trophy_to_coin".equals(String.valueOf(m.get("id")))) {
-                        out.add(new Object[]{"1 / 2", "@gear", "обломка   →",
+                        out.add(new Object[]{"1 / 2", "@gear", "трофея   →",
                             "1 / " + (2 + pair), "@coin", "монеты"});
                     } else {
                         out.add(scienceParts(m));
@@ -459,14 +511,14 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             // монеты, а не две (замечание дизайнера 13.08.2026). Диапазон убран,
             // пара живёт своей строкой.
             case "trophy_to_coin" -> new Object[]{first(m.get("give_trophy")), "@gear",
-                "обломок   →", first(m.get("get_coin")), "@coin", "монета"};
-            case "move_module" -> new Object[]{give, "@gear", "обломка   →", "@module_pair",
+                "трофей   →", first(m.get("get_coin")), "@coin", "монета"};
+            case "move_module" -> new Object[]{give, "@gear", "трофея   →", "@module_pair",
                 "переставить свой модуль на планшете"};
-            case "draw_arsenal" -> new Object[]{give, "@gear", "обломка   →", "@card",
+            case "draw_arsenal" -> new Object[]{give, "@gear", "трофея   →", "@card",
                 "взять 2 карты арсенала, оставить 1"};
-            case "gild_module" -> new Object[]{give, "@gear", "обломка   →", "@module_pair",
+            case "gild_module" -> new Object[]{give, "@gear", "трофея   →", "@module_pair",
                 "позолотить модуль"};
-            default -> new Object[]{give, "@gear", "обломка   →", "обмен не описан"};
+            default -> new Object[]{give, "@gear", "трофея   →", "обмен не описан"};
         };
     }
 
@@ -488,6 +540,29 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             }
         }
         return out;
+    }
+
+    /**
+     * Занимает ли кубик ячейку навсегда (свод 1.33.0 и новее). Смотрим НА
+     * ЗАПИСЬ, а не на действующий свод: проигрыватель обязан рисовать ту партию,
+     * которую открыли, а не ту, в которую играют сейчас.
+     */
+    private boolean кубикиНавсегда() {
+        if (Boolean.TRUE.equals(rget("tech.cubes_are_permanent", null))) {
+            return true;
+        }
+        for (ReplayRecord.Player p : snap.players) {
+            if (p.techCubes >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Сколько кубиков в запасе по правилам этой партии. */
+    private int запасКубиков() {
+        Object o = rget("tech.cube_supply", null);
+        return o instanceof Number n ? n.intValue() : 8;
     }
 
     /** Чьи кубики ещё в стартовой зоне трека (шаг 0). */
@@ -727,7 +802,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
     }
 
     /**
-     * ШЕСТЕРЁНКА — значок цены шага в обломках (ревью дизайнера 17.08.2026,
+     * ШЕСТЕРЁНКА — значок цены шага среди уничтоженных жетонов (ревью дизайнера 17.08.2026,
      * п.3): тёмно-серая заливка, толстая чёрная обводка, размер сопоставим со
      * звездой ПО ({@code r} — тот же параметр, что у {@link #starRow}).
      */

@@ -619,7 +619,7 @@ public final class Replay2Gui {
         Chart.Metric m = switch (metric) {
             case "kelium" -> Chart.Metric.KELIUM;
             case "coin" -> Chart.Metric.COIN;
-            case "debris" -> Chart.Metric.DEBRIS;
+            case "trophy" -> Chart.Metric.TROPHY;
             case "vp" -> Chart.Metric.VP;
             default -> null;
         };
@@ -1217,7 +1217,7 @@ public final class Replay2Gui {
         // ИТОГ В ЗАГОЛОВКЕ — это спойлер. По просьбе его можно выключить.
         if (rec.winner != null && !spoilerFree) {
             sb.append("   ·   победил ").append(rec.playerName(rec.winner))
-              .append(" (").append(Names.condition(rec.condition)).append(')');
+              .append(" (").append(Names.condition(rec.condition, rec.spawnLeft, rec.spawnThreshold)).append(')');
         }
         frame.setTitle(sb.toString());
     }

@@ -44,7 +44,7 @@ public final class VpSources {
         return switch (key) {
             case "coins" -> "монеты в казне";
             case "kelium" -> "келемий на складе";
-            case "debris" -> "обломки и несданные трофеи";
+            case "trophy" -> "трофеи и несданные уничтоженные жетоны";
             case "buildings_on_field" -> "здания на поле";
             case "units_on_field" -> "войска на поле";
             case "tech" -> "шаги по трекам науки";

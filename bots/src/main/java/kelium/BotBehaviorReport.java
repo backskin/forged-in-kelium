@@ -39,7 +39,7 @@ import kelium.engine.LayoutLibrary;
  *       и на каком звене рвётся;</li>
  *   <li><b>холостые ходы</b> — сколько действий не дали НИЧЕГО (ни ресурса, ни
  *       жетона, ни перемещения). Это и есть «бот сидит и тупит» в цифрах;</li>
- *   <li><b>цепочка келемий → маркет</b> — понимает ли он, что добытое можно
+ *   <li><b>цепочка келемий → рынок</b> — понимает ли он, что добытое можно
  *       продать.</li>
  * </ul>
  *
@@ -314,7 +314,7 @@ public final class BotBehaviorReport {
         row(sb, "добытчик примыкает к живой жиле", t.gMinerAdj, games);
         row(sb, "примыкающий добытчик запитан", t.gMinerPowered, games);
         row(sb, "келемий реально снят", t.gMined, games);
-        row(sb, "добытое пущено в Маркет", t.gSoldAfterMining, games);
+        row(sb, "добытое пущено в Рынок", t.gSoldAfterMining, games);
         sb.append('\n');
 
         sb.append("## 2. Холостые ходы\n\n");
@@ -378,8 +378,8 @@ public final class BotBehaviorReport {
         sb.append("## 5. Итоги за партию\n\n");
         sb.append("| показатель | за партию |\n|---|---:|\n");
         avg(sb, "келемия добыто", t.keliumMined, games);
-        avg(sb, "келемия продано на маркете", t.keliumSold, games);
-        avg(sb, "розыгрышей Маркета", t.marketPlays, games);
+        avg(sb, "келемия продано на рынке", t.keliumSold, games);
+        avg(sb, "розыгрышей Рынка", t.marketPlays, games);
         avg(sb, "войск произведено", t.unitsMade, games);
         avg(sb, "шагов науки (сумма по игрокам)", t.techSteps, games);
         avg(sb, "победных очков (сумма по игрокам)", (int) t.vpAvg, games);

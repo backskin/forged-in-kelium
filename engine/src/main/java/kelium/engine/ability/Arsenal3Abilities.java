@@ -55,7 +55,7 @@ public final class Arsenal3Abilities {
         Abilities.register(new EconomyPlus1HpFragile());
         Abilities.register(new BuildOnAdjacentWithOwnUnits());
         Abilities.register(new PayEnergyWithCoin());
-        Abilities.register(new DebrisCellsPlus2());
+        Abilities.register(new TrophyCellsPlus2());
         Abilities.register(new SecondEnergyHexFree());
         Abilities.register(new InfantryJumpsSpawnTile());
         Abilities.register(new TwoSpecWithoutSecurity());
@@ -611,7 +611,7 @@ public final class Arsenal3Abilities {
      * «Переформирование» (бывшие «Геологи»): СПЕЦ за 2 монеты — заменить на поле
      * один свой жетон НАЗЕМНОГО войска на другой наземный жетон из запаса.
      *
-     * <p>Прежние «Геологи» давали лишнее трофейное очко за каждый переворот тайла
+     * <p>Прежние «Геологи» давали лишнее трофей за каждый переворот тайла
      * — дизайнер: «имба, мусор». Замена жетона не добавляет игроку ничего, она
      * ПЕРЕСОБИРАЕТ уже стоящее: пехота на месте техники и наоборот. Полезно ровно
      * тогда, когда рода войск оказались не там, где нужны.
@@ -865,7 +865,7 @@ public final class Arsenal3Abilities {
                     v.setHexId(null);
                     v.resetDamage();
                     v.setCapturedBy(seat);
-                    me.trophySpace.add(v);
+                    me.destroyedTokens.add(v);
                     mine.setHexId(null);   // своя пехота ушла вместе с добычей
                     mine.resetDamage();
                     return true;
@@ -880,15 +880,15 @@ public final class Arsenal3Abilities {
 
         @Override public Hint hint() {
             return new Hint(Bottleneck.TROPHY, 2.0, Horizon.THIS_ROUND, null,
-                "чужой жетон в трофеи ценой своей пехоты", false);
+                "чужой жетон на место уничтоженных жетонов ценой своей пехоты", false);
         }
     }
 
     /**
-     * «Обмен пленными»: СПЕЦ — верни себе в запас свои жетоны с трофейного места
+     * «Обмен пленными»: СПЕЦ — верни себе в запас свои жетоны с места уничтоженных жетонов
      * ОДНОГО противника, отдав ему за КАЖДЫЙ жетон РАЗНЫЙ ресурс.
      *
-     * <p>Ресурсов четыре — монета, боеприпас, келемий, обломок, — и каждый идёт
+     * <p>Ресурсов четыре — монета, боеприпас, келемий, трофей, — и каждый идёт
      * ровно за один жетон, поэтому выкупить можно не больше четырёх, и цена
      * растёт не количеством, а разнообразием: последний жетон обходится в
      * келемий, то есть в победное очко. Прежняя редакция брала любой ресурс за
@@ -897,7 +897,7 @@ public final class Arsenal3Abilities {
     private static final class SpecRansomPrisoners implements Ability, OptionSource {
 
         private static final List<Resource> PRICE =
-            List.of(Resource.COIN, Resource.AMMO, Resource.DEBRIS, Resource.KELIUM);
+            List.of(Resource.COIN, Resource.AMMO, Resource.TROPHY, Resource.KELIUM);
 
         @Override public String id() {
             return "spec_ransom_prisoners";
@@ -911,10 +911,10 @@ public final class Arsenal3Abilities {
             return EnumSet.noneOf(Hook.class);
         }
 
-        /** Мои жетоны в трофейном пространстве места {@code holder}. */
+        /** Мои жетоны в месте уничтоженных жетонов места {@code holder}. */
         private static List<Token> mine(GameState state, int seat, PlayerState holder) {
             List<Token> out = new ArrayList<>();
-            for (Token t : holder.trophySpace) {
+            for (Token t : holder.destroyedTokens) {
                 if (t.owner() == seat) {
                     out.add(t);
                 }
@@ -955,7 +955,7 @@ public final class Arsenal3Abilities {
                 }
                 me.resources.pay(pay, 1);
                 holder.resources.add(pay, 1);
-                holder.trophySpace.remove(t);
+                holder.destroyedTokens.remove(t);
                 t.setCapturedBy(null);
                 t.resetDamage();
                 t.setHexId(null);
@@ -1075,23 +1075,23 @@ public final class Arsenal3Abilities {
     /**
      * «Ядерный удар»: СПЕЦ — заплати 4 боеприпаса, выбери гекс, положи на него
      * тайл ЗАПРЕТНОГО гекса. Все стоявшие там жетоны возвращаются владельцам в
-     * запас; за каждый ЧУЖОЙ жетон ты получаешь 1 обломок, но не больше 4.
+     * запас; за каждый ЧУЖОЙ жетон ты получаешь 1 трофей, но не больше 4.
      *
      * <p>Пара к «Келемиевому дождю» и его противоположность. Дождь платит
      * келемием — то есть победными очками — и СОЗДАЁТ источник; удар платит
      * боеприпасами — то есть военным ресурсом — и НАВСЕГДА ВЫЧЁРКИВАЕТ гекс из
      * игры. Обе карты стирают с гекса всё, и обе делают это МИМО боя: жетоны не
      * уничтожаются, а возвращаются владельцам, значит ни трофеев, ни ответного
-     * боя, ни зачёта заданиям на уничтожение. Плата обломками идёт только за
+     * боя, ни зачёта заданиям на уничтожение. Плата трофеями идёт только за
      * ЧУЖИЕ жетоны — своими игрок платит, а не зарабатывает.
      *
-     * <p>Потолок в 4 обломка нужен, чтобы удар по чужой базе не превращался в
-     * разовый скачок по науке: четыре обломка — это ровно один дорогой шаг.
+     * <p>Потолок в 4 трофея нужен, чтобы удар по чужой базе не превращался в
+     * разовый скачок по науке: четыре трофея — это ровно один дорогой шаг.
      */
     private static final class SpecNuclearStrike implements Ability, OptionSource {
 
         private static final int AMMO_COST = 4;
-        private static final int MAX_DEBRIS = 4;
+        private static final int MAX_TROPHY = 4;
 
         @Override public String id() {
             return "spec_nuclear_strike";
@@ -1163,7 +1163,7 @@ public final class Arsenal3Abilities {
                     }
                 }
             }
-            // Нейтралы с гекса тоже уходят: там больше нечему стоять. Обломков за
+            // Нейтралы с гекса тоже уходят: там больше нечему стоять. Трофеев за
             // них не дают — платят только за ЧУЖИЕ жетоны.
             h.neutrals.clear();
             for (int side = 0; side < 6; side++) {
@@ -1173,16 +1173,16 @@ public final class Arsenal3Abilities {
             h.airToken = null;
             h.kind = kelium.core.HexKind.FORBIDDEN;
 
-            int debris = Math.min(enemyTokens, MAX_DEBRIS);
-            if (debris > 0) {
-                Storage.addDebrisCapped(state, me, debris);
+            int trophy = Math.min(enemyTokens, MAX_TROPHY);
+            if (trophy > 0) {
+                Storage.addTrophyCapped(state, me, trophy);
             }
             return true;
         }
 
         @Override public Hint hint() {
             return new Hint(Bottleneck.TROPHY, 3.0, Horizon.REST_OF_GAME, null,
-                "выжечь гекс и снять обломки с чужих жетонов", false);
+                "выжечь гекс и снять трофеи с чужих жетонов", false);
         }
     }
 
@@ -1220,17 +1220,17 @@ public final class Arsenal3Abilities {
     // ==================================================================
 
     /**
-     * «Трофейный сейф»: +2 ячейки склада, но ТОЛЬКО под обломки.
+     * «Трофейный сейф»: +2 ячейки склада, но ТОЛЬКО под уничтоженные жетоны.
      *
      * <p>Заметка предлагала «три кубика сверх обычного места на любых ячейках» —
-     * дизайнер свёл к простому и печатаемому: две ячейки, только обломки, и
+     * дизайнер свёл к простому и печатаемому: две ячейки, только трофеи, и
      * больше ничего. Смысл: не терять накопленное на дорогой шаг науки к концу
      * раунда.
      */
-    private static final class DebrisCellsPlus2 implements Ability {
+    private static final class TrophyCellsPlus2 implements Ability {
 
         @Override public String id() {
-            return "debris_cells_plus2";
+            return "trophy_cells_plus2";
         }
 
         @Override public Trigger trigger() {
@@ -1242,15 +1242,15 @@ public final class Arsenal3Abilities {
         }
 
         @Override public void modify(RuleQuery q) {
-            if (Resource.DEBRIS.equals(q.subject())
-                    || "debris".equals(String.valueOf(q.subject()))) {
+            if (Resource.TROPHY.equals(q.subject())
+                    || "trophy".equals(String.valueOf(q.subject()))) {
                 q.add(2).by(id());
             }
         }
 
         @Override public Hint hint() {
             return new Hint(Bottleneck.KELIUM, 1.2, Horizon.REST_OF_GAME, null,
-                "обломки доживают до дорогого шага науки", false);
+                "трофеи доживают до дорогого шага науки", false);
         }
     }
 
@@ -1261,7 +1261,7 @@ public final class Arsenal3Abilities {
     /**
      * sa1 «Гвардия «Кель»» — супер-пехота: СПЕЦ (1 БПР) сносит здание
      * противника прямо на своём гексе, без боя и без ответки, и забирает его
-     * в трофеи. ЦУ обрабатывается тем же путём, что и в обычном бою
+     * на место уничтоженных жетонов. ЦУ обрабатывается тем же путём, что и в обычном бою
      * ({@link kelium.engine.CombatResolver#destroy}) — жетон уничтожения ЦУ, компенсация
      * контейнерами, проверка военной победы. Скорость 2 — печатная
      * характеристика жетона, см. {@link kelium.engine.Speed#of(GameState,

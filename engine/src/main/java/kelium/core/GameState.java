@@ -55,7 +55,7 @@ public final class GameState {
      * <p>Флаг одноразовый: Обновление, пропустив передачу, сразу его снимает.
      */
     public boolean firstPlayerHeld = false;
-    public String marketActive = null;        // id активной карты маркета
+    public String marketActive = null;        // id активной карты рынка
     // Карты супер-арсенала, выложенные В ОТКРЫТУЮ на вершинах треков при
     // подготовке: {trackId -> cardId}. Забираются на шаге 4 (по одной).
     public final Map<String, String> superArsenalOffer = new java.util.HashMap<>();
@@ -81,6 +81,15 @@ public final class GameState {
     public boolean finished = false;
     public Integer winner = null;
     public String winCondition = null;
+    /**
+     * СКОЛЬКО ИСТОЧНИКОВ КЕЛЕМИЯ ОСТАЛОСЬ, когда партия кончилась по ним, и при
+     * каком пороге свода. Нужны, чтобы подпись конца не врала: при пороге выше
+     * единицы келемий на поле ещё ЕСТЬ, а партия уже кончилась (жалоба
+     * дизайнера 02.09.2026 — «пишется, что кончился келемий, а на поле два
+     * тайла»). −1 означает «партия кончилась не по келемию».
+     */
+    public int spawnLeftAtEnd = -1;
+    public int spawnThreshold = -1;
 
     // Служебные объекты движка (привязываются в GameEngine.run()).
     /**
@@ -144,9 +153,9 @@ public final class GameState {
         // Второй проход: трофейное пространство держит ЧУЖИЕ жетоны — берём их
         // копии из общего реестра по uid, чтобы объект был ровно один.
         for (int i = 0; i < players.size(); i++) {
-            for (Token t : players.get(i).trophySpace) {
+            for (Token t : players.get(i).destroyedTokens) {
                 Token c = registry.get(t.uid());
-                ps.get(i).trophySpace.add(c != null ? c : t);
+                ps.get(i).destroyedTokens.add(c != null ? c : t);
             }
         }
         Map<String, Deck> dk = new HashMap<>();
@@ -173,6 +182,8 @@ public final class GameState {
         s.finished = finished;
         s.winner = winner;
         s.winCondition = winCondition;
+        s.spawnLeftAtEnd = spawnLeftAtEnd;
+        s.spawnThreshold = spawnThreshold;
         s.journal = journal == null ? null : journal.copy();
         return s;
     }
@@ -245,6 +256,8 @@ public final class GameState {
         finished = fresh.finished;
         winner = fresh.winner;
         winCondition = fresh.winCondition;
+        spawnLeftAtEnd = fresh.spawnLeftAtEnd;
+        spawnThreshold = fresh.spawnThreshold;
         journal = fresh.journal;
         rng.setSeed(pinnedSeed);
     }

@@ -43,12 +43,12 @@ class ReplayRecordNewFieldsRoundTripTest {
         p.shieldedKinds.add("infantry");
         p.shieldedKinds.add("tank");
 
-        ReplayRecord.TrophyToken held = new ReplayRecord.TrophyToken();
+        ReplayRecord.DestroyedToken held = new ReplayRecord.DestroyedToken();
         held.uid = 42;
         held.owner = 1;
         held.type = "infantry";
         held.value = 1;
-        p.trophyHeld.add(held);
+        p.destroyedHeld.add(held);
 
         snap.players.add(p);
         ReplayRecord.Frame f = new ReplayRecord.Frame();
@@ -72,11 +72,11 @@ class ReplayRecordNewFieldsRoundTripTest {
 
             assertEquals(java.util.List.of("infantry", "tank"), q.shieldedKinds);
 
-            assertEquals(1, q.trophyHeld.size());
-            assertEquals(42, q.trophyHeld.get(0).uid);
-            assertEquals(1, q.trophyHeld.get(0).owner);
-            assertEquals("infantry", q.trophyHeld.get(0).type);
-            assertEquals(1, q.trophyHeld.get(0).value);
+            assertEquals(1, q.destroyedHeld.size());
+            assertEquals(42, q.destroyedHeld.get(0).uid);
+            assertEquals(1, q.destroyedHeld.get(0).owner);
+            assertEquals("infantry", q.destroyedHeld.get(0).type);
+            assertEquals(1, q.destroyedHeld.get(0).value);
         } finally {
             Files.deleteIfExists(file);
         }

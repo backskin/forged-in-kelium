@@ -151,8 +151,8 @@ public final class CardBench {
         return ресурс(seat, Resource.KELIUM, n);
     }
 
-    public CardBench обломки(int seat, int n) {
-        return ресурс(seat, Resource.DEBRIS, n);
+    public CardBench трофеи(int seat, int n) {
+        return ресурс(seat, Resource.TROPHY, n);
     }
 
     /** Ровно {@code n} этого ресурса в хранилище, не «плюс n». */
@@ -264,19 +264,19 @@ public final class CardBench {
     private BuildingToken последнееЗдание;
     private UnitToken последнееВойско;
 
-    /** Положить в трофейное место игрока жетон войска противника. */
+    /** Положить в место уничтоженных жетонов игрока жетон войска противника. */
     public CardBench трофейВойско(int seat, int чей, UnitType type) {
         PlayerState жертва = s.player(чей);
         UnitToken u = s.tokenStats.makeUnit(type, чей, ++uid, жертва.unitsOfKind(type));
-        s.player(seat).trophySpace.add(u);
+        s.player(seat).destroyedTokens.add(u);
         return this;
     }
 
-    /** Положить в трофейное место игрока здание противника. */
+    /** Положить в место уничтоженных жетонов игрока здание противника. */
     public CardBench трофейЗдание(int seat, int чей, BuildingType type) {
         BuildingToken b = s.tokenStats.makeBuilding(type, чей, ++uid,
             type == BuildingType.MINER || type == BuildingType.POWER_PLANT ? 1 : null);
-        s.player(seat).trophySpace.add(b);
+        s.player(seat).destroyedTokens.add(b);
         return this;
     }
 

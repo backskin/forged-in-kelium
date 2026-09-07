@@ -35,7 +35,14 @@ import kelium.engine.Symbols;
  */
 class SuperObjectives2Test {
 
-    private static final String RULES = GameConfig.DEFAULT_RULESET;
+    /**
+     * СВОД С ПРОВЕРЯЕМЫМ РЕЖИМОМ («выбор карты из двух», mode: super). В
+     * действующем своде режим другой — solo6, «одна карта втайне»: там игроку
+     * раздают ОДНУ карту, и предложения на выбор не бывает вовсе. Сторож режима
+     * обязан называть свод сам, иначе он падает не от поломки, а от того, что
+     * дизайнер сменил режим.
+     */
+    private static final String RULES = "1.26.0";
 
     private static GameState game(int players, long seed) {
         return Setup.buildGame(GameConfig.buildCached(RULES, players, seed, null, null));

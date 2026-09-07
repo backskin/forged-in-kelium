@@ -57,7 +57,7 @@ arsenal:
      bottom: {kind: POST, passive: objective_hand_plus1, label: "POST: предел руки заданий +1"},
      описание: "Больше заданий на руке — больше шансов, что условие совпадёт с тем, что вы и так делаете."}
   - {id: as8, name: "Изыскатели", kind: starting,
-     top: {effect: gain, params: {debris: 3}, label: "3 трофея"},
+     top: {effect: gain, params: {trophy: 3}, label: "3 трофея"},
      bottom: {kind: POST, passive: science_first_step_discount, label: "POST: первый шаг Науки дешевле"},
      описание: "Наука — половина всех очков в партии, а первый шаг каждого действия дешевле на трофей."}
 

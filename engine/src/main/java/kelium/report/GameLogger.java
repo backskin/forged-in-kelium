@@ -32,7 +32,7 @@ public final class GameLogger {
     private static final Map<String, String> ACTIONS_RU = Map.of(
         "assembly", "Снаряжение", "mining", "Добыча", "build", "Стройка",
         "energy_swap", "Смена энергии", "movement", "Движение", "combat", "Бой",
-        "market", "Маркет", "science", "Наука");
+        "market", "Рынок", "science", "Наука");
     private static final Map<String, String> ORDERS_RU = Map.of(
         "development", "Разработка", "infrastructure", "Инфраструктура",
         "operation", "Операция", "acquisitions", "Приобретения");
@@ -187,7 +187,7 @@ public final class GameLogger {
                     line("\n--- " + (ru ? "РАУНД" : "ROUND") + " " + event.get("round") + "  "
                         + (ru ? "первый игрок" : "first_player") + "=" + seat(event.get("first_player")) + " ---");
                 }
-                line("    " + (ru ? "карта маркета" : "market card") + ": " + state.marketActive);
+                line("    " + (ru ? "карта рынка" : "market card") + ": " + state.marketActive);
                 writeSnapshot(false);
             }
             case "blind_discard" -> {
@@ -203,7 +203,7 @@ public final class GameLogger {
                     }
                 }
                 String heading = ru
-                    ? "слепой сброс (под трофеи каждый отложил): "
+                    ? "слепой сброс (под уничтоженные жетоны каждый отложил): "
                     : "blind discard (each set aside for trophies): ";
                 line("    [" + heading + (sb.length() > 0 ? sb : (ru ? "нет" : "none")) + "]");
             }
@@ -245,7 +245,7 @@ public final class GameLogger {
             case "raze_neutral" -> line("      " + (ru ? "снос нейтральной постройки" : "razed neutral")
                 + (Boolean.TRUE.equals(event.get("big")) ? (ru ? " (большой)" : " (big)") : "")
                 + " @ " + event.get("target") + " (" + seat(event.get("seat")) + ") +"
-                + event.getOrDefault("debris", 1) + (ru ? "обломок " : "debris ")
+                + event.getOrDefault("trophy", 1) + (ru ? "трофей " : "trophy ")
                 + "+" + event.getOrDefault("containers", 1) + (ru ? "контейнер" : "cont"));
             case "damage_neutral" -> line("      " + (ru ? "урон нейтралу" : "damaged neutral")
                 + " @ " + event.get("target") + " (" + seat(event.get("seat")) + "), "
@@ -342,9 +342,9 @@ public final class GameLogger {
 
     private String fmtRes(Resources r) {
         if (ru) {
-            return "мон=" + r.coin() + " кел=" + r.kelium() + " бпр=" + r.ammo() + " обл=" + r.debris();
+            return "мон=" + r.coin() + " кел=" + r.kelium() + " бпр=" + r.ammo() + " обл=" + r.trophy();
         }
-        return "coin=" + r.coin() + " kel=" + r.kelium() + " ammo=" + r.ammo() + " debris=" + r.debris();
+        return "coin=" + r.coin() + " kel=" + r.kelium() + " ammo=" + r.ammo() + " trophy=" + r.trophy();
     }
 
     /** Уникальное имя файла лога на партию: игроки + сид + метка времени. */

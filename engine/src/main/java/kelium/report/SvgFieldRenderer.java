@@ -288,9 +288,9 @@ public final class SvgFieldRenderer {
 
         List<String> lines = new ArrayList<>();
         lines.add(String.format(Locale.ROOT,
-            "монеты %d · келемий %d · БП %d · обломки %d (трофеев %d)",
+            "монеты %d · келемий %d · БП %d · трофеи %d (трофеев %d)",
             p.resources.coin(), p.resources.kelium(), p.resources.ammo(),
-            p.resources.debris(), p.trophySpace.size()));
+            p.resources.trophy(), p.destroyedTokens.size()));
         lines.add(String.format(Locale.ROOT,
             "контейнеры %d · рука: заданий %d, арсенала %d · установлено арс. %d",
             p.containers, p.objectiveHand.size(), p.arsenalHand.size(),

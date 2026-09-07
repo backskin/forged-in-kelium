@@ -118,7 +118,7 @@ public final class ExchangeProbe {
             moveModuleTaken, 100.0 * moveModuleTaken / Math.max(1, scienceActions),
             trophyToCoinTaken, 100.0 * trophyToCoinTaken / Math.max(1, scienceActions)));
         sb.append(String.format(Locale.ROOT,
-            "%nДействий Маркет сыграно: %d (%.2f за партию), сделок всего %d (%.2f за действие)%n",
+            "%nДействий Рынок сыграно: %d (%.2f за партию), сделок всего %d (%.2f за действие)%n",
             marketActions, marketActions / (double) games,
             marketDeals, marketDeals / (double) Math.max(1, marketActions)));
         sb.append(String.format(Locale.ROOT,
@@ -128,7 +128,7 @@ public final class ExchangeProbe {
         String report = sb.toString();
         System.out.println();
         System.out.println(report);
-        Path out = Path.of("reports", "balance", "обмены-наука-маркет-" + players + "p.md");
+        Path out = Path.of("reports", "balance", "обмены-наука-рынок-" + players + "p.md");
         try {
             Files.createDirectories(out.getParent());
             Files.writeString(out, report, java.nio.charset.StandardCharsets.UTF_8);

@@ -32,10 +32,12 @@ class TechStepOnePrizeTest {
         Ruleset rs = Ctx.rules(Fix.game());
         assertEquals(List.of(3, 3, 2, 1), rs.stepCapacity(4),
             "вчетвером открыты все ячейки всех шагов");
-        assertEquals(List.of(2, 2, 2, 1), rs.stepCapacity(3),
-            "втроём закрыты третьи ячейки шагов 1 и 2");
-        assertEquals(List.of(2, 1, 1, 1), rs.stepCapacity(2),
-            "вдвоём открыты только ячейки без пометки состава");
+        // Последняя ячейка шагов 1, 2 и 3 открыта ТОЛЬКО вчетвером, поэтому
+        // вдвоём и втроём состав ячеек одинаковый: 2/2/1/1.
+        assertEquals(List.of(2, 2, 1, 1), rs.stepCapacity(3),
+            "втроём закрыты последние ячейки шагов 1, 2 и 3");
+        assertEquals(List.of(2, 2, 1, 1), rs.stepCapacity(2),
+            "вдвоём открыты те же ячейки, что и втроём");
     }
 
     /** Трек красных модулей: 3 боеприпаса на первой ячейке, 1 на второй. */

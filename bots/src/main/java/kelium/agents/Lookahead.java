@@ -205,7 +205,7 @@ public final class Lookahead {
      *
      * <p>Почему нельзя оценивать действие ПРОСТО по росту оценки позиции. Проверено
      * на лиге: так бот становится слабее. Любое ВЛОЖЕНИЕ — Стройка (минус монеты),
-     * Маркет (минус келемий) — на один шаг вперёд выглядит убытком, и бот
+     * Рынок (минус келемий) — на один шаг вперёд выглядит убытком, и бот
      * перестаёт строить и продавать, то есть перестаёт развиваться. Отличить
      * вложение от растраты можно только доиграв партию, поэтому глубокий режим
      * ({@code horizon > 0}) именно это и делает.
@@ -267,8 +267,8 @@ public final class Lookahead {
         h = mix(h, p.resources.coin());
         h = mix(h, p.resources.kelium());
         h = mix(h, p.resources.ammo());
-        h = mix(h, p.resources.debris());
-        h = mix(h, p.trophySpacePoints());
+        h = mix(h, p.resources.trophy());
+        h = mix(h, p.destroyedValue());
         h = mix(h, p.containers);
         h = mix(h, p.objectiveHand.size());
         h = mix(h, p.arsenalHand.size());

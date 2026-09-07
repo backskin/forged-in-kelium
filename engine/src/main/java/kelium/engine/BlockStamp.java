@@ -67,7 +67,16 @@ public final class BlockStamp {
         }
     }
 
-    private static List<Face> cache;
+    /**
+     * КЭШ ПО ВЕРСИИ НАБОРА. Раньше кэш был один: набор считался единственным и
+     * прибит был к 1.4.0. С эталонным набором 4.0.0 версий стало две (старые
+     * своды продолжают играть 1.4.0), и один кэш отдавал бы чужой картон.
+     */
+    private static final java.util.Map<String, List<Face>> cache =
+        new java.util.HashMap<>();
+
+    /** Набор, который читают своды БЕЗ ключа content_versions.blocks. */
+    public static final String ВЕРСИЯ_ПО_УМОЛЧАНИЮ = "1.4.0";
 
     /**
      * Прочитать набор блоков. Файл лежит рядом с прочими данными игры
@@ -75,12 +84,21 @@ public final class BlockStamp {
      * печатной разметки, а не падаем.
      */
     @SuppressWarnings("unchecked")
-    public static synchronized List<Face> faces(Path dataRoot) {
-        if (cache != null) {
-            return cache;
+    public static List<Face> faces(Path dataRoot) {
+        return faces(dataRoot, ВЕРСИЯ_ПО_УМОЛЧАНИЮ);
+    }
+
+    /** Тот же набор, но названной версии: {@code blocks.<версия>.yaml}. */
+    @SuppressWarnings("unchecked")
+    public static synchronized List<Face> faces(Path dataRoot, String версия) {
+        String v = версия == null || версия.isBlank() ? ВЕРСИЯ_ПО_УМОЛЧАНИЮ : версия;
+        List<Face> готово = cache.get(v);
+        if (готово != null) {
+            return готово;
         }
         List<Face> out = new ArrayList<>();
-        Path p = dataRoot == null ? null : dataRoot.resolve("blocks").resolve("blocks.1.4.0.yaml");
+        Path p = dataRoot == null ? null
+            : dataRoot.resolve("blocks").resolve("blocks." + v + ".yaml");
         if (p != null && Files.exists(p)) {
             try (InputStream in = Files.newInputStream(p)) {
                 Map<String, Object> doc = new org.yaml.snakeyaml.Yaml().load(in);
@@ -107,8 +125,8 @@ public final class BlockStamp {
                 out.clear();
             }
         }
-        cache = out;
-        return cache;
+        cache.put(v, List.copyOf(out));
+        return cache.get(v);
     }
 
     /**
@@ -129,7 +147,11 @@ public final class BlockStamp {
             }
         }
 
-        List<Face> all = faces(dataRoot);
+        // ВЕРСИЯ НАБОРА — ИЗ СВОДА, как у всякого прочего содержимого. Своды без
+        // этого ключа читают 1.4.0 и играются в точности как играли.
+        String версия = rules == null ? ВЕРСИЯ_ПО_УМОЛЧАНИЮ
+            : String.valueOf(rules.get("content_versions.blocks", ВЕРСИЯ_ПО_УМОЛЧАНИЮ));
+        List<Face> all = faces(dataRoot, версия);
         if (all.isEmpty()) {
             // Набора блоков нет — печати не будет вовсе. Разыгрывать жёлтые
             // ячейки самим тут нельзя: они напечатаны на том же картоне, что и
@@ -219,7 +241,7 @@ public final class BlockStamp {
 
     /** Сбросить кэш набора блоков (для тестов). */
     public static synchronized void resetCache() {
-        cache = null;
+        cache.clear();
     }
 
     /** Сводка по полю: сколько печатных контейнеров и сколько из них воздушных. */

@@ -26,8 +26,15 @@ import kelium.core.Choice;
 import kelium.dataio.Ctx;
 
 /**
- * Разрешение боя — по документу «Бой — полные правила». Порт из
- * forge/engine/combat.py.
+ * Разрешение боя.
+ *
+ * <p>ВНИМАНИЕ: ЭТО ПРЕЖНЯЯ МОДЕЛЬ БОЯ. Дизайнер 04.09.2026 решил, что бой
+ * играется КАК ДВИЖЕНИЕ: выбери один свой гекс — войска в нём атакуют даром,
+ * дальше вводи любые свои жетоны с любых гексов по боеприпасу за жетон, и
+ * КАЖДЫЙ ЖЕТОН ВЫБИРАЕТ СВОЮ ЦЕЛЬ. Здесь пока играется старое: один гекс-цель
+ * на всю битву и надбавка за право следующего боя. Разбор расхождения и что
+ * надо переписать — в {@code docs/РАСХОЖДЕНИЯ — свод против документов.md};
+ * действующие правила стола — в {@code rules/РУЛБУК — Кристаллы Раздора.md}.
  *
  * <p>Процедура из 6 шагов: выбрать свой гекс с юнитом -> выбрать один смежный
  * гекс-цель -> выбрать атакующие юниты -> разрешать атаки по одной (платить
@@ -434,7 +441,7 @@ public final class CombatResolver {
             if (u.hexId == null || !u.alive()) {
                 continue;
             }
-            for (String target : s.field.neighbors(u.hexId)) {
+            for (String target : targetHexesFrom(u.hexId)) {
                 if (!validTarget(target, attackerSeat, null)
                         || !Passability.canShootAcross(s, u, target)) {
                     continue;   // между гексами стена — этот жетон не достаёт
@@ -506,7 +513,7 @@ public final class CombatResolver {
             // ровно то, чего он не пробивает. Поэтому canAttack, а не соседство.
             boolean hadShot = false;
             for (String h : srcSet) {
-                for (String n : s.field.neighbors(h)) {
+                for (String n : targetHexesFrom(h)) {
                     if (validTarget(n, attackerSeat, restrictTargetOwner)
                             && canAttack(attackerSeat, h, n)) {
                         hadShot = true;
@@ -540,7 +547,7 @@ public final class CombatResolver {
             .of(s, attackerSeat, kelium.engine.ability.Hook.ATTACK_RANGE)
             .about(source).base(1).ask());
         List<String> targets = new ArrayList<>();
-        for (String h : s.field.neighbors(source)) {
+        for (String h : targetHexesFrom(source)) {
             if (validTarget(h, attackerSeat, restrictTargetOwner)
                     && anyCanShootAcross(attackerSeat, source, h)) {
                 targets.add(h);
@@ -689,10 +696,10 @@ public final class CombatResolver {
                     nh.freeSidesByToken(nb.uid);   // §12.3: стенки нейтрала освобождаются
                     int tro = nb.trophyReward();
                     int con = nb.containerReward();
-                    Storage.addDebrisCapped(s, p, tro);
+                    Storage.addTrophyCapped(s, p, tro);
                     Storage.addContainersCapped(s, p, con, "снос нейтрала");
                     emit("type", "raze_neutral", "seat", attackerSeat, "target", target,
-                        "debris", tro, "containers", con,
+                        "trophy", tro, "containers", con,
                         "big", Boolean.valueOf(nb.big),
                         "left", nh.neutrals.size());
                     journal().of(attackerSeat).neutralsRazed += 1;   // o22 «Зачистка»
@@ -791,7 +798,7 @@ public final class CombatResolver {
                 // o21 «Первая кровь» 10.0: усиление платит за толстую цель.
                 af.maxDestroyedHp = Math.max(af.maxDestroyedHp, Passives.effectiveHp(s, victim));
             }
-            // ТРОФЕЙНЫЕ ОЧКИ убитого — в событие: без этого поля трофейную
+            // ТРОФЕИ убитого — в событие: без этого поля трофейную
             // экономику нечем мерить, а она половина смысла боя. Ценность
             // напечатана на КОНКРЕТНОМ жетоне (у пехоты четвёртый жетон стоит 2 ТО,
             // у техники и авиации — два жетона из четырёх).
@@ -969,7 +976,7 @@ public final class CombatResolver {
      */
     public double attackableValue(int attackerSeat, String source) {
         double v = 0;
-        for (String nb : state.field.neighbors(source)) {
+        for (String nb : targetHexesFrom(source)) {
             if (!validTarget(nb, attackerSeat, null) || !canAttack(attackerSeat, source, nb)) {
                 continue;
             }
@@ -986,6 +993,20 @@ public final class CombatResolver {
             }
         }
         return v;
+    }
+
+    /**
+     * ГЕКСЫ-ЦЕЛИ ДЛЯ БОЯ ИЗ {@code source}: сам гекс и его соседи.
+     *
+     * <p>Правило дизайнера 04.09.2026: целью боя может быть сам выбранный гекс —
+     * жетоны разных игроков стоят на одном гексе и стреляют друг в друга. Свой
+     * гекс идёт ПЕРВЫМ, чтобы бой в упор не терялся в хвосте меню.
+     */
+    private List<String> targetHexesFrom(String source) {
+        List<String> out = new ArrayList<>();
+        out.add(source);
+        out.addAll(state.field.neighbors(source));
+        return out;
     }
 
     private boolean validTarget(String hx, int attackerSeat, Integer restrictOwner) {
@@ -1087,7 +1108,7 @@ public final class CombatResolver {
      * пережила попадание — и СРАЗУ ПОСЛЕ БОЯ уходит владельцу в запас.
      *
      * <p>Карта не спасает здание, а меняет ФОРМУ его потери. Без щита такое
-     * здание сносится с одного удара, идёт атакующему в трофеи и приносит ему
+     * здание сносится с одного удара, идёт атакующему на место уничтоженных жетонов и приносит ему
      * очки; со щитом атакующий тратит боеприпас и не получает ничего, а
      * владелец теряет постройку и место на поле. Это и есть та формулировка,
      * которую просил дизайнер вместо прежнего безусловного «+1 всем зданиям».
@@ -1100,6 +1121,22 @@ public final class CombatResolver {
         for (int owner : owners) {
             if (owner < 0 || owner >= state.numPlayers()) {
                 continue;
+            }
+            // РАНЕНАЯ ПЕХОТА УХОДИТ В ЗАПАС (арсенал 5.0): карта даёт пехоте
+            // пережить удар, но не остаться на месте. Проверяется здесь же, где
+            // и щит экономики: событие одно - конец боя.
+            if (Passives.hasPassive(state, owner, "infantry_hp2_returns_on_damage")) {
+                PlayerState ip = state.player(owner);
+                for (UnitToken u : new java.util.ArrayList<>(ip.unitsOnField())) {
+                    if (u.type != UnitType.INFANTRY || u.damage <= 0) {
+                        continue;
+                    }
+                    u.hexId = null;
+                    u.resetDamage();
+                    emit("type", "ability_reaction", "seat", owner,
+                        "ability", "infantry_hp2_returns_on_damage",
+                        "returned_unit", u.type.code);
+                }
             }
             if (!Passives.hasPassive(state, owner, "economy_plus1_hp_returns_on_damage")) {
                 continue;
@@ -1235,7 +1272,7 @@ public final class CombatResolver {
 
     /**
      * Уничтожить жертву: ЦУ обрабатывается отдельно, прочие переходят на
-     * трофейное поле убийцы; владельцу зданий выдаётся компенсация контейнерами,
+     * место уничтоженных жетонов убийцы; владельцу зданий выдаётся компенсация контейнерами,
      * уничтожение энергостанции снимает выданную ею энергию; применяются пассивы
      * арсенала (доп. боеприпас/ТО за убийство).
      */
@@ -1269,6 +1306,22 @@ public final class CombatResolver {
         if (victim instanceof BuildingToken bt && bt.type == BuildingType.COMMAND_CENTER) {
             destroyCu(bt, attackerSeat);
             return;
+        }
+
+        // КОНТЕЙНЕР ЗА ПОТЕРЮ ЗДАНИЯ (арсенал 5.0, «если твоё здание уничтожили
+        // — получи 1 контейнер из запаса»). Утешение владельцу, а не награда
+        // убийце: карта смотрит на потерю, а не на виновника, поэтому считается
+        // любое уничтожение своего здания — в том числе своим же ядерным
+        // ударом. ЦУ сюда не попадает: у него своя развязка (destroyCu).
+        if (victim instanceof BuildingToken потеря
+                && Passives.hasPassive(s, потеря.owner, "container_on_own_building_lost")) {
+            PlayerState хозяин = s.player(потеря.owner);
+            int взято = Storage.addContainersCapped(s, хозяин, 1);
+            if (взято > 0) {
+                emit("type", "ability_reaction", "seat", потеря.owner,
+                    "ability", "container_on_own_building_lost",
+                    "building", потеря.type.code, "containers", взято);
+            }
         }
 
         // Нарастающий счётчик уничтожений (в отличие от трофеев, он не сбрасывается
@@ -1311,10 +1364,10 @@ public final class CombatResolver {
 
         if (victim instanceof UnitToken ut) {
             ut.trophyValue = scaledUnitTrophy(attackerSeat, ut.type);
-            ut.setHexId(null);   // уходит в трофеи — и из здания, если был внутри
+            ut.setHexId(null);   // уходит на место уничтоженных жетонов — и из здания, если был внутри
             ut.damage = 0;
             ut.capturedBy = attackerSeat;
-            attacker.trophySpace.add(ut);
+            attacker.destroyedTokens.add(ut);
         } else {
             BuildingToken bt = (BuildingToken) victim;
             // Войско, стоявшее ВНУТРИ этого здания, теряет укрытие и остаётся на
@@ -1326,14 +1379,14 @@ public final class CombatResolver {
             bt.hexId = null;
             bt.damage = 0;
             bt.capturedBy = attackerSeat;
-            // K3: сначала вернуть кубики жетона на их источники (в трофеи
+            // K3: сначала вернуть кубики жетона на их источники (на место уничтоженных жетонов
             // жетон уезжает БЕЗ энергии), затем — если это источник — снять
             // его кубики со всех потребителей.
             returnConsumerEnergy(bt);
             if (bt.type == BuildingType.POWER_PLANT) {
                 removeSourceEnergy(bt.owner, bt.uid);
             }
-            attacker.trophySpace.add(bt);
+            attacker.destroyedTokens.add(bt);
             int comp = buildingCompensation(bt);
             if (comp > 0) {
                 Storage.addContainersCapped(s, s.player(bt.owner), comp,
@@ -1349,7 +1402,7 @@ public final class CombatResolver {
         }
         int bonusTrophy = Passives.bonusTrophyOnKill(s, attackerSeat);
         if (bonusTrophy > 0) {
-            Storage.addDebrisCapped(s, attacker, bonusTrophy);
+            Storage.addTrophyCapped(s, attacker, bonusTrophy);
         }
     }
 
@@ -1436,7 +1489,7 @@ public final class CombatResolver {
     private int scaledUnitTrophy(int attackerSeat, UnitType unitType) {
         List<Integer> vals = state.tokenStats.unitTrophyList(unitType);
         int already = 0;
-        for (Token t : state.player(attackerSeat).trophySpace) {
+        for (Token t : state.player(attackerSeat).destroyedTokens) {
             if (t instanceof UnitToken u && u.type == unitType) {
                 already++;
             }

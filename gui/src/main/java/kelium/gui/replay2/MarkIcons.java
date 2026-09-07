@@ -30,7 +30,7 @@ public final class MarkIcons {
      * Нарисовать значок с центром в {@code (cx, cy)}, вписанный в квадрат
      * {@code size × size}.
      *
-     * <p>Коды: {@code COIN, KELIUM, AMMO, TROPHY, DEBRIS, CONTAINER, BUILDING, UNIT,
+     * <p>Коды: {@code COIN, KELIUM, AMMO, TROPHY, TROPHY, CONTAINER, BUILDING, UNIT,
      * CARD, ARSENAL, SUPER, ORDER_DONE, ORDER_LEFT, UP, DOWN, SEAT}.
      */
     public static void paint(Graphics2D g, String code, double cx, double cy, double size,
@@ -108,8 +108,9 @@ public final class MarkIcons {
                 // разрезала патрон надвое, и значок читался как восклицательный знак.
                 g.setColor(colour);
             }
-            // ТРОФЕЙ — кубок: чаша и ножка
-            case "TROPHY" -> {
+            // УНИЧТОЖЕННЫЙ ЖЕТОН — кубок: чаша и ножка. Не трофей: трофей ниже,
+            // это чёрный кубик хранилища.
+            case "DESTROYED" -> {
                 Path2D cup = new Path2D.Double();
                 cup.moveTo(cx - r * 0.72, cy - r * 0.8);
                 cup.lineTo(cx + r * 0.72, cy - r * 0.8);
@@ -122,15 +123,15 @@ public final class MarkIcons {
                 g.fill(new RoundRectangle2D.Double(cx - r * 0.6, cy + r * 0.66, r * 1.2,
                     r * 0.3, r * 0.2, r * 0.2));
             }
-            // ОБЛОМОК — ЧЁРНЫЙ КВАДРАТ С ШЕСТЕРЁНКОЙ В ЦЕНТРЕ (эталон дизайнера).
-            // Цвета у него собственные, как у монеты: обломок узнаётся именно
+            // ТРОФЕЙ — ЧЁРНЫЙ КВАДРАТ С ШЕСТЕРЁНКОЙ В ЦЕНТРЕ (эталон дизайнера).
+            // Цвета у него собственные, как у монеты: трофей узнаётся именно
             // чёрным кубиком, а не цветом текста рядом. Корпус чёрный в обеих
             // темах — это и есть чёрный кубик со стола. А вот НУТРО И ОБВОДКА
             // зависят от темы: на тёмном фоне серая шестерёнка сливается с
             // подложкой, поэтому там она белая и обводка белая.
             // Зубцы — восемь трапеций по окружности; на 12 пикселях их ещё видно,
             // ниже значок читается как круг в квадрате, и это допустимо.
-            case "DEBRIS" -> {
+            case "TROPHY" -> {
                 Color body = new Color(0x14, 0x14, 0x14);
                 Color gear = Theme.isDark() ? Color.WHITE : new Color(0x9A, 0x9A, 0x9A);
                 g.setColor(body);

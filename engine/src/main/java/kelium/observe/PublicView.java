@@ -124,10 +124,10 @@ public final class PublicView {
         public int coin;
         public int kelium;
         public int ammo;
-        public int debris;
+        public int trophy;
         public int keliumCap;
         public int ammoCap;
-        public int debrisCap;
+        public int trophyCap;
         public int storeCap;
         /** Занятость ячеек склада: ячейка → что в ней лежит. */
         public final Map<String, String> storageCells = new LinkedHashMap<>();
@@ -135,15 +135,15 @@ public final class PublicView {
         public final List<String> storageTokens = new ArrayList<>();
 
         // --- трофеи ---
-        public int trophyTokens;
-        public int trophyPoints;
-        /** Трофейная карта: какие именно чужие жетоны на ней лежат. */
-        public final List<Map<String, Object>> trophyCard = new ArrayList<>();
+        public int destroyedCount;
+        public int destroyedValue;
+        /** Карта уничтоженных жетонов: какие именно чужие жетоны на ней лежат. */
+        public final List<Map<String, Object>> destroyedCard = new ArrayList<>();
         /**
          * Трофеи, ЗАДЕРЖАННЫЕ на карте «Трофейный склад» — лежат открыто и,
          * в отличие от трофейной карты, не вернутся владельцу в Возврат.
          */
-        public final List<Map<String, Object>> trophyHeld = new ArrayList<>();
+        public final List<Map<String, Object>> destroyedHeld = new ArrayList<>();
 
         // --- открыто лежащее на планшете ---
         /** Жетоны щита на строках родов войск (коды родов) — лежат открыто. */
@@ -156,6 +156,13 @@ public final class PublicView {
         // --- наука и модули ---
         /** Трек → достигнутый шаг. */
         public final Map<String, Integer> tech = new LinkedHashMap<>();
+        /**
+         * КУБИКИ НАУКИ В ЗАПАСЕ — публично. Кубики выкладываются на общую доску
+         * и остаются на ней навсегда, значит за столом видно, сколько их у
+         * каждого ещё осталось: это прямо говорит, сколько шагов науки соперник
+         * ещё может купить. −1 в сводах, где кубик один на трек.
+         */
+        public int techCubes = -1;
         public int redModules;
         public int blueModules;
         public int goldModules;
@@ -297,21 +304,21 @@ public final class PublicView {
         st.coin = p.coin;
         st.kelium = p.kelium;
         st.ammo = p.ammo;
-        st.debris = p.debris;
+        st.trophy = p.trophy;
         st.keliumCap = p.keliumCap;
         st.ammoCap = p.ammoCap;
-        st.debrisCap = p.debrisCap;
+        st.trophyCap = p.trophyCap;
         st.storeCap = p.storeCap;
         st.storageCells.putAll(p.storageCells);
         st.storageTokens.addAll(p.storageTokens);
 
-        st.trophyTokens = p.trophyTokens;
-        st.trophyPoints = p.trophyPoints;
-        for (ReplayRecord.TrophyToken t : p.trophyCard) {
-            st.trophyCard.add(trophyMap(t));
+        st.destroyedCount = p.destroyedCount;
+        st.destroyedValue = p.destroyedValue;
+        for (ReplayRecord.DestroyedToken t : p.destroyedCard) {
+            st.destroyedCard.add(destroyedMap(t));
         }
-        for (ReplayRecord.TrophyToken t : p.trophyHeld) {
-            st.trophyHeld.add(trophyMap(t));
+        for (ReplayRecord.DestroyedToken t : p.destroyedHeld) {
+            st.destroyedHeld.add(destroyedMap(t));
         }
 
         st.shieldedKinds.addAll(p.shieldedKinds);
@@ -323,6 +330,7 @@ public final class PublicView {
         }
 
         st.tech.putAll(p.tech);
+        st.techCubes = p.techCubes;
         st.redModules = p.redModules;
         st.blueModules = p.blueModules;
         st.goldModules = p.goldModules;
@@ -373,7 +381,7 @@ public final class PublicView {
         return st;
     }
 
-    private static Map<String, Object> trophyMap(ReplayRecord.TrophyToken t) {
+    private static Map<String, Object> destroyedMap(ReplayRecord.DestroyedToken t) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("uid", t.uid);
         m.put("owner", t.owner);
@@ -517,21 +525,22 @@ public final class PublicView {
         o.put("coin", st.coin);
         o.put("kelium", st.kelium);
         o.put("ammo", st.ammo);
-        o.put("debris", st.debris);
+        o.put("trophy", st.trophy);
         o.put("keliumCap", st.keliumCap);
         o.put("ammoCap", st.ammoCap);
-        o.put("debrisCap", st.debrisCap);
+        o.put("trophyCap", st.trophyCap);
         o.put("storeCap", st.storeCap);
         o.put("storageCells", st.storageCells);
         o.put("storageTokens", st.storageTokens);
-        o.put("trophyTokens", st.trophyTokens);
-        o.put("trophyPoints", st.trophyPoints);
-        o.put("trophyCard", st.trophyCard);
-        o.put("trophyHeld", st.trophyHeld);
+        o.put("destroyedCount", st.destroyedCount);
+        o.put("destroyedValue", st.destroyedValue);
+        o.put("destroyedCard", st.destroyedCard);
+        o.put("destroyedHeld", st.destroyedHeld);
         o.put("shieldedKinds", st.shieldedKinds);
         o.put("tuckedCount", st.tuckedCount);
         o.put("tuckedRevealed", st.tuckedRevealed);
         o.put("tech", st.tech);
+        o.put("techCubes", st.techCubes);
         o.put("redModules", st.redModules);
         o.put("blueModules", st.blueModules);
         o.put("goldModules", st.goldModules);

@@ -108,29 +108,9 @@ public final class RulesetDiff {
         return out;
     }
 
-    /** Сравнение версий: по числам, потом по пометке ветки. */
+    /** Сравнение версий — общий порядок программы, см. {@link kelium.dataio.VersionOrder}. */
     public static int compareVersions(String x, String y) {
-        String[] xs = x.split("-", 2);
-        String[] ys = y.split("-", 2);
-        String[] xn = xs[0].split("\\.");
-        String[] yn = ys[0].split("\\.");
-        for (int i = 0; i < Math.max(xn.length, yn.length); i++) {
-            int a = i < xn.length ? number(xn[i]) : 0;
-            int b = i < yn.length ? number(yn[i]) : 0;
-            if (a != b) {
-                return Integer.compare(a, b);
-            }
-        }
-        String xt = xs.length > 1 ? xs[1] : "";
-        String yt = ys.length > 1 ? ys[1] : "";
-        return xt.compareTo(yt);
+        return kelium.dataio.VersionOrder.compare(x, y);
     }
 
-    private static int number(String s) {
-        try {
-            return Integer.parseInt(s.trim());
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
 }

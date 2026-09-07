@@ -1,6 +1,7 @@
 package kelium;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -173,7 +174,11 @@ class MiningReachTest {
         assertEquals(coins, p.resources.coin(), "и монеты за это не списываются");
 
         // Право на доплату возвращает ровно одна карта арсенала.
-        p.arsenalInstalled.add("b20");
+        // ПО СПОСОБНОСТИ, А НЕ ПО НОМЕРУ: номер карты меняется с версией
+        // колоды (b20 в арсенале 3.0.0, a5_32 в 5.0.0), а проверяем мы правило.
+        String карта = kelium.support.Fix.картаСоСпособностью(s, "pay_energy_with_coin");
+        assertNotNull(карта, "в действующей колоде есть карта «Аварийное питание»");
+        p.arsenalInstalled.add(карта);
         assertTrue(mine(s, p) > 0, "с «Аварийным питанием» энергию можно докупить");
         assertTrue(p.resources.coin() < coins,
             "и монеты за это действительно списываются");

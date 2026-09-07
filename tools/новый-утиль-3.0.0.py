@@ -48,9 +48,9 @@ import sys
     "b07": ('{effect: gild_module, params: {pay: kelium, price: 1}, '
             'label: "улучши 1 жетон модуля за 1 келемий"',
             "Утиль золотит один разложенный жетон модуля за келемий."),
-    "b19": ('{effect: exchange_table, params: {from: debris, to: coin, table: [[1, 2], [2, 5]]}, '
-            'label: "обменяй 1 обломок на 2 монеты или 2 обломка на 5"',
-            "Утиль обменивает обломки на монеты по лестнице: один на две, два разом на пять."),
+    "b19": ('{effect: exchange_table, params: {from: trophy, to: coin, table: [[1, 2], [2, 5]]}, '
+            'label: "обменяй 1 трофей на 2 монеты или 2 трофея на 5"',
+            "Утиль обменивает трофеи на монеты по лестнице: один на две, два разом на пять."),
     "b20": ('{effect: gain, params: {coin: 5}, label: "5 монет"',
             "Утиль сразу приносит 5 монет."),
     "b21": ('{effect: steal_resource, params: {resource: kelium, max: 2}, '

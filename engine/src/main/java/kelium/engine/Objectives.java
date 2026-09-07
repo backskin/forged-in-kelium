@@ -91,7 +91,7 @@ public final class Objectives {
             case "trophies":
                 // o22 «Зачистка»: трофейные ЖЕТОНЫ возвращаются владельцам мимо
                 // Науки — очков они не приносят, в этом и цена.
-                return p.trophySpace.size();
+                return p.destroyedTokens.size();
             case "buildings_off_cu":
                 // o47 «Демонтаж»: своё здание уходит в запас БЕЗ компенсации
                 // (обычный снос даёт монету, здесь не даёт).
@@ -171,17 +171,17 @@ public final class Objectives {
                 }
             }
             case "trophies" -> {
-                // o22 «Зачистка»: сдаём трофейные жетоны ВЛАДЕЛЬЦАМ. Первым уходит
+                // o22 «Зачистка»: сдаём уничтоженные жетоны ВЛАДЕЛЬЦАМ. Первым уходит
                 // ЗДАНИЕ — карта требует именно его, и жадный «самый дешёвый»
                 // выбор здесь врал бы: он сдал бы пехоту, а здание осталось.
                 int left = amt;
                 List<kelium.core.Token> order = new ArrayList<>();
-                for (kelium.core.Token t : p.trophySpace) {
+                for (kelium.core.Token t : p.destroyedTokens) {
                     if (t instanceof kelium.core.BuildingToken) {
                         order.add(t);
                     }
                 }
-                for (kelium.core.Token t : p.trophySpace) {
+                for (kelium.core.Token t : p.destroyedTokens) {
                     if (!(t instanceof kelium.core.BuildingToken)) {
                         order.add(t);
                     }
@@ -190,7 +190,7 @@ public final class Objectives {
                     if (left == 0) {
                         break;
                     }
-                    p.trophySpace.remove(t);
+                    p.destroyedTokens.remove(t);
                     t.setCapturedBy(null);
                     t.resetDamage();
                     t.setHexId(null);
@@ -379,12 +379,12 @@ public final class Objectives {
                     int addedC = Storage.addContainersCapped(s, p, n, "награда задания");
                     into.merge("container", addedC, (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
                 }
-                // НАЧАЛЬНЫЕ ЗАДАНИЯ 10.0 платят обломком и картой задания, а
+                // НАЧАЛЬНЫЕ ЗАДАНИЯ 10.0 платят трофеем и картой задания, а
                 // усиления у них нет вовсе — значит эта награда лежит в БАЗОВОЙ и
                 // выдаваться должна отсюда.
-                case "debris" -> {
-                    int addedD = Storage.addDebrisCapped(s, p, n);
-                    into.merge("debris", addedD, (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
+                case "trophy" -> {
+                    int addedD = Storage.addTrophyCapped(s, p, n);
+                    into.merge("trophy", addedD, (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
                 }
                 case "objective_card", "objective_cards" -> {
                     int drawn = 0;
@@ -415,9 +415,9 @@ public final class Objectives {
                     int added = Storage.addKeliumCapped(s, p, n);
                     into.put("kelium", added);
                 }
-                case "debris" -> {
-                    int added = Storage.addDebrisCapped(s, p, n);
-                    into.put("debris", added);
+                case "trophy" -> {
+                    int added = Storage.addTrophyCapped(s, p, n);
+                    into.put("trophy", added);
                 }
                 case "module" -> {
                     // Жетоны-награды: attack -> красный (атака), остальное -> синий

@@ -27,9 +27,9 @@ public final class Names {
      *
      * <p>НАЙДЕНО 18.08.2026: словарь и {@link kelium.engine.Scoring} разошлись —
      * ключ {@code "trophy"} здесь стоял годами, а сам подсчёт очков ни разу его
-     * не выставлял (ресурс переименован в обломки, ключ разбивки — {@code
-     * "debris"}); плюс {@code objective_card_vp} и {@code arsenal_vp} появились в
-     * Scoring позже словаря. Из-за этого КАЖДАЯ партия с обломками или очками
+     * не выставлял (ресурс переименован на место уничтоженных жетонов, ключ разбивки — {@code
+     * "trophy"}); плюс {@code objective_card_vp} и {@code arsenal_vp} появились в
+     * Scoring позже словаря. Из-за этого КАЖДАЯ партия с трофеями или очками
      * задания/арсенала честно, но бесполезно писала в итогах «не описано».
      * Список сверен построчно с {@code Scoring.scorePlayer} — там, где строка
      * попадает в {@code breakdown}, здесь обязана быть подпись.
@@ -38,7 +38,7 @@ public final class Names {
         return switch (key) {
             case "kelium" -> "келемий";
             case "coins" -> "монеты";
-            case "debris" -> "обломки";
+            case "trophy" -> "трофеи";
             case "buildings_on_field" -> "здания";
             case "units_on_field" -> "войска";
             case "tech" -> "наука";
@@ -55,6 +55,9 @@ public final class Names {
             // Прямые очки с карты задания (CardContext.grantVp — редкий пункт vp
             // в данных карты, отдельно от обычной награды монетами/картами).
             case "objective_card_vp" -> "очки с карты задания";
+            // Супер-задание семейства «одна карта втайне»: в режиме 5.0 это
+            // накопитель, в 6.0 — множитель очков в финале.
+            case "super5_stockpile" -> "супер-задание";
             // Установленная (не сожжённая) карта арсенала со своим scoring-условием.
             case "arsenal_vp" -> "очки арсенала";
             case "total" -> "всего";
@@ -208,8 +211,41 @@ public final class Names {
         };
     }
 
+    /**
+     * КОНЕЦ ПО КЕЛЕМИЮ ЧЕСТНОЙ СТРОКОЙ. Порог «остался последний источник»
+     * задаётся сводом, и при пороге выше единицы келемий на поле ещё есть:
+     * подпись «кончился келемий» в этом случае врала (жалоба дизайнера
+     * 02.09.2026 — на поле оставалось два тайла). Поэтому, когда числа
+     * известны и порог не единица, они пишутся прямо в подпись.
+     *
+     * @param left      сколько источников осталось (−1 — неизвестно)
+     * @param threshold порог свода (−1 — неизвестен)
+     */
+    private static String келемий(int left, int threshold, boolean длинная) {
+        if (threshold > 1) {
+            String хвост = длинная ? " · победа по очкам" : "";
+            return "конец по келемию: источников осталось " + left
+                + " при пороге свода " + threshold + хвост;
+        }
+        return длинная
+            ? "конец по келемию: на поле остался последний тайл зарождения · победа по очкам"
+            : "кончился келемий на поле";
+    }
+
     /** Чем кончилась партия. */
     public static String condition(String code) {
+        return conditionShort(code);
+    }
+
+    /** Чем кончилась партия, с числами по келемию, если они известны. */
+    public static String condition(String code, int spawnLeft, int spawnThreshold) {
+        if ("last_spawn_tile".equals(code)) {
+            return келемий(spawnLeft, spawnThreshold, false);
+        }
+        return conditionShort(code);
+    }
+
+    private static String conditionShort(String code) {
         return switch (code == null ? "" : code) {
             case "victory_points" -> "по победным очкам";
             case "super_objective" -> "супер-заданием";
@@ -223,6 +259,18 @@ public final class Names {
 
     /** Чем кончилась партия — фразой для экрана итогов. */
     public static String conditionLong(String code) {
+        return conditionLongBase(code);
+    }
+
+    /** Фраза для экрана итогов, с числами по келемию, если они известны. */
+    public static String conditionLong(String code, int spawnLeft, int spawnThreshold) {
+        if ("last_spawn_tile".equals(code)) {
+            return келемий(spawnLeft, spawnThreshold, true);
+        }
+        return conditionLongBase(code);
+    }
+
+    private static String conditionLongBase(String code) {
         return switch (code == null ? "" : code) {
             case "victory_points" -> "победа по победным очкам";
             case "military" -> "ВОЕННАЯ победа: уничтожено второе ЦУ";
@@ -278,9 +326,9 @@ public final class Names {
             case "place_on_energy_cell" -> "поставить кубик в ячейку энергии";
             case "noop" -> "ничего не даёт";
             // ОБМЕНЫ НАУЧНОГО ОТДЕЛА: «отдал столько — получил столько».
-            case "give_trophy" -> "отдать обломков: " + v;
+            case "give_trophy" -> "отдать трофеев: " + v;
             case "get_coin" -> "получить монет: " + v;
-            case "trophy_to_coin" -> "обломки в монеты";
+            case "trophy_to_coin" -> "трофеи в монеты";
             case "move_module" -> "переставить модуль";
             case "draw_arsenal", "draw2_keep1" -> "взять две карты арсенала, оставить одну";
             case "gild_module" -> "озолотить модуль";

@@ -109,7 +109,8 @@ public final class BlockCatalogPanel extends JPanel {
         }
     }
 
-    private final Map<String, Version> versions = new TreeMap<>();
+    private final Map<String, Version> versions =
+        new TreeMap<>(kelium.dataio.VersionOrder.ASC);
     /**
      * ВЫБОР ПО КОМБИНАЦИИ ПАРАМЕТРОВ, А НЕ ПО ОДНОМУ СПИСКУ ВЕРСИЙ (заказ
      * дизайнера 18.08.2026). Версия набора блоков и так задаётся ДВУМЯ
@@ -149,22 +150,13 @@ public final class BlockCatalogPanel extends JPanel {
         top.add(энергияПикер);
         top.add(new JLabel("Версия:"));
         top.add(совпаденияПикер);
-        // Кнопка поворота — БЕЗ значка-эмодзи: эмодзи в Swing выводились
-        // пустыми квадратами (скриншот дизайнера 12.08.2026), текст надёжнее.
-        JButton повернутьКнопка = new JButton("Повернуть на 60°");
-        повернутьКнопка.setToolTipText("<html><div style='width:280px'>"
-            + "<b>Повернуть все блоки</b><br>"
-            + "Каждое нажатие поворачивает ВСЕ стороны всех блоков на 60° "
-            + "по часовой стрелке — и малые, и большие разом.<br>"
-            + "Ячейки контейнеров и жёлтые ячейки поворачиваются вместе с "
-            + "гексами. Шесть нажатий — полный круг.<br>"
-            + "<i>Только показ: файлы версий не меняются.</i></div></html>");
-        повернутьКнопка.setFocusPainted(false);
-        повернутьКнопка.addActionListener(e -> {
-            поворот = (поворот + 1) % 6;
-            плитка.поворот(поворот);
-        });
-        top.add(повернутьКнопка);
+        // ДВЕ КНОПКИ ПОВОРОТА, В ОБЕ СТОРОНЫ (просьба дизайнера 07.09.2026).
+        // Одной кнопки «на 60° по часовой» мало: чтобы вернуться на один шаг
+        // назад, приходилось нажимать пять раз. Значки — круговые стрелки,
+        // нарисованные Graphics2D: эмодзи в Swing выводятся пустыми квадратами
+        // (скриншот дизайнера 12.08.2026), поэтому их в проекте нет вовсе.
+        top.add(кнопкаПоворота(false));
+        top.add(кнопкаПоворота(true));
         add(top, java.awt.BorderLayout.NORTH);
 
         // ПЛИТКА ДВЕ В ШИРИНУ, ПРОЛИСТЫВАНИЕ ВНИЗ (просьба дизайнера 31.08.2026).
@@ -214,6 +206,28 @@ public final class BlockCatalogPanel extends JPanel {
      * Пересобрать список энергии под выбранные контейнеры — и только из тех
      * значений, которые с ними встречаются в данных.
      */
+    /** Кнопка поворота показа на 60° в одну сторону. */
+    private JButton кнопкаПоворота(boolean поЧасовой) {
+        JButton b = new JButton(new ЗначокПоворота(поЧасовой));
+        b.setToolTipText("<html><div style='width:280px'>"
+            + "<b>Повернуть все блоки " + (поЧасовой ? "по часовой" : "против часовой")
+            + "</b><br>"
+            + "Каждое нажатие поворачивает ВСЕ стороны всех блоков на 60° — и "
+            + "малые, и большие разом.<br>"
+            + "Ячейки контейнеров и жёлтые ячейки поворачиваются вместе с "
+            + "гексами. Шесть нажатий — полный круг.<br>"
+            + "<i>Только показ: файлы версий не меняются.</i></div></html>");
+        b.setFocusPainted(false);
+        b.putClientProperty("JButton.buttonType", "square");
+        int сторона = Theme.px(26);
+        b.setPreferredSize(new java.awt.Dimension(сторона, сторона));
+        b.addActionListener(e -> {
+            поворот = (поворот + (поЧасовой ? 1 : 5)) % 6;
+            плитка.поворот(поворот);
+        });
+        return b;
+    }
+
     private void обновитьЭнергию() {
         if (обновляюсь) {
             return;
@@ -297,7 +311,10 @@ public final class BlockCatalogPanel extends JPanel {
         }
         try (var stream = Files.list(dir)) {
             for (Path f : stream.filter(p -> p.getFileName().toString().startsWith("blocks.")
-                    && p.getFileName().toString().endsWith(".yaml")).sorted().toList()) {
+                    && p.getFileName().toString().endsWith(".yaml"))
+                    .sorted((a, b) -> kelium.dataio.VersionOrder.compare(
+                        a.getFileName().toString(), b.getFileName().toString()))
+                    .toList()) {
                 Map<String, Object> doc;
                 try (var in = Files.newInputStream(f)) {
                     doc = new org.yaml.snakeyaml.Yaml().load(in);

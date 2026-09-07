@@ -558,7 +558,7 @@ public class HeuristicAgent extends Agent {
             };
             // Оплата трофеями (K5): минимизируем сгорающий излишек — жетон,
             // который покрывает остаток с наименьшей переплатой; иначе крупный.
-            case "trophy_pay" -> (s, o) -> {
+            case "destroyed_pay" -> (s, o) -> {
                 int remaining = ctx != null && ctx.get("remaining") instanceof Number n
                     ? n.intValue() : 1;
                 int v = ((kelium.core.Token) o.payload()).trophyValue();
@@ -593,7 +593,6 @@ public class HeuristicAgent extends Agent {
             // не бесплатное по смыслу: карта арсенала уходит из руки, контейнер
             // не будет вскрыт ради содержимого. Значит подсовывать стоит только
             // под требование своего супер задания.
-            case "tuck" -> (s, o) -> scoreTuck(s, o);
             case "mass_open" -> (s, o) -> scoreSpec(s, o);   // те же виды опций
             default -> null;
         };
@@ -903,8 +902,8 @@ public class HeuristicAgent extends Agent {
                 && me.resources.ammo() >= 1) {
             val += 7.0;
         }
-        if (top == Order.ACQUISITIONS && me.trophySpacePoints() > 0) {
-            val += 8.0 + me.trophySpacePoints();
+        if (top == Order.ACQUISITIONS && me.destroyedValue() > 0) {
+            val += 8.0 + me.destroyedValue();
         }
         if (top == Order.DEVELOPMENT && nMil >= 1 && nUnits < 3
                 && wget("aggression") >= 0.8) {
@@ -1009,9 +1008,9 @@ public class HeuristicAgent extends Agent {
         return 1.0 - none;
     }
 
-    /** Трофейный пул игрока = очки жетонов на трофейном поле + чёрные кубы. */
+    /** Трофейный пул игрока = очки жетонов на месте уничтоженных жетонов + чёрные кубы. */
     private static int trophyPool(PlayerState me) {
-        return me.trophySpacePoints() + me.resources.debris();
+        return me.destroyedValue() + me.resources.trophy();
     }
 
     // ================= выбор действия ===================================
@@ -1120,7 +1119,7 @@ public class HeuristicAgent extends Agent {
             return contRoom ? base : 0.2;
         }
         if ("market".equals(name)) {
-            // Продавать нечего — маркет пустой ход. Келемий нужен ЛЮБОЙ сделке.
+            // Продавать нечего — рынок пустой ход. Келемий нужен ЛЮБОЙ сделке.
             if (me.resources.kelium() <= 0) {
                 return 0.15;
             }
@@ -1136,10 +1135,10 @@ public class HeuristicAgent extends Agent {
             if (pool <= 0 || !hasAffordableTechStep(state, me, pool)) {
                 return 0.1;
             }
-            // ЦЕПОЧКА ВОЙНЫ: захваченные жетоны на трофейном поле ВЕРНУТСЯ
+            // ЦЕПОЧКА ВОЙНЫ: захваченные жетоны на месте уничтоженных жетонов ВЕРНУТСЯ
             // владельцам в конце раунда — их надо СДАТЬ В НАУКУ СЕЙЧАС.
             // Несданный трофей = бой был напрасным.
-            double urgency = me.trophySpacePoints() > 0 ? 6.0 + me.trophySpacePoints() : 0.0;
+            double urgency = me.destroyedValue() > 0 ? 6.0 + me.destroyedValue() : 0.0;
             return Math.max(base, 8.0) + Math.min(pool, 6) + urgency;
         }
         return base;
@@ -1838,7 +1837,7 @@ public class HeuristicAgent extends Agent {
     // ================= прочие ===========================================
     @SuppressWarnings("unchecked")
     /**
-     * СТОИТ ЛИ ТРАТИТЬ ОБЛОМОК НА ПЕРЕНОС ЖЕТОНА.
+     * СТОИТ ЛИ ТРАТИТЬ ТРОФЕЙ НА ПЕРЕНОС ЖЕТОНА.
      *
      * <p>Считается одна вещь: сколько пользы сейчас душит ГЛУХОЙ жетон. Он
      * закрывает ячейку атаки одного рода; если печатная цель этого рода стоит на
@@ -2025,21 +2024,21 @@ public class HeuristicAgent extends Agent {
                 int per = ((Number) econ.get("kelium_per_vp")).intValue();
                 yield per > 0 ? 1.0 / per : 0.0;
             }
-            case DEBRIS -> {
+            case TROPHY -> {
                 // ЛИБО-ЛИБО, КАК В Scoring.scorePlayer — не оба курса сразу.
                 // Найдено и исправлено 18.08.2026 вместе с тем же дублированием
                 // в самом подсчёте очков: бот складывал 1/trophy_per_vp И
-                // debris_storage_vp_per_unit, оценивая обломок в 1.333 ПО вместо
+                // trophy_storage_vp_per_unit, оценивая трофей в 1.333 ПО вместо
                 // одного курса (0.333 или 0.5, смотря какой ключ считается).
-                if (econ.containsKey("debris_storage_vp_per_unit")) {
-                    yield ((Number) econ.get("debris_storage_vp_per_unit")).doubleValue();
+                if (econ.containsKey("trophy_storage_vp_per_unit")) {
+                    yield ((Number) econ.get("trophy_storage_vp_per_unit")).doubleValue();
                 }
                 int per = ((Number) econ.getOrDefault("trophy_per_vp", 0)).intValue();
                 yield per > 0 ? 1.0 / per : 0.0;
             }
             // Боеприпас не даёт очков напрямую, но нужен для боя/лишних ходов —
             // небольшая утилитарная цена вместо нуля, чтобы не выбрасывался
-            // бездумно первым же при равенстве с обесцененным келемием/обломком.
+            // бездумно первым же при равенстве с обесцененным келемием/трофеем.
             case AMMO -> 0.2 * wget("aggression");
             default -> 0.0;
         };
@@ -2087,7 +2086,7 @@ public class HeuristicAgent extends Agent {
     }
 
     /**
-     * МАРКЕТ. Печатные обмены (1 келемий -> 3 монеты / 2 боеприпаса / 2 карты
+     * РЫНОК. Печатные обмены (1 келемий -> 3 монеты / 2 боеприпаса / 2 карты
      * задания / кубик навсегда в ячейку энергии) доступны сколько угодно раз за
      * действие; уникальное предложение карты — один раз.
      *
@@ -2125,7 +2124,7 @@ public class HeuristicAgent extends Agent {
                 default -> (spareEnergy(state, me) < 0 ? 3.0 : 0.6) + full;
             };
         }
-        // ---- уникальное предложение карты маркета ----
+        // ---- уникальное предложение карты рынка ----
         Map<String, Object> pl = (Map<String, Object>) o.payload();
         Map<String, Object> offer = (Map<String, Object>) pl.get("offer");
         Map<String, Object> params = offer.get("params") instanceof Map<?, ?> m
@@ -2166,7 +2165,7 @@ public class HeuristicAgent extends Agent {
      * {@code kelium.BoardsProbe}). Отчасти это верно — трофей на треке стоит
      * дороже, чем монета, — но как ПРАВИЛО это ошибка, потому что забывает главное:
      *
-     * <p><b>несданные трофейные жетоны В ВОЗВРАТ ВОЗВРАЩАЮТСЯ ВЛАДЕЛЬЦАМ.</b>
+     * <p><b>несданные уничтоженные жетоны В ВОЗВРАТ ВОЗВРАЩАЮТСЯ ВЛАДЕЛЬЦАМ.</b>
      * То есть «копить на трек» иногда означает «потерять». Если пул трофеев уже
      * больше, чем нужно на очередной шаг, излишек надо тратить — он всё равно
      * пропадёт, и монета за него это чистая прибыль.
@@ -2177,13 +2176,13 @@ public class HeuristicAgent extends Agent {
      */
     private double scoreSciExchange(GameState state, Choice o) {
         PlayerState me = state.player(seat);
-        int pool = me.trophySpacePoints() + me.resources.debris();
+        int pool = me.destroyedValue() + me.resources.trophy();
         int cheapest = cheapestNextStepCost(state, me);
         boolean stepAffordable = cheapest > 0 && pool >= cheapest;
-        // ТРОФЕИ, КОТОРЫЕ ТОЧНО ПРОПАДУТ: только ЖЕТОНЫ на трофейном поле
+        // ТРОФЕИ, КОТОРЫЕ ТОЧНО ПРОПАДУТ: только ЖЕТОНЫ на месте уничтоженных жетонов
         // возвращаются владельцам в Возврат. Чёрные кубы (resources.trophy)
         // остаются у игрока и ждут следующего раунда, их «спасать» не надо.
-        int doomed = me.trophySpacePoints();
+        int doomed = me.destroyedValue();
         // Трофеи ЗАСТРЯЛИ, если на шаг по треку их не хватает даже все вместе.
         boolean stuck = cheapest > 0 && pool < cheapest;
         // СКОЛЬКО АРСЕНАЛА УЖЕ ЕСТЬ (рука + установленные, слотов установки 3).
@@ -2239,7 +2238,7 @@ public class HeuristicAgent extends Agent {
             // Теперь конкурирует, если карт мало.
             return switch (id) {
                 case "gild", "draw_arsenal" -> base;
-                // Перенос жетона стоит обломок и разово, зато открывает дешёвую
+                // Перенос жетона стоит трофей и разово, зато открывает дешёвую
                 // атаку на всю оставшуюся партию — он обязан конкурировать с
                 // пасом, а не отбрасываться правилом «трек важнее всего».
                 case "move_module" -> выгодаПереноса(state) > 0.15 ? base : 0.2;
@@ -2331,7 +2330,6 @@ public class HeuristicAgent extends Agent {
             // приближает ли символ требование карты. Без этой оценки механика
             // мертва: боты не вскрывали НИ РАЗУ, и супер задания перестали
             // закрываться вовсе (замер 13.08.2026).
-            case "spec_symbol_reveal" -> scoreSymbolReveal(state, (String) o.payload());
             case "spec_super_check" -> 8.0;
             // ВАРИАНТ ОТ КАРТЫ АРСЕНАЛА. Бот не знает, что это за карта, и знать не
             // должен: он спрашивает у самой способности, какое узкое место она
@@ -2368,7 +2366,14 @@ public class HeuristicAgent extends Agent {
      * ровно симптом отсутствия этого сравнения.
      */
     private double scoreObjectiveBurn(GameState state, String cid) {
-        double base = 1.5;   // утиль верха — печатное значение не переоценивается заново
+        // ЦЕНА ВЕРХА СПРАШИВАЕТСЯ У САМОГО ВЕРХА (правка 02.09.2026). Раньше
+        // здесь стояла плоская 1.5 с прямой оговоркой «печатное значение не
+        // переоценивается заново» - то есть щит без войск под ударом, атака без
+        // цели и Рынок без келемия стоили ровно столько же, сколько нужный
+        // утиль. Ровно та же ошибка была на стороне арсенала, и там правка дала
+        // сожжений 1.70 -> 1.39 при установках 0.50 -> 0.68. Шкала сохранена:
+        // прежняя середина 1.5 приходится на середину оценки.
+        double base = 0.6 + 1.8 * ценаВерхаЗадания(state, cid);
         if (cid != null && state.journal != null) {
             kelium.engine.ObjectiveHints.Hint h =
                 kelium.engine.ObjectiveHints.forCard(state, seat, state.journal, cid, List.of(), 0);
@@ -2408,6 +2413,27 @@ public class HeuristicAgent extends Agent {
         return base;
     }
 
+    /**
+     * Сколько стоит ВЕРХ карты задания прямо сейчас — общей оценкой утиля
+     * ({@link kelium.engine.cards.TopValue}), той же, что у карт арсенала.
+     */
+    private double ценаВерхаЗадания(GameState state, String cid) {
+        if (cid == null) {
+            return 0.5;
+        }
+        try {
+            var card = Ctx.cards(state, "objectives").byId(cid);
+            Object top = card.get("top");
+            if (!(top instanceof Map<?, ?> m)) {
+                return 0.5;
+            }
+            return kelium.engine.cards.TopValue.of(
+                new kelium.engine.cards.EngineCardContext(state, seat), m);
+        } catch (RuntimeException e) {
+            return 0.5;      // карты нет в наборе — прежняя середина
+        }
+    }
+
     /** Ценность варианта, пришедшего от способности, по её собственной подсказке. */
     private double scoreAbilityOption(GameState state, Choice o) {
         String id = String.valueOf(o.payload());
@@ -2425,89 +2451,6 @@ public class HeuristicAgent extends Agent {
      * поэтому за них есть конкуренция со сжиганием.
      */
     @SuppressWarnings("unchecked")
-    /**
-     * СТОИТ ЛИ ПОДСУНУТЬ карту под планшет. Смотрим на требование своего супер
-     * задания: нужен ли ещё хоть один символ. Символ карты арсенала известен, а
-     * контейнер подсовывается «не глядя» — там ставка на удачу, и цена ниже.
-     */
-    private double scoreTuck(GameState s, Choice o) {
-        if (o.payload() == null) {
-            return 0.5;                      // «ничего не подсовывать»
-        }
-        var p = s.player(seat);
-        if (p.superObjective == null) {
-            return 0.1;
-        }
-        java.util.List<String> need = kelium.engine.Symbols.required(s, p.superObjective);
-        if (need.isEmpty()) {
-            return 0.1;
-        }
-        java.util.List<String> open = kelium.engine.Symbols.revealed(s, p);
-        java.util.List<String> hidden = kelium.engine.Symbols.hiddenForms(s, p);
-        // Чего ещё не хватает с учётом уже подложенного (открытого и закрытого).
-        java.util.Map<String, Integer> have = new java.util.HashMap<>();
-        for (String f : open) {
-            have.merge(f, 1, Integer::sum);
-        }
-        for (String f : hidden) {
-            have.merge(f, 1, Integer::sum);
-        }
-        java.util.Map<String, Integer> want = new java.util.HashMap<>();
-        for (String f : need) {
-            want.merge(f, 1, Integer::sum);
-        }
-        int missing = 0;
-        for (var e : want.entrySet()) {
-            missing += Math.max(0, e.getValue() - have.getOrDefault(e.getKey(), 0));
-        }
-        if (missing == 0) {
-            return 0.2;                      // набор уже собран, беречь карты
-        }
-        if ("tuck_container".equals(o.kind())) {
-            return 1.6;                      // ставка не глядя: символ может не подойти
-        }
-        var marking = kelium.engine.Symbols.of(s);
-        String form = marking.ofArsenal(String.valueOf(o.payload()));
-        if (form == null) {
-            return 0.2;
-        }
-        int stillNeed = want.getOrDefault(form, 0) - have.getOrDefault(form, 0);
-        return stillNeed > 0 ? 4.0 : 0.3;
-    }
-
-    /**
-     * НАСКОЛЬКО ПОЛЕЗНО ВСКРЫТЬ подложенную карту: если её символ нужен супер
-     * заданию и такого символа ещё не хватает — очень полезно, иначе почти нет.
-     *
-     * <p>Символы — сет-коллекшн: вскрывать без надобности значит потратить СПЕЦ
-     * и ничего не получить, поэтому оценка смотрит именно на НЕДОСТАЮЩЕЕ.
-     */
-    private double scoreSymbolReveal(GameState s, String cardId) {
-        var p = s.player(seat);
-        if (p.superObjective == null) {
-            return 0.3;
-        }
-        java.util.List<String> need = kelium.engine.Symbols.required(s, p.superObjective);
-        if (need.isEmpty()) {
-            return 0.3;
-        }
-        var marking = kelium.engine.Symbols.of(s);
-        String form = null;
-        for (var t : p.tucked) {
-            if (t.cardId.equals(cardId) && !t.revealed) {
-                form = "container".equals(t.kind) ? marking.ofContainer(t.cardId)
-                    : marking.ofArsenal(t.cardId);
-            }
-        }
-        if (form == null) {
-            return 0.3;
-        }
-        java.util.List<String> open = kelium.engine.Symbols.revealed(s, p);
-        long have = open.stream().filter(form::equals).count();
-        long want = need.stream().filter(form::equals).count();
-        return want > have ? 6.0 : 0.4;
-    }
-
     /**
      * СПРОСИТЬ САМУ КАРТУ, чего она стоит — установка или утиль (21.08.2026).
      *

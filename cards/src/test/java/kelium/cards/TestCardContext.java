@@ -85,7 +85,7 @@ public final class TestCardContext implements CardContext {
         int added = switch (r) {
             case KELIUM -> Storage.addKeliumCapped(state, me(), amount);
             case AMMO -> Storage.addAmmoCapped(state, me(), amount);
-            case DEBRIS -> Storage.addDebrisCapped(state, me(), amount);
+            case TROPHY -> Storage.addTrophyCapped(state, me(), amount);
             // Монеты склад не занимают: они не кубики, а деньги.
             case COIN -> {
                 me().resources.add(Resource.COIN, amount);

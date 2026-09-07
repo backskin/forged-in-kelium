@@ -35,6 +35,18 @@ import kelium.support.Fix;
  */
 class ObjectiveHintsTest {
 
+    /**
+     * СВОД С ПРЕДИКАТНЫМИ ЗАДАНИЯМИ (objectives 1.11.0), а не свод по умолчанию.
+     *
+     * <p>В действующем каталоге условия заданий проверяет САМА КАРТА
+     * ({@code checked_by: card}), то есть класс из модуля {@code cards}. Модуля
+     * этого на класспасе тестов движка нет и быть не должно — связь между ними
+     * только через ServiceLoader во время работы. Поэтому здесь проверяется
+     * ветка индикаторов «условие задано предикатом»; ветка «условие в карте»
+     * сторожится в модуле карт, где класс доступен.
+     */
+    private static final String СВОД = "1.26.0";
+
     /** Все действия игры — сцена, где приказ ничего не ограничивает. */
     private static final Set<String> ВСЕ = Set.of("assembly", "mining", "build",
         "energy_swap", "movement", "combat", "market", "science");
@@ -57,7 +69,7 @@ class ObjectiveHintsTest {
 
     @Test
     void готовоГоритТолькоКогдаТребованиеВыполнено() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         hand(s, "n3");   // «Патроны»: имей не меньше 3 боеприпасов
         PlayerState p = s.player(0);
@@ -76,7 +88,7 @@ class ObjectiveHintsTest {
 
     @Test
     void уНачальнойКартыПотолокРавенБазовойНаграде() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         hand(s, "n3");
         s.player(0).resources.setAmmo(3);
@@ -93,7 +105,7 @@ class ObjectiveHintsTest {
 
     @Test
     void достижимоДаётИнструкциюСНазваниемДействия() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         hand(s, "n3");
         s.player(0).resources.setAmmo(0);
@@ -111,12 +123,12 @@ class ObjectiveHintsTest {
 
     @Test
     void безНужногоДействияВПриказеПланаНет() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         hand(s, "n3");
         s.player(0).resources.setAmmo(0);
 
-        // Боеприпасы даёт Сборка и Маркет. Вскрыт приказ, где нет ни того, ни
+        // Боеприпасы даёт Сборка и Рынок. Вскрыт приказ, где нет ни того, ни
         // другого — врать про достижимость нельзя.
         ObjectiveHints.Hint h = hint(s, "n3", Set.of("combat", "movement"), 2);
         assertFalse(h.reachable(),
@@ -126,7 +138,7 @@ class ObjectiveHintsTest {
 
     @Test
     void планДлиннееОставшихсяДействийНеПредлагается() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         hand(s, "o21");   // «Первая кровь»: в этот ход уничтожить 2 жетона
         // Бой — действие штучное: два уничтожения это, как правило, два боя.
@@ -143,7 +155,7 @@ class ObjectiveHintsTest {
 
     @Test
     void инструкцияСокращаетсяПоМереВыполнения() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         hand(s, "o21");
         int доБоя = hint(s, "o21", ВСЕ, 2).plans().get(0).steps().size();
@@ -160,9 +172,9 @@ class ObjectiveHintsTest {
 
     @Test
     void ценаНаградыСчитаетсяПоДаннымКарты() {
-        // 3 монеты = 3.0; 2 обломка = 3.0; карта задания = 2.0.
+        // 3 монеты = 3.0; 2 трофея = 3.0; карта задания = 2.0.
         assertEquals(3.0, ObjectiveHints.rewardValue(Map.of("coin", 3)), 1e-9);
-        assertEquals(5.0, ObjectiveHints.rewardValue(Map.of("debris", 2, "objective_card", 1)), 1e-9);
+        assertEquals(5.0, ObjectiveHints.rewardValue(Map.of("trophy", 2, "objective_card", 1)), 1e-9);
         // «module: attack» — не число: один жетон, но самый дорогой в игре.
         assertTrue(ObjectiveHints.rewardValue(Map.of("module", "attack")) >= 5.0);
         assertEquals(0.0, ObjectiveHints.rewardValue(null), 1e-9);
@@ -170,7 +182,7 @@ class ObjectiveHintsTest {
 
     @Test
     void готоваяКартаОцениваетсяДорожеНеготовой() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         PlayerState p = s.player(0);
         p.objectiveHand.clear();
@@ -192,7 +204,7 @@ class ObjectiveHintsTest {
 
     @Test
     void ниОднаКартаКаталогаНеЛомаетИндикаторы() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         PlayerState p = s.player(0);
         StringBuilder broken = new StringBuilder();
@@ -214,7 +226,7 @@ class ObjectiveHintsTest {
 
     @Test
     void укрытоеВойскоПоднимаетГотовностьЗасады() {
-        GameState s = Fix.game();
+        GameState s = Fix.game(СВОД, 4, 7L);
         Fix.turn(s, 0);
         hand(s, "o07");   // «Засада»
         assertFalse(hint(s, "o07", ВСЕ, 2).ready());

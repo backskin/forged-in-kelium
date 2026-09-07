@@ -51,12 +51,12 @@ public final class StrategyDiversity {
     /**
      * Источники очков движка (см. {@code Scoring.scorePlayer}).
      *
-     * <p>{@code debris_storage_vp} убран 18.08.2026 вместе с баг-фиксом двойного
-     * учёта обломка в Scoring: это была вторая, добавочная строка поверх
-     * {@code debris}, а не отдельный источник, — движок её больше не выставляет.
+     * <p>{@code trophy_storage_vp} убран 18.08.2026 вместе с баг-фиксом двойного
+     * учёта трофея в Scoring: это была вторая, добавочная строка поверх
+     * {@code trophy}, а не отдельный источник, — движок её больше не выставляет.
      */
     private static final List<String> VP_SOURCES = List.of(
-        "kelium", "coins", "debris", "buildings_on_field", "units_on_field", "tech",
+        "kelium", "coins", "trophy", "buildings_on_field", "units_on_field", "tech",
         "gold_modules", "spawn_tiles", "cu_tokens", "kills", "war_track",
         "objective_card_vp", "super_arsenal", "super_first_part", "arsenal_vp",
         "level4_stars");
@@ -65,7 +65,7 @@ public final class StrategyDiversity {
     private static final Map<String, String> VP_LABEL = Map.ofEntries(
         Map.entry("kelium", "келемий на складе"),
         Map.entry("coins", "монеты на руках"),
-        Map.entry("debris", "обломки и несданные трофеи"),
+        Map.entry("trophy", "трофеи и несданные уничтоженные жетоны"),
         Map.entry("buildings_on_field", "здания на поле"),
         Map.entry("units_on_field", "войска на поле"),
         Map.entry("tech", "шаги по науке"),

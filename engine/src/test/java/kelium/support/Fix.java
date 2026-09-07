@@ -94,8 +94,20 @@ public final class Fix {
      * вызывать действия и бой.
      */
     public static GameState game(int players, long seed) {
+        return game(GameConfig.DEFAULT_RULESET, players, seed);
+    }
+
+    /**
+     * То же, но на НАЗВАННОМ своде.
+     *
+     * <p>Нужно тестам, которые сторожат конкретную редакцию содержимого, а не
+     * сегодняшние правила: свод по умолчанию переезжает на новые колоды, и такой
+     * тест иначе падал бы не потому, что сломался код, а потому что проверяемой
+     * редакции в игре больше нет. Сторож редакции обязан называть её сам.
+     */
+    public static GameState game(String rulesetId, int players, long seed) {
         GameState s = Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, players, seed, null, null));
+            GameConfig.buildCached(rulesetId, players, seed, null, null));
         List<Agent> agents = new ArrayList<>();
         for (int seat = 0; seat < players; seat++) {
             agents.add(new FirstChoiceAgent(seat));
@@ -109,6 +121,29 @@ public final class Fix {
     /** То же на четверых с сидом по умолчанию. */
     public static GameState game() {
         return game(4, 7L);
+    }
+
+    /**
+     * НОМЕР КАРТЫ АРСЕНАЛА ПО ЕЁ СПОСОБНОСТИ, а не вписанный руками.
+     *
+     * <p>Номера живут в версии колоды и меняются вместе с ней: карта
+     * «Аварийное питание» была b20 в арсенале 3.0.0 и стала a5_32 в 5.0.0.
+     * Тест, вписавший номер, проверяет не правило, а номер — и падает от смены
+     * колоды, ничего не проверив. Способность же живёт в движке и переезжает
+     * вместе с картой.
+     *
+     * @return номер карты действующей колоды или {@code null}, если носителя в
+     *         ней нет вовсе (тогда проверять правило нечем)
+     */
+    @SuppressWarnings("unchecked")
+    public static String картаСоСпособностью(GameState s, String passiveId) {
+        for (var card : kelium.dataio.Ctx.cards(s, "arsenal").entries) {
+            if (card.get("bottom") instanceof java.util.Map<?, ?> bm
+                    && passiveId.equals(String.valueOf(bm.get("passive")))) {
+                return String.valueOf(card.get("id"));
+            }
+        }
+        return null;
     }
 
     /** Поставить игроку здание на гекс (занимает столько сторон, сколько положено). */

@@ -122,7 +122,7 @@ public final class ResultsPanel extends JComponent {
         y += Theme.px(42);
         gg.setFont(Theme.note(17));
         gg.setColor(Theme.ink2());
-        gg.drawString(Names.conditionLong(rec.condition), pad, y + Theme.px(18));
+        gg.drawString(Names.conditionLong(rec.condition, rec.spawnLeft, rec.spawnThreshold), pad, y + Theme.px(18));
         y += Theme.px(38);
 
         // ---- пьедестал
@@ -484,8 +484,8 @@ public final class ResultsPanel extends JComponent {
             ? shown.label.toUpperCase(java.util.Locale.ROOT)
                 + " — жирная линия: сколько на руках · пунктир: сколько потрачено за партию"
             : shown.label.toUpperCase(java.util.Locale.ROOT) + " по ходу партии";
-        if (shown == Metrics.Kind.DEBRIS) {
-            legend += "   (в счёт входят и обломки на складе, и очки с жетонов "
+        if (shown == Metrics.Kind.TROPHY) {
+            legend += "   (в счёт входят и трофеи на складе, и очки с жетонов "
                 + "на карте трофеев, ещё не сданных — наука платит и тем, и другим)";
         }
         g.drawString(legend, x, top - Theme.px(8));

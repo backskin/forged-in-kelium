@@ -142,7 +142,7 @@ public final class Passives {
         return hasPassive(s, seat, "no_second_battle_surcharge");
     }
 
-    /** Доп. трофейное очко за убийство (+1 при bonus_trophy_on_kill). */
+    /** Доп. трофей за убийство (+1 при bonus_trophy_on_kill). */
     public static int bonusTrophyOnKill(GameState s, int seat) {
         return hasPassive(s, seat, "bonus_trophy_on_kill") ? 1 : 0;
     }

@@ -811,7 +811,7 @@ public final class Predicates {
         reg("picked_container_by_unit", false, (s, seat, j, p) ->
             j.of(seat).containersPickedByUnit >= intp(p, "count", 1));
 
-        // o33 «Биржа»: предложение карты маркета (усил: + печатная сделка)
+        // o33 «Биржа»: предложение карты рынка (усил: + печатная сделка)
         reg("used_market_card_offer", false, (s, seat, j, p) -> {
             TurnJournal.TurnFacts f = j.of(seat);
             return f.usedMarketCardOffer
@@ -1359,10 +1359,10 @@ public final class Predicates {
             return false;
         });
 
-        // o22/o25/n10: ЧТО ЛЕЖИТ В ТРОФЕЙНОМ ПРОСТРАНСТВЕ. Проверяется глазами по
+        // o22/o25/n10: ЧТО ЛЕЖИТ В МЕСТЕ УНИЧТОЖЕННЫХ ЖЕТОНОВ. Проверяется глазами по
         // столу — трофеи лежат открыто перед игроком.
-        reg("trophy_contains", false, (s, seat, j, p) -> {
-            List<Token> trophies = s.player(seat).trophySpace;
+        reg("destroyed_contains", false, (s, seat, j, p) -> {
+            List<Token> trophies = s.player(seat).destroyedTokens;
             if (p.containsKey("any")) {
                 return trophies.size() >= intp(p, "any", 1);
             }
@@ -1388,11 +1388,11 @@ public final class Predicates {
             return n >= need;
         });
 
-        // o46 «Трофейный обоз»: сколько РАЗНЫХ видов лежит в трофеях. Род войск и
+        // o46 «Трофейный обоз»: сколько РАЗНЫХ видов лежит среди уничтоженных жетонов. Род войск и
         // каждый тип здания считаются отдельным видом.
-        reg("trophy_distinct_kinds", false, (s, seat, j, p) -> {
+        reg("destroyed_distinct_kinds", false, (s, seat, j, p) -> {
             Set<String> kinds = new HashSet<>();
-            for (Token t : s.player(seat).trophySpace) {
+            for (Token t : s.player(seat).destroyedTokens) {
                 if (t instanceof UnitToken u) {
                     kinds.add("unit:" + u.type.code);
                 } else if (t instanceof BuildingToken b) {
@@ -1536,7 +1536,7 @@ public final class Predicates {
         // «оба на один трек» дороже, чем выглядит).
         // ЗАПЛАЧЕНО В НАУКУ ЗА ХОД. Имя предиката оставлено прежним, чтобы
         // прошлые версии каталога заданий читались без правок, но считает он
-        // теперь ЕДИНИЦЫ ОПЛАТЫ (обломки по действующему своду), а не жетоны:
+        // теперь ЕДИНИЦЫ ОПЛАТЫ (трофеи по действующему своду), а не жетоны:
         // см. TurnJournal.sciencePaidUnits. Параметр same_track больше не
         // спрашивается — с правилом «один трек за действие» он всегда истина, и
         // усиление на нём было бесплатным.

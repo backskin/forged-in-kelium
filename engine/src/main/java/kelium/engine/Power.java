@@ -47,7 +47,18 @@ public final class Power {
      */
     public static int plantOutput(GameState state, BuildingToken b) {
         if (b.type != kelium.core.BuildingType.POWER_PLANT) {
-            return state.tokenStats.buildingEnergyGives(b.type);
+            // ЖЕТОН ХРАНИЛИЩА СТОРОНОЙ ЭНЕРГИИ (правило дизайнера 04.09.2026)
+            // поднимает выработку САМОГО ЦУ: 2 → 3 одним жетоном, до 4 двумя.
+            // Прежде это был отдельный источник вне поля — единственная в игре
+            // сущность, дающая энергию и не стоящая на гексе. Теперь такой
+            // сущности нет, а кубик подчиняется общим правилам: уходит из игры
+            // вместе с уничтоженным ЦУ и возвращается с отстроенным, потому что
+            // новое ЦУ получает кубики ПО НОМИНАЛУ, а номинал считается здесь.
+            int base = state.tokenStats.buildingEnergyGives(b.type);
+            if (b.type == kelium.core.BuildingType.COMMAND_CENTER) {
+                base += storageEnergyTokens(state, b.owner);
+            }
+            return base;
         }
         int nominal = state.tokenStats.plantEnergyGives(b.level);
         if (!onEnergyCell(state, b)) {
@@ -55,6 +66,36 @@ public final class Power {
             return Math.min(nominal, off);
         }
         return nominal;
+    }
+
+    /**
+     * СКОЛЬКО КУБИКОВ ФИЗИЧЕСКИ ЛЕЖИТ У ИСТОЧНИКА — номинал плюс карточные
+     * прибавки. Отличается от {@link #plantOutput} ровно на пассив «+1
+     * станциям»: номинал считается от жетона и ячейки, прибавка — от карты, и
+     * оба слагаемых нужны везде, где источник наполняют или проверяют на
+     * полноту (стройка, переезд станции, активация ЗАБРАТЬ в Смене энергии).
+     *
+     * <p>Раздельно потому, что {@code plantOutput} читают и те, кому нужен
+     * именно номинал жетона; свести их в один метод — значит потерять это
+     * различие.
+     */
+    public static int sourceCubes(GameState state, BuildingToken b) {
+        int n = plantOutput(state, b);
+        if (b.type == kelium.core.BuildingType.POWER_PLANT) {
+            n += kelium.engine.Passives.plantEnergyBonus(state, b.owner);
+        }
+        return n;
+    }
+
+    /** Сколько жетонов хранилища игрок положил стороной энергии. */
+    public static int storageEnergyTokens(GameState state, int seat) {
+        int n = 0;
+        for (String tok : state.player(seat).storageTokens) {
+            if ("+1_energy".equals(tok)) {
+                n++;
+            }
+        }
+        return n;
     }
 
     /**

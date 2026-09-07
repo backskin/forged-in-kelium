@@ -56,7 +56,7 @@ public final class ОбменыИАрсенал {
         Map.entry("trophy_to_coin", "НАУКА: трофеи → монеты"),
         Map.entry("move_module", "НАУКА: трофей → переставить жетон модуля"),
         Map.entry("draw_arsenal", "НАУКА: 2 трофея → две карты арсенала, оставить одну"),
-        Map.entry("gild_module", "НАУКА: 2 обломка → золотой жетон модуля"));
+        Map.entry("gild_module", "НАУКА: 2 трофея → золотой жетон модуля"));
 
     public static void main(String[] args) throws Exception {
         System.setOut(new java.io.PrintStream(new java.io.FileOutputStream(

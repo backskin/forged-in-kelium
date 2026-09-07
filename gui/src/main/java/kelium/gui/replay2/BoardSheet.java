@@ -26,11 +26,11 @@ import kelium.report.ReplayRecord;
  * BoardSheet — ПЛАНШЕТ ИГРОКА ЦЕЛИКОМ, как он лежит на столе.
  *
  * <p>Заказ дизайнера 13.08.2026: видеть всё его хозяйство разом — какие здания
- * построены, какие ещё в запасе, а какие уехали к кому-то в трофеи; сколько войск
+ * построены, какие ещё в запасе, а какие уехали к кому-то на место уничтоженных жетонов; сколько войск
  * осталось в запасе по родам; модули и какой стороной они лежат; арсенал и
  * контейнеры; планшет хранилища с открытыми ячейками; отложенную рубашкой карту
  * приказа; и карту трофеев, на которой вразнобой валяются снесённые жетоны с
- * напечатанной ценностью и чёрные кубики — сколько обломков даст возврат.
+ * напечатанной ценностью и чёрные кубики — сколько трофеев даст возврат.
  *
  * <p>Здания рисуются ТЕМИ ЖЕ силуэтами, что на поле ({@link FieldGeometry}), —
  * так планшет и поле читаются как одна игра, а не как две разные программы.
@@ -238,7 +238,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             y = paintTroops(g, f, p, pad, y, full) + px(12);
         }
 
-        int yLeft = paintBuildings(g, f, p, pad, y, leftW);
+        int yLeft = paintBuildings(g, f, p, pad, y, leftW, printed);
         if (printed) {
             // Планшет хранилища идёт ПОСЛЕ зданий: ячейки на нём открывают
             // именно они, и читается это сверху вниз, как на столе. Ширина —
@@ -248,14 +248,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 cellFill, startFill, coveredCells(buildingsOf(f, p.seat)));
             yLeft += px(10) + PrintedBoards.storageHeight(p.side, sw) + px(6);
         }
-        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW);
+        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
 
         int yRight = paintModulesAndCards(g, p, rightX, y, rightW);
         int cardH = px(180);
         int cardW = px(150);
         yRight += px(6);
         paintSetAside(g, p, rightX, yRight, cardW, cardH);
-        paintTrophyCard(g, p, rightX + cardW + colGap, yRight,
+        paintDestroyedCard(g, p, rightX + cardW + colGap, yRight,
             rightW - cardW - colGap, cardH);
         yRight += cardH + px(24);
 
@@ -281,7 +281,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * работает на столе.
      */
     private int paintBuildings(Graphics2D g, ReplayRecord.Frame f, ReplayRecord.Player p,
-                               int x, int y, int w) {
+                               int x, int y, int w, boolean печатный) {
         buildingSpots.clear();
         moduleSpots.clear();
         storeTokenSpots.clear();
@@ -294,12 +294,23 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             slot("command_center", null), slot("barracks", null),
             slot("factory", null), slot("airbase", null)), x, y, w, cell, gap,
             Under.BLUE_MODULE);
-        y = paintGroup(g, p, "ДОБЫТЧИКИ", roster(all,
-            slot("miner", 1), slot("miner", 2), slot("miner", 3), slot("miner", 4)),
-            x, y, w, cell, gap, Under.STORAGE_CELLS);
-        y = paintGroup(g, p, "ЭНЕРГОСТАНЦИИ", roster(all,
-            slot("power_plant", 1), slot("power_plant", 2), slot("power_plant", 3),
-            slot("power_plant", 4)), x, y, w, cell, gap, Under.STORAGE_CELLS);
+        // ДОБЫТЧИКИ И ЭНЕРГОСТАНЦИИ — ТОЛЬКО НА ПЕЧАТНОМ ПЛАНШЕТЕ, если он есть
+        // (жалоба дизайнера 02.09.2026: «нахуя дублируется инфа о зданиях и
+        // ячейках»). Их жетоны лежат прямо на картинке планшета хранилища
+        // поверх своих ячеек, повёрнутые, как на столе, — рисовать те же
+        // четыре добытчика ещё раз отдельной группой, да ещё с копией их
+        // ячеек, значило бы показывать одно и то же дважды.
+        //
+        // Военные здания остаются здесь: на планшете войск их жетонов нет, там
+        // только колонки родов и места под синие модули.
+        if (!печатный) {
+            y = paintGroup(g, p, "ДОБЫТЧИКИ", roster(all,
+                slot("miner", 1), slot("miner", 2), slot("miner", 3), slot("miner", 4)),
+                x, y, w, cell, gap, Under.STORAGE_CELLS);
+            y = paintGroup(g, p, "ЭНЕРГОСТАНЦИИ", roster(all,
+                slot("power_plant", 1), slot("power_plant", 2), slot("power_plant", 3),
+                slot("power_plant", 4)), x, y, w, cell, gap, Under.STORAGE_CELLS);
+        }
         return y;
     }
 
@@ -551,11 +562,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 a--;
             }
         }
-        // ОБЛОМКИ ИДУТ ПОСЛЕДНИМИ И В ЛЮБУЮ СВОБОДНУЮ ЯЧЕЙКУ. У них нет своего
-        // типа ячейки: обломок занимает ровно одну любую — универсальную,
+        // ТРОФЕИ ИДУТ ПОСЛЕДНИМИ И В ЛЮБУЮ СВОБОДНУЮ ЯЧЕЙКУ. У них нет своего
+        // типа ячейки: трофей занимает ровно одну любую — универсальную,
         // келемиевую или боеприпасную. Раскладываем после келемия и боеприпасов,
         // чтобы не занять именную ячейку у того, кому она предназначена.
-        int d = Math.max(0, p.debris);
+        int d = Math.max(0, p.trophy);
         for (int i = 0; i < types.size() && d > 0; i++) {
             if (holders.get(i)[idx.get(i)[0]] != 0) {
                 continue;
@@ -569,7 +580,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     private static String cellIcon(char has) {
         return switch (has) {
             case 'K' -> "KELIUM";
-            case 'D' -> "DEBRIS";
+            case 'D' -> "TROPHY";
             default -> "AMMO";
         };
     }
@@ -578,7 +589,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     private static Color cellIconColour(char has) {
         return switch (has) {
             case 'K' -> Theme.kelium();
-            case 'D' -> Theme.debris();
+            case 'D' -> Theme.trophy();
             default -> Theme.ink2();
         };
     }
@@ -652,7 +663,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
 
     /**
      * МЕСТО ЗДАНИЯ НА ПЛАНШЕТЕ. Рисуется САМ ЖЕТОН, только пока здание лежит
-     * В ЛИЧНОМ ЗАПАСЕ — то есть не построено и не уехало к сопернику в трофеи.
+     * В ЛИЧНОМ ЗАПАСЕ — то есть не построено и не уехало к сопернику на место уничтоженных жетонов.
      * Ушло с планшета — на его месте остаётся пунктирный силуэт.
      *
      * <p>Раньше было наоборот: жетон рисовался, когда здание СТОИТ НА ПОЛЕ
@@ -680,7 +691,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             g.setStroke(new BasicStroke(Theme.pxf(1.2)));
             g.draw(path);
         } else {
-            // УШЛО С ПЛАНШЕТА — пустое место пунктиром: стоит на поле или в трофеях
+            // УШЛО С ПЛАНШЕТА — пустое место пунктиром: стоит на поле или среди уничтоженных жетонов
             g.setColor(Theme.alpha(captured ? Theme.bad() : Theme.ink3(), 0.9));
             g.setStroke(new BasicStroke(Theme.pxf(1.4), BasicStroke.CAP_BUTT,
                 BasicStroke.JOIN_ROUND, 0, new float[]{Theme.pxf(4), Theme.pxf(3)}, 0));
@@ -738,8 +749,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * ячейках ПОД СВОИМИ ЗДАНИЯМИ выше — рисовать его ещё раз отдельной линией
      * значит показывать одно и то же дважды (замечание дизайнера 13.08.2026).
      */
-    private int paintStorage(Graphics2D g, ReplayRecord.Player p, int x, int y, int w) {
-        caption(g, "ХРАНИЛИЩЕ", x, y);
+    private int paintStorage(Graphics2D g, ReplayRecord.Player p, int x, int y, int w,
+                             boolean печатный) {
+        // ПЕЧАТНЫЕ ЯЧЕЙКИ НЕ ПОВТОРЯЕМ. Свои ячейки склада уже нарисованы на
+        // картинке планшета хранилища вместе с тем, что в них лежит; здесь
+        // остаётся только то, чего на печати нет: ячейки от жетонов модуля и
+        // площадка под свободные кубики энергии.
+        caption(g, печатный ? "ХРАНИЛИЩЕ: ЖЕТОНЫ МОДУЛЯ И СВОБОДНАЯ ЭНЕРГИЯ"
+            : "ХРАНИЛИЩЕ", x, y);
         y += px(14);
         int cell = px(26);
         int gap = px(6);
@@ -752,15 +769,17 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // по нему нельзя было понять, что даёт жетон и куда кладут лишние кубики.
         g.setFont(font(10, Font.PLAIN));
         g.setColor(Theme.ink3());
-        g.drawString("свои ячейки:", x, cy + px(16));
-        cx = x + g.getFontMetrics().stringWidth("свои ячейки:") + px(8);
-        for (int i = 0; i < startFill.length; i++) {
-            paintSquareCell(g, cx, cy, cell, true);
-            if (startFill[i] != 0) {
-                MarkIcons.paint(g, cellIcon(startFill[i]), cx + cell / 2.0,
-                    cy + cell / 2.0, cell * 0.62, cellIconColour(startFill[i]));
+        if (!печатный) {
+            g.drawString("свои ячейки:", x, cy + px(16));
+            cx = x + g.getFontMetrics().stringWidth("свои ячейки:") + px(8);
+            for (int i = 0; i < startFill.length; i++) {
+                paintSquareCell(g, cx, cy, cell, true);
+                if (startFill[i] != 0) {
+                    MarkIcons.paint(g, cellIcon(startFill[i]), cx + cell / 2.0,
+                        cy + cell / 2.0, cell * 0.62, cellIconColour(startFill[i]));
+                }
+                cx += cell + gap;
             }
-            cx += cell + gap;
         }
 
         // ---- ЯЧЕЙКИ ОТ ЖЕТОНОВ МОДУЛЯ: их ровно две, и каждая открывается своим
@@ -785,7 +804,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             }
             cellZones.put(new Rectangle(cx, cy, cell, cell), on
                 ? "ЯЧЕЙКА ОТ ЖЕТОНА ХРАНИЛИЩА\n\nОткрыта: жетон положен стороной "
-                    + "«склад». Годится под келемий, боеприпасы и обломки."
+                    + "«склад». Годится под келемий, боеприпасы и трофеи."
                 : "ЯЧЕЙКА ОТ ЖЕТОНА ХРАНИЛИЩА\n\nПока закрыта. Откроется, когда "
                     + "игрок положит сюда жетон модуля хранилища стороной «склад» "
                     + "(жетоны приходят только с зелёного трека науки).");
@@ -831,25 +850,25 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // ПЕРЕПОЛНЕНИЕ НАЗЫВАЕТСЯ СЛОВАМИ. Склад умеет сжиматься: здание вернулось
         // на планшет и накрыло ячейки, на которых лежали кубики. Само «занято 13
         // из 11» читается как ошибка вида, поэтому причина написана рядом.
-        int busy = p.kelium + p.ammo + p.debris;
+        int busy = p.kelium + p.ammo + p.trophy;
         g.setColor(busy > p.storeCap ? Theme.bad() : Theme.ink2());
         g.drawString("занято " + busy + " из " + p.storeCap
             + (busy > p.storeCap ? " — сверх места, ячейки закрылись" : "")
             + "  ·  келемий ≤ " + p.keliumCap + ", боеприпасы ≤ " + p.ammoCap
-            + ", обломки в любую ячейку", x, cy + px(10));
+            + ", трофеи в любую ячейку", x, cy + px(10));
         cy += px(16);
-        // ОБЛОМКИ ОТДЕЛЬНОЙ СТРОКОЙ: по ячейкам они разложены выше, но пересчитать
+        // ТРОФЕИ ОТДЕЛЬНОЙ СТРОКОЙ: по ячейкам они разложены выше, но пересчитать
         // чёрные кубики глазами по всему планшету тяжело — поэтому ещё и числом.
-        int dn = Math.max(0, p.debris);
+        int dn = Math.max(0, p.trophy);
         for (int i = 0; i < dn && i < 12; i++) {
-            MarkIcons.paint(g, "DEBRIS", x + px(9) + i * px(20), cy + px(9), px(16),
-                Theme.debris());
+            MarkIcons.paint(g, "TROPHY", x + px(9) + i * px(20), cy + px(9), px(16),
+                Theme.trophy());
         }
         g.setColor(Theme.ink2());
         // ПРЕДЕЛ НЕ БЫВАЕТ ОТРИЦАТЕЛЬНЫМ: когда склад переполнен, места под
-        // обломки просто нет — так и написано, а не «из −2».
-        g.drawString("обломки " + p.debris
-                + (p.debrisCap < 0 ? " — места нет" : " из " + p.debrisCap),
+        // трофеи просто нет — так и написано, а не «из −2».
+        g.drawString("трофеи " + p.trophy
+                + (p.trophyCap < 0 ? " — места нет" : " из " + p.trophyCap),
             x + px(9) + Math.min(dn, 12) * px(20) + px(6), cy + px(13));
         cy += px(24);
         cy = paintStorageTokens(g, p, x, cy);
@@ -1488,7 +1507,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      *
      * <p>БАГ-ФИКС 20.08.2026 (дизайнер: «сущий ад с указанием сброшенного
      * приказа… какой-то статус „не вскрыт“ — что это вообще значит для
-     * сброшенной под трофеи карты?»).
+     * сброшенной под уничтоженные жетоны карты?»).
      *
      * <p>Прежде приказы искались среди УЖЕ РАЗЫГРАННЫХ карт партии: если та же
      * карта где-то вскрывалась, её приказы брались оттуда, а если нет — панель
@@ -1557,7 +1576,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * поворот случайный, но УСТОЙЧИВЫЙ — он привязан к номеру жетона, поэтому при
      * листании партии вперёд-назад они не дёргаются на месте.
      */
-    private void paintTrophyCard(Graphics2D g, ReplayRecord.Player p, int x, int y,
+    private void paintDestroyedCard(Graphics2D g, ReplayRecord.Player p, int x, int y,
                                  int w, int h) {
         caption(g, "КАРТА ТРОФЕЕВ", x, y);
         int top = y + px(14);
@@ -1569,11 +1588,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         g.draw(new RoundRectangle2D.Double(x, top, w, h, Theme.R_OVERLAY * 2,
             Theme.R_OVERLAY * 2));
 
-        List<ReplayRecord.TrophyToken> tokens = p.trophyCard;
+        List<ReplayRecord.DestroyedToken> tokens = p.destroyedCard;
         int n = tokens.size();
         int cols = Math.max(1, (w - px(20)) / px(58));
         for (int i = 0; i < n; i++) {
-            ReplayRecord.TrophyToken t = tokens.get(i);
+            ReplayRecord.DestroyedToken t = tokens.get(i);
             int col = i % cols;
             int rowIdx = i / cols;
             double cx = x + px(34) + col * px(58);
@@ -1583,10 +1602,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             }
             // «небрежный» поворот: от номера жетона, поэтому всегда один и тот же
             double angle = ((t.uid * 73) % 60) - 30;
-            paintTrophyToken(g, t, cx, cy, px(40), angle);
+            paintDestroyedToken(g, t, cx, cy, px(40), angle);
         }
-        // чёрные кубики: сколько обломков даст возврат (флат, 1 за жетон)
-        int cubes = Math.max(0, p.trophyTokens);
+        // чёрные кубики: сколько трофеев даст возврат (флат, 1 за жетон)
+        int cubes = Math.max(0, p.destroyedCount);
         int side = px(12);
         int bx = x + px(12);
         int by = top + h - px(22);
@@ -1603,8 +1622,8 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         g.setColor(Theme.ink2());
         // ПРИЖАТО К ПРАВОМУ КРАЮ КАРТЫ ПО ФАКТИЧЕСКОЙ ШИРИНЕ ТЕКСТА, а не по
         // отступу «на глаз»: от фиксированных 90 точек строка вылезала за край
-        // карты и обрезалась на «в возврат: 0 ОБЛ…».
-        String back = "в возврат: " + p.trophyTokens + " ОБЛ";
+        // карты и обрезалась на «в возврат: 0 ТРФ…».
+        String back = "в возврат: " + p.destroyedCount + " ТРФ";
         g.drawString(back, x + w - px(12) - g.getFontMetrics().stringWidth(back),
             by + px(11));
         if (n == 0) {
@@ -1614,8 +1633,8 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         }
     }
 
-    /** Один трофейный жетон: силуэт бывшего владельца и напечатанная ценность. */
-    private void paintTrophyToken(Graphics2D g, ReplayRecord.TrophyToken t, double cx,
+    /** Один уничтоженный жетон: силуэт бывшего владельца и напечатанная ценность. */
+    private void paintDestroyedToken(Graphics2D g, ReplayRecord.DestroyedToken t, double cx,
                                   double cy, double size, double angleDeg) {
         FieldGeometry.Shape sh = t.building
             ? FieldGeometry.buildingByCode(t.type) : FieldGeometry.unitByCode(t.type);
@@ -1655,7 +1674,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         g.drawString(text, x, y + px(9));
     }
 
-    /** Здания игрока: и на поле, и в запасе, и уехавшие в трофеи. */
+    /** Здания игрока: и на поле, и в запасе, и уехавшие на место уничтоженных жетонов. */
     private List<ReplayRecord.Tok> buildingsOf(ReplayRecord.Frame f, int owner) {
         List<ReplayRecord.Tok> out = new ArrayList<>();
         for (ReplayRecord.Tok t : f.snapshot.tokens) {
@@ -1726,7 +1745,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                       .append(t.energySlots);
                 }
             } else if (t.capturedBy != null) {
-                sb.append("\nСНЕСЕНО и лежит в трофеях у игрока ")
+                sb.append("\nСНЕСЕНО и лежит среди уничтоженных жетонов у игрока ")
                   .append(t.capturedBy + 1);
             } else if (!t.alive) {
                 sb.append("\nСНЕСЕНО — вернётся в запас на этапе Возврата");

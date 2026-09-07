@@ -93,32 +93,40 @@ class BoardsAndPodiumTest {
     }
 
     /**
-     * У ИГРОКА ОДИН КУБИК НА ТРЕК: он его переставляет, а не занимает новые
-     * ячейки (уточнение дизайнера 12.08.2026). Значит место игрока встречается на
-     * треке не больше одного раза, и стоит он ровно на своём шаге.
+     * КУБИКИ ЗАНИМАЮТ ЯЧЕЙКИ НАВСЕГДА (заказ дизайнера 02.09.2026): каждый
+     * купленный шаг выкладывает НОВЫЙ кубик, прежние ячейки остаются за
+     * игроком. Значит место игрока встречается на треке столько раз, сколько
+     * шагов он на нём купил, и самая верхняя занятая им ячейка совпадает с его
+     * шагом. Всего кубиков у игрока не больше запаса из свода — иначе он
+     * выкладывал бы то, чего у него нет.
      */
     @Test
-    void onePlayerHasOneCubePerTrack() {
+    void кубикиНакапливаютсяИНеПревышаютЗапас() {
         ReplayRecord rec = game();
+        var rules = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 0L, null, null).ruleset;
+        int запас = rules.getInt("tech.cube_supply", 8);
         for (ReplayRecord.Frame f : rec.frames) {
+            int[] всего = new int[rec.players];
             for (var e : f.snapshot.techOccupancy.entrySet()) {
-                int[] seen = new int[rec.players];
                 List<List<Integer>> steps = e.getValue();
+                int[] верхний = new int[rec.players];
                 for (int i = 0; i < steps.size(); i++) {
                     for (int seat : steps.get(i)) {
-                        seen[seat]++;
-                        int mine = f.snapshot.players.get(seat).tech
-                            .getOrDefault(e.getKey(), 0);
-                        assertEquals(i + 1, mine,
-                            "кубик игрока " + seat + " на треке " + e.getKey()
-                                + " стоит в ячейке шага " + (i + 1) + ", а его шаг " + mine);
+                        всего[seat]++;
+                        верхний[seat] = Math.max(верхний[seat], i + 1);
                     }
                 }
-                for (int seat = 0; seat < seen.length; seat++) {
-                    assertTrue(seen[seat] <= 1,
-                        "игрок " + seat + " держит " + seen[seat] + " кубиков на треке "
-                            + e.getKey() + " — должен один");
+                for (int seat = 0; seat < rec.players; seat++) {
+                    int mine = f.snapshot.players.get(seat).tech.getOrDefault(e.getKey(), 0);
+                    assertEquals(mine, верхний[seat],
+                        "у игрока " + seat + " на треке " + e.getKey() + " шаг " + mine
+                            + ", а самая верхняя занятая им ячейка — " + верхний[seat]);
                 }
+            }
+            for (int seat = 0; seat < rec.players; seat++) {
+                assertTrue(всего[seat] <= запас,
+                    "игрок " + seat + " выложил " + всего[seat] + " кубиков, а в запасе "
+                        + запас);
             }
         }
     }
@@ -141,19 +149,17 @@ class BoardsAndPodiumTest {
     }
 
     /**
-     * Ячейки шагов открываются по составу (правило дизайнера 16.08.2026):
-     * шаг 1 — третья только вчетвером; шаг 2 — вторая втроём и вчетвером,
-     * третья только вчетвером; шаг 3 — вторая втроём и вчетвером; вершина
-     * одна всегда.
+     * Ячейки шагов открываются по составу: на шагах 1, 2 и 3 последняя ячейка
+     * доступна только вчетвером, вершина одна всегда.
      */
     @Test
     void cellCountsFollowThePlayerCount() {
         var rules = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 0L, null, null).ruleset;
         assertEquals(List.of(3, 3, 2, 1), rules.stepCapacity(4), "вчетвером открыто всё");
-        assertEquals(List.of(2, 2, 2, 1), rules.stepCapacity(3),
-            "втроём закрыты третьи ячейки шагов 1 и 2");
-        assertEquals(List.of(2, 1, 1, 1), rules.stepCapacity(2),
-            "вдвоём открыты только ячейки без пометки состава");
+        assertEquals(List.of(2, 2, 1, 1), rules.stepCapacity(3),
+            "втроём закрыты последние ячейки шагов 1, 2 и 3");
+        assertEquals(List.of(2, 2, 1, 1), rules.stepCapacity(2),
+            "вдвоём открыты те же ячейки, что и втроём");
     }
 
     // ==================== рисование ====================

@@ -87,6 +87,14 @@ public final class ReplayRecord {
     public final Map<String, Boolean> expansions = new LinkedHashMap<>();
     public Integer winner;
     public String condition = "";
+    /**
+     * Если партия кончилась по келемию — сколько источников на поле осталось и
+     * какой порог стоял в своде. Нужно, чтобы подпись конца не врала про
+     * «кончился келемий», когда по правилам порог выше единицы. −1 у старых
+     * записей и у партий, кончившихся иначе.
+     */
+    public int spawnLeft = -1;
+    public int spawnThreshold = -1;
     public int rounds;
     /**
      * ПЕЧАТНЫЙ ЛИЧНЫЙ ЗАПАС: сколько жетонов КАЖДОГО вида войск у игрока всего.
@@ -144,7 +152,7 @@ public final class ReplayRecord {
      * Жетон, лежащий на карте трофеев: чей он был, что это и сколько стоит. Номер
      * нужен, чтобы «небрежный» поворот на карте не дёргался при листании партии.
      */
-    public static final class TrophyToken {
+    public static final class DestroyedToken {
         public int uid;
         public int owner;
         public boolean building;
@@ -212,7 +220,7 @@ public final class ReplayRecord {
         public int energyIdle;
         public Integer level;
         public boolean alive = true;
-        /** Кто держит жетон на трофейном месте (уничтожен в этом раунде). */
+        /** Кто держит жетон на месте уничтоженных жетонов (уничтожен в этом раунде). */
         public Integer capturedBy;
         /**
          * Войско ВСТАВЛЕНО В ЗДАНИЕ (uid здания) — рисуется значком внутри, ячейку
@@ -238,11 +246,11 @@ public final class ReplayRecord {
         public int coin;
         public int kelium;
         public int ammo;
-        /** Обломки (бывшие «трофейные очки») в хранилище — черные кубики. */
-        public int debris;
-        /** Вместимость обломков на складе (см. {@code Storage.debrisMax}). */
-        public int debrisCap;
-        /** Жетонов на трофейном месте и суммарная их ценность. */
+        /** Трофеи (бывшие «трофеи») в хранилище — черные кубики. */
+        public int trophy;
+        /** Вместимость трофеев на складе (см. {@code Storage.trophyMax}). */
+        public int trophyCap;
+        /** Жетонов на месте уничтоженных жетонов и суммарная их ценность. */
         /**
          * КАКИЕ ЯЧЕЙКИ СКЛАДА ОТКРЫВАЕТ КАЖДОЕ СКЛАДСКОЕ ЗДАНИЕ. Ключ — «miner-2»
          * или «plant-4», значение — строка вида «UK»: U универсальная, K под
@@ -255,21 +263,21 @@ public final class ReplayRecord {
          * нечем.
          */
         public final Map<String, String> storageCells = new LinkedHashMap<>();
-        public int trophyTokens;
-        public int trophyPoints;
+        public int destroyedCount;
+        public int destroyedValue;
         /**
          * ЖЕТОНЫ НА КАРТЕ ТРОФЕЕВ — что именно снесли и по сколько очков. Раньше в
          * записи было только их число, и показать карту трофеев «как на столе» было
          * нечем (просьба дизайнера 13.08.2026).
          */
-        public final List<TrophyToken> trophyCard = new ArrayList<>();
+        public final List<DestroyedToken> destroyedCard = new ArrayList<>();
         /**
          * ТРОФЕИ, ЗАДЕРЖАННЫЕ НА КАРТЕ «Трофейный склад» (b13) — ОТДЕЛЬНО от
          * обычного трофейного пространства: за столом это разные места, и
          * жетон отсюда не вернётся владельцу в ближайший Возврат. Раньше
          * запись их не различала (дыра §8 п.6 концепта «Командный пункт»).
          */
-        public final List<TrophyToken> trophyHeld = new ArrayList<>();
+        public final List<DestroyedToken> destroyedHeld = new ArrayList<>();
         /**
          * КАРТЫ-СИМВОЛЫ ПОД ПЛАНШЕТОМ — раньше в запись не попадали вовсе
          * (дыра §8 п.3 концепта): ни факт (публичен), ни лица (нужны журналу).
@@ -286,6 +294,14 @@ public final class ReplayRecord {
         public int ammoCap;
         public int storeCap;
         public final Map<String, Integer> tech = new LinkedHashMap<>();
+        /**
+         * КУБИКИ НАУКИ, ОСТАВШИЕСЯ В ЛИЧНОМ ЗАПАСЕ. В сводах, где кубик занимает
+         * ячейку навсегда, это главное число трека: сколько шагов игрок вообще
+         * ещё может купить. −1 — свод играет по-старому (кубик один на трек и
+         * переставляется), и в проигрывателе вместо запаса рисуется стартовая
+         * зона, как раньше.
+         */
+        public int techCubes = -1;
         public int redModules;
         public int blueModules;
         public int goldModules;
@@ -708,30 +724,30 @@ public final class ReplayRecord {
         v.coin = p.resources.coin();
         v.kelium = p.resources.kelium();
         v.ammo = p.resources.ammo();
-        v.debris = p.resources.debris();
-        v.debrisCap = kelium.engine.Storage.debrisMax(s, p);
-        v.trophyTokens = p.trophySpace.size();
-        v.trophyPoints = p.trophySpacePoints();
+        v.trophy = p.resources.trophy();
+        v.trophyCap = kelium.engine.Storage.trophyMax(s, p);
+        v.destroyedCount = p.destroyedTokens.size();
+        v.destroyedValue = p.destroyedValue();
         // Сами жетоны на карте трофеев: их надо показать «как на столе»
-        for (kelium.core.Token t : p.trophySpace) {
-            TrophyToken tt = new TrophyToken();
+        for (kelium.core.Token t : p.destroyedTokens) {
+            DestroyedToken tt = new DestroyedToken();
             tt.uid = t.uid();
             tt.owner = t.owner();
             tt.building = t instanceof kelium.core.BuildingToken;
             tt.type = t instanceof kelium.core.BuildingToken bt ? bt.type.code
                 : ((kelium.core.UnitToken) t).type.code;
             tt.value = t.trophyValue();
-            v.trophyCard.add(tt);
+            v.destroyedCard.add(tt);
         }
-        for (kelium.core.Token t : p.trophyHeldOnCards) {
-            TrophyToken tt = new TrophyToken();
+        for (kelium.core.Token t : p.destroyedOnCards) {
+            DestroyedToken tt = new DestroyedToken();
             tt.uid = t.uid();
             tt.owner = t.owner();
             tt.building = t instanceof kelium.core.BuildingToken;
             tt.type = t instanceof kelium.core.BuildingToken bt ? bt.type.code
                 : ((kelium.core.UnitToken) t).type.code;
             tt.value = t.trophyValue();
-            v.trophyHeld.add(tt);
+            v.destroyedHeld.add(tt);
         }
         for (kelium.core.PlayerState.TuckedCard t : p.tucked) {
             Tucked x = new Tucked();
@@ -758,12 +774,13 @@ public final class ReplayRecord {
         // ПРЕДЕЛЫ СКЛАДА СЧИТАЮТСЯ С ПАРТИЕЙ В РУКАХ, как их считает движок:
         // способности арсенала добавляют ячейки, и без них запись показывала
         // меньший склад, чем игра разрешала. В проигрывателе это выглядело как
-        // «занято 13 из 11», а предел обломков (он-то считался правильно, через
-        // partию) уходил в минус: «обломки 0 из −2».
+        // «занято 13 из 11», а предел трофеев (он-то считался правильно, через
+        // partию) уходил в минус: «трофеи 0 из −2».
         v.keliumCap = Storage.keliumMax(s, p);
         v.ammoCap = Storage.ammoMax(s, p);
         v.storeCap = Storage.totalMax(s, p);
         v.tech.putAll(new TreeMap<>(p.techSteps));
+        v.techCubes = p.techCubesLeft;
         v.redModules = p.redModules;
         v.blueModules = p.blueModules;
         v.goldModules = p.goldModules;
@@ -885,6 +902,8 @@ public final class ReplayRecord {
         m.put("seatColors", seatColors);
         m.put("winner", winner);
         m.put("condition", condition);
+        m.put("spawnLeft", spawnLeft);
+        m.put("spawnThreshold", spawnThreshold);
         m.put("rounds", rounds);
         m.put("unitStock", unitStock);
         m.put("cardNames", cardNames);
@@ -1095,14 +1114,14 @@ public final class ReplayRecord {
         o.put("coin", p.coin);
         o.put("kelium", p.kelium);
         o.put("ammo", p.ammo);
-        o.put("debris", p.debris);
-        o.put("debrisCap", p.debrisCap);
+        o.put("trophy", p.trophy);
+        o.put("trophyCap", p.trophyCap);
         o.put("storageCells", p.storageCells);
-        o.put("trophyTokens", p.trophyTokens);
-        o.put("trophyPoints", p.trophyPoints);
-        if (!p.trophyCard.isEmpty()) {
+        o.put("destroyedCount", p.destroyedCount);
+        o.put("destroyedValue", p.destroyedValue);
+        if (!p.destroyedCard.isEmpty()) {
             List<Object> tc = new ArrayList<>();
-            for (TrophyToken t : p.trophyCard) {
+            for (DestroyedToken t : p.destroyedCard) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("uid", t.uid);
                 m.put("owner", t.owner);
@@ -1111,11 +1130,11 @@ public final class ReplayRecord {
                 m.put("value", t.value);
                 tc.add(m);
             }
-            o.put("trophyCard", tc);
+            o.put("destroyedCard", tc);
         }
-        if (!p.trophyHeld.isEmpty()) {
+        if (!p.destroyedHeld.isEmpty()) {
             List<Object> th = new ArrayList<>();
-            for (TrophyToken t : p.trophyHeld) {
+            for (DestroyedToken t : p.destroyedHeld) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("uid", t.uid);
                 m.put("owner", t.owner);
@@ -1124,7 +1143,7 @@ public final class ReplayRecord {
                 m.put("value", t.value);
                 th.add(m);
             }
-            o.put("trophyHeld", th);
+            o.put("destroyedHeld", th);
         }
         if (!p.tucked.isEmpty()) {
             List<Object> tu = new ArrayList<>();
@@ -1146,6 +1165,7 @@ public final class ReplayRecord {
         o.put("ammoCap", p.ammoCap);
         o.put("storeCap", p.storeCap);
         o.put("tech", p.tech);
+        o.put("techCubes", p.techCubes);
         o.put("red", p.redModules);
         o.put("blue", p.blueModules);
         o.put("gold", p.goldModules);
@@ -1210,6 +1230,10 @@ public final class ReplayRecord {
         }
         r.winner = Json.io(m, "winner");
         r.condition = orEmpty(Json.s(m, "condition"));
+        // Старые записи этих полей не несут: Json.i вернёт 0, а «ноль
+        // источников» - осмысленное значение, поэтому отсутствие читаем как -1.
+        r.spawnLeft = m.containsKey("spawnLeft") ? Json.i(m, "spawnLeft") : -1;
+        r.spawnThreshold = m.containsKey("spawnThreshold") ? Json.i(m, "spawnThreshold") : -1;
         r.rounds = Json.i(m, "rounds");
         // старые записи этого поля не несут — тогда печатный запас по правилам (4)
         Map<String, Object> stock = Json.map(m, "unitStock");
@@ -1440,37 +1464,37 @@ public final class ReplayRecord {
         p.coin = Json.i(o, "coin");
         p.kelium = Json.i(o, "kelium");
         p.ammo = Json.i(o, "ammo");
-        p.debris = Json.i(o, "debris");
-        p.debrisCap = Json.i(o, "debrisCap");
+        p.trophy = Json.i(o, "trophy");
+        p.trophyCap = Json.i(o, "trophyCap");
         Map<String, Object> cells = Json.map(o, "storageCells");
         if (cells != null) {
             for (Map.Entry<String, Object> e : cells.entrySet()) {
                 p.storageCells.put(e.getKey(), String.valueOf(e.getValue()));
             }
         }
-        p.trophyTokens = Json.i(o, "trophyTokens");
-        p.trophyPoints = Json.i(o, "trophyPoints");
-        for (Object to : Json.list(o, "trophyCard")) {
+        p.destroyedCount = Json.i(o, "destroyedCount");
+        p.destroyedValue = Json.i(o, "destroyedValue");
+        for (Object to : Json.list(o, "destroyedCard")) {
             @SuppressWarnings("unchecked")
             Map<String, Object> m = (Map<String, Object>) to;
-            TrophyToken t = new TrophyToken();
+            DestroyedToken t = new DestroyedToken();
             t.uid = Json.i(m, "uid");
             t.owner = Json.i(m, "owner");
             t.building = Json.b(m, "building");
             t.type = Json.s(m, "type");
             t.value = Json.i(m, "value");
-            p.trophyCard.add(t);
+            p.destroyedCard.add(t);
         }
-        for (Object to : Json.list(o, "trophyHeld")) {
+        for (Object to : Json.list(o, "destroyedHeld")) {
             @SuppressWarnings("unchecked")
             Map<String, Object> m = (Map<String, Object>) to;
-            TrophyToken t = new TrophyToken();
+            DestroyedToken t = new DestroyedToken();
             t.uid = Json.i(m, "uid");
             t.owner = Json.i(m, "owner");
             t.building = Json.b(m, "building");
             t.type = Json.s(m, "type");
             t.value = Json.i(m, "value");
-            p.trophyHeld.add(t);
+            p.destroyedHeld.add(t);
         }
         for (Object to : Json.list(o, "tucked")) {
             @SuppressWarnings("unchecked")
@@ -1488,6 +1512,9 @@ public final class ReplayRecord {
         p.ammoCap = Json.i(o, "ammoCap");
         p.storeCap = Json.i(o, "storeCap");
         p.tech.putAll(Json.ints(o, "tech"));
+        // Старые записи поля не несут, и ноль там означал бы «кубиков не
+        // осталось» — то есть враньё. Отсутствие читаем как −1.
+        p.techCubes = o.containsKey("techCubes") ? Json.i(o, "techCubes") : -1;
         p.redModules = Json.i(o, "red");
         p.blueModules = Json.i(o, "blue");
         p.goldModules = Json.i(o, "gold");
