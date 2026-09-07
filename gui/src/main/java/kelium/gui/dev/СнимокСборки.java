@@ -42,6 +42,10 @@ public final class СнимокСборки {
         }
 
         for (boolean метки : new boolean[]{false, true}) {
+            BufferedImage в = выгрузка(метки, w, h);
+            File файл = new File(dir, "выгрузка-" + (метки ? "картонки" : "контуры") + ".png");
+            ImageIO.write(в, "png", файл);
+            System.out.println(файл.getName() + "   " + в.getWidth() + "x" + в.getHeight());
             for (boolean dark : new boolean[]{false, true}) {
                 BufferedImage img = снимок(dark, метки, w, h);
                 File out = new File(dir, "сборка-" + (метки ? "картонки-" : "контуры-")
@@ -51,6 +55,42 @@ public final class СнимокСборки {
                     + описатьЦвет(img.getRGB(w / 2, h - 60)));
             }
         }
+    }
+
+    /**
+     * СНИМОК ВЫГРУЗКИ, а не экрана: тот же путь, которым делается PNG.
+     *
+     * <p>Проверять надо именно его. На экране подписи блоков стоят по краю
+     * поля и всегда влезают, а в выгрузке кадр свой, масштаб свой, и подпись
+     * может уехать за край — ровно на это дизайнер и жаловался.
+     */
+    private static BufferedImage выгрузка(boolean метки, int w, int h) throws Exception {
+        final BufferedImage[] держатель = new BufferedImage[1];
+        SwingUtilities.invokeAndWait(() -> {
+            Theme.apply(false);
+            AssemblyWindow вкладка = new AssemblyWindow(поле());
+            вкладка.перекрасить();
+            вкладка.setSize(900, 600);
+            вкладка.doLayout();
+            вкладка.refresh();
+        });
+        Thread.sleep(1200);
+        SwingUtilities.invokeAndWait(() -> { });
+        final AssemblyWindow[] в = new AssemblyWindow[1];
+        SwingUtilities.invokeAndWait(() -> {
+            AssemblyWindow вкладка = new AssemblyWindow(поле());
+            вкладка.перекрасить();
+            вкладка.setSize(900, 600);
+            вкладка.doLayout();
+            вкладка.refresh();
+            в[0] = вкладка;
+        });
+        Thread.sleep(1200);
+        SwingUtilities.invokeAndWait(() -> {
+            в[0].показыватьМетки(метки);
+            держатель[0] = в[0].renderField(w, h);
+        });
+        return держатель[0];
     }
 
     private static BufferedImage снимок(boolean dark, boolean метки, int w, int h)
