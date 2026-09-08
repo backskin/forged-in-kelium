@@ -213,6 +213,29 @@ public final class OrderCardsPanel extends JComponent {
         }
     }
 
+    /**
+     * ПЕЧАТНОЕ ЛИЦО КАРТЫ ПРИКАЗА — или {@code null}, если художник его не рисовал.
+     *
+     * <p>Обычная карта ищется по своему идентификатору ({@code blue_infra}), у
+     * которого в имени и колода, и верхний приказ. У БЕЗОПАСНОСТИ идентификатор
+     * пронумерован по МЕСТУ ({@code security_1}…), а печатается она в цвете
+     * колоды игрока — поэтому для неё спрашивается цвет, а не номер.
+     */
+    private static java.awt.image.BufferedImage orderArt(String cardId, String deckColor) {
+        if (cardId == null || cardId.isBlank()) {
+            return null;
+        }
+        if (cardId.startsWith("security")) {
+            String c = deckColor == null || deckColor.isBlank() ? "" : deckColor;
+            // «red» и «scarlet» — одно и то же: в наборе колода зовётся алой, а
+            // в идентификаторах карт стоит red.
+            String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
+            return kelium.report.Textures.orderCard("security_" + c,
+                alt.isEmpty() ? null : "security_" + alt, "security");
+        }
+        return kelium.report.Textures.orderCard(cardId);
+    }
+
     private Color deckColour(ReplayRecord.Player p) {
         if (p.orderColor == null || p.orderColor.isBlank()) {
             return Theme.tile();
@@ -322,7 +345,7 @@ public final class OrderCardsPanel extends JComponent {
                     at.x() + at.w() / 2.0, h + at.h() * 0.42);
             }
             drawCard(g, at.x(), at.y(), at.w(), at.h(), deck, at.active(),
-                at.top(), at.bottom(), at.tip());
+                at.top(), at.bottom(), at.tip(), id, p.orderColor);
             g.setTransform(savedTr);
             g.setComposite(savedComp);
         }
@@ -539,10 +562,26 @@ public final class OrderCardsPanel extends JComponent {
      */
     private void drawCard(Graphics2D g, double x, double y, double w, double h,
                           Color deck, boolean active, String top, String bottom,
-                          String tip) {
+                          String tip, String cardId, String deckColor) {
         Shape card = new RoundRectangle2D.Double(x, y, w, h, Theme.px(6), Theme.px(6));
         g.setColor(Theme.panel());
         g.fill(card);
+        // ПЕЧАТНОЕ ЛИЦО КАРТЫ, если художник его нарисовал. Раньше карта была
+        // цветным прямоугольником с двумя подписями; теперь под подписями лежит
+        // сама карта, и веер в руке выглядит как рука за столом. Подписи
+        // остаются поверх: в полосе шириной с палец печатный текст не прочесть,
+        // а знать, что за приказ, надо с одного взгляда.
+        java.awt.image.BufferedImage art = orderArt(cardId, deckColor);
+        if (art != null) {
+            Shape saved = g.getClip();
+            g.clip(card);
+            g.drawImage(art, (int) Math.round(x), (int) Math.round(y),
+                (int) Math.round(w), (int) Math.round(h), null);
+            g.setClip(saved);
+            // Лёгкая вуаль цветом колоды: рисунок не должен спорить с подписями.
+            g.setColor(Theme.alpha(Theme.panel(), active ? 0.30 : 0.45));
+            g.fill(card);
+        }
         g.setColor(Theme.alpha(deck, active ? 0.42 : 0.24));
         g.fill(card);
         g.setColor(active ? Theme.accent() : Theme.alpha(deck, 0.85));

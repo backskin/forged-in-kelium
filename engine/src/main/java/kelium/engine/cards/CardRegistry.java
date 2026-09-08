@@ -37,6 +37,22 @@ public final class CardRegistry {
     private static final List<String> MISSING = new ArrayList<>();
     private static boolean loaded;
 
+    /**
+     * КАКАЯ ВЕРСИЯ НАБОРА СЕЙЧАС ПОДКЛЮЧЕНА, по семействам.
+     *
+     * <p>Нужна картам, у которых от версии набора зависят ЧИСЛА, а не только
+     * состав колоды: щедрость наград заданий ({@code kelium.cards.objectives.
+     * Щедрость}) объявлена по версиям, и без этого карта не могла бы узнать,
+     * какую версию себя сейчас издают. Наборы неизменяемы, поэтому спросить
+     * версию — единственный честный способ: править числа на месте нельзя.
+     */
+    private static final Map<String, String> ACTIVE_VERSION = new LinkedHashMap<>();
+
+    /** Версия набора, подключённого последней загрузкой; {@code null} — неизвестна. */
+    public static synchronized String activeVersion(String family) {
+        return ACTIVE_VERSION.get(family);
+    }
+
     private static synchronized void load() {
         if (loaded) {
             return;
@@ -84,6 +100,22 @@ public final class CardRegistry {
      */
     public static synchronized void bindAll(String family,
                                             List<Map<String, Object>> entries) {
+        bindAll(family, null, entries);
+    }
+
+    /**
+     * То же, но с ВЕРСИЕЙ набора. Версия запоминается ДО выгрузки карт: карта
+     * вправе спросить, какую версию себя сейчас издают, прямо в {@code data()}
+     * — так устроена щедрость наград заданий.
+     *
+     * @param version версия набора из {@code content_versions}; {@code null} —
+     *                неизвестна (сцена собрана вручную в тесте)
+     */
+    public static synchronized void bindAll(String family, String version,
+                                            List<Map<String, Object>> entries) {
+        if (version != null) {
+            ACTIVE_VERSION.put(family, version);
+        }
         load();
         for (Map<String, Object> entry : entries) {
             String id = String.valueOf(entry.get("id"));

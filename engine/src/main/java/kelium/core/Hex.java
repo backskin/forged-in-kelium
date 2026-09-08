@@ -159,6 +159,29 @@ public final class Hex {
      */
     public int containerTokens = 0;
 
+    /**
+     * КАКОЙ КАРТОНКОЙ НАКРЫТ ЭТОТ ГЕКС — блок, его сторона, поворот и место
+     * гекса ВНУТРИ блока.
+     *
+     * <p>Поле на столе собирается из двадцати картонных модулей, и печатные
+     * ячейки берутся не из воздуха, а с того модуля, который сюда лёг
+     * ({@link kelium.engine.BlockStamp}). Прежде игра помнила только результат —
+     * какие ячейки напечатаны, — и показать, ЧЕМ накрыт гекс, было нечем:
+     * рисовалась одна и та же безликая гексовая плитка.
+     *
+     * <p>{@code blockId} — {@code Б1}…{@code М5}; {@code blockSide} — сторона
+     * ({@code A}/{@code B}); {@code blockRot} — на сколько шагов по 60° по
+     * часовой повёрнута картонка; {@code blockQ}/{@code blockR} — осевые
+     * координаты этого гекса В САМОМ БЛОКЕ (как в {@code data/blocks}). Пусто
+     * ({@code blockId == null}) — поле не размечено блоками: ручные сцены
+     * тестов и старые записи партий.
+     */
+    public String blockId;
+    public String blockSide;
+    public int blockRot;
+    public int blockQ;
+    public int blockR;
+
     public Hex(String id) {
         this.id = id;
     }
@@ -192,6 +215,11 @@ public final class Hex {
         h.energyCell = energyCell;
         h.containerTaken = containerTaken;
         h.containerTokens = containerTokens;
+        h.blockId = blockId;
+        h.blockSide = blockSide;
+        h.blockRot = blockRot;
+        h.blockQ = blockQ;
+        h.blockR = blockR;
         return h;
     }
 

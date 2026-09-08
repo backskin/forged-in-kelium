@@ -108,27 +108,42 @@ class PrintedContainersTest {
 
     @Test
     void groundUnitTakesGroundContainerAndAircraftTakesAirOne() {
-        GameState s = game(23L);
-        PlayerState p = s.player(0);
         // ГЕКСЫ ОБЯЗАНЫ БЫТЬ СВОБОДНЫ. По правилу занятый сектор контейнера не
         // отдаёт никому, а на стартовом гексе стоят ЦУ с пехотой: беря ПЕРВЫЙ
         // подходящий гекс, тест держался на том, что в наборе 1.4.0 он случайно
         // оказывался пустым. С набором 5.0.0 первым пошёл занятый — тест упал,
         // и правильно упал.
+        //
+        // ПОЛЕ ПОДБИРАЕТСЯ, А НЕ ЗАДАЁТСЯ ОДНИМ СИДОМ (08.09.2026). Тест
+        // проверяет МЕХАНИКУ: наземный жетон берёт наземный контейнер, авиация
+        // воздушный. Ему нужен лишь расклад, где есть свободный гекс с
+        // наземной ячейкой и свободный с воздушной. Держаться одного сида
+        // нельзя: поле кроется настоящими картонками, и от смены набора или
+        // укладки одного из двух видов на этом сиде может не оказаться — тест
+        // упадёт не потому, что механика сломалась.
+        GameState s = null;
+        PlayerState p = null;
         Hex ground = null;
         Hex sky = null;
-        for (Hex h : s.field.hexes.values()) {
-            if (!PrintedContainers.visibleContainer(s, h) || !чистыйГекс(s, h)) {
-                continue;
-            }
-            if (h.containerCell != BlockStamp.AIR && ground == null) {
-                ground = h;
-            }
-            if (h.containerCell == BlockStamp.AIR && sky == null) {
-                sky = h;
+        for (long seed = 23; seed < 60 && (ground == null || sky == null); seed++) {
+            s = game(seed);
+            p = s.player(0);
+            ground = null;
+            sky = null;
+            for (Hex h : s.field.hexes.values()) {
+                if (!PrintedContainers.visibleContainer(s, h) || !чистыйГекс(s, h)) {
+                    continue;
+                }
+                if (h.containerCell != BlockStamp.AIR && ground == null) {
+                    ground = h;
+                }
+                if (h.containerCell == BlockStamp.AIR && sky == null) {
+                    sky = h;
+                }
             }
         }
-        assertTrue(ground != null && sky != null, "нашлись оба вида открытых ячеек");
+        assertTrue(ground != null && sky != null,
+            "ни на одном поле не нашлось сразу двух видов открытых ячеек");
 
         int before = p.containers;
         assertEquals(1, PrintedContainers.onUnitPlaced(s, p, ground.id, UnitType.INFANTRY),

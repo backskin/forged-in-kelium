@@ -14,9 +14,10 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
-import kelium.gui.BlockAssembler.Cell;
-import kelium.gui.BlockAssembler.Placement;
-import kelium.gui.BlockAssembler.Result;
+import kelium.engine.BlockAssembler;
+import kelium.engine.BlockAssembler.Cell;
+import kelium.engine.BlockAssembler.Placement;
+import kelium.engine.BlockAssembler.Result;
 
 /**
  * СБОРКА ИЗ БЛОКОВ ОБЯЗАНА СОВПАДАТЬ С НАРИСОВАННЫМ ПОЛЕМ.

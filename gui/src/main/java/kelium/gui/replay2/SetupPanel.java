@@ -94,6 +94,12 @@ public final class SetupPanel extends JPanel {
 
     /** Сид сборки картонных блоков — отдельный от сида партии. */
     private Long blockSeed;
+    /**
+     * УКЛАДКА КАРТОНОК НОМЕРОМ: «по сиду» либо один из способов, которыми поле
+     * этой формы вообще кроется (их находит {@link kelium.engine.BlockStamp}).
+     */
+    private final JComboBox<String> сборка = new JComboBox<>(
+        new String[]{"по сиду", "1", "2", "3", "4", "5", "6"});
     /** Мешок раскладок: пока не опустеет, поле не повторится. */
     private final List<Integer> fieldBag = new ArrayList<>();
     private final Random rng = new Random();
@@ -200,19 +206,38 @@ public final class SetupPanel extends JPanel {
         blocks.setFont(Theme.body());
         blocks.setFocusable(false);
         blocks.setToolTipText(Ui2.tip("Разложить поле ДРУГИМИ картонными блоками: "
-            + "печатные контейнеры окажутся на других ячейках. Сид партии, раскладка "
-            + "гексов и боты те же."));
+            + "другие картонки из коробки, другой поворот, другие стороны — значит "
+            + "печатные контейнеры и жёлтые ячейки окажутся в других местах. Сид "
+            + "партии, раскладка гексов и боты те же."));
         blocks.addActionListener(e -> {
             blockSeed = (long) Math.abs(rng.nextInt(1_000_000));
             onPreview.run();
             say.accept("Поле собрано другими блоками (сборка " + blockSeed
                 + "). Контейнеры переехали; сама партия та же.");
         });
+        // ВЫБОР УКЛАДКИ НОМЕРОМ (заказ дизайнера 08.09.2026). Поле кроется
+        // настоящими картонками, и уложить их можно несколькими способами —
+        // движок находит все и по умолчанию берёт один по сиду. Здесь способ
+        // можно ПРИБИТЬ и сравнить укладки между собой, не трогая ничего больше.
+        сборка.setFont(Theme.body());
+        сборка.setToolTipText(Ui2.tip("Какой УКЛАДКОЙ накрыть поле картонками. "
+            + "«по сиду» — как выпадет; номер — всегда эта укладка. Укладок у "
+            + "каждой формы поля своё число: если выбранной нет, движок берёт "
+            + "по сиду."));
+        sameWidth(сборка);
+        сборка.addActionListener(e -> {
+            kelium.engine.BlockStamp.вариантСборки = сборка.getSelectedIndex();
+            onPreview.run();
+            say.accept(сборка.getSelectedIndex() == 0
+                ? "Укладка картонок выбирается по сиду партии."
+                : "Поле кроется укладкой № " + сборка.getSelectedIndex() + ".");
+        });
         row1.add(group("Поле",
             cell(Ui2.label("поле:"), fieldBox,
                 Ui2.iconButton(TransportIcons.of("SHUFFLE", Theme.px(16)),
                     "Случайная раскладка. Идём перетасованным мешком: пока все поля не "
                     + "покажутся, повторов не будет.", 24, this::pickRandomField)),
+            cell(Ui2.label("укладка:"), сборка),
             blocks));
         row1.add(divider());
 
@@ -442,6 +467,7 @@ public final class SetupPanel extends JPanel {
         seed.setEnabled(!busy);
         ruleset.setEnabled(!busy);
         fieldBox.setEnabled(!busy);
+        сборка.setEnabled(!busy);
         for (int i = 0; i < 4; i++) {
             seats[i].setEnabled(!busy && enabled(i));
             levels[i].setEnabled(!busy && enabled(i));

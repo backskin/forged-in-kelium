@@ -87,6 +87,13 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
      * пересчитывается сам: не хватило места — появляется прокрутка.
      */
     private static Dimension design() {
+        // ПЕЧАТНЫЕ ПЛАНШЕТЫ НЕ ВЁРСТКА, А ДВЕ КАРТИНКИ: они умеют быть любого
+        // размера и сами вписываются в отведённое место (см. paintPrinted).
+        // Прокручивать их незачем — незачем и объявлять вершину вёрстки.
+        if (печатные()) {
+            return new Dimension(kelium.gui.replay2.Theme.px(700),
+                kelium.gui.replay2.Theme.px(420));
+        }
         return new Dimension(kelium.gui.replay2.Theme.px(DESIGN_W),
             kelium.gui.replay2.Theme.px(DESIGN_H));
     }
@@ -153,9 +160,374 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         }
         int w = getWidth();
         int h = getHeight();
+        if (печатные()) {
+            paintPrinted(g, w, h);
+            return;
+        }
         int split = Math.max(360, (int) (w * 0.58));
         paintScience(g, 12, 12, split - 24, h - 24);
         paintMarket(g, split, 12, w - split - 12, h - 24);
+    }
+
+    // ==================== ПЕЧАТНЫЕ ПЛАНШЕТЫ СТОЛА ====================
+    //
+    // ЭТО ТЕ САМЫЕ ДОСКИ, ЧТО ЛЕЖАТ НА СТОЛЕ (заказ дизайнера 08.09.2026: «я их
+    // отрисовал и хочу видеть их в симуляторе»). Поэтому здесь не рисованная
+    // копия планшетов, а САМИ картинки компонентов, а поверх них кладётся живое:
+    // кубики науки в напечатанные ячейки — с тем же поворотом, с каким ячейка
+    // напечатана, — и активная карта рынка в свою рамку, а на карту кубики
+    // предложений.
+    //
+    // Куда именно класть, говорят якоря BoardAnchors.science() и
+    // BoardAnchors.marketCard() (сняты по самим картинкам). Нет картинок или нет
+    // якорей — планшеты рисуются прежним рисованным видом ниже, и партия от
+    // этого не зависит: печать не источник правил.
+
+    /** Готовы ли обе картинки и якоря к ним. */
+    private static boolean печатные() {
+        return kelium.report.Textures.board("science") != null
+            && kelium.report.Textures.board("market") != null
+            && kelium.gui.replay2.BoardAnchors.science() != null
+            && kelium.gui.replay2.BoardAnchors.marketCard() != null;
+    }
+
+    private void paintPrinted(Graphics2D g, int w, int h) {
+        int pad = kelium.gui.replay2.Theme.px(10);
+        int strip = kelium.gui.replay2.Theme.px(84);
+        int gap = kelium.gui.replay2.Theme.px(12);
+        java.awt.image.BufferedImage sci = kelium.report.Textures.board("science");
+        java.awt.image.BufferedImage mkt = kelium.report.Textures.board("market");
+        double aspS = sci.getWidth() / (double) sci.getHeight();
+        double aspM = mkt.getWidth() / (double) mkt.getHeight();
+        int roomW = w - 2 * pad - gap;
+        int roomH = h - 2 * pad - strip;
+        if (roomW < 80 || roomH < 60) {
+            return;
+        }
+        // Оба планшета одной высоты и целиком в отведённом месте: доска, у
+        // которой обрезан край, читается как другая доска.
+        int hh = Math.min(roomH, (int) (roomW / (aspS + aspM)));
+        int sw = (int) Math.round(hh * aspS);
+        int mw = (int) Math.round(hh * aspM);
+        int x0 = pad + (roomW - sw - mw) / 2;
+        int y0 = pad + (roomH - hh) / 2;
+        paintScienceArt(g, sci, x0, y0, sw, hh);
+        paintMarketArt(g, mkt, x0 + sw + gap, y0, mw, hh);
+        paintPrintedStrip(g, pad, h - pad - strip, w - 2 * pad, strip);
+    }
+
+    /** Планшет науки: картинка плюс кубики в напечатанных ячейках. */
+    private void paintScienceArt(Graphics2D g, java.awt.image.BufferedImage art,
+                                 int x, int y, int w, int h) {
+        g.drawImage(scaled(art, w, h), x, y, null);
+        kelium.gui.replay2.BoardAnchors.Science sc = kelium.gui.replay2.BoardAnchors.science();
+        double k = w / (double) sc.artW();
+        int[] cost = ints("tech.step_cost_trophy", new int[]{1, 2, 3, 4});
+        int[] cap = ints("tech.step_capacity", new int[]{3, 3, 2, 1});
+        int steps = Math.min(cost.length, cap.length);
+        int players = record == null ? snap.players.size() : record.players;
+        // Кубик ЗАМЕТНО МЕНЬШЕ ячейки: на столе он лежит внутри рамки, а не
+        // вместо неё, и напечатанный приз ячейки должен остаться виден.
+        int cube = (int) Math.round(Math.min(sc.cellW(), sc.cellH()) * k * 0.56);
+        for (int t = 0; t < TRACKS.length; t++) {
+            for (int step = 1; step <= steps; step++) {
+                List<Integer> here = seatsOnStep(TRACKS[t], step);
+                List<Integer> mins = cellMins(step - 1, cap[step - 1]);
+                int used = 0;
+                for (int cell = 0; cell < mins.size(); cell++) {
+                    if (players < mins.get(cell) || used >= here.size()) {
+                        continue;      // закрытая ячейка помечена на самой печати
+                    }
+                    double[] c = sc.cell(TRACKS[t], step, cell, steps);
+                    if (c == null) {
+                        continue;
+                    }
+                    кубикВЯчейку(g, x + c[0] * k, y + c[1] * k, cube, sc.angle(),
+                        FieldView.seatColor(here.get(used++)));
+                }
+            }
+            // ВЕРШИНА ЗАНЯТА — карту супер-арсенала с неё уже забрали. На печати
+            // в этой рамке нарисована карта, и без пометки кажется, что она ещё
+            // лежит там.
+            kelium.gui.replay2.BoardAnchors.ScienceTrack tr = sc.tracks().get(TRACKS[t]);
+            int holder = peakHolder(TRACKS[t], steps);
+            if (tr != null && holder >= 0) {
+                int cx = x + (int) Math.round(tr.cx() * k);
+                int cy = y + (int) Math.round(tr.cy() * k);
+                int cw = (int) Math.round(tr.cw() * k);
+                int ch = (int) Math.round(tr.ch() * k);
+                g.setColor(kelium.gui.replay2.Theme.alpha(kelium.gui.replay2.Theme.bg(), 0.62));
+                g.fillRoundRect(cx, cy, cw, ch, 8, 8);
+                g.setColor(FieldView.seatStroke(holder));
+                g.setStroke(new BasicStroke(Math.max(2f, (float) (6 * k))));
+                g.drawRoundRect(cx, cy, cw, ch, 8, 8);
+                cube(g, cx + cw / 2 - cube / 2, cy + ch / 2 - cube / 2, cube,
+                    FieldView.seatColor(holder));
+            }
+        }
+    }
+
+    /**
+     * КУБИК В ПОВЁРНУТОЙ ЯЧЕЙКЕ. Ячейки шагов напечатаны по гексовой сетке и
+     * лежат наискось; кубик, положенный «прямо», торчит углами из рамки
+     * (заказ дизайнера 08.09.2026: «чтобы по трекам с нужным поворотом клались
+     * кубики»). Поэтому поворачивается не рисунок кубика, а само полотно.
+     */
+    private static void кубикВЯчейку(Graphics2D g, double cx, double cy, int size,
+                                     double angleDeg, Color colour) {
+        java.awt.geom.AffineTransform old = g.getTransform();
+        g.translate(cx, cy);
+        g.rotate(Math.toRadians(angleDeg));
+        cube(g, -size / 2, -size / 2, size, colour);
+        g.setTransform(old);
+    }
+
+    /** Планшет рынка: картинка плюс активная карта в своей напечатанной рамке. */
+    private void paintMarketArt(Graphics2D g, java.awt.image.BufferedImage art,
+                                int x, int y, int w, int h) {
+        g.drawImage(scaled(art, w, h), x, y, null);
+        int[] slot = kelium.gui.replay2.BoardAnchors.marketCard();
+        double k = w / (double) art.getWidth();
+        int cellCost = ((Number) rget("market.cell_cost_kelium", 1)).intValue();
+        int players = record == null ? snap.players.size() : record.players;
+        картаВЯчейку(g,
+            x + (int) Math.round(slot[0] * k), y + (int) Math.round(slot[1] * k),
+            (int) Math.round(slot[2] * k), (int) Math.round(slot[3] * k),
+            cellCost, players);
+    }
+
+    /**
+     * АКТИВНАЯ КАРТА РЫНКА В СВОЕЙ НАПЕЧАТАННОЙ ЯЧЕЙКЕ.
+     *
+     * <p>Отдельная вёрстка, а не {@link #paintMarketCard}: та рисует карту в
+     * широкой полосе планшета и рассчитана на её пропорции, а печатная ячейка —
+     * ровно карта арсенального формата (68×44), и в неё та вёрстка не влезает:
+     * предложения наезжают друг на друга, а последняя строка выходит за карту.
+     * Поэтому здесь всё считается ДОЛЯМИ от самой карты, а кегль подбирается по
+     * месту — карта на экране бывает и в двести пикселей, и в шестьсот.
+     */
+    private void картаВЯчейку(Graphics2D g, int x, int y, int w, int h,
+                              int cellCost, int players) {
+        Map<String, Object> card = snap.market == null ? null : find("market", snap.market);
+        Color accent = new Color(0x2F, 0x85, 0x5A);      // зелень планшета рынка
+        int r = Math.max(6, h / 12);
+        int pad = Math.max(5, w / 32);
+        g.setColor(kelium.gui.replay2.Theme.isDark()
+            ? mix(paper(), accent, 0.22) : mix(Color.WHITE, accent, 0.05));
+        g.fillRoundRect(x, y, w, h, r, r);
+        g.setColor(accent);
+        g.setStroke(new BasicStroke(Math.max(1.6f, h / 90f)));
+        g.drawRoundRect(x, y, w, h, r, r);
+        double du = h * 100.0 / Math.max(1, kelium.gui.replay2.Theme.px(100));
+
+        // ---- шапка: название карты на цветной полосе ----
+        int band = (int) (h * 0.21);
+        g.setColor(kelium.gui.replay2.Theme.alpha(accent, 0.18));
+        g.fillRoundRect(x + 2, y + 2, w - 4, band, r, r);
+        g.fillRect(x + 2, y + band - r, w - 4, r);
+        String name = card == null
+            ? (snap.market == null ? "карта рынка не открыта" : snap.market)
+            : String.valueOf(card.get("name"));
+        g.setFont(вписать(g, name, w - 2 * pad,
+            kelium.gui.replay2.Theme.display(du * 0.135), 0.6));
+        g.setColor(card == null ? ink3() : ink());
+        g.drawString(name, x + pad, y + (int) (band * 0.78));
+        if (card == null) {
+            return;
+        }
+
+        // ---- пояснение карты: две строки, дальше не влезает ----
+        int ty = y + band + (int) (h * 0.09);
+        Object descr = card.get("описание");
+        int textH = 0;
+        if (descr != null) {
+            g.setFont(kelium.gui.replay2.Theme.note(du * 0.052));
+            g.setColor(ink3());
+            // ТРИ строки, а не две: на двух текст карты обрывался посреди фразы
+            // («…Подлог оставляет на»), а место под третью на карте есть.
+            textH = wrap(g, String.valueOf(descr), x + pad, ty, w - 2 * pad,
+                (int) (h * 0.058), 3);
+        }
+
+        // ---- два предложения: остаток карты пополам ----
+        int oy = ty + textH + (int) (h * 0.03);
+        int rowH = (h - (oy - y) - pad) / 2;
+        предложениеВЯчейку(g, x + pad, oy, w - 2 * pad, rowH - Math.max(2, h / 60),
+            card.get("left"), 0, cellCost, players, du, accent);
+        предложениеВЯчейку(g, x + pad, oy + rowH, w - 2 * pad, rowH - Math.max(2, h / 60),
+            card.get("right"), 1, cellCost, players, du, accent);
+    }
+
+    /** Одно предложение карты рынка: что дают и ячейки, кто его уже занял. */
+    private void предложениеВЯчейку(Graphics2D g, int x, int y, int w, int h,
+                                    Object offer, int sideIdx, int cellCost,
+                                    int players, double du, Color accent) {
+        g.setColor(kelium.gui.replay2.Theme.alpha(paper(), 0.85));
+        g.fillRoundRect(x, y, w, h, Math.max(4, h / 6), Math.max(4, h / 6));
+        g.setColor(kelium.gui.replay2.Theme.alpha(accent, 0.55));
+        g.setStroke(new BasicStroke(1.1f));
+        g.drawRoundRect(x, y, w, h, Math.max(4, h / 6), Math.max(4, h / 6));
+        int d = (int) (h * 0.66);
+        int cells = 2;
+        int cx = x + w - Math.max(3, h / 12) - cells * (d + Math.max(2, d / 6));
+        if (!(offer instanceof Map<?, ?> off)) {
+            g.setFont(kelium.gui.replay2.Theme.note(du * 0.055));
+            g.setColor(ink3());
+            g.drawString("нет предложения", x + Math.max(4, h / 8), y + (int) (h * 0.62));
+            return;
+        }
+        int room = cx - x - Math.max(6, h / 6);
+        g.setFont(вписать(g, String.valueOf(off.get("name")), room,
+            kelium.gui.replay2.Theme.font(du * 0.062, Font.BOLD), 0.7));
+        g.setColor(ink());
+        g.drawString(clip(g, String.valueOf(off.get("name")), room),
+            x + Math.max(4, h / 8), y + (int) (h * 0.46));
+        Object label = off.get("label");
+        g.setFont(kelium.gui.replay2.Theme.note(du * 0.05));
+        g.setColor(ink2());
+        g.drawString(clip(g, label == null ? ""
+                : kelium.gui.replay2.Names.offer(String.valueOf(label)), room),
+            x + Math.max(4, h / 8), y + (int) (h * 0.86));
+
+        int[] taken = snap.marketCells == null || snap.marketCells.length <= sideIdx
+            ? new int[]{-1, -1} : snap.marketCells[sideIdx];
+        for (int i = 0; i < cells; i++) {
+            // Сколько ячеек открыто — спрашиваем у движка, а не повторяем условие.
+            boolean live = i < kelium.engine.Actions.marketCellsOpen(players);
+            int cy = y + (h - d) / 2;
+            g.setColor(live ? mix(Color.WHITE, accent, 0.10) : emptyCell());
+            g.fillRoundRect(cx, cy, d, d, 3, 3);
+            g.setColor(live ? accent : line());
+            g.setStroke(live ? new BasicStroke(1.4f)
+                : new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+                    10f, new float[]{3f, 3f}, 0f));
+            g.drawRoundRect(cx, cy, d, d, 3, 3);
+            int seat = i < taken.length ? taken[i] : -1;
+            if (live && seat >= 0) {
+                cube(g, cx + 2, cy + 2, d - 4, KELIUM_CUBE);
+                // метка игрока: чей кубик тут стоит
+                int m = Math.max(5, d / 3);
+                g.setColor(FieldView.seatColor(seat));
+                g.fillOval(cx + d - m / 2, cy - m / 2, m, m);
+                g.setColor(FieldView.seatStroke(seat));
+                g.setStroke(new BasicStroke(1.0f));
+                g.drawOval(cx + d - m / 2, cy - m / 2, m, m);
+            } else if (live) {
+                g.setFont(kelium.gui.replay2.Theme.font(du * 0.05, Font.BOLD));
+                g.setColor(accent.darker());
+                String tag = cellCost + "К";
+                g.drawString(tag, cx + (d - g.getFontMetrics().stringWidth(tag)) / 2,
+                    cy + d / 2 + (int) (d * 0.18));
+            }
+            cx += d + Math.max(2, d / 6);
+        }
+    }
+
+    /**
+     * ПОДОБРАТЬ КЕГЛЬ ПОД МЕСТО: строка на карте должна быть прочитана целиком,
+     * а не обрезана многоточием, пока есть куда уменьшать. Меньше указанной доли
+     * от исходного кегля не опускаемся — дальше уже не текст, а сор.
+     */
+    private static Font вписать(Graphics2D g, String text, int room, Font base, double floor) {
+        Font f = base;
+        for (int i = 0; i < 8; i++) {
+            if (g.getFontMetrics(f).stringWidth(text) <= room
+                    || f.getSize2D() <= base.getSize2D() * floor) {
+                return f;
+            }
+            f = f.deriveFont(f.getSize2D() * 0.92f);
+        }
+        return f;
+    }
+
+    /**
+     * НИЖНЯЯ ПОЛОСА: то, чего на печати нет и быть не может, — личный запас
+     * кубиков каждого игрока и какие карты супер-арсенала лежат на вершинах
+     * (названия меняются от партии к партии, а печатная рамка одна).
+     */
+    private void paintPrintedStrip(Graphics2D g, int x, int y, int w, int h) {
+        int[] cap = ints("tech.step_capacity", new int[]{3, 3, 2, 1});
+        int steps = cap.length;
+        int colW = w / 4;
+        for (int t = 0; t < TRACKS.length; t++) {
+            int cx = x + t * colW;
+            g.setColor(TRACK_COLOR[t]);
+            g.fillRect(cx, y + 4, kelium.gui.replay2.Theme.px(4), h - 12);
+            int tx = cx + kelium.gui.replay2.Theme.px(12);
+            g.setFont(bold(9.5));
+            g.setColor(ink3());
+            g.drawString("ВЕРШИНА · " + TRACK_RU[t], tx, y + 20);
+            String id = snap.superArsenalOffer.get(TRACKS[t]);
+            Map<String, Object> card = id == null ? null : find("super_arsenal", id);
+            int holder = peakHolder(TRACKS[t], steps);
+            g.setFont(bold(11));
+            if (card != null) {
+                g.setColor(ink());
+                g.drawString(clip(g, String.valueOf(card.get("name")), colW - 20), tx, y + 44);
+                g.setFont(note(9.5));
+                g.setColor(ink2());
+                wrap(g, String.valueOf(card.getOrDefault("label", "")), tx, y + 62,
+                    colW - 20, 16, 2);
+            } else if (holder >= 0) {
+                g.setColor(FieldView.seatStroke(holder));
+                g.drawString("забрал игрок " + (holder + 1), tx, y + 44);
+            } else {
+                g.setColor(ink3());
+                g.setFont(note(10));
+                g.drawString(id == null ? "карта не выложена" : id, tx, y + 44);
+            }
+        }
+        int qx = x + 3 * colW + kelium.gui.replay2.Theme.px(12);
+        g.setFont(bold(9.5));
+        g.setColor(ink3());
+        g.drawString(кубикиНавсегда() ? "КУБИКИ В ЗАПАСЕ" : "КУБИК НА ТРЕК ОДИН", qx, y + 20);
+        if (!кубикиНавсегда()) {
+            return;
+        }
+        int cube = kelium.gui.replay2.Theme.px(16);
+        int place = 0;
+        for (ReplayRecord.Player p : snap.players) {
+            if (p.techCubes < 0) {
+                continue;
+            }
+            int px = qx + (place % 2) * (colW / 2);
+            int py = y + 44 + (place / 2) * kelium.gui.replay2.Theme.px(22);
+            cube(g, px, py - cube + 3, cube, FieldView.seatColor(p.seat));
+            g.setFont(bold(11));
+            g.setColor(ink());
+            g.drawString(p.techCubes + "/" + запасКубиков(), px + cube + 6, py);
+            place++;
+        }
+    }
+
+    /**
+     * УМЕНЬШЕННАЯ КОПИЯ КАРТИНКИ, посчитанная один раз. Планшет науки — картинка
+     * почти в пять миллионов пикселей, и пересчитывать её при каждой перерисовке
+     * окна было бы заметно на глаз.
+     */
+    private static final Map<String, java.awt.image.BufferedImage> SCALED =
+        new java.util.HashMap<>();
+
+    private static java.awt.image.BufferedImage scaled(java.awt.image.BufferedImage art,
+                                                        int w, int h) {
+        String key = System.identityHashCode(art) + ":" + w + "x" + h;
+        java.awt.image.BufferedImage got = SCALED.get(key);
+        if (got != null) {
+            return got;
+        }
+        java.awt.image.BufferedImage out =
+            new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D gg = out.createGraphics();
+        gg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        gg.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        gg.drawImage(art, 0, 0, w, h, null);
+        gg.dispose();
+        if (SCALED.size() > 8) {
+            SCALED.clear();            // окно меняет размер — прежние копии не нужны
+        }
+        SCALED.put(key, out);
+        return out;
     }
 
     // ==================== ЦВЕТА ПЛАНШЕТОВ ====================

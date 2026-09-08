@@ -241,13 +241,7 @@ public final class SvgFieldRenderer {
         // партии, и отдаём его общему FieldPainter.
         List<ReplayRecord.HexInfo> infos = new ArrayList<>();
         for (Hex hex : hexes) {
-            int[] qr = FieldGeometry.parseQR(hex.id);
-            ReplayRecord.HexInfo hi = new ReplayRecord.HexInfo();
-            hi.id = hex.id;
-            hi.q = qr[0];
-            hi.r = qr[1];
-            hi.kind = hex.kind.name();
-            infos.add(hi);
+            infos.add(ReplayRecord.HexInfo.of(hex));
         }
         FieldPainter.paintField(new SvgCanvas(sb), SIZE, infos,
             ReplayRecord.snapshotOf(s, null), ox, oy, true);

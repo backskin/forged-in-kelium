@@ -28,6 +28,26 @@ import kelium.report.SvgFieldRenderer;
  */
 class FieldPainterTest {
 
+    /**
+     * ТЕСТ ПРОВЕРЯЕТ ПОРЯДОК СЛОЁВ, А НЕ РАБОТУ ХУДОЖНИКА.
+     *
+     * <p>Жетон, у которого есть НАРИСОВАННАЯ текстура, рисуется картинкой, а не
+     * цветным силуэтом; ищущий силуэт тест начинает падать ровно в тот день,
+     * когда художник принёс рисунок центра управления, — хотя порядок слоёв от
+     * этого не менялся. Поэтому текстуры здесь отключены: проверяется код
+     * отрисовки, а не наличие файла в {@code data/textures}.
+     */
+    @org.junit.jupiter.api.BeforeAll
+    static void безТекстур() throws java.io.IOException {
+        kelium.report.Textures.useFolder(
+            java.nio.file.Files.createTempDirectory("kelium-no-textures"));
+    }
+
+    @org.junit.jupiter.api.AfterAll
+    static void вернутьТекстуры() {
+        kelium.report.Textures.useFolder(null);
+    }
+
     /** Поверхность-протокол: запоминает, ЧТО и в каком порядке рисовали. */
     private static final class RecordingCanvas implements FieldCanvas {
         final List<String> ops = new ArrayList<>();

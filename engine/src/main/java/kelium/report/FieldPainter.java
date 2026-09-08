@@ -84,6 +84,20 @@ public final class FieldPainter {
     public static boolean showEnergy = true;
     public static boolean showOwnership = true;
 
+    /**
+     * НАСТОЯЩИЕ КАРТОННЫЕ МОДУЛИ вместо безликой гексовой плитки. Выключить —
+     * поле рисуется прежним видом, гекс за гексом (нужно и для отчётов, где
+     * важна схема, а не фотография картона).
+     */
+    public static boolean showCardboard = true;
+
+    /**
+     * ПОКАЗАТЬ, ЧЕМ НАКРЫТ ГЕКС: контуры картонок и их имена поверх поля
+     * (заказ дизайнера 08.09.2026 — «тумблер видимости на поле, что за блоки
+     * там расположены»). По умолчанию выключено: на столе этих линий нет.
+     */
+    public static boolean showBlocks;
+
     // ЭНЕРГИЯ НА ЖЕТОНЕ: ЯЧЕЙКА — чёрный квадрат, кубик — жёлтый и заметно
     // меньше, чтобы было видно, что он ЛЕЖИТ В ячейке, а не рядом с ней.
     /**
@@ -166,6 +180,8 @@ public final class FieldPainter {
     private static final String ENERGY_EDGE = "#a07800";
     private static final String HEX_ID_COLOR = "#a8a49a";
     private static final String WHITE = "#ffffff";
+    /** Граница картонки в служебном слое «чем накрыто поле». */
+    private static final String BLOCK_EDGE = "#1F6FEB";
     private static final String LABEL_OUTLINE = "#00000099";
 
     private static final double SPAWN_R = 0.92;
@@ -207,6 +223,9 @@ public final class FieldPainter {
                 byHex.getOrDefault(hi.id, List.of()),
                 centre[0] + ox, centre[1] + oy, showIds, nb);
         }
+        if (showBlocks) {
+            paintBlockOutlines(c, size, hexes, ox, oy);
+        }
     }
 
     /**
@@ -235,10 +254,16 @@ public final class FieldPainter {
                                 boolean[] neighbor) {
         boolean forbidden = "FORBIDDEN".equals(hi.kind);
 
-        // 1. сам гекс + слабая подкраска «чей он»
-        java.awt.image.BufferedImage hexTex = Textures.field(
+        // 1. САМ ГЕКС. Игра знает, какой КАРТОНКОЙ он накрыт (BlockStamp кладёт
+        //    настоящие модули), и если модуль нарисован — рисуется он, обрезанный
+        //    по этому гексу. Соседние гексы того же модуля дорисуют свои куски, и
+        //    картонка сойдётся целой, без швов посередине.
+        boolean картон = !forbidden && paintCardboard(c, size, hi, cx, cy, neighbor);
+        java.awt.image.BufferedImage hexTex = картон ? null : Textures.field(
             forbidden ? "hex_forbidden" : "hex");
-        if (hexTex != null) {
+        if (картон) {
+            // модуль уже нарисован — своей плитки гексу не нужно
+        } else if (hexTex != null) {
             drawHexTexture(c, hexTex, cx, cy, size, 0);
         } else {
             // СКРУГЛЯЕТСЯ ТОЛЬКО ВНЕШНИЙ КОНТУР ПОЛЯ (правка дизайнера
@@ -263,14 +288,17 @@ public final class FieldPainter {
         //    зарождения, под нейтральной постройкой, под зданиями и войсками.
         //    (Сначала он рисовался последним и просвечивал сквозь жетоны, потом
         //    попал между нейтралом и зданиями — и лёг поверх нейтрала.)
-        if (st != null && st.containerCell >= 0) {
+        //    НА НАСТОЯЩЕМ КАРТОНЕ рисовать их НЕ НАДО: и ящик, и жёлтая ячейка
+        //    там уже НАПЕЧАТАНЫ, ровно на этих сторонах (арт сверен с набором
+        //    блоков генератором), и вторые поверх были бы двойными.
+        if (!картон && st != null && st.containerCell >= 0) {
             paintPrintedContainer(c, size, st.containerCell, cx, cy);
         }
 
         // 2б. ЖЁЛТАЯ ЯЧЕЙКА — тоже печать на картоне, тот же слой: лежит под
         //     всем, что на гекс кладут. Только стоя на ней, энергостанция даёт
         //     свой номинал.
-        if (st != null && st.energyCell >= 0 && st.energyCell < 6) {
+        if (!картон && st != null && st.energyCell >= 0 && st.energyCell < 6) {
             paintEnergyCell(c, size, st.energyCell, cx, cy);
         }
 
@@ -451,6 +479,110 @@ public final class FieldPainter {
     }
 
     /**
+     * КУСОК КАРТОННОГО МОДУЛЯ, ПРИХОДЯЩИЙСЯ НА ЭТОТ ГЕКС.
+     *
+     * <p>Рисуется ВЕСЬ модуль, но обрезанный по гексу: остальные его гексы
+     * нарисуют свои куски того же модуля, и картинка сойдётся встык — без швов
+     * посередине картонки и без выхода за край поля.
+     *
+     * <p>Куда встаёт картинка, считается однозначно: гекс знает свои осевые
+     * координаты ВНУТРИ блока ({@code blockQ}, {@code blockR}) и поворот
+     * картонки, а якорь {@link BlockArt} знает, где на картинке центр гекса
+     * (0,0) блока. Значит достаточно отступить от центра этого гекса на
+     * повёрнутое смещение — и точка привязки картинки найдена.
+     *
+     * @return нарисовали ли (нет разметки блоками или нет картинки — нет)
+     */
+    private static boolean paintCardboard(FieldCanvas c, double size,
+                                          ReplayRecord.HexInfo hi, double cx, double cy,
+                                          boolean[] neighbor) {
+        if (!showCardboard || hi.block == null || hi.blockSide == null) {
+            return false;
+        }
+        BlockArt.Anchor a = BlockArt.art();
+        java.awt.image.BufferedImage art = BlockArt.face(hi.block, hi.blockSide);
+        if (a == null || art == null) {
+            return false;
+        }
+        int[] d = kelium.engine.BlockStamp.rotate(hi.blockQ, hi.blockR, hi.blockRot);
+        double[] off = FieldGeometry.hexCenter(d[0], d[1], size);
+        double[][] hex = FieldGeometry.outlineRoundedHexPoints(cx, cy, size,
+            FieldGeometry.TILE_ROUND, neighbor, 4);
+        c.clipTo(hex);
+        c.image(art, cx - off[0], cy - off[1], BlockArt.rotationDeg(hi.blockRot),
+            size / a.hex(), a.ox(), a.oy());
+        c.clipOff();
+        return true;
+    }
+
+    /**
+     * ЧЕМ НАКРЫТО ПОЛЕ: контуры картонок и их имена — поверх всего.
+     *
+     * <p>Служебный слой, а не стол: на столе этих линий нет, зато без них не
+     * видно, какая картонка где лежит и той ли стороной. Линия рисуется только
+     * по ГРАНИЦЕ между разными картонками (и по краю поля), поэтому внутри
+     * модуля рисунок не расчерчивается.
+     */
+    private static void paintBlockOutlines(FieldCanvas c, double size,
+                                           List<ReplayRecord.HexInfo> hexes,
+                                           double ox, double oy) {
+        Map<Long, ReplayRecord.HexInfo> byQr = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo hi : hexes) {
+            byQr.put((((long) hi.q) << 32) ^ (hi.r & 0xffffffffL), hi);
+        }
+        Map<String, double[]> подписи = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo hi : hexes) {
+            if (hi.block == null) {
+                continue;
+            }
+            double[] centre = FieldGeometry.hexCenter(hi.q, hi.r, size);
+            double cx = centre[0] + ox;
+            double cy = centre[1] + oy;
+            String имя = hi.block + "-" + hi.blockSide;
+            double[] сумма = подписи.computeIfAbsent(имя, k -> new double[3]);
+            сумма[0] += cx;
+            сумма[1] += cy;
+            сумма[2]++;
+            for (int s = 0; s < 6; s++) {
+                int[] dir = kelium.core.Field.AXIAL_DIRS[s];
+                ReplayRecord.HexInfo nb = byQr.get(
+                    (((long) (hi.q + dir[0])) << 32) ^ ((hi.r + dir[1]) & 0xffffffffL));
+                boolean своя = nb != null && имя.equals(nb.block + "-" + nb.blockSide);
+                if (своя) {
+                    continue;               // ребро внутри картонки — не чертим
+                }
+                double a1 = Math.toRadians(FieldGeometry.edgeAngle(s) - 30);
+                double a2 = Math.toRadians(FieldGeometry.edgeAngle(s) + 30);
+                c.polygon(new double[][]{
+                    {cx + size * Math.cos(a1), cy + size * Math.sin(a1)},
+                    {cx + size * Math.cos(a2), cy + size * Math.sin(a2)}},
+                    "none", BLOCK_EDGE, 3.0);
+            }
+        }
+        // ПОДПИСЬ — НА ПЛАШКЕ И КРУПНО. Середина картонки почти всегда занята
+        // жетоном, и подпись без подложки читалась поверх него как мусор
+        // (замечание дизайнера 08.09.2026: «шрифт мелковатый, в два раза бы
+        // его увеличить»). Плашка кладётся ПОСЛЕ всех границ, поверх всего:
+        // это служебный слой, он и должен быть виден.
+        for (var e : подписи.entrySet()) {
+            double[] s = e.getValue();
+            if (s[2] <= 0) {
+                continue;
+            }
+            double кегль = size * 0.62;
+            double cx = s[0] / s[2];
+            double cy = s[1] / s[2];
+            double w = e.getKey().length() * кегль * 0.66;
+            double h = кегль * 1.3;
+            c.alpha(0.72);
+            c.roundRect(cx - w / 2, cy - h * 0.72, w, h, h * 0.3,
+                dark ? "#0d1014" : "#1b2026", null, 0);
+            c.alpha(1);
+            c.outlinedText(e.getKey(), cx, cy + кегль * 0.22, кегль, WHITE, LABEL_OUTLINE);
+        }
+    }
+
+    /**
      * Пометка ВЫРАБОТАННОГО НАПОЛОВИНУ тайла зарождения: мелкая жёлтая
      * диагональная штриховка поверх жетона плюс оранжевая обводка.
      *
@@ -505,9 +637,30 @@ public final class FieldPainter {
             // текстура ложится на «палку» вместо настоящего силуэта.
             double[] box = FieldGeometry.neutralBox(cx, cy, size, nb.corners,
                 NEUTRAL_OUTER, NEUTRAL_INNER);
-            c.image(tex, box[0], box[1], box[4], box[2] / tex.getWidth(),
+            // ВПИСЫВАЕМ ЦЕЛИКОМ, А НЕ ТЯНЕМ ПО ШИРИНЕ (правка 08.09.2026,
+            // замечание дизайнера «поехали поворотом и размерами»). Рисунок
+            // художника не обязан иметь ровно те же пропорции, что наша рамка:
+            // масштаб по одной ширине делал большой нейтрал на треть выше рамки,
+            // и постройка вылезала за кромку гекса. Берём меньший из двух
+            // масштабов — картинка целиком внутри рамки при любых пропорциях.
+            double k = Math.min(box[2] / tex.getWidth(), box[3] / tex.getHeight());
+            // РИСУНОК ХУДОЖНИКА ЛЕЖИТ ВДОЛЬ ПЕРВОГО ОТРЕЗКА СТЕНКИ, а рамка
+            // считается вдоль ХОРДЫ между её концами. У прямой стенки это одно
+            // и то же, у изогнутой (большой нейтрал, две стороны гекса) хорда
+            // повёрнута на 30° к каждому отрезку — и картинка ложилась на
+            // силуэт наискось (замечание дизайнера 08.09.2026: «поехали
+            // поворотом и размерами»). Отсюда поправка: по 30° на каждый
+            // отрезок сверх первого.
+            double поправка = 30.0 * (nb.corners.size() - 2);
+            c.image(tex, box[0], box[1], box[4] + поправка, k,
                 tex.getWidth() / 2.0, tex.getHeight() / 2.0);
-            paintNeutralHearts(c, size, nb, cx, cy);
+            // СЕРДЕЧКИ — только когда постройку уже били: на картинке художника
+            // они НАПЕЧАТАНЫ (сколько всего), и рисовать их вторыми поверх
+            // печати значит удваивать. А вот подбитую постройку по одной печати
+            // не отличить от целой, и тогда живой ряд нужен.
+            if (nb.hp < nb.hpMax) {
+                paintNeutralHearts(c, size, nb, cx, cy);
+            }
             return;
         }
         c.polygon(FieldGeometry.neutralShape(cx, cy, size, nb.corners,
@@ -1347,9 +1500,19 @@ public final class FieldPainter {
             double ax = cx + airDrawn * 10;
             double ay = cy - airDrawn * 6;
             FieldGeometry.Shape sh = FieldGeometry.SH_AIRCRAFT;
-            c.shape(sh, ax, ay, 0, size * 0.40 / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
-                tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
-                FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
+            // КАРТИНКА ЖЕТОНА — И В НЕБЕ ТОЖЕ. Наземные войска спрашивают
+            // текстуру, а эта ветка рисовала силуэт всегда: авиация оставалась
+            // единственным родом без рисунка, и на поле это читалось как
+            // пропущенный жетон. Найдено 08.09.2026, когда дизайнер прислал
+            // настоящие картинки жетонов.
+            java.awt.image.BufferedImage airTex = Textures.unit(u.type, u.owner);
+            if (airTex != null) {
+                drawUnitTexture(c, airTex, sh, new double[]{ax, ay}, 0, size * 0.40);
+            } else {
+                c.shape(sh, ax, ay, 0, size * 0.40 / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
+                    tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
+                    FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
+            }
             paintHpPipsAt(c, size, u.hp, u.damage, ax, ay - size * 0.20, 0);
             airDrawn++;
         }

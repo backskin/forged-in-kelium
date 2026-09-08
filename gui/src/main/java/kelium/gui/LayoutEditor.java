@@ -648,7 +648,7 @@ public final class LayoutEditor {
             maxY = Math.max(maxY, c[1] + 1);
         }
         if (assemblyTab != null) {
-            for (BlockAssembler.Cell c : assemblyTab.currentBlackCells()) {
+            for (kelium.engine.BlockAssembler.Cell c : assemblyTab.currentBlackCells()) {
                 double[] p = kelium.report.FieldGeometry.hexCenter(c.q(), c.r(), 1);
                 minX = Math.min(minX, p[0] - 1);
                 maxX = Math.max(maxX, p[0] + 1);
@@ -1671,8 +1671,15 @@ public final class LayoutEditor {
 
     // ==================== холст ====================
     static final class Canvas extends JPanel {
-        static final Color[] SEAT = {new Color(0x3b82d0), new Color(0xe07038),
-            new Color(0x3f9e60), new Color(0xb04a96)};
+        // ЦВЕТА МЕСТ — ИЗ ОДНОГО МЕСТА (kelium.report.FieldGeometry.SEAT_TOKEN):
+        // печатные цвета игры, голубой-алый-зелёный-жёлтый. Здесь стояла своя
+        // копия, и после приведения палитры к печатным цветам 08.09.2026 она
+        // разошлась бы с полем молча.
+        static final Color[] SEAT = {
+            Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[0]),
+            Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[1]),
+            Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[2]),
+            Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[3])};
         static final Color SPAWN_NORMAL = new Color(0x2E7D32);   // тёмно-зелёный
         static final Color SPAWN_START = new Color(0xA5D6A7);    // светло-зелёный
         static final Color NEUTRAL_FILL = new Color(0x9AA0A6);   // серебристый

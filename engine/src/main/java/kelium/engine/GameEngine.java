@@ -681,6 +681,74 @@ public final class GameEngine {
      */
     private void resolveTurn(int seat, String cardId, Map<Integer, Order> topOrders) {
         GameState s = state;
+        Ruleset rs = rs();
+        Map<String, Object> card = orders().byId(cardId);
+        boolean isJoker = Boolean.TRUE.equals(card.get("joker"));
+        boolean coincided = false;
+        boolean bottomOpen = false;
+        int specPenalty = 0;
+        if (!isJoker) {
+            Order myTop = Order.fromCode((String) card.get("top"));
+            // СОВПАДЕНИЕ — с теми, кто вскрыл РАНЬШЕ. Своей карты в этом счёте
+            // нет вовсе, поэтому достаточно одного совпавшего соседа.
+            coincided = rs.getBool("actions.coincidence_rule_enabled", true)
+                && topOrders.containsValue(myTop);
+            // Нижняя половина срабатывает, только если ЭТОТ приказ вскрыл сверху
+            // кто-то, кто вскрылся РАНЬШЕ в этом круге.
+            Order bo = card.get("bottom") == null ? null
+                : Order.fromCode(card.get("bottom").toString());
+            if (bo != null) {
+                for (Map.Entry<Integer, Order> e : topOrders.entrySet()) {
+                    if (e.getValue() == bo && e.getKey() != seat) {
+                        bottomOpen = true;
+                        break;
+                    }
+                }
+            }
+            // «ШТАБНАЯ ДИРЕКТИВА» (sa5, редакция 17.08.2026): каждый, кто в ЭТОМ
+            // РАУНДЕ УЖЕ вскрыл тот же ВЕРХНИЙ приказ, что сейчас берёт держатель
+            // карты, отнимает у ТЕКУЩЕГО игрока одно СПЕЦ-действие. Проверяется
+            // здесь, а не когда сама sa5 разыгрывается: карта не разыгрывается
+            // вовсе, она удерживается на вершине трека и действует постоянно.
+            //
+            // ПОРЯДОК ЗНАЧИМ: если держатель sa5 ещё не вскрыл карту в этом круге,
+            // штраф не сработает — topOrders хранит только УЖЕ вскрытые верхи.
+            for (var e : topOrders.entrySet()) {
+                if (e.getKey() != seat && e.getValue() == myTop
+                        && Passives.superArsenalPassive(s, e.getKey(), "ignore_coincidence")) {
+                    specPenalty++;
+                }
+            }
+        }
+        resolveTurn(seat, cardId, new Reveal(coincided, bottomOpen, specPenalty));
+    }
+
+    /**
+     * ЧТО ИЗВЕСТНО О ВСКРЫТИИ к началу хода: совпал ли верхний приказ с уже
+     * вскрытым, открыт ли нижний, сколько СПЕЦ отнято картами соперников. Это
+     * ВСЁ, что ход берёт из чужих карт, — поэтому по этим трём величинам ход
+     * можно разыграть заново на копии состояния ({@link #simulateTurn}).
+     */
+    public record Reveal(boolean coincided, boolean bottomOpen, int specPenalty) {
+    }
+
+    /**
+     * РАЗЫГРАТЬ ХОД ИГРОКА НА ЭТОМ СОСТОЯНИИ — вход для ботов, которые думают
+     * вперёд: бот копирует состояние ({@link GameState#deepCopy}), привязывает
+     * копию ({@link #bindResume}) и проигрывает на ней свой ход целиком — с
+     * действиями в задуманном порядке, СПЕЦ-действиями и манёвром, — а потом
+     * смотрит, что вышло. Так план хода проверяется делом, а не формулой.
+     *
+     * <p>Ход разыгрывается так же, как в живой партии ({@code resolveTurn}):
+     * тем же кодом, теми же точками решения. Различие одно — что известно о
+     * вскрытии, передаётся явно, а не выводится из чужих карт.
+     */
+    public void simulateTurn(int seat, String cardId, boolean coincided, boolean bottomOpen) {
+        resolveTurn(seat, cardId, new Reveal(coincided, bottomOpen, 0));
+    }
+
+    private void resolveTurn(int seat, String cardId, Reveal reveal) {
+        GameState s = state;
         PlayerState p = s.player(seat);
         Ruleset rs = rs();
         s.journal.startTurn(seat);
@@ -692,28 +760,7 @@ public final class GameEngine {
         }
         Map<String, Object> card = orders().byId(cardId);
         boolean isJoker = Boolean.TRUE.equals(card.get("joker"));
-
-        // «ШТАБНАЯ ДИРЕКТИВА» (sa5, редакция 17.08.2026): каждый, кто в ЭТОМ
-        // РАУНДЕ УЖЕ вскрыл тот же ВЕРХНИЙ приказ, что сейчас берёт держатель
-        // карты, отнимает у ТЕКУЩЕГО игрока одно СПЕЦ-действие. Проверяется
-        // здесь, а не когда сама sa5 разыгрывается: карта не разыгрывается вовсе,
-        // она удерживается на вершине трека и действует постоянно.
-        //
-        // ПОРЯДОК ЗНАЧИМ: если держатель sa5 ещё не вскрыл карту в этом круге,
-        // штраф не сработает — topOrders хранит только УЖЕ вскрытые верхи. Это
-        // тот же порядок, каким считается совпадение приказов, и держатель
-        // карты просто оказывается в выгодном положении, если вскрывает раньше
-        // того, кого хочет наказать.
-        int specPenalty = 0;
-        if (!isJoker) {
-            Order myTop = Order.fromCode((String) card.get("top"));
-            for (var e : topOrders.entrySet()) {
-                if (e.getKey() != seat && e.getValue() == myTop
-                        && Passives.superArsenalPassive(s, e.getKey(), "ignore_coincidence")) {
-                    specPenalty++;
-                }
-            }
-        }
+        int specPenalty = reveal.specPenalty();
 
         // ТОЧКА ПРАВИЛ: сколько СПЕЦ-действий за ход. Карта арсенала может дать
         // второе («два СПЕЦ, если не играл Безопасность») или третье («Параллельные
@@ -756,8 +803,7 @@ public final class GameEngine {
             Order top = Order.fromCode((String) card.get("top"));
             // СОВПАДЕНИЕ — с теми, кто вскрыл РАНЬШЕ. Своей карты в этом счёте
             // нет вовсе, поэтому достаточно одного совпавшего соседа.
-            boolean coincided = rs.getBool("actions.coincidence_rule_enabled", true)
-                && topOrders.containsValue(top);
+            boolean coincided = reveal.coincided();
             List<String> names = List.of(Order.ORDER_ACTIONS.get(top));
             // ТОЧКА ПРАВИЛ: сколько действий даёт ВЕРХНИЙ приказ.
             //
@@ -783,15 +829,7 @@ public final class GameEngine {
             // приказа сразу (просьба дизайнера).
             Order bo = card.get("bottom") == null ? null
                 : Order.fromCode(card.get("bottom").toString());
-            boolean bottomOpen = false;
-            if (bo != null) {
-                for (Map.Entry<Integer, Order> e : topOrders.entrySet()) {
-                    if (e.getValue() == bo && e.getKey() != seat) {
-                        bottomOpen = true;
-                        break;
-                    }
-                }
-            }
+            boolean bottomOpen = bo != null && reveal.bottomOpen();
             // n11 «Второй заход»: открытый нижний приказ — факт хода, и он
             // известен ещё до розыгрыша действий.
             s.journal.of(seat).lowerOrderOpen = bottomOpen;
@@ -903,9 +941,15 @@ public final class GameEngine {
                 opts.add(new Choice("action", nname, nname));
             }
             opts.add(new Choice("pass", null, "ничего не делать"));
+            // Что известно о вскрытии — в контекст решения: бот, который
+            // планирует ход целиком, должен знать, сколько действий у него есть
+            // и открыт ли нижний приказ, не вычитывая это из журнала.
             Choice ch = agents.get(p.seat).choose(s, opts,
                 ev("kind", "action", "remaining", maxActions - ctx.playedCount,
-                    "half", half, "order", order));
+                    "half", half, "order", order,
+                    "coincided", s.journal.of(p.seat).orderBlocked,
+                    "bottom_open", s.journal.of(p.seat).lowerOrderOpen,
+                    "spec_left", ctx.canSpec()));
             if (ch.payload() == null) {
                 break;
             }

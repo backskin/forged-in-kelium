@@ -208,8 +208,13 @@ public final class TransportIcons {
                 g.setColor(new Color(0xBDB6A4));
                 g.setStroke(new BasicStroke(3f));
                 g.draw(new Ellipse2D.Double(26, 26, 48, 48));
-                Color[] seat = {new Color(0x3b82d0), new Color(0xe07038),
-                    new Color(0x3f9e60), new Color(0xb04a96)};
+                // Цвета мест — из общей палитры поля, а не своей копией:
+                // печатные голубой, алый, зелёный, жёлтый.
+                Color[] seat = {
+                    Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[0]),
+                    Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[1]),
+                    Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[2]),
+                    Color.decode(kelium.report.FieldGeometry.SEAT_TOKEN[3])};
                 double[][] at = {{50, 12}, {88, 50}, {50, 88}, {12, 50}};
                 for (int i = 0; i < 4; i++) {
                     g.setColor(seat[i]);

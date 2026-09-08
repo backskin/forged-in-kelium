@@ -124,6 +124,41 @@ public final class ReplayRecord {
         public int q;
         public int r;
         public String kind = "NORMAL";
+        /**
+         * КАКОЙ КАРТОНКОЙ НАКРЫТ ГЕКС — блок, его сторона, поворот и место
+         * гекса внутри блока (см. {@link kelium.core.Hex#blockId}). Лежит в
+         * шапке записи, а не в кадре: картон за партию не двигают.
+         *
+         * <p>{@code block == null} — поле не размечено блоками: ручная сцена
+         * или запись, сделанная до 08.09.2026. Тогда поле рисуется прежним
+         * видом, гекс за гексом.
+         */
+        public String block;
+        public String blockSide;
+        public int blockRot;
+        public int blockQ;
+        public int blockR;
+
+        /**
+         * Снять неизменную часть с живого гекса — ОДНО место, где это делается.
+         * Прежде поле записи заполняли два разных куска кода (проигрыватель и
+         * рисовальщик картинок), и всякое новое поле надо было не забыть
+         * добавить в оба.
+         */
+        public static HexInfo of(kelium.core.Hex h) {
+            HexInfo hi = new HexInfo();
+            int[] qr = FieldGeometry.parseQR(h.id);
+            hi.id = h.id;
+            hi.q = qr != null ? qr[0] : 0;
+            hi.r = qr != null ? qr[1] : 0;
+            hi.kind = h.kind.name();
+            hi.block = h.blockId;
+            hi.blockSide = h.blockSide;
+            hi.blockRot = h.blockRot;
+            hi.blockQ = h.blockQ;
+            hi.blockR = h.blockR;
+            return hi;
+        }
     }
 
     /** Тайл зарождения на гексе. */
@@ -914,6 +949,15 @@ public final class ReplayRecord {
             o.put("q", h.q);
             o.put("r", h.r);
             o.put("kind", h.kind);
+            if (h.block != null) {
+                // Картонка пишется только там, где она есть: старые записи и
+                // ручные сцены остаются такими же короткими, как были.
+                o.put("block", h.block);
+                o.put("blockSide", h.blockSide);
+                o.put("blockRot", h.blockRot);
+                o.put("blockQ", h.blockQ);
+                o.put("blockR", h.blockR);
+            }
             hs.add(o);
         }
         m.put("hexes", hs);
@@ -1257,6 +1301,11 @@ public final class ReplayRecord {
             h.q = Json.i(ho, "q");
             h.r = Json.i(ho, "r");
             h.kind = orDefault(Json.s(ho, "kind"), "NORMAL");
+            h.block = Json.s(ho, "block");
+            h.blockSide = Json.s(ho, "blockSide");
+            h.blockRot = Json.i(ho, "blockRot");
+            h.blockQ = Json.i(ho, "blockQ");
+            h.blockR = Json.i(ho, "blockR");
             r.hexes.add(h);
         }
         for (Object o : Json.list(m, "orderPlays")) {

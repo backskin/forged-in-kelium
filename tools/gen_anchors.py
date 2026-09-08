@@ -157,6 +157,108 @@ def board_cell_counts(root):
     return newest, out
 
 
+# ===========================================================================
+#  ОБЩИЕ ПЛАНШЕТЫ СТОЛА: научный отдел и рынок
+# ===========================================================================
+#  Здесь якоря не ищутся детектором пятен, а ЗАМЕРЕНЫ по сетке и записаны
+#  числами: ячейки шагов науки напечатаны по гексовой сетке и повёрнуты на 30°,
+#  и «пятно ячейки» на этих картинках сливается с соседним — детектор находил
+#  цепочку из трёх ячеек одним куском. Зато сетка регулярна: хватает начала
+#  трека и двух шагов, всё остальное считается.
+#
+#  Числа не берутся на веру: check_science ниже проверяет каждую посчитанную
+#  ячейку по самой картинке — в её середине обязана быть светлая бумага ячейки,
+#  а вокруг серый контур. Художник сдвинул печать — сверка это скажет.
+SHARED = {
+    'science': {
+        'size': (2693, 1866),
+        'cell': (149, 127),
+        'angle': -30,
+        'step': (257, 0),
+        'row': (75, 126),
+        'tracks': [
+            ('left', (214, 949), (919, 882), (735, 681, 157, 107)),
+            ('middle', (1024, 1419), (1729, 1352), (1545, 1151, 157, 107)),
+            ('right', (1836, 949), (2541, 882), (2357, 681, 157, 107)),
+        ],
+    },
+    'market': {
+        'size': (1890, 1890),
+        'card': (468, 618, 1015, 654),
+    },
+}
+
+# Сколько ячеек на каждом шаге — из свода. Столько же должно посчитаться по сетке.
+SCIENCE_CAPACITY = [3, 3, 2, 1]
+
+
+def science_cells(d):
+    """Центры всех ячеек шагов по сетке: (трек, шаг, ячейка, x, y)."""
+    out = []
+    for name, origin, peak, _card in d['tracks']:
+        for step in range(1, len(SCIENCE_CAPACITY) + 1):
+            for cell in range(SCIENCE_CAPACITY[step - 1]):
+                if step == len(SCIENCE_CAPACITY):
+                    x, y = peak
+                else:
+                    x = origin[0] + d['step'][0] * (step - 1) + d['row'][0] * cell
+                    y = origin[1] + d['step'][1] * (step - 1) + d['row'][1] * cell
+                out.append((name, step, cell, x, y))
+    return out
+
+
+def check_science(path, d, problems):
+    """Каждая посчитанная ячейка обязана лежать на картинке и быть светлой."""
+    im = Image.open(path).convert('RGB')
+    if im.size != d['size']:
+        problems.append('science: картинка %dx%d, а якоря сняты с %dx%d'
+                        % (im.size + d['size']))
+        return
+    px = im.load()
+    for name, step, cell, x, y in science_cells(d):
+        if not (0 <= x < im.size[0] and 0 <= y < im.size[1]):
+            problems.append('science/%s шаг %d ячейка %d: центр вне картинки'
+                            % (name, step, cell))
+            continue
+        # Середина ячейки — бумага: светлая и почти без цвета. Попадём в
+        # напечатанный приз (кубик, монета) — там цвет, поэтому смотрим сразу
+        # несколько точек вокруг центра и берём самую светлую.
+        best = 0
+        for dy in (-24, 0, 24):
+            for dx in (-24, 0, 24):
+                r, g, b = px[x + dx, y + dy]
+                best = max(best, min(r, g, b))
+        if best < 170:
+            problems.append('science/%s шаг %d ячейка %d: в центре нет бумаги '
+                            '(самое светлое %d)' % (name, step, cell, best))
+
+
+def shared_board(board, path, problems):
+    """Строки yaml для общего планшета стола."""
+    d = SHARED[board]
+    if board == 'science':
+        check_science(path, d, problems)
+        out = ['  - id: science', '    kind: science',
+               '    size: [%d, %d]' % d['size'],
+               '    cell: [%d, %d]' % d['cell'],
+               '    angle: %d' % d['angle'],
+               '    step: [%d, %d]' % d['step'],
+               '    row: [%d, %d]' % d['row'],
+               '    tracks:']
+        for name, origin, peak, card in d['tracks']:
+            out.append('      - {id: %s, origin: [%d, %d], peak: [%d, %d], '
+                       'card: [%d, %d, %d, %d]}'
+                       % ((name,) + origin + peak + card))
+        return out
+    im = Image.open(path)
+    if im.size != d['size']:
+        problems.append('market: картинка %dx%d, а якоря сняты с %dx%d'
+                        % (im.size + d['size']))
+    return ['  - id: market', '    kind: market',
+            '    size: [%d, %d]' % d['size'],
+            '    card: [%d, %d, %d, %d]' % d['card']]
+
+
 def main():
     src, counts = board_cell_counts(ROOT)
     lines = [
@@ -167,6 +269,13 @@ def main():
         '#  с ' + src + '. Художник перерисовал планшет — перегенерировать, а не',
         '#  править руками. Координаты — пиксели ИСХОДНОЙ картинки, игра пересчитает',
         '#  их под свой масштаб сама.',
+        '#',
+        '#  ПЛАНШЕТЫ ИГРОКА (storage, troop) записаны списком рамок — их находит',
+        '#  детектор пятен. ОБЩИЕ ПЛАНШЕТЫ СТОЛА (science, market) — сеткой: ячейки',
+        '#  шагов науки напечатаны по гексовой сетке и повёрнуты, и вместо сорока',
+        '#  рамок хватает начала трека и двух шагов (origin/step/row). Каждая',
+        '#  посчитанная ячейка сверяется с картинкой: в середине обязана быть',
+        '#  светлая бумага ячейки.',
         '# ===========================================================================',
         '', 'meta:', '  id: 1.0.0', '  type: board_anchors', '  source: ' + src, '',
         'boards:']
@@ -174,8 +283,17 @@ def main():
     for name in sorted(os.listdir(ART)):
         if not name.endswith('.png'):
             continue
-        side = name[:-4].split('-', 1)[1]
         path = os.path.join(ART, name)
+        # ОБЩИЕ ПЛАНШЕТЫ СТОЛА идут отдельным путём: у них нет стороны, а ячейки
+        # шагов науки напечатаны по гексовой сетке и повёрнуты — списком рамок их
+        # не описать (см. shared_board).
+        if name[:-4] in SHARED:
+            lines += shared_board(name[:-4], path, problems)
+            continue
+        if '-' not in name:
+            problems.append('%s: непонятное имя планшета (ждём вид-сторона)' % name)
+            continue
+        side = name[:-4].split('-', 1)[1]
         if name.startswith('storage-'):
             (w, h), groups = storage_cells(path)
             lines += ['  - id: %s' % name[:-4], '    kind: storage',

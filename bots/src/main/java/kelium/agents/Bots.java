@@ -144,6 +144,26 @@ public final class Bots {
             // (см. NoisyAgent: почему именно так, а не обучением поддаваться).
             case НОВИЧОК -> new NoisyAgent(
                 new HeuristicAgent(seat, rng, character), 0.20, rng);
+            // ПЛАНИРОВЩИК (07.09.2026): уровни 2–4 думают ходом целиком —
+            // проигрывают его на копии в разных порядках и повторяют лучший
+            // сценарий. Разница уровней — сколько сценариев проверяется и
+            // выбирается ли приказ симуляцией. Прежние формула и просчёт
+            // (StrategicAgent/SearchAgent) остаются доступны по именам
+            // trained:* и search:* для сравнительных замеров.
+            case ЛЮБИТЕЛЬ -> PlannerAgent.ofLevel(2, character, seat, rng, players);
+            case МАСТЕР -> PlannerAgent.ofLevel(3, character, seat, rng, players);
+            case ГРОССМЕЙСТЕР -> PlannerAgent.ofLevel(4, character, seat, rng, players);
+        };
+    }
+
+    /** Прежняя лестница уровней (формула → просчёт) — для сравнительных замеров. */
+    public static Agent createLegacy(String character, Level level, int seat, Random rng,
+                                     int players) {
+        Genome g = genome(character, players);
+        String name = character + ":" + level.number;
+        return switch (level) {
+            case НОВИЧОК -> new NoisyAgent(
+                new HeuristicAgent(seat, rng, character), 0.20, rng);
             case ЛЮБИТЕЛЬ -> new StrategicAgent(seat, rng, g, name);
             case МАСТЕР -> SearchAgent.mid(seat, rng, g, name);
             case ГРОССМЕЙСТЕР -> SearchAgent.deep(seat, rng, g, name);

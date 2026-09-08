@@ -80,6 +80,12 @@ public final class Fix {
                     return c;
                 }
             }
+            // БОЙ КАК ДВИЖЕНИЕ: у каждого выстрела своя цель в начинке варианта.
+            for (Choice c : options) {
+                if (c.payload() instanceof Map<?, ?> m && hexId.equals(m.get("target"))) {
+                    return c;
+                }
+            }
             for (Choice c : options) {
                 if (!"pass".equals(c.kind()) && c.payload() != null) {
                     return c;

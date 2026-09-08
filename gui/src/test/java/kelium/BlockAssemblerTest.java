@@ -9,9 +9,9 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
-import kelium.gui.BlockAssembler;
-import kelium.gui.BlockAssembler.Cell;
-import kelium.gui.BlockAssembler.Placement;
+import kelium.engine.BlockAssembler;
+import kelium.engine.BlockAssembler.Cell;
+import kelium.engine.BlockAssembler.Placement;
 
 /**
  * Сборка поля из физических блоков: формы, покрытие, честный отказ.

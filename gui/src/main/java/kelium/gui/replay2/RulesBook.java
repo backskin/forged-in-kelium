@@ -515,13 +515,13 @@ final class RulesBook {
             + "большинстве сторон она нулевая, но на одной вышки ходят.");
         h.h("Бой");
         h.p("Бой — второе действие операции, и у него своя большая ветка: см. раздел "
-            + "«Бой». Коротко: выбери свой гекс с войсками, выбери соседний гекс, назначай "
-            + "атаки по одной. Атакованный получает <b>ответный бой</b> — полноценное "
-            + "бесплатное действие.");
+            + "«Бой». Коротко: выбери свой гекс — его войска атакуют по обычной цене; любой "
+            + "другой свой жетон тоже атакует, но каждая его атака дороже на боеприпас. "
+            + "Каждый жетон атакует один раз и выбирает свою цель — соседний гекс или свой же.");
         h.table2("Цена выстрелов", book.rows(
-            "actions.combat.primary_row_ammo_cost",
-            "actions.combat.secondary_row_ammo_cost",
-            "actions.combat.open_battle_surcharge_ammo"));
+            "actions.combat.universal_ammo_cost",
+            "actions.combat.specialized_ammo_cost",
+            "actions.combat.extra_token_ammo"));
         return h.done();
     }
 
@@ -687,12 +687,13 @@ final class RulesBook {
 
     private static String combat(HelpBook book) {
         HelpBook.Html h = new HelpBook.Html();
-        h.p("Бой — второе действие приказа ОПЕРАЦИЯ. Он короткий, считается по одной атаке "
-            + "и почти всегда получает ответ.");
+        h.p("Бой — второе действие приказа ОПЕРАЦИЯ. Он играется как Движение: выбранный "
+            + "гекс бьёт по обычной цене, остальные жетоны — с надбавкой, каждый жетон один "
+            + "раз, атаки считаются по одной, ответного боя нет.");
         h.table2("Бой в правилах этой версии", book.rows(
-            "actions.combat.primary_row_ammo_cost",
-            "actions.combat.secondary_row_ammo_cost",
-            "actions.combat.open_battle_surcharge_ammo",
+            "actions.combat.universal_ammo_cost",
+            "actions.combat.specialized_ammo_cost",
+            "actions.combat.extra_token_ammo",
             "actions.combat.retaliation_enabled",
             "actions.combat.retaliation_is_free",
             "actions.combat.retaliation_to_retaliation",
@@ -798,15 +799,15 @@ final class RulesBook {
 
     private static String combatSecond(HelpBook book) {
         HelpBook.Html h = new HelpBook.Html();
-        h.p("Первый бой в действии бесплатен — платятся только напечатанные цены атак. "
-            + "Каждый следующий бой в том же действии оплачивается отдельно, и это "
-            + "<b>плата за право</b> провести ещё один бой, а не надбавка к атакам внутри "
-            + "него.");
+        h.p("Единицы «второй бой» больше нет: одно действие Бой — одна процедура. Войска "
+            + "выбранного гекса платят напечатанные цены атак, любой другой жетон — на "
+            + "боеприпас больше <b>за каждую атаку</b>. Каждый жетон атакует не больше одного "
+            + "раза за действие.");
         h.table2("Как это задано", book.rows(
+            "actions.combat.extra_token_ammo",
             "actions.combat.surcharge_model",
             "actions.combat.open_battle_surcharge_ammo"));
-        h.p("Второй бой может идти из того же гекса или из другого. Ответный бой счётчик "
-            + "боёв не двигает.");
+        h.p("Ключи прежней модели оставлены в своде ради истории и движком не читаются.");
         return h.done();
     }
 

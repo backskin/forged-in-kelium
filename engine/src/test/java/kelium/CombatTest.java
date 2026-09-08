@@ -49,6 +49,13 @@ class CombatTest {
                         return o;
                     }
                 }
+                // БОЙ КАК ДВИЖЕНИЕ: у каждого выстрела своя цель в начинке
+                // варианта — предпочитаем выстрел по подготовленному гексу.
+                for (Choice o : options) {
+                    if (o.payload() instanceof Map<?, ?> m && preferHex.equals(m.get("target"))) {
+                        return o;
+                    }
+                }
             }
             for (Choice o : options) {
                 if (!"pass".equals(o.kind()) && o.payload() != null) {

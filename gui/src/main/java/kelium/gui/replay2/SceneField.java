@@ -71,7 +71,16 @@ public final class SceneField extends JComponent {
         BUILD_ZONES("зоны стройки", false),
         TRAILS("шлейфы движения за раунд", false),
         HEATMAP("тепловую карту боёв", false),
-        CIRCLES("номера кругов у построек", false);
+        CIRCLES("номера кругов у построек", false),
+        // ЧЕМ НАКРЫТО ПОЛЕ (заказ дизайнера 08.09.2026). Поле собрано из
+        // картонных модулей, но на столе границ между ними не разглядеть —
+        // а проверять раскладку надо. Слой чертит границы картонок и
+        // подписывает, какая где лежит и какой стороной.
+        BLOCKS("границы картонных модулей", false),
+        // ПЕЧАТНЫЕ МОДУЛИ или прежняя схема. Выключить нужно тогда, когда
+        // разглядывают не стол, а разметку: на фотографии картона бледные
+        // служебные пометки читаются хуже.
+        CARDBOARD("рисунок картонных модулей", true);
 
         public final String label;
         public final boolean byDefault;
@@ -108,6 +117,27 @@ public final class SceneField extends JComponent {
         for (Layer l : Layer.values()) {
             if (l.byDefault) {
                 layers.add(l);
+            }
+        }
+        // СЛОИ ПОД СНИМОК: {@code -Dkelium.layers=BLOCKS,-CARDBOARD} включает и
+        // выключает слои при запуске. Нужно прогонщику снимков (правило
+        // 30.08.2026: окно не показываем, мышью в него не ходим); руками эти же
+        // слои переключаются в меню «Слои поля».
+        for (String имя : System.getProperty("kelium.layers", "").split(",")) {
+            String s = имя.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            boolean включить = !s.startsWith("-");
+            try {
+                Layer l = Layer.valueOf(включить ? s : s.substring(1));
+                if (включить) {
+                    layers.add(l);
+                } else {
+                    layers.remove(l);
+                }
+            } catch (IllegalArgumentException e) {
+                System.out.println("нет такого слоя поля: " + s);
             }
         }
         applyPainterFlags();
@@ -243,6 +273,8 @@ public final class SceneField extends JComponent {
         kelium.report.FieldPainter.showEnergy = layers.contains(Layer.ENERGY);
         kelium.report.FieldPainter.showKelium = layers.contains(Layer.KELIUM);
         kelium.report.FieldPainter.showOwnership = layers.contains(Layer.OWNERSHIP);
+        kelium.report.FieldPainter.showBlocks = layers.contains(Layer.BLOCKS);
+        kelium.report.FieldPainter.showCardboard = layers.contains(Layer.CARDBOARD);
     }
 
     public boolean isFocusMode() {

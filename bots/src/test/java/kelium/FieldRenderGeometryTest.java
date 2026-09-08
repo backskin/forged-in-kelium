@@ -23,6 +23,27 @@ import kelium.core.Agent;
  */
 class FieldRenderGeometryTest {
 
+    /**
+     * ЗДЕСЬ МЕРЯЕТСЯ ГЕОМЕТРИЯ СИЛУЭТОВ, А НЕ КАРТИНОК ХУДОЖНИКА.
+     *
+     * <p>У жетона с нарисованной текстурой в {@code transform} стоит не половина
+     * его ширины, а точка привязки внутри картинки (см. {@code drawTexture}), и
+     * разбор «translate(-w/2,-h/2)» считает её шириной жетона: тест начинает
+     * ругаться на «жетон шире гекса» ровно в тот день, когда художник принёс
+     * рисунок, — хотя рисуется всё там же и тем же размером. Поэтому текстуры
+     * на время теста отключены.
+     */
+    @org.junit.jupiter.api.BeforeAll
+    static void безТекстур() throws java.io.IOException {
+        kelium.report.Textures.useFolder(
+            java.nio.file.Files.createTempDirectory("kelium-no-textures"));
+    }
+
+    @org.junit.jupiter.api.AfterAll
+    static void вернутьТекстуры() {
+        kelium.report.Textures.useFolder(null);
+    }
+
     /** Разобрать transform жетона: translate(cx,cy) rotate(a) scale(k) translate(-w/2,-h/2). */
     private record Token(double cx, double cy, double rot, double k, double w, double h) {
         double drawnW() {

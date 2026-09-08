@@ -1471,7 +1471,8 @@ public final class HotSeatWindow {
 
     /** Семья A концепта §3 — цель на поле, payload сводится к гексу. */
     private static final Set<String> HEX_TARGET_KINDS = Set.of(
-        "tower_hex", "build_hex", "move_hex", "energy_hex", "combat_source", "combat_target");
+        "tower_hex", "build_hex", "move_hex", "move_source", "energy_hex", "combat_source",
+        "combat_target");
 
     private static final Map<String, String> KIND_LABELS = Map.ofEntries(
         Map.entry("action", "выберите действие"),
@@ -1484,6 +1485,7 @@ public final class HotSeatWindow {
         Map.entry("build_hex", "гекс для постройки"),
         Map.entry("move_hex", "гекс для переноса"),
         Map.entry("energy_hex", "гекс для энергии"),
+        Map.entry("move_source", "гекс, войска которого двигаются бесплатно"),
         Map.entry("move", "куда шагнуть"),
         Map.entry("maneuver_unit", "какой отряд поведёте"),
         Map.entry("combat_source", "откуда атаковать"),

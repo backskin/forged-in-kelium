@@ -206,6 +206,35 @@ public final class BlockCatalogPanel extends JPanel {
      * Пересобрать список энергии под выбранные контейнеры — и только из тех
      * значений, которые с ними встречаются в данных.
      */
+    /**
+     * Показать названную версию набора — то же, что выбрать её в списках.
+     * Нужно прогонщику снимков: печатный арт нарисован по одной версии, и
+     * снимать надо именно её, а мышью в окно ходить нельзя.
+     *
+     * @return нашлась ли такая версия
+     */
+    public boolean показатьВерсию(String id) {
+        Version v = id == null ? null : versions.get(id);
+        if (v == null) {
+            return false;
+        }
+        remove(пусто);
+        плитка.показать(v.small, v.big, v.id);
+        revalidate();
+        repaint();
+        return true;
+    }
+
+    /**
+     * Повернуть показ на 60° — то же, что нажать кнопку поворота. Нужно
+     * прогонщику снимков: он проверяет, что печатный арт садится на гексы при
+     * любом повороте, а мышью в окно ходить нельзя.
+     */
+    public void повернуть(boolean поЧасовой) {
+        поворот = (поворот + (поЧасовой ? 1 : 5)) % 6;
+        плитка.поворот(поворот);
+    }
+
     /** Кнопка поворота показа на 60° в одну сторону. */
     private JButton кнопкаПоворота(boolean поЧасовой) {
         JButton b = new JButton(new ЗначокПоворота(поЧасовой));
@@ -290,10 +319,10 @@ public final class BlockCatalogPanel extends JPanel {
         Version v = id == null ? null : versions.get(id);
         remove(пусто);
         if (v == null) {
-            плитка.показать(List.of(), List.of());
+            плитка.показать(List.of(), List.of(), "");
             add(пусто, java.awt.BorderLayout.SOUTH);
         } else {
-            плитка.показать(v.small, v.big);
+            плитка.показать(v.small, v.big, v.id);
         }
         revalidate();
         repaint();
@@ -382,6 +411,12 @@ public final class BlockCatalogPanel extends JPanel {
         private List<Face> большие = List.of();
         /** Поворот показа: шагов по 60° по часовой стрелке (0..5). */
         private int поворот;
+        /**
+         * ВЕРСИЯ НАБОРА, КОТОРУЮ ПОКАЗЫВАЕМ. Нужна ровно для одного: печатный
+         * арт модулей нарисован по КОНКРЕТНОЙ версии, и накладывать его на
+         * чужую нельзя — на картинке будут одни контейнеры, а в подписи другие.
+         */
+        private String версия = "";
 
         /**
          * КЕГЛИ КАТАЛОГА (просьба дизайнера 31.08.2026: заголовок раздела крупнее
@@ -436,9 +471,10 @@ public final class BlockCatalogPanel extends JPanel {
             return new double[]{(maxX - minX) + 2 * проба, (maxY - minY) + 2 * проба};
         }
 
-        void показать(List<Face> м, List<Face> б) {
+        void показать(List<Face> м, List<Face> б, String версия) {
             малые = м;
             большие = б;
+            this.версия = версия;
             revalidate();
             repaint();
         }
@@ -649,6 +685,12 @@ public final class BlockCatalogPanel extends JPanel {
             }
             double сдвигX = cx0 - (minX + maxX) / 2;
             double сдвигY = cy0 - (minY + maxY) / 2;
+            // ПЕЧАТНЫЙ МОДУЛЬ, ЕСЛИ ОН НАРИСОВАН. Тогда схему рисовать нечем и
+            // незачем: на картинке настоящий картон, и жёлтые ячейки с
+            // контейнерами на нём уже напечатаны — сверено генератором арта.
+            if (печатный(g, f, сдвигX, сдвигY, size)) {
+                return;
+            }
             for (HexRec hx : гексы) {
                 double[] c = FieldGeometry.hexCenter(hx.q(), hx.r(), size);
                 double cx = сдвигX + c[0];
@@ -683,6 +725,31 @@ public final class BlockCatalogPanel extends JPanel {
                     рисоватьМетку(g, cx, cy, apothem, hx.container(), Theme.container(), false, size);
                 }
             }
+        }
+
+        /**
+         * НАСТОЯЩИЙ КАРТОН вместо схемы: картинка стороны модуля, положенная на
+         * те же гексы.
+         *
+         * <p>Картинку кладёт якорь {@link kelium.report.BlockArt}: в ней
+         * известны радиус гекса и точка, где на картинке центр гекса (0,0)
+         * набора, — значит картинку достаточно повернуть вокруг этой точки на
+         * (поворот показа − поворот печати)·60° и поставить точку туда, где
+         * этот гекс оказался на экране. Никакой подгонки на глаз: то же
+         * преобразование годится и для поля.
+         *
+         * @return нарисовали ли (нет картинки или чужая версия набора — нет)
+         */
+        private boolean печатный(Graphics2D g, Face f, double сдвигX, double сдвигY,
+                                 double size) {
+            if (!kelium.report.BlockArt.matches(версия)) {
+                return false;
+            }
+            // Гекс (0,0) набора на экране: сдвиг уже учитывает центровку блока
+            // в карточке, а поворот и масштаб делает сам укладчик картона.
+            double[] c0 = FieldGeometry.hexCenter(0, 0, size);
+            return kelium.report.BlockArt.paint(g, f.blockId(), f.faceName(),
+                сдвигX + c0[0], сдвигY + c0[1], size, поворот);
         }
 
         /**

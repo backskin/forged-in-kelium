@@ -12,8 +12,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import kelium.dataio.GameConfig;
-import kelium.gui.BlockAssembler.Cell;
-import kelium.gui.BlockAssembler.Placement;
+import kelium.engine.BlockAssembler.Cell;
+import kelium.engine.BlockAssembler.Placement;
 
 /**
  * ПРИВЯЗКА СБОРКИ К КАРТОНКАМ — сторож на то, что метки едут вместе с блоком.

@@ -117,8 +117,15 @@ public final class БлизостьЗаданий {
             java.io.FileDescriptor.out), true, StandardCharsets.UTF_8));
         int games = args.length > 0 ? Integer.parseInt(args[0]) : 100;
         int players = args.length > 1 ? Integer.parseInt(args[1]) : 4;
-        String ruleset = args.length > 2 ? args[2] : GameConfig.DEFAULT_RULESET;
-        List<String> пул = List.of("builder:3", "supplier:3", "stalker:3", "punisher:3");
+        String ruleset = args.length > 2 && !"-".equals(args[2])
+            ? args[2] : GameConfig.DEFAULT_RULESET;
+        // УРОВЕНЬ УМЕНИЯ — аргументом (08.09.2026). Прежде он был вшит третьей
+        // ступенью; с переездом на планировщика третья ступень симулирует ещё и
+        // выбор приказа, партия идёт больше минуты, и воронка на сотне партий
+        // перестала помещаться в разумное время.
+        String уровень = args.length > 3 ? args[3] : "2";
+        List<String> пул = List.of("builder:" + уровень, "supplier:" + уровень,
+            "stalker:" + уровень, "punisher:" + уровень);
 
         Map<String, Карта> итог = new TreeMap<>();
         long[] полки = new long[5];      // 0 · (0;0.25] · (0.25;0.5] · (0.5;0.75] · (0.75;1)

@@ -30,9 +30,9 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
 
-import kelium.gui.BlockAssembler.Cell;
-import kelium.gui.BlockAssembler.Placement;
-import kelium.gui.BlockAssembler.Result;
+import kelium.engine.BlockAssembler.Cell;
+import kelium.engine.BlockAssembler.Placement;
+import kelium.engine.BlockAssembler.Result;
 import kelium.gui.LayoutEditor.LHex;
 import kelium.gui.LayoutEditor.Model;
 
@@ -345,11 +345,13 @@ public final class AssemblyWindow extends JPanel {
     private void пересобратьКартонки() {
         if (!режимМеток.isSelected() || !hasResult()) {
             view.картонки = List.of();
+            view.версияКартонок = "";
             view.repaint();
             return;
         }
-        view.картонки = ПривязкаБлоков.привязать(view.result.blocks(),
-            выбранныйНабор(), зерноКартонок);
+        НаборыБлоков.Версия набор = выбранныйНабор();
+        view.картонки = ПривязкаБлоков.привязать(view.result.blocks(), набор, зерноКартонок);
+        view.версияКартонок = набор == null ? "" : набор.id();
         view.repaint();
     }
 
@@ -584,7 +586,7 @@ public final class AssemblyWindow extends JPanel {
             @Override protected List<Result> doInBackground() {
                 // Ищем не одну сборку, а несколько разных — чтобы кнопку
                 // «Другая сборка» было чем кормить.
-                return BlockAssembler.solveVariants(playable, big, small, black,
+                return kelium.engine.BlockAssembler.solveVariants(playable, big, small, black,
                     BUDGET_MS, 8);
             }
 
@@ -633,6 +635,12 @@ public final class AssemblyWindow extends JPanel {
         Result result;
         /** Уложенные картонки — пусто, если режим меток выключен. */
         List<ПривязкаБлоков.Привязка> картонки = List.of();
+        /**
+         * ВЕРСИЯ НАБОРА, ПО КОТОРОЙ РАЗДАНЫ КАРТОНКИ. Нужна ровно для одного:
+         * печатный арт нарисован под КОНКРЕТНУЮ версию, и класть его на чужую
+         * нельзя — на картинке будут одни контейнеры, а играться другие.
+         */
+        String версияКартонок = "";
         Set<Cell> playable = Set.of();
         double size = 44;
         double panX = 480;
@@ -884,9 +892,9 @@ public final class AssemblyWindow extends JPanel {
                 message(g, "Подбираю сборку…", Theme.ink2());
                 return;
             }
-            if (result.status() != BlockAssembler.Status.OK) {
+            if (result.status() != kelium.engine.BlockAssembler.Status.OK) {
                 drawMuted(g, true);
-                String head = result.status() == BlockAssembler.Status.EMPTY
+                String head = result.status() == kelium.engine.BlockAssembler.Status.EMPTY
                     ? "Поле пустое" : "Поле не собирается";
                 String sub = switch (result.status()) {
                     case IMPOSSIBLE -> "Из такого запаса блоков эту раскладку сложить нельзя";
@@ -910,7 +918,12 @@ public final class AssemblyWindow extends JPanel {
             //    на чертёжных выносках. Порядок важен: метки поверх блоков, а
             //    выноски поверх меток — линия не должна прятаться под меткой.
             if (!картонки.isEmpty()) {
-                рисоватьМетки(g);
+                // С ПЕЧАТНЫМ КАРТОНОМ РИСОВАННЫЕ МЕТКИ НЕ НУЖНЫ: контейнеры и
+                // жёлтые ячейки уже НАПЕЧАТАНЫ на картинке модуля, и вторые
+                // поверх них были бы двойными.
+                if (!kelium.report.BlockArt.matches(версияКартонок)) {
+                    рисоватьМетки(g);
+                }
                 рисоватьВыноски(g);
             }
             legend(g);
@@ -931,20 +944,33 @@ public final class AssemblyWindow extends JPanel {
         /** Блоки без накладок; {@code monochrome} — белая заливка вместо палитры. */
         private void drawBlocksOnly(Graphics2D g, boolean monochrome) {
             List<Placement> blocks = result.blocks();
+            // ПЕЧАТНЫЙ КАРТОН ВМЕСТО ЦВЕТНОЙ ПЛАШКИ, когда он нарисован под этот
+            // набор: на картинке настоящий модуль, и рисованная заливка с
+            // метками ему уже не нужна. В монохром (выгрузка контуров под
+            // печать) картон не идёт — там нужны линии, а не рисунок.
+            java.util.Map<Placement, ПривязкаБлоков.Привязка> поКартону =
+                new java.util.HashMap<>();
+            if (!monochrome && kelium.report.BlockArt.matches(версияКартонок)) {
+                for (ПривязкаБлоков.Привязка п : картонки) {
+                    поКартону.put(п.место(), п);
+                }
+            }
             for (int i = 0; i < blocks.size(); i++) {
                 Placement p = blocks.get(i);
                 Set<Cell> own = new HashSet<>(p.cells());
-                g.setColor(заливкаБлока(i, monochrome));
-                for (Cell c : p.cells()) {
-                    double[] xy = center(c.q(), c.r());
-                    g.fill(roundedCell(xy[0], xy[1], size * 0.99, c, own));
-                }
-                // тонкие внутренние швы между гексами одного блока
-                g.setColor(шовБлока());
-                g.setStroke(new BasicStroke(1f));
-                for (Cell c : p.cells()) {
-                    double[] xy = center(c.q(), c.r());
-                    g.draw(roundedCell(xy[0], xy[1], size * 0.99, c, own));
+                if (!рисоватьКартон(g, поКартону.get(p))) {
+                    g.setColor(заливкаБлока(i, monochrome));
+                    for (Cell c : p.cells()) {
+                        double[] xy = center(c.q(), c.r());
+                        g.fill(roundedCell(xy[0], xy[1], size * 0.99, c, own));
+                    }
+                    // тонкие внутренние швы между гексами одного блока
+                    g.setColor(шовБлока());
+                    g.setStroke(new BasicStroke(1f));
+                    for (Cell c : p.cells()) {
+                        double[] xy = center(c.q(), c.r());
+                        g.draw(roundedCell(xy[0], xy[1], size * 0.99, c, own));
+                    }
                 }
                 // внешний контур блока
                 g.setColor(контурБлока(monochrome));
@@ -969,6 +995,34 @@ public final class AssemblyWindow extends JPanel {
                 }
             }
 
+        }
+
+        /**
+         * НАСТОЯЩАЯ КАРТОНКА на своих гексах.
+         *
+         * <p>Привязка уже знает, какая сторона какого блока легла и каким
+         * поворотом, — остаётся сказать укладчику, куда встал гекс, который у
+         * этого блока значится как (0,0). Само преобразование живёт в
+         * {@link kelium.report.BlockArt}: тем же кладут картон и в каталоге, и на
+         * поле, иначе рисунок поедет относительно гексов в одном из трёх мест.
+         *
+         * @return нарисовали ли (нет привязки или нет картинки — нет)
+         */
+        private boolean рисоватьКартон(Graphics2D g, ПривязкаБлоков.Привязка п) {
+            if (п == null) {
+                return false;
+            }
+            List<НаборыБлоков.Гекс> свои = п.сторона().гексы();
+            for (int i = 0; i < свои.size(); i++) {
+                if (свои.get(i).q() != 0 || свои.get(i).r() != 0) {
+                    continue;
+                }
+                Cell c = п.гексы().get(i).клетка();
+                double[] xy = center(c.q(), c.r());
+                return kelium.report.BlockArt.paint(g, п.сторона().блок(),
+                    п.сторона().имя(), xy[0], xy[1], size, п.поворотов());
+            }
+            return false;
         }
 
         /** Чёрные накладки «недоступный гекс» — свой слой (см. порядок слоёв). */
@@ -1178,10 +1232,17 @@ public final class AssemblyWindow extends JPanel {
          */
         private Font шрифтПодписей() {
             if (ExportPaint.active()) {
-                int кегль = (int) Math.round(Math.max(13, Math.min(34, getHeight() / 42.0)));
-                return Theme.font(кегль, Font.BOLD);
+                return Theme.font(кегльПодписи(getHeight()), Font.BOLD);
             }
-            return Theme.font(13, Font.BOLD);
+            // ВДВОЕ КРУПНЕЕ (заказ дизайнера 08.09.2026: «шрифт мелковатый, в
+            // два раза бы его увеличить»). Подпись читают, косясь на блок, а не
+            // вглядываясь: тринадцати было мало.
+            return Theme.font(26, Font.BOLD);
+        }
+
+        /** Кегль подписи в выгрузке — от высоты кадра, вдвое крупнее прежнего. */
+        private static int кегльПодписи(int высотаКадра) {
+            return (int) Math.round(Math.max(26, Math.min(68, высотаКадра / 21.0)));
         }
 
         /** Длина полки за подписью — от кегля, а не константой. */
@@ -1207,8 +1268,7 @@ public final class AssemblyWindow extends JPanel {
             if (картонки.isEmpty()) {
                 return 0;
             }
-            int кегль = (int) Math.round(Math.max(13, Math.min(34, высотаКадра / 42.0)));
-            Font f = Theme.font(кегль, Font.BOLD);
+            Font f = Theme.font(кегльПодписи(высотаКадра), Font.BOLD);
             java.awt.FontMetrics fm = getFontMetrics(f);
             int самая = 0;
             for (ПривязкаБлоков.Привязка п : картонки) {
@@ -1245,7 +1305,9 @@ public final class AssemblyWindow extends JPanel {
             if (влево) {
                 крайX = Math.max(крайX, поле + самая);
             } else {
-                крайX = Math.min(крайX, getWidth() - поле - самая - полка);
+                // Хвостик полки ушёл влево, к полю, — справа под него места
+                // резервировать больше не надо.
+                крайX = Math.min(крайX, getWidth() - поле - самая);
             }
 
             for (int i = 0; i < столбец.size(); i++) {
@@ -1256,10 +1318,19 @@ public final class AssemblyWindow extends JPanel {
                 String текст = п.сторона().подпись();
                 int ширина = fm.stringWidth(текст);
 
-                // Полка: под текстом, длиной с текст плюс хвостик к полю.
+                // ПОЛКА: под текстом, плюс хвостик В СТОРОНУ ПОЛЯ — именно от
+                // конца хвостика и уходит наклонный участок к блоку.
+                //
+                // ИСПРАВЛЕНО 08.09.2026 (замечание дизайнера: «справа пробел
+                // между палкой и подчёркивающей палкой»). У правого столбца
+                // хвостик отсчитывался от ПРАВОГО конца полки, а перелом — от
+                // левого: между наклонной линией и полкой оставалась дырка
+                // длиной в хвостик. Теперь столбцы устроены зеркально: полка
+                // накрывает текст и выходит хвостиком к полю, а перелом стоит
+                // ровно на конце этого хвостика.
                 int xТекста = влево ? крайX - ширина : крайX;
-                int xПолкиОт = влево ? xТекста : крайX;
-                int xПолкиДо = влево ? крайX + полка : крайX + ширина + полка;
+                int xПолкиОт = влево ? xТекста : крайX - полка;
+                int xПолкиДо = влево ? крайX + полка : крайX + ширина;
                 int xПерелома = влево ? крайX + полка : крайX - полка;
 
                 g.setColor(Theme.alpha(Theme.ink(), 0.6));

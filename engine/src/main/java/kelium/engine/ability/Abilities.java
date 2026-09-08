@@ -91,7 +91,6 @@ public final class Abilities {
         Hook.ASSEMBLY_UNITS_OUT,        // Actions.AssemblyAction: войск за Сборку
         Hook.ASSEMBLY_AMMO_OUT,         // Actions.AssemblyAction: боеприпасов за Сборку
         Hook.ATTACK_AMMO_COST,          // CombatResolver.effCost: цена атаки
-        Hook.COMBAT_SECOND_BATTLE_SURCHARGE, // Actions.CombatAction: надбавка за бой
         Hook.SCORING_VP_SOURCE,         // Scoring.scorePlayer: новый источник очков
         Hook.SCORING_VP_MODIFIER,       // Scoring.scorePlayer: правка итога
         Hook.SCIENCE_PAY_WITH,          // Actions.payTrophy: чем платить за науку

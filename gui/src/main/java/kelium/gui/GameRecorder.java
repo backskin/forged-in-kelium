@@ -381,13 +381,7 @@ public final class GameRecorder {
     public static void fillTableAndField(ReplayRecord rec, GameConfig cfg, GameState state) {
         collectCardNames(cfg, rec);
         for (Hex h : state.field.hexes.values()) {
-            int[] qr = FieldGeometry.parseQR(h.id);
-            ReplayRecord.HexInfo hi = new ReplayRecord.HexInfo();
-            hi.id = h.id;
-            hi.q = qr != null ? qr[0] : 0;
-            hi.r = qr != null ? qr[1] : 0;
-            hi.kind = h.kind.name();
-            rec.hexes.add(hi);
+            rec.hexes.add(ReplayRecord.HexInfo.of(h));
         }
     }
 

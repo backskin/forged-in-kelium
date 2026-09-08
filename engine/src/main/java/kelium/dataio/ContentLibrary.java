@@ -93,7 +93,8 @@ public final class ContentLibrary {
                 "market", "super_objectives", "super_arsenal")) {
             ContentSet cs = sets.get(type);
             if (cs != null) {
-                kelium.engine.cards.CardRegistry.bindAll(type, безКлассов(cs.entries));
+                kelium.engine.cards.CardRegistry.bindAll(type, cs.version,
+                    безКлассов(cs.entries));
             }
         }
     }

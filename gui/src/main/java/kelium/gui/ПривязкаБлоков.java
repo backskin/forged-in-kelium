@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-import kelium.gui.BlockAssembler.Cell;
-import kelium.gui.BlockAssembler.Placement;
+import kelium.engine.BlockAssembler.Cell;
+import kelium.engine.BlockAssembler.Placement;
 
 /**
  * ПРИВЯЗКА СБОРКИ К ФИЗИЧЕСКИМ БЛОКАМ: какой кусок сборки — какая картонка.

@@ -36,9 +36,54 @@ public final class BoardAnchors {
                           int bx, int by, int bw, int bh) {
     }
 
+    /**
+     * ТРЕК НАУЧНОГО ОТДЕЛА на печатном планшете.
+     *
+     * @param origin центр ПЕРВОЙ ячейки первого шага
+     * @param peak   центр единственной ячейки последнего шага: художник поставил
+     *               её под знак бесконечности, а не по сетке
+     * @param card   рамка открытой карты супер-арсенала на вершине
+     */
+    public record ScienceTrack(double ox, double oy, double peakX, double peakY,
+                               int cx, int cy, int cw, int ch) {
+    }
+
+    /**
+     * ПЕЧАТНЫЙ ПЛАНШЕТ НАУКИ: сетка ячеек шагов.
+     *
+     * <p>Ячейки напечатаны по гексовой сетке и ПОВЁРНУТЫ, поэтому и записаны не
+     * списком рамок, а началом трека и двумя шагами сетки: {@code step} — вдоль
+     * трека от шага к шагу, {@code row} — внутрь шага от ячейки к ячейке.
+     */
+    public record Science(int artW, int artH, int cellW, int cellH, double angle,
+                          double stepX, double stepY, double rowX, double rowY,
+                          Map<String, ScienceTrack> tracks) {
+
+        /**
+         * Центр ячейки на картинке: {@code step} считается от 1, {@code cell} — от 0.
+         *
+         * @param steps сколько шагов на треке всего: последний шаг стоит особняком
+         * @return {@code null}, если такого трека в якорях нет
+         */
+        public double[] cell(String track, int step, int cell, int steps) {
+            ScienceTrack t = tracks.get(track);
+            if (t == null) {
+                return null;
+            }
+            if (step >= steps) {
+                return new double[]{t.peakX(), t.peakY()};
+            }
+            return new double[]{
+                t.ox() + stepX * (step - 1) + rowX * cell,
+                t.oy() + stepY * (step - 1) + rowY * cell};
+        }
+    }
+
     private static boolean loaded;
     private static final Map<String, List<Cell>> STORAGE = new LinkedHashMap<>();
     private static final Map<String, List<Column>> TROOP = new LinkedHashMap<>();
+    private static Science science;
+    private static int[] marketCard;
 
     private BoardAnchors() {
     }
@@ -53,6 +98,21 @@ public final class BoardAnchors {
     public static synchronized List<Column> troop(String side) {
         load();
         return TROOP.getOrDefault(key(side), List.of());
+    }
+
+    /** Сетка ячеек печатного планшета науки ({@code null} — якорей нет). */
+    public static synchronized Science science() {
+        load();
+        return science;
+    }
+
+    /**
+     * Рамка под активную карту рынка на печатном планшете рынка:
+     * {@code [x, y, w, h]} в пикселях картинки ({@code null} — якорей нет).
+     */
+    public static synchronized int[] marketCard() {
+        load();
+        return marketCard == null ? null : marketCard.clone();
     }
 
     /**
@@ -129,8 +189,45 @@ public final class BoardAnchors {
                         a[0], a[1], a[2], a[3], s[0], s[1], s[2], s[3]));
                 }
                 TROOP.put(side, List.copyOf(out));
+            } else if ("science".equals(b.get("kind"))) {
+                science = readScience(b);
+            } else if ("market".equals(b.get("kind"))) {
+                marketCard = box(b.get("card"));
             }
         }
+    }
+
+    /** Планшет науки: сетка одна на весь планшет, у каждого трека своё начало. */
+    private static Science readScience(Map<?, ?> b) {
+        int[] size = box2(b.get("size"));
+        int[] cell = box2(b.get("cell"));
+        int[] step = box2(b.get("step"));
+        int[] row = box2(b.get("row"));
+        if (size == null || cell == null || step == null || row == null
+                || !(b.get("tracks") instanceof List<?> ts)) {
+            return null;
+        }
+        Map<String, ScienceTrack> tracks = new LinkedHashMap<>();
+        for (Object to : ts) {
+            if (!(to instanceof Map<?, ?> t)) {
+                continue;
+            }
+            int[] origin = box2(t.get("origin"));
+            int[] peak = box2(t.get("peak"));
+            int[] card = box(t.get("card"));
+            if (origin == null || peak == null || card == null) {
+                continue;
+            }
+            tracks.put(String.valueOf(t.get("id")), new ScienceTrack(
+                origin[0], origin[1], peak[0], peak[1],
+                card[0], card[1], card[2], card[3]));
+        }
+        if (tracks.isEmpty()) {
+            return null;
+        }
+        double angle = b.get("angle") instanceof Number n ? n.doubleValue() : 0;
+        return new Science(size[0], size[1], cell[0], cell[1], angle,
+            step[0], step[1], row[0], row[1], Map.copyOf(tracks));
     }
 
     private static int[] box(Object o) {
@@ -142,6 +239,14 @@ public final class BoardAnchors {
             out[i] = num(l.get(i));
         }
         return out;
+    }
+
+    /** Пара чисел: размер картинки, размер ячейки, шаг сетки. */
+    private static int[] box2(Object o) {
+        if (!(o instanceof List<?> l) || l.size() != 2) {
+            return null;
+        }
+        return new int[]{num(l.get(0)), num(l.get(1))};
     }
 
     private static int num(Object o) {

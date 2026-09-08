@@ -354,6 +354,9 @@ public class HeuristicAgent extends Agent {
             case "build_facing" -> (s, o) -> scoreBuildFacing(s, o, ctx);
             case "assemble" -> (s, o) -> scoreAssemble(s, o);
             case "move" -> (s, o) -> scoreMove(s, o);
+            // ДВИЖЕНИЕ ПО РУЛБУКУ: сперва бесплатный гекс — тот, чьим войскам
+            // есть куда и зачем идти. Без оценки бот брал гекс наугад.
+            case "move_source" -> (s, o) -> scoreMoveSource(s, o);
             case "combat_source" -> (s, o) -> scoreCombatSource(s, o);
             case "combat_target" -> (s, o) -> scoreCombatTarget(s, o);
             case "attack" -> (s, o) -> scoreAttack(s, o);
@@ -1771,6 +1774,33 @@ public class HeuristicAgent extends Agent {
     }
 
     // ================= бой ==============================================
+    /**
+     * БЕСПЛАТНЫЙ ГЕКС ДВИЖЕНИЯ: ценим по войскам, которым есть куда идти, и по
+     * тому, ближе ли они к врагу после хода. Гекс с одной вышкой (скорость 0)
+     * не стоит ничего; гекс с тремя пехотинцами в двух шагах от врага — много.
+     */
+    private double scoreMoveSource(GameState state, Choice o) {
+        if ("pass".equals(o.kind()) || o.payload() == null) {
+            return 0.2;
+        }
+        String hex = (String) o.payload();
+        double agg = wget("aggression");
+        double v = 0;
+        for (UnitToken u : state.player(seat).unitsOnField()) {
+            if (!hex.equals(u.hexId)) {
+                continue;
+            }
+            int speed = kelium.engine.Speed.of(state, seat, u);
+            if (speed <= 0) {
+                continue;
+            }
+            Integer d = nearestEnemyDist(state, hex);
+            double closeness = d == null ? 0.3 : d <= 1 ? 0.6 : d <= speed + 1 ? 1.5 : 0.8;
+            v += 1.0 + closeness * (0.5 + agg);
+        }
+        return v <= 0 ? 0.1 : v;
+    }
+
     private double scoreCombatSource(GameState state, Choice o) {
         if ("pass".equals(o.kind())) {
             return (wget("aggression") >= 1.0 || threatened(state)) ? 0.2 : 1.2;
@@ -1831,7 +1861,17 @@ public class HeuristicAgent extends Agent {
         }
         Map<String, Object> pl = (Map<String, Object>) o.payload();
         int ammo = pl.get("ammo") instanceof Number n ? n.intValue() : 1;
-        return 2.0 + (2 - ammo);
+        // БОЙ КАК ДВИЖЕНИЕ: у каждого выстрела своя цель, отдельной точки
+        // «по какому гексу бить» больше нет — ценность цели считается здесь.
+        double target = 0.0;
+        if (pl.get("target") instanceof String hx) {
+            target = 0.6 * scoreCombatTarget(state, new Choice("combat_target", hx, hx));
+        }
+        // Добивание: жертва с одним очком прочности — приоритет.
+        if (pl.get("victim_hp_left") instanceof Number left && left.intValue() <= 1) {
+            target += 2.0;
+        }
+        return 2.0 + (2 - ammo) + target;
     }
 
     // ================= прочие ===========================================

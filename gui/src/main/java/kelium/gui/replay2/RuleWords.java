@@ -266,16 +266,18 @@ public final class RuleWords {
             case "actions.combat.module_on_universal" ->
                 "жетон модуля кладётся на универсальную атаку, а не на специальную";
             case "actions.combat.open_battle_surcharge_ammo" ->
-                "надбавка боеприпасами за начало боя";
+                "надбавка боеприпасами за начало боя (устарело, не читается)";
+            case "actions.combat.extra_token_ammo" ->
+                "надбавка боеприпасами к каждой атаке жетона не из выбранного гекса";
             case "actions.combat.retaliation_enabled" -> "ответный удар разрешён";
             case "actions.combat.retaliation_is_free" -> "ответный удар не стоит боеприпасов";
             case "actions.combat.retaliation_to_retaliation" ->
                 "на ответный удар можно ответить снова";
             case "actions.combat.surcharge_model" -> "как считается надбавка в бою";
             case "actions.movement.cost_model" -> "как считается цена перемещений";
-            case "actions.movement.first_hex_free" -> "первый гекс бесплатно";
+            case "actions.movement.first_hex_free" -> "войска выбранного гекса двигаются бесплатно";
             case "actions.movement.flat_ammo_per_extra_move" ->
-                "боеприпасов за каждое лишнее перемещение";
+                "боеприпасов за перемещение жетона не из выбранного гекса";
             case "actions.movement.escalating_surcharge_ammo" ->
                 "растущая надбавка боеприпасами за перемещения";
             case "actions.energy_swap.activations_per_source" ->

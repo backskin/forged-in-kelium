@@ -60,6 +60,7 @@ public final class Textures {
         ready = false;
         skipped = 0;
         Zones.forget();
+        BlockArt.forget();
     }
 
     private static synchronized void init() {
@@ -149,6 +150,31 @@ public final class Textures {
     }
 
     /**
+     * КАРТА ПРИКАЗА — печатное лицо или рубашка. Лежат в {@code card/orders/}.
+     *
+     * <p>Имя лица — идентификатор карты из набора ({@code blue_infra},
+     * {@code yellow_oper}): в нём уже закодированы и колода, и верхний приказ.
+     * Исключение — БЕЗОПАСНОСТЬ: в наборе она пронумерована по МЕСТУ
+     * ({@code security_1}…{@code security_4}), а напечатана в цвете колоды
+     * игрока, поэтому её рисунок ищется по ЦВЕТУ ({@code security_blue},
+     * {@code security_scarlet}…). Тем же правилом живут рубашки:
+     * {@code back_<цвет>}, затем общая {@code back}.
+     *
+     * <p>Ключи перечисляются от точного к общему, как и у жетонов; не нашлось
+     * ничего — карта рисуется прежним рисованным видом, и партия от этого не
+     * зависит.
+     */
+    public static BufferedImage orderCard(String... keys) {
+        List<String> list = new ArrayList<>(keys.length);
+        for (String k : keys) {
+            if (k != null && !k.isBlank()) {
+                list.add("card/orders/" + k);
+            }
+        }
+        return find(list);
+    }
+
+    /**
      * ПЕЧАТНЫЙ ПЛАНШЕТ ИГРОКА — картинка настоящего компонента со стола. Лежат в
      * папке {@code board/}: {@code troop-A} (планшет войск), {@code storage-A}
      * (планшет хранилища). Ключ — вид планшета и сторона.
@@ -162,6 +188,23 @@ public final class Textures {
         List<String> list = new ArrayList<>(keys.length);
         for (String k : keys) {
             list.add("board/" + k);
+        }
+        return find(list);
+    }
+
+    /**
+     * ПЕЧАТНЫЙ МОДУЛЬ ПОЛЯ — картинка картонного блока, из которых поле и
+     * собирается. Лежат в папке {@code block/}: {@code big-1-A},
+     * {@code small-3-B} — вид, номер и сторона.
+     *
+     * <p>Как эта картинка садится на гексы, говорит {@link BlockArt} по
+     * {@code block/anchors.yaml}. Нет картинки — модуль рисуется прежним
+     * рисованным видом.
+     */
+    public static BufferedImage block(String... keys) {
+        List<String> list = new ArrayList<>(keys.length);
+        for (String k : keys) {
+            list.add("block/" + k);
         }
         return find(list);
     }
