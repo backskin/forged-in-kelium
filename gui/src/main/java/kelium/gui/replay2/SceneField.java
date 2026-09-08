@@ -99,6 +99,17 @@ public final class SceneField extends JComponent {
     private double zoom = 1.0;
     private double panX;
     private double panY;
+    /**
+     * ПОВОРОТ СТОЛА — на сколько градусов развёрнуто ВСЁ поле (кратно 60°).
+     *
+     * <p>Заказ дизайнера 08.09.2026: «хочу уметь вертеть карту в replay и
+     * смотреть на неё с любых сторон». Это ровно то, что делает человек за
+     * столом: обходит его и смотрит с чужого места. Поворачивается ВИД, а не
+     * данные: гексы, жетоны, подписи — всё то же самое, просто полотно
+     * развёрнуто. Кратность 60° не случайна: гекс при таком повороте ложится
+     * сам на себя, и поле остаётся ровным.
+     */
+    private int поворотСтола;
     private boolean autoFit = true;
     private boolean fitPending = true;
 
@@ -139,6 +150,14 @@ public final class SceneField extends JComponent {
             } catch (IllegalArgumentException e) {
                 System.out.println("нет такого слоя поля: " + s);
             }
+        }
+        // ПОВОРОТ СТОЛА ПОД СНИМОК: -Dkelium.rotate=120. Руками стол вертят
+        // кнопками в строке окна и клавишей R.
+        try {
+            поворотСтола = Math.floorMod(
+                Integer.parseInt(System.getProperty("kelium.rotate", "0")), 360);
+        } catch (NumberFormatException e) {
+            поворотСтола = 0;
         }
         applyPainterFlags();
         setOpaque(true);
@@ -384,8 +403,7 @@ public final class SceneField extends JComponent {
         // наоборот светлеют — см. FieldPainter.dark (просьба дизайнера 13.08.2026).
         kelium.report.FieldPainter.dark = Theme.isDark();
         Graphics2D gf = (Graphics2D) g.create();
-        gf.translate(panX, panY);
-        gf.scale(zoom, zoom);
+        gf.transform(вид());
         kelium.report.FieldPainter.paintField(
             new kelium.report.Java2DCanvas(gf, zoom, getFont()),
             BASE, session.record().hexes, f.snapshot, 0, 0, layers.contains(Layer.IDS));
@@ -405,8 +423,7 @@ public final class SceneField extends JComponent {
             paintDimming(g, f);
         }
         Graphics2D gm = (Graphics2D) g.create();
-        gm.translate(panX, panY);
-        gm.scale(zoom, zoom);
+        gm.transform(вид());
         if (!cheapMode) {
             paintMarkup(gm, f);
         }
@@ -437,10 +454,14 @@ public final class SceneField extends JComponent {
             maxy = Math.max(maxy, c[1] + BASE);
         }
         double m = Theme.px(14);
-        double x1 = panX + zoom * minx - m;
-        double y1 = panY + zoom * miny - m;
-        double w = zoom * (maxx - minx) + 2 * m;
-        double h = zoom * (maxy - miny) + 2 * m;
+        // Рамка считается ПО ПОВЁРНУТОМУ виду: стол можно развернуть, и бумага
+        // обязана лежать под полем, а не там, где поле лежало бы без поворота.
+        java.awt.geom.Rectangle2D рамка = вид().createTransformedShape(
+            new Rectangle2D.Double(minx, miny, maxx - minx, maxy - miny)).getBounds2D();
+        double x1 = рамка.getX() - m;
+        double y1 = рамка.getY() - m;
+        double w = рамка.getWidth() + 2 * m;
+        double h = рамка.getHeight() + 2 * m;
         double arc = Theme.px(14);
         g.setColor(Theme.alpha(java.awt.Color.BLACK, Theme.isDark() ? 0.35 : 0.12));
         g.fill(new RoundRectangle2D.Double(x1 + Theme.px(2), y1 + Theme.px(4), w, h,
@@ -485,9 +506,7 @@ public final class SceneField extends JComponent {
             return;
         }
         Area shade = new Area(new Rectangle2D.Double(0, 0, getWidth(), getHeight()));
-        AffineTransform at = new AffineTransform();
-        at.translate(panX, panY);
-        at.scale(zoom, zoom);
+        AffineTransform at = вид();
         for (String id : keep) {
             ReplayRecord.HexInfo hi = hexIndex.get(id);
             if (hi == null) {
@@ -937,16 +956,60 @@ public final class SceneField extends JComponent {
         return sb.append("</html>").toString();
     }
 
+    /**
+     * ПРЕОБРАЗОВАНИЕ ВИДА: сдвиг, масштаб и поворот стола. ОДНО место, где оно
+     * собирается, — иначе поворот пришлось бы дописывать в пяти местах, и
+     * щелчок мыши попадал бы не туда, куда показывает картинка.
+     */
+    private AffineTransform вид() {
+        AffineTransform at = new AffineTransform();
+        at.translate(panX, panY);
+        at.scale(zoom, zoom);
+        if (поворотСтола != 0) {
+            double[] c = серединаПоля();
+            at.rotate(Math.toRadians(поворотСтола), c[0], c[1]);
+        }
+        return at;
+    }
+
+    /** Середина поля в мировых координатах — вокруг неё и вертится стол. */
+    private double[] серединаПоля() {
+        ReplayRecord rec = session.record();
+        if (rec == null || rec.hexes.isEmpty()) {
+            return new double[]{0, 0};
+        }
+        double minx = Double.MAX_VALUE;
+        double maxx = -Double.MAX_VALUE;
+        double miny = Double.MAX_VALUE;
+        double maxy = -Double.MAX_VALUE;
+        for (ReplayRecord.HexInfo h : rec.hexes) {
+            double[] c = FieldGeometry.hexCenter(h.q, h.r, BASE);
+            minx = Math.min(minx, c[0]);
+            maxx = Math.max(maxx, c[0]);
+            miny = Math.min(miny, c[1]);
+            maxy = Math.max(maxy, c[1]);
+        }
+        return new double[]{(minx + maxx) / 2, (miny + maxy) / 2};
+    }
+
+    /** Повернуть стол на шаг в 60° и перерисовать. */
+    public void повернутьСтол(boolean поЧасовой) {
+        поворотСтола = Math.floorMod(поворотСтола + (поЧасовой ? 60 : -60), 360);
+        repaint();
+    }
+
+    /** На сколько градусов развёрнут стол (для подсказки в окне). */
+    public int поворотСтола() {
+        return поворотСтола;
+    }
+
     /** Гекс под точкой экрана (или null). */
     private String hexAt(Point p) {
         if (session.record() == null) {
             return null;
         }
         try {
-            AffineTransform at = new AffineTransform();
-            at.translate(panX, panY);
-            at.scale(zoom, zoom);
-            Point2D w = at.createInverse().transform(p, null);
+            Point2D w = вид().createInverse().transform(p, null);
             int[] qr = FieldGeometry.hexAt(w.getX(), w.getY(), BASE);
             for (ReplayRecord.HexInfo hi : session.record().hexes) {
                 if (hi.q == qr[0] && hi.r == qr[1]) {

@@ -280,6 +280,16 @@ public final class Replay2Gui {
         right.setOpaque(false);
         // Тема — единственный ЦВЕТНОЙ значок в строке: половина солнечная,
         // половина ночная. Рисованный, а не символ шрифта (◐ рисуется квадратом).
+        // ВЕРТЕТЬ СТОЛ (заказ дизайнера 08.09.2026: «хочу уметь вертеть карту в
+        // replay и смотреть на неё с любых сторон»). Ровно то же, что человек
+        // делает за столом: обходит его и смотрит с чужого места. Шаг 60° —
+        // гекс при таком повороте ложится сам на себя.
+        right.add(Ui2.iconButton(new kelium.gui.ЗначокПоворота(false, Theme.px(16)),
+            "Повернуть стол на 60° против часовой — посмотреть на поле с другой "
+            + "стороны, как из-за чужого места.", 26,
+            () -> field.повернутьСтол(false)));
+        right.add(Ui2.iconButton(new kelium.gui.ЗначокПоворота(true, Theme.px(16)),
+            "Повернуть стол на 60° по часовой.", 26, () -> field.повернутьСтол(true)));
         right.add(Ui2.iconButton(kelium.gui.TransportIcons.of("THEME", Theme.px(18)),
             "Переключить тёмную и светлую темы.", 26, this::toggleTheme));
         right.add(Ui2.textButton("лог", "Открыть или закрыть ящик с логом (L).",
@@ -659,6 +669,9 @@ public final class Replay2Gui {
         view.add(item("Крупнее", "control EQUALS", () -> field.zoomBy(1.2)));
         view.add(item("Мельче", "control MINUS", () -> field.zoomBy(1 / 1.2)));
         view.add(item("Вписать поле", "F", field::fitToWindow));
+        view.add(item("Повернуть стол по часовой", "R", () -> field.повернутьСтол(true)));
+        view.add(item("Повернуть стол против часовой", "shift R",
+            () -> field.повернутьСтол(false)));
         view.addSeparator();
         view.add(scaleMenu());
         view.addSeparator();
