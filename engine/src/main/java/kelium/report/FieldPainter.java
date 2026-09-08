@@ -184,6 +184,12 @@ public final class FieldPainter {
     private static final String BLOCK_EDGE = "#1F6FEB";
     private static final String LABEL_OUTLINE = "#00000099";
 
+    /**
+     * ТОЛЩИНА КАРТОНА У ЖЕТОНА ВОЙСКА — в долях его ширины. Бортик виден,
+     * но жетон от него не «двоится»: больше 0,06 читается уже как второй жетон.
+     */
+    private static final double TOKEN_LIFT = 0.045;
+
     private static final double SPAWN_R = 0.92;
     private static final double NEUTRAL_OUTER = 0.86;
     /**
@@ -646,18 +652,21 @@ public final class FieldPainter {
             // текстура ложится на «палку» вместо настоящего силуэта.
             double[] box = FieldGeometry.neutralBox(cx, cy, size, nb.corners,
                 NEUTRAL_OUTER, NEUTRAL_INNER);
-            // ВПИСЫВАЕМ ЦЕЛИКОМ, А НЕ ТЯНЕМ ПО ШИРИНЕ (правка 08.09.2026,
-            // замечание дизайнера «поехали поворотом и размерами»). Рисунок
-            // художника не обязан иметь ровно те же пропорции, что наша рамка:
-            // масштаб по одной ширине делал большой нейтрал на треть выше рамки,
-            // и постройка вылезала за кромку гекса. Берём меньший из двух
-            // масштабов — картинка целиком внутри рамки при любых пропорциях.
-            // ПОД НАПЕЧАТАННУЮ ЯЧЕЙКУ ПЕХОТЫ. На постройке нарисована ячейка, в
-            // которую встаёт жетон пехоты, и она была крупнее жетона в 1,55 раза.
-            // Дизайнер попросил свести разницу к 1,2: пехота подросла (см.
-            // FieldGeometry.unitWidth), постройка чуть уменьшилась — 0,94 от
-            // полной рамки. Числа связаны: правишь одно — пересчитывай другое.
-            double k = Math.min(box[2] / tex.getWidth(), box[3] / tex.getHeight()) * 0.94;
+            // ВО ВСЮ СТЕНКУ И ВПЛОТНУЮ К КРОМКЕ (заказ дизайнера 08.09.2026:
+            // «здание нейтрала должно ПРИМЫКАТЬ широкой стенкой к краю гекса, а
+            // не стоять по середине сектора… и оно должно быть больше»).
+            //
+            // Масштаб — по ДЛИНЕ стенки: постройка занимает свою сторону гекса
+            // целиком, как на столе. Глубина при этом ограничена полосой: печать
+            // тоньше отведённого места, и остаток полосы просто остаётся полем —
+            // но полем ВНУТРЬ гекса, а не наружу, поэтому картинка сдвигается к
+            // кромке (см. ниже). Раньше здесь стоял меньший из двух масштабов и
+            // центровка по рамке: постройка выходила мелкой лентой посреди
+            // сектора.
+            double k = box[2] / tex.getWidth();
+            if (tex.getHeight() * k > box[3]) {
+                k = box[3] / tex.getHeight();
+            }
             // РИСУНОК ХУДОЖНИКА ЛЕЖИТ ВДОЛЬ ПЕРВОГО ОТРЕЗКА СТЕНКИ, а рамка
             // считается вдоль ХОРДЫ между её концами. У прямой стенки это одно
             // и то же, у изогнутой (большой нейтрал, две стороны гекса) хорда
@@ -666,7 +675,12 @@ public final class FieldPainter {
             // поворотом и размерами»). Отсюда поправка: по 30° на каждый
             // отрезок сверх первого.
             double поправка = 30.0 * (nb.corners.size() - 2);
-            c.image(tex, box[0], box[1], box[4] + поправка, k,
+            // ПРИЖАТЬ К КРОМКЕ: остаток полосы уходит внутрь гекса, а широкая
+            // стенка постройки ложится на край, как картонка на столе.
+            double запас = (box[3] - tex.getHeight() * k) / 2;
+            double наружу = Math.toRadians(box[4] - 90);
+            c.image(tex, box[0] + запас * Math.cos(наружу),
+                box[1] + запас * Math.sin(наружу), box[4] + поправка, k,
                 tex.getWidth() / 2.0, tex.getHeight() / 2.0);
             // СЕРДЕЧКИ — только когда постройку уже били: на картинке художника
             // они НАПЕЧАТАНЫ (сколько всего), и рисовать их вторыми поверх
@@ -828,6 +842,31 @@ public final class FieldPainter {
     private static void drawUnitTexture(FieldCanvas c, java.awt.image.BufferedImage tex,
                                         FieldGeometry.Shape sh, double[] pos, double rotDeg,
                                         double targetW) {
+        drawUnitTexture(c, tex, sh, pos, rotDeg, targetW, null);
+    }
+
+    /**
+     * ЖЕТОН ВОЙСКА КАРТИНКОЙ — И С ТОЛЩИНОЙ КАРТОНА.
+     *
+     * <p>Заказ дизайнера 08.09.2026: «добавь жетонам войск эффект блока с тенью
+     * — это такой эффект толщины, что это объёмный жетон, а не наклейка. Отступ
+     * небольшой, и точно в цвет рамки самого жетона».
+     *
+     * <p>Как сделано: тот же силуэт кладётся под картинку со сдвигом вниз-вправо
+     * и заливается ЦВЕТОМ ОБВОДКИ этого места — получается видимый бортик, как у
+     * лежащей картонки. Сдвиг в экранных осях, а не в осях жетона: свет на столе
+     * падает откуда падает и вместе с жетоном не поворачивается.
+     *
+     * @param edge цвет обводки места ({@code null} — без бортика)
+     */
+    private static void drawUnitTexture(FieldCanvas c, java.awt.image.BufferedImage tex,
+                                        FieldGeometry.Shape sh, double[] pos, double rotDeg,
+                                        double targetW, String edge) {
+        if (edge != null) {
+            double d = targetW * TOKEN_LIFT;
+            c.shape(sh, pos[0] + d, pos[1] + d, rotDeg, targetW / sh.vbW(),
+                sh.vbW() / 2, sh.vbH() / 2, edge, null, 0);
+        }
         c.image(tex, pos[0], pos[1], rotDeg, targetW / tex.getWidth(),
             tex.getWidth() / 2.0, tex.getHeight() / 2.0);
     }
@@ -1627,7 +1666,8 @@ public final class FieldPainter {
                 double w = FieldGeometry.unitWidth(u.type, place.size(), size);
                 pos = FieldGeometry.polar(cx, cy, FieldGeometry.unitSeatRadius(size), face);
                 if (tex != null) {
-                    drawUnitTexture(c, tex, sh, pos, FieldGeometry.unitRotation(sh, face), w);
+                    drawUnitTexture(c, tex, sh, pos, FieldGeometry.unitRotation(sh, face), w,
+                        FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)]);
                 } else {
                     c.shape(sh, pos[0], pos[1], FieldGeometry.unitRotation(sh, face),
                         w / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
@@ -1641,7 +1681,8 @@ public final class FieldPainter {
                     60.0 * overflow - 30 + FieldGeometry.TILT);
                 double w = FieldGeometry.unitWidth(u.type, 1, size) * 0.9;
                 if (tex != null) {
-                    drawUnitTexture(c, tex, sh, pos, 0, w);
+                    drawUnitTexture(c, tex, sh, pos, 0, w,
+                        FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)]);
                 } else {
                     c.shape(sh, pos[0], pos[1], 0, w / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
                         tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),

@@ -174,15 +174,30 @@ public final class Java2DCanvas implements FieldCanvas {
     @Override
     public void image(java.awt.image.BufferedImage img, double cx, double cy, double rotDeg,
                       double k, double anchorX, double anchorY) {
+        // МИПМАПЫ ВМЕСТО ПРЯМОГО СЖАТИЯ. Билинейный фильтр берёт четыре
+        // исходных пикселя на один экранный, и при отъезде камеры (жетон в 736
+        // пикселей рисуется в двадцать) в дело идёт четыре пикселя из тысячи —
+        // отсюда рябь и «мыло», которые глаз читает как «ближайший сосед»
+        // (замечание дизайнера 08.09.2026). Берём заранее уменьшенный уровень
+        // пирамиды: он усреднён по ВСЕМ пикселям, и досжимать его остаётся
+        // самую малость. См. Mips.
+        //
+        // Масштаб считается вместе с преобразованием самого полотна: поле
+        // рисуется через зум, и без него «нужная ширина» была бы шириной без
+        // зума, то есть неправдой.
+        double полотно = Math.sqrt(Math.abs(g.getTransform().getDeterminant()));
+        java.awt.image.BufferedImage взять =
+            Mips.forWidth(img, img.getWidth() * k * (полотно > 0 ? полотно : 1));
+        double уровень = взять.getWidth() / (double) img.getWidth();
         AffineTransform at = new AffineTransform();
         at.translate(cx, cy);
         at.rotate(Math.toRadians(rotDeg));
-        at.scale(k, k);
-        at.translate(-anchorX, -anchorY);
+        at.scale(k / уровень, k / уровень);
+        at.translate(-anchorX * уровень, -anchorY * уровень);
         Object was = g.getRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION);
         g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
             java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.drawImage(img, at, null);
+        g.drawImage(взять, at, null);
         if (was != null) {
             g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, was);
         }

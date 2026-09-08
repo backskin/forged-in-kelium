@@ -61,6 +61,7 @@ public final class Textures {
         skipped = 0;
         Zones.forget();
         BlockArt.forget();
+        Mips.forget();
     }
 
     private static synchronized void init() {
