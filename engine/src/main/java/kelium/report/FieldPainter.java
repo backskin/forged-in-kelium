@@ -186,7 +186,16 @@ public final class FieldPainter {
 
     private static final double SPAWN_R = 0.92;
     private static final double NEUTRAL_OUTER = 0.86;
-    private static final double NEUTRAL_INNER = 0.50;
+    /**
+     * ГЛУБИНА НЕЙТРАЛЬНОЙ ПОСТРОЙКИ — от кромки гекса внутрь.
+     *
+     * <p>Было 0,50 — ровно как полоса жетона здания, и нейтрал выходил узкой
+     * ленточкой: «маловаты» (замечание дизайнера 08.09.2026). Но нейтрал — это
+     * НЕ жетон здания, а своя картонка, и на печати она заметно глубже. Полоса
+     * растянута внутрь до 0,40: дальше мешать некому — здания игрока стоят на
+     * 0,50…0,88 и на СВОИХ сторонах, а воздушная ячейка сидит на 0,26.
+     */
+    private static final double NEUTRAL_INNER = 0.40;
     private static final double CONTAINER_DY = 0.42;
 
     /** Нарисовать ВСЁ поле снимка. Начало координат — {@code (ox, oy)}. */
@@ -917,24 +926,33 @@ public final class FieldPainter {
         // по всему периметру (просьба дизайнера 13.08.2026).
         c.shape(sh, cx, cy, face - sh.outward(), FieldGeometry.seatScale(sh, size),
             sh.hexCx(), sh.hexCy(), "none", FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(seat)], TOKEN_STROKE);
-        // ПОДПИСЬ ЖЕТОНА — общая с планшетом: «Эн-3», «Дб-1», «ЦУ»
-        String code = Labels.buildingLabel(b.type, b.level);
-        // ПОДПИСЬ ИДЁТ ВДОЛЬ СВОЕЙ СТЕНКИ. Первый заход брал угол самой ФОРМЫ
-        // (face − outward) — это внутренняя поправка отрисовки силуэта, к тексту она
-        // отношения не имеет, и надпись уезжала с жетона.
-        c.outlinedTextRotated(code, spot[0], spot[1], size * 0.175,
-            WHITE, LABEL_OUTLINE, readableAngle(labelAngle));
-        // ГНЁЗДА ПРОЧНОСТИ — НАД подписью, в осях жетона: та же точка, где
-        // стояли прежние кубики урона (радиусы из проекта — 0.80 у кромки —
-        // на настоящих узких силуэтах срезались клипом, а место над подписью
-        // проверено неделями с кубиками).
-        {
+        // НА ЖЕТОНЕ С РИСУНКОМ НИКАКИХ БУКВ И ЗНАЧКОВ (решение дизайнера
+        // 08.09.2026: «на жетонах где уже есть текстура НЕ НУЖНЫ никакие буквы и
+        // обозначения — туда разве что кубики будут ставиться»). На картинке уже
+        // напечатано и название, и сердца прочности, и ячейки; своё поверх было
+        // бы вторым слоем того же самого. Игра докладывает только ЖИВОЕ: кубики
+        // энергии в напечатанные ячейки и отметки урона на напечатанные сердца.
+        if (tex == null) {
+            // ПОДПИСЬ ЖЕТОНА — общая с планшетом: «Эн-3», «Дб-1», «ЦУ»
+            String code = Labels.buildingLabel(b.type, b.level);
+            // ПОДПИСЬ ИДЁТ ВДОЛЬ СВОЕЙ СТЕНКИ. Первый заход брал угол самой ФОРМЫ
+            // (face − outward) — это внутренняя поправка отрисовки силуэта, к тексту
+            // она отношения не имеет, и надпись уезжала с жетона.
+            c.outlinedTextRotated(code, spot[0], spot[1], size * 0.175,
+                WHITE, LABEL_OUTLINE, readableAngle(labelAngle));
+            // ГНЁЗДА ПРОЧНОСТИ — НАД подписью, в осях жетона: та же точка, где
+            // стояли прежние кубики урона (радиусы из проекта — 0.80 у кромки —
+            // на настоящих узких силуэтах срезались клипом, а место над подписью
+            // проверено неделями с кубиками).
             double ra = readableAngle(labelAngle);
             double rr = Math.toRadians(ra);
             double px = Math.sin(rr);
             double py = -Math.cos(rr);
             paintHpPipsAt(c, size, b.hp, b.damage,
                 spot[0] + px * size * 0.22, spot[1] + py * size * 0.22, ra);
+        } else {
+            paintDamageOnHearts(c, b, zones, sh, tex, cx, cy,
+                face - sh.outward(), FieldGeometry.seatScale(sh, size));
         }
         return spot;
     }
@@ -1008,6 +1026,43 @@ public final class FieldPainter {
     }
 
     /**
+     * ОТМЕТКИ УРОНА НА НАПЕЧАТАННЫХ СЕРДЦАХ.
+     *
+     * <p>Сердца прочности нарисованы на самом жетоне (розовое пятно маски зон),
+     * поэтому своих игра не рисует — она лишь ГАСИТ те, что уже потеряны.
+     * Отметки ложатся вдоль ряда сердец и едут вместе с жетоном: разметка живёт
+     * в его координатах.
+     *
+     * <p>Целый жетон не помечается никак: чистая печать и означает «целый».
+     */
+    private static void paintDamageOnHearts(FieldCanvas c, ReplayRecord.Tok b, Zones z,
+                                            FieldGeometry.Shape sh,
+                                            java.awt.image.BufferedImage tex,
+                                            double cx, double cy, double rotDeg, double k) {
+        Zones.Area область = z.hearts();
+        if (область == null || !showDamage || b.damage <= 0) {
+            return;
+        }
+        int hp = Math.max(1, b.hp);
+        double масштаб = (sh.vbW() / Math.max(1, z.maskWidth())
+            + sh.vbH() / Math.max(1, z.maskHeight())) / 2 * k;
+        double длина = область.w() * масштаб;
+        double толщина = область.h() * масштаб;
+        double[] mid = onToken(new double[]{область.cx(), область.cy()}, z, sh, tex,
+            cx, cy, rotDeg, k);
+        double a = Math.toRadians(область.angleDeg() + rotDeg);
+        double ux = Math.cos(a);
+        double uy = Math.sin(a);
+        double шаг = длина / hp;
+        double метка = Math.min(толщина, шаг) * 0.74;
+        for (int i = Math.max(0, hp - b.damage); i < hp; i++) {
+            double d = -длина / 2 + шаг * (i + 0.5);
+            tokenSquare(c, mid[0] + ux * d, mid[1] + uy * d, метка,
+                ux, uy, -uy, ux, SLOT_FILL, DAMAGE_EDGE, 1.1);
+        }
+    }
+
+    /**
      * ЭНЕРГИЯ ПО РАЗМЕТКЕ ТЕКСТУРЫ. Ячейки стоят там, где художник нарисовал
      * красные квадраты, и под тем же углом; запас энергии ложится в синее пятно.
      * Всё это едет и крутится вместе с жетоном — разметка живёт в его координатах.
@@ -1025,11 +1080,13 @@ public final class FieldPainter {
             double[] p = onToken(new double[]{s.cx(), s.cy()}, z, sh, tex, cx, cy, rotDeg, k);
             double side = s.w() / Math.max(1, z.maskWidth()) * sh.vbW() * k;
             double angle = rotDeg + s.angleDeg();
-            boolean filled = i < b.energyPlaced;
-            square(c, p[0], p[1], side, angle, SLOT_FILL, SLOT_EDGE);
-            if (filled) {
+            // САМА ЯЧЕЙКА НЕ РИСУЕТСЯ (решение дизайнера 08.09.2026):
+            // она НАПЕЧАТАНА на жетоне, и чёрный квадрат поверх неё закрывал
+            // половину рисунка. Пустая ячейка так и остаётся печатной — игра
+            // кладёт только КУБИК, когда энергия в ней есть.
+            if (i < b.energyPlaced) {
                 double a = Math.toRadians(angle);
-                tokenCube(c, p[0], p[1], side * 0.74, Math.cos(a), Math.sin(a),
+                tokenCube(c, p[0], p[1], side * 0.76, Math.cos(a), Math.sin(a),
                     -Math.sin(a), Math.cos(a), ENERGY_ON, ENERGY_EDGE);
             }
         }
@@ -1616,6 +1673,11 @@ public final class FieldPainter {
      */
     private static void paintUnitLetter(FieldCanvas c, ReplayRecord.Tok u, double[] pos,
                                         double w, double angle) {
+        // НА ЖЕТОНЕ С РИСУНКОМ БУКВА НЕ НУЖНА (решение дизайнера 08.09.2026):
+        // род и так видно по картинке, а буква поверх неё — лишняя наклейка.
+        if (Textures.unit(u.type, u.owner) != null) {
+            return;
+        }
         String s = unitLetter(u.type);
         if (s == null || s.isBlank()) {
             return;

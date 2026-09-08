@@ -46,24 +46,32 @@ public final class Zones {
     }
 
     private static final Map<String, Zones> CACHE = new HashMap<>();
-    private static final Zones EMPTY = new Zones(0, 0, List.of(), null, null);
+    private static final Zones EMPTY = new Zones(0, 0, List.of(), null, null, null);
 
     private final int maskW;
     private final int maskH;
     private final List<Slot> slots;
     private final Area energy;
     private final double[] label;
+    private final Area hearts;
 
-    private Zones(int maskW, int maskH, List<Slot> slots, Area energy, double[] label) {
+    private Zones(int maskW, int maskH, List<Slot> slots, Area energy, double[] label,
+                  Area hearts) {
         this.maskW = maskW;
         this.maskH = maskH;
         this.slots = slots;
         this.energy = energy;
         this.label = label;
+        this.hearts = hearts;
     }
 
     public boolean isEmpty() {
-        return slots.isEmpty() && energy == null && label == null;
+        return slots.isEmpty() && energy == null && label == null && hearts == null;
+    }
+
+    /** Напечатанные сердца прочности — куда класть отметки урона (или null). */
+    public Area hearts() {
+        return hearts;
     }
 
     public List<Slot> slots() {
@@ -128,6 +136,7 @@ public final class Zones {
     private static final int RED = 0;
     private static final int BLUE = 1;
     private static final int GREEN = 2;
+    private static final int PINK = 3;
 
     /** Разобрать готовую картинку маски — этим же пользуются тесты. */
     public static Zones parse(BufferedImage img) {
@@ -147,11 +156,14 @@ public final class Zones {
         boolean[] seen = new boolean[w * h];
         List<double[]> bluePixels = new ArrayList<>();
         List<double[]> greenPixels = new ArrayList<>();
+        List<double[]> pinkPixels = new ArrayList<>();
         for (int i = 0; i < kind.length; i++) {
             if (kind[i] == BLUE) {
                 bluePixels.add(new double[]{i % w, i / w});
             } else if (kind[i] == GREEN) {
                 greenPixels.add(new double[]{i % w, i / w});
+            } else if (kind[i] == PINK) {
+                pinkPixels.add(new double[]{i % w, i / w});
             }
         }
         // КРАСНЫЕ ПЯТНА — по одному на ячейку, каждое считается отдельно: у них
@@ -181,7 +193,8 @@ public final class Zones {
             Area g = principal(greenPixels);
             label = new double[]{g.cx(), g.cy()};
         }
-        return new Zones(w, h, List.copyOf(slots), energy, label);
+        Area hearts = pinkPixels.isEmpty() ? null : principal(pinkPixels);
+        return new Zones(w, h, List.copyOf(slots), energy, label, hearts);
     }
 
     /** К какому смыслу отнести цвет пикселя; −1 — ни к какому. */
@@ -194,6 +207,9 @@ public final class Zones {
         int g = (argb >>> 8) & 0xFF;
         int b = argb & 0xFF;
         // Не требуем точного попадания: художник может слегка промахнуться пипеткой
+        if (r > 140 && b > 140 && g < 110) {
+            return PINK;               // раньше красного: у розового тоже r велик
+        }
         if (r > 140 && g < 110 && b < 110) {
             return RED;
         }

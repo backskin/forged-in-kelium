@@ -242,6 +242,24 @@ if (-not (Select-String -Path $cfgPath -Pattern ([regex]::Escape($dataPath)) -Qu
     throw "cfg главного лончера не содержит kelium.data — проверь патч"
 }
 
+# ДАННЫЕ ИГРЫ — ВНУТРЬ ПРИЛОЖЕНИЯ (08.09.2026).
+#
+# Прежде в exe прибивался только ПУТЬ к папке data на машине сборки, и на чужом
+# компьютере приложение оставалось без правил, карт и картинок: показать
+# кому-нибудь готовую сборку было нельзя. Теперь data кладётся рядом с jar-ами,
+# а движок ищет её там сам (GameConfig.resolveDataRoot), если прибитого пути на
+# машине нет. Свойство kelium.data остаётся: на машине разработчика оно и
+# указывает на рабочую папку, а править данные удобнее в проекте, а не в exe.
+Write-Output "3-бис/6 данные игры внутрь образа…"
+$dataDst = "dist\app\Kelium\app\data"
+Copy-Item -Recurse -Force "data" $dataDst
+# Обученные модели и прогоны в раздачу не идут — это выдача, а не игра.
+foreach ($junk in @("training", "genomes-archive-*", "genomes-boi2", "_archive")) {
+    Get-ChildItem -Path $dataDst -Filter $junk -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}
+"   данные: {0:N1} МБ" -f ((Get-ChildItem -Recurse $dataDst | Measure-Object Length -Sum).Sum / 1MB) | Write-Output
+
 Write-Output "4/6 упаковка образа в архив…"
 $zip = "target\payload.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }

@@ -125,7 +125,22 @@ public final class GameConfig {
         }
         String prop = System.getProperty("kelium.data");
         if (prop != null && !prop.isEmpty()) {
-            return Paths.get(prop);
+            Path p = Paths.get(prop);
+            if (Files.isDirectory(p)) {
+                return p;
+            }
+            // ПАПКИ НЕТ — ЭТО НЕ ПОВОД ОСТАТЬСЯ БЕЗ ДАННЫХ. Сборщик exe
+            // прибивает в свойство путь той машины, на которой собирали; на
+            // чужом компьютере такой папки не существует, и приложение молча
+            // оставалось без правил и карт. Своя копия лежит рядом с программой.
+        }
+        // ДАННЫЕ РЯДОМ С ПРОГРАММОЙ. В собранном приложении data лежит там же,
+        // где его jar-ы, и это единственное надёжное место: рабочий каталог у
+        // ярлыка может быть любым. При запуске из classes (разработка) здесь
+        // ничего не находится, и всё идёт прежним путём — по кандидатам ниже.
+        Path рядом = данныеРядомСПрограммой();
+        if (рядом != null) {
+            return рядом;
         }
         // КАНДИДАТЫ ОТНОСИТЕЛЬНО РАБОЧЕГО КАТАЛОГА. Данные лежат В КОРНЕ проекта
         // (`data/`), поэтому корневые варианты идут первыми: из корня это `data`,
@@ -147,6 +162,39 @@ public final class GameConfig {
         // Ничего не нашлось — называем КОРНЕВОЙ вариант, чтобы сообщение об ошибке
         // указывало туда, где данные и должны лежать.
         return Paths.get("data").toAbsolutePath().normalize();
+    }
+
+    /**
+     * ПАПКА {@code data} РЯДОМ С САМОЙ ПРОГРАММОЙ — либо {@code null}.
+     *
+     * <p>Ищется от того файла, из которого загружен этот класс: в собранном
+     * приложении это jar в папке {@code app/}, и данные лежат там же
+     * ({@code app/data}) либо на уровень выше. Так exe работает на ЛЮБОЙ машине,
+     * а не только на той, где его собрали.
+     */
+    private static Path данныеРядомСПрограммой() {
+        try {
+            var src = GameConfig.class.getProtectionDomain().getCodeSource();
+            if (src == null || src.getLocation() == null) {
+                return null;
+            }
+            Path сам = Paths.get(src.getLocation().toURI());
+            if (!сам.toString().endsWith(".jar")) {
+                return null;         // запуск из classes — это разработка
+            }
+            for (Path base : new Path[]{сам.getParent(), сам.getParent().getParent()}) {
+                if (base == null) {
+                    continue;
+                }
+                Path d = base.resolve("data");
+                if (Files.isDirectory(d)) {
+                    return d.toAbsolutePath().normalize();
+                }
+            }
+        } catch (RuntimeException | java.net.URISyntaxException e) {
+            // Не смогли выяснить, где лежим — не беда, идём по кандидатам.
+        }
+        return null;
     }
 
     /** Собрать конфигурацию: загрузить правила по id и весь их контент из dataRoot. */
