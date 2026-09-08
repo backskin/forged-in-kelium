@@ -274,12 +274,20 @@ public final class Modules {
 
         // Синие: комплект из 4 УНИКАЛЬНЫХ жетонов C1-C4; выдано blueModules штук —
         // игрок выбирает, КАКИЕ задействовать и на какие здания положить.
-        int blueAvail = Math.min(p.blueModules, BLUE_NAMES.length);
+        // СИНИЕ РАСКЛАДЫВАЮТСЯ ТАК ЖЕ, КАК КРАСНЫЕ: с мешками игрок ставит ТЕ
+        // жетоны, что вытянул. Прежде здесь всегда перебирались C1-C4 из кода,
+        // а вытянутое (p.blueTokens) не смотрели вовсе: вытянув три одинаковых
+        // жетона, игрок всё равно ставил четыре разных. У красных это было
+        // сделано сразу, у синих — забыто.
+        List<String> blueNames = p.blueTokens.isEmpty()
+            ? java.util.Arrays.asList(BLUE_NAMES) : new ArrayList<>(p.blueTokens);
+        int blueAvail = p.blueTokens.isEmpty()
+            ? Math.min(p.blueModules, BLUE_NAMES.length) : p.blueTokens.size();
         int goldBlue = Math.max(0, p.goldModules - goldRed);
         java.util.Set<String> usedBlue = new java.util.HashSet<>();
         for (int i = 0; i < blueAvail; i++) {
             List<Choice> bopts = new ArrayList<>();
-            for (String mod : BLUE_NAMES) {
+            for (String mod : blueNames) {
                 if (usedBlue.contains(mod)) {
                     continue;
                 }
@@ -304,6 +312,16 @@ public final class Modules {
             String mod = (String) pick.get("module");
             BuildingType slot = (BuildingType) pick.get("building");
             Map<String, Object> spec = BLUE_MODULES.get(mod);
+            if (spec == null) {
+                // Жетон из НАБОРА ДАННЫХ («Модули 2.0»): числа Сборки и стрелку
+                // золота берём из файла наборов.
+                var tok = ModuleSets.token(ModuleSets.of(s), mod);
+                if (tok == null || !tok.blue()) {
+                    continue;             // неизвестный жетон — не раскладываем
+                }
+                spec = Map.of("ammo", tok.ammo(), "units", tok.units(),
+                    "gild", tok.gild() == null ? "units" : tok.gild());
+            }
             Map<String, Object> placement = new HashMap<>();
             placement.put("id", mod);
             placement.put("ammo", spec.get("ammo"));

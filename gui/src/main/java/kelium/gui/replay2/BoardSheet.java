@@ -68,6 +68,12 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
+                // ЩЕЛЧОК ПО ЖЕТОНУ МОДУЛЯ — подробности крупно (заказ дизайнера
+                // 08.09.2026). Проверяется раньше стопок карт: жетон лежит на
+                // планшете, стопки — рядом, и промахнуться легко.
+                if (модульПод(e.getPoint())) {
+                    return;
+                }
                 Rectangle r = deckAt(e.getPoint());
                 Deck d = r == null ? null : deckSpots.get(r);
                 if (d != null) {
@@ -1691,6 +1697,31 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 b.level == null ? 0 : b.level);
         });
         return out;
+    }
+
+    /**
+     * Открыть подробности жетона модуля под курсором.
+     *
+     * @return {@code true} — жетон нашёлся и окно открыто
+     */
+    private boolean модульПод(java.awt.Point p) {
+        for (Map.Entry<Rectangle, ModuleSpot> en : moduleSpots.entrySet()) {
+            if (en.getKey().contains(p)) {
+                ModuleSpot sp = en.getValue();
+                ModuleZoom.show(javax.swing.SwingUtilities.getWindowAncestor(this),
+                    sp.module(), sp.red(), sp.slotName());
+                return true;
+            }
+        }
+        for (Map.Entry<Rectangle, Object[]> en : printedSpots.entrySet()) {
+            if (en.getKey().contains(p)) {
+                Object[] sp = en.getValue();
+                ModuleZoom.show(javax.swing.SwingUtilities.getWindowAncestor(this),
+                    (ReplayRecord.Module) sp[0], (Boolean) sp[1], String.valueOf(sp[2]));
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

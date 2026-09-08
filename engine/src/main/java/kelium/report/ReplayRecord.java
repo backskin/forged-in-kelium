@@ -419,6 +419,13 @@ public final class ReplayRecord {
         public int ammo;
         /** Сколько войск за сборку даёт синий жетон. */
         public int units;
+        /**
+         * Что поднимает золотая сторона синего: {@code units} | {@code ammo}.
+         * По нему же находится печатная картинка жетона ({@link ModuleArt}) —
+         * без этого поля синий жетон не отличить от его двойника с другой
+         * стрелкой, хотя на столе это разные картонки.
+         */
+        public String gild;
     }
 
     /** Снимок всего, что рисуется, на одном шаге. */
@@ -880,6 +887,9 @@ public final class ReplayRecord {
         m.plus = spec.get("plus") instanceof Number n ? n.intValue() : 0;
         m.ammo = spec.get("ammo") instanceof Number n ? n.intValue() : 0;
         m.units = spec.get("units") instanceof Number n ? n.intValue() : 0;
+        if (spec.get("gild") != null) {
+            m.gild = String.valueOf(spec.get("gild"));
+        }
         return m;
     }
 
@@ -1613,6 +1623,9 @@ public final class ReplayRecord {
             if (m.units != 0) {
                 one.put("units", m.units);
             }
+            if (m.gild != null) {
+                one.put("gild", m.gild);
+            }
             out.put(slot, one);
         });
         return out;
@@ -1640,6 +1653,7 @@ public final class ReplayRecord {
             m.plus = Json.i(one, "plus");
             m.ammo = Json.i(one, "ammo");
             m.units = Json.i(one, "units");
+            m.gild = Json.s(one, "gild");
             into.put(String.valueOf(e.getKey()), m);
         }
     }

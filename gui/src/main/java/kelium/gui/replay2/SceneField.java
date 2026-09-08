@@ -547,7 +547,7 @@ public final class SceneField extends JComponent {
             double[] a = centre(mv[0]);
             double[] b = centre(mv[1]);
             if (a != null && b != null) {
-                arc(g, a, b, accent);
+                arc(g, a, b, accent, перенос(mv[0], mv[1]));
             }
         }
         for (String[] at : f.highlight.attacks) {
@@ -618,7 +618,32 @@ public final class SceneField extends JComponent {
      * Дуга перемещения. Именно дуга, а не прямая: жетон УЖЕ стоит на новом месте, и
      * линия должна читаться как пояснение «откуда пришёл», а не как сам ход.
      */
+    /**
+     * ПЕРЕНОС ЛИ ЭТО, А НЕ ШАГ. Жетон, оказавшийся дальше соседнего гекса, туда
+     * не дошёл: его ПЕРЕНЕСЛА карта (награда супер-задания «Дальний рубеж»
+     * собирает войска на один гекс), а не движение.
+     *
+     * <p>Раньше и шаг, и перенос рисовались одной дугой, и партия читалась как
+     * поломка движка: «техника перелетает через всё поле» (замечание дизайнера
+     * 08.09.2026). Считаем по координатам, а не по виду события, — тогда старые
+     * записи тоже показываются правильно.
+     */
+    private boolean перенос(String откуда, String куда) {
+        ReplayRecord.HexInfo a = hexIndex.get(откуда);
+        ReplayRecord.HexInfo b = hexIndex.get(куда);
+        if (a == null || b == null) {
+            return false;
+        }
+        int d = (Math.abs(a.q - b.q) + Math.abs(a.r - b.r)
+            + Math.abs(a.q + a.r - b.q - b.r)) / 2;
+        return d > 1;
+    }
+
     private void arc(Graphics2D g, double[] a, double[] b, Color colour) {
+        arc(g, a, b, colour, false);
+    }
+
+    private void arc(Graphics2D g, double[] a, double[] b, Color colour, boolean перенос) {
         double dx = b[0] - a[0];
         double dy = b[1] - a[1];
         double len = Math.hypot(dx, dy);
@@ -639,8 +664,19 @@ public final class SceneField extends JComponent {
         g.setStroke(pen(4.6));
         g.draw(curve);
         g.setColor(colour);
-        g.setStroke(pen(2.6));
+        // ПЕРЕНОС — ПУНКТИРОМ. Сплошная линия означает «прошёл ногами»; жетон,
+        // снятый с поля и поставленный в другом месте, дороги не проходил, и
+        // рисовать ему сплошной путь — врать про правила.
+        g.setStroke(перенос
+            ? new BasicStroke((float) (2.6 / Math.max(0.01, zoom)), BasicStroke.CAP_BUTT,
+                BasicStroke.JOIN_ROUND, 10f,
+                new float[]{(float) (BASE * 0.10), (float) (BASE * 0.09)}, 0f)
+            : pen(2.6));
         g.draw(curve);
+        g.setStroke(pen(2.6));
+        if (перенос) {
+            подписьПереноса(g, mx, my, colour);
+        }
         // наконечник по касательной в конце
         double tx = ex - mx;
         double ty = ey - my;
@@ -654,6 +690,22 @@ public final class SceneField extends JComponent {
         tip.lineTo(ex - head * (tx * 0.87 + ty * 0.5), ey - head * (ty * 0.87 - tx * 0.5));
         tip.closePath();
         g.fill(tip);
+    }
+
+    /** Слово «перенос» у середины дуги — чтобы не гадать, почему жетон улетел. */
+    private void подписьПереноса(Graphics2D g, double mx, double my, Color colour) {
+        java.awt.Font f = Theme.font(Math.max(7, BASE * 0.13), java.awt.Font.BOLD);
+        g.setFont(f);
+        var fm = g.getFontMetrics();
+        String t = "перенос";
+        int tw = fm.stringWidth(t);
+        double pad = BASE * 0.05;
+        double w = tw + pad * 2;
+        double h = fm.getHeight() * 0.86;
+        g.setColor(Theme.alpha(Theme.paper(), 0.92));
+        g.fill(new java.awt.geom.RoundRectangle2D.Double(mx - w / 2, my - h / 2, w, h, h, h));
+        g.setColor(colour);
+        g.drawString(t, (float) (mx - tw / 2.0), (float) (my + h * 0.30));
     }
 
     /**

@@ -15,6 +15,10 @@
 data/modules: у красных ровно шесть пар целей, у синих — четыре сочетания
 {2 БПР/1 войско, 1 БПР/2 войска} x {золото растит войска | боеприпас}.
 
+ЦЕЛИ В ИМЕНИ ИДУТ В ОДНОМ И ТОМ ЖЕ ПОРЯДКЕ: пехота, техника, авиация,
+здания-вышки. На картинке они могут стоять как угодно, но имя обязано быть
+предсказуемым — иначе игра не соберёт его по паре целей жетона.
+
 ЧТО НЕ РАЗЛОЖЕНО. Пять картинок («прокачки атаки» 13-17) и два жетона улучшения
 планшета хранилища в наборе модулей не описаны вовсе: 13-16 показывают
 перечёркнутый боеприпас у рода войск, 17 — три звезды на развалинах. Их надо
@@ -42,13 +46,13 @@ OUT = os.path.join(ROOT, 'data', 'textures', 'module')
 КРАСНЫЕ = [
     (1,  'infantry_aircraft',         False),
     (2,  'infantry_vehicle',          False),
-    (3,  'buildings_towers_infantry', False),
+    (3,  'infantry_buildings_towers', False),
     (4,  'vehicle_aircraft',          False),
     (5,  'vehicle_buildings_towers',  False),
     (6,  'aircraft_buildings_towers', False),
     (7,  'infantry_aircraft',         True),
     (8,  'infantry_vehicle',          True),
-    (9,  'buildings_towers_infantry', True),
+    (9,  'infantry_buildings_towers', True),
     (10, 'vehicle_aircraft',          True),
     (11, 'vehicle_buildings_towers',  True),
     (12, 'aircraft_buildings_towers', True),
