@@ -1872,11 +1872,36 @@ public final class Actions {
                 freeExtra = 1;
             }
             int movesDone = 0;
+            // МАНЁВР — БЛИЗНЕЦ БОЯ (правило дизайнера, свод §8.5; в движке с
+            // 08.09.2026). Выбери ОДИН свой гекс: все его жетоны идут даром,
+            // каждый на свою скорость. Любой другой жетон идёт за
+            // token_surcharge_ammo боеприпасов — ОДИН РАЗ ЗА ЖЕТОН, а не за шаг.
+            // Каждый жетон активируется ровно один раз за действие.
+            //
+            // Прежняя модель считала ШАГИ: первое перемещение даром, каждый
+            // следующий ШАГ за боеприпас, и один жетон мог ходить много раз.
+            // Свод описывал нынешнее правило, а движок играл старое — это и было
+            // расхождением. Старая грамматика осталась включаемой ключом
+            // surcharge_model: своды до 1.35.0 играются как играли.
+            boolean близнецБоя = !"per_move".equals(
+                rs.getStr("actions.movement.surcharge_model", "per_token"));
+            int доплатаЗаЖетон = rs.getInt("actions.movement.token_surcharge_ammo",
+                rs.getInt("actions.movement.flat_ammo_per_extra_move"));
+            String бесплатныйГекс = null;
+            Integer ходитСейчас = null;
+            java.util.Set<Integer> отходили = new java.util.HashSet<>();
+            java.util.Map<Integer, String> откуда = new HashMap<>();
             boolean freeUsed = false;
             Map<Integer, Integer> perUnitSteps = new HashMap<>();
             while (true) {
                 List<Choice> opts = new ArrayList<>();
                 for (UnitToken u : player.unitsOnField()) {
+                    // ЖЕТОН ХОДИТ ОДИН РАЗ: отходивший больше не предлагается, и
+                    // пока один жетон в движении, другие ждут своей очереди.
+                    if (близнецБоя && (отходили.contains(u.uid)
+                            || (ходитСейчас != null && ходитСейчас != u.uid))) {
+                        continue;
+                    }
                     // скорость спрашиваем в одном месте: карты и жетоны модулей
                     // вмешиваются через точку правил UNIT_SPEED (13.08.2026)
                     int speed = Speed.of(s, player.seat, u);
@@ -1935,8 +1960,34 @@ public final class Actions {
                 if (pick.payload() == null) {
                     break;
                 }
+                Map<String, Object> payload = (Map<String, Object>) pick.payload();
+                int ходит = ((Number) payload.get("uid")).intValue();
                 int cost = 0;
-                if (freeUsed) {
+                if (близнецБоя) {
+                    // ПЛАТИМ ОДИН РАЗ ЗА ЖЕТОН, когда он трогается с места.
+                    // Гекс, с которого пошёл ПЕРВЫЙ жетон, и есть выбранный:
+                    // отдельным вопросом его не спрашиваем — выбор всё равно
+                    // делается первым ходом, а лишний вопрос агенту не нужен.
+                    if (ходитСейчас == null || ходитСейчас != ходит) {
+                        String дом = откуда.computeIfAbsent(ходит, k -> {
+                            for (UnitToken u : player.units) {
+                                if (u.uid == k) {
+                                    return u.hexId;
+                                }
+                            }
+                            return null;
+                        });
+                        if (бесплатныйГекс == null) {
+                            бесплатныйГекс = дом;
+                        } else if (!бесплатныйГекс.equals(дом)) {
+                            cost = доплатаЗаЖетон;
+                        }
+                        if (freeExtra > 0 && cost > 0) {
+                            freeExtra -= 1;      // карта дала бесплатный жетон
+                            cost = 0;
+                        }
+                    }
+                } else if (freeUsed) {
                     if (freeExtra > 0) {
                         freeExtra -= 1;
                         cost = 0;
@@ -1953,8 +2004,14 @@ public final class Actions {
                 if (cost > 0) {
                     player.resources.pay(Resource.AMMO, cost);
                 }
-                Map<String, Object> mp = (Map<String, Object>) pick.payload();
-                int uid = ((Number) mp.get("uid")).intValue();
+                if (близнецБоя) {
+                    if (ходитСейчас != null && ходитСейчас != ходит) {
+                        отходили.add(ходитСейчас);
+                    }
+                    ходитСейчас = ходит;
+                }
+                Map<String, Object> mp = payload;
+                int uid = ходит;
                 UnitToken unit = null;
                 for (UnitToken u : player.units) {
                     if (u.uid == uid) {

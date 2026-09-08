@@ -276,6 +276,10 @@ public final class RuleWords {
             case "actions.combat.retaliation_to_retaliation" ->
                 "на ответный удар можно ответить снова";
             case "actions.combat.surcharge_model" -> "как считается надбавка в бою";
+            case "actions.movement.surcharge_model" ->
+                "как считается надбавка в манёвре: за жетон или за шаг";
+            case "actions.movement.token_surcharge_ammo" ->
+                "доплата боеприпасами за жетон, идущий не с выбранного гекса";
             case "actions.movement.cost_model" -> "как считается цена перемещений";
             case "actions.movement.first_hex_free" -> "войска выбранного гекса двигаются бесплатно";
             case "actions.movement.flat_ammo_per_extra_move" ->
