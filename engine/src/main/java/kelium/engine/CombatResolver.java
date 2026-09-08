@@ -115,6 +115,21 @@ public final class CombatResolver {
         return out;
     }
 
+    /**
+     * ВСЕ ЖИВЫЕ ВОЙСКА ИГРОКА НА ПОЛЕ — состав атакующих в грамматике С1, где
+     * бьёт не гекс, а любой жетон. Сидящие ВНУТРИ здания сюда не входят:
+     * гарнизон не стреляет, он прячется.
+     */
+    private List<UnitToken> aliveUnitsOnField(int seat) {
+        List<UnitToken> out = new ArrayList<>();
+        for (UnitToken u : state.player(seat).units) {
+            if (u.hexId != null && u.alive() && !u.inside()) {
+                out.add(u);
+            }
+        }
+        return out;
+    }
+
     private List<Token> allTokensOn(String hexId) {
         List<Token> out = new ArrayList<>();
         for (PlayerState p : state.players) {
@@ -482,26 +497,7 @@ public final class CombatResolver {
         GameState s = state;
         PlayerState p = s.player(attackerSeat);
 
-        // БОЙ ИГРАЕТСЯ КАК ДВИЖЕНИЕ (решение дизайнера 04.09.2026, рулбук §8.6;
-        // уточнение 07.09.2026).
-        //
-        //   Выбери ОДИН свой гекс: его войска атакуют по обычной цене
-        //   (универсальная 2 БПР, специальная 1 БПР). Любой другой свой жетон
-        //   тоже может атаковать, но КАЖДАЯ его атака стоит на 1 боеприпас
-        //   дороже (3 вместо 2, 2 вместо 1). Каждый жетон бьёт по соседнему
-        //   гексу или по своему же и цель выбирает СВОЮ — общей цели на всё
-        //   действие нет. Атаки разыгрываются по одной, уничтожение проверяется
-        //   сразу.
-        //
-        // КАЖДЫЙ ЖЕТОН АТАКУЕТ РОВНО ОДИН РАЗ за действие — одной строкой на
-        // выбор (универсальной или специальной), сколько бы боеприпасов у игрока
-        // ни было. Три пехотинца дают до трёх выстрелов.
-        //
-        // Единицы «второй бой» и платы за право следующего боя больше нет: одно
-        // действие Бой — одна процедура, где платят за сами выстрелы и за
-        // надбавку жетонам вне выбранного гекса.
-
-        // Шаг 1: свой гекс, где есть хотя бы один живой жетон.
+        // Шаг 1: выбрать свой гекс, где есть хотя бы один живой юнит.
         Set<String> srcSet = new java.util.TreeSet<>();
         for (UnitToken u : p.units) {
             if (u.hexId != null && u.alive()) {
@@ -514,23 +510,22 @@ public final class CombatResolver {
         }
         List<Choice> srcOpts = new ArrayList<>();
         for (String h : srcSet) {
-            int shots = 0;
-            for (String n : targetHexesFrom(h)) {
-                if (validTarget(n, attackerSeat, restrictTargetOwner)
-                        && canAttack(attackerSeat, h, n)) {
-                    shots++;
-                }
-            }
-            srcOpts.add(new Choice("combat_source", h,
-                h + (shots > 0 ? " (целей рядом: " + shots + ")" : " (бить некого)")));
+            srcOpts.add(new Choice("combat_source", h, h));
         }
         srcOpts.add(new Choice("pass", null, "не бить"));
         Choice src = agent.choose(s, srcOpts,
             Map.of("kind", "combat_source", "retaliation", isRetaliation));
         if (src.payload() == null) {
-            // Отказ отказу рознь: если бить было НЕЧЕМ, отказ правильный; если
+            // Игрок сам отказался бить. Но отказ отказу рознь, и различие тут
+            // принципиальное: если бить было НЕЧЕМ, отказ правильный, а действие
+            // испортила прежняя решимость взять Бой при пустом поле. Если же
             // выстрел был — это ошибка бота, и чинится она в оценке, а не в
-            // правилах. Мерим тем же мерилом, что и сам бой: canAttack.
+            // правилах. Проверяем честно: есть ли хоть один свой гекс, с которого
+            // достаём хоть одну допустимую цель.
+            // Проверять НАДО ТЕМ ЖЕ мерилом, каким пользуется игрок, иначе замер
+            // соврёт: «цель рядом есть» — ещё не «я могу по ней попасть». Род
+            // войск бьёт только две категории из четырёх, и рядом может стоять
+            // ровно то, чего он не пробивает. Поэтому canAttack, а не соседство.
             boolean hadShot = false;
             for (String h : srcSet) {
                 for (String n : targetHexesFrom(h)) {
@@ -549,107 +544,178 @@ public final class CombatResolver {
                 : "сам отказался бить (бить было нечем)");
             return false;
         }
-        String freeHex = (String) src.payload();
+        String source = (String) src.payload();
 
-        // НАДБАВКА ЗА ЖЕТОН ИЗ ДРУГОГО ГЕКСА: +1 боеприпас к цене КАЖДОЙ атаки
-        // жетона, не стоящего в выбранном гексе (универсальная 3 вместо 2,
-        // специальная 2 вместо 1). Выбранный гекс платит за атаки обычную цену.
-        int entryAmmo = rs.getInt("actions.combat.extra_token_ammo", 1);
-        Set<Integer> usedUnits = new HashSet<>();    // жетон уже атаковал в это действие
-        boolean[] firstAttackUsed = {false};
+        // ГРАММАТИКА БОЯ. Свод 1.35.0 и новее играет вариант С1 «Близнец
+        // Движения» (решение дизайнера 04.09.2026): выбранный гекс бьёт даром,
+        // дальше атакует ЛЮБОЙ свой жетон с любого гекса, доплачивая
+        // combat.token_surcharge_ammo ЗА ЖЕТОН (один раз за жетон, а не за
+        // атаку), и КАЖДЫЙ жетон выбирает СВОЮ цель — общей цели на действие
+        // нет. Единицы «бой» в этой грамматике не существует: одно действие —
+        // один счёт.
+        //
+        // Прежние своды играют по-старому: один источник, одна общая цель, а
+        // за второй и следующий бой в ход платится лесенка за право. Обе
+        // грамматики живут в одном методе нарочно: разрешение атаки, снос
+        // нейтрала, выбор жертвы и вся бухгалтерия журнала у них общие, и
+        // второй копии этого кода быть не должно — она разойдётся с первой.
+        boolean близнецДвижения = "per_token".equals(
+            rs.getStr("actions.combat.surcharge_model", "right_to_battle"));
+        int доплатаЗаЖетон = близнецДвижения
+            ? rs.getInt("actions.combat.token_surcharge_ammo") : 0;
+        java.util.Set<Integer> ужеДоплатил = new HashSet<>();
+
+        // Шаг 2: выбрать один смежный гекс-цель с допустимой целью.
+        //
+        // ДОСТАЁТ ЛИ ВООБЩЕ. Соседство по полю — ещё не значит, что до гекса можно
+        // дотянуться: сторону могло закрыть чужое или нейтральное здание, и тогда
+        // между гексами стена. Раньше Бой брал просто всех соседей и стрелял
+        // сквозь неё — дизайнер поймал случай, где техника выстрелила через
+        // нейтральную постройку, стоявшую в её же гексе (сид 770698, «сценарий 4
+        // игрока 1»). Правило проходимости одно и то же для Движения и для Боя,
+        // живёт в Passability. Авиация стенок не замечает — она бьёт сверху.
+        // ТОЧКА ПРАВИЛ: дальность выбора цели. По умолчанию только соседний гекс;
+        // карта арсенала «Целеуказание» поднимает до двух, если на гексе-источнике
+        // есть своя авиация.
+        int range = (int) Math.round(kelium.engine.ability.RuleQuery
+            .of(s, attackerSeat, kelium.engine.ability.Hook.ATTACK_RANGE)
+            .about(source).base(1).ask());
+        List<String> targets = new ArrayList<>();
+        for (String h : targetHexesFrom(source)) {
+            if (validTarget(h, attackerSeat, restrictTargetOwner)
+                    && anyCanShootAcross(attackerSeat, source, h)) {
+                targets.add(h);
+            }
+        }
+        if (range >= 2) {
+            // Второй пояс: соседи соседей. Стенки на пути не проверяем — цель
+            // указывает авиация сверху, а бьют по указанному гексу.
+            for (String near : s.field.neighbors(source)) {
+                for (String far : s.field.neighbors(near)) {
+                    if (!far.equals(source) && !targets.contains(far)
+                            && validTarget(far, attackerSeat, restrictTargetOwner)) {
+                        targets.add(far);
+                    }
+                }
+            }
+        }
+        if (targets.isEmpty() && !близнецДвижения) {
+            dry(attackerSeat, source, null, "рядом нет цели, до которой достаём");
+            return false;
+        }
+        // ОБЩАЯ ЦЕЛЬ — только в старой грамматике. В «Близнеце Движения» цель
+        // выбирает каждый жетон отдельно, прямо в строке атаки.
+        String общаяЦель = null;
+        if (!близнецДвижения) {
+            List<Choice> tgtOpts = new ArrayList<>();
+            for (String h : targets) {
+                tgtOpts.add(new Choice("combat_target", h, h));
+            }
+            Choice tgt = agent.choose(s, tgtOpts,
+                Map.of("kind", "combat_target", "source", source));
+            общаяЦель = (String) tgt.payload();
+        }
+
+        // Шаги 3-5: разрешать атаки по одной.
         boolean didDamage = false;
         Set<Integer> damagedOwners = new HashSet<>();
+        // КТО МОЖЕТ БИТЬ. В старой грамматике — только войска выбранного гекса.
+        // В «Близнеце» — все свои войска на поле; те, что не в выбранном гексе,
+        // доплачивают за право стрелять.
+        List<UnitToken> attackers = близнецДвижения
+            ? aliveUnitsOnField(attackerSeat) : unitsOf(attackerSeat, source);
+        Set<String> usedRows = new HashSet<>();   // "uid:row"
+        boolean[] firstAttackUsed = {false};
         int killsThisBattle = 0;
-        Set<String> neutralRazedAt = new HashSet<>();
-        Set<String> enemyHitAt = new HashSet<>();
-        boolean anythingHappened = false;
+        boolean neutralRazedThisBattle = false;
+        boolean enemyDamagedThisBattle = false;
 
         while (true) {
             List<Choice> options = new ArrayList<>();
-            for (UnitToken u : p.units) {
-                if (u.hexId == null || !u.alive()) {
-                    continue;
-                }
-                boolean inFreeHex = u.hexId.equals(freeHex);
-                int entry = inFreeHex ? 0 : entryAmmo;
-                // ТОЧКА ПРАВИЛ: дальность выбора цели. По умолчанию только сам
-                // гекс и соседи; карта арсенала поднимает до двух, если на гексе
-                // жетона стоит своя авиация.
-                int range = (int) Math.round(kelium.engine.ability.RuleQuery
-                    .of(s, attackerSeat, kelium.engine.ability.Hook.ATTACK_RANGE)
-                    .about(u.hexId).base(1).ask());
-                for (String target : targetHexesFrom(u.hexId, range)) {
-                    if (!validTarget(target, attackerSeat, restrictTargetOwner)) {
+            for (UnitToken u : attackers) {
+                // ЦЕЛИ ЭТОГО ЖЕТОНА. В старой грамматике она одна на всех, в
+                // «Близнеце» — свой гекс и соседние, каждому жетону свои.
+                List<String> цели = общаяЦель != null ? List.of(общаяЦель)
+                    : targetHexesFrom(u.hexId);
+                // ДОПЛАТА ЗА ЖЕТОН: платится один раз за жетон, а не за атаку, и
+                // только если жетон стоит НЕ в выбранном гексе.
+                int доплата = (доплатаЗаЖетон > 0 && !source.equals(u.hexId)
+                    && !ужеДоплатил.contains(u.uid)) ? доплатаЗаЖетон : 0;
+                for (String цель : цели) {
+                    if (!validTarget(цель, attackerSeat, restrictTargetOwner)) {
                         continue;
                     }
-                    // Стенка закрывает выстрел в СОСЕДНИЙ гекс (авиация стенок не
-                    // замечает). Бой внутрь своего гекса границу не пересекает —
-                    // стенку не проверяет; второй пояс указывает авиация сверху.
-                    boolean adjacent = s.field.neighbors(u.hexId).contains(target);
-                    if (adjacent && !Passability.canShootAcross(s, u, target)) {
-                        continue;
+                    if (!Passability.canShootAcross(s, u, цель)) {
+                        continue;   // этому жетону цель закрыта стеной, а другому — нет
                     }
-                    boolean closed = hexClosedAgainst(target, attackerSeat);
+                    boolean closed = hexClosedAgainst(цель, attackerSeat);
                     for (AttackRow ar : attackRows(attackerSeat, u)) {
                         String key = u.uid + ":" + ar.row();
-                        if (usedUnits.contains(u.uid)) {
+                        if (usedRows.contains(key)) {
                             continue;
                         }
-                        int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
-                            firstAttackUsed) + entry;
+                        int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, цель,
+                            firstAttackUsed) + доплата;
                         if (!p.resources.canPay(Resource.AMMO, cost)) {
                             continue;
                         }
-                        Token victim = pickVictimCategory(target, attackerSeat, ar.target(),
+                        Token victim = pickVictimCategory(цель, attackerSeat, ar.target(),
                             restrictTargetOwner, closed, u);
                         if (victim != null) {
                             Map<String, Object> pl = new HashMap<>();
                             pl.put("uid", u.uid);
                             pl.put("row", ar.row());
                             pl.put("ammo", cost);
+                            pl.put("surcharge", доплата);
                             pl.put("base_ammo", ar.ammoCost());
-                            pl.put("entry", entry);
                             pl.put("tcat", ar.target().code);
-                            pl.put("target", target);
-                            pl.put("source", u.hexId);
-                            pl.put("victim_owner", victim.owner());
-                            pl.put("victim_uid", uidOf(victim));
-                            pl.put("victim_hp_left",
-                                Passives.effectiveHp(s, victim) - damageOf(victim));
+                            pl.put("target", цель);
                             options.add(new Choice("attack", pl,
-                                u.type.code + "@" + u.hexId + "." + ar.row() + "->"
-                                    + ar.target().code + "@" + target
-                                    + " (" + cost + " БПР)"));
+                                u.type.code + "." + ar.row() + "->" + ar.target().code
+                                    + "@" + цель));
                         } else if (ar.target() == Target.BUILDINGS_TOWERS
-                                && s.field.get(target).hasNeutral()
+                                && s.field.get(цель).hasNeutral()
                                 && restrictTargetOwner == null) {
                             Map<String, Object> pl = new HashMap<>();
                             pl.put("uid", u.uid);
                             pl.put("row", ar.row());
                             pl.put("ammo", cost);
-                            pl.put("base_ammo", ar.ammoCost());
-                            pl.put("entry", entry);
+                            pl.put("surcharge", доплата);
                             pl.put("tcat", ar.target().code);
-                            pl.put("target", target);
-                            pl.put("source", u.hexId);
+                            pl.put("target", цель);
                             pl.put("neutral", Boolean.TRUE);
                             options.add(new Choice("attack", pl,
-                                u.type.code + "@" + u.hexId + "." + ar.row()
-                                    + "->raze neutral@" + target + " (" + cost + " БПР)"));
+                                u.type.code + "." + ar.row() + "->raze neutral@" + цель));
                         }
                     }
                 }
             }
             if (options.isEmpty()) {
-                if (!anythingHappened) {
-                    emit("type", "combat_dry", "seat", attackerSeat, "source", freeHex,
-                        "target", null, "reason", dryReason(attackerSeat, restrictTargetOwner),
+                // ПОЧЕМУ ЗАЛП НЕ СОСТОЯЛСЯ. Замер 15.08.2026: 69% действий Бой не
+                // дают НИ ОДНОГО попадания, и по событиям было не понять почему —
+                // движок просто молча выходил. Причин ровно три, и лечатся они
+                // по-разному, поэтому их надо различать: стенка (геометрия),
+                // нехватка боеприпаса (экономика) и НЕСОВПАДЕНИЕ ТАБЛИЦЫ АТАК
+                // (мой род войск не бьёт того, кто стоит в цели).
+                if (killsThisBattle == 0 && !enemyDamagedThisBattle
+                        && !neutralRazedThisBattle) {
+                    // Причину сухого действия объясняем по ПЕРВОЙ достижимой
+                    // цели: в грамматике С1 общей цели нет, а разбор нужен по
+                    // конкретному гексу — иначе он ничего не объясняет.
+                    String разбор = общаяЦель != null ? общаяЦель
+                        : (targets.isEmpty() ? null : targets.get(0));
+                    emit("type", "combat_dry", "seat", attackerSeat, "source", source,
+                        "target", разбор, "reason", разбор == null
+                            ? "рядом нет цели, до которой достаём"
+                            : dryReason(attackerSeat, attackers, source, разбор,
+                                restrictTargetOwner, firstAttackUsed),
                         "round", s.round);
                 }
                 break;
             }
             options.add(new Choice("pass", null, "stop attacking"));
-            Choice pick = agent.choose(s, options, Map.of("kind", "attack", "source", freeHex));
+            Choice pick = agent.choose(s, options,
+                Map.of("kind", "attack", "source", source));
             if (pick.payload() == null) {
                 break;
             }
@@ -658,36 +724,35 @@ public final class CombatResolver {
             int uid = ((Number) pl.get("uid")).intValue();
             String row = (String) pl.get("row");
             int ammo = ((Number) pl.get("ammo")).intValue();
-            String target = (String) pl.get("target");
             Target tcat = Target.fromCode((String) pl.get("tcat"));
+            String target = (String) pl.get("target");
             String key = uid + ":" + row;
             boolean closed = hexClosedAgainst(target, attackerSeat);
+            // Доплата за жетон засчитывается в момент, когда жетон реально
+            // выстрелил: вторая его атака в этом же действии уже без неё.
+            if (((Number) pl.getOrDefault("surcharge", 0)).intValue() > 0) {
+                ужеДоплатил.add(uid);
+            }
             UnitToken unit = null;
-            for (UnitToken u : p.units) {
+            for (UnitToken u : attackers) {
                 if (u.uid == uid) {
                     unit = u;
                     break;
                 }
             }
-            if (unit == null || unit.hexId == null) {
-                usedUnits.add(uid);
-                continue;
-            }
-            String source = unit.hexId;
 
             // Снос нейтральной постройки: на гексе их может быть несколько —
-            // какую сносить, выбирает игрок; при обнулении HP — трофей и
-            // контейнер, без ответки.
+            // бьётся ПЕРВАЯ живая; при обнулении HP — трофеи + контейнеры
+            // (награда зависит от размера), без ответки.
             if (Boolean.TRUE.equals(pl.get("neutral"))) {
                 Hex nh = s.field.get(target);
                 if (!nh.hasNeutral()) {
-                    usedUnits.add(uid);
+                    usedRows.add(key);
                     continue;
                 }
                 p.resources.pay(Resource.AMMO, ammo);
-                firstAttackUsed[0] = true;
-                usedUnits.add(uid);
-                anythingHappened = true;
+                usedRows.add(key);
+                // K4: если нейтралов на гексе несколько — какой сносить, выбирает игрок
                 Hex.NeutralBuilding nb;
                 if (nh.neutrals.size() > 1) {
                     List<Choice> nopts = new ArrayList<>();
@@ -714,7 +779,7 @@ public final class CombatResolver {
                         "big", Boolean.valueOf(nb.big),
                         "left", nh.neutrals.size());
                     journal().of(attackerSeat).neutralsRazed += 1;   // o22 «Зачистка»
-                    neutralRazedAt.add(target);
+                    neutralRazedThisBattle = true;
                 } else {
                     emit("type", "damage_neutral", "seat", attackerSeat, "target", target,
                         "hpLeft", nb.hp);
@@ -722,8 +787,8 @@ public final class CombatResolver {
                 continue;
             }
 
-            // Жертву внутри категории выбирает ИГРОК (поимённо): важно для
-            // добивания раненых и выбора, ЧЕЙ жетон бить.
+            // K4: жертву внутри категории выбирает ИГРОК (поимённо): важно для
+            // добивания раненых и выбора, ЧЕЙ жетон бить (кто получит ответку).
             List<Token> victims = victimCandidates(target, attackerSeat, tcat,
                 restrictTargetOwner, closed, unit);
             Token victim;
@@ -743,18 +808,19 @@ public final class CombatResolver {
                 victim = (Token) vpick.payload();
             }
             if (victim == null) {
-                usedUnits.add(uid);
+                usedRows.add(key);
                 continue;
             }
             p.resources.pay(Resource.AMMO, ammo);
             firstAttackUsed[0] = true;
-            usedUnits.add(uid);
-            anythingHappened = true;
-            // ЖЕТОН ЩИТА снимает ПЕРВОЕ попадание по жетону защищённого рода и
-            // уходит. Проверяется ДО начисления урона: у пехоты прочность 1.
+            usedRows.add(key);
+            // ЖЕТОН ЩИТА (эффект «щит», 17.08.2026) снимает ПЕРВОЕ попадание по
+            // жетону защищённого рода и уходит. Проверяется ДО начисления урона:
+            // у пехоты прочность 1, и «снять урон потом» её уже не спасает.
             if (victim instanceof UnitToken shielded) {
                 PlayerState owner0 = s.player(shielded.owner());
                 if (owner0.shieldedKinds.remove(shielded.type)) {
+                    usedRows.add(key);
                     emit("type", "shield_absorbed", "seat", shielded.owner(),
                         "kind", shielded.type.code, "attacker", attackerSeat);
                     continue;
@@ -773,16 +839,26 @@ public final class CombatResolver {
             String vtype = victim instanceof UnitToken vt2 ? vt2.type.code : "building";
             journal().noteCombatHit(attackerSeat, owner, uidOf(victim), vtype, destroyed, isRetaliation);
             TurnJournal.TurnFacts af = journal().of(attackerSeat);
-            enemyHitAt.add(target);
-            // Чужие жетоны под уроном и добитые — общий счёт хода (читают карты
-            // и предикаты заданий).
+            enemyDamagedThisBattle = true;
+            // ЧУЖИЕ ЖЕТОНЫ ПОД УРОНОМ И ДОБИТЫЕ — общий счёт хода.
+            //
+            // НАЙДЕНО 28.08.2026 ЗАМЕРОМ БЛИЗОСТИ. Оба поля журнала читались
+            // картами и предикатами, но не заполнялись НИКЕМ: бой писал только
+            // здания (enemyBuildingsDamaged) и убийства по жетонам-убийцам.
+            // Из-за этого «Подранки» (двое раненых, никого добитого) держали
+            // близость РОВНО НОЛЬ во всех 58 попаданиях карты в руку за 60
+            // партий — условие было невыполнимо в принципе, а выглядело как
+            // тупость ботов. Той же дырой болели предикаты
+            // damaged_distinct_no_kills, damaged_distinct и destroyed_count.
             af.enemyTokensDamaged.add(uidOf(victim));
+            // o43 «Охота на сильного» считает прогресс по РАНЕНОМУ лидеру, а не
+            // только по добитому — поэтому признак ставится здесь, на уроне.
             if (owner == leadingRivalOf(attackerSeat)) {
                 af.damagedLeader = true;
             }
             if (victim instanceof BuildingToken) {
-                af.enemyBuildingHits += 1;
-                af.enemyBuildingsDamaged.add(uidOf(victim));
+                af.enemyBuildingHits += 1;   // o25 в прежней редакции
+                af.enemyBuildingsDamaged.add(uidOf(victim));   // o45 «Пристрелка»
             }
             if (destroyed) {
                 af.enemyTokensDestroyed += 1;
@@ -791,41 +867,44 @@ public final class CombatResolver {
                     af.movedAndKilledSameUnit = true;
                     af.killsByMovedUnit.merge(unit.uid, 1, Integer::sum);
                 }
+                // o26 «Блицкриг» 10.0: двое ОДНИМ жетоном войска — без оговорки
+                // про перемещение, поэтому счёт ведётся по каждому убийце.
                 af.killsByUnit.merge(unit.uid, 1, Integer::sum);
                 af.killerUnitTypes.put(unit.uid, unit.type.code);
+                // o21 «Первая кровь» 10.0: усиление платит за толстую цель.
                 af.maxDestroyedHp = Math.max(af.maxDestroyedHp, Passives.effectiveHp(s, victim));
             }
-            // Трофеи убитого — в событие: без этого трофейную экономику нечем
-            // мерить. Ценность напечатана на КОНКРЕТНОМ жетоне.
-            emit("type", "combat_hit", "seat", attackerSeat, "source", source, "target", target,
+            // ТРОФЕИ убитого — в событие: без этого поля трофейную
+            // экономику нечем мерить, а она половина смысла боя. Ценность
+            // напечатана на КОНКРЕТНОМ жетоне (у пехоты четвёртый жетон стоит 2 ТО,
+            // у техники и авиации — два жетона из четырёх).
+            // «from» — ГЕКС САМОГО СТРЕЛЯВШЕГО, а «source» — выбранный гекс
+            // действия. В старой грамматике они всегда совпадали, и события
+            // хватало одного «source»; в грамматике С1 стрелять может жетон с
+            // любого гекса, и без «from» ни отчёт, ни сторож выстрелов сквозь
+            // стену не знают, чей путь проверять.
+            emit("type", "combat_hit", "seat", attackerSeat, "source", source,
+                "from", unit.hexId, "attacker_uid", unit.uid, "target", target,
                 "attacker", unit.type.code + "." + row, "victim_owner", owner,
                 "victim", victimLabel(victim), "destroyed", destroyed, "ammo", ammo,
-                "entry", pl.getOrDefault("entry", 0),
                 "trophy", destroyed ? victim.trophyValue() : 0,
                 "base_ammo", pl.getOrDefault("base_ammo", ammo));
             if (destroyed) {
                 killsThisBattle++;
                 destroy(victim, attackerSeat);
             }
-            if (s.finished) {
-                break;
-            }
         }
         if (killsThisBattle > journal().of(attackerSeat).maxKillsOneBattle) {
             journal().of(attackerSeat).maxKillsOneBattle = killsThisBattle;
         }
-        // o22-усил: в ОДНОМ бою снёс нейтрала и достал жетон противника НА ТОМ
-        // ЖЕ ГЕКСЕ — теперь у каждого выстрела своя цель, поэтому сверяем гексы.
-        for (String hx : neutralRazedAt) {
-            if (enemyHitAt.contains(hx)) {
-                journal().of(attackerSeat).razedNeutralAndHitEnemySameBattle = true;
-                break;
-            }
+        if (neutralRazedThisBattle && enemyDamagedThisBattle) {
+            // o22-усил: в ОДНОМ бою снёс нейтрала и достал жетон противника
+            // (цель боя — один гекс, так что «на том же гексе» выполняется).
+            journal().of(attackerSeat).razedNeutralAndHitEnemySameBattle = true;
         }
         evacuateShieldedEconomy(damagedOwners);
 
-        // Ответный бой: в правилах 1.34.0+ автоматического нет (ключ выключен);
-        // процедура сохранена для сводов, где он включён, и для эффектов карт.
+        // Шаг 6 / §4: ответный бой (один раз, не для самой ответки).
         if (didDamage && !isRetaliation && rs.getBool("actions.combat.retaliation_enabled", true)) {
             boolean gotRetaliated = false;
             for (int owner : clockwise(attackerSeat, damagedOwners)) {
@@ -837,11 +916,21 @@ public final class CombatResolver {
                     break;
                 }
             }
+            // «Ответный залп» (арсенал 2.0.0): контратаковали в ответ на твой
+            // Бой — 1 боеприпас. Реакция вне реестра способностей (ON_EVENT там
+            // не диспетчеризуется никем) — прямая проверка, как у легаси-пассивок.
             if (gotRetaliated && Passives.hasPassive(s, attackerSeat, "ammo_on_being_retaliated")) {
+                // ЧЕРЕЗ СКЛАД, А НЕ МИМО НЕГО: боеприпас — кубик в ячейке, и если
+                // ячейки кончились, он не помещается. Прямое пополнение счётчика
+                // переполняло склад (в проигрывателе — «занято 13 из 11»).
                 int got = Storage.addAmmoCapped(s, p, 1);
                 emit("type", "ability_reaction", "seat", attackerSeat,
                     "ability", "ammo_on_being_retaliated", "got_ammo", got);
             }
+            // «Ответный залп» 2.3 (редакция 17.08.2026): платит не за сам факт
+            // контратаки, а за ПОНЕСЁННУЮ ПОТЕРЮ — контратака должна была снять
+            // твой жетон. Прежняя редакция срабатывала и тогда, когда противник
+            // впустую расстрелял боеприпасы.
             if (gotRetaliated && journal().of(attackerSeat).lostOwnThisTurn > 0
                     && Passives.hasPassive(s, attackerSeat, "ammo_on_retaliation_kill")) {
                 int got = Storage.addAmmoCapped(s, p, 1);
@@ -849,7 +938,14 @@ public final class CombatResolver {
                     "ability", "ammo_on_retaliation_kill", "got_ammo", got);
             }
         }
-        return didDamage;
+        // СНОС НЕЙТРАЛА — ТОЖЕ СОСТОЯВШИЙСЯ БОЙ. Возвращалось голое didDamage,
+        // которое ставится только на уроне ЧУЖОМУ ЖЕТОНУ; выстрел, снёсший
+        // нейтральную постройку (трофей и контейнер в кармане), считался
+        // несостоявшимся. В старой грамматике из-за этого возвращалась наценка
+        // за право боя, которым игрок вовсю воспользовался. Поймано тестом
+        // CombatTest после перехода на грамматику С1, где сосед-нейтрал стал
+        // достижимой целью чаще.
+        return didDamage || neutralRazedThisBattle;
     }
 
     /** Записать в журнал партии, почему бой ничего не дал. */
@@ -859,50 +955,33 @@ public final class CombatResolver {
     }
 
     /**
-     * ПОЧЕМУ ЗАЛП НЕ СОСТОЯЛСЯ — одна причина, в порядке «что чинить».
+     * ПОЧЕМУ ЗАЛП НЕ СОСТОЯЛСЯ — одна из трёх причин, в порядке «что чинить».
      *
      * <p>Различать их обязательно: стенка — вопрос геометрии поля, боеприпас —
-     * вопрос экономики, закрытый гекс и таблица атак — вопрос самих правил боя.
-     * Считается по ВСЕМ жетонам игрока: в бою «как Движение» бьёт любой жетон с
-     * любого гекса, и причина отказа — общая для всего действия.
+     * вопрос экономики, а несовпадение таблицы атак — вопрос самих правил боя
+     * (род войск бьёт только две категории из четырёх, и в цели может не
+     * оказаться ни одной из них).
      */
-    private String dryReason(int attackerSeat, Integer restrictTargetOwner) {
+    private String dryReason(int attackerSeat, List<UnitToken> attackers, String source,
+                             String target, Integer restrictTargetOwner,
+                             boolean[] firstAttackUsed) {
         GameState s = state;
         PlayerState p = s.player(attackerSeat);
-        boolean anyTarget = false;
+        boolean closed = hexClosedAgainst(target, attackerSeat);
         boolean anyReaches = false;
         boolean anyAffordable = false;
-        boolean anyOpen = false;
-        for (UnitToken u : p.units) {
-            if (u.hexId == null || !u.alive()) {
+        for (UnitToken u : attackers) {
+            if (!Passability.canShootAcross(s, u, target)) {
                 continue;
             }
-            for (String target : targetHexesFrom(u.hexId)) {
-                if (!validTarget(target, attackerSeat, restrictTargetOwner)) {
-                    continue;
-                }
-                anyTarget = true;
-                boolean adjacent = s.field.neighbors(u.hexId).contains(target);
-                if (adjacent && !Passability.canShootAcross(s, u, target)) {
-                    continue;
-                }
-                anyReaches = true;
-                boolean closed = hexClosedAgainst(target, attackerSeat);
-                for (AttackRow ar : attackRows(attackerSeat, u)) {
-                    int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
-                        new boolean[]{false});
-                    if (p.resources.canPay(Resource.AMMO, cost)) {
-                        anyAffordable = true;
-                    }
-                    if (!closed || u.type == UnitType.AIRCRAFT
-                            || ar.target() == Target.BUILDINGS_TOWERS) {
-                        anyOpen = true;
-                    }
+            anyReaches = true;
+            for (AttackRow ar : attackRows(attackerSeat, u)) {
+                int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
+                    firstAttackUsed);
+                if (p.resources.canPay(Resource.AMMO, cost)) {
+                    anyAffordable = true;
                 }
             }
-        }
-        if (!anyTarget) {
-            return "рядом нет цели";
         }
         if (!anyReaches) {
             return "стенка";
@@ -910,7 +989,7 @@ public final class CombatResolver {
         if (!anyAffordable) {
             return "нет боеприпасов";
         }
-        if (!anyOpen) {
+        if (closed) {
             return "гекс закрыт";
         }
         return "таблица атак не бьёт эту цель";
@@ -1016,25 +1095,6 @@ public final class CombatResolver {
         List<String> out = new ArrayList<>();
         out.add(source);
         out.addAll(state.field.neighbors(source));
-        return out;
-    }
-
-    /**
-     * То же с дальностью: при {@code range >= 2} добавляется второй пояс —
-     * соседи соседей. Стенки на пути к нему не проверяются: цель указывает
-     * авиация сверху (карта арсенала «Наводчик»).
-     */
-    private List<String> targetHexesFrom(String source, int range) {
-        List<String> out = targetHexesFrom(source);
-        if (range >= 2) {
-            for (String near : state.field.neighbors(source)) {
-                for (String far : state.field.neighbors(near)) {
-                    if (!out.contains(far)) {
-                        out.add(far);
-                    }
-                }
-            }
-        }
         return out;
     }
 

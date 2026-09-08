@@ -975,17 +975,17 @@ public final class Actions {
                     "снести " + b.type.code + "@" + b.hexId
                         + (сносСтоит > 0 ? " (-" + сносСтоит + " мон)" : " (+" + refund + " мон)")));
             }
-            // ЧЕТВЁРТАЯ ОПЕРАЦИЯ — РЕМОНТ (решение дизайнера 06.09.2026): снять
-            // ВЕСЬ урон с одного своего здания за его НАПЕЧАТАННУЮ цену.
+            // РЕМОНТ ИЗ БАЗЫ УБРАН (решение дизайнера 06.09.2026, третья редакция
+            // того же дня): у Стройки остались ровно два действия со зданием —
+            // поставить и снести. Осевое правило вернулось к прежнему виду:
+            // снять урон может ТОЛЬКО эффект карты.
             //
-            // Осевое правило «урон сам не проходит» этим не отменяется, а
-            // уточняется: урон не снимается ДАРОМ. Раньше снять его мог только
-            // эффект карты; теперь есть и штатный путь, и он дорогой ровно
-            // настолько, насколько дорого само здание. Это же и первый крупный
-            // сток монеты в игре: ремонт под осадой прямо конкурирует с
-            // расширением, а до сих пор монету было почти некуда девать.
+            // Механика оставлена под ключом, а не вырезана: карта, которая
+            // захочет чинить за деньги, получит готовый путь, а балансовый стенд
+            // сможет включить ремонт и померить, чего игре стоит его отсутствие.
+            boolean ремонтМожно = rs.getBool("actions.build.repair_enabled", false);
             for (BuildingToken b : player.buildingsOnField()) {
-                if (b.damage <= 0) {
+                if (!ремонтМожно || b.damage <= 0) {
                     continue;
                 }
                 int цена = printedPrice(player, b);
@@ -1863,151 +1863,98 @@ public final class Actions {
         @SuppressWarnings("unchecked")
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
             GameState s = state;
-            // ДВИЖЕНИЕ ПО РУЛБУКУ §8.5 (правило дизайнера 04.09.2026):
-            //
-            //   Выбери ОДИН свой гекс: войска в нём двигаются бесплатно. Дальше
-            //   двигай любые свои жетоны за 1 боеприпас за перемещение.
-            //
-            // Перемещение — это ход ОДНОГО жетона на его скорость (несколько
-            // шагов по гексу за раз). Жетон из бесплатного гекса ничего не платит;
-            // жетон из любого другого гекса платит боеприпас ОДИН РАЗ за это
-            // действие, и дальше идёт на всю скорость. Вход в гарнизон и возврат
-            // в запас — тоже перемещения, платятся по тому же правилу.
-            //
-            // Прежде движок давал одно бесплатное перемещение любому жетону и
-            // брал боеприпас за каждое следующее — это было расхождение с
-            // правилами (аудит 12.08.2026), и «порция Движения» вырождалась в
-            // один ход одной фишки.
+            var side = player.board.troop;
             Integer aircraftSpeed = Passives.aircraftSpeedOverride(s, player.seat);
-            // Карты дают N бесплатных вводов жетонов из чужих гексов
-            // («первые два перемещения даром» и т.п.).
-            int freeEntries = ctx.freeExtraMoves;
+            int freeExtra = 0;
             if (Passives.firstTwoMovesFree(s, player.seat)) {
-                freeEntries += 2;
+                freeExtra = 2;
             } else if (Passives.firstExtraMoveFree(s, player.seat)) {
-                freeEntries += 1;
+                freeExtra = 1;
             }
-            int entryAmmo = rs.getInt("actions.movement.flat_ammo_per_extra_move", 1);
-
-            // Шаг 1: бесплатный гекс.
-            java.util.Set<String> hexes = new java.util.TreeSet<>();
-            for (UnitToken u : player.unitsOnField()) {
-                if (Speed.of(s, player.seat, u) > 0 || garrisonTargets(s, player, u).size() > 0) {
-                    hexes.add(u.hexId);
-                }
-            }
-            if (hexes.isEmpty()) {
-                ctx.actionsPlayed.add(name());
-                Map<String, Object> tel0 = new HashMap<>();
-                tel0.put("moves", 0);
-                return ActionResult.ok("moved 0 steps (двигать некого)", tel0);
-            }
-            List<Choice> hexOpts = new ArrayList<>();
-            for (String h : hexes) {
-                int n = 0;
-                for (UnitToken u : player.unitsOnField()) {
-                    if (h.equals(u.hexId)) {
-                        n++;
-                    }
-                }
-                hexOpts.add(new Choice("move_source", h, h + " (войск: " + n + ")"));
-            }
-            hexOpts.add(new Choice("pass", null, "без бесплатного гекса"));
-            Choice hp = agent.choose(s, hexOpts, Map.of("kind", "move_source"));
-            String freeHex = hp.payload() == null ? null : (String) hp.payload();
-            // Жетоны бесплатного гекса запоминаются ДО ходов: ушедший с него
-            // жетон остаётся бесплатным на всё своё перемещение.
-            java.util.Set<Integer> freeUids = new java.util.HashSet<>();
-            if (freeHex != null) {
-                for (UnitToken u : player.unitsOnField()) {
-                    if (freeHex.equals(u.hexId)) {
-                        freeUids.add(u.uid);
-                    }
-                }
-            }
-            java.util.Set<Integer> paidUids = new java.util.HashSet<>();   // ввод оплачен
-
             int movesDone = 0;
-            int ammoPaid = 0;
+            boolean freeUsed = false;
             Map<Integer, Integer> perUnitSteps = new HashMap<>();
-            java.util.Set<Integer> retired = new java.util.HashSet<>();     // ушли в запас
             while (true) {
                 List<Choice> opts = new ArrayList<>();
                 for (UnitToken u : player.unitsOnField()) {
-                    if (retired.contains(u.uid)) {
-                        continue;
-                    }
+                    // скорость спрашиваем в одном месте: карты и жетоны модулей
+                    // вмешиваются через точку правил UNIT_SPEED (13.08.2026)
                     int speed = Speed.of(s, player.seat, u);
-                    int done = perUnitSteps.getOrDefault(u.uid, 0);
-                    boolean started = done > 0;
-                    // Цена ввода: 0 в бесплатном гексе, 0 если уже оплачен или
-                    // уже двигался, 0 за счёт карты, иначе боеприпас.
-                    int entry = freeUids.contains(u.uid) || paidUids.contains(u.uid) || started
-                        ? 0 : (freeEntries > 0 ? 0 : entryAmmo);
-                    boolean affordable = entry == 0
-                        || player.resources.canPay(Resource.AMMO, entry);
-                    if (!affordable) {
+                    if (perUnitSteps.getOrDefault(u.uid, 0) >= speed) {
                         continue;
                     }
-                    if (done < speed) {
-                        // ПРЫЖОК ЧЕРЕЗ ТАЙЛ ЗАРОЖДЕНИЯ (точка правил
-                        // MOVEMENT_JUMP_OVER, карта «Десантные тропы»).
-                        boolean canJump = kelium.engine.ability.RuleQuery
-                            .of(s, player.seat, kelium.engine.ability.Hook.MOVEMENT_JUMP_OVER)
-                            .about(u).base(0).ask() >= 1.0;
-                        if (canJump) {
-                            for (String over : s.field.neighbors(u.hexId)) {
-                                if (!s.field.get(over).hasSpawnTile()) {
-                                    continue;
-                                }
-                                for (String behind : s.field.neighbors(over)) {
-                                    if (!behind.equals(u.hexId) && canEnter(u, behind, player.seat)) {
-                                        opts.add(new Choice("move",
-                                            Map.of("uid", u.uid, "to", behind, "ammo", entry),
-                                            u.type.code + "@" + u.hexId + " ПРЫЖОК через " + over
-                                                + "->" + behind + (entry > 0 ? " (" + entry + " БПР)" : "")));
-                                    }
+                    // ПРЫЖОК ЧЕРЕЗ ТАЙЛ ЗАРОЖДЕНИЯ (точка правил MOVEMENT_JUMP_OVER,
+                    // карта «Десантные тропы»): гекс с тайлом нельзя занять, но
+                    // пехота может перескочить его на противоположный гекс. Один
+                    // прыжок стоит один шаг скорости, как обычное перемещение.
+                    boolean canJump = kelium.engine.ability.RuleQuery
+                        .of(s, player.seat, kelium.engine.ability.Hook.MOVEMENT_JUMP_OVER)
+                        .about(u).base(0).ask() >= 1.0;
+                    if (canJump) {
+                        for (String over : s.field.neighbors(u.hexId)) {
+                            if (!s.field.get(over).hasSpawnTile()) {
+                                continue;
+                            }
+                            for (String behind : s.field.neighbors(over)) {
+                                if (!behind.equals(u.hexId) && canEnter(u, behind, player.seat)) {
+                                    opts.add(new Choice("move",
+                                        Map.of("uid", u.uid, "to", behind),
+                                        u.type.code + " ПРЫЖОК через " + over + "->" + behind));
                                 }
                             }
-                        }
-                        for (String nb : s.field.neighbors(u.hexId)) {
-                            if (canEnter(u, nb, player.seat)) {
-                                opts.add(new Choice("move",
-                                    Map.of("uid", u.uid, "to", nb, "ammo", entry),
-                                    u.type.code + "@" + u.hexId + "->" + nb
-                                        + (entry > 0 ? " (" + entry + " БПР)" : "")));
-                            }
-                        }
-                        // ВХОД В ГАРНИЗОН (§8.5): вход своего войска в своё военное
-                        // здание того же рода — тоже перемещение, стоит шаг.
-                        for (BuildingToken b : garrisonTargets(s, player, u)) {
-                            opts.add(new Choice("garrison",
-                                Map.of("uid", u.uid, "b", b.uid, "to", u.hexId, "ammo", entry),
-                                u.type.code + "@" + u.hexId + " в " + b.type
-                                    + (entry > 0 ? " (" + entry + " БПР)" : "")));
                         }
                     }
-                    // ВОЗВРАТ В ЗАПАС ВМЕСТО ПЕРЕМЕЩЕНИЯ (§8.5). Доступен жетону,
-                    // который в это действие ещё не двигался.
-                    if (!started) {
-                        opts.add(new Choice("unit_to_reserve",
-                            Map.of("uid", u.uid, "to", "", "ammo", entry),
-                            u.type.code + "@" + u.hexId + " -> в запас"
-                                + (entry > 0 ? " (" + entry + " БПР)" : "")));
+                    for (String nb : s.field.neighbors(u.hexId)) {
+                        if (canEnter(u, nb, player.seat)) {
+                            opts.add(new Choice("move", Map.of("uid", u.uid, "to", nb),
+                                u.type.code + "->" + nb));
+                        }
+                    }
+                    // ВХОД В ГАРНИЗОН (СВОД §5.3, до правки 04.09.2026 в движке
+                    // отсутствовал вовсе: поле insideBuildingUid только читалось).
+                    // Вход внутрь своего военного здания ТОГО ЖЕ РОДА — это
+                    // перемещение, значит стоит шаг скорости и оплачивается как
+                    // обычный ход. Гарнизонов у игрока до ТРЁХ: по одному в
+                    // казарме, заводе и авиабазе. ЦУ гарнизона не имеет — вышка
+                    // внутрь не встаёт никогда.
+                    for (BuildingToken b : garrisonTargets(s, player, u)) {
+                        // «to» = свой же гекс: жетон никуда не едет, он заходит
+                        // внутрь здания на месте. Ключ обязателен — его читают
+                        // все оценщики перемещений, и без него выбор был бы
+                        // перемещением без адреса.
+                        opts.add(new Choice("garrison",
+                            Map.of("uid", u.uid, "b", b.uid, "to", u.hexId),
+                            u.type.code + " в " + b.type));
                     }
                 }
                 if (opts.isEmpty()) {
                     break;
                 }
                 opts.add(new Choice("pass", null, "stop moving"));
-                Choice pick = agent.choose(s, opts, Map.of("kind", "move",
-                    "free_hex", freeHex == null ? "" : freeHex));
+                Choice pick = agent.choose(s, opts, Map.of("kind", "move"));
                 if (pick.payload() == null) {
                     break;
                 }
+                int cost = 0;
+                if (freeUsed) {
+                    if (freeExtra > 0) {
+                        freeExtra -= 1;
+                        cost = 0;
+                    } else if ("flat".equals(rs.getStr("actions.movement.cost_model", "flat"))) {
+                        cost = rs.getInt("actions.movement.flat_ammo_per_extra_move");
+                    } else {
+                        List<Integer> sched = rs.getIntList("actions.movement.escalating_surcharge_ammo");
+                        cost = sched.get(Math.min(movesDone, sched.size() - 1));
+                    }
+                }
+                if (cost > 0 && !player.resources.canPay(Resource.AMMO, cost)) {
+                    break;
+                }
+                if (cost > 0) {
+                    player.resources.pay(Resource.AMMO, cost);
+                }
                 Map<String, Object> mp = (Map<String, Object>) pick.payload();
                 int uid = ((Number) mp.get("uid")).intValue();
-                int cost = mp.get("ammo") instanceof Number n ? n.intValue() : 0;
                 UnitToken unit = null;
                 for (UnitToken u : player.units) {
                     if (u.uid == uid) {
@@ -2015,55 +1962,34 @@ public final class Actions {
                         break;
                     }
                 }
-                if (unit == null) {
-                    break;
-                }
-                boolean needsEntry = !freeUids.contains(uid) && !paidUids.contains(uid)
-                    && perUnitSteps.getOrDefault(uid, 0) == 0;
-                if (needsEntry) {
-                    if (freeEntries > 0) {
-                        freeEntries--;
-                    } else if (cost > 0) {
-                        if (!player.resources.canPay(Resource.AMMO, cost)) {
-                            break;
-                        }
-                        player.resources.pay(Resource.AMMO, cost);
-                        ammoPaid += cost;
-                    }
-                    paidUids.add(uid);
-                }
-                TurnJournal.TurnFacts f = journal(s).of(player.seat);
-                if ("unit_to_reserve".equals(pick.kind())) {
-                    String fromHex = unit.hexId;
-                    unit.setHexId(null);
-                    unit.resetDamage();
-                    unit.insideBuildingUid = null;
-                    retired.add(uid);
-                    movesDone++;
-                    f.movedUids.add(uid);
-                    f.unitsMoved = f.movedUids.size();
-                    f.movedFromHexes.add(fromHex);
-                    continue;
-                }
                 if ("garrison".equals(pick.kind())) {
-                    // Гекса войско не меняет — печатный контейнер не берётся:
-                    // карту даёт только приход НА сектор.
+                    // Гекса войско не меняет — значит печатный контейнер не
+                    // берётся: карту даёт только приход НА сектор, а гарнизон
+                    // сектора не занимает вовсе.
                     unit.insideBuildingUid = ((Number) mp.get("b")).intValue();
                     perUnitSteps.merge(uid, 1, Integer::sum);
                     movesDone++;
+                    freeUsed = true;
                     continue;
                 }
                 String dest = (String) mp.get("to");
                 String fromHex = unit.hexId;
                 // Признак «был гарнизоном» снимаем ДО хода: смена гекса выводит
-                // войско из здания.
+                // войско из здания, и после setHexId узнать это уже нельзя.
                 boolean wasInside = unit.inside();
+                // setHexId, а не присваивание: смена гекса ВЫВОДИТ войско из
+                // здания, внутри которого оно стояло.
                 unit.setHexId(dest);
-                // ПЕЧАТНЫЙ КОНТЕЙНЕР: войско встало на сектор — берёт карту.
+                // ПЕЧАТНЫЙ КОНТЕЙНЕР: войско встало на ячейку — берёт карту.
+                // o30 «Мародёр» считает такие контейнеры (учёт внутри).
                 PrintedContainers.onUnitMoved(s, player, fromHex, dest, unit.type, wasInside);
+                // СТАРЫЙ РЕЖИМ: жетон контейнера на гексе подбирает войско
+                // (ruleset 1.6.0-c1; в основном режиме вызов ничего не делает).
                 TokenContainers.onUnitEntered(s, player, dest);
                 perUnitSteps.merge(uid, 1, Integer::sum);
+                freeUsed = true;
                 movesDone += 1;
+                TurnJournal.TurnFacts f = journal(s).of(player.seat);
                 f.movedUids.add(uid);
                 f.unitsMoved = f.movedUids.size();
                 f.movedFromHexes.add(fromHex);
@@ -2072,8 +1998,6 @@ public final class Actions {
             ctx.actionsPlayed.add(name());
             Map<String, Object> tel = new HashMap<>();
             tel.put("moves", movesDone);
-            tel.put("ammo", ammoPaid);
-            tel.put("free_hex", freeHex);
             return ActionResult.ok("moved " + movesDone + " steps", tel);
         }
 
@@ -2196,7 +2120,7 @@ public final class Actions {
 
     }
 
-    /** Действие Бой (приказ Операция): одна процедура боя через CombatResolver. */
+    /** Действие Бой (приказ Операция): проведение одной битвы через CombatResolver. */
     static final class CombatAction extends Action {
         CombatAction(GameState state) {
             super(state);
@@ -2208,26 +2132,71 @@ public final class Actions {
 
         @Override
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
-            // БОЙ ИГРАЕТСЯ КАК ДВИЖЕНИЕ (рулбук §8.6, решение 04.09.2026): одно
-            // действие — одна процедура. Выбранный гекс бьёт даром, любой другой
-            // жетон вводится за боеприпас, каждый жетон выбирает свою цель.
-            // Единицы «второй бой» и платы за право следующего боя больше нет;
-            // ключ actions.combat.open_battle_surcharge_ammo движок как
-            // ограничитель не читает (оставлен в сводах ради истории).
+            // C1: за одно действие Бой можно провести НЕСКОЛЬКО боёв; второй и
+            // далее — с наценкой (open_battle_surcharge_ammo), платится ДО боя
+            // (C2). Телеметрия battlesOpened — только по состоявшимся (C3).
+            // ГРАММАТИКА С1 «БЛИЗНЕЦ ДВИЖЕНИЯ» (свод 1.35.0 и новее): единицы
+            // «бой» не существует. Одно действие — один розыгрыш: выбранный гекс
+            // бьёт даром, дальше любой свой жетон доплачивает за право
+            // выстрелить. Лесенка за право следующего боя не взимается вовсе, и
+            // цикл по боям не крутится: всё решается внутри одного вызова.
+            boolean близнец = "per_token".equals(
+                rs.getStr("actions.combat.surcharge_model", "right_to_battle"));
+            List<Integer> schedule = rs.getIntList("actions.combat.open_battle_surcharge_ammo");
             CombatResolver resolver = (CombatResolver) state.combat;
             // Было ли вообще кого бить В МОМЕНТ РОЗЫГРЫША — по этому признаку
             // отчёты отличают «бой не состоялся, потому что некого» от
             // «бой был возможен, но бот его не провёл».
             boolean couldFight = resolver.anyAttackPossible(player.seat);
             int killsBefore = player.killsTotal;
-            boolean did = resolver.runBattle(player.seat, agent);
-            int battles = did ? 1 : 0;
-            if (did) {
+            int battles = 0;
+            while (true) {
+                if (близнец && battles > 0) {
+                    break;      // одно действие — один розыгрыш, второго нет
+                }
+                int surcharge = близнец ? 0 : ctx.nextOpSurcharge("combat", schedule);
+                if (Passives.noSecondBattleSurcharge(state, player.seat)) {
+                    surcharge = 0;
+                }
+                // ТОЧКА ПРАВИЛ: надбавка за второй и следующий бой в ход. База —
+                // расписание из правил (уже со скидкой легаси-пассивки), карта
+                // арсенала может снять её совсем.
+                surcharge = kelium.engine.ability.RuleQuery
+                    .of(state, player.seat,
+                        kelium.engine.ability.Hook.COMBAT_SECOND_BATTLE_SURCHARGE)
+                    .about(battles + 1).base(surcharge).ask();
+                if (surcharge > 0 && !player.resources.canPay(Resource.AMMO, surcharge)) {
+                    break;
+                }
+                if (surcharge > 0) {
+                    player.resources.pay(Resource.AMMO, surcharge);   // плата за ПРАВО боя
+                }
+                boolean did = resolver.runBattle(player.seat, agent);
+                if (!did) {
+                    // бой не состоялся (пас/нет целей): вернуть наценку — право
+                    // не было использовано.
+                    //
+                    // ВОЗВРАТ ИДЁТ ЧЕРЕЗ СКЛАД. Казалось бы, возвращаем своё же и
+                    // переполнить не можем — но между платой и возвратом успевает
+                    // пройти бой, а в бою сносят здания: закрылись ячейки, и
+                    // прежнее количество боеприпасов уже не помещается. Поймано
+                    // сторожем StorageNeverOverflowsTest на одной партии из девяти.
+                    if (surcharge > 0) {
+                        Storage.addAmmoCapped(state, player, surcharge);
+                    }
+                    break;
+                }
+                battles++;
                 journal(state).of(player.seat).battlesOpened += 1;
                 ctx.recordOp("combat");
+                if (state.finished) {
+                    break;
+                }
             }
-            // «Премия за голову»: конец Боя, есть хоть одно уничтожение за это
-            // действие — 1 монета (один раз, не за каждый жетон).
+            // «Премия за голову» (арсенал 2.0.0): конец Боя, есть хоть одно
+            // уничтожение за это действие — 1 монета (один раз, не за кадого
+            // жетона). killsTotal только растёт, поэтому дельта — честный счёт
+            // уничтожений именно в этом действии.
             if (player.killsTotal > killsBefore
                     && Passives.hasPassive(state, player.seat, "coin_on_kill")) {
                 player.resources.add(Resource.COIN, 1);
@@ -2236,12 +2205,11 @@ public final class Actions {
             Map<String, Object> tel = new HashMap<>();
             tel.put("battle", battles);
             tel.put("could_fight", couldFight);
-            tel.put("kills", player.killsTotal - killsBefore);
             if (battles == 0) {
                 return ActionResult.ok(couldFight
                     ? "combat: не стал бить (цели были)" : "combat: бить некого", tel);
             }
-            return ActionResult.ok("combat resolved", tel);
+            return ActionResult.ok("combat resolved x" + battles, tel);
         }
     }
 

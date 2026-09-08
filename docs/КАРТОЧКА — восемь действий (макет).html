@@ -1,0 +1,290 @@
+<title>Карточка восьми действий</title>
+<style>
+  /* ================= ПЕЧАТНАЯ ГЕОМЕТРИЯ =================
+     Карта 70x120 мм. Всё считается в МИЛЛИМЕТРАХ и ПУНКТАХ, а не в пикселях:
+     dpi к вёрстке отношения не имеет — 300 dpi задаёт лишь размер растра
+     (827x1417 px) и потолок мелкой детали в пиктограммах, но не то, сколько
+     влезет текста. Влезает столько, сколько позволяет отношение кегля к
+     миллиметрам.
+
+     БЮДЖЕТ, посчитанный один раз и зашитый в переменные ниже:
+       живое поле (3 мм внутрь от реза)      64 x 114 мм
+       ряд                                   27.4 мм
+       колонка текста (минус рейка 7 мм)     54.6 мм
+       8 пт: em 2.82 мм, строка 3.39 мм  ->  37 знаков в строке
+       11 пт: заголовок, строка 4.46 мм
+       под текст в ряду остаётся 20.5 мм ->  6 строк по 8 пт
+
+     Значит на ряд: заголовок + суть в ДВЕ строки + ЧЕТЫРЕ строки уточнений,
+     и каждая строка не длиннее 37 знаков. Всё, что длиннее, переносится и
+     ряд распухает — ровно на этом резался прошлый макет.
+     ====================================================== */
+  :root{
+    --карта-ш:70mm; --карта-в:120mm; --кромка:3mm;
+    --рейка:7mm; --отступ:1.2mm; --зазор:1.5mm;
+    --бумага:#fffdf8; --поле:#f5f1e8; --тушь:#1d1a16; --серый:#6b6459; --линия:#d5ccbb;
+    --разработка:#4a7c59; --инфраструктура:#a06a2c; --операция:#8c3a3a; --приобретения:#3a5f8c;
+  }
+  body{background:#2a2724;color:var(--тушь);
+       font:14px/1.5 "PT Sans",-apple-system,system-ui,sans-serif;
+       padding:12px;display:flex;flex-direction:column;align-items:center;gap:14px;
+       overflow-x:hidden}
+  @media (min-width:700px){ body{padding:22px;gap:18px} }
+  .подпись{color:#b8b0a4;font-size:13px;max-width:760px;line-height:1.55}
+  #отчёт{max-width:100%;box-sizing:border-box}
+  .подпись b{color:#efe9dd}
+  .подпись code{background:#3a3632;padding:1px 4px;border-radius:3px;font-size:12px}
+  /* ПРЕДПРОСМОТР. Карта свёрстана в миллиметрах и на экране выходит крошечной,
+     поэтому её увеличивают. Увеличение делается НЕ margin-хаком: коробка
+     .окно имеет настоящий размер увеличенной карты, а карта внутри неё
+     масштабируется от левого верхнего угла. Иначе на узком экране (телефон)
+     увеличенная карта вылезала за вьюпорт и обрезалась.
+     Коэффициент --к считает скрипт по ширине окна: на телефоне карта займёт
+     всю доступную ширину, на большом экране остановится на 2.4. */
+  .пары{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+  .окно{position:relative;width:calc(var(--карта-ш) * var(--к, 1));
+        height:calc(var(--карта-в) * var(--к, 1));flex:none}
+  .окно > .сторона{position:absolute;top:0;left:0;
+        transform:scale(var(--к, 1));transform-origin:top left}
+
+  .сторона{width:var(--карта-ш);height:var(--карта-в);background:var(--поле);
+           border-radius:2mm;box-shadow:0 2px 8px rgba(0,0,0,.4);
+           padding:var(--кромка);display:flex;flex-direction:column;
+           gap:var(--зазор);box-sizing:border-box}
+  .шапка{display:flex;justify-content:space-between;align-items:baseline;
+         font-size:5pt;letter-spacing:.09em;text-transform:uppercase;color:var(--серый);
+         line-height:1;height:2mm}
+  .ряды{flex:1;display:flex;flex-direction:column;gap:var(--зазор);min-height:0}
+
+  .ряд{flex:1;min-height:0;display:flex;background:var(--бумага);
+       border:.2mm solid var(--линия);border-radius:1.2mm;overflow:hidden}
+  .рейка{width:var(--рейка);flex:none;display:flex;align-items:center;
+         justify-content:center;color:#fff;font-size:13pt}
+  .тело{flex:1;min-width:0;padding:var(--отступ) 1.5mm;display:flex;
+        flex-direction:column;justify-content:flex-start}
+  h3{margin:0;font-size:11pt;line-height:1.15;letter-spacing:.02em}
+  /* ПЕРЕНОСЫ. С ними в строку влезает заметно больше: слово не прыгает целиком
+     на новую строку, а разрывается по слогам. hyphens:auto работает по словарю
+     браузера (для русского он есть не везде), поэтому в длинных словах ниже
+     проставлены ещё и МЯГКИЕ переносы &shy; — они сработают всегда и ровно там,
+     где положено по правилу: остаток начинается с согласной и он не в одну
+     букву. */
+  .тело{hyphens:auto;-webkit-hyphens:auto}
+  .суть{margin:0;font-size:8pt;line-height:1.2;font-weight:700}
+  ul{margin:0;padding:0;list-style:none}
+  li{font-size:8pt;line-height:1.2;color:#3a352d;text-indent:-1.6mm;padding-left:1.6mm}
+  li::before{content:"· ";color:var(--серый);font-weight:700}
+  table{border-collapse:collapse;font-size:8pt}
+  td{padding:0;line-height:1.2;vertical-align:top}
+  td:first-child{white-space:nowrap;padding-right:1.5mm;color:var(--серый)}
+  b{font-weight:700}
+
+  .р .рейка{background:var(--разработка)} .р h3{color:var(--разработка)}
+  .и .рейка{background:var(--инфраструктура)} .и h3{color:var(--инфраструктура)}
+  .о .рейка{background:var(--операция)} .о h3{color:var(--операция)}
+  .п .рейка{background:var(--приобретения)} .п h3{color:var(--приобретения)}
+
+  /* сторож переполнения — виден только когда есть что показать */
+  .ряд.лишнее{outline:.4mm solid #d33;outline-offset:-.4mm}
+  #отчёт{font-size:13px;color:#8fd28f;background:#1f2a1f;border:1px solid #33502f;
+         padding:10px 14px;border-radius:6px;max-width:760px}
+  #отчёт.плохо{color:#ffb3b3;background:#3a1f1f;border-color:#6b2f2f}
+
+  @media print{
+    body{background:#fff;padding:0;display:block}
+    .подпись,#отчёт{display:none}
+    .пары{gap:0;display:block}
+    .окно{width:auto;height:auto;position:static}
+    .окно > .сторона{position:static;transform:none}
+    .сторона{box-shadow:none;border-radius:0;page-break-after:always}
+    @page{size:70mm 120mm;margin:0}
+  }
+</style>
+
+<div class="подпись">
+  <b>Карточка восьми действий — 70×120 мм, 8 пт мелкий, 11 пт заголовки.</b>
+  Свёрстано в миллиметрах и пунктах, поэтому на печати выйдет ровно так.
+  <b>300 dpi на вёрстку не влияет</b> — это размер растра (827×1417 px) и потолок
+  мелкой детали в пиктограммах, но не то, сколько влезет текста. Бюджет ряда
+  посчитан и зашит в шапку файла: колонка текста 54.6 мм, значит
+  <b>37 знаков в строке</b> при 8 пт, и <b>шесть строк</b> под текст после
+  заголовка. Отсюда правило: суть — не длиннее двух строк, уточнений — четыре.
+  <b>Переносы включены</b> (<code>hyphens:auto</code> плюс мягкие переносы в
+  длинных словах), поэтому предел в 37 знаков перестал быть жёстким: слово
+  разрывается по слогам, а не прыгает на новую строку целиком. Ниже макет показан <b>×2.4 для чтения</b>, геометрия
+  истинная; печать через <code>Ctrl+P</code> даст точный размер.
+</div>
+
+<div id="отчёт">сторож переполнения ещё не отработал</div>
+
+<div class="пары" lang="ru">
+
+<div class="окно"><div class="сторона">
+  <div class="шапка"><span>Кристаллы Раздора</span><span>лицо · хозяйство</span></div>
+  <div class="ряды">
+
+    <div class="ряд и">
+      <div class="рейка">⚒</div>
+      <div class="тело">
+        <h3>СТРОЙКА</h3>
+        <p class="суть">Трать монеты: ставь и сноси свои здания</p>
+        <ul>
+          <li>поставить — цена, снести — 1 монета</li>
+          <li>в своих гексах и за своей стенкой</li>
+          <li>одно здание — одна операция</li>
+          <li>ЦУ не сно&shy;сится и не перено&shy;сится</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ряд и">
+      <div class="рейка">⚡</div>
+      <div class="тело">
+        <h3>СМЕНА ЭНЕРГИИ</h3>
+        <p class="суть">Акти&shy;вируй каждый источ&shy;ник — раз за действие</p>
+        <ul>
+          <li><b>ОТДАТЬ</b> — снять и разложить</li>
+          <li><b>ЗАБРАТЬ</b> — вернуть до полного</li>
+          <li>источники: станции и ЦУ</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ряд р">
+      <div class="рейка">⬢</div>
+      <div class="тело">
+        <h3>СНАРЯЖЕНИЕ</h3>
+        <p class="суть">Запи&shy;танное ВОЕННОЕ здание: войско или бое&shy;припас</p>
+        <ul>
+          <li>запитано = все ячейки закрыты</li>
+          <li>войско — на гекс своего здания</li>
+          <li>техника — 2 смежных сектора</li>
+          <li>вышка — на гекс с любым своим зда&shy;нием</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ряд р">
+      <div class="рейка">⛏</div>
+      <div class="тело">
+        <h3>ДОБЫЧА</h3>
+        <p class="суть">Запи&shy;танный ДОБЫТЧИК: келемий или кон&shy;тейнер</p>
+        <ul>
+          <li>примыкание стенкой, не углом</li>
+          <li>добытчик №1–2 → 1, №3–4 → 2</li>
+          <li>кон&shy;тейнер открыт = нет жетонов</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div>
+
+<div class="окно"><div class="сторона">
+  <div class="шапка"><span>Кристаллы Раздора</span><span>оборот · война и рынок</span></div>
+  <div class="ряды">
+
+    <div class="ряд о">
+      <div class="рейка">➜</div>
+      <div class="тело">
+        <h3>МАНЁВР</h3>
+        <p class="суть">Один свой гекс — даром, дальше 1 БПР</p>
+        <ul>
+          <li>даль&shy;ность = скорость с план&shy;шета</li>
+          <li>нельзя на гекс с чужими вой&shy;сками</li>
+          <li>и через него; уйти — можно</li>
+          <li>авиация не видит, кроме авиа&shy;ции</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ряд о">
+      <div class="рейка">⚔</div>
+      <div class="тело">
+        <h3>БОЙ</h3>
+        <p class="суть">Один свой гекс бьёт даром, дальше 1 БПР</p>
+        <ul>
+          <li>цель — соседний гекс или свой</li>
+          <li>атака — 1 БПР, урон 1</li>
+          <li>чужое здание — бьёшь здания</li>
+          <li>ответа нет, урон не сни&shy;мается</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ряд п">
+      <div class="рейка">⇄</div>
+      <div class="тело">
+        <h3>РЫНОК</h3>
+        <p class="суть">Курсы план&shy;шета и ОДНО предло&shy;жение карты</p>
+        <table>
+          <tr><td>1 / 2 келемия</td><td>3 / <b>7</b> монет</td></tr>
+          <tr><td>1 / 2 келемия</td><td>2 / 4 задания</td></tr>
+        </table>
+        <ul><li>келемий в ячейку — их мало</li></ul>
+      </div>
+    </div>
+
+    <div class="ряд п">
+      <div class="рейка">⚗</div>
+      <div class="тело">
+        <h3>НАУКА</h3>
+        <p class="суть">Сдай трофеи — двигай фишки по трекам</p>
+        <table>
+          <tr><td>1 трофей</td><td>перенос модуля</td></tr>
+          <tr><td>2 трофея</td><td>2 арсенала, одну оставь</td></tr>
+          <tr><td>2 трофея</td><td>позолота модуля</td></tr>
+        </table>
+        <ul><li>один шаг на трек за действие</li></ul>
+      </div>
+    </div>
+
+  </div>
+</div></div>
+
+</div>
+
+<script>
+  // СТОРОЖ ПЕРЕПОЛНЕНИЯ. Макет в миллиметрах врёт молча: текст, который не влез,
+  // просто обрезается рамкой ряда. Здесь каждый ряд сверяется с высотой своего
+  // содержимого, и не влезший обводится красным. Проверка нужна именно потому,
+  // что правило «37 знаков» соблюдать на глаз нельзя.
+  function проверить() {
+    const беда = [];
+    document.querySelectorAll('.ряд').forEach(ряд => {
+      const тело = ряд.querySelector('.тело');
+      const лишку = тело.scrollHeight - тело.clientHeight;
+      ряд.classList.toggle('лишнее', лишку > 1);
+      if (лишку > 1) {
+        беда.push(ряд.querySelector('h3').textContent + ' (+' + лишку.toFixed(0) + 'px)');
+      }
+    });
+    const о = document.getElementById('отчёт');
+    if (беда.length) {
+      о.className = 'плохо';
+      о.textContent = 'НЕ ВЛЕЗЛО в ' + беда.length + ' ряд(ах): ' + беда.join(', ')
+        + '. Убирай строку целиком, а не ужимай кегль — 8 пт это уже пол.';
+    } else {
+      о.className = '';
+      о.textContent = 'Всё влезло: восемь рядов, ни одного переполнения при 8 пт.';
+    }
+  }
+  // УВЕЛИЧЕНИЕ ПО ШИРИНЕ ОКНА. 70 мм в CSS-пикселях меряем настоящим элементом,
+  // а не считаем по 96 dpi: браузеры телефонов трактуют мм по-своему.
+  function увеличить() {
+    const проба = document.createElement('div');
+    проба.style.cssText = 'position:absolute;visibility:hidden;width:70mm';
+    document.body.appendChild(проба);
+    const ширМм = проба.getBoundingClientRect().width;
+    проба.remove();
+    const доступно = document.documentElement.clientWidth - 24;
+    const к = Math.max(1, Math.min(2.4, доступно / ширМм));
+    document.querySelectorAll('.окно').forEach(о => о.style.setProperty('--к', к));
+  }
+  function всё() { увеличить(); проверить(); }
+  document.fonts ? document.fonts.ready.then(всё) : всё();
+  window.addEventListener('resize', всё);
+  window.addEventListener('orientationchange', всё);
+</script>
