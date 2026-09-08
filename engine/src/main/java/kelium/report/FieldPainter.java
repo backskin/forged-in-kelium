@@ -274,8 +274,8 @@ public final class FieldPainter {
         //    по этому гексу. Соседние гексы того же модуля дорисуют свои куски, и
         //    картонка сойдётся целой, без швов посередине.
         boolean картон = !forbidden && paintCardboard(c, size, hi, cx, cy, neighbor);
-        java.awt.image.BufferedImage hexTex = картон ? null : Textures.field(
-            forbidden ? "hex_forbidden" : "hex");
+        java.awt.image.BufferedImage hexTex = картон ? null
+            : forbidden ? запретныйГекс(hi) : Textures.field("hex");
         if (картон) {
             // модуль уже нарисован — своей плитки гексу не нужно
         } else if (hexTex != null) {
@@ -401,7 +401,14 @@ public final class FieldPainter {
         }
         if (tex != null) {
             drawHexTexture(c, tex, cx, cy, size * SPAWN_R, 0);
-            paintSpawnText(c, size, sp, cx, cy);
+            // НА ПЕЧАТНОМ ТАЙЛЕ НИ БУКВЫ, НИ ПЕЧАТНОГО ЧИСЛА (то же правило, что
+            // на жетонах: где есть рисунок, надписи не нужны). Напечатанный
+            // номинал уже нарисован художником, «S»/«K» — тем более: лицо и
+            // оборот и так разные картинки. Игра докладывает ровно одно живое —
+            // СКОЛЬКО КЕЛЕМИЯ ОСТАЛОСЬ, и то кубиками.
+            if (showKelium) {
+                paintKeliumCubes(c, size, Math.max(0, sp.kelium), cx, cy);
+            }
             return;                     // штриховку и заливку заменяет сама картинка
         }
         // ТАЙЛ ЗАРОЖДЕНИЯ — СО СКРУГЛЁННЫМИ УГЛАМИ (просьба дизайнера
@@ -465,6 +472,19 @@ public final class FieldPainter {
                     1, 0, 0, 1, KELIUM_CUBE, KELIUM_CUBE_EDGE);
             }
         }
+    }
+
+    /**
+     * КАРТИНКА ЗАПРЕТНОГО ГЕКСА — ОДНА ИЗ ДЕВЯТИ.
+     *
+     * <p>Художник нарисовал девять разных: на поле запретных гексов лежит по
+     * нескольку рядом, и одинаковые читаются как узор, а не как обломки. Вариант
+     * выбирается ПО КООРДИНАТАМ гекса, а не случайно: тогда он не «дрожит» при
+     * каждой перерисовке и одинаков в окне и в отчёте.
+     */
+    private static java.awt.image.BufferedImage запретныйГекс(ReplayRecord.HexInfo hi) {
+        int n = Math.floorMod(hi.q * 7 + hi.r * 13, 9) + 1;
+        return Textures.field("hex_forbidden_" + n, "hex_forbidden");
     }
 
     /** Картинка тайла: от точного состояния к общему. */
