@@ -842,11 +842,15 @@ public final class GameEngine {
                 playActions(p, ctx, List.of(Order.ORDER_ACTIONS.get(bo)), bottomA, false,
                     "bottom", bo.code);
             }
-            // Плашка манёвра: на картах maneuver:true — одно бесплатное
-            // перемещение одного жетона войска на его скорость (не открывает
-            // Операцию, не тратит боеприпасы).
-            if (Boolean.TRUE.equals(card.get("maneuver"))) {
-                offerManeuver(p);
+            // СПЕЦ-ПЛАШКА КАРТЫ ПРИКАЗА. В наборе orders 2.0.0 плашек три вида
+            // (решение дизайнера 07.09.2026), и у каждой фракции свой набор —
+            // как у нижних приказов. Прежний набор 1.0.0 знал одну плашку и
+            // помечал её ключом maneuver: он читается по-старому, чтобы партии
+            // на нём игрались как игрались.
+            String плашка = card.get("spec") instanceof String с ? с
+                : (Boolean.TRUE.equals(card.get("maneuver")) ? "movement" : null);
+            if (плашка != null) {
+                разыгратьПлашку(p, ctx, плашка);
             }
         }
         s.turnUndo = null;
@@ -944,11 +948,48 @@ public final class GameEngine {
     }
 
     /**
+     * СПЕЦ-ПЛАШКА КАРТЫ ПРИКАЗА — одна из трёх (набор orders 2.0.0).
+     *
+     * <p>Плашка тратит СПЕЦ-ДЕЙСТВИЕ, а их у игрока ровно одно за ход, и за него
+     * конкурируют розыгрыш задания, карта арсенала, вскрытие контейнера, возврат
+     * ЦУ и требование супер-задания. Прежде плашка манёвра спец не тратила
+     * вовсе — движок раздавал её сверх лимита, хотя рулбук перечислял её среди
+     * конкурентов. Расхождение закрыто здесь же.
+     *
+     * <p>Плашка предлагается ПОСЛЕДНЕЙ в ходу: если игрок уже потратил спец на
+     * задание, плашка просто не предлагается — это и есть конкуренция.
+     */
+    private void разыгратьПлашку(PlayerState p, TurnContext ctx, String вид) {
+        if (!ctx.canSpec()) {
+            return;
+        }
+        switch (вид) {
+            case "movement" -> offerManeuver(p, ctx);
+            case "coin" -> {
+                p.resources.add(kelium.core.Resource.COIN, 1);
+                ctx.useSpec();
+                emit(ev("type", "order_spec", "seat", p.seat, "spec", "coin", "got", 1));
+            }
+            case "objective" -> {
+                String карта = state.decks.get("objectives").draw(state.rng);
+                if (карта == null) {
+                    return;             // колода заданий пуста — плашка молчит
+                }
+                p.objectiveHand.add(карта);
+                ctx.useSpec();
+                emit(ev("type", "order_spec", "seat", p.seat, "spec", "objective",
+                    "card", карта));
+            }
+            default -> { }
+        }
+    }
+
+    /**
      * Плашка манёвра: бесплатно передвинуть ОДИН жетон войска на его скорость
      * (несколько шагов одним и тем же жетоном), не открывая Операцию и не тратя
      * боеприпасы. Ход строится по правилам проходимости движения.
      */
-    private void offerManeuver(PlayerState p) {
+    private void offerManeuver(PlayerState p, TurnContext ctx) {
         GameState s = state;
         var side = p.board.troop;
         Integer airOverride = Passives.aircraftSpeedOverride(s, p.seat);
@@ -1025,6 +1066,7 @@ public final class GameEngine {
             f.unitsMoved = f.movedUids.size();
             f.movedFromHexes.add(fromHex);
         }
+        ctx.useSpec();
         emit(ev("type", "maneuver", "seat", p.seat, "unit", uid, "to", unit.hexId));
     }
 
