@@ -17,10 +17,34 @@ Set-Location $PSScriptRoot
 $dataPath = (Resolve-Path "data").Path -replace '\\', '/'
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 
+# ЗАПУЩЕННОЕ ПРИЛОЖЕНИЕ БОЛЬШЕ НЕ МЕШАЕТ СБОРКЕ (правка 08.09.2026).
+#
+# Раньше сборка отказывалась работать, пока открыто хоть одно окно: Windows
+# держит запущенный exe и перезаписать его нельзя. На деле это значило «закрой
+# то, что смотришь, и жди пять минут» — а смотрят как раз затем, чтобы сказать,
+# что поправить.
+#
+# Занятый файл ПЕРЕИМЕНОВЫВАЕТСЯ: открытое приложение продолжает работать из
+# переименованного файла (Windows это разрешает — дескриптор остаётся у файла, а
+# не у имени), а сборка спокойно кладёт на его место новый. Старые «занятые»
+# копии подчищаются при следующем запуске, когда их уже никто не держит.
 $busy = Get-Process | Where-Object { $_.Name -like "Kelium*" }
+Get-ChildItem "dist\*.занят-*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+    try { Remove-Item -Force $_.FullName } catch { }
+}
 if ($busy) {
-    $names = ($busy | Select-Object -ExpandProperty Name -Unique) -join ", "
-    throw "Сначала закрой запущенные приложения ($names) — они держат свои файлы."
+    $имена = ($busy | Select-Object -ExpandProperty Path -Unique) |
+        Where-Object { $_ -and (Test-Path $_) }
+    foreach ($путь in $имена) {
+        $новое = [System.IO.Path]::GetFileNameWithoutExtension($путь) +
+            ".занят-" + (Get-Date -Format "HHmmss") + ".exe"
+        try {
+            Rename-Item -LiteralPath $путь -NewName $новое -Force
+            Write-Output "   открытое приложение отодвинуто: $новое"
+        } catch {
+            throw "Приложение $путь запущено, и отодвинуть файл не удалось: $_`nЗакрой окно и запусти сборку снова."
+        }
+    }
 }
 
 # Свежесозданный крупный exe часто ещё держат антивирус или синхронизация
@@ -253,11 +277,15 @@ if (-not (Select-String -Path $cfgPath -Pattern ([regex]::Escape($dataPath)) -Qu
 Write-Output "3-бис/6 данные игры внутрь образа…"
 $dataDst = "dist\app\Kelium\app\data"
 Copy-Item -Recurse -Force "data" $dataDst
-# Обученные модели и прогоны в раздачу не идут — это выдача, а не игра.
-foreach ($junk in @("training", "genomes-archive-*", "genomes-boi2", "_archive")) {
+# В РАЗДАЧУ ИДЁТ ТОЛЬКО ТО, ЧЕМ ИГРАЮТ. Обученные модели, архивы геномов,
+# отработанные наборы и размеченные образцы для художника игре не нужны, а весят
+# они больше самой игры (одно data/training — два гигабайта).
+foreach ($junk in @("training", "genomes-archive-*", "genomes-boi2", "_archive", "tsv")) {
     Get-ChildItem -Path $dataDst -Filter $junk -ErrorAction SilentlyContinue |
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
+Get-ChildItem -Path (Join-Path $dataDst "textures") -Filter "_образцы" `
+    -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 "   данные: {0:N1} МБ" -f ((Get-ChildItem -Recurse $dataDst | Measure-Object Length -Sum).Sum / 1MB) | Write-Output
 
 Write-Output "4/6 упаковка образа в архив…"
