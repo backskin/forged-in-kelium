@@ -194,6 +194,23 @@ public final class Textures {
     }
 
     /**
+     * ЖЕТОН МОДУЛЯ — прокачка атаки (красный) или найма (синий). Лежат в папке
+     * {@code module/} и названы ПО СОДЕРЖАНИЮ, а не по номеру в наборе:
+     * {@code mod_red_infantry_vehicle}, {@code mod_blue_a2u1_units} и их
+     * золотые стороны с хвостом {@code _gold}. Так любой набор модулей находит
+     * свою картинку сам — жетон опознаётся тем, что на нём напечатано.
+     */
+    public static BufferedImage module(String... keys) {
+        List<String> list = new ArrayList<>(keys.length);
+        for (String k : keys) {
+            if (k != null && !k.isBlank()) {
+                list.add("module/" + k);
+            }
+        }
+        return find(list);
+    }
+
+    /**
      * ПЕЧАТНЫЙ МОДУЛЬ ПОЛЯ — картинка картонного блока, из которых поле и
      * собирается. Лежат в папке {@code block/}: {@code big-1-A},
      * {@code small-3-B} — вид, номер и сторона.
