@@ -174,6 +174,8 @@ public final class FieldPainter {
     private static final double HP_MIN = 34;
     /** Сердечки прочности нейтральных построек. */
     private static final String HEART_FILL = "#E03A3A";
+    /** Кубик урона — тот самый красный кубик, который кладут на сердце. */
+    private static final String DAMAGE_CUBE = "#D42A2A";
     private static final String HEART_EDGE = "#7A1414";
     private static final String ENERGY_ON = "#ffc400";
     private static final String ENERGY_OFF = "#ffffff";
@@ -683,9 +685,14 @@ public final class FieldPainter {
             // кромке (см. ниже). Раньше здесь стоял меньший из двух масштабов и
             // центровка по рамке: постройка выходила мелкой лентой посреди
             // сектора.
-            double k = box[2] / tex.getWidth();
-            if (tex.getHeight() * k > box[3]) {
-                k = box[3] / tex.getHeight();
+            // ЕЩЁ КРУПНЕЕ (заказ дизайнера 08.09.2026: «нейтралы должны быть
+            // ещё больше»). Стенка на столе стоит НА КРОМКЕ гекса и краем
+            // заходит на неё, а не вписывается строго внутрь сектора — потому и
+            // разрешаем пятую часть сверх полосы. Излишек уходит наружу, к
+            // кромке: внутрь гекса постройка лезть не должна, там ходят жетоны.
+            double k = box[2] / tex.getWidth() * 1.20;
+            if (tex.getHeight() * k > box[3] * 1.20) {
+                k = box[3] * 1.20 / tex.getHeight();
             }
             // РИСУНОК ХУДОЖНИКА ЛЕЖИТ ВДОЛЬ ПЕРВОГО ОТРЕЗКА СТЕНКИ, а рамка
             // считается вдоль ХОРДЫ между её концами. У прямой стенки это одно
@@ -702,19 +709,64 @@ public final class FieldPainter {
             c.image(tex, box[0] + запас * Math.cos(наружу),
                 box[1] + запас * Math.sin(наружу), box[4] + поправка, k,
                 tex.getWidth() / 2.0, tex.getHeight() / 2.0);
-            // СЕРДЕЧКИ — только когда постройку уже били: на картинке художника
-            // они НАПЕЧАТАНЫ (сколько всего), и рисовать их вторыми поверх
-            // печати значит удваивать. А вот подбитую постройку по одной печати
-            // не отличить от целой, и тогда живой ряд нужен.
-            if (nb.hp < nb.hpMax) {
-                paintNeutralHearts(c, size, nb, cx, cy);
-            }
+            // СВОИХ СЕРДЕЦ НЕ РИСУЕМ ВОВСЕ (решение дизайнера 08.09.2026:
+            // «убери с них и со всех зданий нарисованные тобой иконки
+            // здоровья»). На картинке они напечатаны; игра кладёт КРАСНЫЙ КУБИК
+            // на то сердце, которое уже потеряно, — по разметке зон рядом с
+            // картинкой (field/neutral_*.zones.png).
+            уронНаНейтрале(c, nb, tex, box, k, поправка);
             return;
         }
         c.polygon(FieldGeometry.neutralShape(cx, cy, size, nb.corners,
                 NEUTRAL_OUTER, NEUTRAL_INNER),
             tone(nb.big ? NEUTRAL_BIG : NEUTRAL_SMALL), NEUTRAL_EDGE, 3.0);
         paintNeutralHearts(c, size, nb, cx, cy);
+    }
+
+    /**
+     * КРАСНЫЕ КУБИКИ УРОНА НА НАПЕЧАТАННЫХ СЕРДЦАХ НЕЙТРАЛА.
+     *
+     * <p>Где на картинке сердца, говорит разметка рядом с ней
+     * ({@code field/neutral_big.zones.png}) — та же, что у жетонов зданий.
+     * Разметка живёт в пикселях картинки, поэтому её надо провести через то же
+     * преобразование, каким рисуется сама картинка.
+     */
+    private static void уронНаНейтрале(FieldCanvas c, ReplayRecord.Neutral nb,
+                                       java.awt.image.BufferedImage tex, double[] box,
+                                       double k, double поправка) {
+        if (!showDamage || nb.hp >= nb.hpMax || nb.hpMax <= 0) {
+            return;
+        }
+        Zones z = Zones.of(nb.big ? "field/neutral_big" : "field/neutral_small",
+            Textures.folder());
+        Zones.Area сердца = z.hearts();
+        if (сердца == null) {
+            return;
+        }
+        int потеряно = Math.max(0, nb.hpMax - nb.hp);
+        // Из пикселей маски — в экранные: картинка нарисована с масштабом k и
+        // повёрнута на (угол рамки + поправка) вокруг своего центра.
+        double sx = tex.getWidth() / (double) Math.max(1, z.maskWidth()) * k;
+        double sy = tex.getHeight() / (double) Math.max(1, z.maskHeight()) * k;
+        double масштаб = (sx + sy) / 2;
+        double a = Math.toRadians(box[4] + поправка);
+        double dx = (сердца.cx() * z.maskWidth() / (double) Math.max(1, z.maskWidth())
+            - z.maskWidth() / 2.0) * k;
+        double dy = (сердца.cy() - z.maskHeight() / 2.0) * k;
+        double px = box[0] + dx * Math.cos(a) - dy * Math.sin(a);
+        double py = box[1] + dx * Math.sin(a) + dy * Math.cos(a);
+        double длина = сердца.w() * масштаб;
+        double толщина = сердца.h() * масштаб;
+        double уголРяда = a + Math.toRadians(сердца.angleDeg());
+        double ux = Math.cos(уголРяда);
+        double uy = Math.sin(уголРяда);
+        double шаг = длина / Math.max(1, nb.hpMax);
+        double кубик = Math.min(толщина, шаг) * 0.8;
+        for (int i = nb.hpMax - потеряно; i < nb.hpMax; i++) {
+            double d = -длина / 2 + шаг * (i + 0.5);
+            tokenCube(c, px + ux * d, py + uy * d, кубик, ux, uy, -uy, ux,
+                DAMAGE_CUBE, DAMAGE_EDGE);
+        }
     }
 
     /**
@@ -928,7 +980,10 @@ public final class FieldPainter {
         }
         // РАНЕНЫЙ ЖЕТОН обводится красным: видно издалека, а на сколько именно
         // ранен — говорит подсказка при наведении.
-        if (b.damage > 0) {
+        if (b.damage > 0 && tex == null) {
+            // У жетона с рисунком раненость показывает КРАСНЫЙ КУБИК на
+            // напечатанном сердце (paintDamageOnHearts) — красная кайма поверх
+            // печатной рамки была бы третьим контуром на одном краю.
             c.shape(sh, cx, cy, face - sh.outward(), FieldGeometry.seatScale(sh, size),
                 sh.hexCx(), sh.hexCy(), "none", DAMAGE_FILL, 2.2);
         }
@@ -983,13 +1038,18 @@ public final class FieldPainter {
             paintEnergyOnToken(c, size, b, sides, cx, cy);
         }
         c.clipOff();
-        // ОБВОДКА ЖЕТОНА ПОВЕРХ ВСЕЙ ПЕЧАТИ. Зона свободной энергии — накладка во
-        // всё крыло, обрезанная силуэтом, поэтому она ложилась ровно на кромку и
-        // съедала обводку с той стороны: жетон выглядел «надкусанным». Контур
-        // обводится ЕЩЁ РАЗ последним слоем, уже без заливки, и рамка снова целая
-        // по всему периметру (просьба дизайнера 13.08.2026).
-        c.shape(sh, cx, cy, face - sh.outward(), FieldGeometry.seatScale(sh, size),
-            sh.hexCx(), sh.hexCy(), "none", FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(seat)], TOKEN_STROKE);
+        // ОБВОДКА — ТОЛЬКО У РИСОВАННОГО ЖЕТОНА. У картинки художника рамка своя,
+        // напечатанная, и наша ложилась поверх неё вторым контуром: при отъезде
+        // камеры она оставалась одной и той же экранной толщины и на мелком
+        // жетоне превращалась в жирную кайму (замечание дизайнера 08.09.2026).
+        // У рисованного силуэта обводка нужна — там её больше взять негде, — и
+        // она обводится ПОСЛЕ всей печати, иначе накладка свободной энергии
+        // съедала её с одной стороны (просьба дизайнера 13.08.2026).
+        if (tex == null) {
+            c.shape(sh, cx, cy, face - sh.outward(), FieldGeometry.seatScale(sh, size),
+                sh.hexCx(), sh.hexCy(), "none",
+                FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(seat)], TOKEN_STROKE);
+        }
         // НА ЖЕТОНЕ С РИСУНКОМ НИКАКИХ БУКВ И ЗНАЧКОВ (решение дизайнера
         // 08.09.2026: «на жетонах где уже есть текстура НЕ НУЖНЫ никакие буквы и
         // обозначения — туда разве что кубики будут ставиться»). На картинке уже
@@ -1121,8 +1181,13 @@ public final class FieldPainter {
         double метка = Math.min(толщина, шаг) * 0.74;
         for (int i = Math.max(0, hp - b.damage); i < hp; i++) {
             double d = -длина / 2 + шаг * (i + 0.5);
-            tokenSquare(c, mid[0] + ux * d, mid[1] + uy * d, метка,
-                ux, uy, -uy, ux, SLOT_FILL, DAMAGE_EDGE, 1.1);
+            // УРОН — КРАСНЫЙ КУБИК НА НАПЕЧАТАННОМ СЕРДЦЕ (решение дизайнера
+            // 08.09.2026). Своих сердец игра не рисует вовсе; кубик кладётся на
+            // то сердце, которое уже потеряно. Больше одного кубика бывает
+            // только у ЦУ и авиабазы — у них по три сердца, и это следует из
+            // правил само: жетон с последним потерянным сердцем уничтожен.
+            tokenCube(c, mid[0] + ux * d, mid[1] + uy * d, метка,
+                ux, uy, -uy, ux, DAMAGE_CUBE, DAMAGE_EDGE);
         }
     }
 
@@ -1149,8 +1214,11 @@ public final class FieldPainter {
             // половину рисунка. Пустая ячейка так и остаётся печатной — игра
             // кладёт только КУБИК, когда энергия в ней есть.
             if (i < b.energyPlaced) {
+                // КУБИК ЗАКРЫВАЕТ ЯЧЕЙКУ ЦЕЛИКОМ (заказ дизайнера 08.09.2026):
+                // ячейка напечатана, и кубик в ней должен лежать, а не болтаться
+                // посередине. Чуть заступить за край не страшно — так и на столе.
                 double a = Math.toRadians(angle);
-                tokenCube(c, p[0], p[1], side * 0.76, Math.cos(a), Math.sin(a),
+                tokenCube(c, p[0], p[1], side * 1.02, Math.cos(a), Math.sin(a),
                     -Math.sin(a), Math.cos(a), ENERGY_ON, ENERGY_EDGE);
             }
         }
@@ -1685,11 +1753,18 @@ public final class FieldPainter {
                 double face = FieldGeometry.meanEdgeAngle(place);
                 double w = FieldGeometry.unitWidth(u.type, place.size(), size);
                 pos = FieldGeometry.polar(cx, cy, FieldGeometry.unitSeatRadius(size), face);
+                // ЖЕТОН НЕ КЛАДЁТСЯ ВВЕРХ НОГАМИ. На верхней половине гекса
+                // поворот «лицом наружу» разворачивал картинку макушкой вниз —
+                // на столе такой жетон просто повернули бы на 180° и смотрели
+                // (уточнение дизайнера 08.09.2026). Тем же правилом живут
+                // подписи: см. readableAngle.
+                double поворотЖетона =
+                    readableAngle(FieldGeometry.unitRotation(sh, face));
                 if (tex != null) {
-                    drawUnitTexture(c, tex, sh, pos, FieldGeometry.unitRotation(sh, face), w,
+                    drawUnitTexture(c, tex, sh, pos, поворотЖетона, w,
                         FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)]);
                 } else {
-                    c.shape(sh, pos[0], pos[1], FieldGeometry.unitRotation(sh, face),
+                    c.shape(sh, pos[0], pos[1], поворотЖетона,
                         w / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
                         tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
                         FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);

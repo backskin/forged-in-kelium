@@ -216,6 +216,34 @@ def маска(имя, ожидаем, беды):
     return out
 
 
+# НЕЙТРАЛЬНЫЕ ПОСТРОЙКИ — тоже с печатными сердцами. Лежат не в token/, а в
+# field/: это картон поля, а не жетон игрока. Разметка им нужна ровно одна —
+# где сердца, чтобы класть на них кубик урона.
+НЕЙТРАЛЫ = {'neutral_big': 2, 'neutral_small': 1}
+
+
+def маска_нейтрала(имя, сердец, беды):
+    путь = os.path.join(ROOT, 'data', 'textures', 'field', имя + '.png')
+    if not os.path.isfile(путь):
+        беды.append('нет картинки %s' % os.path.basename(путь))
+        return None
+    im, r, g, b, al = слои(путь)
+    hp = сердца(r, g, b, al)
+    if not hp:
+        беды.append('%s: сердец на картинке не нашлось' % имя)
+        return None
+    # На нейтрале сердца НЕ СЛИПАЮТСЯ (они разнесены по стенке), поэтому берётся
+    # общая рамка всех пятен: кубик урона ложится вдоль этого ряда.
+    x0 = min(p[0] for p in hp)
+    y0 = min(p[1] for p in hp)
+    x1 = max(p[0] + p[2] for p in hp)
+    y1 = max(p[1] + p[3] for p in hp)
+    out = Image.new('RGBA', im.size, (0, 0, 0, 0))
+    d = __import__('PIL.ImageDraw', fromlist=['ImageDraw']).Draw(out)
+    d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=РОЗОВЫЙ)
+    return out
+
+
 def main():
     источник, ожидания = набор_жетонов(ROOT)
     беды = []
@@ -229,7 +257,19 @@ def main():
         for x in беды:
             print('  ' + x)
         return 1
-    писано = 0
+    нейтральные = {}
+    for имя, сердец in НЕЙТРАЛЫ.items():
+        m = маска_нейтрала(имя, сердец, беды)
+        if m is not None:
+            нейтральные[имя] = m
+    if беды:
+        print('НИЧЕГО НЕ ЗАПИСАНО — сперва разберитесь:')
+        for x in беды:
+            print('  ' + x)
+        return 1
+    for имя, m in нейтральные.items():
+        m.save(os.path.join(ROOT, 'data', 'textures', 'field', имя + '.zones.png'))
+    писано = len(нейтральные)
     for имя, m in готово.items():
         for p in range(1, 5):
             цель = os.path.join(TOK, '%s_p%d.zones.png' % (имя, p))
