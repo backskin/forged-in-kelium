@@ -77,58 +77,14 @@ public final class PlayerState {
      * оставляет, вторую сбрасывает. Выбранная уходит в {@link #objectiveHand}.
      */
     public final List<String> startObjectiveOffer = new ArrayList<>();
-    public int superObjectiveProgress = 0;
+    /**
+     * НИЗ СУПЕР-ЗАДАНИЯ ОТРАБОТАН. Награда за жёсткое требование берётся один
+     * раз за партию, поэтому нужен один флаг — и больше ничего. Прежняя
+     * механика (четыре ячейки, счётчик запуска, жетон супероружия, символы под
+     * планшетом) снесена по требованию дизайнера 09.09.2026: верх карты это
+     * множитель победных очков в финале, низ — требование с разовой наградой.
+     */
     public boolean superObjectiveComplete = false;
-
-    // ======================================================================
-    //  СУПЕРОРУЖИЕ (супер задания 3.0, решение дизайнера 17.08.2026)
-    // ======================================================================
-    /**
-     * СКОЛЬКО ЯЧЕЕК КАРТЫ СУПЕР ЗАДАНИЯ ЕЩЁ ЗАНЯТО. −1 — карта не вскрыта.
-     *
-     * <p>Карта вскрывается одним СПЕЦ-действием, и на неё сразу ложится всё
-     * требуемое: четыре ячейки, четыре взноса. Дальше игрок снимает содержимое
-     * по одной ячейке за СПЕЦ, не чаще раза за круг, — это и есть счётчик
-     * запуска. Снял последнюю — выиграл партию.
-     */
-    public int superCells = -1;
-    /** Жетон супероружия: uid, пока он существует (в запасе или на поле). */
-    public Integer superWeaponUid = null;
-    /**
-     * ГЕКС ЗДАНИЯ, ГДЕ ЖЕТОН СУПЕРОРУЖИЯ БЫЛ НАНЯТ. Снимать ячейки можно, только
-     * пока жетон стоит НЕ на нём: оружие должно выехать со стапеля, а не
-     * запускаться прямо из цеха.
-     */
-    public String superWeaponHiredHex = null;
-    /**
-     * Круг, в котором игрок последний раз снимал ячейку. Снятие разрешено не
-     * чаще раза за круг, поэтому четыре ячейки — это минимум четыре круга.
-     */
-    public int superLastLaunchCircle = -1;
-    /**
-     * ГЕКСЫ, С КОТОРЫХ УЖЕ ЗАПУСКАЛИ. Каждое снятие ячейки требует НОВОГО гекса:
-     * оружие обязано переезжать, а не стоять четыре круга на одном месте.
-     */
-    public final java.util.Set<String> superLaunchedFrom = new java.util.LinkedHashSet<>();
-
-    /**
-     * СИМВОЛЫ НА ЯЧЕЙКАХ СУПЕР-ЗАДАНИЯ — по одному на ячейку, могут повторяться.
-     *
-     * <p>Правило дизайнера 17.08.2026 (переделка): символ больше не нужен, чтобы
-     * ВСКРЫТЬ карту, — он нужен, чтобы СНЯТЬ ячейку. При вскрытии на четыре
-     * ячейки случайно раскладываются четыре символа; чтобы снять ячейку, игрок
-     * ЖЕРТВУЕТ карту арсенала с таким же символом.
-     *
-     * <p>Список сокращается по мере снятия: длина равна числу занятых ячеек.
-     */
-    public final List<String> superCellSymbols = new ArrayList<>();
-    /**
-     * ПОБЕДНЫЕ ОЧКИ ЗА ПЕРВУЮ ЧАСТЬ супер задания (решение дизайнера 13.08.2026):
-     * 2–5 очков по стоимости того, что сдано в лицо карты. Начисляются один раз, в
-     * момент, когда лицо собрано целиком, и остаются у игрока даже если рубашка
-     * так и не сложится, — иначе вложенное в первую часть пропадает зря.
-     */
-    public int superFirstPartVp = 0;
 
     // Модули в резерве (ещё не размещены). red/blue; gold = позолочённые.
     public int redModules = 0;
@@ -169,10 +125,6 @@ public final class PlayerState {
 
     // Карты супер-арсенала, взятые с вершин треков (открытые, до конца партии).
     public final List<String> superArsenalCards = new ArrayList<>();
-
-    // B5: прогресс сборки супер-задания ПО ЧАСТЯМ (kind -> внесено), чтобы
-    // нельзя было закрыть карту пятикратной сдачей одной дешёвой части.
-    public final Map<String, Integer> superPartProgress = new HashMap<>();
 
     // Контейнеры на руках (не вскрытые). Вскрытие — бесплатное действие.
     public int containers = 0;
@@ -285,7 +237,7 @@ public final class PlayerState {
      * Очки, начисленные КАРТАМИ-ОБЪЕКТАМИ напрямую ({@link
      * kelium.engine.cards.CardContext#grantVp}) — например наградой задания за
      * прямой пункт {@code vp} в данных. Отдельное поле по тому же образцу, что
-     * {@link #warTrackVp} и {@link #superFirstPartVp}: копится по ходу партии,
+     * {@link #warTrackVp}: копится по ходу партии,
      * суммируется в {@code Scoring}.
      */
     public int objectiveCardVp = 0;
@@ -364,16 +316,8 @@ public final class PlayerState {
         p.arsenalCardKelium.putAll(arsenalCardKelium);
         p.superObjective = superObjective;
         p.superObjectiveOffer.addAll(superObjectiveOffer);
-        p.superCellSymbols.addAll(superCellSymbols);
         p.startObjectiveOffer.addAll(startObjectiveOffer);
-        p.superObjectiveProgress = superObjectiveProgress;
         p.superObjectiveComplete = superObjectiveComplete;
-        p.superCells = superCells;
-        p.superWeaponUid = superWeaponUid;
-        p.superWeaponHiredHex = superWeaponHiredHex;
-        p.superLastLaunchCircle = superLastLaunchCircle;
-        p.superLaunchedFrom.addAll(superLaunchedFrom);
-        p.superFirstPartVp = superFirstPartVp;
         p.redModules = redModules;
         p.blueModules = blueModules;
         p.redTokens.addAll(redTokens);
@@ -396,7 +340,6 @@ public final class PlayerState {
         }
         p.storageTokens.addAll(storageTokens);
         p.superArsenalCards.addAll(superArsenalCards);
-        p.superPartProgress.putAll(superPartProgress);
         p.containers = containers;
         p.shieldedKinds.addAll(shieldedKinds);
         p.mandateArsenalCard = mandateArsenalCard;

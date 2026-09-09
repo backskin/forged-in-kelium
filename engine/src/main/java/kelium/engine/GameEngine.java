@@ -1244,17 +1244,11 @@ public final class GameEngine {
                 }
             }
         }
-        // СУПЕР ЗАДАНИЯ 3.0 (17.08.2026): вскрытие карты одним СПЕЦ со всеми
-        // взносами разом, затем счётчик запуска — по ячейке за СПЕЦ, не чаще
-        // раза за круг. Сборки по частям и проверки рисунка больше нет.
-        if (SuperWeapon.canReveal(s, p)) {
-            opts.add(new Choice("spec_super_reveal", p.superObjective,
-                "ВСКРЫТЬ супер задание " + p.superObjective));
-        }
-        if (SuperWeapon.canLaunch(s, p)) {
-            opts.add(new Choice("spec_super_launch", p.superObjective,
-                "ЗАПУСК: снять ячейку супероружия (осталось " + p.superCells + ")"));
-        }
+        // ВСКРЫТИЯ И ЗАПУСКА У СУПЕР-ЗАДАНИЙ НЕТ. Карта не вскрывается и не
+        // сжигается: верх это множитель победных очков в финале, низ —
+        // требование с разовой наградой (СуперЗадания.наградаНиза). Прежняя
+        // механика (четыре ячейки, счётчик запуска, жетон супероружия) снесена
+        // по требованию дизайнера 09.09.2026.
         // Вскрытие контейнеров/арсенала: разом — только если правила это разрешают
         // (containers_storage.mass_open; в 1.6.0 выключено).
         if (containersOpenIsSpec() && (p.containers > 0 || !p.arsenalHand.isEmpty())) {
@@ -1336,8 +1330,6 @@ public final class GameEngine {
             case "spec_mandate_store" -> mandateStoreCard(p, (String) ch.payload());
             case "spec_mandate_release" -> mandateReleaseCard(p);
             case "spec_mandate_containers" -> mandateAllocateContainers(p, (Integer) ch.payload());
-            case "spec_super_reveal" -> revealSuper(p);
-            case "spec_super_launch" -> launchSuper(p);
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
             case "spec_super6_claim" -> {
@@ -1811,42 +1803,6 @@ public final class GameEngine {
                     b.damage = Math.min(b.damage, Math.max(0, b.hp - 1));
                 }
             }
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-
-
-    /**
-     * ВСКРЫТЬ СУПЕР ЗАДАНИЕ: выложить на карту всё, что требуют её ячейки,
-     * получить победные очки и жетон супероружия в запас (супер задания 3.0).
-     */
-    private void revealSuper(PlayerState p) {
-        int vp = SuperWeapon.reveal(state, p);
-        if (vp == 0 && p.superCells < 0) {
-            return;   // вскрыть не удалось — СПЕЦ не тратится впустую молча
-        }
-        emit(ev("type", "super_reveal", "seat", p.seat, "card", p.superObjective,
-            "vp", vp, "cells", p.superCells,
-            "weapon", p.superWeaponUid == null ? null : p.superWeaponUid));
-    }
-
-    /**
-     * ЗАПУСК: снять содержимое одной ячейки карты. Снял последнюю — победа.
-     *
-     * <p>Победа наступает В СВОЙ ХОД и только в свой: снимает счётчик сам игрок,
-     * значит срок запуска соперники видят и считают заранее.
-     */
-    private void launchSuper(PlayerState p) {
-        boolean won = SuperWeapon.launch(state, p);
-        emit(ev("type", "super_launch", "seat", p.seat, "card", p.superObjective,
-            "cells_left", p.superCells, "win", won));
-        if (won) {
-            state.finished = true;
-            state.winner = p.seat;
-            state.winCondition = "super_objective";
-            emit(ev("type", "game_end", "reason", "super_objective",
-                "winner", p.seat, "card", p.superObjective));
         }
     }
 

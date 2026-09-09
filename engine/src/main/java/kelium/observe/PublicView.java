@@ -189,14 +189,10 @@ public final class PublicView {
 
         // --- супер-задание (открыто с подготовки) ---
         public String superObjective;
-        public int superProgress;
         public boolean superComplete;
         /** Ячеек счётчика запуска ещё не погашено (−1 — вторая часть не начата). */
-        public int superCells = -1;
         /** Символы на ячейках счётчика. */
-        public final List<String> superCellSymbols = new ArrayList<>();
         /** Части первой половины: часть → сколько положено. */
-        public final Map<String, Integer> superParts = new LinkedHashMap<>();
         /** Карты супер-арсенала, забранные с вершин треков. */
         public final List<String> superArsenal = new ArrayList<>();
 
@@ -347,11 +343,7 @@ public final class PublicView {
         st.vp.putAll(p.vp);
 
         st.superObjective = p.superObjective;
-        st.superProgress = p.superProgress;
         st.superComplete = p.superComplete;
-        st.superCells = p.superCells;
-        st.superCellSymbols.addAll(p.superCellSymbols);
-        st.superParts.putAll(p.superParts);
         st.superArsenal.addAll(p.superArsenal);
 
         st.arsenalInstalled.addAll(p.arsenalInstalled);
@@ -551,11 +543,7 @@ public final class PublicView {
         o.put("startHex", st.startHex);
         o.put("vp", st.vp);
         o.put("superObjective", st.superObjective);
-        o.put("superProgress", st.superProgress);
         o.put("superComplete", st.superComplete);
-        o.put("superCells", st.superCells);
-        o.put("superCellSymbols", st.superCellSymbols);
-        o.put("superParts", st.superParts);
         o.put("superArsenal", st.superArsenal);
         o.put("arsenalInstalled", st.arsenalInstalled);
         o.put("orderPlayed", st.orderPlayed);

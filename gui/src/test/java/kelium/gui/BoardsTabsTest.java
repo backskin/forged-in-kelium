@@ -80,11 +80,10 @@ class BoardsTabsTest {
             assertTrue(held, "карта " + card + " ушла с трека " + track + ", но ни у кого нет");
         }
         for (ReplayRecord.Player p : last.players) {
+            // Карта супер-задания выдаётся с подготовки и никуда не уходит:
+            // она не сжигается и не вскрывается — верх это множитель очков в
+            // финале, низ — требование с разовой наградой.
             assertNotNull(p.superObjective, "супер-задание выдаётся с подготовки");
-            int sum = p.superParts.values().stream().mapToInt(Integer::intValue).sum();
-            assertTrue(sum == p.superProgress,
-                "сумма по частям (" + sum + ") должна совпадать с общим прогрессом ("
-                    + p.superProgress + ")");
         }
     }
 

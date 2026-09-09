@@ -783,19 +783,11 @@ public final class Actions {
             // ей нельзя (см. ветку выше), и без места на поле она не нанимается.
             if (hasRoomForUnit(player, from.hexId, u.type)) {
                 u.hexId = from.hexId;
-                // СУПЕРОРУЖИЕ ПОМНИТ СВОЙ СТАПЕЛЬ: с гекса найма счётчик запуска
-                // не снимается, оружие обязано выехать (супер задания 3.0).
-                if (SuperWeapon.isWeapon(state, u)) {
-                    SuperWeapon.onWeaponHired(player, from.hexId);
-                }
                 PrintedContainers.onUnitPlaced(state, player, from.hexId, u.type);
                 return true;
             }
             u.hexId = from.hexId;
             u.insideBuildingUid = from.uid;
-            if (SuperWeapon.isWeapon(state, u)) {
-                SuperWeapon.onWeaponHired(player, from.hexId);
-            }
             // Печатную ячейку контейнера гарнизон НЕ накрывает: он внутри
             // здания, а не на секторе гекса.
             return true;
@@ -3145,7 +3137,6 @@ public final class Actions {
             Choice pick = agent.choose(state, opts, Map.of("kind", "super_objective_swap"));
             if ("super_objective_take".equals(pick.kind())) {
                 player.superObjective = cid;
-                player.superObjectiveProgress = 0;
                 player.superObjectiveOffer.clear();
                 player.superObjectiveOffer.add(cid);
             }

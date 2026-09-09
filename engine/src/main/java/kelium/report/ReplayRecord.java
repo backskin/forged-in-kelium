@@ -370,28 +370,10 @@ public final class ReplayRecord {
         public String orderSetAside;
         public String orderColor;
         public final List<String> storageTokens = new ArrayList<>();
+        /** Карта супер-задания игрока: множитель очков в финале плюс требование. */
         public String superObjective;
-        public int superProgress;
-        /**
-         * Прогресс супер-задания ПО ЧАСТЯМ: вид части → сколько внесено. Именно
-         * это показывает вкладка супер-заданий: что собралось, а что нет
-         * (просьба дизайнера 12.08.2026); одного числа для этого мало.
-         */
-        public final Map<String, Integer> superParts = new LinkedHashMap<>();
+        /** Низ карты отработан: разовая награда за жёсткое требование взята. */
         public boolean superComplete;
-
-        /**
-         * ВТОРАЯ ПОЛОВИНА СУПЕР-ЗАДАНИЯ (версия правил 3.0, 17.08.2026).
-         *
-         * <p>Прежние поля {@code superProgress} и {@code superParts} остались от
-         * той версии, где вклад вносили ЧАСТЯМИ. Теперь вносят всё разом, а после
-         * вскрытия на карте живёт СЧЁТЧИК ЗАПУСКА: сколько ячеек ещё занято и
-         * какой символ напечатан на каждой. Без этих двух полей проигрыватель
-         * физически не мог показать вторую половину — он показывал «рубашку»,
-         * которой в правилах уже нет.
-         */
-        public int superCells = -1;
-        public final List<String> superCellSymbols = new ArrayList<>();
         public int cuTokens;
         public boolean ownCuToken = true;
         public String startHex = "";
@@ -846,11 +828,7 @@ public final class ReplayRecord {
         v.orderColor = p.orderColor;
         v.storageTokens.addAll(p.storageTokens);
         v.superObjective = p.superObjective;
-        v.superProgress = p.superObjectiveProgress;
-        v.superParts.putAll(new TreeMap<>(p.superPartProgress));
         v.superComplete = p.superObjectiveComplete;
-        v.superCells = p.superCells;
-        v.superCellSymbols.addAll(p.superCellSymbols);
         v.cuTokens = p.cuDestructionTokens;
         v.ownCuToken = p.ownCuTokenAvailable;
         v.startHex = p.startHex;
@@ -1247,8 +1225,6 @@ public final class ReplayRecord {
         o.put("ordColor", p.orderColor);
         o.put("store", p.storageTokens);
         o.put("super", p.superObjective);
-        o.put("superProgress", p.superProgress);
-        o.put("superParts", p.superParts);
         o.put("superComplete", p.superComplete);
         o.put("cuTokens", p.cuTokens);
         o.put("ownCu", p.ownCuToken);
@@ -1593,8 +1569,6 @@ public final class ReplayRecord {
         p.orderColor = Json.s(o, "ordColor");
         p.storageTokens.addAll(Json.strings(o, "store"));
         p.superObjective = Json.s(o, "super");
-        p.superProgress = Json.i(o, "superProgress");
-        p.superParts.putAll(Json.ints(o, "superParts"));
         p.superComplete = Json.b(o, "superComplete");
         p.cuTokens = Json.i(o, "cuTokens");
         p.ownCuToken = Json.b(o, "ownCu");

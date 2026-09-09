@@ -1335,14 +1335,6 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             java.util.List<String> ids = (java.util.List<String>) btn[3];
             bx = стопкаКарт(g, bx, by, label, count, (String) btn[2], ids);
         }
-        if (p.superObjective != null && p.superCells > 0) {
-            int need = px(90);
-            if (bx > x && bx + need > x + w) {
-                bx = x;
-                by += rowH;
-            }
-            bx = superCounter(g, bx, by, p);
-        }
 
         // КОНТЕЙНЕРЫ — только числом, и это честно: движок хранит их СЧЁТОМ, без
         // имён карт, поэтому читать в них нечего.
@@ -1379,11 +1371,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         out.add(new Object[]{"арсенал установлен", p.arsenalInstalled.size(), "arsenal",
             p.arsenalInstalled});
         if (p.superObjective != null) {
-            // ПОДПИСЬ ГОВОРИТ, НА КАКОЙ ПОЛОВИНЕ ИГРОК СТОИТ: до вскрытия это
-            // карта в руке, после — планшет супероружия с ячейками и счётчиком.
+            // Карта супер-задания: множитель очков в финале и требование низа.
+            // Взята ли награда низа — говорит подпись.
             out.add(new Object[]{
-                p.superCells < 0 ? "супер-задание (1-я часть)"
-                    : "супероружие: ячеек " + p.superCells,
+                p.superComplete ? "супер-задание (низ отработан)" : "супер-задание",
                 1, "super_objectives", java.util.List.of(p.superObjective)});
         }
         return out;
@@ -1959,39 +1950,4 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         return null;
     }
 
-    /**
-     * СЧЁТЧИК ЗАПУСКА — вторая половина супер-задания, нарисованная как она
-     * лежит на столе: занятые ячейки с символами, которыми за них платят.
-     *
-     * <p>Раньше на этом месте показывалась «рубашка» — двусторонняя карта с
-     * рисунком, которой в правилах больше нет (версия 3.0 её отменила). Показ
-     * рубашки не говорил ни-че-го: ни сколько ячеек осталось, ни чем их снимать.
-     * Теперь видно ровно то, что решает партию: сколько снятий до победы и какие
-     * символы для них нужны.
-     */
-    private int superCounter(Graphics2D g, int x, int y, ReplayRecord.Player p) {
-        int cell = px(22);
-        int gap = px(4);
-        int n = Math.max(0, p.superCells);
-        int w = n * (cell + gap) + px(8);
-        // Значки берём из разметки символов действующей версии данных: сама
-        // запись хранит формы («квадрат», «круг»), а не картинки.
-        kelium.engine.Symbols.Marking m = kelium.engine.Symbols.load(
-            kelium.dataio.GameConfig.resolveDataRoot(null), null);
-        for (int i = 0; i < n; i++) {
-            int cx = x + px(4) + i * (cell + gap);
-            g.setColor(Theme.alpha(Theme.accent(), 0.16));
-            g.fillRoundRect(cx, y, cell, cell, px(6), px(6));
-            g.setColor(Theme.alpha(Theme.ink3(), 0.55));
-            g.drawRoundRect(cx, y, cell, cell, px(6), px(6));
-            String form = i < p.superCellSymbols.size() ? p.superCellSymbols.get(i) : "";
-            String glyph = m == null || form == null || form.isBlank()
-                ? "?" : m.glyph(form);
-            g.setFont(font(13, Font.BOLD));
-            g.setColor(Theme.ink());
-            int gw = g.getFontMetrics().stringWidth(glyph);
-            g.drawString(glyph, cx + (cell - gw) / 2, y + cell - px(6));
-        }
-        return x + w;
-    }
 }

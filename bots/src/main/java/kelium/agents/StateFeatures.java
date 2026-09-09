@@ -202,7 +202,7 @@ public final class StateFeatures {
         f[16] = techSteps;
         f[17] = peaks;
         f[18] = me.objectiveHand.size();
-        f[19] = kelium.engine.SuperWeapon.progress(s, me);
+        f[19] = me.superObjectiveComplete ? 1 : 0;
         f[20] = силаУстановленных(s, me);
         f[21] = me.containers;
         f[22] = me.cuDestructionTokens;

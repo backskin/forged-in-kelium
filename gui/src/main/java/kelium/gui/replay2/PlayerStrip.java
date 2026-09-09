@@ -649,7 +649,7 @@ public final class PlayerStrip extends JComponent {
             p.arsenalHand.size() + "+" + p.arsenalInstalled.size(), Theme.ink3(), "00+00"));
         items.add(ordersItem(played));
         if (p.superObjective != null) {
-            items.add(markItem("super", "SUPER", String.valueOf(p.superProgress),
+            items.add(markItem("super", "SUPER", p.superComplete ? "✓" : "—",
                 p.superComplete ? Theme.points() : Theme.ink3(), "00"));
         }
 
@@ -948,7 +948,7 @@ public final class PlayerStrip extends JComponent {
                         : "");
             case "orders" -> "Сейчас сыграно " + p.orderPlayed.size() + " из 4.";
             case "super" -> p.superComplete ? "Задание ЗАКРЫТО — потому значок золотой."
-                : "Продвижение: " + p.superProgress + ".";
+                : "Низ карты ещё не отработан.";
             default -> "";
         };
         return head + "\n\n" + what + (now.isEmpty() ? "" : "\n\n" + now);

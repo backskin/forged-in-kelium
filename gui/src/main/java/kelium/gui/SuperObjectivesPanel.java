@@ -278,61 +278,29 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
 
         ty += 30;
         g.setFont(bold(10));
+        // НИЗ КАРТЫ: жёсткое требование и разовая награда за него. Прежней
+        // сборки по частям и счётчика запуска нет — механика снесена
+        // 09.09.2026, и показывать тут нечего, кроме «взята награда или нет».
         g.setColor(p.superComplete ? new Color(0x1E, 0x7A, 0x33) : new Color(0x99, 0x66, 0x11));
-        g.drawString(p.superComplete ? "СОБРАНО" : "внесено частей " + p.superProgress,
-            x + 12, ty);
-        if (p.superComplete) {
-            ty += 20;
-            g.setFont(note(9.5));
-            g.setColor(BoardsPanel.ink2());
-            g.drawString("ждёт развёртывания", x + 12, ty);
-        }
+        g.drawString(p.superComplete ? "НИЗ ОТРАБОТАН" : "низ ещё не отработан", x + 12, ty);
         if (card == null) {
             return;
         }
-
         ty += 26;
-        g.setFont(bold(9.5));
+        g.setFont(note(9.5));
         g.setColor(BoardsPanel.ink2());
-        g.drawString("одна часть за СПЕЦ-действие", x + 12, ty);
-
-        List<Object> parts = new ArrayList<>();
-        if (card.get("assembly") instanceof Map<?, ?> asm
-                && asm.get("parts") instanceof List<?> list) {
-            parts.addAll((List<Object>) list);
-        }
-        for (Object po : parts) {
-            if (!(po instanceof Map<?, ?> part)) {
+        for (String строка : new String[]{
+                String.valueOf(card.getOrDefault("multiplier", "")),
+                String.valueOf(card.getOrDefault("requirement", "")),
+                String.valueOf(card.getOrDefault("reward", ""))}) {
+            if (строка.isBlank() || "null".equals(строка)) {
                 continue;
             }
-            String kind = String.valueOf(part.get("kind"));
-            int need = part.get("amount") instanceof Number nn ? nn.intValue() : 0;
-            int have = Math.min(need, p.superParts.getOrDefault(kind, 0));
-            ty += 24;
-            if (ty > y + h - 22) {
+            ty += 18;
+            if (ty > y + h - 12) {
                 break;
             }
-            // НАЗВАНИЕ ЧАСТИ — СВЕРХУ, полоска — под ним: карта узкая, в одну
-            // строку название и полоска не помещаются (формат 63×89).
-            g.setFont(plain(9.5));
-            g.setColor(BoardsPanel.ink());
-            g.drawString(BoardsPanel.clip(g, partRu(kind), w - 60), x + 14, ty);
-            g.setFont(bold(9));
-            g.setColor(have >= need ? new Color(0x1E, 0x7A, 0x33) : BoardsPanel.ink3());
-            String tag = have + "/" + need;
-            g.drawString(tag, x + w - 14 - g.getFontMetrics().stringWidth(tag), ty);
-            ty += 12;
-            int bw = w - 28;
-            int bh = 9;
-            for (int i = 0; i < need; i++) {
-                int sw = Math.max(5, bw / Math.max(1, need) - 3);
-                int sx = x + 14 + i * (sw + 3);
-                g.setColor(i < have ? new Color(0x1E, 0x7A, 0x33) : BoardsPanel.emptyCell());
-                g.fillRoundRect(sx, ty - bh, sw, bh, 3, 3);
-                g.setColor(BoardsPanel.line());
-                g.setStroke(new BasicStroke(1f));
-                g.drawRoundRect(sx, ty - bh, sw, bh, 3, 3);
-            }
+            g.drawString(BoardsPanel.clip(g, строка, w - 24), x + 12, ty);
         }
     }
 

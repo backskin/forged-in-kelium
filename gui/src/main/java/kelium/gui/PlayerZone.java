@@ -174,7 +174,7 @@ public final class PlayerZone extends JPanel {
 
         set("super", p.superObjective == null ? "не выдано"
             : "«" + Names.card(record, p.superObjective) + "» — частей внесено "
-              + p.superProgress + (p.superComplete ? ", СОБРАНО" : ""));
+              + (p.superComplete ? " — низ отработан" : ""));
 
         set("cu", "свой жетон " + (p.ownCuToken ? "цел" : "потерян")
             + " · захвачено чужих " + p.cuTokens);

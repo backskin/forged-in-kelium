@@ -672,7 +672,7 @@ public final class Drawer extends JPanel {
         sb.append(row("Задания", p.objectiveHand.isEmpty() ? "рука пуста"
             : cards(p.objectiveHand)));
         sb.append(row("Супер-задание", p.superObjective == null ? "не выдано"
-            : "«" + esc(Names.card(rec, p.superObjective)) + "» — внесено " + p.superProgress
+            : "«" + esc(Names.card(rec, p.superObjective)) + "»"
               + (p.superComplete ? ", СОБРАНО" : "")));
         sb.append(row("Жетоны ЦУ", "свой " + (p.ownCuToken ? "цел" : "потерян")
             + " · захвачено чужих " + p.cuTokens));

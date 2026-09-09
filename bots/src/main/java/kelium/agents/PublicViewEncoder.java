@@ -133,7 +133,6 @@ final class PublicViewEncoder {
             clip(st.cuTokens / 2.0),
             st.ownCuToken ? 1.0f : 0.0f,
             clip(vpTotal / 30.0),
-            clip(st.superProgress / 5.0),
             st.superComplete ? 1.0f : 0.0f,
             clip(st.containers / 4.0),
             clip(st.arsenalInstalled.size() / 5.0),

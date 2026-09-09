@@ -457,53 +457,18 @@ public final class Scene {
     }
 
     /**
-     * ВЫДАННАЯ КАРТА СУПЕР-ЗАДАНИЯ и её первая часть.
+     * ВЫДАННАЯ КАРТА СУПЕР-ЗАДАНИЯ.
      *
-     * <p>Без этого планшет пишет «супер-задание: не выдано», даже когда счётчик
-     * второй части уже выставлен: он смотрит на КАРТУ, а не на ячейки. Наступил
-     * на это сразу же, снимая сцену со счётчиком.
+     * <p>Верх карты — множитель победных очков в финале, низ — жёсткое
+     * требование с разовой наградой. Ни счётчиков, ни жетона супероружия у неё
+     * нет: та механика снесена 09.09.2026.
      *
-     * @param cardId   идентификатор карты из каталога супер-заданий
-     * @param progress сколько ресурсов/жетонов уже положено в первой части
+     * @param низОтработан взята ли разовая награда за требование низа
      */
-    public Scene superObjective(int seat, String cardId, int progress) {
+    public Scene superObjective(int seat, String cardId, boolean низОтработан) {
         PlayerState p = state.player(seat);
         p.superObjective = cardId;
-        p.superObjectiveProgress = progress;
-        return this;
-    }
-
-    /**
-     * СУПЕРОРУЖИЕ НА ПОЛЕ: жетон-войско, помеченный как супероружие, и гекс
-     * завода, который его собрал (по правилам оружие обязано отъехать от завода).
-     */
-    public Scene superWeapon(int seat, String hexId, UnitType type, String hiredHex) {
-        unit(seat, hexId, type);
-        PlayerState p = state.player(seat);
-        if (last instanceof UnitToken u) {
-            u.superUnit = true;
-            p.superWeaponUid = u.uid;
-        }
-        p.superWeaponHiredHex = hiredHex;
-        return this;
-    }
-
-    /**
-     * ВТОРАЯ ЧАСТЬ СУПЕР-ЗАДАНИЯ: сколько ячеек счётчика ещё не погашено и какие
-     * символы на них стоят. Символы берутся из разметки, если не заданы.
-     */
-    public Scene superCells(int seat, int cells, String... symbols) {
-        PlayerState p = state.player(seat);
-        p.superCells = cells;
-        p.superCellSymbols.clear();
-        if (symbols.length > 0) {
-            p.superCellSymbols.addAll(List.of(symbols));
-        } else {
-            List<String> forms = kelium.engine.Symbols.of(state).allForms();
-            for (int i = 0; i < cells; i++) {
-                p.superCellSymbols.add(forms.isEmpty() ? "" : forms.get(i % forms.size()));
-            }
-        }
+        p.superObjectiveComplete = низОтработан;
         return this;
     }
 
