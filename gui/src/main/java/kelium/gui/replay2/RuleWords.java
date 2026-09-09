@@ -378,6 +378,8 @@ public final class RuleWords {
                 "за одно действие — не больше шага на трек";
             case "tech.tracks_per_action" ->
                 "сколько РАЗНЫХ треков берёт одно действие Науки";
+            case "tech.super_objective_on_step" ->
+                "на каком шаге трека дают ещё и карту супер-задания (0 — не дают)";
             case "tech.pay_with_trophy_only" ->
                 "за науку платят только трофеями, уничтоженный жетон не сдаётся";
             case "actions.combat.as_spec_ammo" ->

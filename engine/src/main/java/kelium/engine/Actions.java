@@ -3079,6 +3079,76 @@ public final class Actions {
                     }
                 }
             }
+            картаСуперЗаданияЗаШаг(state, cfg, player, agent, reached);
+        }
+
+        /**
+         * КАРТА СУПЕР-ЗАДАНИЯ КАК НАДБАВКА К ШАГУ ТРЕКА.
+         *
+         * <p>Решение дизайнера 09.09.2026: «супер-задание может быть особой
+         * формой награды; на каждом треке третий шаг дополнительно даёт
+         * супер-задание». Карт супер-заданий в наборе больше, чем игроков за
+         * столом, и лишние лежали без дела. Номер шага задан сводом
+         * ({@code tech.super_objective_on_step}), а не зашит в код: у прошлых
+         * редакций этого ключа нет, и они играются как раньше.
+         *
+         * <p>ПРОЕКТ У ИГРОКА ОДИН. Супер-задание — это проект под планшетом со
+         * своим счётчиком, и второго счётчика в игре нет. Поэтому пришедшая
+         * карта либо занимает пустое место, либо ЗАМЕНЯЕТ прежнюю по выбору
+         * игрока, и прежняя уходит из игры. Уже СОБРАННЫЙ проект не меняется:
+         * менять выполненное значило бы отнимать заработанное.
+         */
+        private static void картаСуперЗаданияЗаШаг(GameState state, GameConfig cfg,
+                                                   PlayerState player, Agent agent,
+                                                   int reached) {
+            Ruleset rs = cfg.ruleset;
+            int шаг = rs.getInt("tech.super_objective_on_step", 0);
+            if (шаг <= 0 || reached != шаг
+                    || !kelium.engine.Setup.expansionOn(rs, "super_objectives")
+                    || player.superObjectiveComplete) {
+                return;
+            }
+            var колода = state.decks.get("super_objectives");
+            if (колода == null) {
+                return;
+            }
+            // КАРТА, КОТОРОЙ НИ У КОГО НЕТ: раздача подготовки берёт карты из
+            // НАБОРА, а не из колоды, поэтому в колоде они всё ещё лежат.
+            String cid = null;
+            for (int попытка = 0; попытка < 8 && cid == null; попытка++) {
+                String тянем = колода.draw(state.rng);
+                if (тянем == null) {
+                    return;
+                }
+                boolean занята = false;
+                for (PlayerState p : state.players) {
+                    занята |= тянем.equals(p.superObjective);
+                }
+                if (!занята) {
+                    cid = тянем;
+                }
+            }
+            if (cid == null) {
+                return;
+            }
+            if (player.superObjective == null) {
+                player.superObjective = cid;
+                player.superObjectiveOffer.clear();
+                player.superObjectiveOffer.add(cid);
+                return;
+            }
+            // ВЫБОР ЗА ИГРОКОМ: проект стоит очков и определяет, чем он занят до
+            // конца партии, поэтому подменять его молча нельзя.
+            List<Choice> opts = List.of(
+                new Choice("super_objective_keep", player.superObjective, "оставить прежнее"),
+                new Choice("super_objective_take", cid, "взять новое"));
+            Choice pick = agent.choose(state, opts, Map.of("kind", "super_objective_swap"));
+            if ("super_objective_take".equals(pick.kind())) {
+                player.superObjective = cid;
+                player.superObjectiveProgress = 0;
+                player.superObjectiveOffer.clear();
+                player.superObjectiveOffer.add(cid);
+            }
         }
 
         /**
