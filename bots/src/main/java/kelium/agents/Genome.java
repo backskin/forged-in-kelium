@@ -158,6 +158,12 @@ public final class Genome {
         w.put("combat.building_bonus", 2.0);    // добить здание/вышку (→трофей крупнее)
         w.put("combat.cu_bonus", 8.0);          // бить чужое ЦУ (путь к военной победе)
         w.put("combat.raze_neutral", 3.0);      // снос нейтрала (трофеи + место в мид-гейме)
+        // СНОС СВОЕГО ЗДАНИЯ. По умолчанию ниже паса (0,1) — то есть бот не
+        // сносит, пока отбор не найдёт в этом выгоды. Раньше на этом месте в
+        // коде стояла константа, и снос был мёртвой ветвью: ни один геном не
+        // мог его выбрать, а карта на перестройку — выполниться. Снос теперь
+        // ВОЗВРАЩАЕТ монету (свод 1.39.0), так что выгода вполне может быть.
+        w.put("build.demolish", 0.06);
         w.put("build.strike_building", 5.0);    // строить завод/авиабазу (техника/авиация бьют ЦУ)
         w.put("assemble.strike_unit", 4.0);     // производить технику/авиацию (единственные, кто бьёт ЦУ)
         w.put("combat.hit_leader", 5.0);        // бонус за удар по токенам лидера
@@ -355,7 +361,7 @@ public final class Genome {
             "move.toward_killable", "move.strike_range", "move.toward_enemy",
             "combat.kill_value", "combat.building_bonus", "combat.cu_bonus",
             "combat.raze_neutral", "combat.hit_leader",
-            "build.strike_building", "assemble.strike_unit",
+            "build.strike_building", "build.demolish", "assemble.strike_unit",
             "plan.value.kelium", "plan.value.sell", "plan.value.tech",
             "plan.value.army", "plan.value.economy", "plan.value.objective",
             "plan.chain_penalty", "plan.focus",
