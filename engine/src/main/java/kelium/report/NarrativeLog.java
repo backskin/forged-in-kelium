@@ -390,7 +390,7 @@ public final class NarrativeLog {
             String ru = switch (top) {
                 case "development" -> "Разработка";
                 case "infrastructure" -> "Инфраструктура";
-                case "operation" -> "Операция";
+                case "operation" -> "Наступление";
                 case "acquisitions" -> "Приобретения";
                 default -> top;
             };

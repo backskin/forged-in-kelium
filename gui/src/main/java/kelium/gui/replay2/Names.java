@@ -183,7 +183,7 @@ public final class Names {
         return switch (code) {
             case "development" -> "РАЗРАБОТКА";
             case "infrastructure" -> "ИНФРАСТРУКТУРА";
-            case "operation" -> "ОПЕРАЦИЯ";
+            case "operation" -> "НАСТУПЛЕНИЕ";
             case "acquisitions" -> "ПРИОБРЕТЕНИЯ";
             // Джокер печатается как БЕЗОПАСНОСТЬ — у него нет верха и низа.
             case "security", "joker" -> "БЕЗОПАСНОСТЬ";

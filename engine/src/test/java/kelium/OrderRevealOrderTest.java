@@ -85,7 +85,7 @@ class OrderRevealOrderTest {
             низОткрыт.put(seat, Boolean.TRUE.equals(ev.get("bottom_open")));
         }).run();
 
-        assertEquals(3, блок.size(), "все три места обязаны вскрыть «Операцию»");
+        assertEquals(3, блок.size(), "все три места обязаны вскрыть «Наступление»");
         List<Integer> порядок = new ArrayList<>(блок.keySet());
         int первый = порядок.get(0);
         assertFalse(блок.get(первый),

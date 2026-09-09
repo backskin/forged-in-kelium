@@ -33,7 +33,7 @@ public final class ActionIcons {
         return switch (cat) {
             case "infrastructure" -> "ИНФРАСТРУКТУРА";
             case "development" -> "РАЗРАБОТКА";
-            case "operation" -> "ОПЕРАЦИЯ";
+            case "operation" -> "НАСТУПЛЕНИЕ";
             case "acquisitions" -> "ПРИОБРЕТЕНИЯ";
             default -> cat == null ? "" : cat.toUpperCase(java.util.Locale.ROOT);
         };

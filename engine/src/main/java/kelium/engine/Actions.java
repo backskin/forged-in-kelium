@@ -1850,7 +1850,7 @@ public final class Actions {
     //  OPERATION: movement, combat
     // ======================================================================
 
-    /** Действие Движение (приказ Операция): перемещение юнитов по смежным гексам. */
+    /** Действие Движение (приказ Наступление): перемещение юнитов по смежным гексам. */
     static final class MovementAction extends Action {
         MovementAction(GameState state) {
             super(state);
@@ -2210,7 +2210,7 @@ public final class Actions {
 
     }
 
-    /** Действие Бой (приказ Операция): проведение одной битвы через CombatResolver. */
+    /** Действие Бой (приказ Наступление): проведение одной битвы через CombatResolver. */
     static final class CombatAction extends Action {
         CombatAction(GameState state) {
             super(state);
