@@ -65,17 +65,39 @@ final class ModuleSlot {
         // где картонный жетон меньше напечатанной под него площадки.
         paintPlace(g, x, y, side);
         double in = side * 0.15;
-        double t = side - 2 * in;
-        double tx = x + in;
-        double ty = y + in;
-        double arc = t * 0.22;
         if (m == null || m.id == null || m.id.isBlank()) {
             return;                          // место есть, жетона на нём нет
         }
-        // ПЕЧАТНЫЙ ЖЕТОН, ЕСЛИ ОН ЕСТЬ. Тот же принцип, что у жетонов войск и
-        // картона поля: принесли картинку — кладём картинку, и она сама говорит,
-        // какой стороной жетон лежит. Рисованный вид ниже остаётся для тех
-        // жетонов, которых художник ещё не рисовал (характеристики, предложения).
+        жетон(g, m, colour, x + in, y + in, side - 2 * in);
+    }
+
+    /**
+     * ЖЕТОН НА НАПЕЧАТАННОЙ ЯЧЕЙКЕ — без рисованного места и без зазора.
+     *
+     * <p>На печатном планшете ячейка УЖЕ напечатана, и рисовать поверх неё ещё
+     * одну рамку нельзя (правило дизайнера: на планшете только настоящие
+     * печатные объекты). Зазор тоже не нужен: там жетон кладут в ячейку, и он
+     * закрывает её целиком.
+     */
+    static void paintOnPrint(Graphics2D g, ReplayRecord.Module m, Color colour,
+                             double x, double y, double side) {
+        if (m == null || m.id == null || m.id.isBlank()) {
+            return;
+        }
+        жетон(g, m, colour, x, y, side);
+    }
+
+    /**
+     * САМ ЖЕТОН в отведённом квадрате: печатная картинка, если она есть, иначе
+     * рисованный вид — он остаётся для жетонов, которых художник ещё не рисовал
+     * (характеристики, предложения).
+     */
+    private static void жетон(Graphics2D g, ReplayRecord.Module m, Color colour,
+                              double x, double y, double side) {
+        double t = side;
+        double tx = x;
+        double ty = y;
+        double arc = t * 0.22;
         if (картинка(g, m, colour, tx, ty, t)) {
             return;
         }

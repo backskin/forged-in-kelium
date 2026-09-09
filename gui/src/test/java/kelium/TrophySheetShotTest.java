@@ -106,8 +106,13 @@ class TrophySheetShotTest {
     private static void shoot(Session s, int frame, int seat, Path out) throws Exception {
         s.seek(frame);
         BoardSheet sheet = new BoardSheet(s, seat);
-        sheet.setSize(760, 1180);
-        BufferedImage img = new BufferedImage(760, 1180, BufferedImage.TYPE_INT_RGB);
+        // ШИРИНА — ПО ЛИСТУ, А НЕ ПО СНИМКУ. Печатные планшеты лежат сцепкой
+        // (хранилище слева от войск) и просят свою ширину; жёсткие 760 точек
+        // ужимали бы их так, что на снимке ничего не разглядеть.
+        int w = Math.max(760, sheet.getPreferredSize().width);
+        int h = 1180;
+        sheet.setSize(w, h);
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         sheet.paint(g);
         g.dispose();

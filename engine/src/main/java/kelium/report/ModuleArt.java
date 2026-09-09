@@ -109,8 +109,13 @@ public final class ModuleArt {
         double lift = Math.max(1.0, side * 0.055);
         double arc = Math.min(ш, в) * 0.20;
         if (edge != null) {
+            // ТОРЕЦ ПРОТЯНУТ, А НЕ СМЕЩЁН: силуэт заливается на всём пути от
+            // жетона до конца сдвига — получается боковая стенка картонки.
+            // Одна смещённая копия читается как плоская тень под плоской
+            // картинкой (замечание дизайнера 09.09.2026).
             g.setColor(edge);
-            g.fill(new RoundRectangle2D.Double(лx + lift, лy + lift, ш, в, arc, arc));
+            ТеньЖетона.блок(g, new RoundRectangle2D.Double(лx, лy, ш, в, arc, arc),
+                lift, lift);
         }
         BufferedImage lvl = Mips.forWidth(art, (int) Math.ceil(ш));
         g.drawImage(lvl, (int) Math.round(лx), (int) Math.round(лy),

@@ -132,12 +132,14 @@ final class PrintedBoards {
         ReplayRecord.Module m = p.redPlaced.get(c.unit());
         Rectangle box = scale(x, y, k, c.ax(), c.ay(), c.aw(), c.ah());
         if (m != null) {
-            // Жетон НАКРЫВАЕТ напечатанную цель целиком — так он и лежит на столе.
-            int side = (int) Math.round(Math.min(box.width, box.height) * 0.62);
+            // Жетон НАКРЫВАЕТ напечатанную ячейку ЦЕЛИКОМ — так он и лежит на
+            // столе. Прежде он рисовался в 0,62 ячейки, и дизайнер это отбил
+            // (09.09.2026): «жетоны красные и синие нихуя не закрывают собой
+            // полностью ячейку, они милипиздрические какие-то».
+            int side = Math.min(box.width, box.height);
             int sx = box.x + (box.width - side) / 2;
             int sy = box.y + (box.height - side) / 2;
-            shade(g, box);
-            ModuleSlot.paint(g, m, ModuleSlot.red(), sx, sy, side);
+            ModuleSlot.paintOnPrint(g, m, ModuleSlot.red(), sx, sy, side);
             spots.put(new Rectangle(sx, sy, side, side),
                 new Object[]{m, Boolean.TRUE, Names.unit(c.unit())});
             return;
@@ -162,14 +164,201 @@ final class PrintedBoards {
             return;
         }
         Rectangle box = scale(x, y, k, c.bx(), c.by(), c.bw(), c.bh());
-        int side = (int) Math.round(Math.min(box.width, box.height) * 0.74);
+        // Рамка Сборки ВЫТЯНУТАЯ, и синий жетон нарисован таким же. Меру берём
+        // по ВЫСОТЕ рамки: жетон встаёт в неё во весь рост и своей пропорцией,
+        // а не ужимается до квадратика в середине.
+        int side = box.height;
         int sx = box.x + (box.width - side) / 2;
         int sy = box.y + (box.height - side) / 2;
-        shade(g, box);
-        ModuleSlot.paint(g, m, ModuleSlot.blue(), sx, sy, side);
+        ModuleSlot.paintOnPrint(g, m, ModuleSlot.blue(), sx, sy, side);
         spots.put(new Rectangle(sx, sy, side, side),
             new Object[]{m, Boolean.FALSE,
                 kelium.gui.GameRecorder.buildingName(c.building())});
+    }
+
+    // ==================== сцепка планшетов ====================
+
+    /**
+     * СЦЕПКА ДВУХ ПЛАНШЕТОВ — как они лежат на столе.
+     *
+     * <p>Заказ дизайнера 09.09.2026: «планшет хранилища ВСЕГДА вставляется
+     * СЛЕВА от планшета войск, слегка находя на него, таким образом он
+     * полностью вставляется углом в „углубление“ слева у планшета».
+     *
+     * <p>И это не украшение, а замер: на левой кромке планшета войск напечатана
+     * V-образная выемка, а у планшета хранилища справа — выступ ровно того же
+     * угла. Совмещаем вершину выемки с вершиной выступа: планшеты садятся друг в
+     * друга без зазора и без нахлёста печати.
+     *
+     * <p>Над планшетом войск отведена полоса под ЖЕТОНЫ ВОЕННЫХ ЗДАНИЙ: на
+     * печати их места подписаны сверху («Казармы», «Завод», «Авиабаза», «Центр
+     * Управления»), и жетон каждого ложится над своей подписью.
+     *
+     * <p>Все размеры — в пикселях ПЕЧАТИ; рисуя, их умножают на масштаб.
+     *
+     * @param ширина  вся сцепка вместе с полосой зданий
+     * @param хрX хрY  левый верхний угол планшета хранилища
+     * @param войX войY то же для планшета войск
+     * @param зданияH высота полосы зданий сверху
+     */
+    record Сцепка(double ширина, double высота, double хрX, double хрY,
+                  double войX, double войY, double зданияH) {
+    }
+
+    /** Рост жетона военного здания над планшетом, в пикселях печати. */
+    private static final double ЗДАНИЕ_H = 215;
+
+    /** Зазор между полосой зданий и кромкой планшета войск. */
+    private static final double ЗДАНИЕ_ЗАЗОР = 18;
+
+    private static final Map<BufferedImage, double[]> КРОМКИ =
+        new java.util.WeakHashMap<>();
+
+    /** Как сложены планшеты этого игрока ({@code null} — картинок нет). */
+    static Сцепка сцепка(int seat) {
+        BufferedImage вой = troopArt(seat);
+        BufferedImage хр = storageArt(seat);
+        if (вой == null || хр == null) {
+            return null;
+        }
+        double[] выем = выемка(вой);
+        double[] угол = уголХранилища(хр);
+        double полоса = ЗДАНИЕ_H + ЗДАНИЕ_ЗАЗОР;
+        double войX = угол[0] - выем[0];
+        double войY = полоса + угол[1] - выем[1];
+        return new Сцепка(войX + вой.getWidth(),
+            Math.max(полоса + хр.getHeight(), войY + вой.getHeight()),
+            0, полоса, войX, войY, полоса);
+    }
+
+    /**
+     * ВЕРШИНА ВЫЕМКИ на левой кромке планшета войск — самая правая точка левого
+     * края в его средней части. Считается по НЕПРОЗРАЧНОСТИ картинки: форму
+     * задаёт художник, и списать её числами в код значило бы завести второй
+     * источник правды, который разойдётся с печатью при первой же перерисовке.
+     */
+    private static double[] выемка(BufferedImage art) {
+        return КРОМКИ.computeIfAbsent(art, картинка -> {
+            int w = картинка.getWidth();
+            int h = картинка.getHeight();
+            int предел = Math.max(4, w / 8);
+            double лучшийX = 0;
+            double лучшийY = h / 2.0;
+            for (int y = h / 4; y < h * 3 / 4; y++) {
+                for (int x = 0; x < предел; x++) {
+                    if ((картинка.getRGB(x, y) >>> 24) > 16) {
+                        if (x > лучшийX) {
+                            лучшийX = x;
+                            лучшийY = y;
+                        }
+                        break;
+                    }
+                }
+            }
+            return new double[]{лучшийX, лучшийY};
+        });
+    }
+
+    /** Вершина выступа планшета хранилища: середина его правой кромки. */
+    private static double[] уголХранилища(BufferedImage art) {
+        return КРОМКИ.computeIfAbsent(art, картинка -> {
+            int w = картинка.getWidth();
+            int h = картинка.getHeight();
+            int первый = -1;
+            int последний = -1;
+            for (int y = 0; y < h; y++) {
+                if ((картинка.getRGB(w - 1, y) >>> 24) > 16) {
+                    if (первый < 0) {
+                        первый = y;
+                    }
+                    последний = y;
+                }
+            }
+            double cy = первый < 0 ? h / 2.0 : (первый + последний) / 2.0;
+            return new double[]{w, cy};
+        });
+    }
+
+    /**
+     * ОБА ПЛАНШЕТА И ЖЕТОНЫ ВОЕННЫХ ЗДАНИЙ — одной сцепкой.
+     *
+     * @param k       масштаб: экранных точек на пиксель печати
+     * @param вЗапасе коды военных зданий, чьи жетоны ещё лежат на планшете
+     */
+    static void paintPair(Graphics2D g, int x, int y, double k, Сцепка с,
+                          ReplayRecord.Player p, kelium.core.TroopSide troop,
+                          Map<String, char[]> fill, char[] base, Set<String> covered,
+                          Set<String> вЗапасе, Map<Rectangle, Object[]> spots,
+                          Map<Rectangle, String> storeSpots) {
+        BufferedImage хр = storageArt(p.seat);
+        BufferedImage вой = troopArt(p.seat);
+        if (с == null || хр == null || вой == null) {
+            return;
+        }
+        paintStorage(g, (int) Math.round(x + с.хрX() * k), (int) Math.round(y + с.хрY() * k),
+            (int) Math.round(хр.getWidth() * k), p, fill, base, covered, storeSpots);
+        int войX = (int) Math.round(x + с.войX() * k);
+        int войY = (int) Math.round(y + с.войY() * k);
+        paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
+        военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
+    }
+
+    /**
+     * ЖЕТОНЫ ВОЕННЫХ ЗДАНИЙ НАД ПЛАНШЕТОМ ВОЙСК — каждый над своей подписью.
+     *
+     * <p>Заказ дизайнера 09.09.2026: «военные здания надо располагать НАД
+     * планшетом войск на соответствующих местах (подписано на планшете
+     * сверху)». Прежде они шли отдельной группой «ВОЕННЫЕ ЗДАНИЯ» ниже и с
+     * колонками своего рода войск не были связаны ничем, кроме порядка.
+     *
+     * <p>Жетон лежит, пока здание В ЗАПАСЕ. Построил — жетон уехал на поле, и
+     * место над подписью пустует: там просто печать, ничего не подрисовываем.
+     */
+    private static void военныеЗдания(Graphics2D g, int войX, int войY, double k,
+                                      ReplayRecord.Player p, Set<String> вЗапасе,
+                                      Map<Rectangle, Object[]> spots) {
+        if (вЗапасе == null || вЗапасе.isEmpty()) {
+            return;
+        }
+        for (BoardAnchors.Column c : troopCols(p.seat)) {
+            if (!вЗапасе.contains(c.building())) {
+                continue;
+            }
+            жетонЗдания(g, войX + c.labelCx() * k, войY - ЗДАНИЕ_ЗАЗОР * k,
+                ЗДАНИЕ_H * k, c.building(), p.seat, spots);
+        }
+    }
+
+    /**
+     * ЖЕТОН ЗДАНИЯ НА СВОБОДНОМ МЕСТЕ: серединой по {@code cx}, нижней кромкой
+     * по {@code низ}, ростом в {@code высота}. Под жетоном — торец картонки.
+     */
+    private static void жетонЗдания(Graphics2D g, double cx, double низ, double высота,
+                                    String code, int seat,
+                                    Map<Rectangle, Object[]> spots) {
+        var найдено = Textures.found(code, 0, seat);
+        if (найдено == null || найдено.image() == null) {
+            return;
+        }
+        BufferedImage tex = найдено.image();
+        double k = высота / tex.getHeight();
+        double ш = tex.getWidth() * k;
+        AffineTransform at = new AffineTransform();
+        at.translate(cx - ш / 2, низ - высота);
+        at.scale(k, k);
+        double d = Math.max(1.5, высота * 0.045);
+        kelium.report.ТеньЖетона.блок(g,
+            kelium.report.ТеньЖетона.силуэт(tex,
+                kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
+            at, d, d);
+        g.drawImage(tex, at, null);
+        if (spots != null) {
+            spots.put(new Rectangle((int) Math.round(cx - ш / 2),
+                    (int) Math.round(низ - высота),
+                    (int) Math.round(ш), (int) Math.round(высота)),
+                new Object[]{null, Boolean.FALSE,
+                    kelium.gui.GameRecorder.buildingName(code)});
+        }
     }
 
     // ==================== планшет хранилища ====================
@@ -183,7 +372,8 @@ final class PrintedBoards {
      * СВОИМИ БОКАМИ накрывает эти ячейки (значит, они не в игре).
      */
     static void paintStorage(Graphics2D g, int x, int y, int width, ReplayRecord.Player p,
-                             Map<String, char[]> fill, char[] base, Set<String> covered) {
+                             Map<String, char[]> fill, char[] base, Set<String> covered,
+                             Map<Rectangle, String> storeSpots) {
         BufferedImage art = storageArt(p.seat);
         if (art == null) {
             return;
@@ -234,6 +424,42 @@ final class PrintedBoards {
         java.util.List<Крыло> крылья = крылья(лист);
         for (var e : зоны.entrySet()) {
             жетонНаКрыле(g, e.getKey(), e.getValue(), p.seat, крылья);
+        }
+        жетоныХранилища(g, x, y, k, p, storeSpots);
+    }
+
+    /**
+     * ДВА ЖЕТОНА ХРАНИЛИЩА — В НАПЕЧАТАННЫЕ МЕСТА.
+     *
+     * <p>Заказ дизайнера 09.09.2026: «жетоны модулей хранилища вставляются в
+     * планшет хранилища» — и приложена маска с двумя большими квадратами со
+     * значком склада слева и справа от середины. Прежде эти два жетона лежали
+     * отдельной строкой под планшетом, то есть на столе им места не было вовсе.
+     *
+     * <p>Пустое место НЕ обводится: оно уже напечатано на планшете, и рисовать
+     * поверх печати свою рамку нельзя.
+     */
+    private static void жетоныХранилища(Graphics2D g, int x, int y, double k,
+                                        ReplayRecord.Player p,
+                                        Map<Rectangle, String> storeSpots) {
+        var места = BoardAnchors.stores(цвет(p.seat));
+        if (места.isEmpty()) {
+            места = BoardAnchors.stores("A");
+        }
+        for (int i = 0; i < места.size(); i++) {
+            String tok = i < p.storageTokens.size() ? p.storageTokens.get(i) : null;
+            if (tok == null) {
+                continue;
+            }
+            int[] b = места.get(i);
+            Rectangle box = scale(x, y, k, b[0], b[1], b[2], b[3]);
+            int side = Math.min(box.width, box.height);
+            int sx = box.x + (box.width - side) / 2;
+            int sy = box.y + (box.height - side) / 2;
+            ModuleSlot.paintStorageToken(g, tok, sx, sy, side);
+            if (storeSpots != null) {
+                storeSpots.put(new Rectangle(sx, sy, side, side), tok);
+            }
         }
     }
 
@@ -392,15 +618,17 @@ final class PrintedBoards {
             at.rotate(своё.угол());
             at.scale(k, k);
             at.translate(-tex.getWidth() / 2.0, -tex.getHeight() / 2.0);
-            java.awt.Composite было = g.getComposite();
-            g.setComposite(java.awt.AlphaComposite.getInstance(
-                java.awt.AlphaComposite.SRC_OVER, 0.30f));
-            g.setColor(java.awt.Color.BLACK);
-            AffineTransform тень = new AffineTransform(at);
-            тень.preConcatenate(AffineTransform.getTranslateInstance(
-                Math.max(1.5, k * 8), Math.max(1.5, k * 8)));
-            g.drawImage(tex, тень, null);
-            g.setComposite(было);
+            // ТОЛЩИНА КАРТОНКИ, А НЕ ТЕНЬ ПОД НЕЙ. Прежде под жетон клалась
+            // полупрозрачная чёрная копия со сдвигом — дизайнер забраковал
+            // (09.09.2026): «тень не протягивается вектором от крайней точки
+            // текстуры, получается плоская картинка на фоне плоской тени».
+            // Теперь силуэт протягивается вдоль вектора и красится в цвет
+            // обводки места: это виден торец картонки.
+            double d = Math.max(1.5, k * 8);
+            kelium.report.ТеньЖетона.блок(g,
+                kelium.report.ТеньЖетона.силуэт(tex,
+                    kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
+                at, d, d);
             g.drawImage(tex, at, null);
             return;
         }
@@ -418,10 +646,9 @@ final class PrintedBoards {
         at.scale(k, k);
         at.translate(-sh.vbW() / 2.0, -sh.vbH() / 2.0);
         java.awt.Shape path = at.createTransformedShape(sh.path());
-        AffineTransform тень = new AffineTransform();
-        тень.translate(Math.max(1.5, k * 6), Math.max(1.5, k * 6));
-        g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.28));
-        g.fill(тень.createTransformedShape(path));
+        double торец = Math.max(1.5, k * 6);
+        g.setColor(Theme.seatStroke(seat));
+        kelium.report.ТеньЖетона.блок(g, path, торец, торец);
         g.setColor(Theme.seat(seat));
         g.fill(path);
         g.setColor(Theme.seatStroke(seat));

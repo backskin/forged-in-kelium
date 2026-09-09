@@ -137,7 +137,30 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     public Dimension getPreferredSize() {
         // Высота — ПО СОДЕРЖИМОМУ, иначе прокрутка не дотягивается до низа: планшет
         // растёт с числом зданий и карт (замечание дизайнера 13.08.2026).
-        return new Dimension(px(980), Math.max(px(560), contentH));
+        return new Dimension(Math.max(px(980), ширинаСцепки()),
+            Math.max(px(560), contentH));
+    }
+
+    /** Планшет войск в развёрнутом виде — не мельче этого, иначе печать не читается. */
+    private static final int ВОЙСКА_МИН = 1000;
+
+    /**
+     * СКОЛЬКО МЕСТА ПРОСИТ СЦЕПКА ПЛАНШЕТОВ.
+     *
+     * <p>Хранилище пристроено слева от войск, и вдвоём они в полтора раза шире
+     * одного планшета войск. Ужимать сцепку по ящику нельзя — печать станет
+     * нечитаемой; поэтому лист просит СВОЮ ширину, а вбок его прокручивают
+     * (предложение дизайнера 09.09.2026: «их можно было бы пролистывать
+     * горизонтально на отдельной полосе»).
+     *
+     * @return 0, если печатных планшетов нет — тогда лист по-прежнему по ящику
+     */
+    private int ширинаСцепки() {
+        var с = PrintedBoards.сцепка(seat);
+        if (с == null) {
+            return 0;
+        }
+        return px(14) * 2 + (int) Math.ceil(с.ширина() * px(ВОЙСКА_МИН) / 2400.0);
     }
 
     // ============ ШИРИНА — ПО ЯЩИКУ, А НЕ ПО СЕБЕ ============
@@ -150,7 +173,8 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
 
     @Override
     public boolean getScrollableTracksViewportWidth() {
-        return getParent() instanceof javax.swing.JViewport vp && vp.getWidth() >= px(560);
+        return getParent() instanceof javax.swing.JViewport vp
+            && vp.getWidth() >= Math.max(px(560), ширинаСцепки());
     }
 
     @Override
@@ -236,9 +260,19 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         int full = getWidth() - pad * 2;
         boolean printed = PrintedBoards.available(p.seat);
         if (printed) {
+            // ОБА ПЛАНШЕТА ОДНОЙ СЦЕПКОЙ, как они лежат на столе: хранилище
+            // слева, углом в выемку планшета войск, и жетоны военных зданий
+            // над своими подписями сверху (заказ дизайнера 09.09.2026).
             printedSpots.clear();
-            PrintedBoards.paintTroop(g, pad, y, full, p, troopSide(p), printedSpots);
-            y += PrintedBoards.troopHeight(p.seat, full) + px(8);
+            storeTokenSpots.clear();
+            var сцепка = PrintedBoards.сцепка(p.seat);
+            if (сцепка != null) {
+                double k = full / сцепка.ширина();
+                PrintedBoards.paintPair(g, pad, y, k, сцепка, p, troopSide(p),
+                    cellFill, startFill, coveredCells(buildingsOf(f, p.seat)),
+                    вЗапасе(f, p.seat), printedSpots, storeTokenSpots);
+                y += (int) Math.round(сцепка.высота() * k) + px(8);
+            }
             y = paintStockStrip(g, f, p, pad, y, full) + px(10);
         }
         if (!printed) {
@@ -255,21 +289,6 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             rightW - cardW - colGap, cardH);
         yRight += cardH + px(24);
 
-        if (printed) {
-            // ПЛАНШЕТ ХРАНИЛИЩА — ВО ВСЮ ШИРИНУ И ПОД ОБЕИМИ КОЛОНКАМИ.
-            //
-            // Он широкий (две трети листа), и в левой колонке налезал на правую:
-            // отложенный приказ и карта трофеев оказывались поверх печати.
-            // Ставим его ниже обеих колонок — тогда ни ужимать его до марки, ни
-            // резать соседей не приходится, а читается лист по-прежнему сверху
-            // вниз: планшет войск, хозяйство, планшет хранилища.
-            int sw = (int) (full * 0.66);
-            int yОбщий = Math.max(yLeft, yRight) + px(10);
-            PrintedBoards.paintStorage(g, pad, yОбщий, sw, p,
-                cellFill, startFill, coveredCells(buildingsOf(f, p.seat)));
-            yLeft = yОбщий + PrintedBoards.storageHeight(p.seat, sw) + px(6);
-            yRight = yLeft;
-        }
         yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
 
         // ВЫСОТА СЧИТАЕТСЯ ПО СОДЕРЖИМОМУ: планшет выше окна, и без этого прокрутка
@@ -303,10 +322,12 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         int gap = px(8);
         planCells(p, all);
 
-        y = paintGroup(g, p, "ВОЕННЫЕ ЗДАНИЯ", roster(all,
-            slot("command_center", null), slot("barracks", null),
-            slot("factory", null), slot("airbase", null)), x, y, w, cell, gap,
-            Under.BLUE_MODULE);
+        if (!печатный) {
+            y = paintGroup(g, p, "ВОЕННЫЕ ЗДАНИЯ", roster(all,
+                slot("command_center", null), slot("barracks", null),
+                slot("factory", null), slot("airbase", null)), x, y, w, cell, gap,
+                Under.BLUE_MODULE);
+        }
         // ДОБЫТЧИКИ И ЭНЕРГОСТАНЦИИ — ТОЛЬКО НА ПЕЧАТНОМ ПЛАНШЕТЕ, если он есть
         // (жалоба дизайнера 02.09.2026: «нахуя дублируется инфа о зданиях и
         // ячейках»). Их жетоны лежат прямо на картинке планшета хранилища
@@ -314,8 +335,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // четыре добытчика ещё раз отдельной группой, да ещё с копией их
         // ячеек, значило бы показывать одно и то же дважды.
         //
-        // Военные здания остаются здесь: на планшете войск их жетонов нет, там
-        // только колонки родов и места под синие модули.
+        // Военные здания на печатном планшете тоже лежат на своём месте — над
+        // подписями «Казармы», «Завод», «Авиабаза», «Центр Управления» в самом
+        // верху планшета войск (заказ дизайнера 09.09.2026). Поэтому отдельной
+        // группы для них здесь больше нет: она показывала бы то же самое дважды.
         if (!печатный) {
             y = paintGroup(g, p, "ДОБЫТЧИКИ", roster(all,
                 slot("miner", 1), slot("miner", 2), slot("miner", 3), slot("miner", 4)),
@@ -325,6 +348,21 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 slot("power_plant", 4)), x, y, w, cell, gap, Under.STORAGE_CELLS);
         }
         return y;
+    }
+
+    /**
+     * ВОЕННЫЕ ЗДАНИЯ, ЧЬИ ЖЕТОНЫ ЕЩЁ НА ПЛАНШЕТЕ. Здание построено, захвачено
+     * или разрушено — жетона на планшете нет, и место над подписью пустует.
+     */
+    private java.util.Set<String> вЗапасе(ReplayRecord.Frame f, int seat) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>(
+            List.of("command_center", "barracks", "factory", "airbase"));
+        for (ReplayRecord.Tok t : buildingsOf(f, seat)) {
+            if (t.hexId != null || !t.alive || t.capturedBy != null) {
+                out.remove(t.type);
+            }
+        }
+        return out;
     }
 
     /**
@@ -802,7 +840,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // картинке планшета хранилища вместе с тем, что в них лежит; здесь
         // остаётся только то, чего на печати нет: ячейки от жетонов модуля и
         // площадка под свободные кубики энергии.
-        caption(g, печатный ? "ХРАНИЛИЩЕ: ЖЕТОНЫ МОДУЛЯ И СВОБОДНАЯ ЭНЕРГИЯ"
+        caption(g, печатный ? "ХРАНИЛИЩЕ: СВОБОДНАЯ ЭНЕРГИЯ И СЧЁТ"
             : "ХРАНИЛИЩЕ", x, y);
         y += px(14);
         int cell = px(26);
@@ -832,8 +870,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // ---- ЯЧЕЙКИ ОТ ЖЕТОНОВ МОДУЛЯ: их ровно две, и каждая открывается своим
         // жетоном, положенным стороной «склад». Пока жетон не положен — место
         // нарисовано, но погашено: видно, что открыть ещё можно.
+        //
+        // НА ПЕЧАТНОМ ПЛАНШЕТЕ ИХ ЗДЕСЬ НЕТ: эти две ячейки напечатаны в
+        // середине планшета хранилища, и жетоны кладутся прямо в них. Рисовать
+        // рядом их копию значило бы показывать одно и то же дважды.
         cx += px(6);
-        cx = divider(g, cx, cy, cell);
         int opened = 0;
         for (String tok : p.storageTokens) {
             if (tok != null && !tok.contains("energy")) {
@@ -841,7 +882,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             }
         }
         cellZones.clear();
-        for (int i = 0; i < 2; i++) {
+        if (!печатный) {
+            cx = divider(g, cx, cy, cell);
+        }
+        for (int i = 0; !печатный && i < 2; i++) {
             boolean on = i < opened;
             paintSquareCell(g, cx, cy, cell, on);
             if (!on) {
@@ -918,7 +962,12 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 + (p.trophyCap < 0 ? " — места нет" : " из " + p.trophyCap),
             x + px(9) + Math.min(dn, 12) * px(20) + px(6), cy + px(13));
         cy += px(24);
-        cy = paintStorageTokens(g, p, x, cy);
+        // ЖЕТОНЫ ХРАНИЛИЩА — НА ПЕЧАТНОМ ПЛАНШЕТЕ, а не строкой под ним: у них
+        // там свои напечатанные места (заказ дизайнера 09.09.2026). Без печати
+        // класть их некуда, и тогда они по-прежнему идут строкой.
+        if (!печатный) {
+            cy = paintStorageTokens(g, p, x, cy);
+        }
         // контейнеры
         int cn = Math.max(p.containers, 0);
         for (int i = 0; i < cn; i++) {

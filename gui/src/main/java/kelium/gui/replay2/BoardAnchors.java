@@ -30,10 +30,24 @@ public final class BoardAnchors {
     public record Cell(String group, int level, char type, int x, int y, int w, int h) {
     }
 
-    /** Колонка планшета войск: род, здание и две рамки под жетоны модулей. */
+    /**
+     * Колонка планшета войск: род, здание, две рамки под жетоны модулей и
+     * плашка с названием здания в самом верху печати.
+     *
+     * @param ax ay aw ah рамка спец-атаки (красный жетон)
+     * @param bx by bw bh рамка Сборки (синий жетон)
+     * @param lx ly lw lh плашка с названием здания: над ней ложится жетон
+     *                    этого здания (заказ дизайнера 09.09.2026)
+     */
     public record Column(String unit, String building,
                           int ax, int ay, int aw, int ah,
-                          int bx, int by, int bw, int bh) {
+                          int bx, int by, int bw, int bh,
+                          int lx, int ly, int lw, int lh) {
+
+        /** Середина плашки с названием по горизонтали — по ней ровняют жетон. */
+        public double labelCx() {
+            return lx + lw / 2.0;
+        }
     }
 
     /**
@@ -82,6 +96,7 @@ public final class BoardAnchors {
     private static boolean loaded;
     private static final Map<String, List<Cell>> STORAGE = new LinkedHashMap<>();
     private static final Map<String, List<Column>> TROOP = new LinkedHashMap<>();
+    private static final Map<String, List<int[]>> STORES = new LinkedHashMap<>();
     private static Science science;
     private static int[] marketCard;
 
@@ -98,6 +113,21 @@ public final class BoardAnchors {
     public static synchronized List<Column> troop(String side) {
         load();
         return TROOP.getOrDefault(key(side), List.of());
+    }
+
+    /**
+     * ДВА МЕСТА ПОД ЖЕТОНЫ ХРАНИЛИЩА на печатном планшете: большие квадраты со
+     * значком склада слева и справа от середины. Каждое — {@code [x, y, w, h]}
+     * в пикселях картинки (пусто — якорей нет).
+     */
+    public static synchronized List<int[]> stores(String side) {
+        load();
+        List<int[]> из = STORES.getOrDefault(key(side), List.of());
+        List<int[]> копия = new ArrayList<>(из.size());
+        for (int[] b : из) {
+            копия.add(b.clone());
+        }
+        return копия;
     }
 
     /** Сетка ячеек печатного планшета науки ({@code null} — якорей нет). */
@@ -173,6 +203,16 @@ public final class BoardAnchors {
                         box[0], box[1], box[2], box[3]));
                 }
                 STORAGE.put(side, List.copyOf(out));
+                if (b.get("stores") instanceof List<?> ss) {
+                    List<int[]> места = new ArrayList<>();
+                    for (Object so : ss) {
+                        int[] box = box(so);
+                        if (box != null) {
+                            места.add(box);
+                        }
+                    }
+                    STORES.put(side, List.copyOf(места));
+                }
             } else if ("troop".equals(b.get("kind")) && b.get("columns") instanceof List<?> cs) {
                 List<Column> out = new ArrayList<>();
                 for (Object co : cs) {
@@ -184,9 +224,17 @@ public final class BoardAnchors {
                     if (a == null || s == null) {
                         continue;
                     }
+                    // Плашки с названием могло не быть в старом файле якорей —
+                    // тогда её место считается нулевым, и жетон здания просто
+                    // не ляжет: показ от этого не рушится.
+                    int[] l = box(c.get("label"));
+                    if (l == null) {
+                        l = new int[]{0, 0, 0, 0};
+                    }
                     out.add(new Column(String.valueOf(c.get("unit")),
                         String.valueOf(c.get("building")),
-                        a[0], a[1], a[2], a[3], s[0], s[1], s[2], s[3]));
+                        a[0], a[1], a[2], a[3], s[0], s[1], s[2], s[3],
+                        l[0], l[1], l[2], l[3]));
                 }
                 TROOP.put(side, List.copyOf(out));
             } else if ("science".equals(b.get("kind"))) {

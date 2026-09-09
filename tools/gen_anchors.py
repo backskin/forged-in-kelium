@@ -139,6 +139,71 @@ def troop_frames(path):
     return (w, h), [(c[0], c[1], c[2], max(c[3], ph)) for c in pink], blue
 
 
+#  ПОДПИСЬ ЗДАНИЯ НАД КОЛОНКОЙ — светлая плашка с названием («Казармы»,
+#  «Завод», «Авиабаза», «Центр Управления») в самом верху планшета. Над ней
+#  ложится жетон этого здания, поэтому её место нужно знать.
+#
+#  ПОЧЕМУ ЗАМЕР, А НЕ ДЕТЕКТОР. Плашка светлая, но и сам планшет светлый:
+#  детектор пятен находит её на красном планшете и теряет на зелёном, а
+#  сравнение с печатью вокруг не различает их вовсе (проверено на всех
+#  четырёх сторонах). Шага у плашек тоже нет — художник ставил их по
+#  названию, и «Центр Управления» вдобавок в две строки, потому и выше
+#  остальных. Поэтому плашки ЗАМЕРЕНЫ по печати один раз, долями от размера
+#  картинки, как и рамки модулей выше. Замер сделан по красному планшету и
+#  сверен детектором на синем и жёлтом: там те же четыре места до пикселя.
+#  Художник перерисовал верх планшета — замерить заново.
+ПОДПИСИ = [
+    (198 / 2400.0, 54 / 634.0, 184 / 2400.0, 58 / 634.0),
+    (723 / 2400.0, 54 / 634.0, 184 / 2400.0, 58 / 634.0),
+    (1306 / 2400.0, 54 / 634.0, 194 / 2400.0, 58 / 634.0),
+    (1853 / 2400.0, 49 / 634.0, 196 / 2400.0, 87 / 634.0),
+]
+
+
+def troop_label(w, h, i):
+    """Плашка с названием здания над колонкой i: (x, y, w, h) в пикселях печати."""
+    lx, ly, lw, lh = ПОДПИСИ[i]
+    return (int(round(lx * w)), int(round(ly * h)),
+            int(round(lw * w)), int(round(lh * h)))
+
+
+def storage_stores(path):
+    """
+    ДВА МЕСТА ПОД ЖЕТОНЫ ХРАНИЛИЩА — большие светлые квадраты со значком склада
+    слева и справа от середины планшета. В них вставляются жетоны «склад» и
+    «энергия» (макет дизайнера 09.09.2026).
+
+    <p>Находятся детектором: квадраты крупные (десятая часть ширины планшета) и
+    заметно светлее печати, поэтому ловятся на всех сторонах одинаково. Всё,
+    что задевает середину, отбрасывается — там стоят маленькие ячейки начала
+    игры и плашка цены уровня.
+    """
+    im = Image.open(path).convert('RGB')
+    w, h = im.size
+    полоса = im.crop((int(w * 0.25), int(h * 0.28), int(w * 0.75), int(h * 0.72)))
+    dx, dy = int(w * 0.25), int(h * 0.28)
+    боксы = []
+    for c in components(полоса, lambda r, g, b: r > 195 and g > 190 and b > 185, 5, 4000):
+        if c[2] < w * 0.10 or c[3] < h * 0.16:
+            continue
+        box = (c[0] + dx, c[1] + dy, c[2], c[3])
+        серёдка = box[0] < w * 0.52 and box[0] + box[2] > w * 0.48
+        if not серёдка:
+            боксы.append(box)
+    боксы.sort(key=lambda b: b[0])
+    return (w, h), боксы
+
+
+def места_хранилища(board_id, path, problems):
+    """Строки yaml с двумя местами под жетоны хранилища."""
+    _, боксы = storage_stores(path)
+    if len(боксы) != 2:
+        problems.append('%s: мест под жетоны хранилища нашлось %d — ждали 2'
+                        % (board_id, len(боксы)))
+        return []
+    return ['    stores:'] + ['      - [%d, %d, %d, %d]' % b for b in боксы]
+
+
 def player_board(board_id, path, problems):
     """Якоря цветного планшета игрока: хранилище по образцу, войска по замеру."""
     im = Image.open(path).convert('RGB')
@@ -166,6 +231,7 @@ def player_board(board_id, path, problems):
         if плохих:
             problems.append('%s: у %d ячеек не нашлось контура — печать сдвинулась?'
                             % (board_id, плохих))
+        lines += места_хранилища(board_id, path, problems)
         return lines
     # ПЛАНШЕТ ВОЙСК: четыре колонки, в каждой два места под жетоны модулей.
     units = ['infantry', 'vehicle', 'aircraft', 'tower']
@@ -181,9 +247,10 @@ def player_board(board_id, path, problems):
                   int(round(aw * w)), int(round(ah * h)))
         assembly = (int(round(bx * w + шаг * i)), int(round(by * h)),
                     int(round(bw * w)), int(round(bh * h)))
+        label = troop_label(w, h, i)
         lines.append('      - {unit: %s, building: %s, attack: [%d, %d, %d, %d], '
-                     'assembly: [%d, %d, %d, %d]}'
-                     % ((units[i], builds[i]) + attack + assembly))
+                     'assembly: [%d, %d, %d, %d], label: [%d, %d, %d, %d]}'
+                     % ((units[i], builds[i]) + attack + assembly + label))
     return lines
 
 
@@ -418,6 +485,7 @@ def main():
                     lv, t = flat[i] if i < len(flat) else (0, 'U')
                     lines.append('      - {group: %s, level: %d, type: %s, '
                                  'box: [%d, %d, %d, %d]}' % ((grp, lv, t) + c))
+            lines += места_хранилища(name[:-4], path, problems)
         elif name.startswith('troop-'):
             (w, h), pink, blue = troop_frames(path)
             units = ['infantry', 'vehicle', 'aircraft', 'tower']
@@ -428,10 +496,11 @@ def main():
                 problems.append('%s: рамок спец-атаки %d, сборки %d — ждали по 4'
                                 % (name, len(pink), len(blue)))
             for i in range(min(4, len(pink), len(blue))):
+                label = troop_label(w, h, i)
                 lines.append('      - {unit: %s, building: %s, attack: [%d, %d, %d, %d], '
-                             'assembly: [%d, %d, %d, %d]}'
+                             'assembly: [%d, %d, %d, %d], label: [%d, %d, %d, %d]}'
                              % ((units[i], builds[i]) + tuple(pink[i][:4])
-                                + tuple(blue[i][:4])))
+                                + tuple(blue[i][:4]) + label))
     out = os.path.join(ART, 'anchors.yaml')
     io.open(out, 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
     print('записано:', out)
