@@ -1017,7 +1017,12 @@ public final class GameEngine {
             case "objective" -> {
                 String карта = state.decks.get("objectives").draw(state.rng);
                 if (карта == null) {
-                    return;             // колода заданий пуста — плашка молчит
+                    // Колода заданий пуста — плашка молчит и СПЕЦ не тратит. В
+                    // лог это всё равно попадает: молчание плашки есть событие,
+                    // иначе его не видно ни в разборе, ни в замерах.
+                    emit(ev("type", "order_spec", "seat", p.seat, "spec", "objective",
+                        "empty", true));
+                    return;
                 }
                 p.objectiveHand.add(карта);
                 ctx.useSpec();

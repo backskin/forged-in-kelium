@@ -5,6 +5,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 import java.util.Set;
 
 import kelium.core.BuildingToken;
@@ -1864,7 +1865,6 @@ public final class Actions {
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
             GameState s = state;
             var side = player.board.troop;
-            Integer aircraftSpeed = Passives.aircraftSpeedOverride(s, player.seat);
             int freeExtra = 0;
             if (Passives.firstTwoMovesFree(s, player.seat)) {
                 freeExtra = 2;
@@ -1874,8 +1874,77 @@ public final class Actions {
             int movesDone = 0;
             boolean freeUsed = false;
             Map<Integer, Integer> perUnitSteps = new HashMap<>();
+
+            // ГРАММАТИКА МАНЁВРА. Свод 1.35.0 и новее играет тот же «Близнец
+            // Движения», что и Бой (решение дизайнера 07.09.2026): выбери один
+            // свой гекс — ВСЕ его жетоны идут даром, каждый на свою скорость, —
+            // дальше веди любой жетон с любого гекса, доплачивая
+            // movement.token_surcharge_ammo ЗА ЖЕТОН, а не за шаг. КАЖДЫЙ ЖЕТОН
+            // АКТИВИРУЕТСЯ ОДИН РАЗ: активация даёт ему всю скорость целиком.
+            //
+            // Прежние своды играют по-старому: первое перемещение даром, каждое
+            // следующее — по боеприпасу за ШАГ (или лесенкой). Обе грамматики
+            // живут в одном цикле нарочно: проходимость, прыжок через тайл,
+            // гарнизон, печатные контейнеры и журнал у них общие, и второй копии
+            // этого кода быть не должно — она разойдётся с первой.
+            boolean близнец = "per_token".equals(
+                rs.getStr("actions.movement.cost_model", "flat"));
+            int доплатаЗаЖетон = близнец
+                ? rs.getInt("actions.movement.token_surcharge_ammo") : 0;
+            Set<Integer> ужеАктивирован = new HashSet<>();
+
+            // БЕСПЛАТНЫЙ ГЕКС выбирается один раз, до первого шага. Кандидаты —
+            // гексы, с которых вообще есть чем и куда пойти: гекс с одной вышкой
+            // (скорость 0) в список не попадает.
+            String source = null;
+            if (близнец) {
+                java.util.LinkedHashSet<String> откуда = new java.util.LinkedHashSet<>();
+                for (UnitToken u : player.unitsOnField()) {
+                    if (Speed.of(s, player.seat, u) > 0
+                            && !moveOptions(s, player, u).isEmpty()) {
+                        откуда.add(u.hexId);
+                    }
+                }
+                if (откуда.isEmpty()) {
+                    ctx.recordOp("movement");
+                    ctx.actionsPlayed.add(name());
+                    return ActionResult.ok("moved 0 steps", Map.of("moves", 0));
+                }
+                List<Choice> srcOpts = new ArrayList<>();
+                for (String h : откуда) {
+                    srcOpts.add(new Choice("move_source", h, h));
+                }
+                srcOpts.add(new Choice("pass", null, "stop moving"));
+                Choice src = agent.choose(s, srcOpts, Map.of("kind", "move_source"));
+                if (src.payload() == null) {
+                    ctx.recordOp("movement");
+                    ctx.actionsPlayed.add(name());
+                    return ActionResult.ok("moved 0 steps", Map.of("moves", 0));
+                }
+                source = (String) src.payload();
+            }
+
             while (true) {
+                // ЦЕНА СЛЕДУЮЩЕГО ШАГА в старой грамматике не зависит от жетона —
+                // считаем её один раз на круг. В «Близнеце» она своя у каждого
+                // жетона и считается ниже, в цикле по войскам.
+                int старCost = 0;
+                if (!близнец && freeUsed) {
+                    if (freeExtra > 0) {
+                        старCost = 0;
+                    } else if ("flat".equals(rs.getStr("actions.movement.cost_model", "flat"))) {
+                        старCost = rs.getInt("actions.movement.flat_ammo_per_extra_move");
+                    } else {
+                        List<Integer> sched =
+                            rs.getIntList("actions.movement.escalating_surcharge_ammo");
+                        старCost = sched.get(Math.min(movesDone, sched.size() - 1));
+                    }
+                    if (старCost > 0 && !player.resources.canPay(Resource.AMMO, старCost)) {
+                        break;
+                    }
+                }
                 List<Choice> opts = new ArrayList<>();
+                Map<Integer, Integer> ценаЖетона = new HashMap<>();
                 for (UnitToken u : player.unitsOnField()) {
                     // скорость спрашиваем в одном месте: карты и жетоны модулей
                     // вмешиваются через точку правил UNIT_SPEED (13.08.2026)
@@ -1883,69 +1952,37 @@ public final class Actions {
                     if (perUnitSteps.getOrDefault(u.uid, 0) >= speed) {
                         continue;
                     }
-                    // ПРЫЖОК ЧЕРЕЗ ТАЙЛ ЗАРОЖДЕНИЯ (точка правил MOVEMENT_JUMP_OVER,
-                    // карта «Десантные тропы»): гекс с тайлом нельзя занять, но
-                    // пехота может перескочить его на противоположный гекс. Один
-                    // прыжок стоит один шаг скорости, как обычное перемещение.
-                    boolean canJump = kelium.engine.ability.RuleQuery
-                        .of(s, player.seat, kelium.engine.ability.Hook.MOVEMENT_JUMP_OVER)
-                        .about(u).base(0).ask() >= 1.0;
-                    if (canJump) {
-                        for (String over : s.field.neighbors(u.hexId)) {
-                            if (!s.field.get(over).hasSpawnTile()) {
-                                continue;
-                            }
-                            for (String behind : s.field.neighbors(over)) {
-                                if (!behind.equals(u.hexId) && canEnter(u, behind, player.seat)) {
-                                    opts.add(new Choice("move",
-                                        Map.of("uid", u.uid, "to", behind),
-                                        u.type.code + " ПРЫЖОК через " + over + "->" + behind));
-                                }
-                            }
+                    // ДОПЛАТА ЗА ЖЕТОН: один раз за жетон и только если он стоит
+                    // НЕ в выбранном гексе. Жетон, вышедший из выбранного гекса,
+                    // доигрывает свою скорость даром — он уже активирован.
+                    int цена = старCost;
+                    if (близнец) {
+                        цена = (доплатаЗаЖетон > 0 && !ужеАктивирован.contains(u.uid)
+                            && !source.equals(u.hexId)) ? доплатаЗаЖетон : 0;
+                        if (цена > 0 && !player.resources.canPay(Resource.AMMO, цена)) {
+                            continue;   // этот жетон не по карману, другие — может быть
                         }
                     }
-                    for (String nb : s.field.neighbors(u.hexId)) {
-                        if (canEnter(u, nb, player.seat)) {
-                            opts.add(new Choice("move", Map.of("uid", u.uid, "to", nb),
-                                u.type.code + "->" + nb));
-                        }
-                    }
-                    // ВХОД В ГАРНИЗОН (СВОД §5.3, до правки 04.09.2026 в движке
-                    // отсутствовал вовсе: поле insideBuildingUid только читалось).
-                    // Вход внутрь своего военного здания ТОГО ЖЕ РОДА — это
-                    // перемещение, значит стоит шаг скорости и оплачивается как
-                    // обычный ход. Гарнизонов у игрока до ТРЁХ: по одному в
-                    // казарме, заводе и авиабазе. ЦУ гарнизона не имеет — вышка
-                    // внутрь не встаёт никогда.
-                    for (BuildingToken b : garrisonTargets(s, player, u)) {
-                        // «to» = свой же гекс: жетон никуда не едет, он заходит
-                        // внутрь здания на месте. Ключ обязателен — его читают
-                        // все оценщики перемещений, и без него выбор был бы
-                        // перемещением без адреса.
-                        opts.add(new Choice("garrison",
-                            Map.of("uid", u.uid, "b", b.uid, "to", u.hexId),
-                            u.type.code + " в " + b.type));
-                    }
+                    ценаЖетона.put(u.uid, цена);
+                    opts.addAll(moveOptions(s, player, u));
                 }
                 if (opts.isEmpty()) {
                     break;
                 }
                 opts.add(new Choice("pass", null, "stop moving"));
-                Choice pick = agent.choose(s, opts, Map.of("kind", "move"));
+                Choice pick = agent.choose(s, opts, Map.of("kind", "move",
+                    "source", source == null ? "" : source));
                 if (pick.payload() == null) {
                     break;
                 }
-                int cost = 0;
-                if (freeUsed) {
-                    if (freeExtra > 0) {
-                        freeExtra -= 1;
-                        cost = 0;
-                    } else if ("flat".equals(rs.getStr("actions.movement.cost_model", "flat"))) {
-                        cost = rs.getInt("actions.movement.flat_ammo_per_extra_move");
-                    } else {
-                        List<Integer> sched = rs.getIntList("actions.movement.escalating_surcharge_ammo");
-                        cost = sched.get(Math.min(movesDone, sched.size() - 1));
-                    }
+                Map<String, Object> mp = (Map<String, Object>) pick.payload();
+                int uid = ((Number) mp.get("uid")).intValue();
+                int cost = ценаЖетона.getOrDefault(uid, 0);
+                // ПАССИВКИ «первые перемещения даром» гасят доплату — в старой
+                // грамматике за шаг, в «Близнеце» за жетон.
+                if (cost > 0 && freeExtra > 0) {
+                    freeExtra -= 1;
+                    cost = 0;
                 }
                 if (cost > 0 && !player.resources.canPay(Resource.AMMO, cost)) {
                     break;
@@ -1953,8 +1990,7 @@ public final class Actions {
                 if (cost > 0) {
                     player.resources.pay(Resource.AMMO, cost);
                 }
-                Map<String, Object> mp = (Map<String, Object>) pick.payload();
-                int uid = ((Number) mp.get("uid")).intValue();
+                ужеАктивирован.add(uid);
                 UnitToken unit = null;
                 for (UnitToken u : player.units) {
                     if (u.uid == uid) {
@@ -1999,6 +2035,59 @@ public final class Actions {
             Map<String, Object> tel = new HashMap<>();
             tel.put("moves", movesDone);
             return ActionResult.ok("moved " + movesDone + " steps", tel);
+        }
+
+        /**
+         * КУДА МОЖЕТ ШАГНУТЬ ЭТО ВОЙСКО — один шаг, без учёта скорости и цены.
+         *
+         * <p>Вынесено отдельно, потому что список нужен дважды: в цикле выбора и
+         * заранее, когда «Близнец Движения» спрашивает бесплатный гекс — гекс без
+         * единого хода в кандидаты не идёт.
+         */
+        private List<Choice> moveOptions(GameState s, PlayerState player, UnitToken u) {
+            List<Choice> opts = new ArrayList<>();
+            // ПРЫЖОК ЧЕРЕЗ ТАЙЛ ЗАРОЖДЕНИЯ (точка правил MOVEMENT_JUMP_OVER,
+            // карта «Десантные тропы»): гекс с тайлом нельзя занять, но пехота
+            // может перескочить его на противоположный гекс. Один прыжок стоит
+            // один шаг скорости, как обычное перемещение.
+            boolean canJump = kelium.engine.ability.RuleQuery
+                .of(s, player.seat, kelium.engine.ability.Hook.MOVEMENT_JUMP_OVER)
+                .about(u).base(0).ask() >= 1.0;
+            if (canJump) {
+                for (String over : s.field.neighbors(u.hexId)) {
+                    if (!s.field.get(over).hasSpawnTile()) {
+                        continue;
+                    }
+                    for (String behind : s.field.neighbors(over)) {
+                        if (!behind.equals(u.hexId) && canEnter(u, behind, player.seat)) {
+                            opts.add(new Choice("move",
+                                Map.of("uid", u.uid, "to", behind),
+                                u.type.code + " ПРЫЖОК через " + over + "->" + behind));
+                        }
+                    }
+                }
+            }
+            for (String nb : s.field.neighbors(u.hexId)) {
+                if (canEnter(u, nb, player.seat)) {
+                    opts.add(new Choice("move", Map.of("uid", u.uid, "to", nb),
+                        u.type.code + "->" + nb));
+                }
+            }
+            // ВХОД В ГАРНИЗОН (СВОД §5.3, до правки 04.09.2026 в движке
+            // отсутствовал вовсе: поле insideBuildingUid только читалось). Вход
+            // внутрь своего военного здания ТОГО ЖЕ РОДА — это перемещение,
+            // значит стоит шаг скорости и оплачивается как обычный ход.
+            // Гарнизонов у игрока до ТРЁХ: по одному в казарме, заводе и
+            // авиабазе. ЦУ гарнизона не имеет — вышка внутрь не встаёт никогда.
+            for (BuildingToken b : garrisonTargets(s, player, u)) {
+                // «to» = свой же гекс: жетон никуда не едет, он заходит внутрь
+                // здания на месте. Ключ обязателен — его читают все оценщики
+                // перемещений, и без него выбор был бы перемещением без адреса.
+                opts.add(new Choice("garrison",
+                    Map.of("uid", u.uid, "b", b.uid, "to", u.hexId),
+                    u.type.code + " в " + b.type));
+            }
+            return opts;
         }
 
         /**

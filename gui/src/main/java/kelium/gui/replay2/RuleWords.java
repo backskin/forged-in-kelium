@@ -230,6 +230,8 @@ public final class RuleWords {
             case "actions.build.demolish_cost_coins" -> "сколько стоит снос своего здания";
             case "actions.combat.token_surcharge_ammo" ->
                 "доплата боеприпасами за жетон, бьющий не из выбранного гекса";
+            case "actions.movement.token_surcharge_ammo" ->
+                "доплата боеприпасами за жетон, идущий не из выбранного гекса";
             case "actions.build.move_enabled" ->
                 "базовая Стройка умеет переносить здания (снято 06.09.2026)";
             case "economy.vp_per_level4_building" ->

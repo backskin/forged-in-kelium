@@ -403,9 +403,16 @@ actions:
     retaliation_to_retaliation: false
 
   movement:
-    # CONFIRMED: flat +1 ammo per extra move (one move free per action).
-    cost_model: flat                      # flat | escalating
+    # ГРАММАТИКА МАНЁВРА — «Близнец Движения», решение дизайнера 07.09.2026:
+    # выбери один свой гекс, ВСЕ его жетоны идут даром каждый на свою скорость,
+    # дальше веди любой жетон с любого гекса за token_surcharge_ammo ЗА ЖЕТОН
+    # (не за шаг). Каждый жетон активируется один раз. Ровно то же, что уже
+    # играет Бой (actions.combat.surcharge_model: per_token) — одна грамматика
+    # на оба военных действия.
+    cost_model: per_token                 # flat | escalating | per_token
+    token_surcharge_ammo: 1
     first_hex_free: true
+    # Ключи старой грамматики: читаются, когда cost_model = flat/escalating.
     flat_ammo_per_extra_move: 1
     escalating_surcharge_ammo: [0, 1, 2, 3]
 
