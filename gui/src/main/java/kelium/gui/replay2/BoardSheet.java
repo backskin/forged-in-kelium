@@ -1315,7 +1315,12 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // зависит от подписи и от числа карт, поэтому в один ряд они помещаются
         // не всегда: кнопка «арсенал установлен» уезжала за правый край листа и
         // обрезалась краем компонента.
-        int rowH = px(28);
+        // ВЫСОТА РЯДА ЗАВИСИТ ОТ ТОГО, ЕСТЬ ЛИ РУБАШКИ. Настоящие рубашки колод
+        // заданий и арсенала художник ещё не рисовал (в текстурах лежат
+        // заготовки), и стопка пока показывается прежней плашкой с числом —
+        // ряд ей нужен низкий. Появятся рубашки — ряд станет выше сам.
+        int rowH = kelium.report.Textures.card("deck_objectives", "deck") != null
+            ? px(66) : px(28);
         int bx = x;
         int by = y;
         for (Object[] btn : deckButtons(p)) {
@@ -1328,7 +1333,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             }
             @SuppressWarnings("unchecked")
             java.util.List<String> ids = (java.util.List<String>) btn[3];
-            bx = deckButton(g, bx, by, label, count, (String) btn[2], ids);
+            bx = стопкаКарт(g, bx, by, label, count, (String) btn[2], ids);
         }
         if (p.superObjective != null && p.superCells > 0) {
             int need = px(90);
@@ -1386,8 +1391,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
 
     /** Ширина кнопки-стопки вместе с отступом до следующей. */
     private int deckButtonWidth(Graphics2D g, String label, int count) {
-        g.setFont(font(11, Font.PLAIN));
-        return g.getFontMetrics().stringWidth(label + " " + count) + px(18) + px(6);
+        g.setFont(font(9, Font.PLAIN));
+        int стопка = (int) Math.round(px(48) / КАРТА)
+            + (Math.min(Math.max(count, 1), 5) - 1) * px(4);
+        return Math.max(стопка, g.getFontMetrics().stringWidth(
+            label + (count > 0 ? " " + count : ""))) + px(10);
     }
 
     /** Стопка карт: что это, сколько, и куда ведёт щелчок. */
@@ -1397,7 +1405,57 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     /** Кнопки стопок и что за ними стоит — заполняется при отрисовке. */
     private final Map<Rectangle, Deck> deckSpots = new LinkedHashMap<>();
 
-    /** Кнопка-стопка карт. Возвращает правый край. */
+    /** Отношение высоты печатной карты к ширине (256×358 точек). */
+    private static final double КАРТА = 358 / 256.0;
+
+    /**
+     * СТОПКА КАРТ — НАСТОЯЩИМИ КАРТАМИ, А НЕ КНОПКОЙ С ЧИСЛОМ.
+     *
+     * <p>Заказ дизайнера 09.09.2026: в зоне игрока только реальные предметы.
+     * Поэтому каждая карта на руках рисуется своей РУБАШКОЙ из типографии, а
+     * сколько их — видно по толщине стопки, как за столом. Подпись остаётся ПОД
+     * стопкой, а не поверх карты. Щелчок по стопке по-прежнему открывает читалку:
+     * лиц карт заданий и арсенала художник пока не рисовал, и прочесть их можно
+     * только текстом.
+     *
+     * @return правый край занятого места
+     */
+    private int стопкаКарт(Graphics2D g, int x, int y, String label, int count,
+                           String kind, java.util.List<String> ids) {
+        java.awt.image.BufferedImage рубашка = kelium.report.Textures.card(
+            "deck_" + kind, "deck");
+        if (рубашка == null) {
+            return deckButton(g, x, y, label, count, kind, ids);
+        }
+        int кh = px(48);
+        int кw = (int) Math.round(кh / КАРТА);
+        int шаг = px(4);
+        int видно = Math.min(Math.max(count, 1), 5);
+        int w = кw + (видно - 1) * шаг;
+        boolean live = count > 0 && !ids.isEmpty();
+        java.awt.Composite было = g.getComposite();
+        if (!live) {
+            // Стопки нет — на её месте бледный след одной карты: место за столом
+            // существует всегда, просто сейчас пусто.
+            g.setComposite(java.awt.AlphaComposite.getInstance(
+                java.awt.AlphaComposite.SRC_OVER, 0.22f));
+        }
+        for (int i = 0; i < видно; i++) {
+            g.drawImage(рубашка, x + i * шаг, y, кw, кh, null);
+        }
+        g.setComposite(было);
+        g.setFont(font(9, Font.PLAIN));
+        g.setColor(live ? Theme.ink2() : Theme.ink3());
+        String подпись = label + (count > 0 ? " " + count : "");
+        int пw = g.getFontMetrics().stringWidth(подпись);
+        g.drawString(подпись, x, y + кh + px(10));
+        if (live) {
+            deckSpots.put(new Rectangle(x, y, w, кh), new Deck(kind, ids, label));
+        }
+        return x + Math.max(w, пw) + px(10);
+    }
+
+    /** Прежний вид стопки — числом в рамке; остаётся, если рубашки нет. */
     private int deckButton(Graphics2D g, int x, int y, String label, int count,
                            String kind, java.util.List<String> ids) {
         g.setFont(font(11, Font.PLAIN));
