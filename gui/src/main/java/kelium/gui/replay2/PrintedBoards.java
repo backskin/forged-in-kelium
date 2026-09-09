@@ -193,7 +193,7 @@ final class PrintedBoards {
         g.drawImage(art, x, y, width, h, null);
         // Рамки ячеек КАЖДОГО складского здания: по ним ляжет сам жетон, если он
         // ещё на планшете (см. ниже, жетонПоверхЯчеек).
-        Map<String, Rectangle> зоны = new java.util.LinkedHashMap<>();
+        Map<String, java.util.List<java.awt.geom.Point2D>> зоны = new java.util.LinkedHashMap<>();
         int seen = 0;
         int lastLevel = -1;
         String lastGroup = "";
@@ -223,14 +223,30 @@ final class PrintedBoards {
                 // рисовался ОТДЕЛЬНОЙ группой ниже: одно и то же здание было на
                 // листе дважды (жалоба дизайнера 02.09.2026).
                 String key = ("miner".equals(c.group()) ? "miner-" : "plant-") + c.level();
-                зоны.merge(key, box, PrintedBoards::объединить);
+                зоны.computeIfAbsent(key, ключ -> new java.util.ArrayList<>())
+                    .add(new java.awt.geom.Point2D.Double(box.getCenterX(), box.getCenterY()));
             } else if (has != 0) {
                 cube(g, box, has);
             }
         }
+        // ШИРИНА ЖЕТОНА ОДНА НА ВСЕ ЗДАНИЯ и считается от печатной ячейки, а не
+        // от накрытого пятна (почему — см. жетонПоверхЯчеек).
+        double ячейка = ширинаЯчейки(storageCells(p.seat)) * k;
         for (var e : зоны.entrySet()) {
-            жетонПоверхЯчеек(g, e.getKey(), e.getValue(), p.seat);
+            жетонПоверхЯчеек(g, e.getKey(), e.getValue(), p.seat, ячейка);
         }
+    }
+
+    /** Ширина печатной ячейки хранилища — они все одного размера. */
+    private static double ширинаЯчейки(java.util.List<BoardAnchors.Cell> cells) {
+        if (cells.isEmpty()) {
+            return 0;
+        }
+        double сумма = 0;
+        for (BoardAnchors.Cell c : cells) {
+            сумма += c.w();
+        }
+        return сумма / cells.size();
     }
 
     /** Уровень здания из ключа вида {@code miner-3}; {@code null} — без уровня. */
@@ -246,10 +262,6 @@ final class PrintedBoards {
         }
     }
 
-    private static Rectangle объединить(Rectangle a, Rectangle b) {
-        return a.union(b);
-    }
-
     /**
      * ЖЕТОН ЗДАНИЯ ПОВЕРХ СВОИХ ПЕЧАТНЫХ ЯЧЕЕК — так, как он лежит на столе.
      *
@@ -257,14 +269,54 @@ final class PrintedBoards {
      * ячейки хранилища. Показывать это крестиком было и скучно, и неправдиво:
      * игрок за столом видит НАСТОЯЩИЙ силуэт добытчика или энергостанции.
      *
-     * <p>ПОВОРОТ выбирается по форме места: если рамка ячеек лежит вдоль, а
-     * силуэт вытянут поперёк (или наоборот), жетон кладётся на 90°. Плюс
-     * небольшой наклон в 8° — жетон на столе никогда не лежит идеально ровно, и
-     * именно наклон отличает «положили» от «нарисовали».
+     * <p>РАЗМЕР У ВСЕХ ОДИН, ПОВОРОТ — ПО ЛИНИИ СВОИХ ЯЧЕЕК. Раньше жетон
+     * подгонялся под пятно накрытых ячеек и разворачивался по форме этого пятна
+     * — и выходил балаган (замечание дизайнера 09.09.2026: «здания на планшете
+     * хранилища гомерически смешно по-разному сидят, все маленькие, повороты
+     * рандомные»). Причина простая: у первого уровня одна ячейка, у четвёртого
+     * две в ряд, у третьего две по диагонали, поэтому пятно каждый раз другой
+     * формы и величины. А на столе лежит ОДНА И ТА ЖЕ картонка: все жетоны
+     * добытчика и энергостанции одного размера, в два сектора шириной.
+     *
+     * <p>Поэтому ширина считается от печатной ячейки и одинакова везде, а
+     * ячейки задают только КУДА жетон лёг: центр — между ними, поворот — вдоль
+     * линии, которая их соединяет. У пары в ряд это прямо, у пары по диагонали
+     * (третий уровень) — по её наклону, ровно как картонку положил бы игрок,
+     * чтобы накрыть обе ячейки. Одна ячейка — жетон лежит прямо.
      */
-    private static void жетонПоверхЯчеек(Graphics2D g, String key, Rectangle box, int seat) {
+    private static void жетонПоверхЯчеек(Graphics2D g, String key,
+                                         java.util.List<java.awt.geom.Point2D> ячейки,
+                                         int seat, double ячейка) {
+        if (ячейки.isEmpty()) {
+            return;
+        }
         String code = key.startsWith("miner") ? "miner" : "power_plant";
         int уровень = уровеньИз(key);
+        // Жетон здания в два сектора: пара ячеек в ряд плюс запас по краям — так
+        // картонка заметна на планшете и накрывает свои ячейки с полями.
+        double ширина = ячейка > 0 ? ячейка * 2.6 : 0;
+        if (ширина <= 0) {
+            return;
+        }
+        double cx = 0;
+        double cy = 0;
+        for (java.awt.geom.Point2D t : ячейки) {
+            cx += t.getX();
+            cy += t.getY();
+        }
+        cx /= ячейки.size();
+        cy /= ячейки.size();
+        double угол = 0;
+        if (ячейки.size() > 1) {
+            java.awt.geom.Point2D a = ячейки.get(0);
+            java.awt.geom.Point2D b = ячейки.get(ячейки.size() - 1);
+            угол = Math.atan2(b.getY() - a.getY(), b.getX() - a.getX());
+            // Жетон читается слева направо: линию ячеек берём в ту же сторону,
+            // иначе один и тот же наклон даст перевёрнутую картонку.
+            if (Math.abs(угол) > Math.PI / 2) {
+                угол += угол > 0 ? -Math.PI : Math.PI;
+            }
+        }
         // ПЕЧАТНЫЙ ЖЕТОН, ЕСЛИ ОН ЕСТЬ. На столе на планшете лежит та же
         // картонка, что потом встанет на поле, — и узнаётся она по рисунку, а не
         // по цветному силуэту. Силуэт остаётся для тех жетонов, которых художник
@@ -272,16 +324,9 @@ final class PrintedBoards {
         var найдено = Textures.found(code, уровень, seat);
         if (найдено != null && найдено.image() != null) {
             BufferedImage tex = найдено.image();
-            boolean боком = (box.width >= box.height) != (tex.getWidth() >= tex.getHeight());
-            double уголГрад = (боком ? 90 : 0) + 8;
-            double угол = Math.toRadians(уголГрад);
-            double cos = Math.abs(Math.cos(угол));
-            double sin = Math.abs(Math.sin(угол));
-            double wRot = tex.getWidth() * cos + tex.getHeight() * sin;
-            double hRot = tex.getWidth() * sin + tex.getHeight() * cos;
-            double k = Math.min(box.width * 0.98 / wRot, box.height * 0.98 / hRot);
+            double k = ширина / tex.getWidth();
             AffineTransform at = new AffineTransform();
-            at.translate(box.getCenterX(), box.getCenterY());
+            at.translate(cx, cy);
             at.rotate(угол);
             at.scale(k, k);
             at.translate(-tex.getWidth() / 2.0, -tex.getHeight() / 2.0);
@@ -303,18 +348,11 @@ final class PrintedBoards {
         } catch (RuntimeException e) {
             return;
         }
-        boolean боком = (box.width >= box.height) != (sh.vbW() >= sh.vbH());
-        double уголГрад = (боком ? 90 : 0) + 8;
-        double угол = Math.toRadians(уголГрад);
-        // Габарит силуэта ПОСЛЕ поворота — иначе повёрнутый жетон вылезает за
-        // свои ячейки ровно на столько, на сколько его развернули.
-        double cos = Math.abs(Math.cos(угол));
-        double sin = Math.abs(Math.sin(угол));
-        double wRot = sh.vbW() * cos + sh.vbH() * sin;
-        double hRot = sh.vbW() * sin + sh.vbH() * cos;
-        double k = Math.min(box.width * 0.94 / wRot, box.height * 0.94 / hRot);
+        // Силуэт — для жетонов, которых художник ещё не рисовал; размер и
+        // поворот те же, что у печатных, иначе разнобой вернётся.
+        double k = ширина / sh.vbW();
         AffineTransform at = new AffineTransform();
-        at.translate(box.getCenterX(), box.getCenterY());
+        at.translate(cx, cy);
         at.rotate(угол);
         at.scale(k, k);
         at.translate(-sh.vbW() / 2.0, -sh.vbH() / 2.0);
