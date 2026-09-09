@@ -192,6 +192,13 @@ public final class FieldPainter {
      */
     private static final double TOKEN_LIFT = 0.045;
 
+    /**
+     * ДОЛЯ ОТ ОБЫЧНОГО ЖЕТОНА для войска в гарнизоне. Жетон лежит НА здании, и
+     * в полную величину он закрывал бы картонку целиком; две трети читаются как
+     * «положен сверху», а не как «занял сектор».
+     */
+    private static final double ГАРНИЗОН_ЖЕТОН = 0.66;
+
     private static final double SPAWN_R = 0.92;
     private static final double NEUTRAL_OUTER = 0.86;
     /**
@@ -360,12 +367,13 @@ public final class FieldPainter {
                     sides.add(i);
                 }
             }
-            double[] spot = paintBuilding(c, size, b, sides, cx, cy);
-            // Место для значка «войско внутри» помечается по UID ЗДАНИЯ: войско
-            // теперь ЯВНО указывает, в каком здании оно стоит. Раньше ключом был
-            // «владелец:тип здания», и проигрыватель показывал спрятанными войска,
-            // которые просто стояли на гексе своего здания подходящего рода.
-            hideSpots.put(String.valueOf(b.uid), spot);
+            // МЕСТО ГАРНИЗОНА ПОМЕЧАЕТСЯ ПО UID ЗДАНИЯ: войско ЯВНО говорит, в
+            // каком здании оно сидит. Раньше ключом было «владелец + тип
+            // здания», и проигрыватель показывал внутри те войска, что просто
+            // стояли на гексе своего здания подходящего рода.
+            double[] гнездо = new double[4];
+            paintBuilding(c, size, b, sides, cx, cy, гнездо);
+            hideSpots.put(String.valueOf(b.uid), гнездо);
         }
 
         // 7. ВОЗДУШНАЯ ЯЧЕЙКА — ПОВЕРХ зданий: она принадлежит гексу целиком,
@@ -962,6 +970,16 @@ public final class FieldPainter {
     /** Здание на своих секторах; возвращает точку для подписи и укрытых войск. */
     private static double[] paintBuilding(FieldCanvas c, double size, ReplayRecord.Tok b,
                                           List<Integer> sides, double hexCx, double hexCy) {
+        return paintBuilding(c, size, b, sides, hexCx, hexCy, null);
+    }
+
+    /**
+     * То же, но с записью МЕСТА ГАРНИЗОНА: центр жетона здания и его разворот.
+     * Войска, сидящие внутри, кладутся прямо на здание — им нужно и то, и другое.
+     */
+    private static double[] paintBuilding(FieldCanvas c, double size, ReplayRecord.Tok b,
+                                          List<Integer> sides, double hexCx, double hexCy,
+                                          double[] гнездо) {
         double face = FieldGeometry.meanEdgeAngle(sides);
         int seat = b.owner % 4;
         // ЖЕТОН ПРИЖАТ К КРОМКЕ ГЕКСА. Силуэт ужат до 0,88 радиуса, и раньше вся
@@ -1093,6 +1111,19 @@ public final class FieldPainter {
         } else {
             paintDamageOnHearts(c, b, zones, sh, tex, cx, cy,
                 face - sh.outward(), FieldGeometry.seatScale(sh, size));
+        }
+        if (гнездо != null) {
+            // ЖЕТОН ГАРНИЗОНА ЛОЖИТСЯ В СЕРЕДИНУ ЗАНЯТОГО КЛИНА. Не в точку
+            // привязки формы: у авиабазы это выемка её «галки», и жетон
+            // оказывался половиной за краем картонки. И не в место подписи: оно
+            // прижато к одной стенке, у авиабазы — к самому дальнему её краю.
+            // Середина клина лежит на печатном поле при любом числе сторон; что
+            // название окажется накрыто — так и задумано (дизайнер).
+            double[] серёдка = sectorMiddle(c, size, sides, hexCx, hexCy, face);
+            гнездо[0] = серёдка[0];
+            гнездо[1] = серёдка[1];
+            гнездо[2] = face;
+            гнездо[3] = sides.size();
         }
         return spot;
     }
@@ -1689,7 +1720,10 @@ public final class FieldPainter {
                                    Map<String, double[]> hideSpots, double cx, double cy) {
         // авиация — в центральную воздушную ячейку
         int airDrawn = 0;
-        boolean airHideUsed = false;
+        // СКОЛЬКО ЖЕТОНОВ УЖЕ ЛЕЖИТ В КАЖДОМ ЗДАНИИ: внутри их может быть
+        // ЛЮБОЕ число (правило 09.09.2026), и каждый следующий сдвигается,
+        // чтобы был виден край предыдущего.
+        Map<String, Integer> вГнезде = new LinkedHashMap<>();
         for (ReplayRecord.Tok u : tokens) {
             if (u.building || !"aircraft".equals(u.type)) {
                 continue;
@@ -1697,9 +1731,9 @@ public final class FieldPainter {
             // Внутри здания — только если войско ЯВНО туда вставлено.
             double[] hide = u.insideBuildingUid == null ? null
                 : hideSpots.get(String.valueOf(u.insideBuildingUid));
-            if (hide != null && !airHideUsed) {
-                airHideUsed = true;
-                paintHidden(c, size, u, hide[0] - size * 0.20, hide[1] - size * 0.20);
+            if (hide != null) {
+                paintGarrison(c, size, u, hide,
+                    вГнезде.merge(String.valueOf(u.insideBuildingUid), 1, Integer::sum) - 1);
                 continue;
             }
             double ax = cx + airDrawn * 10;
@@ -1732,7 +1766,6 @@ public final class FieldPainter {
         }
         int overflow = 0;
         Set<Integer> занятые = new java.util.LinkedHashSet<>();
-        Set<String> hideUsed = new HashSet<>();
         for (ReplayRecord.Tok u : tokens) {
             if (u.building || "aircraft".equals(u.type)) {
                 continue;
@@ -1742,9 +1775,9 @@ public final class FieldPainter {
             String hideKey = u.insideBuildingUid == null ? null
                 : String.valueOf(u.insideBuildingUid);
             double[] spot = hideKey == null ? null : hideSpots.get(hideKey);
-            if (spot != null && !hideUsed.contains(hideKey)) {
-                hideUsed.add(hideKey);
-                paintHidden(c, size, u, spot[0] - size * 0.20, spot[1] - size * 0.20);
+            if (spot != null) {
+                paintGarrison(c, size, u, spot,
+                    вГнезде.merge(hideKey, 1, Integer::sum) - 1);
                 continue;
             }
             // ЖЕТОНЫ РАССАЖИВАЮТСЯ ВРАЗБРОС, А НЕ ПОДРЯД. Прежде брался первый
@@ -1920,13 +1953,50 @@ public final class FieldPainter {
     }
 
     /** Значок «войско укрыто в своём здании» (§5.3 свода). */
-    private static void paintHidden(FieldCanvas c, double size, ReplayRecord.Tok u,
-                                    double x, double y) {
-        double r = size * 0.115;
-        c.circle(x, y, r, tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]), WHITE, 1.4);
-        c.text(unitLetter(u.type), x, y + r * 0.62, r * 1.5, true, WHITE);
-        // Урон укрытого войска значок не несёт — он и так мелкий; точные числа
-        // даёт подсказка при наведении (проект «гнёзда прочности»).
+    /**
+     * ВОЙСКО ВНУТРИ ЗДАНИЯ — НАСТОЯЩИМ ЖЕТОНОМ ПОВЕРХ ЗДАНИЯ.
+     *
+     * <p>Заказ дизайнера: жетоны войск ложатся в печатное поле военного здания —
+     * «то, что накроет название, так и задумано». Так и на столе: жетон,
+     * произведённый «на себя», кладут прямо на картонку здания, и он закрывает
+     * собой её рисунок. Прежде вместо жетона рисовался цветной кружок с буквой:
+     * по нему нельзя было понять ни рода, ни чей он, ни сколько их там.
+     *
+     * <p>Внутри может сидеть ЛЮБОЕ число жетонов (правило 09.09.2026), поэтому
+     * каждый следующий сдвигается вдоль кромки здания: видно и сколько их, и
+     * что все они одного хозяина.
+     *
+     * @param гнездо {@code {центр X, центр Y, разворот здания, сторон занято}}
+     * @param номер  какой это по счёту жетон в этом здании (с нуля)
+     */
+    private static void paintGarrison(FieldCanvas c, double size, ReplayRecord.Tok u,
+                                      double[] гнездо, int номер) {
+        double face = гнездо[2];
+        FieldGeometry.Shape sh = FieldGeometry.unitByCode(u.type);
+        java.awt.image.BufferedImage tex = Textures.unit(u.type, u.owner);
+        // Жетон в гарнизоне ЗАМЕТНО МЕЛЬЧЕ жетона на гексе: он лежит НА здании,
+        // а не в своей ячейке, и не должен вылезать за его края.
+        double w = FieldGeometry.unitWidth(u.type, 1, size) * ГАРНИЗОН_ЖЕТОН;
+        // Сдвиг вдоль кромки здания — веером от середины, по три в ряд.
+        double шаг = w * 0.55;
+        double вдоль = (номер % 3) * шаг - шаг;
+        double поперёк = (номер / 3) * шаг * 0.75 - (номер < 3 ? 0 : шаг * 0.2);
+        double a = Math.toRadians(face);
+        double x = гнездо[0] - Math.sin(a) * вдоль + Math.cos(a) * поперёк;
+        double y = гнездо[1] + Math.cos(a) * вдоль + Math.sin(a) * поперёк;
+        double сырой = FieldGeometry.unitRotation(sh, face);
+        double поворот = квадратный(tex, sh) ? readableAngle(сырой) : сырой;
+        if (tex != null) {
+            drawUnitTexture(c, tex, sh, new double[]{x, y}, поворот, w,
+                FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)]);
+        } else {
+            c.shape(sh, x, y, поворот, w / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
+                tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
+                FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
+        }
+        // Прочность — как у любого жетона: гарнизон в бою не участвует, но
+        // раненым в здание он войти может.
+        paintHpPipsAt(c, size, u.hp, u.damage, x, y - w * 0.42, поворот);
     }
 
     private static void paintEnergy(FieldCanvas c, double size, boolean powered,

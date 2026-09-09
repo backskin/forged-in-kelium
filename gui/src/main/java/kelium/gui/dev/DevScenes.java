@@ -41,6 +41,9 @@ public final class DevScenes {
         ALL.put("энергия", new Item(
             "станции всех уровней на жёлтом секторе и вне него, кубики и простой",
             DevScenes::энергия));
+        ALL.put("гарнизон", new Item(
+            "войска ВНУТРИ зданий: по одному, по трое и целой толпой",
+            DevScenes::гарнизон));
         ALL.put("энергия-повороты", new Item(
             "казарма, авиабаза и ЦУ на всех шести поворотах — кубики в печатных ячейках",
             DevScenes::энергияПовороты));
@@ -157,6 +160,31 @@ public final class DevScenes {
         s.building(0, hex, BuildingType.POWER_PLANT, 4, (yellow + 2) % 6).idleEnergy(1);
         s.building(0, hs.get(1), BuildingType.AIRBASE, null, 0).energy(3);
         s.building(0, hs.get(2), BuildingType.FACTORY, null, 0).energy(1);
+        return s.round(4, 1);
+    }
+
+    /**
+     * ВОЙСКА В ГАРНИЗОНЕ — ЖЕТОНАМИ ПОВЕРХ ЗДАНИЯ.
+     *
+     * <p>Правило дизайнера 09.09.2026: здание всегда может произвести жетон
+     * «на себя», и внутри может сидеть ЛЮБОЕ их число; оттуда они не атакуют и
+     * защищены постройкой. Сцена показывает, как это выглядит: казарма с одним
+     * жетоном внутри, завод с тремя и авиабаза с шестью — чтобы было видно и
+     * веер, и что жетоны не вылезают за картонку.
+     */
+    private static Scene гарнизон() {
+        Scene s = Scene.of(4).title("войска внутри зданий: один, трое, толпа");
+        List<String> hs = размеченныеГексы(s, 3);
+        s.building(0, hs.get(0), BuildingType.BARRACKS, null, 0);
+        s.garrison(0, hs.get(0), UnitType.INFANTRY);
+        s.building(0, hs.get(1), BuildingType.FACTORY, null, 2);
+        for (int i = 0; i < 3; i++) {
+            s.garrison(0, hs.get(1), UnitType.VEHICLE);
+        }
+        s.building(0, hs.get(2), BuildingType.AIRBASE, null, 4);
+        for (int i = 0; i < 6; i++) {
+            s.garrison(0, hs.get(2), UnitType.AIRCRAFT);
+        }
         return s.round(4, 1);
     }
 
