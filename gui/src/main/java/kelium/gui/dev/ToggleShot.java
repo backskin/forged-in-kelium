@@ -61,6 +61,7 @@ public final class ToggleShot {
         BufferedImage img = new BufferedImage(w, pref.height,
             BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setColor(Color.WHITE);
         g.fillRect(0, 0, w, pref.height);
         row.paint(g);

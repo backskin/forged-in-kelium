@@ -1478,6 +1478,7 @@ public final class Replay2Gui {
             java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(w, h,
                 java.awt.image.BufferedImage.TYPE_INT_RGB);
             java.awt.Graphics2D g = img.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             field.paint(g);
             g.dispose();
             javax.imageio.ImageIO.write(img, "png", file.toFile());

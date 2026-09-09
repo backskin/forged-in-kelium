@@ -212,6 +212,7 @@ public final class OrderStrip extends JPanel {
     protected void paintComponent(Graphics g0) {
         super.paintComponent(g0);
         Graphics2D g = (Graphics2D) g0;
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -237,6 +238,7 @@ public final class OrderStrip extends JPanel {
             // Карта рисуется в НОМИНАЛЬНЫХ координатах 124×176, а на экран попадает
             // с общим масштабом: одна геометрия на любую высоту полоски.
             Graphics2D gc = (Graphics2D) g.create();
+            kelium.report.Сглаживание.включить(gc);
             gc.translate(x, y);
             gc.scale(k, k);
             drawCard(gc, plays.get(i), used.get(i), resolved.get(i), 0, 0, i == 0);

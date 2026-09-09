@@ -237,6 +237,7 @@ public final class HelpShots {
         int h = Math.max(1, c.getHeight());
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setColor(Theme.bg());
         g.fillRect(0, 0, w, h);
@@ -268,6 +269,7 @@ public final class HelpShots {
         BufferedImage cut = src.getSubimage(src.getWidth() / 4, src.getHeight() / 4, w, h);
         BufferedImage out = new BufferedImage(w * 2, h * 2, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = out.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
             RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(cut, 0, 0, w * 2, h * 2, null);

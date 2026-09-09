@@ -300,6 +300,7 @@ final class BuilderScene extends JPanel {
     protected void paintComponent(java.awt.Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
+        kelium.report.Сглаживание.включить(g2);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.translate(getWidth() / 2.0 + panX, getHeight() / 2.0 + panY);
 

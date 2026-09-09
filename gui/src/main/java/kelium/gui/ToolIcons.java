@@ -70,6 +70,7 @@ public final class ToolIcons {
 
         @Override public void paintIcon(Component c, Graphics g0, int x, int y) {
             Graphics2D g = (Graphics2D) g0.create();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
             g.translate(x, y);

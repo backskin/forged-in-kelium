@@ -93,6 +93,7 @@ public final class ResultsPanel extends JComponent {
     @Override
     protected void paintComponent(Graphics g) {
         Graphics2D gg = (Graphics2D) g.create();
+        kelium.report.Сглаживание.включить(gg);
         gg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         gg.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);

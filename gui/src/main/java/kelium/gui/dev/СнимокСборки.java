@@ -118,6 +118,7 @@ public final class СнимокСборки {
         final BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         SwingUtilities.invokeAndWait(() -> {
             Graphics2D g = img.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             держатель[0].doLayout();
             // printAll — ровно то, чем Swing рисует компонент на экран: снимок
             // ловит те же краски, что видит глаз, а не печатные краски экспорта.

@@ -45,6 +45,7 @@ public final class СнимокПланшетов {
         boards.show(rec, rec.frames.get(rec.frames.size() - 1).snapshot);
         BufferedImage im = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = im.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setColor(java.awt.Color.WHITE);
         g.fillRect(0, 0, w, h);
         boards.paint(g);

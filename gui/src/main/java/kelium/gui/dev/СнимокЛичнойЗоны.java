@@ -49,12 +49,14 @@ public final class СнимокЛичнойЗоны {
         // не знает, что на нём поместилось.
         BufferedImage warm = new BufferedImage(w, 3000, BufferedImage.TYPE_INT_RGB);
         Graphics2D wg = warm.createGraphics();
+        kelium.report.Сглаживание.включить(wg);
         sheet.paint(wg);
         wg.dispose();
         int h = Math.max(600, sheet.getPreferredSize().height);
         sheet.setSize(w, h);
         BufferedImage im = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = im.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         sheet.paint(g);
         g.dispose();
         File out = new File(dir, "личная-зона-место" + seat + ".png");

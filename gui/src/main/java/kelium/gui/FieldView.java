@@ -551,6 +551,7 @@ public final class FieldView extends JComponent {
     @Override
     protected void paintComponent(Graphics g0) {
         Graphics2D g = (Graphics2D) g0.create();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
@@ -577,6 +578,7 @@ public final class FieldView extends JComponent {
 
         if (showLegendHint) {
             Graphics2D gt = (Graphics2D) g0.create();
+            kelium.report.Сглаживание.включить(gt);
             gt.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
                 RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             drawTurnCaption(gt, frame);
@@ -585,6 +587,7 @@ public final class FieldView extends JComponent {
         // ИТОГИ ПАРТИИ — на самом последнем шаге, поверх поблёкшего поля.
         if (isLastFrame()) {
             Graphics2D gp = (Graphics2D) g0.create();
+            kelium.report.Сглаживание.включить(gp);
             gp.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
             gp.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,

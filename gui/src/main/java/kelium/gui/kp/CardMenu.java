@@ -267,6 +267,7 @@ public final class CardMenu extends JComponent {
             return;
         }
         Graphics2D g = (Graphics2D) g0.create();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);

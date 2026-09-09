@@ -444,6 +444,7 @@ public final class AssemblyWindow extends JPanel {
         java.awt.image.BufferedImage img =
             new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setColor(ExportPaint.FIELD_BG);
         g.fillRect(0, 0, w, h);
@@ -483,6 +484,7 @@ public final class AssemblyWindow extends JPanel {
         java.awt.image.BufferedImage img =
             new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int savedW = view.getWidth();
         int savedH = view.getHeight();
@@ -752,6 +754,7 @@ public final class AssemblyWindow extends JPanel {
             java.awt.image.BufferedImage img =
                 new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
             Graphics2D g = img.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
             // ФОН КАДРА ЧУТЬ ТЕМНЕЕ БУМАГИ — общее правило всех видов экспорта
@@ -885,6 +888,7 @@ public final class AssemblyWindow extends JPanel {
         @Override protected void paintComponent(Graphics g0) {
             super.paintComponent(g0);
             Graphics2D g = (Graphics2D) g0;
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
 

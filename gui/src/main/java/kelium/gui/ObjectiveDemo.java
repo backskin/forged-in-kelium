@@ -129,6 +129,7 @@ public final class ObjectiveDemo {
         view.fitToWindow();
         BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setColor(Color.WHITE);
         g.fillRect(0, 0, W, H);
         view.paint(g);

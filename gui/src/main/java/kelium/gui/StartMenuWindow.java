@@ -859,6 +859,7 @@ public final class StartMenuWindow {
         @Override
         protected void paintComponent(java.awt.Graphics g0) {
             java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
                 java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
             int d = Math.min(getWidth(), getHeight()) - Theme.px(2);

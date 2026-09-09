@@ -109,6 +109,7 @@ public final class Shot {
         BufferedImage img = new BufferedImage(
             Math.max(1, sz.width), Math.max(1, sz.height), BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         SwingUtilities.invokeAndWait(() -> fw.paint(g));
         g.dispose();
         javax.imageio.ImageIO.write(img, "png", new java.io.File(out));

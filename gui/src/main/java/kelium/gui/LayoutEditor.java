@@ -698,6 +698,7 @@ public final class LayoutEditor {
         java.awt.image.BufferedImage out =
             assemblyTab.renderBlocksLayer(fw, fh, fit[0], fit[1], fit[2], true);
         java.awt.Graphics2D g = out.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
             java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
         if (options.hexGrid()) {
@@ -1835,6 +1836,7 @@ public final class LayoutEditor {
             java.awt.image.BufferedImage img =
                 new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
             java.awt.Graphics2D g = img.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
             // ФОН КАДРА ЧУТЬ ТЕМНЕЕ БУМАГИ (просьба дизайнера 17.08.2026): так
@@ -1975,6 +1977,7 @@ public final class LayoutEditor {
             java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
                 w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             java.awt.Graphics2D g = img.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
             int savedW = getWidth();
@@ -2059,6 +2062,7 @@ public final class LayoutEditor {
             java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
                 w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             java.awt.Graphics2D g = img.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
             int savedW = getWidth();
@@ -2095,6 +2099,7 @@ public final class LayoutEditor {
             java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
                 w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             java.awt.Graphics2D g = img.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
             int savedW = getWidth();
@@ -2145,6 +2150,7 @@ public final class LayoutEditor {
             java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
                 w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             java.awt.Graphics2D g = img.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
             g.setStroke(new BasicStroke(1f));
@@ -2580,6 +2586,7 @@ public final class LayoutEditor {
         @Override protected void paintComponent(Graphics g0) {
             super.paintComponent(g0);
             Graphics2D g = (Graphics2D) g0;
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
 

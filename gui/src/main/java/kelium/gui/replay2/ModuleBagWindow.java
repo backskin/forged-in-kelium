@@ -234,6 +234,7 @@ public final class ModuleBagWindow {
         @Override
         protected void paintComponent(Graphics g0) {
             Graphics2D g = (Graphics2D) g0.create();
+            kelium.report.Сглаживание.включить(g);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                 RenderingHints.VALUE_INTERPOLATION_BILINEAR);

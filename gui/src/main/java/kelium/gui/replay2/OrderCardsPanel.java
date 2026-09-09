@@ -259,6 +259,7 @@ public final class OrderCardsPanel extends JComponent {
             return;
         }
         Graphics2D g = (Graphics2D) g0.create();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 

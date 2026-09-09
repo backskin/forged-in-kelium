@@ -66,6 +66,7 @@ public final class ПолосаИгрока {
             BufferedImage im = new BufferedImage(strip.getWidth(), strip.getHeight(),
                 BufferedImage.TYPE_INT_ARGB);
             java.awt.Graphics2D g = im.createGraphics();
+            kelium.report.Сглаживание.включить(g);
             strip.printAll(g);
             g.dispose();
             File out = new File(dir, "полоса-кадр-" + idx + ".png");

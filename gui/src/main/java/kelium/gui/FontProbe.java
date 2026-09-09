@@ -53,6 +53,7 @@ public final class FontProbe {
         col.setBackground(java.awt.Color.WHITE);
         BufferedImage img = new BufferedImage(700, 380, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         g.setColor(java.awt.Color.WHITE);
         g.fillRect(0, 0, 700, 380);
         SwingUtilities.invokeAndWait(() -> {

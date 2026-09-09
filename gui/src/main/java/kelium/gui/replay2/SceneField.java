@@ -382,6 +382,7 @@ public final class SceneField extends JComponent {
     @Override
     protected void paintComponent(Graphics g0) {
         Graphics2D g = (Graphics2D) g0.create();
+        kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -409,6 +410,7 @@ public final class SceneField extends JComponent {
         // наоборот светлеют — см. FieldPainter.dark (просьба дизайнера 13.08.2026).
         kelium.report.FieldPainter.dark = Theme.isDark();
         Graphics2D gf = (Graphics2D) g.create();
+        kelium.report.Сглаживание.включить(gf);
         gf.transform(вид());
         kelium.report.FieldPainter.paintField(
             new kelium.report.Java2DCanvas(gf, zoom, getFont()),
@@ -429,6 +431,7 @@ public final class SceneField extends JComponent {
             paintDimming(g, f);
         }
         Graphics2D gm = (Graphics2D) g.create();
+        kelium.report.Сглаживание.включить(gm);
         gm.transform(вид());
         if (!cheapMode) {
             paintMarkup(gm, f);

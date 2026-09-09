@@ -110,6 +110,7 @@ public final class Replay2Shot {
 
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
+        kelium.report.Сглаживание.включить(g);
         SwingUtilities.invokeAndWait(() -> frame.paint(g));
         g.dispose();
         javax.imageio.ImageIO.write(img, "png", new java.io.File(outFile));

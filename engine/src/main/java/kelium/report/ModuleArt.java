@@ -96,15 +96,25 @@ public final class ModuleArt {
         if (art == null || side <= 0) {
             return false;
         }
+        // ПРОПОРЦИИ. Красные модули нарисованы квадратом, синие — вытянутым
+        // прямоугольником (400x667). Растягивать синий жетон до квадрата
+        // нельзя: на столе это картон ровно той формы, что нарисована. Поэтому
+        // картинка ВПИСЫВАЕТСЯ в отведённый квадрат по большей стороне и
+        // центрируется в нём.
+        double доля = (double) art.getWidth() / art.getHeight();
+        double ш = доля >= 1 ? side : side * доля;
+        double в = доля >= 1 ? side / доля : side;
+        double лx = x + (side - ш) / 2;
+        double лy = y + (side - в) / 2;
         double lift = Math.max(1.0, side * 0.055);
-        double arc = side * 0.20;
+        double arc = Math.min(ш, в) * 0.20;
         if (edge != null) {
             g.setColor(edge);
-            g.fill(new RoundRectangle2D.Double(x + lift, y + lift, side, side, arc, arc));
+            g.fill(new RoundRectangle2D.Double(лx + lift, лy + lift, ш, в, arc, arc));
         }
-        BufferedImage lvl = Mips.forWidth(art, (int) Math.ceil(side));
-        g.drawImage(lvl, (int) Math.round(x), (int) Math.round(y),
-            (int) Math.round(side), (int) Math.round(side), null);
+        BufferedImage lvl = Mips.forWidth(art, (int) Math.ceil(ш));
+        g.drawImage(lvl, (int) Math.round(лx), (int) Math.round(лy),
+            (int) Math.round(ш), (int) Math.round(в), null);
         return true;
     }
 }
