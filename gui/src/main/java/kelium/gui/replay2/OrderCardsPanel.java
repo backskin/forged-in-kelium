@@ -63,14 +63,15 @@ public final class OrderCardsPanel extends JComponent {
     private static final long serialVersionUID = 1L;
 
     /**
-     * ПРОПОРЦИИ КАРТЫ. Шире, чем печатная карта приказа (184/132), СОЗНАТЕЛЬНО:
-     * подписи идут ГОРИЗОНТАЛЬНО (требование дизайнера 20.08.2026 — «тупо что
-     * на картах всё написано вертикально, поверни нормально горизонтально»), а
-     * названия приказов длинные («ИНФРАСТРУКТУРА», «ПРИОБРЕТЕНИЕ»). На узкой
-     * карте горизонтальный текст пришлось бы либо резать, либо мельчить до
-     * нечитаемого — поэтому карта здесь не копия печатной, а её читаемый вид.
+     * ПРОПОРЦИИ КАРТЫ — РОВНО КАК У ПЕЧАТНОЙ (661×1028 точек, то есть 1,555).
+     *
+     * <p>Прежде карта была шире и ниже (1,24): на ней стояли собственные
+     * подписи приказов, и под горизонтальный текст нужна была ширина. Теперь на
+     * карте лежит сама печать художника, а печать нельзя ни ужать, ни
+     * растянуть — иначе это уже другая карта (заказ дизайнера 09.09.2026:
+     * «карты скукоживаются, сохрани пропорции, формат этих же карт»).
      */
-    private static final double CARD_RATIO = 1.24;
+    private static final double CARD_RATIO = 1028 / 661.0;
     /** Наклон между соседними картами веера, градусы. */
     private static final double FAN_STEP_DEG = 16;
     /** Максимальный разворот крайней карты веера, градусы. */
@@ -564,13 +565,12 @@ public final class OrderCardsPanel extends JComponent {
                           Color deck, boolean active, String top, String bottom,
                           String tip, String cardId, String deckColor) {
         Shape card = new RoundRectangle2D.Double(x, y, w, h, Theme.px(6), Theme.px(6));
-        g.setColor(Theme.panel());
-        g.fill(card);
-        // ПЕЧАТНОЕ ЛИЦО КАРТЫ, если художник его нарисовал. Раньше карта была
-        // цветным прямоугольником с двумя подписями; теперь под подписями лежит
-        // сама карта, и веер в руке выглядит как рука за столом. Подписи
-        // остаются поверх: в полосе шириной с палец печатный текст не прочесть,
-        // а знать, что за приказ, надо с одного взгляда.
+        // ПЕЧАТНАЯ КАРТА — И БОЛЬШЕ НИЧЕГО ПОВЕРХ. Прежде на неё ложилась вуаль
+        // цветом колоды и две собственные подписи приказов: они закрывали
+        // рисунок художника, ради которого карта и нарисована (заказ дизайнера
+        // 09.09.2026: «не надо накладывать поверх карт приказов ещё и векторный
+        // цвет и название, они перекрывают оригинальную картинку»). Что за
+        // приказ — говорит подсказка при наведении и лог.
         java.awt.image.BufferedImage art = orderArt(cardId, deckColor);
         if (art != null) {
             Shape saved = g.getClip();
@@ -578,10 +578,18 @@ public final class OrderCardsPanel extends JComponent {
             g.drawImage(art, (int) Math.round(x), (int) Math.round(y),
                 (int) Math.round(w), (int) Math.round(h), null);
             g.setClip(saved);
-            // Лёгкая вуаль цветом колоды: рисунок не должен спорить с подписями.
-            g.setColor(Theme.alpha(Theme.panel(), active ? 0.30 : 0.45));
-            g.fill(card);
+            // Активная карта обводится — она одна выделяется из веера.
+            if (active) {
+                g.setColor(Theme.accent());
+                g.setStroke(new BasicStroke(2.2f));
+                g.draw(card);
+            }
+            hits.add(new Hit(g.getTransform().createTransformedShape(card), tip));
+            return;
         }
+        // ПЕЧАТИ НЕТ — рисуем прежним видом: цветная карта с подписями.
+        g.setColor(Theme.panel());
+        g.fill(card);
         g.setColor(Theme.alpha(deck, active ? 0.42 : 0.24));
         g.fill(card);
         g.setColor(active ? Theme.accent() : Theme.alpha(deck, 0.85));

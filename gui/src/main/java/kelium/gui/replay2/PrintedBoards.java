@@ -250,8 +250,20 @@ final class PrintedBoards {
         }
     }
 
-    /** Крыло планшета: куда и как ложится жетон одного уровня. */
-    private record Крыло(double cx, double cy, double угол, double длина, double глубина) {
+    /**
+     * Крыло планшета: куда и как ложится жетон одного уровня.
+     *
+     * @param крx     середина внешней кромки крыла
+     * @param крy     то же по вертикали
+     * @param нx      нормаль к кромке, направленная вглубь планшета
+     * @param нy      то же по вертикали
+     * @param угол    поворот жетона: широкой стороной к кромке
+     * @param длина   длина кромки — сколько места вдоль
+     * @param размер  какой глубины бывает жетон на этом планшете
+     * @param полоса  от кромки до внутренней черты печати: сюда жетон и упирается
+     */
+    private record Крыло(double крx, double крy, double нx, double нy, double угол,
+                         double длина, double размер, double полоса) {
     }
 
     /**
@@ -275,7 +287,14 @@ final class PrintedBoards {
             в[i][0] = лист.getMinX() + доли[i][0] * лист.width;
             в[i][1] = лист.getMinY() + доли[i][1] * лист.height;
         }
-        double глубина = лист.height * 0.256;
+        // РАЗМЕР ЖЕТОНА и ПОЛОСА КРЫЛА — разные величины. Полоса идёт от кромки
+        // планшета до полупрозрачной черты печати, за которой начинается
+        // середина; жетон немного тоньше её. Он упирается УЗКИМ краем в эту
+        // черту, а не лежит вплотную к кромке (заказ дизайнера 09.09.2026: «есть
+        // зазор до чёрт таких полупрозрачных — его не должно быть, их надо
+        // отодвинуть от края»). Обе доли сняты с печати.
+        double размер = лист.height * 0.256;
+        double полоса = лист.height * 0.283;
         double цx = лист.getCenterX();
         double цy = лист.getCenterY();
         java.util.List<Крыло> out = new java.util.ArrayList<>();
@@ -316,8 +335,7 @@ final class PrintedBoards {
                 if (-Math.sin(угол) * -нx + Math.cos(угол) * -нy < 0) {
                     угол += Math.PI;
                 }
-                out.add(new Крыло(сx + нx * глубина / 2, сy + нy * глубина / 2,
-                    угол, длина, глубина));
+                out.add(new Крыло(сx, сy, нx, нy, угол, длина, размер, полоса));
             }
         }
         return out;
@@ -351,7 +369,9 @@ final class PrintedBoards {
         Крыло своё = крылья.get(0);
         double ближе = Double.MAX_VALUE;
         for (Крыло к : крылья) {
-            double d = Math.hypot(к.cx() - cx, к.cy() - cy);
+            // Сравниваем с СЕРЕДИНОЙ ПОЛОСЫ крыла: там и лежат его ячейки.
+            double d = Math.hypot(к.крx() + к.нx() * к.полоса() / 2 - cx,
+                к.крy() + к.нy() * к.полоса() / 2 - cy);
             if (d < ближе) {
                 ближе = d;
                 своё = к;
@@ -364,8 +384,9 @@ final class PrintedBoards {
         if (найдено != null && найдено.image() != null) {
             BufferedImage tex = найдено.image();
             double k = масштабВКрыло(tex.getWidth(), tex.getHeight(), своё);
+            double[] c = центрВКрыле(своё, tex.getHeight() * k);
             AffineTransform at = new AffineTransform();
-            at.translate(своё.cx(), своё.cy());
+            at.translate(c[0], c[1]);
             at.rotate(своё.угол());
             at.scale(k, k);
             at.translate(-tex.getWidth() / 2.0, -tex.getHeight() / 2.0);
@@ -388,8 +409,9 @@ final class PrintedBoards {
             return;
         }
         double k = масштабВКрыло(sh.vbW(), sh.vbH(), своё);
+        double[] c = центрВКрыле(своё, sh.vbH() * k);
         AffineTransform at = new AffineTransform();
-        at.translate(своё.cx(), своё.cy());
+        at.translate(c[0], c[1]);
         at.rotate(своё.угол());
         at.scale(k, k);
         at.translate(-sh.vbW() / 2.0, -sh.vbH() / 2.0);
@@ -410,7 +432,18 @@ final class PrintedBoards {
      * Полей по длине оставляем чуть — картонка не упирается в соседнее крыло.
      */
     private static double масштабВКрыло(double texW, double texH, Крыло крыло) {
-        return Math.min(крыло.длина() * 0.97 / texW, крыло.глубина() * 1.0 / texH);
+        return Math.min(крыло.длина() * 0.97 / texW, крыло.размер() / texH);
+    }
+
+    /**
+     * СЕРЕДИНА ЖЕТОНА В КРЫЛЕ: узким краем — во внутреннюю черту печати.
+     *
+     * @param высота глубина жетона после масштабирования
+     */
+    private static double[] центрВКрыле(Крыло крыло, double высота) {
+        double вглубь = крыло.полоса() - высота / 2;
+        return new double[]{крыло.крx() + крыло.нx() * вглубь,
+            крыло.крy() + крыло.нy() * вглубь};
     }
 
     /** Кубик ресурса в напечатанной ячейке: тем же значком, что и везде. */
