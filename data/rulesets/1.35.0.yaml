@@ -409,8 +409,9 @@ actions:
     # (не за шаг). Каждый жетон активируется один раз. Ровно то же, что уже
     # играет Бой (actions.combat.surcharge_model: per_token) — одна грамматика
     # на оба военных действия.
-    cost_model: per_token                 # flat | escalating | per_token
+    surcharge_model: per_token            # per_token | per_move (прежняя модель)
     token_surcharge_ammo: 1
+    cost_model: flat                      # устарело: только для per_move
     first_hex_free: true
     # Ключи старой грамматики: читаются, когда cost_model = flat/escalating.
     flat_ammo_per_extra_move: 1

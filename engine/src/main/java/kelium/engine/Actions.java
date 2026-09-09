@@ -1888,9 +1888,10 @@ public final class Actions {
             // гарнизон, печатные контейнеры и журнал у них общие, и второй копии
             // этого кода быть не должно — она разойдётся с первой.
             boolean близнец = "per_token".equals(
-                rs.getStr("actions.movement.cost_model", "flat"));
+                rs.getStr("actions.movement.surcharge_model", "per_move"));
             int доплатаЗаЖетон = близнец
-                ? rs.getInt("actions.movement.token_surcharge_ammo") : 0;
+                ? rs.getInt("actions.movement.token_surcharge_ammo",
+                    rs.getInt("actions.movement.flat_ammo_per_extra_move")) : 0;
             Set<Integer> ужеАктивирован = new HashSet<>();
 
             // БЕСПЛАТНЫЙ ГЕКС выбирается один раз, до первого шага. Кандидаты —

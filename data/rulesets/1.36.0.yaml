@@ -447,8 +447,9 @@ actions:
     # перемещается не больше одного раза за действие. Вход в гарнизон и возврат
     # в запас — тоже перемещения. Прежняя модель «одно бесплатное перемещение
     # любому жетону, дальше по боеприпасу за шаг» была расхождением с правилами.
-    cost_model: per_token                 # flat | escalating | per_token
-    token_surcharge_ammo: 1
+    surcharge_model: per_token            # per_token | per_move (прежняя модель)
+    token_surcharge_ammo: 1               # доплата за жетон вне выбранного гекса
+    cost_model: flat                      # устарело: только для per_move
     first_hex_free: true
     # Ключи старой грамматики: читаются, когда cost_model = flat/escalating.
     flat_ammo_per_extra_move: 1
