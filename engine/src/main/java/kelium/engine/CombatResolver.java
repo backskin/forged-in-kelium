@@ -1593,10 +1593,10 @@ public final class CombatResolver {
         boolean heldForeignToken = attacker.cuDestructionTokens >= need - 1;
         // Супер-задания 5.0: «Трофейный обоз» и «Тень штаба» смотрят, разрушалось
         // ли ЦУ игрока ХОТЬ РАЗ за партию.
-        owner.super5CuEverLost = true;
+        owner.cuEverLost = true;
         // «Тень штаба»: глухой жетон изъят из игры навсегда — за снос этого ЦУ
         // захватчик не получает НИЧЕГО: ни оборота, ни шага к военной победе.
-        if (owner.super5SealRemoved) {
+        if (owner.cuTokenRemoved) {
             owner.ownCuTokenAvailable = false;
         }
         if (owner.ownCuTokenAvailable) {

@@ -255,27 +255,15 @@ public final class PlayerState {
      */
     public int killsTotal = 0;
 
-    // === СУПЕР-ЗАДАНИЯ 5.0 («суперутиль или накопитель», черновик 25.08.2026) ===
-    /** Карта 5.0, розданная втайне при подготовке; null — режим выключен. */
-    public String super5Card = null;
-    /** Сожжена ли карта ради суперутиля (накопитель тогда пропал). */
-    public boolean super5Burned = false;
-    /** Сколько раундов игрок начинал первым (накопитель «Штабной игры»). */
-    public int super5RoundsFirst = 0;
+    // === ЧТО СЧИТАЮТ МНОЖИТЕЛИ СУПЕР-ЗАДАНИЙ ===
+    /** Сколько раундов игрок начинал первым (множитель «Штабной игры»). */
+    public int roundsFirstPlayer = 0;
     /** Разрушалось ли ЦУ игрока хоть раз («Трофейный обоз», «Тень штаба»). */
-    public boolean super5CuEverLost = false;
-    /** Глухой жетон изъят из игры навсегда («Тень штаба»): снос ЦУ не даёт оборота. */
-    public boolean super5SealRemoved = false;
-    /** Выполнено заданий за партию (накопитель «Архива штаба»). */
+    public boolean cuEverLost = false;
+    /** Жетон уничтожения ЦУ изъят из игры навсегда («Тень штаба»). */
+    public boolean cuTokenRemoved = false;
+    /** Выполнено заданий за партию (множитель «Архива штаба»). */
     public int objectivesCompleted = 0;
-    /**
-     * НАГРАДА НИЗА СУПЕР-КАРТЫ ПОЛУЧЕНА (режим 6.0).
-     *
-     * <p>Отдельно от {@link #super5Burned}: в 6.0 карта НЕ сжигается — она
-     * остаётся перед игроком и до конца партии даёт множитель верха. Получить
-     * награду низа можно один раз, и это не отменяет множитель.
-     */
-    public boolean super6RewardTaken = false;
 
     public PlayerState(int seat, PlayerBoard board, Resources resources, String startHex) {
         this.seat = seat;
@@ -354,13 +342,12 @@ public final class PlayerState {
         p.warTrackVp = warTrackVp;
         p.cuKills = cuKills;
         p.killsTotal = killsTotal;
-        p.super5Card = super5Card;
-        p.super5Burned = super5Burned;
-        p.super5RoundsFirst = super5RoundsFirst;
-        p.super5CuEverLost = super5CuEverLost;
-        p.super5SealRemoved = super5SealRemoved;
+        p.superObjective = superObjective;
+        p.roundsFirstPlayer = roundsFirstPlayer;
+        p.cuEverLost = cuEverLost;
+        p.cuTokenRemoved = cuTokenRemoved;
         p.objectivesCompleted = objectivesCompleted;
-        p.super6RewardTaken = super6RewardTaken;
+        p.superObjectiveComplete = superObjectiveComplete;
         return p;
     }
 

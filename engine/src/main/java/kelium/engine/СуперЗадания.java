@@ -19,35 +19,33 @@ import kelium.core.UnitToken;
 import kelium.core.UnitType;
 
 /**
- * СУПЕР-ЗАДАНИЯ 5.0 — «суперутиль или накопитель».
+ * СУПЕР-ЗАДАНИЯ — множитель очков в финале и жёсткое требование с наградой.
  *
- * <p>Механика по черновику дизайнера 25.08.2026 (см.
- * {@code design-docs/ЧЕРНОВИК — супер-задания 5.0 (12 карт).md}): каждому игроку
- * в подготовку втайне раздаётся ОДНА карта. Сыграть можно только одну половину:
+ * <p>Каждому игроку в подготовку втайне раздаётся ОДНА карта, и она остаётся
+ * перед ним до конца партии: не сжигается, не вскрывается, из игры не уходит.
+ *
  * <ul>
- *   <li><b>СУПЕРУТИЛЬ</b> — разовый эффект чудовищной силы. Сжигается
- *       СПЕЦ-действием в любой момент; накопитель при этом пропадает;</li>
- *   <li><b>НАКОПИТЕЛЬ</b> — победные очки в конце партии, если карта дожила до
- *       конца нетронутой. Считается по полю и открытой выкладке.</li>
+ *   <li><b>ВЕРХ — МНОЖИТЕЛЬ ПОБЕДНЫХ ОЧКОВ</b>, считается в финале партии
+ *       ({@link #stockpileVp}). Сюда переехали базовые источники очков
+ *       (решение дизайнера 04.09.2026);</li>
+ *   <li><b>НИЗ — ЖЁСТКОЕ ТРЕБОВАНИЕ</b> ({@link #требованиеВыполнено}) и очень
+ *       хорошая награда за него ({@link #наградаНиза}), которая берётся один раз
+ *       за партию и множитель верха не отменяет.</li>
  * </ul>
  *
- * <p>Прежняя конструкция (четыре ячейки, вскрытие, счётчик запуска, жетон
- * супероружия) в этом режиме не действует. Режим включается ключом
- * {@code super_objectives.mode: solo5} — старые своды не меняются.
+ * <p>Прежние редакции («суперутиль или накопитель», четыре ячейки со счётчиком
+ * запуска, жетон супероружия, символы под планшетом) отменены и вычищены из
+ * движка 09.09.2026 по требованию дизайнера.
  *
- * <p>Здесь и раздача, и все двенадцать утилей, и все двенадцать накопителей:
- * механика цельная, и растаскивать её по трём файлам значило бы получить ровно
- * тот класс ошибок «поле есть — никто не пишет», что чинился сегодня же.
+ * <p>Здесь всё вместе: раздача, требования и награды. Механика цельная, и
+ * растаскивать её по трём файлам значило бы получить ровно тот класс ошибок
+ * «поле есть — никто не пишет», от которого этот класс однажды и лечили.
  */
-public final class Super5 {
+public final class СуперЗадания {
 
-    private Super5() {
+    private СуперЗадания() {
     }
 
-    /** Включён ли режим 5.0 («суперутиль или накопитель») этим сводом. */
-    public static boolean on(GameState s) {
-        return "solo5".equals(String.valueOf(Ctx.rules(s).get("super_objectives.mode", "")));
-    }
 
     /**
      * Включён ли режим 6.0 («множитель в финале плюс жёсткое требование»).
@@ -70,7 +68,7 @@ public final class Super5 {
         java.util.Collections.shuffle(pool, rng);
         for (PlayerState p : s.players) {
             if (!pool.isEmpty()) {
-                p.super5Card = pool.remove(pool.size() - 1);
+                p.superObjective = pool.remove(pool.size() - 1);
             }
         }
     }
@@ -79,21 +77,6 @@ public final class Super5 {
     //  СУПЕРУТИЛИ
     // ==================================================================
 
-    /**
-     * Сжечь карту ради суперутиля. Возвращает журнал того, что произошло, —
-     * он уходит в событие, потому что «эффект чудовищной силы» без следа в
-     * логе неотличим от бага.
-     */
-    public static Map<String, Object> burn(GameState s, PlayerState p, Agent agent,
-                                           java.util.function.Consumer<Map<String, Object>> emit) {
-        String id = p.super5Card;
-        Map<String, Object> got = new HashMap<>();
-        if (id == null || p.super5Burned) {
-            return got;
-        }
-        p.super5Burned = true;
-        return выдать(s, p, agent, emit, id);
-    }
 
     /**
      * КАРТЫ, КОТОРЫЕ ЭТОТ КОД УМЕЕТ РАЗЫГРЫВАТЬ.
@@ -128,10 +111,10 @@ public final class Super5 {
      */
     public static Map<String, Object> наградаНиза(GameState s, PlayerState p, Agent agent,
                                                   java.util.function.Consumer<Map<String, Object>> emit) {
-        if (p.super5Card == null) {
+        if (p.superObjective == null) {
             return new HashMap<>();
         }
-        return выдать(s, p, agent, emit, p.super5Card);
+        return выдать(s, p, agent, emit, p.superObjective);
     }
 
     private static Map<String, Object> выдать(GameState s, PlayerState p, Agent agent,
@@ -464,7 +447,7 @@ public final class Super5 {
         if (где != null) {
             p.redPlacements.remove(где);
         }
-        p.super5SealRemoved = true;
+        p.cuTokenRemoved = true;
         return где != null;
     }
 
@@ -481,13 +464,10 @@ public final class Super5 {
      */
     public static int stockpileVp(GameState s, int seat) {
         PlayerState p = s.player(seat);
-        if (p.super5Card == null) {
+        if (p.superObjective == null) {
             return 0;
         }
-        if (p.super5Burned && !on6(s)) {
-            return 0;
-        }
-        return switch (p.super5Card) {
+        return switch (p.superObjective) {
             case "s5_01" -> {
                 java.util.Set<UnitType> роды = new java.util.HashSet<>();
                 for (UnitToken u : p.unitsOnField()) {
@@ -547,8 +527,8 @@ public final class Super5 {
                 }
                 yield Math.min(6, 2 * n);
             }
-            case "s5_09" -> p.super5CuEverLost ? 0 : Math.min(6, p.killsTotal);
-            case "s5_10" -> Math.min(6, 2 * p.super5RoundsFirst);
+            case "s5_09" -> p.cuEverLost ? 0 : Math.min(6, p.killsTotal);
+            case "s5_10" -> Math.min(6, 2 * p.roundsFirstPlayer);
             case "s5_11" -> {
                 int n = 0;
                 for (BuildingToken b : p.buildingsOnField()) {
@@ -559,12 +539,12 @@ public final class Super5 {
                 yield Math.min(6, 2 * n);
             }
             case "s5_12" -> {
-                if (p.super5CuEverLost) {
+                if (p.cuEverLost) {
                     yield 0;
                 }
                 int n = 3;
                 for (PlayerState o : s.players) {
-                    if (o.seat != seat && o.super5CuEverLost) {
+                    if (o.seat != seat && o.cuEverLost) {
                         n += 1;
                     }
                 }
@@ -605,10 +585,10 @@ public final class Super5 {
      */
     public static boolean требованиеВыполнено(GameState s, int seat) {
         PlayerState p = s.player(seat);
-        if (p.super5Card == null) {
+        if (p.superObjective == null) {
             return false;
         }
-        switch (p.super5Card) {
+        switch (p.superObjective) {
             case "s5_15":
             case "s5_01": {
                 // Три РАЗНЫХ рода на одном гексе — смотр в прямом смысле.
@@ -697,9 +677,9 @@ public final class Super5 {
             }
             case "s5_17":
             case "s5_09":
-                return p.killsTotal >= 4 && !p.super5CuEverLost;
+                return p.killsTotal >= 4 && !p.cuEverLost;
             case "s5_10":
-                return p.super5RoundsFirst >= 2;
+                return p.roundsFirstPlayer >= 2;
             case "s5_11": {
                 // Четыре здания первого уровня — широкая дешёвая сеть.
                 int n = 0;
@@ -712,11 +692,11 @@ public final class Super5 {
             }
             case "s5_12": {
                 // Твоё ЦУ цело, а у соперника уже снесли: война идёт, но не у тебя.
-                if (p.super5CuEverLost) {
+                if (p.cuEverLost) {
                     return false;
                 }
                 for (PlayerState o : s.players) {
-                    if (o.seat != seat && o.super5CuEverLost) {
+                    if (o.seat != seat && o.cuEverLost) {
                         return true;
                     }
                 }

@@ -48,10 +48,10 @@ class GameSetupTest {
                 // делает игрок в начале партии (super_objectives.deal = 2).
                 // Где лежит карта, зависит от РЕЖИМА супер-заданий: в старых
                 // режимах это superObjective/superObjectiveOffer, в режимах
-                // «одна карта втайне» (solo5/solo6) — super5Card. Сторож
+                // «одна карта втайне» (solo5/solo6) — superObjective. Сторож
                 // проверяет, что карта РАЗДАНА, а не в каком она поле.
                 assertTrue(p.superObjective != null || !p.superObjectiveOffer.isEmpty()
-                        || p.super5Card != null,
+                        || p.superObjective != null,
                     "супер-задание назначено, предложено на выбор или роздано втайне");
             }
         }

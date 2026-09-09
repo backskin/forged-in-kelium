@@ -158,7 +158,7 @@ public final class Scoring {
         // рубашка так и не сложилась: иначе вложенное в первую часть пропадает.
         // Супер-задания 5.0: накопитель платит, только если карта дожила до
         // конца партии нетронутой; сожжённая уже расплатилась суперутилём.
-        int super5 = kelium.engine.Super5.stockpileVp(state, seat);
+        int super5 = kelium.engine.СуперЗадания.stockpileVp(state, seat);
         if (super5 != 0) {
             breakdown.put("super5_stockpile", super5);
         }

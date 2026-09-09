@@ -70,22 +70,19 @@ public final class Супер5 {
             GameEngine.playGame(s, ags, ev -> { });
             раундов += s.round;
             for (PlayerState p : s.players) {
-                if (p.super5Card == null) {
+                if (p.superObjective == null) {
                     continue;
                 }
-                Карта k = итог.computeIfAbsent(p.super5Card, x -> new Карта());
+                Карта k = итог.computeIfAbsent(p.superObjective, x -> new Карта());
                 if (k.имя.isEmpty()) {
-                    var e = cfg.content.get("super_objectives").find(p.super5Card);
-                    k.имя = e == null ? p.super5Card : String.valueOf(e.get("name"));
+                    var e = cfg.content.get("super_objectives").find(p.superObjective);
+                    k.имя = e == null ? p.superObjective : String.valueOf(e.get("name"));
                 }
                 k.роздано++;
-                if (p.super5Burned) {
-                    k.сожжено++;
-                }
-                if (p.super6RewardTaken) {
+                if (p.superObjectiveComplete) {
                     k.требованиеВзято++;
                 }
-                if (kelium.engine.Super5.требованиеВыполнено(s, p.seat)) {
+                if (kelium.engine.СуперЗадания.требованиеВыполнено(s, p.seat)) {
                     k.требованиеБылоГотово++;
                 }
                 // В 6.0 множитель платит всегда — карта не сжигается.

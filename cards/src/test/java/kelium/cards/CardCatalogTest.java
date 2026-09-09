@@ -65,7 +65,7 @@ class CardCatalogTest {
     void каждоеСуперЗаданиеВтайнеДвижокЗнает() {
         java.util.List<String> нет = new java.util.ArrayList<>();
         for (Map<String, Object> card : entries("super_objectives")) {
-            if (втайне(card) && !kelium.engine.Super5.знает(String.valueOf(card.get("id")))) {
+            if (втайне(card) && !kelium.engine.СуперЗадания.знает(String.valueOf(card.get("id")))) {
                 нет.add(String.valueOf(card.get("id")));
             }
         }
