@@ -1202,7 +1202,11 @@ public final class GameEngine {
         // для карт, у которых в данных задан top.
         for (String cid : new ArrayList<>(p.objectiveHand)) {
             Map<String, Object> oc = Ctx.cards(s, "objectives").find(cid);
-            if (oc != null && oc.get("top") instanceof Map<?, ?>) {
+            if (oc != null && oc.get("top") instanceof Map<?, ?>
+                    && kelium.engine.Реакции.видКарты(s, cid) == null) {
+                // ВЕРХ «В МОМЕНТЕ» В СВОЙ ХОД НЕ ПРЕДЛАГАЕТСЯ. Реакция ждёт
+                // чужого удара, и сжечь её просто так значило бы отдать карту
+                // даром: окно ей открывает бой (kelium.engine.Реакции).
                 opts.add(new Choice("spec_objective_burn", cid, "burn top " + cid));
             }
         }

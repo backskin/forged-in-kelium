@@ -305,6 +305,12 @@ public final class EngineCardContext implements CardContext {
         return !kelium.engine.Effects.apply("heal_hex", state, seat, Map.of()).isEmpty();
     }
 
+    @Override public boolean exchangeScienceOrMarket(int amount) {
+        Map<String, Object> got = kelium.engine.Effects.apply("exchange_science_or_market",
+            state, seat, Map.of("amount", amount));
+        return Boolean.TRUE.equals(got.get("ran"));
+    }
+
     @Override public void grantVp(int amount, String source) {
         if (amount == 0) {
             return;

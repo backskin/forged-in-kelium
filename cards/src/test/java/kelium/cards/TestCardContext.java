@@ -168,6 +168,11 @@ public final class TestCardContext implements CardContext {
         return true;
     }
 
+    @Override public boolean exchangeScienceOrMarket(int amount) {
+        log.add(Map.of("exchange_science_or_market", amount));
+        return true;
+    }
+
     @Override public List<Token> enemyTokensOn(String hexId) {
         List<Token> out = new java.util.ArrayList<>();
         for (Token t : enemyTokensOnField()) {

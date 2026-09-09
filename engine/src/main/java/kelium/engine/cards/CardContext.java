@@ -191,6 +191,12 @@ public interface CardContext {
     /** РЕМОНТ ГЕКСА: снять по кубику урона со всего своего на одном гексе. */
     boolean healHex();
 
+    /**
+     * ОДИН ОБМЕН — в Науке (без шага трека) или на Рынке (без карты); что из
+     * двух, выбирает игрок.
+     */
+    boolean exchangeScienceOrMarket(int amount);
+
     /** Выдать победные очки напрямую (источник указывается для разбора партии). */
     void grantVp(int vp, String source);
 

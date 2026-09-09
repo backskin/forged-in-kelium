@@ -2261,7 +2261,8 @@ public final class Actions {
                 if (surcharge > 0) {
                     player.resources.pay(Resource.AMMO, surcharge);   // плата за ПРАВО боя
                 }
-                boolean did = resolver.runBattle(player.seat, agent);
+                boolean did = resolver.runBattle(player.seat, agent, false, null,
+                    ctx.attackTokensLimit);
                 if (!did) {
                     // бой не состоялся (пас/нет целей): вернуть наценку — право
                     // не было использовано.
@@ -2445,7 +2446,8 @@ public final class Actions {
                 // обычное правило — не больше ОДНОГО предложения с карты за
                 // действие; надбавка утиля снимает именно это ограничение, а
                 // ячейки предложения по-прежнему расходуются.
-                if ((!cardOfferUsed || ctx.marketBothOffers) && active != null) {
+                if ((!cardOfferUsed || ctx.marketBothOffers) && active != null
+                        && ctx.exchangeOnlyLimit == 0) {
                     Map<String, Object> card = cfg.content.get("market").find(active);
                     if (card != null) {
                         for (String side : new String[]{"left", "right"}) {
@@ -2485,6 +2487,9 @@ public final class Actions {
                             }
                         }
                     }
+                }
+                if (ctx.exchangeOnlyLimit > 0 && deals >= ctx.exchangeOnlyLimit) {
+                    break;
                 }
                 opts.add(new Choice("pass", null, "хватит торговать"));
 
@@ -2688,6 +2693,11 @@ public final class Actions {
             List<String> usedExchanges = new ArrayList<>();
             String exchange = null;
             while (true) {
+                // ВЕРХ КАРТЫ ДАЁТ РОВНО СТОЛЬКО ОБМЕНОВ, сколько написано, и ни
+                // одного шага трека (см. TurnContext.exchangeOnlyLimit).
+                if (ctx.exchangeOnlyLimit > 0 && usedExchanges.size() >= ctx.exchangeOnlyLimit) {
+                    break;
+                }
                 String got = maybeExchange(player, agent);
                 if (got == null) {
                     break;
@@ -2707,7 +2717,8 @@ public final class Actions {
             // ради баланса: за одно действие нельзя разложить трофеи сразу по
             // всем трекам). Ключа нет — работает как раньше, по одному шагу на
             // каждом треке, поэтому старые своды читаются без правок.
-            int tracksAllowed = rs.getInt("tech.tracks_per_action", tech.tracks.size());
+            int tracksAllowed = ctx.exchangeOnlyLimit > 0 ? 0
+                : rs.getInt("tech.tracks_per_action", tech.tracks.size());
             // КУБИКИ НАВСЕГДА (свод 1.33.0 и новее): каждый шаг выкладывает НОВЫЙ
             // кубик из личного запаса игрока, прежние ячейки за ним остаются.
             // Кончился запас — шаги больше не предлагаются вовсе, сколько бы

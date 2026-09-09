@@ -80,6 +80,7 @@ public final class Effects {
             case "landing" -> landing(s, seat, p);
             case "speed_boost" -> speedBoost(s, seat, p);
             case "energy_or_modules" -> energyOrModules(s, seat, p);
+            case "exchange_science_or_market" -> exchangeScienceOrMarket(s, seat, p);
             case "convert" -> convert(s, seat, p);
             case "discard_enemy_arsenal" -> discardEnemyArsenal(s, seat, p);
             case "unlimited_spec" -> unlimitedSpec(s, seat, p);
@@ -455,6 +456,15 @@ public final class Effects {
         if (p.get("fixed_price") instanceof Number fp) {
             ctx.buildFixedPrice = fp.intValue();
         }
+        // АТАКА ОДНИМ ВОЙСКОМ: бой обычный, но стреляет ограниченное число
+        // РАЗНЫХ жетонов.
+        if (p.get("attack_tokens") instanceof Number at) {
+            ctx.attackTokensLimit = at.intValue();
+        }
+        // ТОЛЬКО ОБМЕНЫ: Наука без шага трека, Рынок без карты.
+        if (p.get("exchange_only") instanceof Number eo) {
+            ctx.exchangeOnlyLimit = eo.intValue();
+        }
         var res = Actions.create(name, s).perform(s.player(seat), ctx, agent);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
             tj.onAction(seat, name, res.telemetry());
@@ -789,6 +799,33 @@ public final class Effects {
         }
         Map<String, Object> got = new HashMap<>(freeAction(s, seat, Map.of("action", "energy_swap")));
         got.put("chose", "energy_swap");
+        return got;
+    }
+
+    /**
+     * ОДИН ОБМЕН — В НАУКЕ ИЛИ НА РЫНКЕ, что из двух, выбирает игрок.
+     *
+     * <p>Именно ОБМЕН: шаг трека и карта рынка сюда не входят. Верх карты
+     * задания нарочно мелкий — он выручает того, у кого не сложилось действие,
+     * а не заменяет собой ход.
+     */
+    static Map<String, Object> exchangeScienceOrMarket(GameState s, int seat,
+                                                       Map<String, Object> p) {
+        Agent ag = agentFor(s, seat);
+        int сколько = p.get("amount") instanceof Number n ? n.intValue() : 1;
+        String pick = "science";
+        if (ag != null) {
+            Choice ch = ag.choose(s, List.of(
+                new Choice("exchange_where", "science", "обмен в Науке (без шага трека)"),
+                new Choice("exchange_where", "market", "обмен на Рынке (без карты)")),
+                Map.of("kind", "exchange_where"));
+            if (ch != null && ch.payload() != null) {
+                pick = String.valueOf(ch.payload());
+            }
+        }
+        Map<String, Object> got = new HashMap<>(freeAction(s, seat,
+            Map.of("action", pick, "exchange_only", сколько)));
+        got.put("chose", pick);
         return got;
     }
 
