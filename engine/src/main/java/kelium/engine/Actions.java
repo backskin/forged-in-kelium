@@ -73,6 +73,88 @@ public final class Actions {
         return Placement.footprint(btype);
     }
 
+    /**
+     * ВЛЕЗЕТ ЛИ НА ГЕКС И ЗДАНИЕ, И ТО, ЧТО ОНО ПРОИЗВОДИТ.
+     *
+     * <p>ЗАЧЕМ ЭТО ПРАВИЛО ОТДЕЛЬНО. Военное здание, поставленное на тесный
+     * гекс, работать не может: техника занимает две смежные ячейки, и если
+     * после завода их не осталось, завод не выпустит ни одного жетона за всю
+     * партию. Дизайнер увидел это в записи прямо: «почему он ставит завод
+     * так, что невозможно поставить технику?» (08.09.2026).
+     *
+     * <p>Считается ТЕМ ЖЕ механизмом, что и сама постановка ({@link
+     * kelium.core.Hex#fitsWithRepack}): здание кладётся своим следом, а войска
+     * гекса переупаковываются — только к нынешним войскам добавляется ещё
+     * один жетон нужного рода. Второй копии правила вместимости быть не
+     * должно: она разойдётся с первой.
+     *
+     * @param fp сколько смежных сторон займёт здание
+     */
+    public static boolean roomForBuildingAndUnit(GameState state, String hexId,
+                                                 int fp, UnitType unit) {
+        Hex h = state.field.get(hexId);
+        if (h == null) {
+            return false;
+        }
+        if (unit == UnitType.AIRCRAFT) {
+            // У авиации свой сектор Неба: он не спорит с наземными ячейками,
+            // спорит только с чужой авиацией на этом же гексе.
+            return roomForUnit(state, hexId, UnitType.AIRCRAFT)
+                && h.fitsWithRepack(fp, groundLoad(state, hexId, -1)[0],
+                    groundLoad(state, hexId, -1)[1]);
+        }
+        if (unit == UnitType.TOWER) {
+            // Вышка ставится в ЛЮБОМ гексе зоны стройки, не обязательно в этом.
+            return h.fitsWithRepack(fp, groundLoad(state, hexId, -1)[0],
+                groundLoad(state, hexId, -1)[1]);
+        }
+        int[] load = groundLoad(state, hexId, -1);
+        int vehicles = load[0] + (unit == UnitType.VEHICLE ? 1 : 0);
+        int singles = load[1] + (unit == UnitType.VEHICLE ? 0 : 1);
+        return h.fitsWithRepack(fp, vehicles, singles);
+    }
+
+    /**
+     * ОСТАНЕТСЯ ЛИ МЕСТО ПОД ЖЕТОН, ЕСЛИ ЗДАНИЕ ВСТАНЕТ ИМЕННО ТАК.
+     *
+     * <p>От поворота здания зависит не только, куда растёт зона стройки, но и
+     * влезет ли потом техника: ей нужны ДВЕ СМЕЖНЫЕ свободные ячейки. Гекс
+     * может быть просторным, а след здания — разрезать свободное место на
+     * одиночные ячейки, и завод окажется бесполезным.
+     *
+     * @param sides стороны, которые займёт здание
+     */
+    public static boolean roomAfterFootprint(GameState state, String hexId,
+                                             java.util.List<Integer> sides, UnitType unit) {
+        Hex h = state.field.get(hexId);
+        if (h == null || unit == UnitType.AIRCRAFT) {
+            return h != null && roomForUnit(state, hexId, UnitType.AIRCRAFT);
+        }
+        int сторон = h.sideOwner.length;
+        boolean[] свободно = new boolean[сторон];
+        for (int i = 0; i < сторон; i++) {
+            свободно[i] = h.sideOwner[i] == null;
+        }
+        if (sides != null) {
+            for (int side : sides) {
+                if (side >= 0 && side < сторон) {
+                    свободно[side] = false;
+                }
+            }
+        }
+        int надо = unit == UnitType.VEHICLE ? 2 : 1;
+        int подряд = 0;
+        // Стороны замкнуты в кольцо: пара «последняя и нулевая» такая же
+        // смежная, как «нулевая и первая», — поэтому обходим два круга.
+        for (int i = 0; i < сторон * 2; i++) {
+            подряд = свободно[i % сторон] ? подряд + 1 : 0;
+            if (подряд >= надо) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Гексы, где игроку доступна Стройка (см. {@link Placement}). */
     public static List<String> buildableHexes(GameState state, int seat) {
         return Placement.buildableHexes(state, seat);
@@ -420,6 +502,7 @@ public final class Actions {
                         grid != null ? "Добыча: контейнер ВМЕСТО келемия"
                                      : "Добыча: контейнер (келемия рядом не было)");
                     journal(s).of(player.seat).minerTookContainer = true;
+                    journal(s).of(player.seat).containersTaken += 1;
                     if (b.level != null) {
                         journal(s).of(player.seat).minerContainerLevels.add(b.level);
                     }
@@ -499,7 +582,11 @@ public final class Actions {
                         }
                     }
                 } else {
-                    roomForUnit = hasRoomForUnit(player, b.hexId, unitType);
+                    // ЗДАНИЕ ПРОИЗВОДИТ ВСЕГДА (правило дизайнера 09.09.2026):
+                    // не хватило места на гексе — жетон садится гарнизоном в
+                    // само здание, и число сидящих там не ограничено. Поэтому
+                    // «нет места» больше не отнимает у здания выбор.
+                    roomForUnit = true;
                 }
                 // ТОЧКИ ПРАВИЛ: сколько выходит за одну Сборку. Спрашиваются ДО
                 // выбора и для ОБОИХ выходов — иначе точка «войска» молчала бы в
@@ -680,16 +767,19 @@ public final class Actions {
                 PrintedContainers.onUnitPlaced(state, player, placeHex, u.type);
                 return true;
             }
-            // НАЙМ ИДЁТ НА ГЕКС СО ЗДАНИЕМ, А НЕ ВНУТРЬ ЗДАНИЯ (правило дизайнера
-            // 17.08.2026). Прежде при нехватке места на гексе войско сажалось
-            // ГАРНИЗОНОМ внутрь здания прямо на найме — из-за этого укрытие
-            // получалось само собой, без единого решения игрока. Гарнизон
-            // остаётся, но входят в здание ТОЛЬКО Движением (§5.3): вход внутрь —
-            // это перемещение, и оно стоит хода.
+            // ЗДАНИЕ ПРОИЗВОДИТ ВСЕГДА — ЕСЛИ НЕ НА ГЕКС, ТО НА СЕБЯ (правило
+            // дизайнера 09.09.2026). Место на гексе есть — жетон встаёт на гекс
+            // и живёт обычной жизнью. Места нет — жетон садится ГАРНИЗОНОМ
+            // внутрь произведшего его здания, и таких жетонов внутри может быть
+            // сколько угодно: здание их прячет, но стрелять оттуда нельзя, а
+            // выйти можно только перемещением на соседний гекс.
             //
-            // Единственное исключение из «на гекс своего здания» — вышка: она
-            // встаёт на гекс с ЛЮБЫМ своим зданием (см. ветку выше), потому что
-            // её производит ЦУ, а стоять она должна там, где нужна.
+            // Почему это важно: без этого правила завод на тесном гексе не
+            // выпускал НИ ОДНОГО жетона за партию — деньги потрачены, толку
+            // нет. Замер kelium.БесполезныеЗдания: таких заводов было 85%.
+            //
+            // Единственное исключение — вышка: её производит ЦУ, внутрь зданий
+            // ей нельзя (см. ветку выше), и без места на поле она не нанимается.
             if (hasRoomForUnit(player, from.hexId, u.type)) {
                 u.hexId = from.hexId;
                 // СУПЕРОРУЖИЕ ПОМНИТ СВОЙ СТАПЕЛЬ: с гекса найма счётчик запуска
@@ -700,8 +790,14 @@ public final class Actions {
                 PrintedContainers.onUnitPlaced(state, player, from.hexId, u.type);
                 return true;
             }
-            // Места на гексе нет — жетон не нанимается и остаётся в запасе.
-            return false;
+            u.hexId = from.hexId;
+            u.insideBuildingUid = from.uid;
+            if (SuperWeapon.isWeapon(state, u)) {
+                SuperWeapon.onWeaponHired(player, from.hexId);
+            }
+            // Печатную ячейку контейнера гарнизон НЕ накрывает: он внутри
+            // здания, а не на секторе гекса.
+            return true;
         }
 
         /** Есть ли на гексе место под юнит данного типа (ячейка по размеру). */
@@ -954,7 +1050,12 @@ public final class Actions {
             // работает прежний demolish_refund_coins и снос по-прежнему платит.
             Integer сносЦена = rs.get("actions.build.demolish_cost_coins", null)
                 instanceof Number n ? n.intValue() : null;
-            int refund = сносЦена != null ? 0 : rs.getInt("actions.build.demolish_refund_coins");
+            // НОЛЬ В ЦЕНЕ СНОСА ЗНАЧИТ «СНОС НЕ ПЛАТИТСЯ», а не «и не платится, и
+            // ничего не даёт»: иначе свод-двойник для сравнения («снос ДАЁТ
+            // монету») нельзя написать, не удаляя ключ целиком — а сравнивать
+            // надо два свода, отличающиеся одной строкой.
+            int refund = сносЦена != null && сносЦена > 0
+                ? 0 : rs.getInt("actions.build.demolish_refund_coins");
             int сносСтоит = сносЦена != null ? сносЦена : 0;
             // СНОС СВОЕГО ЦУ (заказ дизайнера 25.08.2026, ключ
             // actions.build.demolish_cu_allowed). Прежде ЦУ из меню исключалось
@@ -2116,16 +2217,11 @@ public final class Actions {
                         || ASSEMBLY_UNIT.get(b.type) != u.type) {
                     continue;
                 }
-                boolean occupied = false;
-                for (UnitToken o : player.units) {
-                    if (o.inside() && o.insideBuildingUid != null && o.insideBuildingUid == b.uid) {
-                        occupied = true;
-                        break;
-                    }
-                }
-                if (!occupied) {
-                    out.add(b);
-                }
+                // ВНУТРИ ЗДАНИЯ СИДИТ СКОЛЬКО УГОДНО ЖЕТОНОВ (правило дизайнера
+                // 09.09.2026). Прежде место было одно, и гарнизон был штучным
+                // приёмом; теперь здание — это укрытие для всех, кого туда
+                // завели, платой служит невозможность стрелять оттуда.
+                out.add(b);
             }
             return out;
         }
@@ -2261,7 +2357,8 @@ public final class Actions {
                 if (surcharge > 0) {
                     player.resources.pay(Resource.AMMO, surcharge);   // плата за ПРАВО боя
                 }
-                boolean did = resolver.runBattle(player.seat, agent);
+                boolean did = resolver.runBattle(player.seat, agent, false, null,
+                    ctx.attackTokensLimit);
                 if (!did) {
                     // бой не состоялся (пас/нет целей): вернуть наценку — право
                     // не было использовано.
@@ -2445,7 +2542,8 @@ public final class Actions {
                 // обычное правило — не больше ОДНОГО предложения с карты за
                 // действие; надбавка утиля снимает именно это ограничение, а
                 // ячейки предложения по-прежнему расходуются.
-                if ((!cardOfferUsed || ctx.marketBothOffers) && active != null) {
+                if ((!cardOfferUsed || ctx.marketBothOffers) && active != null
+                        && ctx.exchangeOnlyLimit == 0) {
                     Map<String, Object> card = cfg.content.get("market").find(active);
                     if (card != null) {
                         for (String side : new String[]{"left", "right"}) {
@@ -2485,6 +2583,9 @@ public final class Actions {
                             }
                         }
                     }
+                }
+                if (ctx.exchangeOnlyLimit > 0 && deals >= ctx.exchangeOnlyLimit) {
+                    break;
                 }
                 opts.add(new Choice("pass", null, "хватит торговать"));
 
@@ -2688,6 +2789,11 @@ public final class Actions {
             List<String> usedExchanges = new ArrayList<>();
             String exchange = null;
             while (true) {
+                // ВЕРХ КАРТЫ ДАЁТ РОВНО СТОЛЬКО ОБМЕНОВ, сколько написано, и ни
+                // одного шага трека (см. TurnContext.exchangeOnlyLimit).
+                if (ctx.exchangeOnlyLimit > 0 && usedExchanges.size() >= ctx.exchangeOnlyLimit) {
+                    break;
+                }
                 String got = maybeExchange(player, agent);
                 if (got == null) {
                     break;
@@ -2707,7 +2813,8 @@ public final class Actions {
             // ради баланса: за одно действие нельзя разложить трофеи сразу по
             // всем трекам). Ключа нет — работает как раньше, по одному шагу на
             // каждом треке, поэтому старые своды читаются без правок.
-            int tracksAllowed = rs.getInt("tech.tracks_per_action", tech.tracks.size());
+            int tracksAllowed = ctx.exchangeOnlyLimit > 0 ? 0
+                : rs.getInt("tech.tracks_per_action", tech.tracks.size());
             // КУБИКИ НАВСЕГДА (свод 1.33.0 и новее): каждый шаг выкладывает НОВЫЙ
             // кубик из личного запаса игрока, прежние ячейки за ним остаются.
             // Кончился запас — шаги больше не предлагаются вовсе, сколько бы

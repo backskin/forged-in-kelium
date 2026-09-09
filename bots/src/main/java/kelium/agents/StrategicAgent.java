@@ -1510,7 +1510,11 @@ public class StrategicAgent extends HeuristicAgent {
 
     /**
      * Выбор жетона для бесплатного манёвра: предпочитаем тот, у кого есть
+<<<<<<< HEAD
      * убиваемая цель — манёвр приблизит к удару без затрат Наступления/боеприпасов.
+=======
+     * убиваемая цель — манёвр приблизит к удару без затрат Наступления и боеприпасов.
+>>>>>>> origin/main
      */
     private double scoreManeuverUnit(GameState state, Choice o) {
         if ("pass".equals(o.kind())) {

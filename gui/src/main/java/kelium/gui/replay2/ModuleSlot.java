@@ -72,6 +72,13 @@ final class ModuleSlot {
         if (m == null || m.id == null || m.id.isBlank()) {
             return;                          // место есть, жетона на нём нет
         }
+        // ПЕЧАТНЫЙ ЖЕТОН, ЕСЛИ ОН ЕСТЬ. Тот же принцип, что у жетонов войск и
+        // картона поля: принесли картинку — кладём картинку, и она сама говорит,
+        // какой стороной жетон лежит. Рисованный вид ниже остаётся для тех
+        // жетонов, которых художник ещё не рисовал (характеристики, предложения).
+        if (картинка(g, m, colour, tx, ty, t)) {
+            return;
+        }
         // ТЕЛО ЖЕТОНА — своим цветом всегда, в том числе на золотой стороне.
         g.setColor(colour);
         g.fill(new RoundRectangle2D.Double(tx, ty, t, t, arc, arc));
@@ -108,6 +115,32 @@ final class ModuleSlot {
         g.setColor(Color.WHITE);
         g.drawString(label, (float) (x + (side - fm.stringWidth(label)) / 2 + shift),
             (float) (y + side / 2 + fm.getAscent() * 0.36));
+    }
+
+    /**
+     * ПЕЧАТНАЯ КАРТИНКА ЖЕТОНА — с «блоком тени»: под картонкой видна её кромка
+     * цветом самого жетона, поэтому она читается как положенная сверху, а не
+     * напечатанная.
+     *
+     * @return {@code false} — печати для этого жетона нет, рисуем по-старому
+     */
+    static boolean картинка(Graphics2D g, ReplayRecord.Module m, Color colour,
+                            double x, double y, double side) {
+        java.awt.image.BufferedImage art = арт(m);
+        return art != null && kelium.report.ModuleArt.paint(g, art, colour, x, y, side);
+    }
+
+    /** Картинка этого жетона: красный ищется по паре целей, синий — по числам. */
+    static java.awt.image.BufferedImage арт(ReplayRecord.Module m) {
+        if (m == null) {
+            return null;
+        }
+        java.awt.image.BufferedImage art =
+            kelium.report.ModuleArt.red(m.targets, m.gold);
+        if (art == null) {
+            art = kelium.report.ModuleArt.blue(m.ammo, m.units, m.gild, m.gold);
+        }
+        return art;
     }
 
     /**

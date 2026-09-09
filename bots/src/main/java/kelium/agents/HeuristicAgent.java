@@ -1067,9 +1067,14 @@ public class HeuristicAgent extends Agent {
                 return 0.1;
             }
             boolean ammoRoom = kelium.engine.Storage.ammoMax(me) > me.resources.ammo();
+            // МЕСТО НА ГЕКСЕ БОЛЬШЕ НЕ УСЛОВИЕ НАЙМА (правило 09.09.2026):
+            // здание производит всегда, и при нехватке места жетон садится
+            // гарнизоном внутрь. Но гарнизон не стреляет, поэтому Сборка без
+            // места на гексе стоит меньше — она даёт жетон, которому ещё
+            // предстоит выйти наружу отдельным перемещением.
             boolean unitRoom = anyHexHasRoom(state, me);
             if (!ammoRoom && !unitRoom) {
-                return 0.2;
+                return 0.6;
             }
             // АРМИЯ НУЖНА, А СНАРЯЖЕНИЕ НЕ БЕРУТ. Замер 12.08.2026: Снаряжение
             // предлагалась 19 раз за партию на игрока, а выбиралась 2.6 — боты
@@ -1462,6 +1467,18 @@ public class HeuristicAgent extends Agent {
             return h.sideOwner[h.energyCell] == null ? 9.0 : 0.5;
         }
         if ("factory".equals(btype) || "airbase".equals(btype) || "barracks".equals(btype)) {
+            // СНАЧАЛА — ВЛЕЗЕТ ЛИ ТО, ЧТО ЭТО ЗДАНИЕ ПРОИЗВОДИТ (замечание
+            // дизайнера 08.09.2026: «почему он ставит завод так, что невозможно
+            // поставить технику?»). Техника занимает две смежные ячейки, и завод
+            // на тесном гексе не выпустит ни одного жетона за всю партию: здание
+            // построено, денег стоило, а толку ноль. Такой гекс не «чуть хуже» —
+            // он бесполезен, поэтому и оценка ниже паса.
+            kelium.core.BuildingType бт = kelium.core.BuildingType.fromCode(btype);
+            UnitType род = kelium.engine.Actions.ASSEMBLY_UNIT.get(бт);
+            if (род != null && !kelium.engine.Actions.roomForBuildingAndUnit(
+                    state, hid, kelium.engine.Actions.buildingFootprint(бт), род)) {
+                return 0.05;
+            }
             // УДАРНОЕ ЗДАНИЕ СТАВИМ БЛИЖЕ К ПРОТИВНИКУ. Раньше этот метод не
             // различал гексы вообще (плоская 1.0) — бот мог поставить завод в
             // дальнем углу своей зоны, и весь набег потом уходил на марш через
@@ -1474,7 +1491,26 @@ public class HeuristicAgent extends Agent {
             // ближе — лучше; авиабаза бьёт с шагом 2 (сама долетает дальше),
             // поэтому ей чуть меньше важна вплотную-близость, чем заводу.
             double farPenalty = "airbase".equals(btype) ? 0.6 : 1.0;
-            return 8.0 - farPenalty * dist;
+            double v = 8.0 - farPenalty * dist;
+            // ПРОСТОР ВАЖЕН НЕ МЕНЬШЕ БЛИЗОСТИ К ВРАГУ. Одной проверки «влезет
+            // ли жетон прямо сейчас» мало: гекс забивается позже — вторым
+            // зданием, чужой стенкой, своими же войсками. Замер
+            // kelium.БесполезныеЗдания: с одной проверкой заводы, которым
+            // некуда ставить технику, 72.7% против 84.9% без неё — лучше, но
+            // всё ещё почти все. Поэтому свободные ячейки идут в оценку
+            // ЧИСЛОМ: чем просторнее гекс, тем дольше здание останется рабочим.
+            kelium.core.Hex h = state.field.get(hid);
+            if (h != null) {
+                int свободных = 0;
+                for (Integer владелец : h.sideOwner) {
+                    if (владелец == null) {
+                        свободных++;
+                    }
+                }
+                int след = kelium.engine.Actions.buildingFootprint(бт);
+                v += 0.9 * Math.max(0, свободных - след);
+            }
+            return v;
         }
         return 1.0;
     }
@@ -1576,6 +1612,16 @@ public class HeuristicAgent extends Agent {
                 // самый дорогой поворот в игре, дороже любой стенки в поле.
                 v += 12.0;
             }
+        }
+        // ПОВОРОТ РЕШАЕТ, ОСТАНЕТСЯ ЛИ МЕСТО ПОД ТЕХНИКУ. Гекс может быть
+        // просторным, а здание — встать так, что двух смежных свободных ячеек
+        // не осталось: завод построен и бесполезен. Проверяем ИМЕННО ЭТОТ след,
+        // а не гекс вообще (гекс проверяется раньше, при выборе места).
+        kelium.core.BuildingType бт = kelium.core.BuildingType.fromCode(btype);
+        UnitType род = бт == null ? null : kelium.engine.Actions.ASSEMBLY_UNIT.get(бт);
+        if (род != null && род != UnitType.AIRCRAFT && род != UnitType.TOWER
+                && !kelium.engine.Actions.roomAfterFootprint(state, hid, sides, род)) {
+            v -= 10.0;
         }
         return v;
     }
@@ -1697,18 +1743,30 @@ public class HeuristicAgent extends Agent {
         }
         Map<String, Object> pl = (Map<String, Object>) o.payload();
         String dest = (String) pl.get("to");
+        // ВЫВЕСТИ ГАРНИЗОН — ОТДЕЛЬНАЯ ЦЕННОСТЬ. Жетон внутри здания защищён, но
+        // не стреляет: пока он там, он не воюет вовсе. Выход наружу — это не
+        // «ещё один шаг», это возвращение жетона в игру, и стоит он дороже
+        // обычного перемещения на ту же дистанцию.
+        double изГарнизона = 0.0;
+        int uid = pl.get("uid") instanceof Number n ? n.intValue() : -1;
+        for (UnitToken u : state.player(seat).units) {
+            if (u.uid == uid && u.inside()) {
+                изГарнизона = 5.0;
+                break;
+            }
+        }
         Integer d = nearestEnemyDist(state, dest);
         if (d == null) {
-            return 0.6;
+            return 0.6 + изГарнизона;
         }
         // d==1 — идеальная ДИСТАНЦИЯ УДАРА (сосед врага, можно атаковать).
         // d==0 — встать НА гекс врага: с него по этому врагу бить нельзя (бой
         // требует цель на СОСЕДНЕМ гексе), поэтому это хуже, чем d==1.
         if (d == 1) {
-            return 12.0 * (0.6 + agg);
+            return 12.0 * (0.6 + agg) + изГарнизона;
         }
         if (d == 0) {
-            return 4.0;
+            return 4.0 + изГарнизона;
         }
         // ДОСЯГАЕМОСТЬ: шаг ИЗ ДВУХ гексов в один — самый ценный после выхода на
         // дистанцию удара, потому что следующим же действием можно бить. Раньше
@@ -1723,12 +1781,12 @@ public class HeuristicAgent extends Agent {
         // одиночке их не выбить.
         double group = friendsAt(state, dest) * (d <= 2 ? 3.0 : 1.2);
         if (d == 1) {
-            return 12.0 * (0.6 + agg) + group;
+            return 12.0 * (0.6 + agg) + group + изГарнизона;
         }
         if (d == 2) {
-            return 7.0 * (0.6 + agg) + closer + group;
+            return 7.0 * (0.6 + agg) + closer + group + изГарнизона;
         }
-        return 3.0 + (agg * 4.0) / d + closer + group;
+        return 3.0 + (agg * 4.0) / d + closer + group + изГарнизона;
     }
 
     /** Идёт ли этот игрок первым по победным очкам (по нему бьём охотнее). */
@@ -2018,7 +2076,12 @@ public class HeuristicAgent extends Agent {
         if (!built) {
             return 0.5;
         }
-        Map<String, Object> spec = kelium.engine.Modules.BLUE_MODULES.get(mod);
+        // ЧИСЛА ЖЕТОНА СПРАШИВАЕМ У ДВИЖКА: жетоны из мешка описаны данными, и
+        // прямая заглядка в комплект C1-C4 давала на них null.
+        Map<String, Object> spec = kelium.engine.Modules.blueSpec(state, mod);
+        if (spec == null) {
+            return 0.5;                   // жетон незнаком — ставить наугад незачем
+        }
         int units = spec.get("units") instanceof Number n ? n.intValue() : 1;
         int ammo = spec.get("ammo") instanceof Number n ? n.intValue() : 1;
         double v = 2.0;

@@ -495,8 +495,26 @@ public final class CombatResolver {
      */
     public boolean runBattle(int attackerSeat, Agent agent, boolean isRetaliation,
                              Integer restrictTargetOwner) {
+        return runBattle(attackerSeat, agent, isRetaliation, restrictTargetOwner, 0);
+    }
+
+    /**
+     * То же, но с ПРЕДЕЛОМ УЧАСТНИКОВ: {@code предельноЖетонов} > 0 — бить может
+     * не больше стольких РАЗНЫХ жетонов. Нужен верху карты «АТАКА ОДНИМ
+     * ВОЙСКОМ»: это не отдельный вид боя, а обычный бой, в котором стреляет один.
+     */
+    public boolean runBattle(int attackerSeat, Agent agent, boolean isRetaliation,
+                             Integer restrictTargetOwner, int предельноЖетонов) {
         GameState s = state;
         PlayerState p = s.player(attackerSeat);
+
+        // Шаг 0: ЧУЖИЕ РЕАКЦИИ ПЕРЕД БОЕМ. Карта «разыграй бой перед чужим боем»
+        // играется именно здесь — до того, как атакующий выбрал гекс: успевший
+        // выстрелить может снять тот жетон, которым собирались бить. Ответный
+        // бой окна не открывает: он сам уже ответ.
+        if (!isRetaliation) {
+            бойПередБоем(attackerSeat);
+        }
 
         // Шаг 1: выбрать свой гекс, где есть хотя бы один живой юнит.
         Set<String> srcSet = new java.util.TreeSet<>();
@@ -630,10 +648,21 @@ public final class CombatResolver {
         int killsThisBattle = 0;
         boolean neutralRazedThisBattle = false;
         boolean enemyDamagedThisBattle = false;
+        Set<String> отходСпрошен = new HashSet<>();   // гексы, где окно отхода уже было
+        Set<Integer> стреляли = new HashSet<>();     // чьи жетоны уже выстрелили
 
         while (true) {
             List<Choice> options = new ArrayList<>();
             for (UnitToken u : attackers) {
+                // ЖЕТОН МОГ ПОГИБНУТЬ ПРЯМО В ЭТОМ ЖЕ ДЕЙСТВИИ. Список
+                // стреляющих собран ДО первого выстрела, а между выстрелами
+                // атакующего сносит предсмертный хрип жертвы: у убитого hexId
+                // уже null, и запрос целей от него падал. Проверять надо здесь,
+                // а не при сборке списка: список собирается один раз, а гибнут
+                // по ходу дела.
+                if (u.hexId == null || !u.alive()) {
+                    continue;
+                }
                 // ЦЕЛИ ЭТОГО ЖЕТОНА. В старой грамматике она одна на всех, в
                 // «Близнеце» — свой гекс и соседние, каждому жетону свои.
                 List<String> цели = общаяЦель != null ? List.of(общаяЦель)
@@ -714,6 +743,20 @@ public final class CombatResolver {
                 }
                 break;
             }
+            if (предельноЖетонов > 0 && стреляли.size() >= предельноЖетонов) {
+                break;      // все отведённые жетоны уже отстрелялись
+            }
+            if (предельноЖетонов > 0 && !стреляли.isEmpty()) {
+                // Предел считается по РАЗНЫМ жетонам: тот, кто уже стрелял,
+                // может стрелять снова (у него две строки атаки), а новый —
+                // только если место ещё есть.
+                options.removeIf(o -> o.payload() instanceof Map<?, ?> m
+                    && m.get("uid") instanceof Number n
+                    && !стреляли.contains(n.intValue()));
+                if (options.isEmpty()) {
+                    break;
+                }
+            }
             options.add(new Choice("pass", null, "stop attacking"));
             Choice pick = agent.choose(s, options,
                 Map.of("kind", "attack", "source", source));
@@ -728,6 +771,13 @@ public final class CombatResolver {
             Target tcat = Target.fromCode((String) pl.get("tcat"));
             String target = (String) pl.get("target");
             String key = uid + ":" + row;
+            // ОТХОД — окно на КАЖДЫЙ гекс по одному разу, перед первой атакой по
+            // нему. «Уже разыгранные атаки остаются» (текст карты), поэтому окно
+            // не открывается заново после каждого выстрела: ушедший жетон уходит
+            // до залпа, а не между попаданиями.
+            if (отходСпрошен.add(target)) {
+                отход(target, attackerSeat);
+            }
             boolean closed = hexClosedAgainst(target, attackerSeat);
             // Доплата за жетон засчитывается в момент, когда жетон реально
             // выстрелил: вторая его атака в этом же действии уже без неё.
@@ -813,8 +863,13 @@ public final class CombatResolver {
                 continue;
             }
             p.resources.pay(Resource.AMMO, ammo);
+            стреляли.add(uid);
             firstAttackUsed[0] = true;
             usedRows.add(key);
+            // РИКОШЕТ — после того как цель назначена и атака оплачена: удар
+            // состоялся, спор идёт лишь о том, кому он достался. Потому карта и
+            // не отменяет атаку — она её ПЕРЕВОДИТ.
+            victim = рикошет(victim, target, attackerSeat);
             // ЖЕТОН ЩИТА (эффект «щит», 17.08.2026) снимает ПЕРВОЕ попадание по
             // жетону защищённого рода и уходит. Проверяется ДО начисления урона:
             // у пехоты прочность 1, и «снять урон потом» её уже не спасает.
@@ -864,6 +919,22 @@ public final class CombatResolver {
             if (destroyed) {
                 af.enemyTokensDestroyed += 1;
                 af.minKillAmmoCost = Math.min(af.minKillAmmoCost, ammo);
+                // ФАКТЫ КОЛОДЫ 1.16.0. Считаются ЗДЕСЬ, в момент удара, потому
+                // что после боя их уже не восстановить: на вычищенном гексе не
+                // написано, сколько там стояло, а у побитого игрока не написано,
+                // сколько у него было войск, когда по нему били.
+                af.destroyedOnHex.merge(target, 1, Integer::sum);
+                if (victim instanceof BuildingToken pb
+                        && pb.type == BuildingType.POWER_PLANT) {
+                    af.destroyedPlantLevels.add(pb.level == null ? 1 : pb.level);
+                }
+                if (victim instanceof BuildingToken mb && mb.type == BuildingType.MINER
+                        && mb.energyPlaced >= mb.energySlots && уКелемия(mb.hexId)) {
+                    af.destroyedFullMinerAtKelium = true;
+                }
+                af.victimUnitsAtHit.merge(owner, s.player(owner).unitsOnField().size(),
+                    Math::max);
+                af.myUnitsAtHit.merge(owner, p.unitsOnField().size(), Math::max);
                 if (af.movedUids.contains(unit.uid)) {
                     af.movedAndKilledSameUnit = true;
                     af.killsByMovedUnit.merge(unit.uid, 1, Integer::sum);
@@ -892,7 +963,15 @@ public final class CombatResolver {
                 "base_ammo", pl.getOrDefault("base_ammo", ammo));
             if (destroyed) {
                 killsThisBattle++;
-                destroy(victim, attackerSeat);
+                // ЭВАКУАЦИЯ ТРОФЕЕВ спрашивается ПЕРЕД уничтожением: после него
+                // жетон уже лежит на месте уничтоженных жетонов атакующего, и
+                // увести его оттуда нечем.
+                if (!эвакуация(victim, attackerSeat)) {
+                    destroy(victim, attackerSeat);
+                }
+                // ПРЕДСМЕРТНЫЙ ХРИП — последним: жетон уже снят, и ранит он
+                // именно того, кто его снял.
+                хрип(victim, unit, attackerSeat);
             }
         }
         if (killsThisBattle > journal().of(attackerSeat).maxKillsOneBattle) {
@@ -1168,12 +1247,11 @@ public final class CombatResolver {
      * ВОЙСКО ВНУТРИ ЗДАНИЯ НЕ АТАКУЕМО, пока здание живо: сперва надо снести
      * здание. Состояние ЯВНОЕ — {@link UnitToken#insideBuildingUid}.
      *
-     * <p>Раньше укрытие ВЫЧИСЛЯЛОСЬ по совпадению «войско стоит на гексе своего
-     * здания подходящего рода», и из-за этого неуязвимыми становились ВСЕ войска у
-     * своих зданий (казарма превращалась в крепость), а также вышка на гексе ЦУ —
-     * при прямом запрете правила «вышки спрятаться не могут нигде». По уточнению
-     * дизайнера укрытие — тактический приём: внутри здания стоит РОВНО ОДНО войско,
-     * и такое здание у игрока только одно.
+     * <p>УКРЫТИЕ ДЕРЖИТСЯ НА ЗДАНИИ, А НЕ НА ГЕКСЕ. Спрятан тот, кто ВНУТРИ
+     * здания ({@code insideBuildingUid}); войско, просто стоящее на гексе со
+     * своим зданием, — обычная цель, иначе казарма превращалась бы в крепость.
+     * Внутри может сидеть сколько угодно жетонов (правило дизайнера
+     * 09.09.2026), и платят они за это тем, что оттуда не стреляют.
      */
     private boolean unitHidden(UnitToken unit) {
         if (!unit.inside()) {
@@ -1626,6 +1704,234 @@ public final class CombatResolver {
     }
 
     private Agent agentFor(int seat) {
-        return agents.get(seat);
+        return agents == null || seat < 0 || seat >= agents.size() ? null : agents.get(seat);
+    }
+
+    // ==================================================================
+    //  РЕАКЦИИ КАРТ ЗАДАНИЙ (верх «В МОМЕНТЕ», решение дизайнера 04.09.2026)
+    // ==================================================================
+
+    /**
+     * ПРЕДСМЕРТНЫЙ ХРИП: уничтоженный жетон ранит своего убийцу.
+     *
+     * <p>Окно открывается ровно в тот миг, когда жетон снят: до этого хозяин не
+     * знает, добили его или ранили, а после — уже поздно. Урон идёт ТОЛЬКО по
+     * жетону-убийце и ТОЛЬКО один; если хрип добивает убийцу, второго хрипа не
+     * будет — отвечать некому, а окно внутри окна {@link Реакции} не открывает.
+     */
+    private void хрип(Token убитый, UnitToken убийца, int attackerSeat) {
+        if (убийца == null || !убийца.alive() || убийца.hexId == null) {
+            return;                       // бить некого: убийцы на поле уже нет
+        }
+        Реакции.Вид вид = убитый instanceof UnitToken
+            ? Реакции.Вид.ОТВЕТНЫЙ_ОГОНЬ : Реакции.Вид.ЗАГРАДИТЕЛЬНЫЙ_ОГОНЬ;
+        int хозяин = убитый.owner();
+        String карта = Реакции.предложить(state, хозяин, вид, agentFor(хозяин),
+            "нанести 1 урон жетону, который тебя уничтожил",
+            Map.of("attacker", attackerSeat, "killer_hex", убийца.hexId),
+            emit);
+        if (карта == null) {
+            return;
+        }
+        убийца.damage += 1;
+        boolean снесён = damageOf(убийца) >= Passives.effectiveHp(state, убийца);
+        emit("type", "reaction_hit", "seat", хозяин, "card", карта,
+            "reaction", вид.код, "attacker", attackerSeat,
+            "hex", убийца.hexId, "destroyed", снесён);
+        if (снесён) {
+            destroy(убийца, хозяин);
+        }
+    }
+
+    /**
+     * ЭВАКУАЦИЯ ТРОФЕЕВ: снесённый жетон уходит в СВОЙ запас, а не к тому, кто
+     * его снёс. Спрашивается ДО {@link #destroy}: там жетон уже кладётся на
+     * место уничтоженных жетонов атакующего, и забрать его обратно нечем.
+     *
+     * @return true — жетон эвакуирован, обычного уничтожения не будет
+     */
+    private boolean эвакуация(Token жертва, int attackerSeat) {
+        int хозяин = жертва.owner();
+        String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЭВАКУАЦИЯ_ТРОФЕЕВ,
+            agentFor(хозяин), "увести свой уничтоженный жетон в запас, а не отдать врагу",
+            Map.of("attacker", attackerSeat), emit);
+        if (карта == null) {
+            return false;
+        }
+        if (жертва instanceof UnitToken u) {
+            u.setHexId(null);
+            u.damage = 0;
+        } else {
+            BuildingToken b = (BuildingToken) жертва;
+            evictFromBuilding(b);
+            if (state.field.hexes.containsKey(b.hexId)) {
+                state.field.get(b.hexId).freeSidesByToken(b.uid);
+            }
+            b.hexId = null;
+            b.damage = 0;
+            returnConsumerEnergy(b);
+            if (b.type == BuildingType.POWER_PLANT) {
+                removeSourceEnergy(b.owner, b.uid);
+            }
+        }
+        state.journal.of(хозяин).lostOwnThisTurn += 1;
+        emit("type", "reaction_evacuate", "seat", хозяин, "card", карта,
+            "attacker", attackerSeat);
+        return true;
+    }
+
+    /**
+     * РИКОШЕТ: назначенная атака переходит на ДРУГОЙ жетон того же гекса —
+     * чей угодно и любого рода. Войско внутри здания целью не становится: оно
+     * укрыто, и укрытие рикошетом не отменяется.
+     *
+     * @return жетон, по которому теперь бьют (прежний, если реакции не было)
+     */
+    private Token рикошет(Token жертва, String hexId, int attackerSeat) {
+        int хозяин = жертва.owner();
+        List<Token> другие = new ArrayList<>();
+        for (Token t : tokensOn(hexId)) {
+            if (t != жертва && !вЗдании(t)) {
+                другие.add(t);
+            }
+        }
+        if (другие.isEmpty()) {
+            return жертва;
+        }
+        String карта = Реакции.предложить(state, хозяин, Реакции.Вид.РИКОШЕТ,
+            agentFor(хозяин), "перевести атаку на другой жетон в этом же гексе",
+            Map.of("attacker", attackerSeat, "hex", hexId), emit);
+        if (карта == null) {
+            return жертва;
+        }
+        List<Choice> opts = new ArrayList<>();
+        for (Token t : другие) {
+            opts.add(new Choice("ricochet_target", t,
+                victimLabel(t) + " игрока " + t.owner()));
+        }
+        Choice ch = agentFor(хозяин).choose(state, opts,
+            Map.of("kind", "ricochet_target", "hex", hexId));
+        Token новая = ch == null || ch.payload() == null ? жертва : (Token) ch.payload();
+        emit("type", "reaction_ricochet", "seat", хозяин, "card", карта,
+            "hex", hexId, "to_owner", новая.owner());
+        return новая;
+    }
+
+    /** Все живые жетоны на гексе — и войска, и здания. */
+    private List<Token> tokensOn(String hexId) {
+        List<Token> out = new ArrayList<>();
+        for (PlayerState pl : state.players) {
+            for (UnitToken u : pl.units) {
+                if (hexId.equals(u.hexId) && u.alive()) {
+                    out.add(u);
+                }
+            }
+            for (BuildingToken b : pl.buildings) {
+                if (hexId.equals(b.hexId) && b.alive()) {
+                    out.add(b);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Примыкает ли гекс к тайлу зарождения, на котором ещё есть келемий. */
+    private boolean уКелемия(String hexId) {
+        if (hexId == null || !state.field.hexes.containsKey(hexId)) {
+            return false;
+        }
+        for (String рядом : state.field.neighbors(hexId)) {
+            Hex h = state.field.get(рядом);
+            if (h != null && h.spawnTile != null && h.spawnTile.kelium > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean вЗдании(Token t) {
+        return t instanceof UnitToken u && u.insideBuildingUid != null;
+    }
+
+    /**
+     * ОТХОД: пока чужой Бой ещё не начал разрешать атаки по гексу, хозяин
+     * жетонов в нём может увести ОДИН на соседний гекс. Уже разыгранные атаки
+     * остаются — потому окно и открывается один раз, до первой атаки.
+     */
+    private void отход(String hexId, int attackerSeat) {
+        for (PlayerState pl : state.players) {
+            if (pl.seat == attackerSeat) {
+                continue;
+            }
+            List<UnitToken> свои = new ArrayList<>();
+            for (UnitToken u : pl.units) {
+                if (hexId.equals(u.hexId) && u.alive() && !вЗдании(u)) {
+                    свои.add(u);
+                }
+            }
+            if (свои.isEmpty()) {
+                continue;
+            }
+            String карта = Реакции.предложить(state, pl.seat, Реакции.Вид.ОТХОД,
+                agentFor(pl.seat), "увести один жетон из атакуемого гекса",
+                Map.of("attacker", attackerSeat, "hex", hexId), emit);
+            if (карта == null) {
+                continue;
+            }
+            List<Choice> opts = new ArrayList<>();
+            for (UnitToken u : свои) {
+                for (String куда : state.field.neighbors(hexId)) {
+                    if (Actions.roomForUnit(state, куда, u.type)) {
+                        opts.add(new Choice("withdraw_to", new Object[]{u, куда},
+                            u.type.code + " -> " + куда));
+                    }
+                }
+            }
+            if (opts.isEmpty()) {
+                continue;
+            }
+            Choice ch = agentFor(pl.seat).choose(state, opts,
+                Map.of("kind", "withdraw_to", "hex", hexId));
+            if (ch == null || ch.payload() == null) {
+                continue;
+            }
+            Object[] пара = (Object[]) ch.payload();
+            UnitToken u = (UnitToken) пара[0];
+            u.setHexId((String) пара[1]);
+            emit("type", "reaction_withdraw", "seat", pl.seat, "card", карта,
+                "from", hexId, "to", пара[1], "unit", u.type.code);
+        }
+    }
+
+    /**
+     * БОЙ ПЕРЕД ЧУЖИМ БОЕМ: до того как чужое действие Бой начнёт разрешаться,
+     * ответивший играет СВОЙ бой — по обычным правилам и за свои боеприпасы.
+     *
+     * <p>Порядок обхода — по часовой стрелке от атакующего: за столом первым
+     * отвечает сосед слева, и это не мелочь — успевший выстрелить может снять
+     * тот самый жетон, которым собирались бить.
+     */
+    private void бойПередБоем(int attackerSeat) {
+        if (Реакции.внутриОкна()) {
+            return;
+        }
+        Set<Integer> есть = new HashSet<>();
+        for (PlayerState pl : state.players) {
+            if (pl.seat != attackerSeat
+                    && Реакции.естьЧем(state, pl.seat, Реакции.Вид.БОЙ_ПЕРЕД_БОЕМ)) {
+                есть.add(pl.seat);
+            }
+        }
+        for (int seat : clockwise(attackerSeat, есть)) {
+            Agent a = agentFor(seat);
+            String карта = Реакции.предложить(state, seat, Реакции.Вид.БОЙ_ПЕРЕД_БОЕМ, a,
+                "разыграть свой Бой ПЕРЕД чужим", Map.of("attacker", attackerSeat), emit);
+            if (карта == null) {
+                continue;
+            }
+            emit("type", "reaction_battle_first", "seat", seat, "card", карта,
+                "attacker", attackerSeat);
+            runBattle(seat, a, false, null);
+        }
     }
 }

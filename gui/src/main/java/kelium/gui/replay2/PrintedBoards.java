@@ -32,35 +32,66 @@ final class PrintedBoards {
     private PrintedBoards() {
     }
 
-    /** Есть ли печатный планшет обоих видов для этой стороны. */
-    static boolean available(String side) {
-        return troopArt(side) != null && storageArt(side) != null;
+    /**
+     * ПЛАНШЕТ ВЫБИРАЕТСЯ ПО ЦВЕТУ ИГРОКА, А НЕ ПО СТОРОНЕ.
+     *
+     * <p>Сторон «А» и «Б» больше нет (решение дизайнера 09.09.2026): асимметрия
+     * планшетами упразднена. Вместо неё у каждого игрока СВОЙ планшет своего
+     * цвета — с его портретом и его палитрой, чтобы за столом было видно, где
+     * чьё хозяйство. Печать на всех четырёх одна и та же.
+     *
+     * <p>Старые планшеты сторон остаются запасным вариантом: по ним читаются
+     * записи прошлых партий, где цветных планшетов ещё не было.
+     */
+    private static String цвет(int seat) {
+        return "p" + (ПЛАНШЕТ_ПО_ЦВЕТУ[kelium.report.FieldGeometry.seatColor(seat)]);
     }
 
-    private static BufferedImage troopArt(String side) {
-        return Textures.board("troop-" + key(side), "troop-A");
+    /**
+     * ЦВЕТОВОЕ ГНЕЗДО → НОМЕР ПЛАНШЕТА В ПАПКЕ.
+     *
+     * <p>Нумерация у двух наборов печати РАЗНАЯ, и это не описка, а факт: у
+     * жетонов войск {@code p1} синий, {@code p2} красный, {@code p3} зелёный,
+     * {@code p4} жёлтый; у планшетов игроков {@code p1} красный, {@code p2}
+     * зелёный, {@code p3} синий, {@code p4} песочный. Связывать их по номеру
+     * нельзя — тогда у синего игрока был бы красный планшет. Связываем по
+     * ЦВЕТУ: гнездо 0 (синее) берёт планшет p3 и так далее.
+     */
+    private static final int[] ПЛАНШЕТ_ПО_ЦВЕТУ = {3, 1, 2, 4};
+
+    /** Есть ли печатный планшет обоих видов для этого игрока. */
+    static boolean available(int seat) {
+        return troopArt(seat) != null && storageArt(seat) != null;
     }
 
-    private static BufferedImage storageArt(String side) {
-        return Textures.board("storage-" + key(side), "storage-A");
+    private static BufferedImage troopArt(int seat) {
+        return Textures.board("troop-" + цвет(seat), "troop-A");
     }
 
-    private static String key(String side) {
-        if (side == null || side.isBlank()) {
-            return "A";
-        }
-        return side.trim().toUpperCase(java.util.Locale.ROOT)
-            .replace('А', 'A').replace('Б', 'B');
+    private static BufferedImage storageArt(int seat) {
+        return Textures.board("storage-" + цвет(seat), "storage-A");
     }
 
     /** Высота планшета войск при такой ширине (0 — картинки нет). */
-    static int troopHeight(String side, int width) {
-        return height(troopArt(side), width);
+    static int troopHeight(int seat, int width) {
+        return height(troopArt(seat), width);
     }
 
     /** Высота планшета хранилища при такой ширине (0 — картинки нет). */
-    static int storageHeight(String side, int width) {
-        return height(storageArt(side), width);
+    static int storageHeight(int seat, int width) {
+        return height(storageArt(seat), width);
+    }
+
+    /** Якоря планшета войск этого игрока (с откатом на планшет стороны А). */
+    private static java.util.List<BoardAnchors.Column> troopCols(int seat) {
+        var cols = BoardAnchors.troop(цвет(seat));
+        return cols.isEmpty() ? BoardAnchors.troop("A") : cols;
+    }
+
+    /** Якоря планшета хранилища этого игрока (с откатом на планшет стороны А). */
+    private static java.util.List<BoardAnchors.Cell> storageCells(int seat) {
+        var cells = BoardAnchors.storage(цвет(seat));
+        return cells.isEmpty() ? BoardAnchors.storage("A") : cells;
     }
 
     private static int height(BufferedImage art, int width) {
@@ -81,14 +112,14 @@ final class PrintedBoards {
     static void paintTroop(Graphics2D g, int x, int y, int width,
                            ReplayRecord.Player p, kelium.core.TroopSide troop,
                            Map<Rectangle, Object[]> spots) {
-        BufferedImage art = troopArt(p.side);
+        BufferedImage art = troopArt(p.seat);
         if (art == null) {
             return;
         }
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
         g.drawImage(art, x, y, width, h, null);
-        for (BoardAnchors.Column c : BoardAnchors.troop(p.side)) {
+        for (BoardAnchors.Column c : troopCols(p.seat)) {
             paintTroopAttack(g, x, y, k, c, p, troop, spots);
             paintTroopAssembly(g, x, y, k, c, p, spots);
         }
@@ -153,9 +184,7 @@ final class PrintedBoards {
      */
     static void paintStorage(Graphics2D g, int x, int y, int width, ReplayRecord.Player p,
                              Map<String, char[]> fill, char[] base, Set<String> covered) {
-        String side = p.storageSide == null || p.storageSide.isBlank()
-            ? p.side : p.storageSide;
-        BufferedImage art = storageArt(side);
+        BufferedImage art = storageArt(p.seat);
         if (art == null) {
             return;
         }
@@ -164,11 +193,11 @@ final class PrintedBoards {
         g.drawImage(art, x, y, width, h, null);
         // Рамки ячеек КАЖДОГО складского здания: по ним ляжет сам жетон, если он
         // ещё на планшете (см. ниже, жетонПоверхЯчеек).
-        Map<String, Rectangle> зоны = new java.util.LinkedHashMap<>();
+        Map<String, java.util.List<Rectangle>> зоны = new java.util.LinkedHashMap<>();
         int seen = 0;
         int lastLevel = -1;
         String lastGroup = "";
-        for (BoardAnchors.Cell c : BoardAnchors.storage(side)) {
+        for (BoardAnchors.Cell c : storageCells(p.seat)) {
             if (!c.group().equals(lastGroup) || c.level() != lastLevel) {
                 lastGroup = c.group();
                 lastLevel = c.level();
@@ -194,59 +223,199 @@ final class PrintedBoards {
                 // рисовался ОТДЕЛЬНОЙ группой ниже: одно и то же здание было на
                 // листе дважды (жалоба дизайнера 02.09.2026).
                 String key = ("miner".equals(c.group()) ? "miner-" : "plant-") + c.level();
-                зоны.merge(key, box, PrintedBoards::объединить);
+                зоны.computeIfAbsent(key, ключ -> new java.util.ArrayList<>()).add(box);
             } else if (has != 0) {
                 cube(g, box, has);
             }
         }
+        // КРЫЛЬЯ ПЛАНШЕТА: жетон занимает КРЫЛО целиком, а не только свои
+        // ячейки, — так он и лежит на столе (пример дизайнера 09.09.2026).
+        Rectangle лист = new Rectangle(x, y, width, h);
+        java.util.List<Крыло> крылья = крылья(лист);
         for (var e : зоны.entrySet()) {
-            жетонПоверхЯчеек(g, e.getKey(), e.getValue(), p.seat);
+            жетонНаКрыле(g, e.getKey(), e.getValue(), p.seat, крылья);
         }
     }
 
-    private static Rectangle объединить(Rectangle a, Rectangle b) {
-        return a.union(b);
+    /** Уровень здания из ключа вида {@code miner-3}; {@code null} — без уровня. */
+    private static Integer уровеньИз(String key) {
+        int i = key.indexOf('-');
+        if (i < 0) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(key.substring(i + 1));
+        } catch (NumberFormatException неЧисло) {
+            return null;
+        }
     }
 
     /**
-     * ЖЕТОН ЗДАНИЯ ПОВЕРХ СВОИХ ПЕЧАТНЫХ ЯЧЕЕК — так, как он лежит на столе.
+     * Крыло планшета: куда и как ложится жетон одного уровня.
      *
-     * <p>Пока здание не построено, его жетон лежит на планшете и закрывает собой
-     * ячейки хранилища. Показывать это крестиком было и скучно, и неправдиво:
-     * игрок за столом видит НАСТОЯЩИЙ силуэт добытчика или энергостанции.
-     *
-     * <p>ПОВОРОТ выбирается по форме места: если рамка ячеек лежит вдоль, а
-     * силуэт вытянут поперёк (или наоборот), жетон кладётся на 90°. Плюс
-     * небольшой наклон в 8° — жетон на столе никогда не лежит идеально ровно, и
-     * именно наклон отличает «положили» от «нарисовали».
+     * @param крx     середина внешней кромки крыла
+     * @param крy     то же по вертикали
+     * @param нx      нормаль к кромке, направленная вглубь планшета
+     * @param нy      то же по вертикали
+     * @param угол    поворот жетона: широкой стороной к кромке
+     * @param длина   длина кромки — сколько места вдоль
+     * @param размер  какой глубины бывает жетон на этом планшете
+     * @param полоса  от кромки до внутренней черты печати: сюда жетон и упирается
      */
-    private static void жетонПоверхЯчеек(Graphics2D g, String key, Rectangle box, int seat) {
+    private record Крыло(double крx, double крy, double нx, double нy, double угол,
+                         double длина, double размер, double полоса) {
+    }
+
+    /**
+     * ВОСЕМЬ КРЫЛЬЕВ ПЛАНШЕТА ХРАНИЛИЩА — по одному на каждое складское здание.
+     *
+     * <p>Печать разложена шестиугольником: у верхней и нижней кромок по два
+     * крыла (добытчик слева, энергостанция справа), у каждой из четырёх
+     * наклонных — по одному. Жетон лежит на своём крыле ЦЕЛИКОМ: накрывает и
+     * ячейки, и подпись уровня, и достаёт почти до кромки — так эта картонка и
+     * лежит на столе (пример дизайнера 09.09.2026).
+     *
+     * <p>Шестиугольник задан долями от прямоугольника картинки: печать одна на
+     * все четыре цвета, и мерить её каждый раз незачем. Глубина крыла — полоса
+     * от кромки до внутреннего шестиугольника, тоже снята с печати.
+     */
+    private static java.util.List<Крыло> крылья(Rectangle лист) {
+        double[][] доли = {{0.1657, 0}, {0.8357, 0}, {1, 0.5},
+            {0.8357, 1}, {0.1657, 1}, {0, 0.5}};
+        double[][] в = new double[6][2];
+        for (int i = 0; i < 6; i++) {
+            в[i][0] = лист.getMinX() + доли[i][0] * лист.width;
+            в[i][1] = лист.getMinY() + доли[i][1] * лист.height;
+        }
+        // РАЗМЕР ЖЕТОНА и ПОЛОСА КРЫЛА — разные величины. Полоса идёт от кромки
+        // планшета до полупрозрачной черты печати, за которой начинается
+        // середина; жетон немного тоньше её. Он упирается УЗКИМ краем в эту
+        // черту, а не лежит вплотную к кромке (заказ дизайнера 09.09.2026: «есть
+        // зазор до чёрт таких полупрозрачных — его не должно быть, их надо
+        // отодвинуть от края»). Обе доли сняты с печати.
+        double размер = лист.height * 0.256;
+        double полоса = лист.height * 0.283;
+        double цx = лист.getCenterX();
+        double цy = лист.getCenterY();
+        java.util.List<Крыло> out = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            double[] a = в[i];
+            double[] b = в[(i + 1) % 6];
+            // Верхняя и нижняя кромки держат ПО ДВА крыла, наклонные — по одному.
+            int частей = Math.abs(a[1] - b[1]) < лист.height * 0.01 ? 2 : 1;
+            for (int ч = 0; ч < частей; ч++) {
+                double t0 = ч / (double) частей;
+                double t1 = (ч + 1) / (double) частей;
+                double x0 = a[0] + (b[0] - a[0]) * t0;
+                double y0 = a[1] + (b[1] - a[1]) * t0;
+                double x1 = a[0] + (b[0] - a[0]) * t1;
+                double y1 = a[1] + (b[1] - a[1]) * t1;
+                double сx = (x0 + x1) / 2;
+                double сy = (y0 + y1) / 2;
+                double длина = Math.hypot(x1 - x0, y1 - y0);
+                // ВГЛУБЬ — ПО НОРМАЛИ К КРОМКЕ, А НЕ К СЕРЕДИНЕ ПЛАНШЕТА. С
+                // направлением «на середину» жетон съезжал вдоль кромки: у
+                // верхнего крыла на полсотни пикселей вправо, и печать из-под
+                // него выглядывала (замечание дизайнера 09.09.2026: «жетоны
+                // смещены и не на своих местах»). Нормаль ставит картонку ровно
+                // в полосу своего крыла.
+                double нx = -(y1 - y0) / длина;
+                double нy = (x1 - x0) / длина;
+                if (нx * (цx - сx) + нy * (цy - сy) < 0) {
+                    нx = -нx;
+                    нy = -нy;
+                }
+                double угол = Math.atan2(y1 - y0, x1 - x0);
+                // ШИРОКАЯ СТОРОНА КАРТОНКИ — К КРОМКЕ. У жетона добытчика и
+                // станции силуэт трапеции: длинное основание внизу картинки. На
+                // столе оно лежит по кромке планшета, наружу, а узкий край
+                // смотрит в середину. Поэтому поворот берётся на все 360°: если
+                // после разворота основание смотрит внутрь, добавляем полоборота
+                // (замечание дизайнера 09.09.2026: «они крутятся на все 360»).
+                if (-Math.sin(угол) * -нx + Math.cos(угол) * -нy < 0) {
+                    угол += Math.PI;
+                }
+                out.add(new Крыло(сx, сy, нx, нy, угол, длина, размер, полоса));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * ЖЕТОН СКЛАДСКОГО ЗДАНИЯ НА СВОЁМ КРЫЛЕ ПЛАНШЕТА.
+     *
+     * <p>Пока здание не построено, его жетон лежит на планшете и закрывает
+     * собой всё крыло: и печатные ячейки, и подпись уровня. Крыло выбирается по
+     * ячейкам — то, в которое они попали.
+     *
+     * <p>Размер — во всю полосу крыла: картонка достаёт почти до кромки, а по
+     * длине садится с небольшими полями. Никаких подгонок под ячейки: они
+     * оказываются под жетоном сами.
+     */
+    private static void жетонНаКрыле(Graphics2D g, String key,
+                                     java.util.List<Rectangle> ячейки, int seat,
+                                     java.util.List<Крыло> крылья) {
+        if (ячейки.isEmpty() || крылья.isEmpty()) {
+            return;
+        }
+        double cx = 0;
+        double cy = 0;
+        for (Rectangle r : ячейки) {
+            cx += r.getCenterX();
+            cy += r.getCenterY();
+        }
+        cx /= ячейки.size();
+        cy /= ячейки.size();
+        Крыло своё = крылья.get(0);
+        double ближе = Double.MAX_VALUE;
+        for (Крыло к : крылья) {
+            // Сравниваем с СЕРЕДИНОЙ ПОЛОСЫ крыла: там и лежат его ячейки.
+            double d = Math.hypot(к.крx() + к.нx() * к.полоса() / 2 - cx,
+                к.крy() + к.нy() * к.полоса() / 2 - cy);
+            if (d < ближе) {
+                ближе = d;
+                своё = к;
+            }
+        }
+
         String code = key.startsWith("miner") ? "miner" : "power_plant";
+        int уровень = уровеньИз(key);
+        var найдено = Textures.found(code, уровень, seat);
+        if (найдено != null && найдено.image() != null) {
+            BufferedImage tex = найдено.image();
+            double k = масштабВКрыло(tex.getWidth(), tex.getHeight(), своё);
+            double[] c = центрВКрыле(своё, tex.getHeight() * k);
+            AffineTransform at = new AffineTransform();
+            at.translate(c[0], c[1]);
+            at.rotate(своё.угол());
+            at.scale(k, k);
+            at.translate(-tex.getWidth() / 2.0, -tex.getHeight() / 2.0);
+            java.awt.Composite было = g.getComposite();
+            g.setComposite(java.awt.AlphaComposite.getInstance(
+                java.awt.AlphaComposite.SRC_OVER, 0.30f));
+            g.setColor(java.awt.Color.BLACK);
+            AffineTransform тень = new AffineTransform(at);
+            тень.preConcatenate(AffineTransform.getTranslateInstance(
+                Math.max(1.5, k * 8), Math.max(1.5, k * 8)));
+            g.drawImage(tex, тень, null);
+            g.setComposite(было);
+            g.drawImage(tex, at, null);
+            return;
+        }
         kelium.report.FieldGeometry.Shape sh;
         try {
             sh = kelium.report.FieldGeometry.buildingByCode(code);
         } catch (RuntimeException e) {
             return;
         }
-        boolean боком = (box.width >= box.height) != (sh.vbW() >= sh.vbH());
-        double уголГрад = (боком ? 90 : 0) + 8;
-        double угол = Math.toRadians(уголГрад);
-        // Габарит силуэта ПОСЛЕ поворота — иначе повёрнутый жетон вылезает за
-        // свои ячейки ровно на столько, на сколько его развернули.
-        double cos = Math.abs(Math.cos(угол));
-        double sin = Math.abs(Math.sin(угол));
-        double wRot = sh.vbW() * cos + sh.vbH() * sin;
-        double hRot = sh.vbW() * sin + sh.vbH() * cos;
-        double k = Math.min(box.width * 0.94 / wRot, box.height * 0.94 / hRot);
+        double k = масштабВКрыло(sh.vbW(), sh.vbH(), своё);
+        double[] c = центрВКрыле(своё, sh.vbH() * k);
         AffineTransform at = new AffineTransform();
-        at.translate(box.getCenterX(), box.getCenterY());
-        at.rotate(угол);
+        at.translate(c[0], c[1]);
+        at.rotate(своё.угол());
         at.scale(k, k);
         at.translate(-sh.vbW() / 2.0, -sh.vbH() / 2.0);
         java.awt.Shape path = at.createTransformedShape(sh.path());
-
-        // Тень под жетоном: без неё силуэт читается как печать, а не как
-        // положенный сверху картонный жетон.
         AffineTransform тень = new AffineTransform();
         тень.translate(Math.max(1.5, k * 6), Math.max(1.5, k * 6));
         g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.28));
@@ -258,14 +427,34 @@ final class PrintedBoards {
         g.draw(path);
     }
 
+    /**
+     * МАСШТАБ ЖЕТОНА ПОД КРЫЛО: во всю глубину полосы, если по длине влезает.
+     * Полей по длине оставляем чуть — картонка не упирается в соседнее крыло.
+     */
+    private static double масштабВКрыло(double texW, double texH, Крыло крыло) {
+        return Math.min(крыло.длина() * 0.97 / texW, крыло.размер() / texH);
+    }
+
+    /**
+     * СЕРЕДИНА ЖЕТОНА В КРЫЛЕ: узким краем — во внутреннюю черту печати.
+     *
+     * @param высота глубина жетона после масштабирования
+     */
+    private static double[] центрВКрыле(Крыло крыло, double высота) {
+        double вглубь = крыло.полоса() - высота / 2;
+        return new double[]{крыло.крx() + крыло.нx() * вглубь,
+            крыло.крy() + крыло.нy() * вглубь};
+    }
+
     /** Кубик ресурса в напечатанной ячейке: тем же значком, что и везде. */
     private static void cube(Graphics2D g, Rectangle box, char has) {
         double s = Math.min(box.width, box.height) * 0.66;
         double cx = box.x + box.width / 2.0;
         double cy = box.y + box.height / 2.0;
-        g.setColor(Theme.alpha(Color.WHITE, 0.9));
-        g.fill(new java.awt.geom.Ellipse2D.Double(cx - s * 0.62, cy - s * 0.62,
-            s * 1.24, s * 1.24));
+        // БЕЛОГО КРУЖКА ПОД КУБИКОМ НЕТ (замечание дизайнера 09.09.2026: «что
+        // за кружочек под кубиком?»). Он подкладывался под плоский значок, чтобы
+        // тот читался на печати; объёмному кубику подложка не нужна — он и так
+        // виден, а кружок выглядел как ещё одна деталь печати.
         MarkIcons.paint(g, switch (has) {
             case 'K' -> "KELIUM";
             case 'D' -> "TROPHY";

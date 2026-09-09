@@ -110,6 +110,12 @@ public final class SceneField extends JComponent {
      * сам на себя, и поле остаётся ровным.
      */
     private int поворотСтола;
+    /** Сколько миллисекунд едет стол на один щелчок поворота. */
+    private static final int ДОВОРОТ_МС = 260;
+    private double доворотОт;
+    private double доворотДо;
+    private long доворотНачат;
+    private Timer доворотТаймер;
     private boolean autoFit = true;
     private boolean fitPending = true;
 
@@ -547,7 +553,7 @@ public final class SceneField extends JComponent {
             double[] a = centre(mv[0]);
             double[] b = centre(mv[1]);
             if (a != null && b != null) {
-                arc(g, a, b, accent);
+                arc(g, a, b, accent, перенос(mv[0], mv[1]));
             }
         }
         for (String[] at : f.highlight.attacks) {
@@ -618,7 +624,32 @@ public final class SceneField extends JComponent {
      * Дуга перемещения. Именно дуга, а не прямая: жетон УЖЕ стоит на новом месте, и
      * линия должна читаться как пояснение «откуда пришёл», а не как сам ход.
      */
+    /**
+     * ПЕРЕНОС ЛИ ЭТО, А НЕ ШАГ. Жетон, оказавшийся дальше соседнего гекса, туда
+     * не дошёл: его ПЕРЕНЕСЛА карта (награда супер-задания «Дальний рубеж»
+     * собирает войска на один гекс), а не движение.
+     *
+     * <p>Раньше и шаг, и перенос рисовались одной дугой, и партия читалась как
+     * поломка движка: «техника перелетает через всё поле» (замечание дизайнера
+     * 08.09.2026). Считаем по координатам, а не по виду события, — тогда старые
+     * записи тоже показываются правильно.
+     */
+    private boolean перенос(String откуда, String куда) {
+        ReplayRecord.HexInfo a = hexIndex.get(откуда);
+        ReplayRecord.HexInfo b = hexIndex.get(куда);
+        if (a == null || b == null) {
+            return false;
+        }
+        int d = (Math.abs(a.q - b.q) + Math.abs(a.r - b.r)
+            + Math.abs(a.q + a.r - b.q - b.r)) / 2;
+        return d > 1;
+    }
+
     private void arc(Graphics2D g, double[] a, double[] b, Color colour) {
+        arc(g, a, b, colour, false);
+    }
+
+    private void arc(Graphics2D g, double[] a, double[] b, Color colour, boolean перенос) {
         double dx = b[0] - a[0];
         double dy = b[1] - a[1];
         double len = Math.hypot(dx, dy);
@@ -639,8 +670,19 @@ public final class SceneField extends JComponent {
         g.setStroke(pen(4.6));
         g.draw(curve);
         g.setColor(colour);
-        g.setStroke(pen(2.6));
+        // ПЕРЕНОС — ПУНКТИРОМ. Сплошная линия означает «прошёл ногами»; жетон,
+        // снятый с поля и поставленный в другом месте, дороги не проходил, и
+        // рисовать ему сплошной путь — врать про правила.
+        g.setStroke(перенос
+            ? new BasicStroke((float) (2.6 / Math.max(0.01, zoom)), BasicStroke.CAP_BUTT,
+                BasicStroke.JOIN_ROUND, 10f,
+                new float[]{(float) (BASE * 0.10), (float) (BASE * 0.09)}, 0f)
+            : pen(2.6));
         g.draw(curve);
+        g.setStroke(pen(2.6));
+        if (перенос) {
+            подписьПереноса(g, mx, my, colour);
+        }
         // наконечник по касательной в конце
         double tx = ex - mx;
         double ty = ey - my;
@@ -654,6 +696,22 @@ public final class SceneField extends JComponent {
         tip.lineTo(ex - head * (tx * 0.87 + ty * 0.5), ey - head * (ty * 0.87 - tx * 0.5));
         tip.closePath();
         g.fill(tip);
+    }
+
+    /** Слово «перенос» у середины дуги — чтобы не гадать, почему жетон улетел. */
+    private void подписьПереноса(Graphics2D g, double mx, double my, Color colour) {
+        java.awt.Font f = Theme.font(Math.max(7, BASE * 0.13), java.awt.Font.BOLD);
+        g.setFont(f);
+        var fm = g.getFontMetrics();
+        String t = "перенос";
+        int tw = fm.stringWidth(t);
+        double pad = BASE * 0.05;
+        double w = tw + pad * 2;
+        double h = fm.getHeight() * 0.86;
+        g.setColor(Theme.alpha(Theme.paper(), 0.92));
+        g.fill(new java.awt.geom.RoundRectangle2D.Double(mx - w / 2, my - h / 2, w, h, h, h));
+        g.setColor(colour);
+        g.drawString(t, (float) (mx - tw / 2.0), (float) (my + h * 0.30));
     }
 
     /**
@@ -965,11 +1023,37 @@ public final class SceneField extends JComponent {
         AffineTransform at = new AffineTransform();
         at.translate(panX, panY);
         at.scale(zoom, zoom);
-        if (поворотСтола != 0) {
+        double угол = показанныйУгол();
+        if (угол != 0) {
             double[] c = серединаПоля();
-            at.rotate(Math.toRadians(поворотСтола), c[0], c[1]);
+            at.rotate(Math.toRadians(угол), c[0], c[1]);
         }
         return at;
+    }
+
+    /**
+     * УГОЛ, КОТОРЫЙ ВИДЕН СЕЙЧАС — с учётом идущего поворота.
+     *
+     * <p>Стол доворачивается плавно (просьба дизайнера 09.09.2026: «я бы очень
+     * хотел видеть этот поворот, чтобы картинка двигалась, а не сразу
+     * перещёлкивалась»). Пока идёт доворот, показывается промежуточный угол; во
+     * всём остальном — щелчках по гексам, подсказках, снимках — участвует
+     * КОНЕЧНЫЙ угол, потому что промежуточного положения на столе не бывает.
+     */
+    private double показанныйУгол() {
+        if (доворотДо == доворотОт) {
+            return поворотСтола;
+        }
+        long прошло = System.currentTimeMillis() - доворотНачат;
+        if (прошло >= ДОВОРОТ_МС) {
+            доворотОт = доворотДо;
+            return поворотСтола;
+        }
+        double t = прошло / (double) ДОВОРОТ_МС;
+        // Мягкий разгон и торможение: равномерный поворот выглядит механическим,
+        // а стол крутят рукой.
+        double s = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        return доворотОт + (доворотДо - доворотОт) * s;
     }
 
     /** Середина поля в мировых координатах — вокруг неё и вертится стол. */
@@ -994,7 +1078,22 @@ public final class SceneField extends JComponent {
 
     /** Повернуть стол на шаг в 60° и перерисовать. */
     public void повернутьСтол(boolean поЧасовой) {
-        поворотСтола = Math.floorMod(поворотСтола + (поЧасовой ? 60 : -60), 360);
+        int шаг = поЧасовой ? 60 : -60;
+        // ОТКУДА КРУТИМ — от того угла, который сейчас ВИДЕН, а не от конечного:
+        // иначе второе нажатие подряд дёргает картинку назад.
+        доворотОт = показанныйУгол();
+        поворотСтола = Math.floorMod(поворотСтола + шаг, 360);
+        доворотДо = доворотОт + шаг;
+        доворотНачат = System.currentTimeMillis();
+        if (доворотТаймер == null) {
+            доворотТаймер = new Timer(16, e -> {
+                if (доворотДо == доворотОт) {
+                    доворотТаймер.stop();
+                }
+                repaint();
+            });
+        }
+        доворотТаймер.restart();
         repaint();
     }
 

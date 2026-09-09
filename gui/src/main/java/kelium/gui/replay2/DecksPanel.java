@@ -334,6 +334,9 @@ public final class DecksPanel extends JPanel {
         /** Куда попадает щелчок: прямоугольник → (набор, сброс?). */
         private final Map<Rectangle, String[]> зоны = new LinkedHashMap<>();
 
+        /** Мешочки модулей: прямоугольник → красный ли мешок. */
+        private final Map<Rectangle, Boolean> мешочки = new LinkedHashMap<>();
+
         /**
          * ЗАПОМНИТЬ ЗОНУ ЩЕЛЧКА ТАМ ЖЕ, ГДЕ СТОПКА НАРИСОВАНА.
          *
@@ -353,6 +356,14 @@ public final class DecksPanel extends JPanel {
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
+                    for (var z : мешочки.entrySet()) {
+                        if (z.getKey().contains(e.getPoint())) {
+                            ModuleBagWindow.show(
+                                javax.swing.SwingUtilities.getWindowAncestor(DecksPanel.this),
+                                record, z.getValue());
+                            return;
+                        }
+                    }
                     for (var z : зоны.entrySet()) {
                         if (z.getKey().contains(e.getPoint())) {
                             выбранныйНабор = z.getValue()[0];
@@ -413,6 +424,8 @@ public final class DecksPanel extends JPanel {
                     ? snap.arsenalDisplay.size() : 0);
                 всего += стопок * шир + (стопок - 1) * зазор() + межГруппами();
             }
+            // Два мешочка модулей — они квадратные и стоят последней группой.
+            всего += 2 * высота + зазор() + межГруппами();
             return всего;
         }
 
@@ -457,9 +470,14 @@ public final class DecksPanel extends JPanel {
             g.setColor(Theme.divider());
             g.drawLine(0, h - 1, w, h - 1);
             if (snap == null) {
+                // КОЛОД НЕТ, А МЕШОЧКИ ЕСТЬ: их содержимое не зависит от партии
+                // — это состав по правилам, и смотреть его полезно как раз до
+                // игры, когда решают, каким мешком играть.
                 g.setColor(Theme.ink3());
                 g.setFont(Theme.font(12, Font.PLAIN));
-                g.drawString("Партия не сыграна и не открыта — колод пока нет.", 14, h / 2);
+                g.drawString("Партия не сыграна и не открыта — колод пока нет.", 14,
+                    (int) Math.round(30 * Theme.effectiveScale()));
+                нарисоватьМешочки(g, 14, 0);
                 g.dispose();
                 return;
             }
@@ -468,7 +486,67 @@ public final class DecksPanel extends JPanel {
                 нарисоватьГруппу(g, n[0], n[1], x, 0);
                 x += ширинаГруппы(n[0]) + межГруппами();
             }
+            нарисоватьМешочки(g, x, 0);
             g.dispose();
+        }
+
+        /**
+         * ДВА МЕШОЧКА С ЖЕТОНАМИ МОДУЛЕЙ — красный и синий (заказ дизайнера
+         * 08.09.2026). Стоят последней группой в том же ряду, где колоды: за
+         * столом это такой же общий запас, из которого тянут.
+         *
+         * <p>Мешок нарисован, а не показан текстурой: картинки мешочка у нас
+         * нет, а рисовать вместо неё квадрат было бы враньём — квадрат читается
+         * как колода. Форма с горловиной и завязкой узнаётся сразу.
+         */
+        private void нарисоватьМешочки(Graphics2D g, int x, int y) {
+            мешочки.clear();
+            int выс = высотаКарты();
+            int cy = y + (int) Math.round(24 * Theme.effectiveScale());
+            g.setFont(Theme.font(11, Font.BOLD));
+            g.setColor(Theme.ink2());
+            g.drawString("МЕШОЧКИ МОДУЛЕЙ", x, cy - (int) Math.round(8 * Theme.effectiveScale()));
+            мешочек(g, x, cy, выс, true);
+            мешочек(g, x + выс + зазор(), cy, выс, false);
+        }
+
+        private void мешочек(Graphics2D g, int x, int y, int side, boolean красный) {
+            мешочки.put(new Rectangle(x, y, side, side), красный);
+            Color цвет = красный ? ModuleSlot.red() : ModuleSlot.blue();
+            double w = side * 0.78;
+            double h = side * 0.74;
+            double cx = x + side / 2.0;
+            double низ = y + side * 0.94;
+            java.awt.geom.Path2D мешок = new java.awt.geom.Path2D.Double();
+            мешок.moveTo(cx - w * 0.22, y + side * 0.24);           // горловина слева
+            мешок.curveTo(cx - w * 0.62, y + side * 0.40,
+                cx - w * 0.56, низ - h * 0.06, cx, низ);            // левый бок
+            мешок.curveTo(cx + w * 0.56, низ - h * 0.06,
+                cx + w * 0.62, y + side * 0.40, cx + w * 0.22, y + side * 0.24);
+            мешок.closePath();
+            g.setColor(Theme.alpha(Color.BLACK, 0.18));
+            g.translate(side * 0.03, side * 0.03);
+            g.fill(мешок);
+            g.translate(-side * 0.03, -side * 0.03);
+            g.setColor(цвет);
+            g.fill(мешок);
+            g.setColor(Theme.alpha(Color.BLACK, 0.35));
+            g.setStroke(new BasicStroke(1.4f));
+            g.draw(мешок);
+            // Завязка: две петли поперёк горловины.
+            g.setColor(Theme.alpha(Color.WHITE, 0.75));
+            g.setStroke(new BasicStroke(Math.max(1.6f, (float) (side * 0.035))));
+            g.drawLine((int) (cx - w * 0.26), (int) (y + side * 0.30),
+                (int) (cx + w * 0.26), (int) (y + side * 0.30));
+            // Сколько в мешке видов — но только если наборы читаются.
+            g.setFont(Theme.font(Math.max(9, side * 0.11), Font.BOLD));
+            String с = красный ? "АТАКА" : "НАЙМ";
+            int sw = g.getFontMetrics().stringWidth(с);
+            g.setColor(Color.WHITE);
+            g.drawString(с, (float) (cx - sw / 2.0), (float) (y + side * 0.62));
+            g.setFont(Theme.font(10, Font.PLAIN));
+            g.setColor(Theme.ink3());
+            g.drawString(красный ? "красный" : "синий", x, y + side + 14);
         }
 
         private void нарисоватьГруппу(Graphics2D g, String набор, String имя, int x, int y) {

@@ -44,12 +44,21 @@ public final class ModuleSets {
      * @param goldBoth золотая сторона бьёт ОБЕ цели (иначе — выбор из списка)
      * @param stat    характеристика вместо цели: {@code hp} | {@code speed} | null
      * @param plus    насколько растёт характеристика на обычной стороне
-     * @param ammo    цена атаки этого жетона в боеприпасах
+     * @param ammo    цена атаки этого жетона в боеприпасах (красный) или выход
+     *                Сборки в боеприпасах (синий)
      * @param effect  особый эффект вместо цели (null — нет)
+     * @param units   выход Сборки в войсках (синий; у красных 0)
+     * @param gild    что поднимает золотая сторона синего: {@code units} |
+     *                {@code ammo} (у красных null)
      */
     public record ModuleToken(String id, List<String> targets, List<String> gold,
                               boolean goldBoth, String stat, int plus, int ammo,
-                              String effect) {
+                              String effect, int units, String gild) {
+
+        /** Синий жетон — тот, у которого есть выход Сборки. */
+        public boolean blue() {
+            return units > 0;
+        }
     }
 
     /**
@@ -122,8 +131,16 @@ public final class ModuleSets {
                     "both".equals(String.valueOf(t.getOrDefault("gold_mode", ""))),
                     t.get("stat") == null ? null : String.valueOf(t.get("stat")),
                     t.get("plus") instanceof Number pn ? pn.intValue() : 0,
-                    setAmmo,
-                    t.get("effect") == null ? null : String.valueOf(t.get("effect"))));
+                    // ЦЕНА/ВЫХОД — СНАЧАЛА СВОЯ, ПОТОМ НАБОРА. У красных цена
+                    // атаки написана на наборе (весь набор стоит одинаково), у
+                    // синих на КАЖДОМ жетоне свои числа Сборки: «2 БПР или 1
+                    // войско». Прежде числа синих не читались вовсе — жетон
+                    // C30-1 приходил из мешка пустым, и по нему нельзя было
+                    // сказать даже, что он даёт.
+                    t.get("ammo") instanceof Number an ? an.intValue() : setAmmo,
+                    t.get("effect") == null ? null : String.valueOf(t.get("effect")),
+                    t.get("units") instanceof Number un ? un.intValue() : 0,
+                    t.get("gild") == null ? null : String.valueOf(t.get("gild"))));
             }
             ModuleSet set = new ModuleSet(String.valueOf(m.get("id")),
                 String.valueOf(m.getOrDefault("name", m.get("id"))),

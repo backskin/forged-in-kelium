@@ -249,7 +249,17 @@ class ObjectiveContractTest {
         for (kelium.cards.objectives.Утиль у : kelium.cards.objectives.Утиль.values()) {
             assertFalse(у.метка().isBlank(), у + ": пустая печатная метка");
             TestCardContext ctx = new TestCardContext(s, 0);
-            у.сыграть(ctx);
+            boolean сыграл = у.сыграть(ctx);
+            if (у.реакция()) {
+                // ВЕРХ «В МОМЕНТЕ» В СВОЙ ХОД НЕ ИГРАЕТСЯ ВОВСЕ, и это не
+                // послабление, а проверка: окно ему открывает бой, а сжигание
+                // «просто так» обязано быть отказом, иначе карта уходила бы
+                // даром.
+                assertFalse(сыграл, "реакция " + у + " сыграла себя вне своего окна");
+                assertTrue(ctx.log.isEmpty() && ctx.granted.isEmpty(),
+                    "реакция " + у + " что-то сделала вне своего окна");
+                continue;
+            }
             // Выдача ресурса идёт в granted, всё остальное — в журнал двойника.
             assertFalse(ctx.log.isEmpty() && ctx.granted.isEmpty(),
                 "утиль " + у + " («" + у.метка() + "») не сделал ничего");

@@ -906,6 +906,17 @@ public final class GameRecorder {
                 case "super_deploy":
                     return "ПОБЕДА! " + who(ev.get("seat")) + " развернул супер-задание «"
                         + card(ev.get("card")) + "» — мгновенная победа!";
+                // --- НАГРАДА НИЗА СУПЕР-ЗАДАНИЯ ---
+                // Без этих двух строк в логе стояло сырое «super6_claim {seat=2,
+                // got={gathered=3}, card=s5_02}», и понять, почему три жетона
+                // вдруг оказались на одном гексе, было нельзя (замечание
+                // дизайнера 08.09.2026: «техника перелетает через всё поле»).
+                case "super6_claim":
+                    return who(ev.get("seat")) + " забрал награду супер-задания «"
+                        + card(ev.get("card")) + "»: " + наградаСупер(ev.get("got"));
+                case "super5_burn":
+                    return who(ev.get("seat")) + " сжёг супер-задание «"
+                        + card(ev.get("card")) + "» ради награды: " + наградаСупер(ev.get("got"));
                 case "module_swap":
                     return who(ev.get("seat")) + " переставил модули";
                 case "war_track":
@@ -946,6 +957,40 @@ public final class GameRecorder {
                 default:
                     return t + " " + trimmed(ev);
             }
+        }
+
+        /**
+         * ЧТО ИМЕННО ДАЛА НАГРАДА НИЗА. Движок отдаёт словарь вида
+         * {@code {gathered=3}} — ключ говорит, КАКАЯ это была награда, число
+         * говорит, насколько она сработала.
+         */
+        private static String наградаСупер(Object got) {
+            if (!(got instanceof Map<?, ?> m) || m.isEmpty()) {
+                return "ничего не вышло";
+            }
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<?, ?> e : m.entrySet()) {
+                if (sb.length() > 0) {
+                    sb.append(", ");
+                }
+                String v = String.valueOf(e.getValue());
+                switch (String.valueOf(e.getKey())) {
+                    case "gathered" -> sb.append("перенесено на один гекс жетонов ").append(v)
+                        .append(", урон с них снят");
+                    case "hired" -> sb.append("нанято войск ").append(v);
+                    case "built" -> sb.append("построено зданий ").append(v);
+                    case "orders" -> sb.append("получено карт приказов ").append(v);
+                    case "cards" -> sb.append("взято карт ").append(v);
+                    case "burned" -> sb.append("сожжено карт арсенала ").append(v);
+                    case "actions" -> sb.append("сыграно лишних действий ").append(v);
+                    case "steps" -> sb.append("шагов науки ").append(v);
+                    case "razed" -> sb.append("снесено чужого ").append(v);
+                    case "upgraded" -> sb.append("улучшено ").append(v);
+                    case "seal_gone" -> sb.append("заглушка снята");
+                    default -> sb.append(e.getKey()).append(": ").append(v);
+                }
+            }
+            return sb.toString();
         }
 
         /**

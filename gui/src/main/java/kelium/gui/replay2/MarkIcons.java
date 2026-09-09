@@ -26,6 +26,52 @@ public final class MarkIcons {
     private MarkIcons() {
     }
 
+    /** Кубик келемия — классический зелёный, как на планшетах и на поле. */
+    private static final Color КЕЛЕМИЙ = new Color(0x2E, 0xA8, 0x4C);
+    /** Кубик боеприпаса — красный. */
+    private static final Color БОЕПРИПАС = new Color(0xD1, 0x2B, 0x2B);
+    /** Кубик трофея — чёрный. */
+    private static final Color ТРОФЕЙ = new Color(0x1E, 0x1E, 0x1E);
+
+    /**
+     * ОБЪЁМНЫЙ КУБИК: лицевая грань, светлая верхняя и тёмная боковая — как
+     * настоящий кубик на столе. Заказ дизайнера 09.09.2026: ресурсы показываются
+     * кубиками, а не картинками кристалла, патрона и шестерёнки.
+     */
+    private static void кубик(Graphics2D g, double cx, double cy, double size, Color цвет) {
+        double s = size * 0.94;
+        double d = Math.max(2, s * 0.26);          // глубина «объёма»
+        double лицо = s - d;
+        double x = cx - s / 2;
+        double y = cy - s / 2;
+        // верхняя грань
+        Path2D верх = new Path2D.Double();
+        верх.moveTo(x, y + d);
+        верх.lineTo(x + d, y);
+        верх.lineTo(x + s, y);
+        верх.lineTo(x + лицо, y + d);
+        верх.closePath();
+        g.setColor(цвет.brighter());
+        g.fill(верх);
+        // правая боковая
+        Path2D бок = new Path2D.Double();
+        бок.moveTo(x + лицо, y + d);
+        бок.lineTo(x + s, y);
+        бок.lineTo(x + s, y + лицо);
+        бок.lineTo(x + лицо, y + s);
+        бок.closePath();
+        g.setColor(цвет.darker());
+        g.fill(бок);
+        // лицо
+        g.setColor(цвет);
+        g.fill(new java.awt.geom.Rectangle2D.Double(x, y + d, лицо, лицо));
+        // Кромка: на тёмной теме чёрный кубик без неё пропадает.
+        g.setColor(Theme.isDark() ? Theme.alpha(Color.WHITE, 0.55)
+            : new Color(0x22, 0x22, 0x22, 160));
+        g.setStroke(new BasicStroke(Math.max(1f, (float) (size * 0.05))));
+        g.draw(new java.awt.geom.Rectangle2D.Double(x, y + d, лицо, лицо));
+    }
+
     /**
      * Нарисовать значок с центром в {@code (cx, cy)}, вписанный в квадрат
      * {@code size × size}.
@@ -64,50 +110,14 @@ public final class MarkIcons {
                 g.setFont(was);
                 g.setColor(colour);
             }
-            // КЕЛЕМИЙ — кристалл: ромб с гранью, как на тайлах зарождения
-            case "KELIUM" -> {
-                Path2D p = new Path2D.Double();
-                p.moveTo(cx, cy - r);
-                p.lineTo(cx + r * 0.78, cy);
-                p.lineTo(cx, cy + r);
-                p.lineTo(cx - r * 0.78, cy);
-                p.closePath();
-                g.fill(p);
-                g.setColor(Theme.alpha(Color.WHITE, 0.35));
-                Path2D face = new Path2D.Double();
-                face.moveTo(cx, cy - r);
-                face.lineTo(cx + r * 0.78, cy);
-                face.lineTo(cx, cy);
-                face.closePath();
-                g.fill(face);
-            }
-            // БОЕПРИПАСЫ — ЧЁРНЫЙ ПАТРОН НА КРАСНОМ КВАДРАТЕ (просьба дизайнера
-            // 13.08.2026). Прежняя серая «гильза» без подложки читалась как
-            // случайная палочка; красный квадрат делает значок узнаваемым сразу.
-            case "AMMO" -> {
-                g.setColor(new java.awt.Color(0xD1, 0x2B, 0x2B));
-                g.fill(new RoundRectangle2D.Double(cx - r * 0.95, cy - r * 0.95,
-                    r * 1.9, r * 1.9, r * 0.45, r * 0.45));
-                g.setColor(new java.awt.Color(0x8A, 0x14, 0x14));
-                g.setStroke(new BasicStroke((float) Math.max(1, size * 0.07)));
-                g.draw(new RoundRectangle2D.Double(cx - r * 0.95, cy - r * 0.95,
-                    r * 1.9, r * 1.9, r * 0.45, r * 0.45));
-                // сам патрон: остроконечная пуля и корпус гильзы
-                g.setColor(new java.awt.Color(0x14, 0x14, 0x14));
-                double bw = r * 0.52;
-                double tip = r * 0.58;
-                Path2D bullet = new Path2D.Double();
-                bullet.moveTo(cx, cy - r * 0.72);
-                bullet.lineTo(cx + bw / 2, cy - r * 0.72 + tip);
-                bullet.lineTo(cx + bw / 2, cy + r * 0.72);
-                bullet.lineTo(cx - bw / 2, cy + r * 0.72);
-                bullet.lineTo(cx - bw / 2, cy - r * 0.72 + tip);
-                bullet.closePath();
-                g.fill(bullet);
-                // ПОЯСКА ГИЛЬЗЫ НЕТ намеренно: на 14 пикселях красная полоска
-                // разрезала патрон надвое, и значок читался как восклицательный знак.
-                g.setColor(colour);
-            }
+            // КЕЛЕМИЙ — ЗЕЛЁНЫЙ ОБЪЁМНЫЙ КУБИК. Был кристалл-ромб, и дизайнер
+            // велел так не делать (09.09.2026): «на месте кристаллов, патронов,
+            // шестерёнок — просто ставь те же объёмные кубики зелёные, красные,
+            // чёрные». На столе это и есть кубики, и все они одной формы;
+            // различает их цвет, а не силуэт.
+            case "KELIUM" -> кубик(g, cx, cy, size, КЕЛЕМИЙ);
+            // БОЕПРИПАСЫ — КРАСНЫЙ ОБЪЁМНЫЙ КУБИК (тот же заказ 09.09.2026).
+            case "AMMO" -> кубик(g, cx, cy, size, БОЕПРИПАС);
             // УНИЧТОЖЕННЫЙ ЖЕТОН — кубок: чаша и ножка. Не трофей: трофей ниже,
             // это чёрный кубик хранилища.
             case "DESTROYED" -> {
@@ -123,46 +133,11 @@ public final class MarkIcons {
                 g.fill(new RoundRectangle2D.Double(cx - r * 0.6, cy + r * 0.66, r * 1.2,
                     r * 0.3, r * 0.2, r * 0.2));
             }
-            // ТРОФЕЙ — ЧЁРНЫЙ КВАДРАТ С ШЕСТЕРЁНКОЙ В ЦЕНТРЕ (эталон дизайнера).
-            // Цвета у него собственные, как у монеты: трофей узнаётся именно
-            // чёрным кубиком, а не цветом текста рядом. Корпус чёрный в обеих
-            // темах — это и есть чёрный кубик со стола. А вот НУТРО И ОБВОДКА
-            // зависят от темы: на тёмном фоне серая шестерёнка сливается с
-            // подложкой, поэтому там она белая и обводка белая.
-            // Зубцы — восемь трапеций по окружности; на 12 пикселях их ещё видно,
-            // ниже значок читается как круг в квадрате, и это допустимо.
-            case "TROPHY" -> {
-                Color body = new Color(0x14, 0x14, 0x14);
-                Color gear = Theme.isDark() ? Color.WHITE : new Color(0x9A, 0x9A, 0x9A);
-                g.setColor(body);
-                g.fill(new RoundRectangle2D.Double(cx - r * 0.92, cy - r * 0.92, r * 1.84,
-                    r * 1.84, r * 0.28, r * 0.28));
-                g.setColor(Theme.alpha(Color.WHITE, Theme.isDark() ? 0.85 : 0.22));
-                g.setStroke(new BasicStroke(Theme.isDark() ? 1.4f : 1f));
-                g.draw(new RoundRectangle2D.Double(cx - r * 0.92, cy - r * 0.92, r * 1.84,
-                    r * 1.84, r * 0.28, r * 0.28));
-                g.setColor(gear);
-                double rim = r * 0.44;
-                double tooth = r * 0.60;
-                for (int i = 0; i < 8; i++) {
-                    double a = Math.toRadians(45.0 * i);
-                    double half = Math.toRadians(11.0);
-                    Path2D t = new Path2D.Double();
-                    t.moveTo(cx + rim * Math.cos(a - half), cy + rim * Math.sin(a - half));
-                    t.lineTo(cx + tooth * Math.cos(a - half * 0.6),
-                        cy + tooth * Math.sin(a - half * 0.6));
-                    t.lineTo(cx + tooth * Math.cos(a + half * 0.6),
-                        cy + tooth * Math.sin(a + half * 0.6));
-                    t.lineTo(cx + rim * Math.cos(a + half), cy + rim * Math.sin(a + half));
-                    t.closePath();
-                    g.fill(t);
-                }
-                g.fill(new Ellipse2D.Double(cx - rim, cy - rim, rim * 2, rim * 2));
-                // ступица — дырка цветом корпуса, чтобы шестерёнка не слиплась в диск
-                g.setColor(body);
-                g.fill(new Ellipse2D.Double(cx - r * 0.17, cy - r * 0.17, r * 0.34, r * 0.34));
-                g.setColor(colour);
-            }
+            // ТРОФЕЙ — ЧЁРНЫЙ ОБЪЁМНЫЙ КУБИК. Была шестерёнка в чёрном
+            // квадрате; тот же заказ 09.09.2026 убрал и её. Кубик со стола
+            // чёрный в обеих темах, поэтому на тёмном фоне ему добавлена
+            // светлая кромка — иначе он сливается с подложкой.
+            case "TROPHY" -> кубик(g, cx, cy, size, ТРОФЕЙ);
             // КОНТЕЙНЕР — коробка с крышкой
             case "CONTAINER" -> {
                 g.setStroke(new BasicStroke((float) Math.max(1, size * 0.13)));

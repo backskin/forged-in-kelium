@@ -92,6 +92,15 @@ public final class Objectives {
                 // o22 «Зачистка»: трофейные ЖЕТОНЫ возвращаются владельцам мимо
                 // Науки — очков они не приносят, в этом и цена.
                 return p.destroyedTokens.size();
+            case "units_on_field":
+                // ЛЮБЫЕ свои войска, стоящие на поле, включая вышки: карта
+                // просит вернуть жетоны в запас, а не увести их с позиций.
+                return p.unitsOnField().size();
+            case "arsenal_cards":
+                // Карты арсенала в руке. Установленные не считаются: они уже
+                // работают, и снимать работающую способность ради задания —
+                // другая сделка, чем расстаться с ещё не сыгранной картой.
+                return p.arsenalHand.size();
             case "buildings_off_cu":
                 // o47 «Демонтаж»: своё здание уходит в запас БЕЗ компенсации
                 // (обычный снос даёт монету, здесь не даёт).
@@ -119,6 +128,27 @@ public final class Objectives {
             }
         }
         return new ArrayList<>(hexes);
+    }
+
+    /**
+     * ДВА ЖЕТОНА ТЕХНИКИ И/ИЛИ АВИАЦИИ С ОДНОГО ГЕКСА — то, за что платит
+     * усиление «Разоружения». Пусто, если такой пары на поле нет.
+     */
+    private static List<kelium.core.UnitToken> ударнаяПара(PlayerState p) {
+        java.util.Map<String, List<kelium.core.UnitToken>> поГексам =
+            new java.util.LinkedHashMap<>();
+        for (kelium.core.UnitToken u : p.unitsOnField()) {
+            if (u.type == kelium.core.UnitType.VEHICLE
+                    || u.type == kelium.core.UnitType.AIRCRAFT) {
+                поГексам.computeIfAbsent(u.hexId, k -> new ArrayList<>()).add(u);
+            }
+        }
+        for (List<kelium.core.UnitToken> группа : поГексам.values()) {
+            if (группа.size() >= 2) {
+                return new ArrayList<>(группа);
+            }
+        }
+        return new ArrayList<>();
     }
 
     /** Свои здания на поле, кроме ЦУ — их можно сдать в жертву (o47). */
@@ -168,6 +198,44 @@ public final class Objectives {
                             break;
                         }
                     }
+                }
+            }
+            case "units_on_field" -> {
+                // ПОРЯДОК СДАЧИ НЕ СЛУЧАЕН: сперва пара техники или авиации С
+                // ОДНОГО ГЕКСА — ровно то, за что платит усиление карты. Тот же
+                // приём, что у «трофеев», где первым уходит здание: жадный
+                // «первый попавшийся» сдал бы пехоту и лишил игрока усиления,
+                // которое он честно заслужил.
+                List<kelium.core.UnitToken> порядок = ударнаяПара(p);
+                boolean пара = порядок.size() >= amt;
+                for (kelium.core.UnitToken u : p.unitsOnField()) {
+                    if (!порядок.contains(u)) {
+                        порядок.add(u);
+                    }
+                }
+                int left = amt;
+                for (kelium.core.UnitToken u : порядок) {
+                    if (left == 0) {
+                        break;
+                    }
+                    u.setHexId(null);
+                    u.resetDamage();
+                    left--;
+                }
+                if (пара && s.journal != null) {
+                    s.journal.of(p.seat).sacrificedStrikeGroup = true;
+                }
+            }
+            case "arsenal_cards" -> {
+                int left = amt;
+                List<String> рука = new ArrayList<>(p.arsenalHand);
+                for (String карта : рука) {
+                    if (left == 0) {
+                        break;
+                    }
+                    p.arsenalHand.remove(карта);
+                    s.decks.get("arsenal").discard(карта);
+                    left--;
                 }
             }
             case "trophies" -> {

@@ -68,6 +68,12 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
+                // ЩЕЛЧОК ПО ЖЕТОНУ МОДУЛЯ — подробности крупно (заказ дизайнера
+                // 08.09.2026). Проверяется раньше стопок карт: жетон лежит на
+                // планшете, стопки — рядом, и промахнуться легко.
+                if (модульПод(e.getPoint())) {
+                    return;
+                }
                 Rectangle r = deckAt(e.getPoint());
                 Deck d = r == null ? null : deckSpots.get(r);
                 if (d != null) {
@@ -227,11 +233,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // рисованный вид, он же остаётся источником чисел, которых на печати
         // нет (запас жетонов, цены, скорости).
         int full = getWidth() - pad * 2;
-        boolean printed = PrintedBoards.available(p.side);
+        boolean printed = PrintedBoards.available(p.seat);
         if (printed) {
             printedSpots.clear();
             PrintedBoards.paintTroop(g, pad, y, full, p, troopSide(p), printedSpots);
-            y += PrintedBoards.troopHeight(p.side, full) + px(8);
+            y += PrintedBoards.troopHeight(p.seat, full) + px(8);
             y = paintStockStrip(g, f, p, pad, y, full) + px(10);
         }
         if (!printed) {
@@ -239,17 +245,6 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         }
 
         int yLeft = paintBuildings(g, f, p, pad, y, leftW, printed);
-        if (printed) {
-            // Планшет хранилища идёт ПОСЛЕ зданий: ячейки на нём открывают
-            // именно они, и читается это сверху вниз, как на столе. Ширина —
-            // две трети листа: в узкую колонку он ужимался до марки.
-            int sw = (int) (full * 0.66);
-            PrintedBoards.paintStorage(g, pad, yLeft + px(10), sw, p,
-                cellFill, startFill, coveredCells(buildingsOf(f, p.seat)));
-            yLeft += px(10) + PrintedBoards.storageHeight(p.side, sw) + px(6);
-        }
-        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
-
         int yRight = paintModulesAndCards(g, p, rightX, y, rightW);
         int cardH = px(180);
         int cardW = px(150);
@@ -258,6 +253,23 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         paintDestroyedCard(g, p, rightX + cardW + colGap, yRight,
             rightW - cardW - colGap, cardH);
         yRight += cardH + px(24);
+
+        if (printed) {
+            // ПЛАНШЕТ ХРАНИЛИЩА — ВО ВСЮ ШИРИНУ И ПОД ОБЕИМИ КОЛОНКАМИ.
+            //
+            // Он широкий (две трети листа), и в левой колонке налезал на правую:
+            // отложенный приказ и карта трофеев оказывались поверх печати.
+            // Ставим его ниже обеих колонок — тогда ни ужимать его до марки, ни
+            // резать соседей не приходится, а читается лист по-прежнему сверху
+            // вниз: планшет войск, хозяйство, планшет хранилища.
+            int sw = (int) (full * 0.66);
+            int yОбщий = Math.max(yLeft, yRight) + px(10);
+            PrintedBoards.paintStorage(g, pad, yОбщий, sw, p,
+                cellFill, startFill, coveredCells(buildingsOf(f, p.seat)));
+            yLeft = yОбщий + PrintedBoards.storageHeight(p.seat, sw) + px(6);
+            yRight = yLeft;
+        }
+        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
 
         // ВЫСОТА СЧИТАЕТСЯ ПО СОДЕРЖИМОМУ: планшет выше окна, и без этого прокрутка
         // не доходила до низа — нижняя часть просто обрезалась.
@@ -673,6 +685,40 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     private void paintBuildingCell(Graphics2D g, Slot s, int seat, int x, int y, int cell) {
         boolean inStock = s.inStock();
         boolean captured = s.token() != null && s.token().capturedBy != null;
+
+        // ПЕЧАТНЫЙ ЖЕТОН, ЕСЛИ ОН НАРИСОВАН. На планшете лежит та же картонка,
+        // что потом встанет на поле, — и узнаётся она по рисунку художника, а не
+        // по цветному силуэту (заказ дизайнера 09.09.2026: в зоне игрока только
+        // настоящие предметы). Ушло с планшета — остаётся приглушённый след той
+        // же картинки: место видно, а жетона на нём нет.
+        var печать = kelium.report.Textures.found(s.type(), s.level(), seat);
+        if (печать != null && печать.image() != null) {
+            java.awt.image.BufferedImage tex = печать.image();
+            double kт = Math.min(cell * 0.94 / tex.getWidth(),
+                (cell - px(12)) / (double) tex.getHeight());
+            int tw = (int) Math.round(tex.getWidth() * kт);
+            int th = (int) Math.round(tex.getHeight() * kт);
+            int tx = x + (cell - tw) / 2;
+            int ty0 = y + (cell - px(12) - th) / 2;
+            java.awt.Composite было = g.getComposite();
+            if (!inStock) {
+                g.setComposite(java.awt.AlphaComposite.getInstance(
+                    java.awt.AlphaComposite.SRC_OVER, 0.22f));
+            }
+            g.drawImage(tex, tx, ty0, tw, th, null);
+            g.setComposite(было);
+            g.setFont(font(11, Font.BOLD));
+            g.setColor(inStock ? Theme.ink() : Theme.ink3());
+            g.drawString(kelium.gui.GameRecorder.buildingLabel(s.type(), s.level()),
+                x + px(2), y + cell - px(2));
+            if (captured) {
+                g.setColor(Theme.bad());
+                g.setFont(font(9, Font.BOLD));
+                g.drawString("трофей", x + px(2), y + px(10));
+            }
+            return;
+        }
+
         g.setColor(Theme.tile());
         g.fill(new RoundRectangle2D.Double(x, y, cell, cell, Theme.R_TILE * 2,
             Theme.R_TILE * 2));
@@ -1409,10 +1455,62 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     }
 
     /** Отложенный приказ — рубашкой вверх, как он и лежит на столе. */
+    /** Отношение высоты печатной карты к её ширине (661×1028 точек). */
+    private static final double КАРТА_ПРИКАЗА = 1028 / 661.0;
+
+    /**
+     * РУБАШКА КОЛОДЫ ПРИКАЗОВ этого игрока — печатная картинка со стола.
+     *
+     * <p>В наборе карт колода зовётся алой ({@code scarlet}), а в
+     * идентификаторах карт стоит {@code red}: спрашиваем оба имени, потом общую
+     * рубашку.
+     */
+    private static java.awt.image.BufferedImage рубашкаПриказов(String colour) {
+        String c = colour == null || colour.isBlank() ? "" : colour;
+        String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
+        return kelium.report.Textures.orderCard(c.isEmpty() ? null : "back_" + c,
+            alt.isEmpty() ? null : "back_" + alt, "back");
+    }
+
+    /** Печатное лицо карты приказа; {@code null} — художник его не рисовал. */
+    private java.awt.image.BufferedImage лицоПриказа(String cardId, String colour) {
+        if (cardId == null || cardId.isBlank()) {
+            return null;
+        }
+        if (cardId.startsWith("security")) {
+            String c = colour == null || colour.isBlank() ? "" : colour;
+            String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
+            return kelium.report.Textures.orderCard(c.isEmpty() ? null : "security_" + c,
+                alt.isEmpty() ? null : "security_" + alt, "security");
+        }
+        return kelium.report.Textures.orderCard(cardId);
+    }
+
     private void paintSetAside(Graphics2D g, ReplayRecord.Player p, int x, int y,
                                int w, int h) {
         caption(g, "ОТЛОЖЕННЫЙ ПРИКАЗ", x, y);
         int top = y + px(14);
+        // ПЕЧАТНАЯ КАРТА, И БОЛЬШЕ НИЧЕГО. Отложенный приказ показывается лицом
+        // (решение дизайнера 13.08.2026): разбор партии — не стол, смотрящий
+        // должен видеть, ЧТО отложили. Но рисуется он ровно печатной картинкой в
+        // её пропорциях, без цветной подложки и без своих подписей поверх
+        // (заказ дизайнера 09.09.2026).
+        java.awt.image.BufferedImage печать = p.orderSetAside == null
+            ? рубашкаПриказов(p.orderColor) : лицоПриказа(p.orderSetAside, p.orderColor);
+        if (печать != null) {
+            int кв = (int) Math.min(w, h / КАРТА_ПРИКАЗА);
+            int кh = (int) (кв * КАРТА_ПРИКАЗА);
+            java.awt.Composite было = g.getComposite();
+            if (p.orderSetAside == null) {
+                // Ничего не отложено — на месте лежит рубашка, приглушённая:
+                // место занято колодой, а не картой этого круга.
+                g.setComposite(java.awt.AlphaComposite.getInstance(
+                    java.awt.AlphaComposite.SRC_OVER, 0.35f));
+            }
+            g.drawImage(печать, x, top, кв, кh, null);
+            g.setComposite(было);
+            return;
+        }
         Color back = orderColour(p.orderColor);
         g.setColor(p.orderSetAside == null ? Theme.tile() : back);
         g.fill(new RoundRectangle2D.Double(x, top, w, h, Theme.R_OVERLAY * 2,
@@ -1580,13 +1678,29 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                                  int w, int h) {
         caption(g, "КАРТА ТРОФЕЕВ", x, y);
         int top = y + px(14);
-        g.setColor(Theme.tile());
-        g.fill(new RoundRectangle2D.Double(x, top, w, h, Theme.R_OVERLAY * 2,
-            Theme.R_OVERLAY * 2));
-        g.setColor(Theme.border());
-        g.setStroke(new BasicStroke(1f));
-        g.draw(new RoundRectangle2D.Double(x, top, w, h, Theme.R_OVERLAY * 2,
-            Theme.R_OVERLAY * 2));
+        // МЕСТО ПОД ТРОФЕИ — ЭТО РУБАШКА КАРТЫ ПРИКАЗОВ, ПОВЁРНУТАЯ НА 90°
+        // ПРОТИВ ЧАСОВОЙ (заказ дизайнера 09.09.2026: «зачем ты используешь
+        // отдельно нарисованную область, когда можно взять рубашку карты — и
+        // получится ровно та же самая область, и это будет как раз в тему»).
+        // Своей нарисованной плашки здесь больше нет.
+        java.awt.image.BufferedImage рубашка = рубашкаПриказов(p.orderColor);
+        if (рубашка != null) {
+            int кh = (int) Math.min(h, w / КАРТА_ПРИКАЗА);
+            int кв = (int) (кh * КАРТА_ПРИКАЗА);
+            java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform();
+            at.translate(x, top + кh);
+            at.rotate(-Math.PI / 2);
+            at.scale(кh / (double) рубашка.getWidth(), кв / (double) рубашка.getHeight());
+            g.drawImage(рубашка, at, null);
+        } else {
+            g.setColor(Theme.tile());
+            g.fill(new RoundRectangle2D.Double(x, top, w, h, Theme.R_OVERLAY * 2,
+                Theme.R_OVERLAY * 2));
+            g.setColor(Theme.border());
+            g.setStroke(new BasicStroke(1f));
+            g.draw(new RoundRectangle2D.Double(x, top, w, h, Theme.R_OVERLAY * 2,
+                Theme.R_OVERLAY * 2));
+        }
 
         List<ReplayRecord.DestroyedToken> tokens = p.destroyedCard;
         int n = tokens.size();
@@ -1691,6 +1805,31 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 b.level == null ? 0 : b.level);
         });
         return out;
+    }
+
+    /**
+     * Открыть подробности жетона модуля под курсором.
+     *
+     * @return {@code true} — жетон нашёлся и окно открыто
+     */
+    private boolean модульПод(java.awt.Point p) {
+        for (Map.Entry<Rectangle, ModuleSpot> en : moduleSpots.entrySet()) {
+            if (en.getKey().contains(p)) {
+                ModuleSpot sp = en.getValue();
+                ModuleZoom.show(javax.swing.SwingUtilities.getWindowAncestor(this),
+                    sp.module(), sp.red(), sp.slotName());
+                return true;
+            }
+        }
+        for (Map.Entry<Rectangle, Object[]> en : printedSpots.entrySet()) {
+            if (en.getKey().contains(p)) {
+                Object[] sp = en.getValue();
+                ModuleZoom.show(javax.swing.SwingUtilities.getWindowAncestor(this),
+                    (ReplayRecord.Module) sp[0], (Boolean) sp[1], String.valueOf(sp[2]));
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

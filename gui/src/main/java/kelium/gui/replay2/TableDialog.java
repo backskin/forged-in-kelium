@@ -40,7 +40,6 @@ import kelium.gui.GameRecorder;
 public final class TableDialog {
 
     private static final String AUTO = "как раздастся";
-    private static final String AS_RULES = "как в правилах";
 
     private TableDialog() {
     }
@@ -57,8 +56,6 @@ public final class TableDialog {
                                JComboBox<String>[] facingBoxes, SeatChip[] chips,
                                java.util.function.IntConsumer randomCharacter) {
         List<String> decks = decks(rulesetId);
-        List<String> troop = sides(rulesetId, "troop_side");
-        List<String> storage = sides(rulesetId, "storage_side");
 
         JPanel form = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets " + Theme.px(10) + ", gapx " + Theme.px(10)
@@ -71,13 +68,12 @@ public final class TableDialog {
         // соперник и насколько он силён — два разных вопроса.
         form.add(caption("уровень"));
         form.add(caption("поворот ЦУ"), "span 2");
-        form.add(caption("колода приказов"));
-        form.add(caption("планшет войск"));
-        form.add(caption("планшет хранилища"), "wrap");
+        // СТОЛБЦОВ «ПЛАНШЕТ ВОЙСК» И «ПЛАНШЕТ ХРАНИЛИЩА» ЗДЕСЬ НЕТ. Сторон «Б»
+        // не существует (решение дизайнера 09.09.2026): планшеты у всех
+        // одинаковые, и выбирать было бы нечего.
+        form.add(caption("колода приказов"), "wrap");
 
         List<JComboBox<String>> dc = new ArrayList<>();
-        List<JComboBox<String>> tc = new ArrayList<>();
-        List<JComboBox<String>> sc = new ArrayList<>();
         List<GameConfig.SeatPick> now = GameConfig.seatPickAll();
         for (int seat = 0; seat < players; seat++) {
             final int seatFinal = seat;
@@ -99,34 +95,22 @@ public final class TableDialog {
                 + "узор нижних приказов (что откроется вскрытой картой) — это главная "
                 + "асимметрия партии. Цвет самого места на поле колода НЕ меняет — "
                 + "он всегда идёт по номеру места."));
-            form.add(d, "growx");
+            form.add(d, "growx, wrap");
             dc.add(d);
-
-            JComboBox<String> t = box(AS_RULES, troop, pick.troopSide(), s -> s);
-            t.setToolTipText(Ui2.tip("Сторона планшета ВОЙСК: чем и по кому бьют "
-                + "роды войск этого игрока."));
-            form.add(t, "growx");
-            tc.add(t);
-
-            JComboBox<String> s = box(AS_RULES, storage, pick.storageSide(), x -> x);
-            s.setToolTipText(Ui2.tip("Сторона планшета ХРАНИЛИЩА: сколько ячеек и "
-                + "под что они открываются."));
-            form.add(s, "growx, wrap");
-            sc.add(s);
         }
         JLabel note = new JLabel("<html>Колода, выбранная за столом, остальным местам "
             + "уже не достанется. На что колода не выбрана — раздаётся по сиду, как "
             + "раньше. Характер бота и поворот ЦУ применяются сразу.</html>");
         note.setFont(Theme.note(11));
         note.setForeground(Theme.ink3());
-        form.add(note, "span 7, growx, gaptop " + Theme.px(6));
+        form.add(note, "span 5, growx, gaptop " + Theme.px(6));
         form.setPreferredSize(new Dimension(Theme.px(820),
             form.getPreferredSize().height));
 
         Window owner = parent == null ? null
             : javax.swing.SwingUtilities.getWindowAncestor(parent);
         int ok = JOptionPane.showConfirmDialog(owner, form,
-            "Игроки: характер, колода и планшеты",
+            "Игроки: характер, уровень, поворот ЦУ и колода приказов",
             JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (ok != JOptionPane.OK_OPTION) {
             return false;
@@ -134,38 +118,29 @@ public final class TableDialog {
         boolean changed = false;
         for (int seat = 0; seat < players; seat++) {
             String deck = deckValue(dc.get(seat), decks);
-            String t = value(tc.get(seat), AS_RULES);
-            String s = value(sc.get(seat), AS_RULES);
             GameConfig.SeatPick was = seat < now.size() && now.get(seat) != null
                 ? now.get(seat) : new GameConfig.SeatPick(null, null, null);
-            if (!java.util.Objects.equals(was.orderColor(), deck)
-                    || !java.util.Objects.equals(was.troopSide(), t)
-                    || !java.util.Objects.equals(was.storageSide(), s)) {
+            if (!java.util.Objects.equals(was.orderColor(), deck)) {
                 changed = true;
             }
-            GameConfig.pickSeat(seat, t, s, deck);
+            GameConfig.pickSeat(seat, null, null, deck);
         }
         return changed;
     }
 
     /**
-     * РАЗДАТЬ КОЛОДЫ И СТОРОНЫ ПЛАНШЕТОВ СЛУЧАЙНО: каждому месту своя колода и
-     * свои стороны планшетов.
+     * РАЗДАТЬ КОЛОДЫ ПРИКАЗОВ СЛУЧАЙНО — по одной на место.
      *
-     * <p>Колоды берутся БЕЗ ПОВТОРОВ — двух одинаковых колод приказов за столом
+     * <p>Колоды берутся БЕЗ ПОВТОРОВ: двух одинаковых колод приказов за столом
      * не бывает, и выдать их значило бы собрать партию, которую нельзя сыграть.
-     * Стороны планшетов повторяться могут: это разные планшеты у разных игроков.
+     * Стороны планшетов не раздаются — их больше нет.
      */
     public static void randomise(String rulesetId, int players, java.util.Random rng) {
         List<String> decks = new ArrayList<>(decks(rulesetId));
-        List<String> troop = sides(rulesetId, "troop_side");
-        List<String> storage = sides(rulesetId, "storage_side");
         java.util.Collections.shuffle(decks, rng);
         for (int seat = 0; seat < players; seat++) {
             String c = seat < decks.size() ? decks.get(seat) : null;
-            String t = troop.isEmpty() ? null : troop.get(rng.nextInt(troop.size()));
-            String s = storage.isEmpty() ? null : storage.get(rng.nextInt(storage.size()));
-            GameConfig.pickSeat(seat, t, s, c);
+            GameConfig.pickSeat(seat, null, null, c);
         }
         // Лишние места чистим: иначе выбор от партии на четверых остался бы висеть
         // на игре вдвоём и колода ушла бы тому, кого за столом нет.
@@ -174,7 +149,7 @@ public final class TableDialog {
         }
     }
 
-    /** Короткая сводка выбора для строки настройки: «Волк · Б1/A» и т. п. */
+    /** Короткая сводка выбора для строки настройки: «1: Красная колода». */
     public static String summary(int players) {
         List<GameConfig.SeatPick> all = GameConfig.seatPickAll();
         List<String> out = new ArrayList<>();
@@ -187,10 +162,6 @@ public final class TableDialog {
             List<String> bits = new ArrayList<>();
             if (p.orderColor() != null) {
                 bits.add(Names.orderDeck(p.orderColor()));
-            }
-            if (p.troopSide() != null || p.storageSide() != null) {
-                bits.add((p.troopSide() == null ? "—" : p.troopSide()) + "/"
-                    + (p.storageSide() == null ? "—" : p.storageSide()));
             }
             out.add((seat + 1) + ": " + String.join(" ", bits));
         }
@@ -209,17 +180,6 @@ public final class TableDialog {
             Object deck = e.get("deck");
             if (deck != null) {
                 out.add(String.valueOf(deck));
-            }
-        }
-        return new ArrayList<>(out);
-    }
-
-    /** Стороны планшетов заданного вида из набора досок. */
-    private static List<String> sides(String rulesetId, String kind) {
-        Set<String> out = new LinkedHashSet<>();
-        for (Map<String, Object> e : entries(rulesetId, "boards")) {
-            if (kind.equals(e.get("kind")) && e.get("side") != null) {
-                out.add(String.valueOf(e.get("side")));
             }
         }
         return new ArrayList<>(out);
@@ -278,33 +238,5 @@ public final class TableDialog {
         return idx <= 0 || idx - 1 >= values.size() ? null : values.get(idx - 1);
     }
 
-    private static JComboBox<String> box(String first, List<String> values, String chosen,
-                                         java.util.function.Function<String, String> ru) {
-        JComboBox<String> box = new JComboBox<>();
-        box.setFont(Theme.body());
-        box.addItem(first);
-        for (String v : values) {
-            box.addItem(v.equals(ru.apply(v)) ? v : v + " — " + ru.apply(v));
-        }
-        if (chosen != null) {
-            for (int i = 1; i < box.getItemCount(); i++) {
-                if (box.getItemAt(i).startsWith(chosen)) {
-                    box.setSelectedIndex(i);
-                }
-            }
-        }
-        return box;
-    }
-
-    /** Выбранное значение: первый пункт — «не выбрано», остальное — до тире. */
-    private static String value(JComboBox<String> box, String first) {
-        Object o = box.getSelectedItem();
-        if (o == null || first.equals(o)) {
-            return null;
-        }
-        String s = String.valueOf(o);
-        int cut = s.indexOf(" — ");
-        return cut < 0 ? s : s.substring(0, cut);
-    }
 
 }
