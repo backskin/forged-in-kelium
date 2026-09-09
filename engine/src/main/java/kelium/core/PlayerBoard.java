@@ -20,13 +20,37 @@ public final class PlayerBoard {
         this.storage = storage;
     }
 
-    /** Собрать доску игрока из контента по кодам боевой и складской сторон. */
+    /**
+     * Собрать доску игрока из контента по кодам боевой и складской сторон.
+     *
+     * <p>СТОРОН «Б» БОЛЬШЕ НЕТ (решение дизайнера 09.09.2026): в наборе
+     * планшетов 3.0.0 лежит по одной записи на планшет, одинаковой для всех.
+     * Но записи прошлых партий и старые своды называют стороны Б1…Б4, В и Г, и
+     * читаться они обязаны. Поэтому названной стороны нет в наборе — берётся
+     * общий планшет, а не падение: партия важнее буквы в поле.
+     */
     public static PlayerBoard fromContent(List<Map<String, Object>> boardsEntries,
                                           String troopSide, String storageSide) {
-        Map<String, Object> troopRaw = find(boardsEntries, "troop_side", troopSide);
-        Map<String, Object> storageRaw = find(boardsEntries, "storage_side", storageSide);
+        Map<String, Object> troopRaw = искать(boardsEntries, "troop_side", troopSide);
+        Map<String, Object> storageRaw = искать(boardsEntries, "storage_side", storageSide);
         return new PlayerBoard(new TroopSide(troopSide, troopRaw),
                                new StorageSide(storageSide, storageRaw));
+    }
+
+    /** Сторона из набора, а нет такой — единственная запись этого вида. */
+    private static Map<String, Object> искать(List<Map<String, Object>> boardsEntries,
+                                              String kind, String side) {
+        for (Map<String, Object> e : boardsEntries) {
+            if (kind.equals(e.get("kind")) && side.equals(e.get("side"))) {
+                return e;
+            }
+        }
+        for (Map<String, Object> e : boardsEntries) {
+            if (kind.equals(e.get("kind"))) {
+                return e;
+            }
+        }
+        throw new IllegalArgumentException("в контенте досок нет ни одной записи " + kind);
     }
 
     /** Найти в контенте досок запись заданного вида (kind) и стороны (side). */
