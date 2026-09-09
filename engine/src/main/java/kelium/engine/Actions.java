@@ -406,6 +406,7 @@ public final class Actions {
                 if (!tile.popStack()) {
                     gh.spawnTile = null;
                 }
+                journal(state).of(player.seat).spawnTileClaimed = true;
                 if (!tile.isStart) {
                     journal(state).of(player.seat).spawnTileClaimedNonStart = true;
                 }

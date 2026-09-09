@@ -169,6 +169,16 @@ public final class TurnJournal {
         public final Set<Integer> minerContainerLevels = new HashSet<>();
         public boolean lastKeliumNonStart = false;
         public boolean spawnTileClaimedNonStart = false;
+        /**
+         * ЗАРОЖДЕНИЕ ИСЧЕРПАНО И УШЛО С ПОЛЯ — любое, стартовое или большое.
+         *
+         * <p>Карта «В ЭТОТ ХОД забери последний келемий с зарождения» и её
+         * усиление «ты исчерпал зарождение — оно ушло с поля» про зарождения
+         * ВООБЩЕ, без деления на стартовые и большие (таблица дизайнера
+         * 09.09.2026). Рядом стоящий признак с «NonStart» остаётся: он нужен
+         * тем картам, которым важно именно большое зарождение.
+         */
+        public boolean spawnTileClaimed = false;
         // Стройка: снос (o13); перенос не-ЦУ (o16); ЦУ на «чистый» гекс (o17).
         public boolean demolishedNonCu = false;
         public boolean movedNonCuBuilding = false;
@@ -312,6 +322,7 @@ public final class TurnJournal {
             minerContainerLevels.addAll(o.minerContainerLevels);
             lastKeliumNonStart = o.lastKeliumNonStart;
             spawnTileClaimedNonStart = o.spawnTileClaimedNonStart;
+            spawnTileClaimed = o.spawnTileClaimed;
             demolishedNonCu = o.demolishedNonCu;
             movedNonCuBuilding = o.movedNonCuBuilding;
             movedNonCuUids.clear();
@@ -413,6 +424,7 @@ public final class TurnJournal {
             minerContainerLevels.clear();
             lastKeliumNonStart = false;
             spawnTileClaimedNonStart = false;
+            spawnTileClaimed = false;
             demolishedNonCu = false;
             movedNonCuBuilding = false;
             movedNonCuUids.clear();
