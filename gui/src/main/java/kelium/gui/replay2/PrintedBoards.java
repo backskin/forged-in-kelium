@@ -386,7 +386,7 @@ final class PrintedBoards {
         if (найдено != null && найдено.image() != null) {
             BufferedImage tex = найдено.image();
             double k = масштабВКрыло(tex.getWidth(), tex.getHeight(), своё);
-            double[] c = центрВКрыле(своё, tex.getHeight() * k);
+            double[] c = центрВКрыле(своё, tex.getHeight() * k / УМЕНЬШЕНИЕ);
             AffineTransform at = new AffineTransform();
             at.translate(c[0], c[1]);
             at.rotate(своё.угол());
@@ -411,7 +411,7 @@ final class PrintedBoards {
             return;
         }
         double k = масштабВКрыло(sh.vbW(), sh.vbH(), своё);
-        double[] c = центрВКрыле(своё, sh.vbH() * k);
+        double[] c = центрВКрыле(своё, sh.vbH() * k / УМЕНЬШЕНИЕ);
         AffineTransform at = new AffineTransform();
         at.translate(c[0], c[1]);
         at.rotate(своё.угол());
@@ -434,8 +434,17 @@ final class PrintedBoards {
      * Полей по длине оставляем чуть — картонка не упирается в соседнее крыло.
      */
     private static double масштабВКрыло(double texW, double texH, Крыло крыло) {
-        return крыло.ширина() / texW;
+        return крыло.ширина() * УМЕНЬШЕНИЕ / texW;
     }
+
+    /**
+     * НА СТОЛЬКО ЖЕТОН МЕНЬШЕ СВОЕГО КРЫЛА. Ровно во всю кромку он ложился чуть
+     * крупновато (замечание дизайнера 09.09.2026: «получилось почти идеально, но
+     * слегка большеватые, уменьши от центра на 5%»). Уменьшение идёт ОТ СЕРЕДИНЫ
+     * жетона: место, куда он лёг, не меняется, вокруг него просто появляется
+     * тонкий воздух.
+     */
+    private static final double УМЕНЬШЕНИЕ = 0.95;
 
     /**
      * СЕРЕДИНА ЖЕТОНА В КРЫЛЕ: широкой стороной вплотную к кромке планшета.
@@ -450,7 +459,9 @@ final class PrintedBoards {
 
     /** Кубик ресурса в напечатанной ячейке: тем же значком, что и везде. */
     private static void cube(Graphics2D g, Rectangle box, char has) {
-        double s = Math.min(box.width, box.height) * 0.66;
+        // КУБИК КРУПНЕЕ НА ПЯТУЮ (заказ дизайнера 09.09.2026): в печатной ячейке
+        // он сидел мелко, и ячейка читалась как пустая рамка со значком внутри.
+        double s = Math.min(box.width, box.height) * 0.79;
         double cx = box.x + box.width / 2.0;
         double cy = box.y + box.height / 2.0;
         // БЕЛОГО КРУЖКА ПОД КУБИКОМ НЕТ (замечание дизайнера 09.09.2026: «что
