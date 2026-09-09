@@ -32,35 +32,66 @@ final class PrintedBoards {
     private PrintedBoards() {
     }
 
-    /** Есть ли печатный планшет обоих видов для этой стороны. */
-    static boolean available(String side) {
-        return troopArt(side) != null && storageArt(side) != null;
+    /**
+     * ПЛАНШЕТ ВЫБИРАЕТСЯ ПО ЦВЕТУ ИГРОКА, А НЕ ПО СТОРОНЕ.
+     *
+     * <p>Сторон «А» и «Б» больше нет (решение дизайнера 09.09.2026): асимметрия
+     * планшетами упразднена. Вместо неё у каждого игрока СВОЙ планшет своего
+     * цвета — с его портретом и его палитрой, чтобы за столом было видно, где
+     * чьё хозяйство. Печать на всех четырёх одна и та же.
+     *
+     * <p>Старые планшеты сторон остаются запасным вариантом: по ним читаются
+     * записи прошлых партий, где цветных планшетов ещё не было.
+     */
+    private static String цвет(int seat) {
+        return "p" + (ПЛАНШЕТ_ПО_ЦВЕТУ[kelium.report.FieldGeometry.seatColor(seat)]);
     }
 
-    private static BufferedImage troopArt(String side) {
-        return Textures.board("troop-" + key(side), "troop-A");
+    /**
+     * ЦВЕТОВОЕ ГНЕЗДО → НОМЕР ПЛАНШЕТА В ПАПКЕ.
+     *
+     * <p>Нумерация у двух наборов печати РАЗНАЯ, и это не описка, а факт: у
+     * жетонов войск {@code p1} синий, {@code p2} красный, {@code p3} зелёный,
+     * {@code p4} жёлтый; у планшетов игроков {@code p1} красный, {@code p2}
+     * зелёный, {@code p3} синий, {@code p4} песочный. Связывать их по номеру
+     * нельзя — тогда у синего игрока был бы красный планшет. Связываем по
+     * ЦВЕТУ: гнездо 0 (синее) берёт планшет p3 и так далее.
+     */
+    private static final int[] ПЛАНШЕТ_ПО_ЦВЕТУ = {3, 1, 2, 4};
+
+    /** Есть ли печатный планшет обоих видов для этого игрока. */
+    static boolean available(int seat) {
+        return troopArt(seat) != null && storageArt(seat) != null;
     }
 
-    private static BufferedImage storageArt(String side) {
-        return Textures.board("storage-" + key(side), "storage-A");
+    private static BufferedImage troopArt(int seat) {
+        return Textures.board("troop-" + цвет(seat), "troop-A");
     }
 
-    private static String key(String side) {
-        if (side == null || side.isBlank()) {
-            return "A";
-        }
-        return side.trim().toUpperCase(java.util.Locale.ROOT)
-            .replace('А', 'A').replace('Б', 'B');
+    private static BufferedImage storageArt(int seat) {
+        return Textures.board("storage-" + цвет(seat), "storage-A");
     }
 
     /** Высота планшета войск при такой ширине (0 — картинки нет). */
-    static int troopHeight(String side, int width) {
-        return height(troopArt(side), width);
+    static int troopHeight(int seat, int width) {
+        return height(troopArt(seat), width);
     }
 
     /** Высота планшета хранилища при такой ширине (0 — картинки нет). */
-    static int storageHeight(String side, int width) {
-        return height(storageArt(side), width);
+    static int storageHeight(int seat, int width) {
+        return height(storageArt(seat), width);
+    }
+
+    /** Якоря планшета войск этого игрока (с откатом на планшет стороны А). */
+    private static java.util.List<BoardAnchors.Column> troopCols(int seat) {
+        var cols = BoardAnchors.troop(цвет(seat));
+        return cols.isEmpty() ? BoardAnchors.troop("A") : cols;
+    }
+
+    /** Якоря планшета хранилища этого игрока (с откатом на планшет стороны А). */
+    private static java.util.List<BoardAnchors.Cell> storageCells(int seat) {
+        var cells = BoardAnchors.storage(цвет(seat));
+        return cells.isEmpty() ? BoardAnchors.storage("A") : cells;
     }
 
     private static int height(BufferedImage art, int width) {
@@ -81,14 +112,14 @@ final class PrintedBoards {
     static void paintTroop(Graphics2D g, int x, int y, int width,
                            ReplayRecord.Player p, kelium.core.TroopSide troop,
                            Map<Rectangle, Object[]> spots) {
-        BufferedImage art = troopArt(p.side);
+        BufferedImage art = troopArt(p.seat);
         if (art == null) {
             return;
         }
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
         g.drawImage(art, x, y, width, h, null);
-        for (BoardAnchors.Column c : BoardAnchors.troop(p.side)) {
+        for (BoardAnchors.Column c : troopCols(p.seat)) {
             paintTroopAttack(g, x, y, k, c, p, troop, spots);
             paintTroopAssembly(g, x, y, k, c, p, spots);
         }
@@ -153,9 +184,7 @@ final class PrintedBoards {
      */
     static void paintStorage(Graphics2D g, int x, int y, int width, ReplayRecord.Player p,
                              Map<String, char[]> fill, char[] base, Set<String> covered) {
-        String side = p.storageSide == null || p.storageSide.isBlank()
-            ? p.side : p.storageSide;
-        BufferedImage art = storageArt(side);
+        BufferedImage art = storageArt(p.seat);
         if (art == null) {
             return;
         }
@@ -168,7 +197,7 @@ final class PrintedBoards {
         int seen = 0;
         int lastLevel = -1;
         String lastGroup = "";
-        for (BoardAnchors.Cell c : BoardAnchors.storage(side)) {
+        for (BoardAnchors.Cell c : storageCells(p.seat)) {
             if (!c.group().equals(lastGroup) || c.level() != lastLevel) {
                 lastGroup = c.group();
                 lastLevel = c.level();
@@ -204,6 +233,19 @@ final class PrintedBoards {
         }
     }
 
+    /** Уровень здания из ключа вида {@code miner-3}; {@code null} — без уровня. */
+    private static Integer уровеньИз(String key) {
+        int i = key.indexOf('-');
+        if (i < 0) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(key.substring(i + 1));
+        } catch (NumberFormatException неЧисло) {
+            return null;
+        }
+    }
+
     private static Rectangle объединить(Rectangle a, Rectangle b) {
         return a.union(b);
     }
@@ -222,6 +264,39 @@ final class PrintedBoards {
      */
     private static void жетонПоверхЯчеек(Graphics2D g, String key, Rectangle box, int seat) {
         String code = key.startsWith("miner") ? "miner" : "power_plant";
+        int уровень = уровеньИз(key);
+        // ПЕЧАТНЫЙ ЖЕТОН, ЕСЛИ ОН ЕСТЬ. На столе на планшете лежит та же
+        // картонка, что потом встанет на поле, — и узнаётся она по рисунку, а не
+        // по цветному силуэту. Силуэт остаётся для тех жетонов, которых художник
+        // ещё не рисовал.
+        var найдено = Textures.found(code, уровень, seat);
+        if (найдено != null && найдено.image() != null) {
+            BufferedImage tex = найдено.image();
+            boolean боком = (box.width >= box.height) != (tex.getWidth() >= tex.getHeight());
+            double уголГрад = (боком ? 90 : 0) + 8;
+            double угол = Math.toRadians(уголГрад);
+            double cos = Math.abs(Math.cos(угол));
+            double sin = Math.abs(Math.sin(угол));
+            double wRot = tex.getWidth() * cos + tex.getHeight() * sin;
+            double hRot = tex.getWidth() * sin + tex.getHeight() * cos;
+            double k = Math.min(box.width * 0.98 / wRot, box.height * 0.98 / hRot);
+            AffineTransform at = new AffineTransform();
+            at.translate(box.getCenterX(), box.getCenterY());
+            at.rotate(угол);
+            at.scale(k, k);
+            at.translate(-tex.getWidth() / 2.0, -tex.getHeight() / 2.0);
+            java.awt.Composite было = g.getComposite();
+            g.setComposite(java.awt.AlphaComposite.getInstance(
+                java.awt.AlphaComposite.SRC_OVER, 0.30f));
+            g.setColor(java.awt.Color.BLACK);
+            AffineTransform тень = new AffineTransform(at);
+            тень.preConcatenate(AffineTransform.getTranslateInstance(
+                Math.max(1.5, k * 8), Math.max(1.5, k * 8)));
+            g.drawImage(tex, тень, null);
+            g.setComposite(было);
+            g.drawImage(tex, at, null);
+            return;
+        }
         kelium.report.FieldGeometry.Shape sh;
         try {
             sh = kelium.report.FieldGeometry.buildingByCode(code);

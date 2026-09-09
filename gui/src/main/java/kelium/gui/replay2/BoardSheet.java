@@ -233,11 +233,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // рисованный вид, он же остаётся источником чисел, которых на печати
         // нет (запас жетонов, цены, скорости).
         int full = getWidth() - pad * 2;
-        boolean printed = PrintedBoards.available(p.side);
+        boolean printed = PrintedBoards.available(p.seat);
         if (printed) {
             printedSpots.clear();
             PrintedBoards.paintTroop(g, pad, y, full, p, troopSide(p), printedSpots);
-            y += PrintedBoards.troopHeight(p.side, full) + px(8);
+            y += PrintedBoards.troopHeight(p.seat, full) + px(8);
             y = paintStockStrip(g, f, p, pad, y, full) + px(10);
         }
         if (!printed) {
@@ -245,17 +245,6 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         }
 
         int yLeft = paintBuildings(g, f, p, pad, y, leftW, printed);
-        if (printed) {
-            // Планшет хранилища идёт ПОСЛЕ зданий: ячейки на нём открывают
-            // именно они, и читается это сверху вниз, как на столе. Ширина —
-            // две трети листа: в узкую колонку он ужимался до марки.
-            int sw = (int) (full * 0.66);
-            PrintedBoards.paintStorage(g, pad, yLeft + px(10), sw, p,
-                cellFill, startFill, coveredCells(buildingsOf(f, p.seat)));
-            yLeft += px(10) + PrintedBoards.storageHeight(p.side, sw) + px(6);
-        }
-        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
-
         int yRight = paintModulesAndCards(g, p, rightX, y, rightW);
         int cardH = px(180);
         int cardW = px(150);
@@ -264,6 +253,23 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         paintDestroyedCard(g, p, rightX + cardW + colGap, yRight,
             rightW - cardW - colGap, cardH);
         yRight += cardH + px(24);
+
+        if (printed) {
+            // ПЛАНШЕТ ХРАНИЛИЩА — ВО ВСЮ ШИРИНУ И ПОД ОБЕИМИ КОЛОНКАМИ.
+            //
+            // Он широкий (две трети листа), и в левой колонке налезал на правую:
+            // отложенный приказ и карта трофеев оказывались поверх печати.
+            // Ставим его ниже обеих колонок — тогда ни ужимать его до марки, ни
+            // резать соседей не приходится, а читается лист по-прежнему сверху
+            // вниз: планшет войск, хозяйство, планшет хранилища.
+            int sw = (int) (full * 0.66);
+            int yОбщий = Math.max(yLeft, yRight) + px(10);
+            PrintedBoards.paintStorage(g, pad, yОбщий, sw, p,
+                cellFill, startFill, coveredCells(buildingsOf(f, p.seat)));
+            yLeft = yОбщий + PrintedBoards.storageHeight(p.seat, sw) + px(6);
+            yRight = yLeft;
+        }
+        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
 
         // ВЫСОТА СЧИТАЕТСЯ ПО СОДЕРЖИМОМУ: планшет выше окна, и без этого прокрутка
         // не доходила до низа — нижняя часть просто обрезалась.

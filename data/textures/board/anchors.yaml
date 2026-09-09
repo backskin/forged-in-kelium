@@ -54,6 +54,82 @@ boards:
       - {group: plant, level: 4, type: U, box: [1043, 736, 116, 113]}
       - {group: base, level: 0, type: U, box: [713, 425, 116, 113]}
       - {group: base, level: 0, type: U, box: [713, 560, 116, 113]}
+  - id: storage-p1
+    kind: storage
+    side: p1
+    size: [1400, 802]
+    cells:
+      - {group: miner, level: 1, type: U, box: [416, 35, 104, 102]}
+      - {group: miner, level: 2, type: U, box: [158, 210, 105, 103]}
+      - {group: miner, level: 3, type: U, box: [127, 449, 105, 102]}
+      - {group: miner, level: 3, type: U, box: [186, 559, 105, 102]}
+      - {group: miner, level: 4, type: U, box: [348, 666, 105, 102]}
+      - {group: miner, level: 4, type: U, box: [484, 666, 105, 102]}
+      - {group: plant, level: 1, type: U, box: [873, 36, 104, 102]}
+      - {group: plant, level: 2, type: U, box: [1137, 210, 104, 103]}
+      - {group: plant, level: 3, type: U, box: [1173, 445, 105, 102]}
+      - {group: plant, level: 3, type: U, box: [1116, 555, 105, 102]}
+      - {group: plant, level: 4, type: U, box: [808, 666, 105, 102]}
+      - {group: plant, level: 4, type: U, box: [944, 666, 105, 102]}
+      - {group: base, level: 0, type: U, box: [645, 385, 105, 102]}
+      - {group: base, level: 0, type: U, box: [645, 507, 105, 102]}
+  - id: storage-p2
+    kind: storage
+    side: p2
+    size: [1400, 802]
+    cells:
+      - {group: miner, level: 1, type: U, box: [416, 35, 104, 102]}
+      - {group: miner, level: 2, type: U, box: [158, 210, 105, 103]}
+      - {group: miner, level: 3, type: U, box: [127, 449, 105, 102]}
+      - {group: miner, level: 3, type: U, box: [186, 559, 105, 102]}
+      - {group: miner, level: 4, type: U, box: [348, 666, 105, 102]}
+      - {group: miner, level: 4, type: U, box: [484, 666, 105, 102]}
+      - {group: plant, level: 1, type: U, box: [873, 36, 104, 102]}
+      - {group: plant, level: 2, type: U, box: [1137, 210, 104, 103]}
+      - {group: plant, level: 3, type: U, box: [1173, 445, 105, 102]}
+      - {group: plant, level: 3, type: U, box: [1116, 555, 105, 102]}
+      - {group: plant, level: 4, type: U, box: [808, 666, 105, 102]}
+      - {group: plant, level: 4, type: U, box: [944, 666, 105, 102]}
+      - {group: base, level: 0, type: U, box: [645, 385, 105, 102]}
+      - {group: base, level: 0, type: U, box: [645, 507, 105, 102]}
+  - id: storage-p3
+    kind: storage
+    side: p3
+    size: [1400, 802]
+    cells:
+      - {group: miner, level: 1, type: U, box: [416, 35, 104, 102]}
+      - {group: miner, level: 2, type: U, box: [158, 210, 105, 103]}
+      - {group: miner, level: 3, type: U, box: [127, 449, 105, 102]}
+      - {group: miner, level: 3, type: U, box: [186, 559, 105, 102]}
+      - {group: miner, level: 4, type: U, box: [348, 666, 105, 102]}
+      - {group: miner, level: 4, type: U, box: [484, 666, 105, 102]}
+      - {group: plant, level: 1, type: U, box: [873, 36, 104, 102]}
+      - {group: plant, level: 2, type: U, box: [1137, 210, 104, 103]}
+      - {group: plant, level: 3, type: U, box: [1173, 445, 105, 102]}
+      - {group: plant, level: 3, type: U, box: [1116, 555, 105, 102]}
+      - {group: plant, level: 4, type: U, box: [808, 666, 105, 102]}
+      - {group: plant, level: 4, type: U, box: [944, 666, 105, 102]}
+      - {group: base, level: 0, type: U, box: [645, 385, 105, 102]}
+      - {group: base, level: 0, type: U, box: [645, 507, 105, 102]}
+  - id: storage-p4
+    kind: storage
+    side: p4
+    size: [1400, 802]
+    cells:
+      - {group: miner, level: 1, type: U, box: [416, 35, 104, 102]}
+      - {group: miner, level: 2, type: U, box: [158, 210, 105, 103]}
+      - {group: miner, level: 3, type: U, box: [127, 449, 105, 102]}
+      - {group: miner, level: 3, type: U, box: [186, 559, 105, 102]}
+      - {group: miner, level: 4, type: U, box: [348, 666, 105, 102]}
+      - {group: miner, level: 4, type: U, box: [484, 666, 105, 102]}
+      - {group: plant, level: 1, type: U, box: [873, 36, 104, 102]}
+      - {group: plant, level: 2, type: U, box: [1137, 210, 104, 103]}
+      - {group: plant, level: 3, type: U, box: [1173, 445, 105, 102]}
+      - {group: plant, level: 3, type: U, box: [1116, 555, 105, 102]}
+      - {group: plant, level: 4, type: U, box: [808, 666, 105, 102]}
+      - {group: plant, level: 4, type: U, box: [944, 666, 105, 102]}
+      - {group: base, level: 0, type: U, box: [645, 385, 105, 102]}
+      - {group: base, level: 0, type: U, box: [645, 507, 105, 102]}
   - id: troop-A
     kind: troop
     side: A
@@ -63,3 +139,39 @@ boards:
       - {unit: vehicle, building: factory, attack: [650, 226, 151, 150], assembly: [763, 7, 92, 146]}
       - {unit: aircraft, building: airbase, attack: [1078, 226, 150, 150], assembly: [1185, 4, 92, 149]}
       - {unit: tower, building: command_center, attack: [1495, 226, 150, 150], assembly: [1537, 4, 93, 150]}
+  - id: troop-p1
+    kind: troop
+    side: p1
+    size: [2400, 634]
+    columns:
+      - {unit: infantry, building: barracks, attack: [335, 323, 215, 215], assembly: [467, 5, 146, 215]}
+      - {unit: vehicle, building: factory, attack: [935, 323, 215, 215], assembly: [1067, 5, 146, 215]}
+      - {unit: aircraft, building: airbase, attack: [1535, 323, 215, 215], assembly: [1667, 5, 146, 215]}
+      - {unit: tower, building: command_center, attack: [2135, 323, 215, 215], assembly: [2267, 5, 146, 215]}
+  - id: troop-p2
+    kind: troop
+    side: p2
+    size: [2400, 634]
+    columns:
+      - {unit: infantry, building: barracks, attack: [335, 323, 215, 215], assembly: [467, 5, 146, 215]}
+      - {unit: vehicle, building: factory, attack: [935, 323, 215, 215], assembly: [1067, 5, 146, 215]}
+      - {unit: aircraft, building: airbase, attack: [1535, 323, 215, 215], assembly: [1667, 5, 146, 215]}
+      - {unit: tower, building: command_center, attack: [2135, 323, 215, 215], assembly: [2267, 5, 146, 215]}
+  - id: troop-p3
+    kind: troop
+    side: p3
+    size: [2400, 634]
+    columns:
+      - {unit: infantry, building: barracks, attack: [335, 323, 215, 215], assembly: [467, 5, 146, 215]}
+      - {unit: vehicle, building: factory, attack: [935, 323, 215, 215], assembly: [1067, 5, 146, 215]}
+      - {unit: aircraft, building: airbase, attack: [1535, 323, 215, 215], assembly: [1667, 5, 146, 215]}
+      - {unit: tower, building: command_center, attack: [2135, 323, 215, 215], assembly: [2267, 5, 146, 215]}
+  - id: troop-p4
+    kind: troop
+    side: p4
+    size: [2400, 634]
+    columns:
+      - {unit: infantry, building: barracks, attack: [335, 323, 215, 215], assembly: [467, 5, 146, 215]}
+      - {unit: vehicle, building: factory, attack: [935, 323, 215, 215], assembly: [1067, 5, 146, 215]}
+      - {unit: aircraft, building: airbase, attack: [1535, 323, 215, 215], assembly: [1667, 5, 146, 215]}
+      - {unit: tower, building: command_center, attack: [2135, 323, 215, 215], assembly: [2267, 5, 146, 215]}

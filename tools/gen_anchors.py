@@ -139,6 +139,77 @@ def troop_frames(path):
     return (w, h), [(c[0], c[1], c[2], max(c[3], ph)) for c in pink], blue
 
 
+def player_board(board_id, path, problems):
+    """Якоря цветного планшета игрока: хранилище по образцу, войска по замеру."""
+    im = Image.open(path).convert('RGB')
+    w, h = im.size
+    lines = []
+    if board_id.startswith('storage-'):
+        # ЯЧЕЙКИ ХРАНИЛИЩА берутся с образца storage-A: печать та же, только
+        # перекрашена, и позиции ячеек совпадают. Каждая проверяется по
+        # картинке — вокруг ячейки обязан быть цветной контур.
+        обр = os.path.join(ART, 'storage-A.png')
+        (sw, sh), groups = storage_cells(обр)
+        k = w / float(sw)
+        lines += ['  - id: %s' % board_id, '    kind: storage',
+                  '    side: %s' % board_id.split('-')[1],
+                  '    size: [%d, %d]' % (w, h), '    cells:']
+        плохих = 0
+        for grp in ('miner', 'plant', 'base'):
+            for i, c in enumerate(groups[grp]):
+                box = tuple(int(round(v * k)) for v in c[:4])
+                lvl = 0 if grp == 'base' else (i // 2 + 1 if grp != 'base' else 0)
+                lines.append('      - {group: %s, level: %d, type: U, '
+                             'box: [%d, %d, %d, %d]}' % ((grp, уровень(grp, i)) + box))
+                if not контур_есть(im, box):
+                    плохих += 1
+        if плохих:
+            problems.append('%s: у %d ячеек не нашлось контура — печать сдвинулась?'
+                            % (board_id, плохих))
+        return lines
+    # ПЛАНШЕТ ВОЙСК: четыре колонки, в каждой два места под жетоны модулей.
+    units = ['infantry', 'vehicle', 'aircraft', 'tower']
+    builds = ['barracks', 'factory', 'airbase', 'command_center']
+    lines += ['  - id: %s' % board_id, '    kind: troop',
+              '    side: %s' % board_id.split('-')[1],
+              '    size: [%d, %d]' % (w, h), '    columns:']
+    шаг = w / float(PLAYER_TROOP['columns'])
+    for i in range(PLAYER_TROOP['columns']):
+        ax, ay, aw, ah = PLAYER_TROOP['attack']
+        bx, by, bw, bh = PLAYER_TROOP['assembly']
+        attack = (int(round(ax * w + шаг * i)), int(round(ay * h)),
+                  int(round(aw * w)), int(round(ah * h)))
+        assembly = (int(round(bx * w + шаг * i)), int(round(by * h)),
+                    int(round(bw * w)), int(round(bh * h)))
+        lines.append('      - {unit: %s, building: %s, attack: [%d, %d, %d, %d], '
+                     'assembly: [%d, %d, %d, %d]}'
+                     % ((units[i], builds[i]) + attack + assembly))
+    return lines
+
+
+def уровень(группа, i):
+    """Уровень склада по порядку ячейки в группе (1,2,3,3,4,4)."""
+    if группа == 'base':
+        return 0
+    return [1, 2, 3, 3, 4, 4][i] if i < 6 else 4
+
+
+def контур_есть(im, box):
+    """Есть ли вокруг ячейки цветной контур — проверка замера по картинке."""
+    x, y, bw, bh = box
+    w, h = im.size
+    n = 0
+    for yy in range(max(0, y - 4), min(h, y + bh + 4)):
+        for xx in range(max(0, x - 4), min(w, x + bw + 4)):
+            r, g, b = im.getpixel((xx, yy))
+            if (max(r, g, b) - min(r, g, b) >= 45
+                    and (g > r and g > b and g > 120 or r > g + 45 and r > 130)):
+                n += 1
+                if n > 30:
+                    return True
+    return False
+
+
 def board_cell_counts(root):
     """Сколько ячеек на каждом уровне — из свежайшего data/boards/*.yaml."""
     d = os.path.join(root, 'data', 'boards')
@@ -186,6 +257,28 @@ SHARED = {
         'size': (1890, 1890),
         'card': (468, 618, 1015, 654),
     },
+}
+
+# ===========================================================================
+#  ЛИЧНЫЕ ПЛАНШЕТЫ ИГРОКОВ (по цвету, а не по стороне)
+# ===========================================================================
+#  Сторон «А» и «Б» больше нет (решение дизайнера 09.09.2026): асимметрия
+#  планшетами упразднена, у каждого игрока свой планшет своего цвета. Четыре
+#  планшета — ОДНА И ТА ЖЕ ПЕЧАТЬ в четырёх цветах, поэтому места на них
+#  совпадают до пикселя, и искать их детектором на каждом отдельно незачем: у
+#  цветного планшета фон подкрашен, и цветовой детектор ячеек на нём слепнет
+#  (красный планшет — «красное» повсюду).
+#
+#  Поэтому места ЗАМЕРЕНЫ по печати один раз и записаны здесь долями. Каждое
+#  замеренное место ПРОВЕРЯЕТСЯ по картинке (см. check_player_board), так что
+#  сдвинувшуюся печать скрипт заметит, а не выдаст молча кривые якоря.
+PLAYER_TROOP = {
+    # Колонок четыре, шаг колонки — четверть ширины. В колонке два места под
+    # жетоны модулей: рамка Сборки (сверху справа) и рамка спец-атаки (снизу
+    # справа, с розовой каймой).
+    'columns': 4,
+    'assembly': (467 / 2400.0, 5 / 634.0, 146 / 2400.0, 215 / 634.0),
+    'attack': (335 / 2400.0, 323 / 634.0, 215 / 2400.0, 215 / 634.0),
 }
 
 # Сколько ячеек на каждом шаге — из свода. Столько же должно посчитаться по сетке.
@@ -294,6 +387,11 @@ def main():
             problems.append('%s: непонятное имя планшета (ждём вид-сторона)' % name)
             continue
         side = name[:-4].split('-', 1)[1]
+        # ЦВЕТНЫЕ ПЛАНШЕТЫ ИГРОКОВ идут отдельным путём: места на них замерены
+        # по печати, а не найдены детектором (см. PLAYER_TROOP выше).
+        if re.fullmatch(r'p[1-4]', side):
+            lines += player_board(name[:-4], path, problems)
+            continue
         if name.startswith('storage-'):
             (w, h), groups = storage_cells(path)
             lines += ['  - id: %s' % name[:-4], '    kind: storage',

@@ -463,7 +463,12 @@ public final class FieldPainter {
             return;
         }
         int shown = Math.min(count, 8);
-        double cube = size * ENERGY_SLOT * ENERGY_CUBE_IN_SLOT * 2;
+        // ПОМЕЛЬЧЕ, ЧЕМ БЫЛО (просьба дизайнера 09.09.2026: «уж больно
+        // крупные»). Кубик келемия по-прежнему заметно крупнее кубика энергии в
+        // ячейке здания — иначе на тайле его не разглядеть, — но полуторный, а
+        // не двойной: восемь двойных занимали половину тайла и спорили с
+        // печатным рисунком.
+        double cube = size * ENERGY_SLOT * ENERGY_CUBE_IN_SLOT * 1.55;
         int perRow = shown <= 4 ? shown : (shown + 1) / 2;
         int rows = shown <= 4 ? 1 : 2;
         double step = cube * 1.16;
