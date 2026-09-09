@@ -35,7 +35,7 @@ public final class GameLogger {
         "market", "Рынок", "science", "Наука");
     private static final Map<String, String> ORDERS_RU = Map.of(
         "development", "Разработка", "infrastructure", "Инфраструктура",
-        "operation", "Операция", "acquisitions", "Приобретения");
+        "operation", "Наступление", "acquisitions", "Приобретения");
     private static final Map<String, String> COND_RU = Map.of(
         "victory_points", "по победным очкам", "military", "военная победа",
         "super_objective", "супер-задание", "all_peaks_occupied", "заняты все вершины",

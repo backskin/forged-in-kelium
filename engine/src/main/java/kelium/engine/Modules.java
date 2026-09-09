@@ -93,6 +93,29 @@ public final class Modules {
         return assemblyOutput(player, btype, "unit");
     }
 
+    /**
+     * ЧИСЛА СИНЕГО ЖЕТОНА ПО ЕГО ИМЕНИ — одно место на движок и ботов.
+     *
+     * <p>Комплект C1-C4 вшит в код, а жетоны из мешка («Модули 2.0») описаны
+     * данными, и у них другие имена. Пока лазили прямо в {@link #BLUE_MODULES},
+     * бот на вытянутом C30-1 получал null и ронял партию: жетон был, чисел у
+     * него не было. Спрашивать надо ЗДЕСЬ — сперва комплект, потом набор.
+     *
+     * @return {@code null}, если такого жетона нет нигде
+     */
+    public static Map<String, Object> blueSpec(GameState s, String id) {
+        Map<String, Object> spec = BLUE_MODULES.get(id);
+        if (spec != null) {
+            return spec;
+        }
+        var tok = ModuleSets.token(ModuleSets.of(s), id);
+        if (tok == null || !tok.blue()) {
+            return null;
+        }
+        return Map.of("ammo", tok.ammo(), "units", tok.units(),
+            "gild", tok.gild() == null ? "units" : tok.gild());
+    }
+
     /** Вернуть словарь красного модуля, размещённого на этом роде войск, или null. */
     public static Map<String, Object> redModuleOn(PlayerState player, UnitType unitType) {
         return player.redPlacements.get(unitType);
@@ -311,16 +334,9 @@ public final class Modules {
             Map<String, Object> pick = (Map<String, Object>) ch.payload();
             String mod = (String) pick.get("module");
             BuildingType slot = (BuildingType) pick.get("building");
-            Map<String, Object> spec = BLUE_MODULES.get(mod);
+            Map<String, Object> spec = blueSpec(s, mod);
             if (spec == null) {
-                // Жетон из НАБОРА ДАННЫХ («Модули 2.0»): числа Сборки и стрелку
-                // золота берём из файла наборов.
-                var tok = ModuleSets.token(ModuleSets.of(s), mod);
-                if (tok == null || !tok.blue()) {
-                    continue;             // неизвестный жетон — не раскладываем
-                }
-                spec = Map.of("ammo", tok.ammo(), "units", tok.units(),
-                    "gild", tok.gild() == null ? "units" : tok.gild());
+                continue;                 // неизвестный жетон — не раскладываем
             }
             Map<String, Object> placement = new HashMap<>();
             placement.put("id", mod);

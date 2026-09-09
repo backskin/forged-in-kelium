@@ -175,8 +175,8 @@ public enum Утиль {
             return ctx.exchangeScienceOrMarket(1);
         }
     },
-    /** +1 боеприпас к приказу ОПЕРАЦИЯ. */
-    БОЕПРИПАС_В_ОПЕРАЦИЮ("+1 БОЕПРИПАС В ПРИКАЗ ОПЕРАЦИЯ", "gain",
+    /** +1 боеприпас к приказу НАСТУПЛЕНИЕ. */
+    БОЕПРИПАС_В_НАСТУПЛЕНИЕ("+1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ", "gain",
         Map.of("ammo", 1, "order", "operation")) {
         @Override
         public boolean сыграть(CardContext ctx) {

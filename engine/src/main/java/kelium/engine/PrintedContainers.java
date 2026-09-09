@@ -363,6 +363,7 @@ public final class PrintedContainers {
         if (got > 0) {
             if (s.journal != null) {
                 s.journal.of(p.seat).containersPickedByUnit += got;
+                s.journal.of(p.seat).containersTaken += got;
             }
             STATS.computeIfAbsent(source,
                 k -> new java.util.concurrent.atomic.LongAdder()).add(got);

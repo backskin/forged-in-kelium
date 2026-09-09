@@ -897,7 +897,7 @@ public class HeuristicAgent extends Agent {
             val += 4.0;
         }
         // ЦЕПОЧКА РАУНДА (порядок розыгрыша карт внутри раунда!):
-        // 1) ОПЕРАЦИЯ РАНЬШЕ, пока есть чем и кого бить — успеем сдать добычу;
+        // 1) НАСТУПЛЕНИЕ РАНЬШЕ, пока есть чем и кого бить — успеем сдать добычу;
         // 2) захватил жетоны -> НЕМЕДЛЕННО Приобретения (наука), пока трофеи
         //    не вернулись владельцам в Возврат;
         // 3) армии нет, а бить хочется -> сперва Разработка (сборка).
@@ -2018,7 +2018,12 @@ public class HeuristicAgent extends Agent {
         if (!built) {
             return 0.5;
         }
-        Map<String, Object> spec = kelium.engine.Modules.BLUE_MODULES.get(mod);
+        // ЧИСЛА ЖЕТОНА СПРАШИВАЕМ У ДВИЖКА: жетоны из мешка описаны данными, и
+        // прямая заглядка в комплект C1-C4 давала на них null.
+        Map<String, Object> spec = kelium.engine.Modules.blueSpec(state, mod);
+        if (spec == null) {
+            return 0.5;                   // жетон незнаком — ставить наугад незачем
+        }
         int units = spec.get("units") instanceof Number n ? n.intValue() : 1;
         int ammo = spec.get("ammo") instanceof Number n ? n.intValue() : 1;
         double v = 2.0;

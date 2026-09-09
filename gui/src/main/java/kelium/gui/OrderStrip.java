@@ -195,7 +195,7 @@ public final class OrderStrip extends JPanel {
     private static final java.util.Map<String, String> ORDER_RU = java.util.Map.of(
         "development", "РАЗРАБОТКА",
         "infrastructure", "ИНФРАСТРУКТУРА",
-        "operation", "ОПЕРАЦИЯ",
+        "operation", "НАСТУПЛЕНИЕ",
         "acquisitions", "ПРИОБРЕТЕНИЯ");
 
     private static Color orderColor(String code) {

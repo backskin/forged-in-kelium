@@ -53,6 +53,15 @@ public final class ВыгрузкаЗаданий {
             out.put(семья, карты);
         }
         out.put("versions", версии);
+        // ВСЕ КЛАССЫ КОЛОДЫ, а не только те, что попали в действующий набор.
+        // Пересборка колоды начинается с вопроса «что у нас уже написано»: в
+        // пачке есть карты, которых в наборе нет, и переписывать их заново было
+        // бы работой на пустом месте.
+        List<Map<String, Object>> всеКлассы = new ArrayList<>();
+        for (kelium.engine.cards.Card c : new kelium.cards.objectives.ObjectivePack().cards()) {
+            всеКлассы.add(new LinkedHashMap<>(c.data()));
+        }
+        out.put("classes", всеКлассы);
         Files.createDirectories(куда.toAbsolutePath().getParent());
         Files.writeString(куда, kelium.report.Json.write(out), StandardCharsets.UTF_8);
         System.out.println("выгружено: " + куда.toAbsolutePath());

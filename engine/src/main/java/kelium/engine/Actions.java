@@ -420,6 +420,7 @@ public final class Actions {
                         grid != null ? "Добыча: контейнер ВМЕСТО келемия"
                                      : "Добыча: контейнер (келемия рядом не было)");
                     journal(s).of(player.seat).minerTookContainer = true;
+                    journal(s).of(player.seat).containersTaken += 1;
                     if (b.level != null) {
                         journal(s).of(player.seat).minerContainerLevels.add(b.level);
                     }
@@ -954,7 +955,12 @@ public final class Actions {
             // работает прежний demolish_refund_coins и снос по-прежнему платит.
             Integer сносЦена = rs.get("actions.build.demolish_cost_coins", null)
                 instanceof Number n ? n.intValue() : null;
-            int refund = сносЦена != null ? 0 : rs.getInt("actions.build.demolish_refund_coins");
+            // НОЛЬ В ЦЕНЕ СНОСА ЗНАЧИТ «СНОС НЕ ПЛАТИТСЯ», а не «и не платится, и
+            // ничего не даёт»: иначе свод-двойник для сравнения («снос ДАЁТ
+            // монету») нельзя написать, не удаляя ключ целиком — а сравнивать
+            // надо два свода, отличающиеся одной строкой.
+            int refund = сносЦена != null && сносЦена > 0
+                ? 0 : rs.getInt("actions.build.demolish_refund_coins");
             int сносСтоит = сносЦена != null ? сносЦена : 0;
             // СНОС СВОЕГО ЦУ (заказ дизайнера 25.08.2026, ключ
             // actions.build.demolish_cu_allowed). Прежде ЦУ из меню исключалось
@@ -1850,7 +1856,7 @@ public final class Actions {
     //  OPERATION: movement, combat
     // ======================================================================
 
-    /** Действие Движение (приказ Операция): перемещение юнитов по смежным гексам. */
+    /** Действие Движение (приказ Наступление): перемещение юнитов по смежным гексам. */
     static final class MovementAction extends Action {
         MovementAction(GameState state) {
             super(state);
@@ -2210,7 +2216,7 @@ public final class Actions {
 
     }
 
-    /** Действие Бой (приказ Операция): проведение одной битвы через CombatResolver. */
+    /** Действие Бой (приказ Наступление): проведение одной битвы через CombatResolver. */
     static final class CombatAction extends Action {
         CombatAction(GameState state) {
             super(state);

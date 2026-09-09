@@ -645,7 +645,7 @@ public final class GameRecorder {
         private static final Map<String, String> ORDERS = Map.of(
             "development", "Разработка",
             "infrastructure", "Инфраструктура",
-            "operation", "Операция",
+            "operation", "Наступление",
             "acquisitions", "Приобретения");
 
         private final GameConfig cfg;

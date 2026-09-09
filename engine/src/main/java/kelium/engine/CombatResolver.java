@@ -441,7 +441,7 @@ public final class CombatResolver {
      * МОГ ЛИ вообще состояться бой у игрока прямо сейчас.
      *
      * <p>Замечание дизайнера (12.08.2026): «холостым» бой считать честно —
-     * только когда бой был ВОЗМОЖЕН, но не состоялся. Приказ Операция сплошь и
+     * только когда бой был ВОЗМОЖЕН, но не состоялся. Приказ Наступление сплошь и
      * рядом вскрывают ради Движения, чтобы подвигаться или выждать момент, и
      * бить при этом попросту некого — такой розыгрыш холостым не является.
      *
@@ -919,6 +919,22 @@ public final class CombatResolver {
             if (destroyed) {
                 af.enemyTokensDestroyed += 1;
                 af.minKillAmmoCost = Math.min(af.minKillAmmoCost, ammo);
+                // ФАКТЫ КОЛОДЫ 1.16.0. Считаются ЗДЕСЬ, в момент удара, потому
+                // что после боя их уже не восстановить: на вычищенном гексе не
+                // написано, сколько там стояло, а у побитого игрока не написано,
+                // сколько у него было войск, когда по нему били.
+                af.destroyedOnHex.merge(target, 1, Integer::sum);
+                if (victim instanceof BuildingToken pb
+                        && pb.type == BuildingType.POWER_PLANT) {
+                    af.destroyedPlantLevels.add(pb.level == null ? 1 : pb.level);
+                }
+                if (victim instanceof BuildingToken mb && mb.type == BuildingType.MINER
+                        && mb.energyPlaced >= mb.energySlots && уКелемия(mb.hexId)) {
+                    af.destroyedFullMinerAtKelium = true;
+                }
+                af.victimUnitsAtHit.merge(owner, s.player(owner).unitsOnField().size(),
+                    Math::max);
+                af.myUnitsAtHit.merge(owner, p.unitsOnField().size(), Math::max);
                 if (af.movedUids.contains(unit.uid)) {
                     af.movedAndKilledSameUnit = true;
                     af.killsByMovedUnit.merge(unit.uid, 1, Integer::sum);
@@ -1818,6 +1834,20 @@ public final class CombatResolver {
             }
         }
         return out;
+    }
+
+    /** Примыкает ли гекс к тайлу зарождения, на котором ещё есть келемий. */
+    private boolean уКелемия(String hexId) {
+        if (hexId == null || !state.field.hexes.containsKey(hexId)) {
+            return false;
+        }
+        for (String рядом : state.field.neighbors(hexId)) {
+            Hex h = state.field.get(рядом);
+            if (h != null && h.spawnTile != null && h.spawnTile.kelium > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean вЗдании(Token t) {

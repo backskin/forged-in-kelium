@@ -11,7 +11,7 @@ import kelium.core.Resource;
  * <pre>
  *   development (разработка)        -> сборка, добыча
  *   infrastructure (инфраструктура) -> стройка, смена энергии
- *   operation (операция)            -> движение, бой
+ *   operation (наступление)            -> движение, бой
  *   acquisitions (приобретения)     -> рынок, наука
  * </pre>
  */
