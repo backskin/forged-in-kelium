@@ -50,6 +50,9 @@ public final class DevScenes {
         ALL.put("стенки", new Item(
             "нейтральные здания на 1, 2 и 3 сектора вокруг одного гекса",
             DevScenes::стенки));
+        ALL.put("посадка", new Item(
+            "как жетоны садятся в секторы: пехота, техника, вышка и два нейтрала",
+            DevScenes::посадка));
         ALL.put("полный-стол", new Item(
             "живая партия на четверых, доигранная до пятого раунда",
             DevScenes::полныйСтол));
@@ -227,10 +230,33 @@ public final class DevScenes {
     private static Scene стенки() {
         return Scene.of(4)
             .title("нейтральные стенки на 1, 2 и 3 сектора")
-            .neutral("h0_0", false, 0)
-            .neutral("h0_0", false, 2, 3)
-            .neutral("h1_0", true, 0, 1, 2)
+            .neutral("h0_0", false, 1, 2)
+            .neutral("h0_0", false, 3, 4)
+            .neutral("h1_0", true, 4, 5, 6)
             .unit(0, "h0_0", UnitType.INFANTRY)
+            .round(3, 1);
+    }
+
+    /**
+     * ПОСАДКА ЖЕТОНОВ В СЕКТОРЫ — сцена ради одного вопроса: помещается ли жетон
+     * в свой сектор и как он в нём повёрнут.
+     *
+     * <p>Собрана нарочно тесно: на одном гексе стоят пехота, техника и вышка, а
+     * рядом нейтральные стенки на один и на два сектора. Именно на такой тесноте
+     * дизайнер и увидел, что «с поворотами и размещением техники и вышек
+     * полнейший пиздец» (09.09.2026): жетоны вылезали за кромку и наезжали друг
+     * на друга.
+     */
+    private static Scene посадка() {
+        return Scene.of(4)
+            .title("посадка жетонов в секторы")
+            .unit(0, "h0_0", UnitType.INFANTRY)
+            .unit(0, "h0_0", UnitType.VEHICLE)
+            .unit(0, "h0_0", UnitType.TOWER)
+            .unit(1, "h1_0", UnitType.VEHICLE)
+            .unit(1, "h1_0", UnitType.TOWER)
+            .neutral("h0_-1", false, 1, 2)
+            .neutral("h1_-1", true, 3, 4, 5)
             .round(3, 1);
     }
 

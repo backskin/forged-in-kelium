@@ -387,19 +387,18 @@ public final class FieldPainter {
     private static void paintSpawn(FieldCanvas c, double size, ReplayRecord.Spawn sp,
                                    double cx, double cy) {
         boolean start = sp.start;
-        // ДВОЙНОЙ ТАЙЛ — это ДВЕ картонки одна на другой, а не особый жетон: рисуем
-        // тот же тайл со сдвигом, отдельной текстуры под него не нужно
-        // (уточнение дизайнера 13.08.2026).
+        // ДВОЙНОЙ ТАЙЛ — это ДВЕ картонки одна на другой, а не особый жетон.
+        //
+        // НИЖНЯЯ — БЕЗ РИСУНКА, ПРОСТО ТЁМНАЯ ПОДКЛАДКА (просьба дизайнера
+        // 09.09.2026). Со второй копией текстуры выходило наслоение двух почти
+        // одинаковых картин, и оба тайла читались хуже, чем один: глаз
+        // спотыкался о сдвинутый повтор рисунка. Подкладка говорит ровно то, что
+        // нужно, — «тут две картонки», — и не спорит с верхней за внимание.
         java.awt.image.BufferedImage tex = spawnTexture(sp);
         if (sp.stack > 1) {
-            if (tex != null) {
-                drawHexTexture(c, tex, cx + size * 0.07, cy + size * 0.07,
-                    size * SPAWN_R, 0);
-            } else {
-                c.polygon(FieldGeometry.roundedHexPoints(cx + size * 0.07,
-                        cy + size * 0.07, size * SPAWN_R),
-                    tone(start ? SPAWN_UNDER_START : SPAWN_UNDER_NORMAL), SPAWN_UNDER_EDGE, 1.4);
-            }
+            c.polygon(FieldGeometry.roundedHexPoints(cx + size * 0.07,
+                    cy + size * 0.07, size * SPAWN_R),
+                tone(start ? SPAWN_UNDER_START : SPAWN_UNDER_NORMAL), SPAWN_UNDER_EDGE, 1.4);
         }
         if (tex != null) {
             drawHexTexture(c, tex, cx, cy, size * SPAWN_R, 0);
@@ -452,6 +451,11 @@ public final class FieldPainter {
      *
      * <p>Кубиков рисуется столько, сколько осталось, но не больше восьми: дальше
      * они перестают помещаться на тайл, а число рядом и так всё говорит.
+     *
+     * <p>КЛАДУТСЯ В ВЕРХНЮЮ ПОЛОВИНУ ТАЙЛА (просьба дизайнера 09.09.2026). В
+     * нижней напечатано, во что тайл обменивается, — и кубики закрывали собой
+     * ровно этот текст. Верхняя половина у тайла свободнее: там номинал, а его
+     * кубики как раз и уточняют.
      */
     private static void paintKeliumCubes(FieldCanvas c, double size, int count,
                                          double cx, double cy) {
@@ -463,7 +467,7 @@ public final class FieldPainter {
         int perRow = shown <= 4 ? shown : (shown + 1) / 2;
         int rows = shown <= 4 ? 1 : 2;
         double step = cube * 1.16;
-        double y0 = cy + size * 0.34 - (rows - 1) * step / 2;
+        double y0 = cy - size * 0.34 - (rows - 1) * step / 2;
         int left = shown;
         for (int r = 0; r < rows; r++) {
             int n = Math.min(perRow, left);
@@ -935,9 +939,16 @@ public final class FieldPainter {
                                         FieldGeometry.Shape sh, double[] pos, double rotDeg,
                                         double targetW, String edge) {
         if (edge != null) {
+            // БОРТИК ПОВТОРЯЕТ ФОРМУ САМОЙ КАРТОНКИ, А НЕ СИЛУЭТ РОДА ВОЙСК:
+            // берём силуэт картинки по её непрозрачности и кладём его под жетон
+            // со сдвигом. Из-под квадратной картинки прежде торчал цветной
+            // пятиугольник обводки танка — читалось как брак печати.
             double d = targetW * TOKEN_LIFT;
-            c.shape(sh, pos[0] + d, pos[1] + d, rotDeg, targetW / sh.vbW(),
-                sh.vbW() / 2, sh.vbH() / 2, edge, null, 0);
+            java.awt.image.BufferedImage бортик = ТеньЖетона.силуэт(tex, edge);
+            if (бортик != null) {
+                c.image(бортик, pos[0] + d, pos[1] + d, rotDeg, targetW / tex.getWidth(),
+                    tex.getWidth() / 2.0, tex.getHeight() / 2.0);
+            }
         }
         c.image(tex, pos[0], pos[1], rotDeg, targetW / tex.getWidth(),
             tex.getWidth() / 2.0, tex.getHeight() / 2.0);
@@ -1715,6 +1726,7 @@ public final class FieldPainter {
             }
         }
         int overflow = 0;
+        Set<Integer> занятые = new java.util.LinkedHashSet<>();
         Set<String> hideUsed = new HashSet<>();
         for (ReplayRecord.Tok u : tokens) {
             if (u.building || "aircraft".equals(u.type)) {
@@ -1730,36 +1742,40 @@ public final class FieldPainter {
                 paintHidden(c, size, u, spot[0] - size * 0.20, spot[1] - size * 0.20);
                 continue;
             }
-            List<Integer> place = null;
-            if ("vehicle".equals(u.type)) {
-                outer:
-                for (int a : free) {
-                    for (int b : free) {
-                        if ((a + 1) % 6 == b) {
-                            place = List.of(a, b);
-                            break outer;
-                        }
-                    }
-                }
-            } else if (!free.isEmpty()) {
-                place = List.of(free.get(0));
-            }
+            // ЖЕТОНЫ РАССАЖИВАЮТСЯ ВРАЗБРОС, А НЕ ПОДРЯД. Прежде брался первый
+            // свободный сектор, и три жетона на пустом гексе слипались в одну
+            // кучу с краю, хотя места хватало на весь круг. За столом их так и
+            // раскладывают — по разным сторонам, чтобы каждый был виден.
+            List<Integer> place = "vehicle".equals(u.type)
+                ? параСекторов(free, занятые) : одинСектор(free, занятые);
             FieldGeometry.Shape sh = FieldGeometry.unitByCode(u.type);
             double[] pos;
             java.awt.image.BufferedImage tex = Textures.unit(u.type, u.owner);
             double unitAngle;
             if (place != null) {
                 free.removeAll(place);
+                занятые.addAll(place);
                 double face = FieldGeometry.meanEdgeAngle(place);
                 double w = FieldGeometry.unitWidth(u.type, place.size(), size);
-                pos = FieldGeometry.polar(cx, cy, FieldGeometry.unitSeatRadius(size), face);
-                // ЖЕТОН НЕ КЛАДЁТСЯ ВВЕРХ НОГАМИ. На верхней половине гекса
-                // поворот «лицом наружу» разворачивал картинку макушкой вниз —
-                // на столе такой жетон просто повернули бы на 180° и смотрели
-                // (уточнение дизайнера 08.09.2026). Тем же правилом живут
-                // подписи: см. readableAngle.
-                double поворотЖетона =
-                    readableAngle(FieldGeometry.unitRotation(sh, face));
+                // РАДИУС ПОД ВЫСОТУ ЖЕТОНА: наружу жетон вылезает высотой, а не
+                // шириной — он лежит ВДОЛЬ кромки. С общим радиусом техника
+                // выходила за гекс и наезжала на соседей.
+                double hТок = tex != null
+                    ? w * tex.getHeight() / (double) tex.getWidth()
+                    : w * sh.vbH() / sh.vbW();
+                pos = FieldGeometry.polar(cx, cy,
+                    FieldGeometry.unitSeatRadius(size, hТок), face);
+                // ПОВОРОТ: ПО ФОРМЕ ЖЕТОНА, А НЕ ПО ЧИТАЕМОСТИ.
+                //
+                // Вытянутый жетон (техника, вышка, авиация) обязан лечь в свой
+                // сектор так, как он туда ложится на столе, — вдоль кромки; его
+                // разворот на 180° в нижней половине гекса это и есть нормальное
+                // положение, а не ошибка. КВАДРАТНЫЙ жетон пехоты — другое дело:
+                // его можно повернуть как удобнее смотреть, что дизайнер и
+                // просил (08.09.2026: «жетон пехоты всегда можно прокручивать,
+                // не вверх тормашками»).
+                double сырой = FieldGeometry.unitRotation(sh, face);
+                double поворотЖетона = квадратный(tex, sh) ? readableAngle(сырой) : сырой;
                 if (tex != null) {
                     drawUnitTexture(c, tex, sh, pos, поворотЖетона, w,
                         FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)]);
@@ -1828,6 +1844,74 @@ public final class FieldPainter {
         // (замечание дизайнера 13.08.2026).
         c.outlinedTextRotated(s, pos[0], pos[1], w * 0.42,
             WHITE, LABEL_OUTLINE, readableAngle(angle));
+    }
+
+    /**
+     * САМЫЙ ДАЛЬНИЙ ОТ УЖЕ ЗАНЯТЫХ свободный сектор. Пусто — {@code null}.
+     *
+     * <p>Расстояние между секторами считается по кольцу (0 и 5 соседи), поэтому
+     * второй жетон садится напротив первого, третий — между ними, и так далее.
+     */
+    private static List<Integer> одинСектор(List<Integer> free, Set<Integer> занятые) {
+        if (free.isEmpty()) {
+            return null;
+        }
+        int лучший = free.get(0);
+        int лучшаяДаль = -1;
+        for (int s : free) {
+            int даль = дальностьОт(s, занятые);
+            if (даль > лучшаяДаль) {
+                лучшаяДаль = даль;
+                лучший = s;
+            }
+        }
+        return List.of(лучший);
+    }
+
+    /** Пара СМЕЖНЫХ свободных секторов, самая дальняя от занятых. */
+    private static List<Integer> параСекторов(List<Integer> free, Set<Integer> занятые) {
+        List<Integer> лучшая = null;
+        int лучшаяДаль = -1;
+        for (int a : free) {
+            int b = (a + 1) % 6;
+            if (!free.contains(b)) {
+                continue;
+            }
+            int даль = Math.min(дальностьОт(a, занятые), дальностьОт(b, занятые));
+            if (даль > лучшаяДаль) {
+                лучшаяДаль = даль;
+                лучшая = List.of(a, b);
+            }
+        }
+        return лучшая;
+    }
+
+    /** Сколько секторов по кольцу до ближайшего занятого (пусто — 3, максимум). */
+    private static int дальностьОт(int сектор, Set<Integer> занятые) {
+        if (занятые.isEmpty()) {
+            return 3;
+        }
+        int min = 3;
+        for (int з : занятые) {
+            int d = Math.abs(сектор - з);
+            min = Math.min(min, Math.min(d, 6 - d));
+        }
+        return min;
+    }
+
+    /**
+     * КВАДРАТНЫЙ ЛИ ЖЕТОН — можно ли его вертеть как удобно.
+     *
+     * <p>У квадратной картонки нет «своей» стороны вдоль кромки: как ни поверни,
+     * она ляжет в сектор одинаково, и тогда её поворачивают так, чтобы рисунок
+     * читался. Вытянутую же кладут единственным способом — вдоль кромки.
+     */
+    private static boolean квадратный(java.awt.image.BufferedImage tex,
+                                      FieldGeometry.Shape sh) {
+        double k = tex != null
+            ? tex.getWidth() / (double) tex.getHeight()
+            : sh.vbW() / sh.vbH();
+        return Math.abs(k - 1.0) < 0.12;
     }
 
     /** Значок «войско укрыто в своём здании» (§5.3 свода). */

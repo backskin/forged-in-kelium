@@ -231,12 +231,26 @@ public final class Scene {
     }
 
     /** Нейтральное здание на указанные секторы гекса. */
-    public Scene neutral(String hexId, boolean big, Integer... sectors) {
+    /**
+     * НЕЙТРАЛЬНАЯ ПОСТРОЙКА ПО УГЛАМ ГЕКСА, а не по секторам.
+     *
+     * <p>Постройка стоит НА СТЕНКЕ, и стенка задаётся углами, которых она
+     * касается: малая занимает два соседних угла (одна сторона), большая — три
+     * (две стороны). Углы нумеруются с единицы, как в сценариях.
+     *
+     * <p>Прежде сюда передавали НОМЕРА СЕКТОРОВ, и рисовальщик получал один
+     * угол вместо двух: фигура вырождалась в отрезок, а постройка выходила
+     * тонкой лентой. В настоящих партиях этого не видно — там углы приходят из
+     * сценария правильные, — и потому сцена врала ровно там, где на неё
+     * смотрели.
+     */
+    public Scene neutral(String hexId, boolean big, Integer... corners) {
         Hex h = state.field.get(hexId);
         int uid = -1000 - h.neutrals.size();
-        h.neutrals.add(new Hex.NeutralBuilding(uid, big, List.of(sectors)));
-        for (Integer i : sectors) {
-            h.sideOwner[i] = uid;
+        Hex.NeutralBuilding nb = new Hex.NeutralBuilding(uid, big, List.of(corners));
+        h.neutrals.add(nb);
+        for (Integer сторона : nb.wallSides()) {
+            h.sideOwner[сторона] = uid;
         }
         return this;
     }
