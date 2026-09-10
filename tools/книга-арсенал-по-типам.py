@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""КНИГА АРСЕНАЛА 5.0.0 — листы по типам плюс сводка эффектов.
+"""КНИГА АРСЕНАЛА — листы по типам плюс сводка эффектов.
 
 Карта арсенала состоит из двух половин, и они разной природы:
 
@@ -19,20 +19,22 @@
 несут и НОМЕРА этих карт — отдельно по верхам и по низам. Номера сквозные по
 всему набору (1..40) и не сбиваются при переходе с листа на лист.
 
-Данные читаются прямо из data/cards/arsenal.5.0.0.yaml — файл и есть источник.
+Версия набора НЕ ЗАШИТА: берётся из свода, который играет движок
+(GameConfig.DEFAULT_RULESET -> content_versions.arsenal), см. tools/версии.py.
+Захардкоженная версия однажды уже подвела — книга заданий полгода собиралась
+из каталога 1.15.0, когда в игре стоял 1.17.0.
 
 Запуск: python tools/книга-арсенал-по-типам.py
 """
-import io
+import sys
 from collections import Counter, defaultdict
 
-import yaml
+sys.path.insert(0, 'tools')
+import версии                                    # noqa: E402
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-ИСТОЧНИК = 'data/cards/arsenal.5.0.0.yaml'
-ЦЕЛЬ = 'docs/АРСЕНАЛ 5.0.0 — по типам.xlsx'
 
 ТОНКАЯ = Side(style='thin', color='FFB0B0B0')
 РАМКА = Border(left=ТОНКАЯ, right=ТОНКАЯ, top=ТОНКАЯ, bottom=ТОНКАЯ)
@@ -108,9 +110,9 @@ def сводка(wb, карты):
 
 
 def main():
-    данные = yaml.safe_load(io.open(ИСТОЧНИК, encoding='utf-8'))
-    ключ = [k for k in данные if k != 'meta'][0]
-    карты = [(n, к) for n, к in enumerate(данные[ключ], start=1)]
+    свод, в, набор, путь = версии.каталог('arsenal')
+    цель = f'docs/АРСЕНАЛ {в} — по типам.xlsx'
+    карты = [(n, к) for n, к in enumerate(набор, start=1)]
 
     def отбор(kind, низKind=None):
         return [(n, к) for n, к in карты
@@ -128,8 +130,10 @@ def main():
                  (('regular', 'POST'), ('regular', 'SPEC'), ('starting',)))
     if учтено != len(карты):
         raise SystemExit(f'по листам разошлось: {учтено} из {len(карты)} карт')
-    wb.save(ЦЕЛЬ)
-    print(f'готово: {ЦЕЛЬ}; карт {len(карты)}, листов {len(wb.sheetnames)}')
+    wb.save(цель)
+    print(f'готово: {цель}')
+    print(f'  свод {свод}, набор {в}, источник {путь}')
+    print(f'  карт {len(карты)}, листов {len(wb.sheetnames)}')
 
 
 if __name__ == '__main__':
