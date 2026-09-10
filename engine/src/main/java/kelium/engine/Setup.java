@@ -302,7 +302,7 @@ public final class Setup {
     private static Scenario.FieldWithStarts loadField(GameConfig config, int n) {
         // B8: у сценариев СВОЙ ключ версии (независимый от досок).
         String version = config.ruleset.getStr("content_versions.scenarios",
-            config.ruleset.getStr("content_versions.boards", "1.0.0"));
+            config.ruleset.getStr("content_versions.boards", "3.0.0"));
         String problem = null;
         try {
             // Если раскладка выбрана явно (config.scenarioId) — берём именно её,

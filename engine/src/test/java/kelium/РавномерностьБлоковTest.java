@@ -55,8 +55,9 @@ class РавномерностьБлоковTest {
         } catch (java.io.IOException e) {
             throw new IllegalStateException("не прочитать папку блоков", e);
         }
-        assertTrue(out.size() >= 9,
-            "наборов семейства 5.* должно быть девять, а найдено " + out.size());
+        // Набор в игре ОДИН: варианты, из которых его выбирали, удалены вместе
+        // с прочим старьём. Проверяется тот, что лежит в данных.
+        assertTrue(!out.isEmpty(), "набора семейства 5.* нет в данных вовсе");
         return out;
     }
 
@@ -225,7 +226,7 @@ class РавномерностьБлоковTest {
     void сводИграетЭталонПятогоСемейства() {
         var rules = GameConfig.build(GameConfig.DEFAULT_RULESET, 4, 1L, null, null).ruleset;
         assertEquals(ЭТАЛОН,
-            String.valueOf(rules.get("content_versions.blocks", "1.4.0")),
+            String.valueOf(rules.get("content_versions.blocks", "5.0.0")),
             "действующий свод обязан играть эталон " + ЭТАЛОН);
     }
 }

@@ -34,7 +34,7 @@ public final class AuditNewestCards {
         // делает это) — на первом прогоне это дало ложный «missing: 0» на СТАРОЙ
         // колоде (22/48 карт вместо 24/54), пока не проверил числа.
         GameConfig.pickContentVersion("arsenal", "2.0.0");
-        GameConfig.pickContentVersion("objectives", "1.6.0");
+        GameConfig.pickContentVersion("objectives", "1.17.0");
         GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 1L, null, null);
         GameConfig.pickContentVersion("arsenal", null);
         GameConfig.pickContentVersion("objectives", null);

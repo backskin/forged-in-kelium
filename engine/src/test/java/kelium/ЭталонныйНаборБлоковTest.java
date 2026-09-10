@@ -179,13 +179,13 @@ class ЭталонныйНаборБлоковTest {
     /**
      * СВОД ИГРАЕТ ЭТАЛОН, а не авторский набор. Ключ
      * {@code content_versions.blocks} — как у всякого прочего содержимого;
-     * своды без него читают 1.4.0 и играются в точности как играли.
+     * набор один, и он же читается без ключа.
      */
     @Test
     void действующийСводИграетЭталон() {
         var rules = GameConfig.build(GameConfig.DEFAULT_RULESET, 4, 1L, null, null).ruleset;
         assertEquals(ЭТАЛОН,
-            String.valueOf(rules.get("content_versions.blocks", "1.4.0")),
+            String.valueOf(rules.get("content_versions.blocks", "5.0.0")),
             "действующий свод обязан играть эталонный набор блоков");
     }
 

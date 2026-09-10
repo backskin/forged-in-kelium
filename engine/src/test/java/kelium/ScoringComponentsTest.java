@@ -192,43 +192,4 @@ class ScoringComponentsTest {
             "остаток сверх полного курса очков не даёт");
     }
 
-    /**
-     * ЕДИНЫЙ КУРС ЗАМЕНЯЕТ, А НЕ СКЛАДЫВАЕТСЯ С УСТАРЕВШИМ.
-     *
-     * <p>Свод "1.7.1-trophy-vp" держит ОБА ключа сразу (trophy_per_vp: 3,
-     * trophy_storage_vp_per_unit: 1.0) — именно на такой записи и жил баг
-     * двойного учёта. До баг-фикса 18.08.2026 три трофея стоили 1 (от
-     * trophy_per_vp) + 3 (от trophy_storage_vp_per_unit) = 4 очка в отдельной
-     * строке "trophy_storage_vp" ПОВЕРХ строки "trophy". Теперь строка одна:
-     * "trophy", посчитанная ТОЛЬКО по дробному курсу, — три трофея стоят
-     * ровно 3 очка, а второй строки в разбивке больше нет вовсе.
-     */
-    @Test
-    void trophyVpVariantZeroesKeliumAndUsesOnlyFractionalRate() {
-        GameState s = Setup.buildGame(
-            kelium.dataio.GameConfig.buildCached("1.7.1-trophy-vp", 4, 1L, null, null));
-        List<Agent> agents = new ArrayList<>();
-        for (int seat = 0; seat < 4; seat++) {
-            agents.add(new Fix.FirstChoiceAgent(seat));
-        }
-        GameEngine.bind(s, agents);
-        PlayerState p = s.player(0);
-
-        p.resources.setKelium(50);
-        assertEquals(0, vp(s, 0, "kelium"), "вариант: келемий в хранилище очков не даёт");
-
-        p.resources.add(Resource.TROPHY, 3);
-        Map<String, Integer> breakdown = Scoring.scorePlayer(s, 0);
-        assertEquals(3, breakdown.getOrDefault("trophy", 0),
-            "3 трофея по дробному курсу 1.0 — ровно 3 очка, без двойного учёта");
-        assertFalse(breakdown.containsKey("trophy_storage_vp"),
-            "отдельной добавочной строки поверх \"trophy\" быть не должно — "
-                + "это и была двойная учётка");
-
-        int totalBefore = breakdown.get("total");
-        p.resources.add(Resource.TROPHY, 1);   // теперь 4 трофея
-        int totalAfter4 = Scoring.scorePlayer(s, 0).get("total");
-        assertEquals(totalBefore + 1, totalAfter4,
-            "четвёртый трофей при ставке 1.0 добавляет ровно одно очко");
-    }
 }

@@ -31,7 +31,7 @@ import kelium.engine.Setup;
 class ЭффектыРынка2Test {
 
     private static GameState партия() {
-        GameState s = Setup.buildGame(GameConfig.buildCached("1.33.0", 4, 7L, null, null));
+        GameState s = Setup.buildGame(GameConfig.buildCached("1.40.0", 4, 7L, null, null));
         List<kelium.core.Agent> agents = new java.util.ArrayList<>();
         for (int i = 0; i < 4; i++) {
             agents.add(kelium.agents.Bots.create("builder", i, new java.util.Random(i), 4));

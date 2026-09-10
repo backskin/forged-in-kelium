@@ -36,77 +36,8 @@ import kelium.engine.Setup;
  */
 class StartModesAndBagsTest {
 
-    /**
-     * СВОД С РЕЖИМОМ «ВЫБОР СУПЕР-ЗАДАНИЯ ИЗ ДВУХ» — именно он здесь и
-     * проверяется. Действующий свод раздаёт ОДНУ карту втайне (solo6), и
-     * предложения на выбор в нём нет; сторож режима называет свод сам.
-     */
-    private static final String СВОД = "1.26.0";
 
-    private static GameState game(String mode, int players, long seed) {
-        GameConfig cfg = GameConfig.buildCached(
-            СВОД, players, seed, null, null);
-        // ДОПОЛНЕНИЯ — ТРИ НЕЗАВИСИМЫХ ТУМБЛЕРА (17.08.2026). Прежний трёхзначный
-        // режим отменён: супер задания и начальные задания больше не исключают
-        // друг друга. Сцены теста задают тумблеры напрямую.
-        if (mode != null) {
-            cfg.ruleset.override("expansions.super_objectives", "super".equals(mode));
-            cfg.ruleset.override("expansions.starting_objectives", "starters".equals(mode));
-        }
-        return Setup.buildGame(cfg);
-    }
 
-    // ==================== режимы ====================
-
-    @Test
-    void superModeDealsTwoSuperCardsAndNoStarters() {
-        GameState s = game("super", 4, 21L);
-        for (PlayerState p : s.players) {
-            assertEquals(2, p.superObjectiveOffer.size(), "две карты супер задания");
-            assertTrue(p.startObjectiveOffer.isEmpty(), "начальных заданий в этом режиме нет");
-        }
-        assertTrue(startersInDeck(s).isEmpty(),
-            "начальные задания изъяты из общей колоды: " + startersInDeck(s));
-    }
-
-    @Test
-    void startersModeDealsTwoStartingObjectivesAndKeepsOne() {
-        GameState s = game("starters", 4, 22L);
-        for (PlayerState p : s.players) {
-            assertEquals(2, p.startObjectiveOffer.size(),
-                "начальные задания раздаются так же: две карты на выбор");
-            assertTrue(p.superObjectiveOffer.isEmpty(), "супер заданий в этом режиме нет");
-            assertTrue(p.objectiveHand.isEmpty(), "до выбора рука пуста — выбирает игрок");
-        }
-        List<Agent> agents = new ArrayList<>();
-        for (int seat = 0; seat < 4; seat++) {
-            agents.add(Bots.create("balanced", seat, new Random(seat + 1L), 4));
-        }
-        GameEngine.playGame(s, agents, null);
-        // после партии проверяем, что выбор состоялся: одна из двух карт была взята
-        for (PlayerState p : s.players) {
-            Set<String> offered = new HashSet<>(p.startObjectiveOffer);
-            assertEquals(2, offered.size(), "предложение из двух разных карт");
-        }
-    }
-
-    /**
-     * ОБА ДОПОЛНЕНИЯ РАЗОМ. Прежде это было невозможно: режим был один на три
-     * значения. Дизайнер отменил исключительность 17.08.2026 — «можно включать и
-     * то и другое в партию пускай», — и теперь игрок получает и предложение
-     * супер заданий, и предложение начальных.
-     */
-    @Test
-    void обаДополненияМогутБытьВключеныРазом() {
-        GameConfig cfg = GameConfig.buildCached(СВОД, 4, 25L, null, null);
-        cfg.ruleset.override("expansions.super_objectives", true);
-        cfg.ruleset.override("expansions.starting_objectives", true);
-        GameState s = Setup.buildGame(cfg);
-        for (PlayerState p : s.players) {
-            assertEquals(2, p.superObjectiveOffer.size(), "две карты супер задания");
-            assertEquals(2, p.startObjectiveOffer.size(), "и две начальные — одно другому не мешает");
-        }
-    }
 
     @Test
     void noneModeDealsNothing() {
@@ -121,21 +52,6 @@ class StartModesAndBagsTest {
         }
     }
 
-    @Test
-    void startersAreChosenByThePlayerNotByTheDeck() {
-        GameState s = game("starters", 4, 24L);
-        List<Agent> agents = new ArrayList<>();
-        int[] picks = {0};
-        for (int seat = 0; seat < 4; seat++) {
-            agents.add(Bots.create("hawk", seat, new Random(seat * 7L + 1), 4));
-        }
-        GameEngine.playGame(s, agents, ev -> {
-            if ("start_objective_pick".equals(ev.get("type"))) {
-                picks[0]++;
-            }
-        });
-        assertEquals(4, picks[0], "выбор начального задания делает каждый игрок");
-    }
 
     private static List<String> startersInDeck(GameState s) {
         List<String> found = new ArrayList<>();

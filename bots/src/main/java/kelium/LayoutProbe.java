@@ -108,7 +108,7 @@ public final class LayoutProbe {
 
         for (int players : new int[]{2, 3, 4}) {
             GameConfig probe = GameConfig.build(players, 0L);
-            String version = probe.ruleset.getStr("content_versions.boards", "1.0.0");
+            String version = probe.ruleset.getStr("content_versions.boards", "3.0.0");
             List<Map<String, Object>> variants =
                 Scenario.loadAllVariants(players, version, probe.dataRoot);
             int k = variants.size();

@@ -72,8 +72,8 @@ class NewestContentIntegrityTest {
     }
 
     private static GameConfig newestContent() {
-        GameConfig.pickContentVersion("arsenal", "2.0.0");
-        GameConfig.pickContentVersion("objectives", "1.6.0");
+        GameConfig.pickContentVersion("arsenal", "5.0.0");
+        GameConfig.pickContentVersion("objectives", "1.17.0");
         try {
             // buildCached, НЕ build(): GameConfig.build() не читает CONTENT_PICK
             // вовсе (грабля, на которой сам обжёгся 14.08.2026 — первый прогон
@@ -87,7 +87,7 @@ class NewestContentIntegrityTest {
 
     /** Задания-рисунки (1.6.0): все предикаты, названные в данных, реализованы. */
     @Test
-    void objectives160HaveNoMissingPredicates() {
+    void objectivesHaveNoMissingPredicates() {
         GameConfig cfg = newestContent();
         ContentSet objectives = cfg.content.sets.get("objectives");
         TreeSet<String> missing = new TreeSet<>();
@@ -103,7 +103,7 @@ class NewestContentIntegrityTest {
 
     /** Арсенал 2.0.0: утиль-эффекты (верх карты) реализованы все, без исключений. */
     @Test
-    void arsenal200HasNoMissingTopEffects() {
+    void arsenalHasNoMissingTopEffects() {
         GameConfig cfg = newestContent();
         ContentSet arsenal = cfg.content.sets.get("arsenal");
         TreeSet<String> missing = new TreeSet<>();
@@ -122,7 +122,7 @@ class NewestContentIntegrityTest {
      * Список деклар и рационал — см. javadoc класса.
      */
     @Test
-    void arsenal200HasAtMostFourKnownMissingPassives() {
+    void arsenalHasAtMostFourKnownMissingPassives() {
         GameConfig cfg = newestContent();
         ContentSet arsenal = cfg.content.sets.get("arsenal");
         TreeSet<String> missing = new TreeSet<>();
