@@ -108,6 +108,28 @@ public final class Textures {
         return find(names(type, level, seat));
     }
 
+    /**
+     * ТРОФЕЙНАЯ СТОРОНА ЖЕТОНА — та, что лежит на карте приказов после
+     * уничтожения. Печать у неё своя и без цвета места: трофей уже ничей.
+     *
+     * <p>У войск трофейных сторон ДВЕ, по числу очков на обороте
+     * ({@code infantry_trophy1}, {@code infantry_trophy2}); у зданий одна
+     * ({@code barracks_trophy}), и уровень входит в имя
+     * ({@code miner_l3_trophy}).
+     *
+     * @param value сколько очков на обороте; 0 — сторона одна, без номера
+     */
+    public static BufferedImage trophySide(String type, Integer level, int value) {
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        String база = level == null ? type : type + "_l" + level;
+        if (value > 0) {
+            keys.add(база + "_trophy" + value);
+        }
+        keys.add(база + "_trophy");
+        keys.add(type + "_trophy");
+        return find(keys);
+    }
+
     /** Текстура войска: те же правила, уровня у войск нет. */
     public static BufferedImage unit(String type, int seat) {
         return find(names(type, null, seat));

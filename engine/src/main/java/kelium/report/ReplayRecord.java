@@ -192,6 +192,12 @@ public final class ReplayRecord {
         public int owner;
         public boolean building;
         public String type = "";
+        /**
+         * Уровень добытчика или энергостанции; {@code null} у прочих. Нужен
+         * ПОКАЗУ: трофейная сторона у каждого уровня своя печать
+         * ({@code miner_l3_trophy}), и без уровня её не найти.
+         */
+        public Integer level;
         public int value;
     }
 
@@ -760,6 +766,7 @@ public final class ReplayRecord {
             tt.building = t instanceof kelium.core.BuildingToken;
             tt.type = t instanceof kelium.core.BuildingToken bt ? bt.type.code
                 : ((kelium.core.UnitToken) t).type.code;
+            tt.level = t instanceof kelium.core.BuildingToken bl ? bl.level : null;
             tt.value = t.trophyValue();
             v.destroyedCard.add(tt);
         }
@@ -770,6 +777,7 @@ public final class ReplayRecord {
             tt.building = t instanceof kelium.core.BuildingToken;
             tt.type = t instanceof kelium.core.BuildingToken bt ? bt.type.code
                 : ((kelium.core.UnitToken) t).type.code;
+            tt.level = t instanceof kelium.core.BuildingToken bl ? bl.level : null;
             tt.value = t.trophyValue();
             v.destroyedHeld.add(tt);
         }
@@ -1159,6 +1167,9 @@ public final class ReplayRecord {
                 m.put("owner", t.owner);
                 m.put("building", t.building);
                 m.put("type", t.type);
+                if (t.level != null) {
+                    m.put("level", t.level);
+                }
                 m.put("value", t.value);
                 tc.add(m);
             }
@@ -1172,6 +1183,9 @@ public final class ReplayRecord {
                 m.put("owner", t.owner);
                 m.put("building", t.building);
                 m.put("type", t.type);
+                if (t.level != null) {
+                    m.put("level", t.level);
+                }
                 m.put("value", t.value);
                 th.add(m);
             }
@@ -1517,6 +1531,7 @@ public final class ReplayRecord {
             t.owner = Json.i(m, "owner");
             t.building = Json.b(m, "building");
             t.type = Json.s(m, "type");
+            t.level = m.get("level") instanceof Number lv ? lv.intValue() : null;
             t.value = Json.i(m, "value");
             p.destroyedCard.add(t);
         }
@@ -1528,6 +1543,7 @@ public final class ReplayRecord {
             t.owner = Json.i(m, "owner");
             t.building = Json.b(m, "building");
             t.type = Json.s(m, "type");
+            t.level = m.get("level") instanceof Number lv ? lv.intValue() : null;
             t.value = Json.i(m, "value");
             p.destroyedHeld.add(t);
         }

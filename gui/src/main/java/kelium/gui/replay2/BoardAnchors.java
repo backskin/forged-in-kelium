@@ -97,6 +97,7 @@ public final class BoardAnchors {
     private static final Map<String, List<Cell>> STORAGE = new LinkedHashMap<>();
     private static final Map<String, List<Column>> TROOP = new LinkedHashMap<>();
     private static final Map<String, List<int[]>> STORES = new LinkedHashMap<>();
+    private static final Map<String, Map<String, List<int[]>>> SLOTS = new LinkedHashMap<>();
     private static Science science;
     private static int[] marketCard;
 
@@ -123,6 +124,29 @@ public final class BoardAnchors {
     public static synchronized List<int[]> stores(String side) {
         load();
         List<int[]> из = STORES.getOrDefault(key(side), List.of());
+        List<int[]> копия = new ArrayList<>(из.size());
+        for (int[] b : из) {
+            копия.add(b.clone());
+        }
+        return копия;
+    }
+
+    /**
+     * ТРИ ПАЗА ПОД КАРТЫ внизу планшета войск, по виду содержимого.
+     *
+     * <p>Ключи: {@code arsenal_back} — закрытая карта арсенала (три паза),
+     * {@code arsenal_open} — она же вскрытая и вставленная (три), {@code
+     * container} — контейнеры, по ДВА в каждый паз (шесть). Рамки в пикселях
+     * картинки планшета; низ уходит НИЖЕ высоты планшета — карта торчит из паза,
+     * и это не ошибка.
+     */
+    public static synchronized List<int[]> cardSlots(String side, String kind) {
+        load();
+        Map<String, List<int[]>> byKind = SLOTS.get(key(side));
+        List<int[]> из = byKind == null ? null : byKind.get(kind);
+        if (из == null) {
+            return List.of();
+        }
         List<int[]> копия = new ArrayList<>(из.size());
         for (int[] b : из) {
             копия.add(b.clone());
@@ -237,6 +261,23 @@ public final class BoardAnchors {
                         l[0], l[1], l[2], l[3]));
                 }
                 TROOP.put(side, List.copyOf(out));
+                if (b.get("card_slots") instanceof Map<?, ?> slotMap) {
+                    Map<String, List<int[]>> byKind = new LinkedHashMap<>();
+                    for (Map.Entry<?, ?> e : slotMap.entrySet()) {
+                        if (!(e.getValue() instanceof List<?> boxes)) {
+                            continue;
+                        }
+                        List<int[]> места = new ArrayList<>();
+                        for (Object one : boxes) {
+                            int[] box = box(one);
+                            if (box != null) {
+                                места.add(box);
+                            }
+                        }
+                        byKind.put(String.valueOf(e.getKey()), List.copyOf(места));
+                    }
+                    SLOTS.put(side, Map.copyOf(byKind));
+                }
             } else if ("science".equals(b.get("kind"))) {
                 science = readScience(b);
             } else if ("market".equals(b.get("kind"))) {

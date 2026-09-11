@@ -291,7 +291,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             rightW - cardW - colGap, cardH);
         yRight += cardH + px(24);
 
-        yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
+        // БЛОКА СЧЁТА ХРАНИЛИЩА ПРИ ПЕЧАТНОМ ПЛАНШЕТЕ НЕТ (заказ дизайнера
+        // 11.09.2026: «наезжает текст в личной зоне, и он там и нахуй не нужен,
+        // и так ведь всё видно»). Келемий, боеприпасы и трофеи лежат кубиками в
+        // своих ячейках, жетоны хранилища — в своих местах, контейнеры — в пазах
+        // планшета войск. Считать это словами больше незачем.
+        if (!printed) {
+            yLeft = paintStorage(g, p, pad, yLeft + px(10), leftW, printed);
+        }
 
         // ВЫСОТА СЧИТАЕТСЯ ПО СОДЕРЖИМОМУ: планшет выше окна, и без этого прокрутка
         // не доходила до низа — нижняя часть просто обрезалась.
@@ -1418,26 +1425,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             bx = стопкаКарт(g, bx, by, label, count, (String) btn[2], ids);
         }
 
-        // КОНТЕЙНЕРЫ — только числом, и это честно: движок хранит их СЧЁТОМ, без
-        // имён карт, поэтому читать в них нечего.
-        g.setFont(font(11, Font.PLAIN));
-        g.setColor(Theme.ink3());
-        String tail = "контейнеров на руках " + p.containers;
-        int tx = bx + px(4);
-        int tyy = by + px(16);
-        if (g.getFontMetrics().stringWidth(tail) > x + w - tx) {
-            tx = x;
-            tyy = by + px(38);
-        }
-        g.drawString(tail, tx, tyy);
-        // ПОЧЕМУ ИХ НЕЛЬЗЯ ОТКРЫТЬ — в подсказке, а не на экране: при каждом
-        // взгляде это знание не нужно, а место занимает и сбивает ритм строки.
-        cellZones.put(new Rectangle(tx, tyy - px(12),
-                g.getFontMetrics().stringWidth(tail), px(16)),
-            "КОНТЕЙНЕРЫ НА РУКАХ\n\nСколько карт контейнеров игрок держит. Какие "
-            + "именно — запись не хранит: движок ведёт их счётом, имя карты "
-            + "появляется только в момент вскрытия.");
-        return Math.max(by + px(34), tyy + px(6));
+        // СТРОКИ ПРО КОНТЕЙНЕРЫ ЗДЕСЬ БОЛЬШЕ НЕТ, как и кнопок арсенала: и карты
+        // арсенала, и контейнеры лежат в трёх пазах внизу планшета войск, каждая
+        // на своём месте (заказ дизайнера 11.09.2026). Осталась только стопка
+        // заданий — ей на планшете места не напечатано.
+        return by + px(34);
     }
 
     /**
@@ -1449,9 +1441,9 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     private java.util.List<Object[]> deckButtons(ReplayRecord.Player p) {
         java.util.List<Object[]> out = new ArrayList<>();
         out.add(new Object[]{"задания", p.objectiveHand.size(), "objectives", p.objectiveHand});
-        out.add(new Object[]{"арсенал в руке", p.arsenalHand.size(), "arsenal", p.arsenalHand});
-        out.add(new Object[]{"арсенал установлен", p.arsenalInstalled.size(), "arsenal",
-            p.arsenalInstalled});
+        // КНОПОК АРСЕНАЛА ЗДЕСЬ НЕТ: карты арсенала лежат в трёх пазах внизу
+        // планшета войск, и читать их открывают щелчком прямо оттуда (заказ
+        // дизайнера 11.09.2026).
         if (p.superObjective != null) {
             // Карта супер-задания: множитель очков в финале и требование низа.
             // Взята ли награда низа — говорит подпись.
@@ -1881,6 +1873,23 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     /** Один уничтоженный жетон: силуэт бывшего владельца и напечатанная ценность. */
     private void paintDestroyedToken(Graphics2D g, ReplayRecord.DestroyedToken t, double cx,
                                   double cy, double size, double angleDeg) {
+        // ТРОФЕЙНАЯ СТОРОНА — СВОЕЙ ПЕЧАТЬЮ (заказ дизайнера 11.09.2026:
+        // «трофеи на карте приказов должны быть видны непосредственно текстурой
+        // трофейного оборота жетона»). Печать есть у всех: у войск две, по числу
+        // очков на обороте, у зданий одна, и уровень входит в имя. Нет печати —
+        // ниже прежний рисованный силуэт.
+        java.awt.image.BufferedImage троф =
+            kelium.report.Textures.trophySide(t.type, t.level, t.value);
+        if (троф != null) {
+            AffineTransform tt = new AffineTransform();
+            double kk = size / Math.max(троф.getWidth(), троф.getHeight());
+            tt.translate(cx, cy);
+            tt.rotate(Math.toRadians(angleDeg));
+            tt.scale(kk, kk);
+            tt.translate(-троф.getWidth() / 2.0, -троф.getHeight() / 2.0);
+            g.drawImage(троф, tt, null);
+            return;
+        }
         FieldGeometry.Shape sh = t.building
             ? FieldGeometry.buildingByCode(t.type) : FieldGeometry.unitByCode(t.type);
         AffineTransform at = new AffineTransform();

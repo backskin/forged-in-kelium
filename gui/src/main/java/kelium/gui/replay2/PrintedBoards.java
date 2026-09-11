@@ -357,6 +357,7 @@ final class PrintedBoards {
         int войY = (int) Math.round(y + с.войY() * k);
         paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
         военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
+        картыВПазах(g, войX, войY, k, p);
         // Блок запаса стоит В ТОЙ ЖЕ ПОЛОСЕ, что и жетоны военных зданий над
         // планшетом войск: она начинается у самого верха сцепки и кончается там,
         // где начинаются планшеты. Отсюда и «вровень по высоте».
@@ -421,6 +422,73 @@ final class PrintedBoards {
             g.drawString(счёт, cx - g.getFontMetrics().stringWidth(счёт) / 2,
                 y + картинкаH + строка * 2 - 2);
         }
+    }
+
+    /**
+     * КАРТЫ В ТРИ ПАЗА ВНИЗУ ПЛАНШЕТА ВОЙСК.
+     *
+     * <p>Заказ дизайнера 11.09.2026: «надо эксплуатировать три ячейки под карты
+     * арсенала и карты контейнеров правильным образом, прямо непосредственно
+     * размещая их там визуально» — и убрать текст «арсенал в руке / установлен /
+     * контейнеров».
+     *
+     * <p>Паз занимают тремя способами, и у каждого своя рамка в маске:
+     * УСТАНОВЛЕННАЯ карта арсенала вставлена в паз и видна лицом
+     * ({@code arsenal_open}); карта В РУКЕ лежит рубашкой и торчит из паза
+     * дальше ({@code arsenal_back}); КОНТЕЙНЕРЫ кладутся по два в паз
+     * ({@code container}).
+     *
+     * <p>Порядок раскладки — как на столе: сперва установленные, потом то, что в
+     * руке, потом контейнеры; каждая занятая ячейка выбывает.
+     */
+    private static void картыВПазах(Graphics2D g, int войX, int войY, double k,
+                                    ReplayRecord.Player p) {
+        var вставлено = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_open");
+        var рубашкой = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_back");
+        var подКонтейнер = BoardAnchors.cardSlots(цвет(p.seat), "container");
+        if (вставлено.isEmpty()) {
+            return;
+        }
+        int паз = 0;
+        BufferedImage лицоНет = Textures.card("deck_arsenal", "deck");
+        for (String id : p.arsenalInstalled) {
+            if (паз >= вставлено.size()) {
+                break;
+            }
+            картаВПаз(g, войX, войY, k, вставлено.get(паз), лицоНет);
+            паз++;
+        }
+        for (int i = 0; i < p.arsenalHand.size() && паз < рубашкой.size(); i++) {
+            картаВПаз(g, войX, войY, k, рубашкой.get(паз), лицоНет);
+            паз++;
+        }
+        // КОНТЕЙНЕРЫ: по два в паз, поэтому рамок шесть — берём те, что
+        // относятся к ещё свободным пазам.
+        BufferedImage конт = Textures.card("deck_containers", "deck");
+        int положено = 0;
+        for (int i = паз * 2; i < подКонтейнер.size() && положено < p.containers; i++) {
+            картаВПаз(g, войX, войY, k, подКонтейнер.get(i), конт);
+            положено++;
+        }
+    }
+
+    /** Одна карта в свой паз: рамка задана в пикселях печати планшета. */
+    private static void картаВПаз(Graphics2D g, int войX, int войY, double k,
+                                  int[] рамка, BufferedImage картинка) {
+        Rectangle box = scale(войX, войY, k, рамка[0], рамка[1], рамка[2], рамка[3]);
+        if (картинка != null) {
+            g.drawImage(картинка, box.x, box.y, box.width, box.height, null);
+            return;
+        }
+        // Печати нет — рисуем саму карту: паз не должен выглядеть пустым, когда
+        // в нём что-то лежит.
+        g.setColor(Theme.tile());
+        g.fill(new RoundRectangle2D.Double(box.x, box.y, box.width, box.height,
+            box.width * 0.08, box.width * 0.08));
+        g.setColor(Theme.border());
+        g.setStroke(new BasicStroke(Math.max(1f, (float) (box.width * 0.02))));
+        g.draw(new RoundRectangle2D.Double(box.x, box.y, box.width, box.height,
+            box.width * 0.08, box.width * 0.08));
     }
 
     /**
