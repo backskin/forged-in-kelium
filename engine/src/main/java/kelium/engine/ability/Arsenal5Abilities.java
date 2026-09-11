@@ -478,6 +478,12 @@ public final class Arsenal5Abilities {
                     }
                 }
                 for (BuildingToken b : new ArrayList<>(pl.buildingsOnField())) {
+                    // ЦУ С ГЕКСА НЕ СНИМАЕТСЯ: его уход с поля — отдельное
+                    // событие со своими последствиями (жетон уничтоженного ЦУ,
+                    // очки захватчику), а не тихий возврат в запас.
+                    if (b.type == BuildingType.COMMAND_CENTER) {
+                        continue;
+                    }
                     if (hexId.equals(b.hexId)) {
                         kelium.engine.Actions.returnOwnBuildingToReserve(state, pl, b, !чужой);
                         жетонов++;

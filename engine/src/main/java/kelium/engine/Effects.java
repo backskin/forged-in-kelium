@@ -1061,6 +1061,21 @@ public final class Effects {
      * поставить стенку на пустое место, здесь выбирается ЗДАНИЕ, и нейтрал
      * встаёт ровно на его секторы — сколько бы их ни было.
      */
+    /**
+     * МОЖНО ЛИ УБРАТЬ ЭТО ЗДАНИЕ С ПОЛЯ КАРТОЙ — то есть тихо, в запас владельцу.
+     *
+     * <p>ЦЕНТР УПРАВЛЕНИЯ — НЕЛЬЗЯ. Его уход с поля это отдельное событие со
+     * своими последствиями: жетон уничтоженного ЦУ, очки захватчику, счётчик
+     * военной победы. Карта, которая «отдаёт здание в запас владельцу», обходила
+     * всё это стороной: ЦУ уезжал в запас без единой записи, а потом ставился
+     * обратно за ноль монет посреди партии. Дизайнер поймал это в журнале
+     * (11.09.2026): «синий игрок просто берёт и сносит в начале игры свой ЦУ,
+     * это вообще-то запрещено, а потом выставляет».
+     */
+    static boolean снимаемое(kelium.core.BuildingToken b) {
+        return b != null && b.type != kelium.core.BuildingType.COMMAND_CENTER;
+    }
+
     static Map<String, Object> replaceBuildingWithNeutral(GameState s, int seat,
                                                           Map<String, Object> p) {
         Agent agent = agentFor(s, seat);
@@ -1070,7 +1085,7 @@ public final class Effects {
                 continue;
             }
             for (kelium.core.BuildingToken b : other.buildingsOnField()) {
-                if (b.hexId == null) {
+                if (b.hexId == null || !снимаемое(b)) {
                     continue;
                 }
                 opts.add(new Choice("replace_building", new Object[]{other.seat, b.uid},
@@ -1858,7 +1873,10 @@ public final class Effects {
                     continue;           // своё не сносим
                 }
                 for (kelium.core.BuildingToken b : new ArrayList<>(any.buildingsOnField())) {
-                    if (b.uid == tokenUid) {
+                    // ЦУ С МЕСТА НЕ ГОНИМ: его уход с поля — отдельное событие
+                    // со своими последствиями, а не тихий возврат в запас
+                    // (см. снимаемое).
+                    if (b.uid == tokenUid && снимаемое(b)) {
                         Actions.returnOwnBuildingToReserve(s, any, b, false);
                         ousted++;
                     }
