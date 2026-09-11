@@ -167,6 +167,50 @@ def troop_label(w, h, i):
             int(round(lw * w)), int(round(lh * h)))
 
 
+def storage_cells_colour(path):
+    """
+    ЯЧЕЙКИ ХРАНИЛИЩА НА ЦВЕТНОМ ПЛАНШЕТЕ — найденные на нём самом.
+
+    <p>ПОЧЕМУ НЕ ПЕРЕСЧЁТ С ОБРАЗЦА. Раньше якоря цветных планшетов брались с
+    storage-A и умножались на отношение ширин: считалось, что печать та же,
+    только перекрашена. Это неправда — художник переставил ячейки уровней 2 и 3,
+    и кубики ложились мимо них почти на полклетки (замечание дизайнера
+    11.09.2026). Проверка «вокруг ячейки есть цветной контур» этого не ловила:
+    при таком сдвиге рядом оказывалась кромка соседней рамки.
+
+    <p>ЧТО ИЩЕТСЯ. Сама ячейка — светло-серый квадрат ~101x101 с почти нулевой
+    насыщенностью, тогда как весь планшет вокруг подкрашен цветом места. По
+    насыщенности они и отделяются, на всех четырёх цветах одинаково. Квадраты
+    неквадратной формы отбрасываются: на красном планшете так отсеивается
+    единственное лишнее пятно (часть печати шириной в полторы ячейки).
+    """
+    im = Image.open(path).convert('RGB')
+    w, h = im.size
+    raw = components(
+        im, lambda r, g, b: max(r, g, b) - min(r, g, b) <= 28
+        and 150 <= min(r, g, b) <= 235, 3, 3000)
+    cells = []
+    for x, y, cw, ch, _ in raw:
+        if not (70 < cw < 150 and 70 < ch < 150):
+            continue
+        if abs(cw - ch) > max(cw, ch) * 0.18:
+            continue          # не квадрат — это не ячейка
+        cells.append((x, y, cw, ch))
+    mid = w / 2.0
+    groups = {'miner': [], 'plant': [], 'base': []}
+    for c in cells:
+        cx = c[0] + c[2] / 2.0
+        if abs(cx - mid) < w * 0.06:
+            groups['base'].append(c)
+        elif cx < mid:
+            groups['miner'].append(c)
+        else:
+            groups['plant'].append(c)
+    for k in groups:
+        groups[k].sort(key=lambda c: (c[1], c[0]))
+    return (w, h), groups
+
+
 def storage_stores(path):
     """
     ДВА МЕСТА ПОД ЖЕТОНЫ ХРАНИЛИЩА — большие светлые квадраты со значком склада
@@ -210,27 +254,20 @@ def player_board(board_id, path, problems):
     w, h = im.size
     lines = []
     if board_id.startswith('storage-'):
-        # ЯЧЕЙКИ ХРАНИЛИЩА берутся с образца storage-A: печать та же, только
-        # перекрашена, и позиции ячеек совпадают. Каждая проверяется по
-        # картинке — вокруг ячейки обязан быть цветной контур.
-        обр = os.path.join(ART, 'storage-A.png')
-        (sw, sh), groups = storage_cells(обр)
-        k = w / float(sw)
+        # ЯЧЕЙКИ ИЩУТСЯ НА САМОМ ПЛАНШЕТЕ (см. storage_cells_colour): пересчёт
+        # с образца storage-A давал промах на уровнях 2 и 3.
+        (_, _), groups = storage_cells_colour(path)
         lines += ['  - id: %s' % board_id, '    kind: storage',
                   '    side: %s' % board_id.split('-')[1],
                   '    size: [%d, %d]' % (w, h), '    cells:']
-        плохих = 0
+        сколько = {'miner': 6, 'plant': 6, 'base': 2}
         for grp in ('miner', 'plant', 'base'):
+            if len(groups[grp]) != сколько[grp]:
+                problems.append('%s/%s: ячеек нашлось %d, а должно быть %d'
+                                % (board_id, grp, len(groups[grp]), сколько[grp]))
             for i, c in enumerate(groups[grp]):
-                box = tuple(int(round(v * k)) for v in c[:4])
-                lvl = 0 if grp == 'base' else (i // 2 + 1 if grp != 'base' else 0)
                 lines.append('      - {group: %s, level: %d, type: U, '
-                             'box: [%d, %d, %d, %d]}' % ((grp, уровень(grp, i)) + box))
-                if not контур_есть(im, box):
-                    плохих += 1
-        if плохих:
-            problems.append('%s: у %d ячеек не нашлось контура — печать сдвинулась?'
-                            % (board_id, плохих))
+                             'box: [%d, %d, %d, %d]}' % ((grp, уровень(grp, i)) + c))
         lines += места_хранилища(board_id, path, problems)
         return lines
     # ПЛАНШЕТ ВОЙСК: четыре колонки, в каждой два места под жетоны модулей.

@@ -62,20 +62,20 @@ boards:
     side: p1
     size: [1400, 802]
     cells:
-      - {group: miner, level: 1, type: U, box: [416, 35, 104, 102]}
-      - {group: miner, level: 2, type: U, box: [158, 210, 105, 103]}
-      - {group: miner, level: 3, type: U, box: [127, 449, 105, 102]}
-      - {group: miner, level: 3, type: U, box: [186, 559, 105, 102]}
-      - {group: miner, level: 4, type: U, box: [348, 666, 105, 102]}
-      - {group: miner, level: 4, type: U, box: [484, 666, 105, 102]}
-      - {group: plant, level: 1, type: U, box: [873, 36, 104, 102]}
-      - {group: plant, level: 2, type: U, box: [1137, 210, 104, 103]}
-      - {group: plant, level: 3, type: U, box: [1173, 445, 105, 102]}
-      - {group: plant, level: 3, type: U, box: [1116, 555, 105, 102]}
-      - {group: plant, level: 4, type: U, box: [808, 666, 105, 102]}
-      - {group: plant, level: 4, type: U, box: [944, 666, 105, 102]}
-      - {group: base, level: 0, type: U, box: [645, 385, 105, 102]}
-      - {group: base, level: 0, type: U, box: [645, 507, 105, 102]}
+      - {group: miner, level: 1, type: U, box: [418, 32, 101, 102]}
+      - {group: miner, level: 2, type: U, box: [170, 162, 101, 101]}
+      - {group: miner, level: 3, type: U, box: [111, 449, 101, 101]}
+      - {group: miner, level: 3, type: U, box: [165, 563, 101, 101]}
+      - {group: miner, level: 4, type: U, box: [358, 664, 102, 101]}
+      - {group: miner, level: 4, type: U, box: [475, 664, 101, 101]}
+      - {group: plant, level: 1, type: U, box: [877, 32, 101, 101]}
+      - {group: plant, level: 2, type: U, box: [1116, 162, 101, 101]}
+      - {group: plant, level: 3, type: U, box: [1188, 449, 101, 101]}
+      - {group: plant, level: 3, type: U, box: [1135, 563, 101, 101]}
+      - {group: plant, level: 4, type: U, box: [824, 664, 102, 101]}
+      - {group: plant, level: 4, type: U, box: [940, 664, 102, 101]}
+      - {group: base, level: 0, type: U, box: [649, 375, 102, 101]}
+      - {group: base, level: 0, type: U, box: [649, 489, 102, 101]}
     stores:
       - [391, 305, 193, 193]
       - [817, 305, 192, 193]
@@ -84,20 +84,20 @@ boards:
     side: p2
     size: [1400, 802]
     cells:
-      - {group: miner, level: 1, type: U, box: [416, 35, 104, 102]}
-      - {group: miner, level: 2, type: U, box: [158, 210, 105, 103]}
-      - {group: miner, level: 3, type: U, box: [127, 449, 105, 102]}
-      - {group: miner, level: 3, type: U, box: [186, 559, 105, 102]}
-      - {group: miner, level: 4, type: U, box: [348, 666, 105, 102]}
-      - {group: miner, level: 4, type: U, box: [484, 666, 105, 102]}
-      - {group: plant, level: 1, type: U, box: [873, 36, 104, 102]}
-      - {group: plant, level: 2, type: U, box: [1137, 210, 104, 103]}
-      - {group: plant, level: 3, type: U, box: [1173, 445, 105, 102]}
-      - {group: plant, level: 3, type: U, box: [1116, 555, 105, 102]}
-      - {group: plant, level: 4, type: U, box: [808, 666, 105, 102]}
-      - {group: plant, level: 4, type: U, box: [944, 666, 105, 102]}
-      - {group: base, level: 0, type: U, box: [645, 385, 105, 102]}
-      - {group: base, level: 0, type: U, box: [645, 507, 105, 102]}
+      - {group: miner, level: 1, type: U, box: [418, 33, 101, 101]}
+      - {group: miner, level: 2, type: U, box: [170, 162, 101, 101]}
+      - {group: miner, level: 3, type: U, box: [111, 449, 101, 101]}
+      - {group: miner, level: 3, type: U, box: [165, 563, 101, 101]}
+      - {group: miner, level: 4, type: U, box: [358, 664, 102, 101]}
+      - {group: miner, level: 4, type: U, box: [475, 664, 101, 101]}
+      - {group: plant, level: 1, type: U, box: [877, 33, 101, 101]}
+      - {group: plant, level: 2, type: U, box: [1116, 162, 101, 101]}
+      - {group: plant, level: 3, type: U, box: [1188, 449, 101, 101]}
+      - {group: plant, level: 3, type: U, box: [1135, 563, 101, 101]}
+      - {group: plant, level: 4, type: U, box: [824, 664, 102, 101]}
+      - {group: plant, level: 4, type: U, box: [940, 664, 102, 101]}
+      - {group: base, level: 0, type: U, box: [649, 375, 102, 101]}
+      - {group: base, level: 0, type: U, box: [649, 489, 102, 101]}
     stores:
       - [391, 306, 192, 192]
       - [817, 306, 192, 192]
@@ -106,20 +106,20 @@ boards:
     side: p3
     size: [1400, 802]
     cells:
-      - {group: miner, level: 1, type: U, box: [416, 35, 104, 102]}
-      - {group: miner, level: 2, type: U, box: [158, 210, 105, 103]}
-      - {group: miner, level: 3, type: U, box: [127, 449, 105, 102]}
-      - {group: miner, level: 3, type: U, box: [186, 559, 105, 102]}
-      - {group: miner, level: 4, type: U, box: [348, 666, 105, 102]}
-      - {group: miner, level: 4, type: U, box: [484, 666, 105, 102]}
-      - {group: plant, level: 1, type: U, box: [873, 36, 104, 102]}
-      - {group: plant, level: 2, type: U, box: [1137, 210, 104, 103]}
-      - {group: plant, level: 3, type: U, box: [1173, 445, 105, 102]}
-      - {group: plant, level: 3, type: U, box: [1116, 555, 105, 102]}
-      - {group: plant, level: 4, type: U, box: [808, 666, 105, 102]}
-      - {group: plant, level: 4, type: U, box: [944, 666, 105, 102]}
-      - {group: base, level: 0, type: U, box: [645, 385, 105, 102]}
-      - {group: base, level: 0, type: U, box: [645, 507, 105, 102]}
+      - {group: miner, level: 1, type: U, box: [418, 32, 101, 102]}
+      - {group: miner, level: 2, type: U, box: [170, 162, 101, 101]}
+      - {group: miner, level: 3, type: U, box: [111, 449, 101, 101]}
+      - {group: miner, level: 3, type: U, box: [165, 563, 101, 101]}
+      - {group: miner, level: 4, type: U, box: [358, 664, 102, 101]}
+      - {group: miner, level: 4, type: U, box: [475, 664, 101, 101]}
+      - {group: plant, level: 1, type: U, box: [877, 33, 101, 101]}
+      - {group: plant, level: 2, type: U, box: [1116, 162, 101, 101]}
+      - {group: plant, level: 3, type: U, box: [1188, 449, 101, 101]}
+      - {group: plant, level: 3, type: U, box: [1135, 563, 101, 101]}
+      - {group: plant, level: 4, type: U, box: [824, 664, 102, 101]}
+      - {group: plant, level: 4, type: U, box: [940, 664, 102, 101]}
+      - {group: base, level: 0, type: U, box: [649, 375, 102, 101]}
+      - {group: base, level: 0, type: U, box: [649, 489, 102, 101]}
     stores:
       - [391, 305, 192, 193]
       - [817, 306, 192, 192]
@@ -128,20 +128,20 @@ boards:
     side: p4
     size: [1400, 802]
     cells:
-      - {group: miner, level: 1, type: U, box: [416, 35, 104, 102]}
-      - {group: miner, level: 2, type: U, box: [158, 210, 105, 103]}
-      - {group: miner, level: 3, type: U, box: [127, 449, 105, 102]}
-      - {group: miner, level: 3, type: U, box: [186, 559, 105, 102]}
-      - {group: miner, level: 4, type: U, box: [348, 666, 105, 102]}
-      - {group: miner, level: 4, type: U, box: [484, 666, 105, 102]}
-      - {group: plant, level: 1, type: U, box: [873, 36, 104, 102]}
-      - {group: plant, level: 2, type: U, box: [1137, 210, 104, 103]}
-      - {group: plant, level: 3, type: U, box: [1173, 445, 105, 102]}
-      - {group: plant, level: 3, type: U, box: [1116, 555, 105, 102]}
-      - {group: plant, level: 4, type: U, box: [808, 666, 105, 102]}
-      - {group: plant, level: 4, type: U, box: [944, 666, 105, 102]}
-      - {group: base, level: 0, type: U, box: [645, 385, 105, 102]}
-      - {group: base, level: 0, type: U, box: [645, 507, 105, 102]}
+      - {group: miner, level: 1, type: U, box: [418, 32, 101, 102]}
+      - {group: miner, level: 2, type: U, box: [170, 162, 101, 101]}
+      - {group: miner, level: 3, type: U, box: [111, 449, 101, 101]}
+      - {group: miner, level: 3, type: U, box: [165, 563, 101, 101]}
+      - {group: miner, level: 4, type: U, box: [358, 664, 102, 101]}
+      - {group: miner, level: 4, type: U, box: [475, 664, 101, 101]}
+      - {group: plant, level: 1, type: U, box: [877, 32, 101, 102]}
+      - {group: plant, level: 2, type: U, box: [1116, 162, 101, 101]}
+      - {group: plant, level: 3, type: U, box: [1188, 449, 101, 101]}
+      - {group: plant, level: 3, type: U, box: [1135, 563, 101, 101]}
+      - {group: plant, level: 4, type: U, box: [824, 664, 102, 101]}
+      - {group: plant, level: 4, type: U, box: [940, 664, 102, 101]}
+      - {group: base, level: 0, type: U, box: [649, 375, 102, 101]}
+      - {group: base, level: 0, type: U, box: [649, 489, 102, 101]}
     stores:
       - [391, 305, 193, 193]
       - [816, 305, 193, 193]
