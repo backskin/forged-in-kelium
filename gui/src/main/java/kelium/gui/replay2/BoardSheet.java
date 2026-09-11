@@ -1409,7 +1409,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // заготовки), и стопка пока показывается прежней плашкой с числом —
         // ряд ей нужен низкий. Появятся рубашки — ряд станет выше сам.
         int rowH = kelium.report.Textures.card("deck_objectives", "deck") != null
-            ? px(66) : px(28);
+            ? px(96) : px(28);
         int bx = x;
         int by = y;
         for (Object[] btn : deckButtons(p)) {
@@ -1429,7 +1429,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // арсенала, и контейнеры лежат в трёх пазах внизу планшета войск, каждая
         // на своём месте (заказ дизайнера 11.09.2026). Осталась только стопка
         // заданий — ей на планшете места не напечатано.
-        return by + px(34);
+        //
+        // Высота считается ПО РЯДУ СТОПОК, а не прибавкой «на глаз»: рубашка
+        // карты задания стоячая и высокая, и от прежних 34 точек следующий
+        // заголовок налезал прямо на неё.
+        return by + rowH + px(14);
     }
 
     /**
@@ -1492,8 +1496,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         if (рубашка == null) {
             return deckButton(g, x, y, label, count, kind, ids);
         }
-        int кh = px(48);
-        int кw = (int) Math.round(кh / КАРТА);
+        // РАЗМЕР — ПО САМОЙ РУБАШКЕ, а не по одной общей пропорции: карта
+        // задания стоячая (661x1028), карта арсенала лежачая (803x520), и делить
+        // их на одно число значило бы врать про форму обеих.
+        int кh = px(76);
+        int кw = (int) Math.round(кh * рубашка.getWidth() / (double) рубашка.getHeight());
         int шаг = px(4);
         int видно = Math.min(Math.max(count, 1), 5);
         int w = кw + (видно - 1) * шаг;
