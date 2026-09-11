@@ -357,7 +357,8 @@ final class PrintedBoards {
                           Set<String> вЗапасе, Map<String, int[]> запас,
                           Map<Rectangle, Object[]> spots,
                           Map<Rectangle, String> storeSpots,
-                          ПроКарты про, Map<Rectangle, String> клики) {
+                          ПроКарты про, Map<Rectangle, String> клики,
+                          Map<Rectangle, String> вставленные) {
         BufferedImage хр = storageArt(p.seat);
         BufferedImage вой = troopArt(p.seat);
         if (с == null || хр == null || вой == null) {
@@ -370,7 +371,7 @@ final class PrintedBoards {
         int войY = (int) Math.round(y + с.войY() * k);
         paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
         военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
-        картыВПазах(g, войX, войY, k, p, про, клики);
+        картыВПазах(g, войX, войY, k, p, про, клики, вставленные);
         // Блок запаса стоит В ТОЙ ЖЕ ПОЛОСЕ, что и жетоны военных зданий над
         // планшетом войск: она начинается у самого верха сцепки и кончается там,
         // где начинаются планшеты. Отсюда и «вровень по высоте».
@@ -456,7 +457,8 @@ final class PrintedBoards {
      */
     private static void картыВПазах(Graphics2D g, int войX, int войY, double k,
                                     ReplayRecord.Player p, ПроКарты про,
-                                    Map<Rectangle, String> клики) {
+                                    Map<Rectangle, String> клики,
+                                    Map<Rectangle, String> вставленные) {
         var вставлено = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_open");
         var рубашкой = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_back");
         var подКонтейнер = BoardAnchors.cardSlots(цвет(p.seat), "container");
@@ -475,9 +477,12 @@ final class PrintedBoards {
             // вместе с утилем, и на столе её не прочитать (заказ дизайнера
             // 11.09.2026). Остаётся название и нижняя половина — та, что
             // работает, пока карта установлена.
-            лицоАрсенала(g, рамкаПаза(войX, войY, k, вставлено.get(паз)),
-                вставлено.get(паз), k, безВерха(про == null
-                    ? new String[]{id} : про.половины(id)));
+            Rectangle место = рамкаПаза(войX, войY, k, вставлено.get(паз));
+            лицоАрсенала(g, место, вставлено.get(паз), k, безВерха(про == null
+                ? new String[]{id} : про.половины(id)));
+            if (вставленные != null) {
+                вставленные.put(место, id);
+            }
             паз++;
         }
         for (int i = 0; i < p.arsenalHand.size() && паз < рубашкой.size(); i++) {

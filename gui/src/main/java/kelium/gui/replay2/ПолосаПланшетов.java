@@ -63,6 +63,9 @@ public final class ПолосаПланшетов extends JComponent implements 
     /** Карты в пазах: рамка → код карты. По ним идёт переворот щелчком. */
     private final Map<Rectangle, String> карты = new LinkedHashMap<>();
 
+    /** Вставленные карты арсенала: они уже лежат лицом, их не переворачивают. */
+    private final Map<Rectangle, String> вставленные = new LinkedHashMap<>();
+
     /** Стопка карт: что это, что открывать читалкой и как назвать. */
     private record Стопка(String вид, java.util.List<String> карты, String имя) {
     }
@@ -72,6 +75,19 @@ public final class ПолосаПланшетов extends JComponent implements 
 
     /** Какие карты игрок перевернул лицом — живёт, пока открыт планшет. */
     private final Set<String> вскрытые = new LinkedHashSet<>();
+
+    /**
+     * ПОДСКАЗКИ ПО ВСЕМУ ОСТАЛЬНОМУ: рамка → что это. Спрашиваются ПОСЛЕДНИМИ,
+     * после жетонов и карт, потому что это крупные области — сами планшеты и
+     * колонки запаса, — внутри которых лежит всё мелкое.
+     */
+    private final Map<Rectangle, String> подсказки = new LinkedHashMap<>();
+
+    /** Откуда потащили ленту рукой ({@code null} — не тащат). */
+    private java.awt.Point откуда;
+
+    /** Тащили ли на самом деле: после таскания щелчок не считается. */
+    private boolean тащили;
 
     /** Перевёрнута ли отложенная карта приказа под планшетом хранилища. */
     private boolean приказВскрыт;
@@ -94,12 +110,49 @@ public final class ПолосаПланшетов extends JComponent implements 
         addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (тащили) {
+                    тащили = false;     // это было таскание, а не щелчок
+                    return;
+                }
                 щелчок(e.getPoint());
+            }
+
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                откуда = e.getPoint();
+                тащили = false;
+            }
+
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent e) {
+                откуда = null;
+                setCursor(java.awt.Cursor.getDefaultCursor());
+            }
+        });
+        // ТАСКАНИЕ РУКОЙ. При увеличении лента больше окна, и возить её
+        // полосами прокрутки неудобно — за неё берутся и тянут, как за лист
+        // бумаги на столе (заказ дизайнера 11.09.2026).
+        addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(java.awt.event.MouseEvent e) {
+                if (откуда == null || !(getParent() instanceof javax.swing.JViewport vp)) {
+                    return;
+                }
+                тащили = true;
+                setCursor(java.awt.Cursor.getPredefinedCursor(
+                    java.awt.Cursor.MOVE_CURSOR));
+                Rectangle вид = vp.getViewRect();
+                вид.x += откуда.x - e.getX();
+                вид.y += откуда.y - e.getY();
+                scrollRectToVisible(вид);
             }
         });
         addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
             @Override
             public void mouseMoved(java.awt.event.MouseEvent e) {
+                if (откуда != null) {
+                    return;             // тащим — курсор уже свой
+                }
                 boolean рука = найти(карты, e.getPoint()) != null
                     || найти(стопки, e.getPoint()) != null
                     || найти(модули, e.getPoint()) != null
@@ -262,7 +315,9 @@ public final class ПолосаПланшетов extends JComponent implements 
         модули.clear();
         жетоныХранилища.clear();
         карты.clear();
+        вставленные.clear();
         стопки.clear();
+        подсказки.clear();
 
         ReplayRecord.Frame f = session.frame();
         Раскладка р = раскладка();
@@ -279,7 +334,7 @@ public final class ПолосаПланшетов extends JComponent implements 
         PrintedBoards.paintPair(g, x, y, р.k(), р.с(), p, BoardSheet.troopSide(session, p),
             план.ячейки(), план.старт(), BoardSheet.coveredCells(все),
             BoardSheet.вЗапасе(f, p.seat), BoardSheet.запасВойск(session, f, p.seat),
-            модули, жетоныХранилища, проКарты(), карты);
+            модули, жетоныХранилища, проКарты(), карты, вставленные);
 
         int столбецX = x + (int) Math.round(р.с().ширина() * р.k()) + р.зазор();
         int верхПланшета = y + (int) Math.round(р.с().войY() * р.k());
@@ -298,6 +353,7 @@ public final class ПолосаПланшетов extends JComponent implements 
                 "супер-задание", столбецX, верхПланшета, высотаПланшета, р.сдвиг());
         }
         местоПриказа = null;
+        областиПодсказок(р, p, x, y);
         if (р.хр() != null) {
             // КАРТА ПОД ПЛАНШЕТОМ ХРАНИЛИЩА — ТОГО ЖЕ РАЗМЕРА, ЧТО КАРТА
             // ЗАДАНИЯ СПРАВА, только лежащая (заказ дизайнера 11.09.2026). По
@@ -352,6 +408,49 @@ public final class ПолосаПланшетов extends JComponent implements 
         if (count > 0) {
             стопки.put(new Rectangle(x, y, w + (видно - 1) * сдвиг,
                 h + (видно - 1) * сдвиг), new Стопка(вид, карты, имя));
+        }
+    }
+
+    /**
+     * КРУПНЫЕ ОБЛАСТИ ЛЕНТЫ И ЧТО ОНИ ЗНАЧАТ: сами планшеты и колонки запаса
+     * войск над хранилищем. Подсказка должна быть у ВСЕГО, на что ни наведи
+     * (заказ дизайнера 11.09.2026), а мелочь — жетоны, кубики, карты — уже
+     * отмечена своими рамками и спрашивается раньше.
+     */
+    private void областиПодсказок(Раскладка р, ReplayRecord.Player p, int x, int y) {
+        var с = р.с();
+        double k = р.k();
+        int войX = x + (int) Math.round(с.войX() * k);
+        int войY = y + (int) Math.round(с.войY() * k);
+        int войW = (int) Math.round((с.ширина() - с.войX()) * k);
+        int войH = (int) Math.round(р.войH() * k);
+        подсказки.put(new Rectangle(войX, войY, войW, войH),
+            "ПЛАНШЕТ ВОЙСК\nчетыре колонки по родам: что род умеет, чем"
+                + " стреляет и что у него можно собрать.\nВнизу три паза:"
+                + " карты арсенала и контейнеры.");
+        if (р.хр() != null) {
+            int хрX = x + (int) Math.round(с.хрX() * k);
+            int хрY = y + (int) Math.round(с.хрY() * k);
+            int хрW = (int) Math.round(р.хр()[0] * с.хрМасштаб() * k);
+            int хрH = (int) Math.round(р.хр()[1] * с.хрМасштаб() * k);
+            подсказки.put(new Rectangle(хрX, хрY, хрW, хрH),
+                "ПЛАНШЕТ ХРАНИЛИЩА\nячейки под келемий, боеприпасы и трофеи."
+                    + "\nЯчейку открывает построенное здание — пока оно в"
+                    + " запасе, его жетон лежит поверх и ячейки закрыты.");
+            // КОЛОНКИ ЗАПАСА ВОЙСК — над планшетом хранилища, по одной на род.
+            int полосаH = (int) Math.round((с.зданияH() - 18) * k);
+            String[] роды = {"infantry", "vehicle", "aircraft", "tower"};
+            var запас = BoardSheet.запасВойск(session, session.frame(), p.seat);
+            int colW = хрW / роды.length;
+            for (int i = 0; i < роды.length; i++) {
+                int[] c = запас.getOrDefault(роды[i], new int[]{0, 0});
+                подсказки.put(new Rectangle(хрX + i * colW, y, colW, полосаH),
+                    Names.unit(роды[i]).toUpperCase(java.util.Locale.ROOT)
+                        + "\nв запасе " + c[1] + " из " + (c[0] + c[1])
+                        + ", на поле " + c[0]
+                        + "\nЖетоны берут отсюда: чего нет в запасе, того не"
+                        + " собрать.");
+            }
         }
     }
 
@@ -453,6 +552,9 @@ public final class ПолосаПланшетов extends JComponent implements 
 
     private void щелчок(java.awt.Point точка) {
         Object[] м = найти(модули, точка);
+        if (м != null && м[0] == null) {
+            return;                     // жетон здания: показывать нечего
+        }
         if (м != null) {
             ModuleZoom.show(javax.swing.SwingUtilities.getWindowAncestor(this),
                 (ReplayRecord.Module) м[0], (Boolean) м[1], String.valueOf(м[2]));
@@ -487,6 +589,11 @@ public final class ПолосаПланшетов extends JComponent implements 
     @Override
     public String getToolTipText(java.awt.event.MouseEvent e) {
         Object[] м = найти(модули, e.getPoint());
+        if (м != null && м[0] == null) {
+            return Ui2.tip(String.valueOf(м[2])
+                + "\nжетон лежит на планшете — здание в запасе, его ещё не"
+                + " строили или оно вернулось");
+        }
         if (м != null) {
             return Ui2.tip(ModuleSlot.describe((ReplayRecord.Module) м[0],
                 (Boolean) м[1], String.valueOf(м[2])));
@@ -498,16 +605,23 @@ public final class ПолосаПланшетов extends JComponent implements 
         String id = найти(карты, e.getPoint());
         if (id != null) {
             return Ui2.tip(Names.card(session.record(), id)
-                + "\nщелчок — перевернуть карту");
+                + "\nлежит в пазу рубашкой; щелчок — перевернуть карту");
+        }
+        String вставлена = найти(вставленные, e.getPoint());
+        if (вставлена != null) {
+            return Ui2.tip(Names.card(session.record(), вставлена)
+                + "\nУСТАНОВЛЕННАЯ КАРТА АРСЕНАЛА: работает её нижняя половина."
+                + "\nВерхняя (утиль) ушла в паз — её уже не разыграть.");
         }
         Стопка стопка = найти(стопки, e.getPoint());
         if (стопка != null) {
             return Ui2.tip(стопка.имя() + " — щелчок открывает читалку");
         }
         if (местоПриказа != null && местоПриказа.contains(e.getPoint())) {
-            return Ui2.tip("отложенная карта приказа, на ней лежат трофеи"
+            return Ui2.tip("ОТЛОЖЕННАЯ КАРТА ПРИКАЗА, на ней лежат трофеи"
                 + "\nщелчок — перевернуть её лицом");
         }
-        return null;
+        String область = найти(подсказки, e.getPoint());
+        return область == null ? null : Ui2.tip(область);
     }
 }
