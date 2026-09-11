@@ -1728,10 +1728,16 @@ public final class FieldPainter {
                                    Map<String, double[]> hideSpots, double cx, double cy) {
         // авиация — в центральную воздушную ячейку
         int airDrawn = 0;
-        // СКОЛЬКО ЖЕТОНОВ УЖЕ ЛЕЖИТ В КАЖДОМ ЗДАНИИ: внутри их может быть
-        // ЛЮБОЕ число (правило 09.09.2026), и каждый следующий сдвигается,
-        // чтобы был виден край предыдущего.
+        // СКОЛЬКО ЖЕТОНОВ В КАЖДОМ ЗДАНИИ: внутри их может быть ЛЮБОЕ число
+        // (правило 09.09.2026). В ячейку кладётся ОДИН — верхний, — а число
+        // пишется на нём цифрой, поэтому счёт нужен ЗАРАНЕЕ, до рисования.
         Map<String, Integer> вГнезде = new LinkedHashMap<>();
+        for (ReplayRecord.Tok u : tokens) {
+            if (!u.building && u.insideBuildingUid != null) {
+                вГнезде.merge(String.valueOf(u.insideBuildingUid), 1, Integer::sum);
+            }
+        }
+        Set<String> нарисовано = new java.util.LinkedHashSet<>();
         for (ReplayRecord.Tok u : tokens) {
             if (u.building || !"aircraft".equals(u.type)) {
                 continue;
@@ -1740,8 +1746,10 @@ public final class FieldPainter {
             double[] hide = u.insideBuildingUid == null ? null
                 : hideSpots.get(String.valueOf(u.insideBuildingUid));
             if (hide != null) {
-                paintGarrison(c, size, u, hide,
-                    вГнезде.merge(String.valueOf(u.insideBuildingUid), 1, Integer::sum) - 1);
+                String ключ = String.valueOf(u.insideBuildingUid);
+                if (нарисовано.add(ключ)) {
+                    paintGarrison(c, size, u, hide, вГнезде.getOrDefault(ключ, 1));
+                }
                 continue;
             }
             double ax = cx + airDrawn * 10;
@@ -1784,8 +1792,9 @@ public final class FieldPainter {
                 : String.valueOf(u.insideBuildingUid);
             double[] spot = hideKey == null ? null : hideSpots.get(hideKey);
             if (spot != null) {
-                paintGarrison(c, size, u, spot,
-                    вГнезде.merge(hideKey, 1, Integer::sum) - 1);
+                if (нарисовано.add(hideKey)) {
+                    paintGarrison(c, size, u, spot, вГнезде.getOrDefault(hideKey, 1));
+                }
                 continue;
             }
             // ЖЕТОНЫ РАССАЖИВАЮТСЯ ВРАЗБРОС, А НЕ ПОДРЯД. Прежде брался первый
@@ -1914,22 +1923,62 @@ public final class FieldPainter {
         return List.of(лучший);
     }
 
-    /** Пара СМЕЖНЫХ свободных секторов, самая дальняя от занятых. */
+    /**
+     * ПАРА СМЕЖНЫХ СВОБОДНЫХ СЕКТОРОВ под вытянутый жетон.
+     *
+     * <p>Выбор идёт по двум мерам, и ПЕРВАЯ ВАЖНЕЕ: сколько пар останется
+     * свободными ПОСЛЕ этой, и только потом — как далеко пара от занятых.
+     *
+     * <p>ПОЧЕМУ ИМЕННО ТАК. С одной мерой «дальше от занятых» на пустом гексе
+     * получалось: первая машина брала стороны 0–1, вторая — 3–4 (она дальше), и
+     * оставались 2 и 5 — НЕ СМЕЖНЫЕ. Третьей машине пары не находилось, и она
+     * уходила в ветку перелива, то есть повисала в середине гекса поверх
+     * соседей. Дизайнер увидел это в записи партии (шаг 380, три машины на
+     * h1_2) и спросил, что за жетон «висит в воздухе». Три машины на гекс
+     * помещаются ровно: 0–1, 2–3, 4–5 — надо только не рвать кольцо.
+     */
     private static List<Integer> параСекторов(List<Integer> free, Set<Integer> занятые) {
         List<Integer> лучшая = null;
+        int лучшийЗапас = -1;
         int лучшаяДаль = -1;
         for (int a : free) {
             int b = (a + 1) % 6;
             if (!free.contains(b)) {
                 continue;
             }
+            List<Integer> остаток = new ArrayList<>(free);
+            остаток.remove(Integer.valueOf(a));
+            остаток.remove(Integer.valueOf(b));
+            int запас = сколькоПар(остаток);
             int даль = Math.min(дальностьОт(a, занятые), дальностьОт(b, занятые));
-            if (даль > лучшаяДаль) {
+            if (запас > лучшийЗапас || (запас == лучшийЗапас && даль > лучшаяДаль)) {
+                лучшийЗапас = запас;
                 лучшаяДаль = даль;
                 лучшая = List.of(a, b);
             }
         }
         return лучшая;
+    }
+
+    /** Сколько ещё вытянутых жетонов влезет в эти свободные стороны. */
+    private static int сколькоПар(List<Integer> free) {
+        List<Integer> свободные = new ArrayList<>(free);
+        int пар = 0;
+        boolean нашли = true;
+        while (нашли) {
+            нашли = false;
+            for (int a : свободные) {
+                int b = (a + 1) % 6;
+                if (свободные.contains(b)) {
+                    свободные.remove(Integer.valueOf(a));
+                    свободные.remove(Integer.valueOf(b));
+                    пар++;
+                    нашли = true;
+                    break;
+                }
+            }
+        }
+        return пар;
     }
 
     /** Сколько секторов по кольцу до ближайшего занятого (пусто — 3, максимум). */
@@ -1977,21 +2026,30 @@ public final class FieldPainter {
      * @param гнездо {@code {центр X, центр Y, разворот здания, сторон занято}}
      * @param номер  какой это по счёту жетон в этом здании (с нуля)
      */
+    /**
+     * ГАРНИЗОН — ОДИН ЖЕТОН В СВОЕЙ ЯЧЕЙКЕ, А СКОЛЬКО ИХ — ЦИФРОЙ НА НЁМ.
+     *
+     * <p>Прежде жетоны раскладывались веером от середины здания, по три в ряд,
+     * и при четырёх-пяти войсках превращались в кучу поверх печати. Дизайнер
+     * попросил иначе (11.09.2026): жетон ложится ТОЧНО в свою напечатанную
+     * ячейку, а если войск больше одного — на жетоне пишется их число белой
+     * цифрой с чёрной обводкой.
+     *
+     * <p>Так честнее и по столу: в ячейку кладут верхний жетон, остальные
+     * стоят под ним стопкой, и число на столе считают глазами.
+     *
+     * @param всего сколько войск сидит в этом здании
+     */
     private static void paintGarrison(FieldCanvas c, double size, ReplayRecord.Tok u,
-                                      double[] гнездо, int номер) {
+                                      double[] гнездо, int всего) {
         double face = гнездо[2];
         FieldGeometry.Shape sh = FieldGeometry.unitByCode(u.type);
         java.awt.image.BufferedImage tex = Textures.unit(u.type, u.owner);
-        // Жетон в гарнизоне ЗАМЕТНО МЕЛЬЧЕ жетона на гексе: он лежит НА здании,
-        // а не в своей ячейке, и не должен вылезать за его края.
+        // Жетон в гарнизоне мельче жетона на гексе: он лежит в ячейке НА здании
+        // и не должен вылезать за её края.
         double w = FieldGeometry.unitWidth(u.type, 1, size) * ГАРНИЗОН_ЖЕТОН;
-        // Сдвиг вдоль кромки здания — веером от середины, по три в ряд.
-        double шаг = w * 0.55;
-        double вдоль = (номер % 3) * шаг - шаг;
-        double поперёк = (номер / 3) * шаг * 0.75 - (номер < 3 ? 0 : шаг * 0.2);
-        double a = Math.toRadians(face);
-        double x = гнездо[0] - Math.sin(a) * вдоль + Math.cos(a) * поперёк;
-        double y = гнездо[1] + Math.cos(a) * вдоль + Math.sin(a) * поперёк;
+        double x = гнездо[0];
+        double y = гнездо[1];
         double сырой = FieldGeometry.unitRotation(sh, face);
         double поворот = квадратный(tex, sh) ? readableAngle(сырой) : сырой;
         if (tex != null) {
@@ -2001,6 +2059,11 @@ public final class FieldPainter {
             c.shape(sh, x, y, поворот, w / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
                 tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
                 FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
+        }
+        if (всего > 1) {
+            // Белая цифра с чёрной обводкой — читается на жетоне любого цвета.
+            c.outlinedText(String.valueOf(всего), x, y + w * 0.20, w * 0.58,
+                "#FFFFFF", "#000000");
         }
         // Прочность — как у любого жетона: гарнизон в бою не участвует, но
         // раненым в здание он войти может.
