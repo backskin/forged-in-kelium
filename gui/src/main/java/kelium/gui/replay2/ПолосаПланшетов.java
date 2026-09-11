@@ -49,6 +49,7 @@ public final class ПолосаПланшетов extends JComponent implements 
     private static final double МАКС_ЗУМ = 3.0;
 
     private final Session session;
+    private final BoardSheet лист;
     private int seat;
     private double зум = 1.0;
     private Runnable приЗуме;
@@ -62,14 +63,19 @@ public final class ПолосаПланшетов extends JComponent implements 
     /** Карты в пазах: рамка → код карты. По ним идёт переворот щелчком. */
     private final Map<Rectangle, String> карты = new LinkedHashMap<>();
 
-    /** Стопка заданий: рамка → что открывать читалкой. */
-    private final Map<Rectangle, java.util.List<String>> стопки = new LinkedHashMap<>();
+    /** Стопка карт: что это, что открывать читалкой и как назвать. */
+    private record Стопка(String вид, java.util.List<String> карты, String имя) {
+    }
+
+    /** Стопки карт на ленте: рамка → стопка. */
+    private final Map<Rectangle, Стопка> стопки = new LinkedHashMap<>();
 
     /** Какие карты игрок перевернул лицом — живёт, пока открыт планшет. */
     private final Set<String> вскрытые = new LinkedHashSet<>();
 
-    public ПолосаПланшетов(Session session, int seat) {
+    public ПолосаПланшетов(Session session, int seat, BoardSheet лист) {
         this.session = session;
+        this.лист = лист;
         this.seat = seat;
         setOpaque(true);
         session.whenFrameChanged(s -> repaint());
@@ -159,7 +165,8 @@ public final class ПолосаПланшетов extends JComponent implements 
 
     /** Раскладка ленты в экранных точках — одна на отрисовку и на размер. */
     private record Раскладка(double k, int ширина, int высота, PrintedBoards.Сцепка с,
-                             double войH, double[] хр, int зазор, int сдвиг, int стопкаW) {
+                             double войH, double[] хр, int зазор, int сдвиг, int стопкаW,
+                             int столбецW) {
     }
 
     private Раскладка раскладка() {
@@ -181,9 +188,16 @@ public final class ПолосаПланшетов extends JComponent implements 
         int сдвиг = (int) Math.round(BoardSheet.px(6) * зум);
         int стопкаW = доляЗад <= 0 ? 0
             : (int) Math.round(войH * k * доляЗад) + (видно - 1) * сдвиг;
+        // СТОЛБЕЦ СПРАВА: отложенный приказ и запас модулей. Карта приказа
+        // втрое уже планшета войск — дизайнер просил её «раза в полтора
+        // меньше» прежней (11.09.2026), и мерить её надо от планшета, а не
+        // точками, иначе при увеличении она снова разъедется.
+        int столбецW = (int) Math.round(войH * k * 0.30);
         double[] хр = PrintedBoards.размерХранилища(место);
         int ширина = (int) Math.round(с.ширина() * k)
-            + (стопкаW > 0 ? зазор + стопкаW : 0);
+            + (стопкаW > 0 ? зазор + стопкаW : 0) + зазор + столбецW
+            // запас под подпись «ОТЛОЖЕННЫЙ ПРИКАЗ»: она шире самой карты
+            + BoardSheet.px(90);
         int высота = (int) Math.round(с.высота() * k);
         if (хр != null) {
             int хрW = (int) Math.round(хр[0] * с.хрМасштаб() * k);
@@ -191,7 +205,8 @@ public final class ПолосаПланшетов extends JComponent implements 
             высота = Math.max(высота, хрНиз + BoardSheet.px(10) + BoardSheet.px(14)
                 + (int) Math.round(хрW / BoardSheet.КАРТА_ПРИКАЗА));
         }
-        return new Раскладка(k, ширина, высота, с, войH, хр, зазор, сдвиг, стопкаW);
+        return new Раскладка(k, ширина, высота, с, войH, хр, зазор, сдвиг, стопкаW,
+            столбецW);
     }
 
     @Override
@@ -259,11 +274,27 @@ public final class ПолосаПланшетов extends JComponent implements 
             BoardSheet.вЗапасе(f, p.seat), BoardSheet.запасВойск(session, f, p.seat),
             модули, жетоныХранилища, проКарты(), карты);
 
+        int столбецX = x + (int) Math.round(р.с().ширина() * р.k()) + р.зазор();
+        int верхПланшета = y + (int) Math.round(р.с().войY() * р.k());
+        int высотаПланшета = (int) Math.round(р.войH() * р.k());
         if (р.стопкаW() > 0) {
-            стопкаЗаданий(g, p, x + (int) Math.round(р.с().ширина() * р.k()) + р.зазор(),
-                y + (int) Math.round(р.с().войY() * р.k()),
-                (int) Math.round(р.войH() * р.k()), р.сдвиг());
+            стопка(g, "objectives", p.objectiveHand, "задания", столбецX, верхПланшета,
+                высотаПланшета, р.сдвиг());
+            столбецX += р.стопкаW() + р.зазор();
         }
+        // ОТЛОЖЕННЫЙ ПРИКАЗ И ЗАПАС МОДУЛЕЙ — тут же, рядом с планшетами: своего
+        // листа под ними больше нет (заказ дизайнера 11.09.2026).
+        int столбецY = верхПланшета;
+        if (p.superObjective != null) {
+            int вh = (int) Math.round(высотаПланшета * 0.42);
+            стопка(g, "super_objectives", java.util.List.of(p.superObjective),
+                "супер-задание", столбецX, столбецY, вh, р.сдвиг());
+            столбецY += вh + BoardSheet.px(16);
+        }
+        лист.отложенныйПриказ(g, p, столбецX, столбецY, р.столбецW(),
+            (int) Math.round(р.столбецW() * BoardSheet.КАРТА_ПРИКАЗА));
+        лист.запасМодулей(g, p, столбецX, столбецY
+            + (int) Math.round(р.столбецW() * BoardSheet.КАРТА_ПРИКАЗА) + BoardSheet.px(26));
         if (р.хр() != null) {
             // КАРТА ТРОФЕЕВ — СТРОГО ПОД ПЛАНШЕТОМ ХРАНИЛИЩА, в его ширину и в
             // своей пропорции (заказ дизайнера 11.09.2026).
@@ -285,14 +316,14 @@ public final class ПолосаПланшетов extends JComponent implements 
      * которым на планшете места не напечатано. Рядом с планшетом им и место: на
      * столе они лежат ровно там.
      */
-    private void стопкаЗаданий(Graphics2D g, ReplayRecord.Player p, int x, int y,
-                               int h, int сдвиг) {
-        var рубашка = kelium.report.Textures.card("deck_objectives", "deck");
+    private void стопка(Graphics2D g, String вид, java.util.List<String> карты,
+                        String имя, int x, int y, int h, int сдвиг) {
+        var рубашка = kelium.report.Textures.card("deck_" + вид, "deck");
         if (рубашка == null || h <= 0) {
             return;
         }
         int w = (int) Math.round(h * рубашка.getWidth() / (double) рубашка.getHeight());
-        int count = p.objectiveHand.size();
+        int count = карты.size();
         int видно = BoardSheet.видимыхКарт(count);
         java.awt.Composite было = g.getComposite();
         if (count == 0) {
@@ -307,7 +338,7 @@ public final class ПолосаПланшетов extends JComponent implements 
         g.setComposite(было);
         if (count > 0) {
             стопки.put(new Rectangle(x, y, w + (видно - 1) * сдвиг,
-                h + (видно - 1) * сдвиг), p.objectiveHand);
+                h + (видно - 1) * сдвиг), new Стопка(вид, карты, имя));
         }
     }
 
@@ -364,13 +395,13 @@ public final class ПолосаПланшетов extends JComponent implements 
             repaint();
             return;
         }
-        var ids = найти(стопки, точка);
-        if (ids != null) {
+        Стопка стопка = найти(стопки, точка);
+        if (стопка != null) {
             ReplayRecord rec = session.record();
             CardReader.show(javax.swing.SwingUtilities.getWindowAncestor(this),
-                session.content(), "objectives",
-                (rec == null ? "" : rec.playerName(seat) + " · ") + "задания",
-                ids, кто -> Names.card(rec, кто));
+                session.content(), стопка.вид(),
+                (rec == null ? "" : rec.playerName(seat) + " · ") + стопка.имя(),
+                стопка.карты(), кто -> Names.card(rec, кто));
         }
     }
 
@@ -390,8 +421,9 @@ public final class ПолосаПланшетов extends JComponent implements 
             return Ui2.tip(Names.card(session.record(), id)
                 + "\nщелчок — перевернуть карту");
         }
-        if (найти(стопки, e.getPoint()) != null) {
-            return Ui2.tip("задания на руках — щелчок открывает читалку");
+        Стопка стопка = найти(стопки, e.getPoint());
+        if (стопка != null) {
+            return Ui2.tip(стопка.имя() + " — щелчок открывает читалку");
         }
         return null;
     }

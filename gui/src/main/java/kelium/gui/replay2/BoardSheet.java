@@ -1637,6 +1637,32 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     }
 
     /** Печатное лицо карты приказа; {@code null} — художник его не рисовал. */
+    /**
+     * ОТЛОЖЕННЫЙ ПРИКАЗ ДЛЯ ЛЕНТЫ. Рисует его {@link ПолосаПланшетов}: при
+     * печатных планшетах нижнего листа нет вовсе, а карта — вещь со стола и
+     * лежит рядом с планшетами. Счёт половин и лиц остаётся здесь: он завязан
+     * на набор карт партии.
+     */
+    void отложенныйПриказ(Graphics2D g, ReplayRecord.Player p, int x, int y,
+                          int w, int h) {
+        paintSetAside(g, p, x, y, w, h);
+    }
+
+    /** Неразложенные жетоны модулей — тоже для ленты. */
+    void запасМодулей(Graphics2D g, ReplayRecord.Player p, int x, int y) {
+        int t = px(18);
+        int freeRed = Math.max(0, p.redModules - p.redPlaced.size());
+        int freeBlue = Math.max(0, p.blueModules - p.bluePlaced.size());
+        int cx = spare(g, x, y, t, freeRed, ModuleSlot.red(), "красных");
+        spare(g, cx, y, t, freeBlue, ModuleSlot.blue(), "синих");
+        if (freeRed + freeBlue == 0) {
+            g.setFont(Theme.italic());
+            g.setColor(Theme.ink3());
+            g.drawString(p.redModules + p.blueModules == 0
+                ? "модулей пока нет" : "все жетоны разложены", x, y + px(13));
+        }
+    }
+
     private java.awt.image.BufferedImage лицоПриказа(String cardId, String colour) {
         if (cardId == null || cardId.isBlank()) {
             return null;
