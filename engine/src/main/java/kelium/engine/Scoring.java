@@ -115,14 +115,16 @@ public final class Scoring {
             ? asInt(econ.get("spawn_back_vp_big")) : 1;
         breakdown.put("spawn_tiles",
             p.claimedStartTiles * backVpSmall + p.claimedNormalTiles * backVpBig);
-        // ЖЕТОН УНИЧТОЖЕНИЯ ЦУ ДВУСТОРОННИЙ (правило дизайнера 12.08.2026):
-        //   СВОЙ жетон, оставшийся у тебя (ЦУ уцелело), лежит лицом — 1 ПО;
+        // ЖЕТОН УНИЧТОЖЕНИЯ ЦУ ДВУСТОРОННИЙ, НО ОЧКИ ДАЁТ ТОЛЬКО ОБОРОТ
+        // (правило дизайнера 11.09.2026):
+        //   СВОЙ жетон лежит на планшете войск лицом и закрывает ячейку атаки —
+        //     это помеха, и очков она не даёт вовсе;
         //   ЧУЖОЙ, забранный за снос вражеского ЦУ, переворачивается — 3 ПО.
-        // Разница и есть награда за войну: снести чужое ЦУ втрое ценнее, чем
-        // просто уберечь своё.
+        // Награда за войну, стало быть, не «втрое больше», а единственная: за
+        // сохранённое своё ЦУ не платят ничем.
         int cuTokenVp = p.cuDestructionTokens * rs.getInt("command_center.destruction_token_vp");
         if (p.ownCuTokenAvailable) {
-            cuTokenVp += ((Number) rs.get("command_center.own_token_vp_if_cu_never_destroyed", 3)).intValue();
+            cuTokenVp += ((Number) rs.get("command_center.own_token_vp_if_cu_never_destroyed", 0)).intValue();
         }
         breakdown.put("cu_tokens", cuTokenVp);
         // ЭКСПЕРИМЕНТАЛЬНЫЙ КЛЮЧ (по умолчанию 0 — правила не меняются): очки за

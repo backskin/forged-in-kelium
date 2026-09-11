@@ -62,7 +62,7 @@ public final class DualCellStats {
             }
         }
 
-        LayoutLibrary.setRulesetOverride("1.40.0");
+        LayoutLibrary.setRulesetOverride("1.41.0");
         // System-свойство, а НЕ Locations.setBotMemory(...): тот метод пишет в
         // постоянные Preferences (реестр Windows) и переживает выход из
         // процесса — баг-фикс 18.08.2026, найден по испорченному замеру

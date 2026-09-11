@@ -100,19 +100,22 @@ class ScoringComponentsTest {
     }
 
     /**
-     * §12.1: за СВОЙ жетон разрушения, который так и не забрали, игрок получает
-     * очки в конце партии. Потеря жетона эти очки убирает.
+     * СВОЙ ЖЕТОН РАЗРУШЕНИЯ ОЧКОВ НЕ ДАЁТ (правило дизайнера 11.09.2026).
+     *
+     * <p>Он лежит на планшете войск лицом и закрывает ячейку атаки — это
+     * помеха, а не имущество. Очки даёт только его ОБОРОТ, и только тому, кто
+     * снёс чужое ЦУ; за уцелевшее своё не платят ничем.
      */
     @Test
-    void keepingYourOwnCommandCentreTokenScores() {
+    void keepingYourOwnCommandCentreTokenScoresNothing() {
         GameState s = Fix.game();
         PlayerState p = s.player(0);
         p.ownCuTokenAvailable = true;
         int withToken = vp(s, 0, "cu_tokens");
         p.ownCuTokenAvailable = false;
         int without = vp(s, 0, "cu_tokens");
-        assertTrue(withToken > without,
-            "неснесённое ЦУ обязано давать очки: " + withToken + " против " + without);
+        assertEquals(without, withToken,
+            "свой жетон на планшете очков не даёт: " + withToken + " против " + without);
     }
 
     /** Захваченные жетоны разрушения ЦУ считаются по курсу правил. */

@@ -113,6 +113,16 @@ Write-Output "1/6 сборка jar…"
 # (packaging=pom), реальные jar лежат в engine\target, bots\target, gui\target.
 # `mvn package` из корня собирает все три по реактору в правильном порядке.
 mvn -q package -DskipTests
+# СБОРКА ОБЯЗАНА ПАДАТЬ ГРОМКО. Без этой проверки провалившийся mvn проходил
+# мимо: exe собирался из ПРОШЛЫХ классов, и наружу уходил движок одной версии
+# с окнами другой. Именно так 11.09.2026 уехала сборка, где кнопка «игроки…»
+# падала с NoSuchMethodError.
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "СБОРКА НЕ ПРОШЛА: mvn package вернул $LASTEXITCODE." -ForegroundColor Red
+    Write-Host "Exe не пересобраны — в dist лежит прежнее." -ForegroundColor Red
+    exit 1
+}
 # Копировать зависимости надо от модуля gui — только у него полный
 # ТРАНЗИТИВНЫЙ набор (движок + боты + все сторонние библиотеки). Собственные
 # kelium-* jar сюда тоже попадут — они НЕ лишние: pkgin ниже наполняется

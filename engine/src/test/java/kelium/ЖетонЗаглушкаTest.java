@@ -35,7 +35,7 @@ import kelium.engine.Setup;
 class ЖетонЗаглушкаTest {
 
     /** Свод, в котором правило включено. */
-    private static final String СВОД = "1.40.0";
+    private static final String СВОД = "1.41.0";
 
     /**
      * Стол уже ПОСЛЕ подготовки: заглушка выдана и лежит в ячейке своего рода.

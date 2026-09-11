@@ -31,7 +31,7 @@ import kelium.engine.Setup;
 class ЭффектыРынка2Test {
 
     private static GameState партия() {
-        GameState s = Setup.buildGame(GameConfig.buildCached("1.40.0", 4, 7L, null, null));
+        GameState s = Setup.buildGame(GameConfig.buildCached("1.41.0", 4, 7L, null, null));
         List<kelium.core.Agent> agents = new java.util.ArrayList<>();
         for (int i = 0; i < 4; i++) {
             agents.add(kelium.agents.Bots.create("builder", i, new java.util.Random(i), 4));
@@ -120,16 +120,42 @@ class ЭффектыРынка2Test {
             "сданный жетон ушёл в мешок");
     }
 
+    /**
+     * ЗАМЕНА БЕРЁТ ОБЫЧНОЕ ЗДАНИЕ И НЕ БЕРЁТ ЦУ.
+     *
+     * <p>На старте единственное здание на поле — центр управления, а его эта
+     * карта трогать не имеет права: уход ЦУ с поля это отдельное событие со
+     * своими последствиями, а не тихий возврат в запас (дизайнер поймал это в
+     * журнале 11.09.2026). Поэтому сцена САМА ставит сопернику казарму — на
+     * ней замена и проверяется, а ЦУ рядом служит сторожем.
+     */
     @Test
     void чужоеЗданиеЗаменяетсяНейтральным() {
         GameState s = партия();
         PlayerState враг = s.player(1);
-        BuildingToken цель = враг.buildingsOnField().isEmpty()
-            ? null : враг.buildingsOnField().get(0);
-        assertNotNull(цель, "на старте у соперника есть здание на поле");
+        BuildingToken цу = враг.buildingsOnField().get(0);
+        assertEquals(kelium.core.BuildingType.COMMAND_CENTER, цу.type,
+            "на старте на поле стоит только ЦУ");
+        BuildingToken казарма = s.tokenStats.makeBuilding(
+            kelium.core.BuildingType.BARRACKS, 1, 9001, null);
+        String свободный = null;
+        for (String h : s.field.hexes.keySet()) {
+            if (s.field.get(h).neutrals.isEmpty() && !h.equals(цу.hexId)) {
+                var хекс = s.field.get(h);
+                if (хекс.occupySides(казарма.uid, java.util.List.of(0))) {
+                    свободный = h;
+                    break;
+                }
+            }
+        }
+        assertNotNull(свободный, "не нашлось гекса под казарму соперника");
+        казарма.hexId = свободный;
+        враг.buildings.add(казарма);
+        BuildingToken цель = казарма;
         String hex = цель.hexId;
         int uid = цель.uid;
         int зданийБыло = враг.buildingsOnField().size();
+        String цуГекс = цу.hexId;
         int нейтраловБыло = s.field.get(hex).neutrals.size();
 
         Map<String, Object> got = Effects.apply("replace_building_with_neutral", s, 0,
@@ -142,6 +168,15 @@ class ЭффектыРынка2Test {
             }
         }
         assertFalse(наПолеЛи, "заменённое здание ушло с поля");
+        // СТОРОЖ ПРОТИВ ТИХОГО УВОДА ЦУ: что бы карта ни выбрала, центр
+        // управления обязан остаться на своём гексе.
+        boolean цуНаМесте = false;
+        for (BuildingToken b : враг.buildingsOnField()) {
+            if (b.uid == цу.uid && цуГекс.equals(b.hexId)) {
+                цуНаМесте = true;
+            }
+        }
+        assertTrue(цуНаМесте, "ЦУ соперника карта трогать не смеет");
         assertTrue(враг.buildingsOnField().size() < зданийБыло
                 || !hex.equals(String.valueOf(got.get("hex"))),
             "у соперника стало меньше зданий на поле");

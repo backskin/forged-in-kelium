@@ -36,8 +36,25 @@ import kelium.engine.Setup;
  */
 class StartModesAndBagsTest {
 
+    /** Свод, на котором стоят эти сторожа: действующий. */
+    private static final String СВОД = "1.41.0";
 
-
+    /**
+     * Партия с заданными тумблерами дополнений.
+     *
+     * <p>Дополнения — ТРИ НЕЗАВИСИМЫХ ТУМБЛЕРА (17.08.2026): супер задания и
+     * начальные задания друг друга не исключают, поэтому сцена задаёт их
+     * напрямую, а не выбором «режима». {@code mode} {@code null} — оставить как
+     * в своде.
+     */
+    private static GameState game(String mode, int players, long seed) {
+        GameConfig cfg = GameConfig.buildCached(СВОД, players, seed, null, null);
+        if (mode != null) {
+            cfg.ruleset.override("expansions.super_objectives", "super".equals(mode));
+            cfg.ruleset.override("expansions.starting_objectives", "starters".equals(mode));
+        }
+        return Setup.buildGame(cfg);
+    }
 
     @Test
     void noneModeDealsNothing() {

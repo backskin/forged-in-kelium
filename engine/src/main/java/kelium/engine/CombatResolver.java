@@ -1751,17 +1751,15 @@ public final class CombatResolver {
             u.setHexId(null);
             u.damage = 0;
         } else {
+            // ЗДАНИЕ УВОДИТСЯ ОБЩИМ ПУТЁМ ВОЗВРАТА, а не вручную. Здесь стояла
+            // своя копия этого пути — освободить стороны, снять энергию,
+            // обнулить урон, — и она забывала ПОДРЕЗАТЬ СКЛАД: уехавший
+            // добытчик уносит с собой свои ячейки, а кубики оставались лежать,
+            // и получалось «занято 9 при 8 ячейках» (поймано сторожем
+            // StorageNeverOverflowsTest 11.09.2026). Возврат не в свой ход,
+            // поэтому выбора, что сгорит, игроку не дают.
             BuildingToken b = (BuildingToken) жертва;
-            evictFromBuilding(b);
-            if (state.field.hexes.containsKey(b.hexId)) {
-                state.field.get(b.hexId).freeSidesByToken(b.uid);
-            }
-            b.hexId = null;
-            b.damage = 0;
-            returnConsumerEnergy(b);
-            if (b.type == BuildingType.POWER_PLANT) {
-                removeSourceEnergy(b.owner, b.uid);
-            }
+            Actions.returnOwnBuildingToReserve(state, state.player(хозяин), b, false);
         }
         state.journal.of(хозяин).lostOwnThisTurn += 1;
         emit("type", "reaction_evacuate", "seat", хозяин, "card", карта,
