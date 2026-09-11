@@ -228,6 +228,18 @@ final class PrintedBoards {
     private static final Map<BufferedImage, double[]> КРОМКИ =
         new java.util.WeakHashMap<>();
 
+    /** Высота планшета войск в пикселях печати (0 — картинки нет). */
+    static double высотаВойск(int seat) {
+        BufferedImage вой = troopArt(seat);
+        return вой == null ? 0 : вой.getHeight();
+    }
+
+    /** Размер планшета хранилища в ЕГО пикселях печати ({@code null} — нет). */
+    static double[] размерХранилища(int seat) {
+        BufferedImage хр = storageArt(seat);
+        return хр == null ? null : new double[]{хр.getWidth(), хр.getHeight()};
+    }
+
     /** Как сложены планшеты этого игрока ({@code null} — картинок нет). */
     static Сцепка сцепка(int seat) {
         BufferedImage вой = troopArt(seat);
@@ -344,7 +356,8 @@ final class PrintedBoards {
                           Map<String, char[]> fill, char[] base, Set<String> covered,
                           Set<String> вЗапасе, Map<String, int[]> запас,
                           Map<Rectangle, Object[]> spots,
-                          Map<Rectangle, String> storeSpots) {
+                          Map<Rectangle, String> storeSpots,
+                          ПроКарты про, Map<Rectangle, String> клики) {
         BufferedImage хр = storageArt(p.seat);
         BufferedImage вой = troopArt(p.seat);
         if (с == null || хр == null || вой == null) {
@@ -357,7 +370,7 @@ final class PrintedBoards {
         int войY = (int) Math.round(y + с.войY() * k);
         paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
         военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
-        картыВПазах(g, войX, войY, k, p);
+        картыВПазах(g, войX, войY, k, p, про, клики);
         // Блок запаса стоит В ТОЙ ЖЕ ПОЛОСЕ, что и жетоны военных зданий над
         // планшетом войск: она начинается у самого верха сцепки и кончается там,
         // где начинаются планшеты. Отсюда и «вровень по высоте».
@@ -442,7 +455,8 @@ final class PrintedBoards {
      * руке, потом контейнеры; каждая занятая ячейка выбывает.
      */
     private static void картыВПазах(Graphics2D g, int войX, int войY, double k,
-                                    ReplayRecord.Player p) {
+                                    ReplayRecord.Player p, ПроКарты про,
+                                    Map<Rectangle, String> клики) {
         var вставлено = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_open");
         var рубашкой = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_back");
         var подКонтейнер = BoardAnchors.cardSlots(цвет(p.seat), "container");
@@ -450,25 +464,113 @@ final class PrintedBoards {
             return;
         }
         int паз = 0;
-        BufferedImage лицоНет = Textures.card("deck_arsenal", "deck");
         for (String id : p.arsenalInstalled) {
             if (паз >= вставлено.size()) {
                 break;
             }
-            картаВПаз(g, войX, войY, k, вставлено.get(паз), лицоНет);
+            // ВСТАВЛЕННАЯ КАРТА ЛЕЖИТ ЛИЦОМ — её уже разыграли, скрывать нечего.
+            // Лиц арсенала художник пока не рисовал, поэтому вместо картинки
+            // идёт заглушка с названием (заказ дизайнера 11.09.2026).
+            лицоАрсенала(g, рамкаПаза(войX, войY, k, вставлено.get(паз)),
+                вставлено.get(паз), k, про == null ? id : про.имя("arsenal", id));
             паз++;
         }
         for (int i = 0; i < p.arsenalHand.size() && паз < рубашкой.size(); i++) {
-            картаВПаз(g, войX, войY, k, рубашкой.get(паз), лицоНет);
+            String id = p.arsenalHand.get(i);
+            int[] рамка = рубашкой.get(паз);
+            Rectangle box = рамкаПаза(войX, войY, k, рамка);
+            if (про != null && про.вскрыта(id)) {
+                лицоАрсенала(g, box, рамка, k, про.имя("arsenal", id));
+            } else {
+                // НАЧАЛЬНЫЙ АРСЕНАЛ — СВОЯ РУБАШКА: это другая колода, и на
+                // столе её ни с чем не спутать (замечание дизайнера 11.09.2026
+                // «ты используешь рубашку обычного арсенала на начальном»).
+                boolean начальный = про != null && про.начальный(id);
+                картаВПаз(g, box, рамка, k, Textures.card(
+                    начальный ? "deck_arsenal_start" : "deck_arsenal", "deck"));
+            }
+            if (клики != null) {
+                клики.put(box, id);
+            }
             паз++;
         }
         // КОНТЕЙНЕРЫ: по два в паз, поэтому рамок шесть — берём те, что
-        // относятся к ещё свободным пазам.
+        // относятся к ещё свободным пазам. ПЕРЕВЕРНУТЬ ИХ НЕЛЬЗЯ: в записи
+        // партии контейнеры — ЧИСЛО, а не карты, и какой именно контейнер лежит
+        // у игрока, не знает никто. Лица появятся вместе с новой колодой.
         BufferedImage конт = Textures.card("deck_containers", "deck");
         int положено = 0;
         for (int i = паз * 2; i < подКонтейнер.size() && положено < p.containers; i++) {
-            картаВПаз(g, войX, войY, k, подКонтейнер.get(i), конт);
+            int[] рамка = подКонтейнер.get(i);
+            картаВПаз(g, рамкаПаза(войX, войY, k, рамка), рамка, k, конт);
             положено++;
+        }
+    }
+
+    /** Рамка паза на экране. */
+    private static Rectangle рамкаПаза(int войX, int войY, double k, int[] рамка) {
+        return scale(войX, войY, k, рамка[0], рамка[1], рамка[2], рамка[3]);
+    }
+
+    /**
+     * ЗАГЛУШКА ЛИЦА КАРТЫ АРСЕНАЛА: белое поле, чёрные буквы.
+     *
+     * <p>Лиц арсенала художник ещё не рисовал, а видеть, ЧТО игрок вставил,
+     * нужно уже сейчас (заказ дизайнера 11.09.2026). Поэтому карта показана
+     * названием, но ПО ФОРМЕ СВОЕГО ПАЗА — с тем же скруглением и той же
+     * обрезкой, — чтобы, когда печать появится, ничего не сдвинулось.
+     *
+     * <p>Из эффектов оставлен ОДИН, у нижней кромки: карта сидит в пазу, и
+     * тёмная полоса под ней — это край кармана. Тень по кругу превратила бы её
+     * в наклейку поверх планшета.
+     */
+    private static void лицоАрсенала(Graphics2D g, Rectangle box, int[] рамка,
+                                     double k, String имя) {
+        java.awt.Shape форма = вырез(box, рамка, k);
+        java.awt.Shape было = g.getClip();
+        g.clip(форма);
+        g.setColor(java.awt.Color.WHITE);
+        g.fill(форма);
+        int полоса = Math.max(2, (int) Math.round(box.height * 0.07));
+        g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.30));
+        g.fill(new java.awt.geom.Rectangle2D.Double(box.x,
+            box.y + box.height - полоса, box.width, полоса));
+        надписьКарты(g, box, имя);
+        g.setClip(было);
+        g.setColor(new java.awt.Color(0x1E, 0x1E, 0x1E));
+        g.setStroke(new BasicStroke(Math.max(1f, (float) (box.width * 0.008))));
+        g.draw(форма);
+    }
+
+    /** Название карты в несколько строк по центру заглушки. */
+    private static void надписьКарты(Graphics2D g, Rectangle box, String имя) {
+        if (имя == null || имя.isBlank()) {
+            return;
+        }
+        int кегль = Math.max(9, (int) Math.round(box.height * 0.15));
+        g.setFont(Theme.font(кегль, java.awt.Font.BOLD));
+        java.util.List<String> строки = new java.util.ArrayList<>();
+        StringBuilder строка = new StringBuilder();
+        int предел = (int) (box.width * 0.86);
+        for (String слово : имя.trim().split("\\s+")) {
+            String проба = строка.length() == 0 ? слово : строка + " " + слово;
+            if (g.getFontMetrics().stringWidth(проба) > предел && строка.length() > 0) {
+                строки.add(строка.toString());
+                строка = new StringBuilder(слово);
+            } else {
+                строка = new StringBuilder(проба);
+            }
+        }
+        if (строка.length() > 0) {
+            строки.add(строка.toString());
+        }
+        int шаг = g.getFontMetrics().getHeight();
+        int y = box.y + (box.height - шаг * строки.size()) / 2
+            + g.getFontMetrics().getAscent();
+        g.setColor(java.awt.Color.BLACK);
+        for (String s : строки) {
+            g.drawString(s, box.x + (box.width - g.getFontMetrics().stringWidth(s)) / 2, y);
+            y += шаг;
         }
     }
 
@@ -480,14 +582,16 @@ final class PrintedBoards {
      * та наполовину ушла в паз. Поэтому карта кладётся во всю свою ширину,
      * прижатой верхом, и обрезается краем паза — ровно как торчит из кармана.
      */
-    private static void картаВПаз(Graphics2D g, int войX, int войY, double k,
-                                  int[] рамка, BufferedImage картинка) {
-        Rectangle box = scale(войX, войY, k, рамка[0], рамка[1], рамка[2], рамка[3]);
+    private static void картаВПаз(Graphics2D g, Rectangle box, int[] рамка, double k,
+                                  BufferedImage картинка) {
         if (картинка != null) {
             int h = (int) Math.round(box.width
                 * картинка.getHeight() / (double) картинка.getWidth());
             java.awt.Shape было = g.getClip();
-            g.clip(box);
+            // УГЛЫ СРЕЗАНЫ ПО РАЗМЕТКЕ (заказ дизайнера 11.09.2026: «обрежь
+            // края контейнерам и арсеналу согласно разметке»). Радиус не
+            // выдуман — он снят с самой маски и лежит пятым числом якоря.
+            g.clip(вырез(box, рамка, k));
             g.drawImage(картинка, box.x, box.y, box.width, Math.max(h, box.height), null);
             g.setClip(было);
             return;
@@ -912,6 +1016,32 @@ final class PrintedBoards {
     }
 
     // ==================== мелочи рисования ====================
+
+    /**
+     * ФОРМА ПАЗА: скруглённый прямоугольник с радиусом из разметки. Радиуса нет
+     * (старые якоря) — форма остаётся прямоугольной, как была.
+     */
+    private static java.awt.Shape вырез(Rectangle box, int[] рамка, double k) {
+        double r = рамка != null && рамка.length > 4 ? рамка[4] * k : 0;
+        if (r <= 0.5) {
+            return box;
+        }
+        return new RoundRectangle2D.Double(box.x, box.y, box.width, box.height,
+            r * 2, r * 2);
+    }
+
+    /** Что программа знает о картах в пазах планшета войск. */
+    interface ПроКарты {
+
+        /** Название карты по коду — для заглушки, пока лица не нарисовано. */
+        String имя(String вид, String id);
+
+        /** НАЧАЛЬНЫЙ ли это арсенал: у него своя рубашка, другая колода. */
+        boolean начальный(String id);
+
+        /** Перевёрнута ли карта щелчком — показывать лицо. */
+        boolean вскрыта(String id);
+    }
 
     private static Rectangle scale(int x, int y, double k, int bx, int by, int bw, int bh) {
         return new Rectangle(x + (int) Math.round(bx * k), y + (int) Math.round(by * k),

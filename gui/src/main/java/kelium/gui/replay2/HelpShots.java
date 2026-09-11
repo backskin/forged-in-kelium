@@ -168,7 +168,7 @@ public final class HelpShots {
     }
 
     /**
-     * Личная зона — это ПЛАНШЕТ игрока из разбора 2.0 ({@link BoardSheet}), а не
+     * Личная зона — это ПЛАНШЕТ игрока из разбора 2.0 ({@link ЛичнаяЗона}), а не
      * текстовая зона версии 1.0: в справочнике объясняется именно тот вид, который
      * дизайнер видит по кнопке «Личная зона».
      */
@@ -177,8 +177,9 @@ public final class HelpShots {
             return null;
         }
         session.seek(frame);
-        BoardSheet z = new BoardSheet(session, 0);
+        ЛичнаяЗона z = new ЛичнаяЗона(session, 0);
         z.setSize(Theme.px(900), Theme.px(660));
+        layoutTree(z);
         return paint(z);
     }
 

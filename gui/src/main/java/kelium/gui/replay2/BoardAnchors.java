@@ -269,7 +269,7 @@ public final class BoardAnchors {
                         }
                         List<int[]> места = new ArrayList<>();
                         for (Object one : boxes) {
-                            int[] box = box(one);
+                            int[] box = пазКарты(one);
                             if (box != null) {
                                 места.add(box);
                             }
@@ -325,6 +325,25 @@ public final class BoardAnchors {
         }
         int[] out = new int[4];
         for (int i = 0; i < 4; i++) {
+            out[i] = num(l.get(i));
+        }
+        return out;
+    }
+
+    /**
+     * ПАЗ ПОД КАРТУ: {@code [x, y, ширина, высота, радиус скругления]}.
+     *
+     * <p>Пятое число появилось 11.09.2026 вместе с заказом «обрежь края
+     * контейнерам и арсеналу согласно разметке»: пазы на печати скруглены, и
+     * карта в пазу должна быть срезана тем же радиусом. Старые якоря без него
+     * читаются по-прежнему — радиус тогда ноль, и углы острые.
+     */
+    private static int[] пазКарты(Object o) {
+        if (!(o instanceof List<?> l) || l.size() < 4 || l.size() > 5) {
+            return null;
+        }
+        int[] out = new int[5];
+        for (int i = 0; i < l.size(); i++) {
             out[i] = num(l.get(i));
         }
         return out;

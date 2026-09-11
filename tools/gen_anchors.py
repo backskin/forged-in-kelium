@@ -10,6 +10,7 @@
 Пишет:   data/textures/board/anchors.yaml
 """
 import sys
+import math
 import os
 import re
 import io
@@ -206,8 +207,26 @@ def маска(имя):
     for ключ, pred in ЦВЕТА_МАСКИ.items():
         cs = [c for c in components(im, pred, 4, 3000)]
         cs.sort(key=lambda c: (c[1] // 80, c[0]))
-        out[ключ] = [(c[0], c[1] - верх, c[2], c[3]) for c in cs]
+        out[ключ] = [(c[0], c[1] - верх, c[2], c[3], скругление(c)) for c in cs]
     return out
+
+
+def скругление(пятно):
+    """РАДИУС УГЛОВ рамки — по тому, сколько площади срезано у прямоугольника.
+
+    Дизайнер рисует пазы скруглёнными, и карта в пазу обязана быть срезана так
+    же, иначе её острый угол торчит из печатного кармана. Мерить радиус на глаз
+    нельзя: у каждого паза он свой. Зато у скруглённого прямоугольника площадь
+    ровно на (4 − π)·r² меньше описанного, откуда r и берётся.
+    """
+    x, y, w, h, n = пятно
+    срез = w * h - n
+    if срез <= 0:
+        return 0
+    r = (срез / (4 - math.pi)) ** 0.5
+    # Больше половины меньшей стороны радиус быть не может — значит это не
+    # скругление, а дырявое пятно, и лучше не срезать ничего.
+    return int(round(r)) if r <= min(w, h) / 2 else 0
 
 
 def storage_cells_colour(path):
@@ -344,8 +363,8 @@ def player_board(board_id, path, problems):
         label = troop_label(w, h, i)
         lines.append('      - {unit: %s, building: %s, attack: [%d, %d, %d, %d], '
                      'assembly: [%d, %d, %d, %d], label: [%d, %d, %d, %d]}'
-                     % ((units[i], builds[i]) + tuple(осн['attack'][i])
-                        + tuple(осн['assembly'][i]) + label))
+                     % ((units[i], builds[i]) + tuple(осн['attack'][i])[:4]
+                        + tuple(осн['assembly'][i])[:4] + label))
     # ПАЗЫ ПОД КАРТЫ: три штуки, и у каждого три вида содержимого. Карта торчит
     # из паза вниз ЗА КРАЙ планшета — поэтому у рамок отрицательного верха нет,
     # но низ уходит ниже высоты планшета, и это не ошибка.
@@ -360,7 +379,8 @@ def player_board(board_id, path, problems):
             continue
         lines.append('      %s:' % ключ)
         for b in боксы:
-            lines.append('        - [%d, %d, %d, %d]' % b)
+            # пятое число — радиус скругления паза
+            lines.append('        - [%d, %d, %d, %d, %d]' % b)
     return lines
 
 

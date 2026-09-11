@@ -43,6 +43,7 @@ import kelium.gui.kp.KpTab;
 import kelium.gui.kp.PromptOverlay;
 import kelium.gui.kp.ZoomCard;
 import kelium.gui.replay2.BoardSheet;
+import kelium.gui.replay2.ЛичнаяЗона;
 import kelium.gui.replay2.Session;
 import kelium.gui.replay2.Theme;
 import kelium.report.ReplayRecord;
@@ -121,11 +122,11 @@ public final class HotSeatWindow {
     private ChipLabel chipTrophy;
     FieldView field;
     private BoardsPanel boards;
-    private BoardSheet sheet;
+    private ЛичнаяЗона зона;
 
     /** Планшет смотрящего места — для прогонщиков и тестов. */
     BoardSheet sheetForTest() {
-        return sheet;
+        return зона.лист();
     }
     /** Кнопки выбора места в ящике «Планшет» — их приходится запирать. */
     private final Map<Integer, JToggleButton> sheetSeatBtns = new LinkedHashMap<>();
@@ -415,7 +416,7 @@ public final class HotSeatWindow {
         // работает подсказка гекса, для решений — подсветка целей.
         field.setShowIds(false);
         boards = new BoardsPanel();
-        sheet = new BoardSheet(session, 0);
+        зона = new ЛичнаяЗона(session, 0);
 
         layered = new JLayeredPane();
         layered.add(field, JLayeredPane.DEFAULT_LAYER);
@@ -437,17 +438,17 @@ public final class HotSeatWindow {
             b.setForeground(Theme.seatInk(i));
             b.setFocusable(false);
             b.setSelected(i == 0);
-            b.addActionListener(e -> sheet.setSeat(s));
+            b.addActionListener(e -> зона.setSeat(s));
             group.add(b);
             seatRow.add(b);
             sheetSeatBtns.put(i, b);
         }
         sheetWrap.add(seatRow, BorderLayout.NORTH);
-        JScrollPane sheetScroll = new JScrollPane(sheet);
-        sheetScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
-        sheetScroll.setBorder(null);
-        sheetWrap.add(sheetScroll, BorderLayout.CENTER);
-        this.sheetScroll = sheetScroll;
+        // ЛИЧНАЯ ЗОНА САМА ДЕРЖИТ СВОИ ПРОКРУТКИ: сверху лента планшетов с
+        // прокруткой вбок, снизу лист с прокруткой вниз. Одна общая прокрутка
+        // поверх них двигала бы и то, и другое разом.
+        sheetWrap.add(зона, BorderLayout.CENTER);
+        this.sheetScroll = null;
         drawers.put("Планшет", wrapDrawer(sheetWrap));
 
         // СБРОС ПРИКАЗОВ — ЛИЧНЫЙ. Разыгранные в круге приказы уходят в свой
@@ -1562,7 +1563,7 @@ public final class HotSeatWindow {
             }
         });
         if (общийСтол) {
-            sheet.setSeat(viewedSeat);
+            зона.setSeat(viewedSeat);
         }
     }
 

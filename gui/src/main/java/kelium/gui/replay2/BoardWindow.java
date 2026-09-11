@@ -9,7 +9,6 @@ import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JToggleButton;
 import javax.swing.WindowConstants;
 
@@ -30,11 +29,11 @@ public final class BoardWindow {
     private static BoardWindow open;
 
     private final JFrame frame;
-    private final BoardSheet sheet;
+    private final ЛичнаяЗона зона;
     private final JToggleButton[] tabs;
 
     private BoardWindow(Session session, int seat, Window owner) {
-        sheet = new BoardSheet(session, seat);
+        зона = new ЛичнаяЗона(session, seat);
         frame = new JFrame("Планшет игрока");
         frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         frame.getContentPane().setLayout(new BorderLayout());
@@ -54,17 +53,14 @@ public final class BoardWindow {
             b.setForeground(Theme.seat(i));
             b.setFocusable(false);
             b.setSelected(i == seat);
-            b.addActionListener(e -> sheet.setSeat(s));
+            b.addActionListener(e -> зона.setSeat(s));
             group.add(b);
             tabs[i] = b;
             top.add(b);
         }
         frame.add(top, BorderLayout.NORTH);
 
-        JScrollPane sc = new JScrollPane(sheet);
-        sc.setBorder(null);
-        sc.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
-        frame.add(sc, BorderLayout.CENTER);
+        frame.add(зона, BorderLayout.CENTER);
 
         frame.setSize(new Dimension(Theme.px(1000), Theme.px(720)));
         frame.setMinimumSize(new Dimension(Theme.px(720), Theme.px(520)));
@@ -92,7 +88,7 @@ public final class BoardWindow {
         if (open == null) {
             open = new BoardWindow(session, seat, owner);
         }
-        open.sheet.setSeat(seat);
+        open.зона.setSeat(seat);
         if (seat < open.tabs.length) {
             open.tabs[seat].setSelected(true);
         }

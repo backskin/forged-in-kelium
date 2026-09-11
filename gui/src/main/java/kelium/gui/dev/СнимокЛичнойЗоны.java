@@ -6,7 +6,6 @@ import java.io.File;
 
 import javax.imageio.ImageIO;
 
-import kelium.gui.replay2.BoardSheet;
 import kelium.gui.replay2.Session;
 import kelium.report.ReplayRecord;
 
@@ -41,9 +40,12 @@ public final class СнимокЛичнойЗоны {
         // планшете — видно и жетоны поверх ячеек, и открытые ячейки с ресурсами.
         session.seek(rec.frames.size() / 2);
 
-        BoardSheet sheet = new BoardSheet(session, seat);
+        // ЛИЧНАЯ ЗОНА ЦЕЛИКОМ: сверху лента печатных планшетов, снизу лист.
+        // Снимать один лист значило бы показывать зону без планшетов вовсе.
+        kelium.gui.replay2.ЛичнаяЗона sheet = new kelium.gui.replay2.ЛичнаяЗона(
+            session, seat);
         sheet.setSize(w, 3000);
-        sheet.doLayout();
+        разложить(sheet);
         // ПЕРВЫЙ ПРОХОД ВХОЛОСТУЮ: лист считает свою высоту по содержимому во
         // время рисования, и до первой отрисовки предпочтительный размер ещё
         // не знает, что на нём поместилось.
@@ -54,6 +56,7 @@ public final class СнимокЛичнойЗоны {
         wg.dispose();
         int h = Math.max(600, sheet.getPreferredSize().height);
         sheet.setSize(w, h);
+        разложить(sheet);
         BufferedImage im = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = im.createGraphics();
         kelium.report.Сглаживание.включить(g);
@@ -62,5 +65,15 @@ public final class СнимокЛичнойЗоны {
         File out = new File(dir, "личная-зона-место" + seat + ".png");
         ImageIO.write(im, "png", out);
         System.out.println("снято: " + out.getAbsolutePath() + " " + w + "x" + h);
+    }
+
+    /** Разложить дерево руками: без окна менеджеры сами этого не делают. */
+    private static void разложить(java.awt.Component c) {
+        c.doLayout();
+        if (c instanceof java.awt.Container box) {
+            for (java.awt.Component ch : box.getComponents()) {
+                разложить(ch);
+            }
+        }
     }
 }
