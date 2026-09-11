@@ -285,7 +285,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // лежит под хранилищем, на своём месте со стола.
         if (!printed) {
             paintDestroyedCard(g, p, rightX + cardW + colGap, yRight,
-                rightW - cardW - colGap, cardH);
+                rightW - cardW - colGap, cardH, null);
         }
         yRight += cardH + px(24);
 
@@ -1648,21 +1648,6 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         paintSetAside(g, p, x, y, w, h);
     }
 
-    /** Неразложенные жетоны модулей — тоже для ленты. */
-    void запасМодулей(Graphics2D g, ReplayRecord.Player p, int x, int y) {
-        int t = px(18);
-        int freeRed = Math.max(0, p.redModules - p.redPlaced.size());
-        int freeBlue = Math.max(0, p.blueModules - p.bluePlaced.size());
-        int cx = spare(g, x, y, t, freeRed, ModuleSlot.red(), "красных");
-        spare(g, cx, y, t, freeBlue, ModuleSlot.blue(), "синих");
-        if (freeRed + freeBlue == 0) {
-            g.setFont(Theme.italic());
-            g.setColor(Theme.ink3());
-            g.drawString(p.redModules + p.blueModules == 0
-                ? "модулей пока нет" : "все жетоны разложены", x, y + px(13));
-        }
-    }
-
     private java.awt.image.BufferedImage лицоПриказа(String cardId, String colour) {
         if (cardId == null || cardId.isBlank()) {
             return null;
@@ -1865,15 +1850,20 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * листании партии вперёд-назад они не дёргаются на месте.
      */
     static void paintDestroyedCard(Graphics2D g, ReplayRecord.Player p, int x, int y,
-                                 int w, int h) {
-        caption(g, "КАРТА ТРОФЕЕВ", x, y);
+                                 int w, int h, java.awt.image.BufferedImage лицо) {
+        caption(g, лицо == null ? "КАРТА ТРОФЕЕВ" : "ОТЛОЖЕНО", x, y);
         int top = y + px(14);
         // МЕСТО ПОД ТРОФЕИ — ЭТО РУБАШКА КАРТЫ ПРИКАЗОВ, ПОВЁРНУТАЯ НА 90°
         // ПРОТИВ ЧАСОВОЙ (заказ дизайнера 09.09.2026: «зачем ты используешь
         // отдельно нарисованную область, когда можно взять рубашку карты — и
         // получится ровно та же самая область, и это будет как раз в тему»).
         // Своей нарисованной плашки здесь больше нет.
-        java.awt.image.BufferedImage рубашка = рубашкаПриказов(p.orderColor);
+        // ЭТО И ЕСТЬ ОТЛОЖЕННАЯ КАРТА ПРИКАЗА, лежащая повёрнутой: на неё же
+        // складывают снесённые жетоны. Щелчок переворачивает её лицом, не
+        // разворачивая (заказ дизайнера 11.09.2026), и тогда трофеи поверх не
+        // рисуются — иначе они закрыли бы то, ради чего её перевернули.
+        java.awt.image.BufferedImage рубашка = лицо != null ? лицо
+            : рубашкаПриказов(p.orderColor);
         if (рубашка != null) {
             int кh = (int) Math.min(h, w / КАРТА_ПРИКАЗА);
             int кв = (int) (кh * КАРТА_ПРИКАЗА);
@@ -1882,6 +1872,9 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             at.rotate(-Math.PI / 2);
             at.scale(кh / (double) рубашка.getWidth(), кв / (double) рубашка.getHeight());
             g.drawImage(рубашка, at, null);
+            if (лицо != null) {
+                return;
+            }
         } else {
             g.setColor(Theme.tile());
             g.fill(new RoundRectangle2D.Double(x, top, w, h, Theme.R_OVERLAY * 2,

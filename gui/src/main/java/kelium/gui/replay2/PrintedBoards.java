@@ -472,7 +472,7 @@ final class PrintedBoards {
             // Лиц арсенала художник пока не рисовал, поэтому вместо картинки
             // идёт заглушка с названием (заказ дизайнера 11.09.2026).
             лицоАрсенала(g, рамкаПаза(войX, войY, k, вставлено.get(паз)),
-                вставлено.get(паз), k, про == null ? id : про.имя("arsenal", id));
+                вставлено.get(паз), k, про == null ? new String[]{id} : про.половины(id));
             паз++;
         }
         for (int i = 0; i < p.arsenalHand.size() && паз < рубашкой.size(); i++) {
@@ -480,7 +480,7 @@ final class PrintedBoards {
             int[] рамка = рубашкой.get(паз);
             Rectangle box = рамкаПаза(войX, войY, k, рамка);
             if (про != null && про.вскрыта(id)) {
-                лицоАрсенала(g, box, рамка, k, про.имя("arsenal", id));
+                лицоАрсенала(g, box, рамка, k, про.половины(id));
             } else {
                 // НАЧАЛЬНЫЙ АРСЕНАЛ — СВОЯ РУБАШКА: это другая колода, и на
                 // столе её ни с чем не спутать (замечание дизайнера 11.09.2026
@@ -525,7 +525,7 @@ final class PrintedBoards {
      * в наклейку поверх планшета.
      */
     private static void лицоАрсенала(Graphics2D g, Rectangle box, int[] рамка,
-                                     double k, String имя) {
+                                     double k, String[] карта) {
         java.awt.Shape форма = вырез(box, рамка, k);
         java.awt.Shape было = g.getClip();
         g.clip(форма);
@@ -535,43 +535,85 @@ final class PrintedBoards {
         g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.30));
         g.fill(new java.awt.geom.Rectangle2D.Double(box.x,
             box.y + box.height - полоса, box.width, полоса));
-        надписьКарты(g, box, имя);
+        текстКарты(g, box, карта, полоса);
         g.setClip(было);
         g.setColor(new java.awt.Color(0x1E, 0x1E, 0x1E));
         g.setStroke(new BasicStroke(Math.max(1f, (float) (box.width * 0.008))));
         g.draw(форма);
     }
 
-    /** Название карты в несколько строк по центру заглушки. */
-    private static void надписьКарты(Graphics2D g, Rectangle box, String имя) {
-        if (имя == null || имя.isBlank()) {
+    /**
+     * ВСЯ КАРТА ТЕКСТОМ: название, верхняя половина, нижняя половина.
+     *
+     * <p>Заказ дизайнера 11.09.2026: «там места спокойно хватает на разметке на
+     * вставленном арсенале, чтобы разместить весь текст и все пометки». Одного
+     * названия и правда мало: по нему не скажешь, что карта делает.
+     *
+     * <p>Половины разделены чертой — так они и напечатаны. Кегль считается от
+     * высоты паза, поэтому при увеличении ленты текст растёт вместе с картой.
+     */
+    private static void текстКарты(Graphics2D g, Rectangle box, String[] карта,
+                                   int полоса) {
+        if (карта == null || карта.length == 0) {
             return;
         }
-        int кегль = Math.max(9, (int) Math.round(box.height * 0.15));
-        g.setFont(Theme.font(кегль, java.awt.Font.BOLD));
-        java.util.List<String> строки = new java.util.ArrayList<>();
+        int поле = (int) Math.round(box.width * 0.05);
+        int x = box.x + поле;
+        int ширина = box.width - поле * 2;
+        int y = box.y + поле;
+        int низ = box.y + box.height - полоса - поле / 2;
+        g.setColor(java.awt.Color.BLACK);
+        if (карта[0] != null && !карта[0].isBlank()) {
+            g.setFont(Theme.font(Math.max(8, (int) Math.round(box.height * 0.115)),
+                java.awt.Font.BOLD));
+            y = строки(g, карта[0], x, y, ширина, низ);
+            y += Math.max(2, (int) Math.round(box.height * 0.03));
+        }
+        int кегль = Math.max(7, (int) Math.round(box.height * 0.082));
+        for (int i = 1; i < карта.length; i++) {
+            if (карта[i] == null || карта[i].isBlank() || y >= низ) {
+                continue;
+            }
+            g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.30));
+            g.setStroke(new BasicStroke(1f));
+            g.drawLine(x, y, x + ширина, y);
+            y += Math.max(3, (int) Math.round(box.height * 0.035));
+            g.setColor(java.awt.Color.BLACK);
+            g.setFont(Theme.font(кегль, java.awt.Font.PLAIN));
+            y = строки(g, карта[i], x, y, ширина, низ);
+            y += Math.max(2, (int) Math.round(box.height * 0.025));
+        }
+    }
+
+    /** Текст в столбик по ширине; возвращает, докуда дошёл. */
+    private static int строки(Graphics2D g, String текст, int x, int y, int ширина,
+                              int низ) {
+        var fm = g.getFontMetrics();
         StringBuilder строка = new StringBuilder();
-        int предел = (int) (box.width * 0.86);
-        for (String слово : имя.trim().split("\\s+")) {
+        java.util.List<String> готовые = new java.util.ArrayList<>();
+        for (String слово : текст.trim().split("\\s+")) {
             String проба = строка.length() == 0 ? слово : строка + " " + слово;
-            if (g.getFontMetrics().stringWidth(проба) > предел && строка.length() > 0) {
-                строки.add(строка.toString());
+            if (fm.stringWidth(проба) > ширина && строка.length() > 0) {
+                готовые.add(строка.toString());
                 строка = new StringBuilder(слово);
             } else {
                 строка = new StringBuilder(проба);
             }
         }
         if (строка.length() > 0) {
-            строки.add(строка.toString());
+            готовые.add(строка.toString());
         }
-        int шаг = g.getFontMetrics().getHeight();
-        int y = box.y + (box.height - шаг * строки.size()) / 2
-            + g.getFontMetrics().getAscent();
-        g.setColor(java.awt.Color.BLACK);
-        for (String s : строки) {
-            g.drawString(s, box.x + (box.width - g.getFontMetrics().stringWidth(s)) / 2, y);
+        int шаг = fm.getHeight();
+        for (String s : готовые) {
+            if (y + шаг > низ) {
+                // Не влезло — честно обрываем многоточием, а не лезем за край.
+                g.drawString("…", x, y + fm.getAscent());
+                return низ;
+            }
+            g.drawString(s, x, y + fm.getAscent());
             y += шаг;
         }
+        return y;
     }
 
     /**
@@ -1035,6 +1077,13 @@ final class PrintedBoards {
 
         /** Название карты по коду — для заглушки, пока лица не нарисовано. */
         String имя(String вид, String id);
+
+        /**
+         * ЧТО НАПЕЧАТАНО НА КАРТЕ АРСЕНАЛА: {@code {название, верхняя половина,
+         * нижняя половина}}. Любая строка может быть пустой — тогда её не
+         * рисуют.
+         */
+        String[] половины(String id);
 
         /** НАЧАЛЬНЫЙ ли это арсенал: у него своя рубашка, другая колода. */
         boolean начальный(String id);

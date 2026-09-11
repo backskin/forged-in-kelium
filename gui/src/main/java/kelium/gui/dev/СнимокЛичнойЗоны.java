@@ -35,6 +35,18 @@ public final class СнимокЛичнойЗоны {
         int w = args.length > 3 ? Integer.parseInt(args[3]) : 980;
 
         Session session = new Session();
+        // НАБОР КАРТ ПАРТИИ: по нему на вставленной карте арсенала пишут обе
+        // её половины. Без него виднелось бы одно название.
+        try {
+            var правила = kelium.rules.Ruleset.loadById(
+                rec.ruleset == null || rec.ruleset.isBlank()
+                    ? kelium.dataio.GameConfig.DEFAULT_RULESET : rec.ruleset,
+                kelium.dataio.GameConfig.resolveDataRoot(null).resolve("rulesets"));
+            session.setContent(kelium.dataio.ContentLibrary.forRuleset(правила,
+                kelium.dataio.GameConfig.resolveDataRoot(null)));
+        } catch (RuntimeException e) {
+            System.out.println("набор карт не открылся: " + e.getMessage());
+        }
         session.setRecord(rec);
         // Середина партии: часть зданий уже на поле, часть ещё лежит на
         // планшете — видно и жетоны поверх ячеек, и открытые ячейки с ресурсами.

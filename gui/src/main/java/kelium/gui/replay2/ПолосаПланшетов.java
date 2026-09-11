@@ -73,6 +73,12 @@ public final class ПолосаПланшетов extends JComponent implements 
     /** Какие карты игрок перевернул лицом — живёт, пока открыт планшет. */
     private final Set<String> вскрытые = new LinkedHashSet<>();
 
+    /** Перевёрнута ли отложенная карта приказа под планшетом хранилища. */
+    private boolean приказВскрыт;
+
+    /** Где она лежит — по ней и щёлкают. */
+    private Rectangle местоПриказа;
+
     public ПолосаПланшетов(Session session, int seat, BoardSheet лист) {
         this.session = session;
         this.лист = лист;
@@ -96,7 +102,8 @@ public final class ПолосаПланшетов extends JComponent implements 
             public void mouseMoved(java.awt.event.MouseEvent e) {
                 boolean рука = найти(карты, e.getPoint()) != null
                     || найти(стопки, e.getPoint()) != null
-                    || найти(модули, e.getPoint()) != null;
+                    || найти(модули, e.getPoint()) != null
+                    || (местоПриказа != null && местоПриказа.contains(e.getPoint()));
                 setCursor(рука
                     ? java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
                     : java.awt.Cursor.getDefaultCursor());
@@ -282,28 +289,29 @@ public final class ПолосаПланшетов extends JComponent implements 
                 высотаПланшета, р.сдвиг());
             столбецX += р.стопкаW() + р.зазор();
         }
-        // ОТЛОЖЕННЫЙ ПРИКАЗ И ЗАПАС МОДУЛЕЙ — тут же, рядом с планшетами: своего
-        // листа под ними больше нет (заказ дизайнера 11.09.2026).
-        int столбецY = верхПланшета;
+        // ОТЛОЖЕННОГО ПРИКАЗА ОТДЕЛЬНО ЗДЕСЬ НЕТ: это та самая повёрнутая карта
+        // под планшетом хранилища, на которую кладут трофеи. Запаса модулей
+        // тоже нет — все жетоны и так видны на самой печати (заказ дизайнера
+        // 11.09.2026).
         if (p.superObjective != null) {
-            int вh = (int) Math.round(высотаПланшета * 0.42);
             стопка(g, "super_objectives", java.util.List.of(p.superObjective),
-                "супер-задание", столбецX, столбецY, вh, р.сдвиг());
-            столбецY += вh + BoardSheet.px(16);
+                "супер-задание", столбецX, верхПланшета, высотаПланшета, р.сдвиг());
         }
-        лист.отложенныйПриказ(g, p, столбецX, столбецY, р.столбецW(),
-            (int) Math.round(р.столбецW() * BoardSheet.КАРТА_ПРИКАЗА));
-        лист.запасМодулей(g, p, столбецX, столбецY
-            + (int) Math.round(р.столбецW() * BoardSheet.КАРТА_ПРИКАЗА) + BoardSheet.px(26));
+        местоПриказа = null;
         if (р.хр() != null) {
-            // КАРТА ТРОФЕЕВ — СТРОГО ПОД ПЛАНШЕТОМ ХРАНИЛИЩА, в его ширину и в
-            // своей пропорции (заказ дизайнера 11.09.2026).
+            // КАРТА ПОД ПЛАНШЕТОМ ХРАНИЛИЩА — ТОГО ЖЕ РАЗМЕРА, ЧТО КАРТА
+            // ЗАДАНИЯ СПРАВА, только лежащая (заказ дизайнера 11.09.2026). По
+            // ширине планшета она была втрое крупнее любой другой карты на
+            // столе, хотя карта у них одна и та же.
             int хрX = x + (int) Math.round(р.с().хрX() * р.k());
-            int хрW = (int) Math.round(р.хр()[0] * р.с().хрМасштаб() * р.k());
             int хрНиз = y + (int) Math.round(
                 (р.с().хрY() + р.хр()[1] * р.с().хрМасштаб()) * р.k());
-            BoardSheet.paintDestroyedCard(g, p, хрX, хрНиз + BoardSheet.px(10), хрW,
-                (int) Math.round(хрW / BoardSheet.КАРТА_ПРИКАЗА));
+            int вW = высотаПланшета;
+            int вH = (int) Math.round(высотаПланшета / BoardSheet.КАРТА_ПРИКАЗА);
+            int вY = хрНиз + BoardSheet.px(10);
+            BoardSheet.paintDestroyedCard(g, p, хрX, вY, вW, вH,
+                приказВскрыт ? лицоПриказа(p) : null);
+            местоПриказа = new Rectangle(хрX, вY + BoardSheet.px(14), вW, вH);
         }
         g.dispose();
     }
@@ -342,12 +350,39 @@ public final class ПолосаПланшетов extends JComponent implements 
         }
     }
 
-    /** Что программа знает о картах в пазах — для {@link PrintedBoards}. */
+    /** Печатное лицо отложенной карты приказа ({@code null} — нечего показывать). */
+    private java.awt.image.BufferedImage лицоПриказа(ReplayRecord.Player p) {
+        if (p.orderSetAside == null || p.orderSetAside.isBlank()) {
+            return null;
+        }
+        if (p.orderSetAside.startsWith("security")) {
+            String c = p.orderColor == null ? "" : p.orderColor;
+            String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
+            return kelium.report.Textures.orderCard(c.isEmpty() ? null : "security_" + c,
+                alt.isEmpty() ? null : "security_" + alt, "security");
+        }
+        return kelium.report.Textures.orderCard(p.orderSetAside);
+    }
+
+    /** Что программа знает о картах в пазах — для {@link PrintedBoards}. */    /** Что программа знает о картах в пазах — для {@link PrintedBoards}. */
     private PrintedBoards.ПроКарты проКарты() {
         return new PrintedBoards.ПроКарты() {
             @Override
             public String имя(String вид, String id) {
                 return Names.card(session.record(), id);
+            }
+
+            @Override
+            public String[] половины(String id) {
+                var набор = session.content() == null ? null
+                    : session.content().get("arsenal");
+                var карта = набор == null ? null : набор.find(id);
+                String имя = Names.card(session.record(), id);
+                if (карта == null) {
+                    return new String[]{имя};
+                }
+                return new String[]{имя, половина(карта.get("top")),
+                    половина(карта.get("bottom"))};
             }
 
             @Override
@@ -363,6 +398,40 @@ public final class ПолосаПланшетов extends JComponent implements 
             public boolean вскрыта(String id) {
                 return вскрытые.contains(id);
             }
+        };
+    }
+
+    /** Печатная строка половины карты: пометка вида и сам текст. */
+    private static String половина(Object половина) {
+        if (!(половина instanceof Map<?, ?> m)) {
+            return null;
+        }
+        Object текст = m.get("label");
+        if (текст == null) {
+            return null;
+        }
+        String строка = String.valueOf(текст);
+        String вид = пометка(m.get("kind"));
+        // Пометку вида не дублируем: на многих картах она уже стоит в самом
+        // тексте («СПЕЦ: …», «ДЕСАНТ: …»).
+        return вид == null || строка.toUpperCase(java.util.Locale.ROOT)
+            .startsWith(вид) ? строка : вид + ": " + строка;
+    }
+
+    /**
+     * ПОМЕТКА ВИДА ПОЛОВИНЫ по-русски. В наборе карт она записана латиницей
+     * ({@code SPEC}, {@code POST}), а на печати стоит русскими буквами — в
+     * текстах карт того же набора так и написано: «СПЕЦ: …».
+     */
+    private static String пометка(Object вид) {
+        if (вид == null) {
+            return null;
+        }
+        String код = String.valueOf(вид).toUpperCase(java.util.Locale.ROOT);
+        return switch (код) {
+            case "SPEC" -> "СПЕЦ";
+            case "POST" -> "ПОСТ";
+            default -> код;
         };
     }
 
@@ -387,6 +456,11 @@ public final class ПолосаПланшетов extends JComponent implements 
         // ЩЕЛЧОК ПО ЗАКРЫТОЙ КАРТЕ — ПЕРЕВОРОТ (заказ дизайнера 11.09.2026).
         // Карта в пазу лежит рубашкой, как на столе; кто разбирает партию,
         // вправе её перевернуть и положить обратно.
+        if (местоПриказа != null && местоПриказа.contains(точка)) {
+            приказВскрыт = !приказВскрыт;
+            repaint();
+            return;
+        }
         String id = найти(карты, точка);
         if (id != null) {
             if (!вскрытые.remove(id)) {
@@ -424,6 +498,10 @@ public final class ПолосаПланшетов extends JComponent implements 
         Стопка стопка = найти(стопки, e.getPoint());
         if (стопка != null) {
             return Ui2.tip(стопка.имя() + " — щелчок открывает читалку");
+        }
+        if (местоПриказа != null && местоПриказа.contains(e.getPoint())) {
+            return Ui2.tip("отложенная карта приказа, на ней лежат трофеи"
+                + "\nщелчок — перевернуть её лицом");
         }
         return null;
     }
