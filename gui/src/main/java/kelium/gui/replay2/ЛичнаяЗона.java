@@ -1,7 +1,7 @@
 package kelium.gui.replay2;
 
 import java.awt.BorderLayout;
-import java.awt.Dimension;
+import java.awt.CardLayout;
 import java.awt.Font;
 
 import javax.swing.BorderFactory;
@@ -12,37 +12,44 @@ import javax.swing.JScrollPane;
 import javax.swing.ScrollPaneConstants;
 
 /**
- * ЛичнаяЗона — ВСЁ ХОЗЯЙСТВО ИГРОКА: лента печатных планшетов и лист под ней.
+ * ЛичнаяЗона — ВСЁ ХОЗЯЙСТВО ИГРОКА.
  *
- * <p>Заказ дизайнера 11.09.2026: «отдельно необходимо сделать ленту
- * пролистывания полосы с планшетами; уметь зумить содержимое — не помещается на
- * экране». Отсюда и разделение на две части:
+ * <p>Показывается ОДНО ИЗ ДВУХ, а не оба сразу:
  *
  * <ul>
- *   <li>СВЕРХУ — {@link ПолосаПланшетов}: сцепка планшетов, стопка заданий и
- *       карта трофеев. У неё своя прокрутка вбок и своё увеличение, потому что
- *       печать разглядывают вблизи, а вся она в окно не влезает;</li>
- *   <li>СНИЗУ — {@link BoardSheet}: то, чего на печати нет вовсе, — здания
- *       списком, модули в запасе, отложенный приказ.</li>
+ *   <li>есть печатные планшеты — во всю зону идёт {@link ПолосаПланшетов}:
+ *       сцепка планшетов, карты в пазах, стопки заданий и супер-задания и
+ *       отложенная карта приказа с трофеями. У неё своя прокрутка и своё
+ *       увеличение, потому что печать разглядывают вблизи;</li>
+ *   <li>печати нет (старая запись, чужой набор) — во всю зону идёт прежний
+ *       рисованный лист {@link BoardSheet}.</li>
  * </ul>
  *
- * <p>Прежде это был один лист, и прокрутка вбок таскала всё сразу: чтобы
- * увидеть правый край планшета, приходилось увозить за край экрана и карты, и
- * модули.
+ * <p>Сперва они жили один над другим, но при печатных планшетах листу нечего
+ * показывать: всё, что на нём было, либо напечатано, либо переехало в ленту, —
+ * и внизу оставалась пустая полоса, которая вдобавок закрывала собой низ
+ * (замечание дизайнера 11.09.2026: «убери вообще нижнюю часть, она же теперь
+ * пустая»).
+ *
+ * <p>Сверху — узкая шапка: чей это планшет и сколько у него очков. Без неё при
+ * ленте этого было бы негде взять.
  */
 public final class ЛичнаяЗона extends JPanel {
 
     private static final long serialVersionUID = 1L;
 
+    private static final String ЛЕНТА = "лента";
+    private static final String ЛИСТ = "лист";
+
+    private final Session сессия;
     private final ПолосаПланшетов лента;
     private final BoardSheet лист;
-    private final JScrollPane лентаБокс;
-    private final JPanel верх;
-    private final JScrollPane листБокс;
-    private JLabel подписьЗума;
+    private final CardLayout что = new CardLayout();
+    private final JPanel середина = new JPanel(что);
     private final JLabel имяМеста = new JLabel();
     private final JLabel очки = new JLabel();
-    private final Session сессия;
+    private JLabel подписьЗума;
+    private String показано = "";
 
     public ЛичнаяЗона(Session session, int seat) {
         super(new BorderLayout());
@@ -51,43 +58,42 @@ public final class ЛичнаяЗона extends JPanel {
         лист = new BoardSheet(session, seat);
         лента = new ПолосаПланшетов(session, seat, лист);
 
-        лентаБокс = new JScrollPane(лента,
-            ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+        JScrollPane лентаБокс = new JScrollPane(лента,
+            ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
             ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        лентаБокс.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()));
+        лентаБокс.setBorder(null);
         лентаБокс.getHorizontalScrollBar().setUnitIncrement(Theme.px(40));
-        // ЯЩИК ТОГО ЖЕ ЦВЕТА, ЧТО И ЛЕНТА: белое поле сбоку от планшетов
+        лентаБокс.getVerticalScrollBar().setUnitIncrement(Theme.px(40));
+        // ЯЩИК ТОГО ЖЕ ЦВЕТА, ЧТО И ЛЕНТА: светлое поле сбоку от планшетов
         // выглядело как часть картинки, хотя это просто пустой ящик.
         лентаБокс.setBackground(Theme.bg());
         лентаБокс.getViewport().setBackground(Theme.bg());
 
-        верх = new JPanel(new BorderLayout());
-        верх.setBackground(Theme.bg());
-        верх.add(шапка(), BorderLayout.NORTH);
-        верх.add(лентаБокс, BorderLayout.CENTER);
-        верх.add(полосаЗума(), BorderLayout.EAST);
+        JPanel сЛентой = new JPanel(new BorderLayout());
+        сЛентой.setBackground(Theme.bg());
+        сЛентой.add(лентаБокс, BorderLayout.CENTER);
+        сЛентой.add(полосаЗума(), BorderLayout.EAST);
 
-        листБокс = new JScrollPane(лист);
+        JScrollPane листБокс = new JScrollPane(лист);
         листБокс.setBorder(null);
         листБокс.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
 
-        add(верх, BorderLayout.NORTH);
-        add(листБокс, BorderLayout.CENTER);
+        середина.setBackground(Theme.bg());
+        середина.add(сЛентой, ЛЕНТА);
+        середина.add(листБокс, ЛИСТ);
+
+        add(шапка(), BorderLayout.NORTH);
+        add(середина, BorderLayout.CENTER);
+
         лента.приЗуме(this::обновитьЗум);
-        обновитьВысотуЛенты();
-        обновитьШапку();
-        session.whenFrameChanged(s -> обновитьШапку());
-        session.whenRecordChanged(s -> {
-            обновитьВысотуЛенты();
-            обновитьШапку();
-        });
+        session.whenFrameChanged(s -> обновить());
+        session.whenRecordChanged(s -> обновить());
+        обновить();
     }
 
     /**
-     * ШАПКА ЛЕНТЫ: чьё это хозяйство и сколько у него очков.
-     *
-     * <p>Раньше эта строка стояла на нижнем листе, но листа при печатных
-     * планшетах больше нет, а знать, чей планшет открыт, нужно всегда.
+     * ШАПКА: чьё это хозяйство и сколько у него очков. Раньше эта строка стояла
+     * на листе, но при печатных планшетах листа не видно вовсе.
      */
     private JPanel шапка() {
         JPanel ряд = new JPanel(new BorderLayout());
@@ -102,21 +108,7 @@ public final class ЛичнаяЗона extends JPanel {
         return ряд;
     }
 
-    private void обновитьШапку() {
-        var запись = сессия.record();
-        int место = лист.seat();
-        имяМеста.setText(запись == null ? "" : запись.playerName(место));
-        имяМеста.setForeground(Theme.seatInk(место));
-        var кадр = сессия.frame();
-        if (кадр == null || кадр.snapshot == null
-                || место >= кадр.snapshot.players.size()) {
-            очки.setText("");
-            return;
-        }
-        очки.setText(кадр.snapshot.players.get(место).vp.getOrDefault("total", 0) + " ПО");
-    }
-
-    /** Кнопки увеличения ленты: «мельче», сколько сейчас, «крупнее». */    /** Кнопки увеличения ленты: «мельче», сколько сейчас, «крупнее». */
+    /** Кнопки увеличения ленты: крупнее, мельче, обратно в натуральную. */
     private JPanel полосаЗума() {
         JPanel бок = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets " + Theme.px(4) + ", gapx " + Theme.px(2) + ", wrap 1", "[grow]"));
@@ -146,65 +138,39 @@ public final class ЛичнаяЗона extends JPanel {
         if (подписьЗума != null) {
             подписьЗума.setText(Math.round(лента.зум() * 100) + "%");
         }
-        обновитьВысотуЛенты();
     }
 
-    /**
-     * ВЫСОТА ЛЕНТЫ — ПО САМОЙ ЛЕНТЕ, но не больше половины окна: планшеты
-     * разглядывают, а не живут в них, и лист под ними должен оставаться виден.
-     * Планшетов нет вовсе — ленты нет тоже.
-     */
-    private void обновитьВысотуЛенты() {
-        boolean есть = лента.естьЧтоПоказать();
-        if (верх.isVisible() != есть) {
-            верх.setVisible(есть);
-            revalidate();
+    /** Что показывать сейчас и что написать в шапке. */
+    private void обновить() {
+        String надо = лента.естьЧтоПоказать() ? ЛЕНТА : ЛИСТ;
+        if (!надо.equals(показано)) {
+            показано = надо;
+            что.show(середина, надо);
         }
-        // НИЖНЕГО ЛИСТА ПРИ ПЕЧАТНЫХ ПЛАНШЕТАХ НЕТ ВОВСЕ (заказ дизайнера
-        // 11.09.2026: «почему у тебя вообще это нижнее остаётся — оно не
-        // нужно»). Всё, что на нём оставалось, переехало в ленту. Лист живёт
-        // только там, где печати нет и планшет рисуется по-старому.
-        if (листБокс.isVisible() == есть) {
-            листБокс.setVisible(!есть);
-            revalidate();
-        }
-        if (!есть) {
+        var запись = сессия.record();
+        int место = лист.seat();
+        имяМеста.setText(запись == null ? "" : запись.playerName(место));
+        имяМеста.setForeground(Theme.seatInk(место));
+        var кадр = сессия.frame();
+        if (кадр == null || кадр.snapshot == null
+                || место >= кадр.snapshot.players.size()) {
+            очки.setText("");
             return;
         }
-        int надо = лента.getPreferredSize().height
-            + лентаБокс.getHorizontalScrollBar().getPreferredSize().height + Theme.px(6);
-        // ПОТОЛОК — ДВЕ ТРЕТИ ОКНА: планшеты разглядывают, но лист под ними
-        // должен оставаться виден. Пока окна нет (снимок в файл), потолка нет
-        // тоже — иначе на снимке лента обрезалась бы посередине.
-        int потолок = getHeight() > 0
-            ? Math.max(Theme.px(240), getHeight() * 2 / 3) : надо;
-        Dimension хочу = new Dimension(10, Math.min(надо, потолок));
-        // РАЗМЕР СТАВИТСЯ ТОЛЬКО КОГДА ОН И ПРАВДА СМЕНИЛСЯ: revalidate внутри
-        // раскладки иначе зацикливает её саму на себя.
-        if (!хочу.equals(лентаБокс.getPreferredSize())) {
-            лентаБокс.setPreferredSize(хочу);
-            revalidate();
-        }
-    }
-
-    @Override
-    public void addNotify() {
-        super.addNotify();
-        обновитьВысотуЛенты();
+        очки.setText(кадр.snapshot.players.get(место).vp.getOrDefault("total", 0) + " ПО");
     }
 
     public void setSeat(int seat) {
         лента.setSeat(seat);
         лист.setSeat(seat);
-        обновитьВысотуЛенты();
-        обновитьШапку();
+        обновить();
     }
 
     public int seat() {
         return лист.seat();
     }
 
-    /** Лист под лентой — прогонщикам и тестам. */
+    /** Рисованный лист — прогонщикам и тестам. */
     public BoardSheet лист() {
         return лист;
     }
