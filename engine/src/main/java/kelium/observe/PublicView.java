@@ -216,6 +216,15 @@ public final class PublicView {
         public List<String> orderHand;
         public List<String> objectiveHand;
         public List<String> arsenalHand;
+
+        /**
+         * КАКИЕ КОНТЕЙНЕРЫ ЛЕЖАТ У ИГРОКА — только СВОЕМУ. Контейнер берётся
+         * из колоды сразу и лежит рубашкой вверх: соседу видно, что он есть, но
+         * не что в нём. Число для всех — {@link #containerHandCount}.
+         */
+        public List<String> containerHand;
+
+        public int containerHandCount;
         public String setAsideOrder;
         /**
          * Свои подложенные карты-символы ЦЕЛИКОМ (kind/card/rev) — владелец
@@ -354,12 +363,14 @@ public final class PublicView {
         st.objectiveHandCount = p.objectiveHand.size();
         st.arsenalHandCount = p.arsenalHand.size();
         st.containers = p.containers;
+        st.containerHandCount = p.containerHand.size();
         st.containerCap = p.containerCap;
         st.hasSetAsideOrder = p.orderSetAside != null;
         if (mine) {
             st.orderHand = List.copyOf(p.orderHand);
             st.objectiveHand = List.copyOf(p.objectiveHand);
             st.arsenalHand = List.copyOf(p.arsenalHand);
+            st.containerHand = List.copyOf(p.containerHand);
             st.setAsideOrder = p.orderSetAside;
             st.tucked = new ArrayList<>();
             for (ReplayRecord.Tucked t : p.tucked) {
@@ -556,6 +567,8 @@ public final class PublicView {
         o.put("orderHand", st.orderHand);
         o.put("objectiveHand", st.objectiveHand);
         o.put("arsenalHand", st.arsenalHand);
+        o.put("containerHand", st.containerHand);
+        o.put("containerHandCount", st.containerHandCount);
         o.put("setAsideOrder", st.setAsideOrder);
         o.put("tucked", st.tucked);
         return o;

@@ -1135,9 +1135,11 @@ public final class GameEngine {
             return;
         }
         GameState s = state;
-        String cid = s.decks.get("containers").draw(s.rng);
+        // КАРТА УЖЕ ЛЕЖИТ ПЕРЕД ИГРОКОМ: её взяли, когда получили контейнер.
+        // Вскрытие только переворачивает верхнюю (заказ дизайнера 11.09.2026).
+        String cid = p.containerHand.isEmpty() ? null : p.containerHand.get(0);
         if (cid == null) {
-            return;   // I3: пустая колода — жетон НЕ сгорает
+            return;   // I3: карты нет (колода была пуста) — жетон НЕ сгорает
         }
         Map<String, Object> card = Ctx.cards(s, "containers").byId(cid);
         Map<String, Object> a = (Map<String, Object>) card.get("a");
@@ -1151,6 +1153,7 @@ public final class GameEngine {
         Object[] payload = new Object[]{"a", a};
         Map<String, Object> variant = (Map<String, Object>) payload[1];
         p.containers -= 1;
+        p.containerHand.remove(0);
         Map<String, Object> got;
         try {
             got = Effects.apply((String) variant.get("effect"), s, p.seat,

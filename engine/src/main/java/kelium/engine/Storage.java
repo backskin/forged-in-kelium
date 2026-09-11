@@ -200,6 +200,18 @@ public final class Storage {
             add = Math.min(n, Math.max(0, cap - p.containers));
             p.containers += add;
         }
+        // КАРТА БЕРЁТСЯ СРАЗУ, а не при вскрытии: у игрока лежит конкретный
+        // контейнер рубашкой вверх (заказ дизайнера 11.09.2026). Колода пуста —
+        // контейнер всё равно выдан: правило «жетон не сгорает» старше колоды,
+        // просто вскрывать будет нечего.
+        var колода = s.decks == null ? null : s.decks.get("containers");
+        for (int i = 0; i < add && колода != null; i++) {
+            String cid = колода.draw(s.rng);
+            if (cid == null) {
+                break;
+            }
+            p.containerHand.add(cid);
+        }
         if (add > 0) {
             SOURCE_STATS.computeIfAbsent(source,
                 k -> new java.util.concurrent.atomic.LongAdder()).add(add);

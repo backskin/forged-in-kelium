@@ -102,6 +102,8 @@ public final class Effects {
             case "replace_building_with_neutral" -> replaceBuildingWithNeutral(s, seat, p);
             case "steal_objective_cards" -> stealObjectiveCards(s, seat, p);
             case "exchange_table" -> exchangeTable(s, seat, p);
+            // === КОНТЕЙНЕРЫ 5.0 (экспорт дизайнера, 11.09.2026) ===
+            case "place_unit_anywhere" -> placeUnitAnywhere(s, seat, p);
             case "noop" -> Map.of("noop", p.getOrDefault("note", "unimplemented"));
             // ПУСТОЙ КОНТЕЙНЕР (заказ дизайнера 18.08.2026, контейнеры 4.0) —
             // НАМЕРЕННО ничего не даёт, это не заглушка недоделки. Отдельно от
@@ -133,6 +135,7 @@ public final class Effects {
                  // видел, а в отчётах они выглядели просто редкими.
                  "grab_first_player", "power_building_free", "permanent_energy",
                  "cancel_attack", "build_neutral", "evacuate",
+                 "place_unit_anywhere",
                  // Девять эффектов ревью 17.08.2026: щит, десант, скорость,
                  // выбор «энергия или модули», конверсия и четыре арсенальных.
                  "shield", "landing", "speed_boost", "energy_or_modules", "convert",
@@ -1552,6 +1555,53 @@ public final class Effects {
             }
         }
         return Map.of("deployed", placed);
+    }
+
+    /**
+     * ЖЕТОН ВОЙСКА ИЗ ЗАПАСА НА ЛЮБОЙ ГЕКС — контейнеры «прототип БТР» и
+     * «военная криокапсула» (набор 5.0).
+     *
+     * <p>Жетон берётся ИЗ ЛИЧНОГО ЗАПАСА игрока и сверх запаса не появляется:
+     * в этой игре картон и дерево, жетонов у каждого по четыре на род, и
+     * взяться пятому неоткуда. Запас пуст — контейнер не даёт ничего, и это
+     * честный исход, а не осечка.
+     *
+     * <p>Гекс — ЛЮБОЙ на поле: так нарисовано на карте (жетон со стрелкой в
+     * пустой гекс), и в этом вся её ценность — высадка там, где своего здания
+     * нет.
+     */
+    static Map<String, Object> placeUnitAnywhere(GameState s, int seat,
+                                                 Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        UnitType ut;
+        try {
+            ut = UnitType.fromCode(String.valueOf(p.getOrDefault("unit", "infantry")));
+        } catch (RuntimeException e) {
+            throw new EffectError("неизвестный род войск: " + p.get("unit"));
+        }
+        if (pl.unitsOfKind(ut) >= s.tokenStats.unitStock(ut)) {
+            return Map.of("placed", 0, "why", "в запасе нет жетона");
+        }
+        List<Choice> opts = new ArrayList<>();
+        for (String hex : s.field.hexes.keySet()) {
+            opts.add(new Choice("place_unit", hex, "поставить @" + hex));
+        }
+        if (opts.isEmpty()) {
+            return Map.of("placed", 0);
+        }
+        Agent agent = agentFor(s, seat);
+        Choice pick = agent != null
+            ? agent.choose(s, opts, Map.of("kind", "place_unit_anywhere",
+                "unit", ut.code))
+            : opts.get(0);
+        String hex = pick != null && pick.payload() != null
+            ? String.valueOf(pick.payload()) : String.valueOf(opts.get(0).payload());
+        UnitToken u = s.tokenStats.makeUnit(ut, seat, Placement.nextUid(s),
+            pl.unitsOfKind(ut));
+        u.hexId = hex;
+        pl.units.add(u);
+        PrintedContainers.onUnitPlaced(s, pl, hex, ut);
+        return Map.of("placed", 1, "unit", ut.code, "hex", hex);
     }
 
     static Map<String, Object> placeDamage(GameState s, int seat, Map<String, Object> p) {

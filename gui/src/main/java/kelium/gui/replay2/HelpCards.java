@@ -41,7 +41,8 @@ public final class HelpCards {
         group(root, content, dataRoot, "super_arsenal", "Супер-арсенал",
             HelpCards::superArsenalGroup);
         group(root, content, dataRoot, "super_objectives", "Супер-задания", c -> "");
-        group(root, content, dataRoot, "containers", "Контейнеры", HelpCards::tierGroup);
+        group(root, content, dataRoot, "containers", "Контейнеры",
+            HelpCards::containerGroup);
         group(root, content, dataRoot, "market", "Рынок", c -> "");
         return root;
     }
@@ -206,6 +207,20 @@ public final class HelpCards {
             case "power" -> "способности";
             default -> "не описано";
         };
+    }
+
+    /**
+     * КОНТЕЙНЕРЫ РАСКЛАДЫВАЮТСЯ ПО ЛИЦАМ. В наборе 5.0 лиц четырнадцать, а карт
+     * тридцать две: одно и то же лицо напечатано на нескольких картах, и
+     * разряды common/good/rare у них отменены вместе с прежней колодой.
+     */
+    private static String containerGroup(Map<String, Object> card) {
+        Object лицо = card.get("face");
+        if (лицо == null) {
+            return tierGroup(card);
+        }
+        Object имя = card.get("name");
+        return "лицо " + лицо + (имя == null ? "" : " · " + имя);
     }
 
     private static String tierGroup(Map<String, Object> card) {

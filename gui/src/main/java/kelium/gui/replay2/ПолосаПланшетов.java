@@ -502,6 +502,21 @@ public final class ПолосаПланшетов extends JComponent implements 
             public boolean вскрыта(String id) {
                 return вскрытые.contains(id);
             }
+
+            @Override
+            public java.awt.image.BufferedImage лицо(String вид, String id) {
+                if (!"containers".equals(вид)) {
+                    return null;        // лиц арсенала художник ещё не рисовал
+                }
+                // ЛИЦ ЧЕТЫРНАДЦАТЬ, А КАРТ ТРИДЦАТЬ ДВЕ: картинка ищется по
+                // БУКВЕ ЛИЦА из набора, а не по коду карты.
+                var набор = session.content() == null ? null
+                    : session.content().get("containers");
+                var карта = набор == null ? null : набор.find(id);
+                Object буква = карта == null ? null : карта.get("face");
+                return буква == null ? null
+                    : kelium.report.Textures.containerCard(String.valueOf(буква));
+            }
         };
     }
 
@@ -604,8 +619,9 @@ public final class ПолосаПланшетов extends JComponent implements 
         }
         String id = найти(карты, e.getPoint());
         if (id != null) {
-            return Ui2.tip(Names.card(session.record(), id)
-                + "\nлежит в пазу рубашкой; щелчок — перевернуть карту");
+            return Ui2.tip(Names.card(session.record(), id) + "\n"
+                + (вскрытые.contains(id) ? "лежит лицом; щелчок — закрыть обратно"
+                    : "лежит рубашкой; щелчок — перевернуть"));
         }
         String вставлена = найти(вставленные, e.getPoint());
         if (вставлена != null) {

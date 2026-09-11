@@ -505,14 +505,25 @@ final class PrintedBoards {
             паз++;
         }
         // КОНТЕЙНЕРЫ: по два в паз, поэтому рамок шесть — берём те, что
-        // относятся к ещё свободным пазам. ПЕРЕВЕРНУТЬ ИХ НЕЛЬЗЯ: в записи
-        // партии контейнеры — ЧИСЛО, а не карты, и какой именно контейнер лежит
-        // у игрока, не знает никто. Лица появятся вместе с новой колодой.
-        BufferedImage конт = Textures.card("deck_containers", "deck");
+        // относятся к ещё свободным пазам. Каждый контейнер — КОНКРЕТНАЯ карта,
+        // взятая рубашкой вверх; щелчок её переворачивает (заказ дизайнера
+        // 11.09.2026).
+        BufferedImage рубашкаК = Textures.containerCard("back");
+        if (рубашкаК == null) {
+            рубашкаК = Textures.card("deck_containers", "deck");
+        }
         int положено = 0;
         for (int i = паз * 2; i < подКонтейнер.size() && положено < p.containers; i++) {
             int[] рамка = подКонтейнер.get(i);
-            картаВПаз(g, рамкаПаза(войX, войY, k, рамка), рамка, k, конт);
+            Rectangle box = рамкаПаза(войX, войY, k, рамка);
+            String id = положено < p.containerHand.size()
+                ? p.containerHand.get(положено) : null;
+            BufferedImage лицо = id == null || про == null || !про.вскрыта(id)
+                ? null : про.лицо("containers", id);
+            картаВПаз(g, box, рамка, k, лицо != null ? лицо : рубашкаК);
+            if (клики != null && id != null) {
+                клики.put(box, id);
+            }
             положено++;
         }
     }
@@ -1110,6 +1121,12 @@ final class PrintedBoards {
 
         /** Перевёрнута ли карта щелчком — показывать лицо. */
         boolean вскрыта(String id);
+
+        /**
+         * ПЕЧАТНОЕ ЛИЦО КАРТЫ ({@code null} — не нарисовано). У контейнеров оно
+         * есть, у арсенала пока нет — тому вместо картинки пишут текст.
+         */
+        BufferedImage лицо(String вид, String id);
     }
 
     private static Rectangle scale(int x, int y, double k, int bx, int by, int bw, int bh) {

@@ -127,7 +127,26 @@ public final class PlayerState {
     public final List<String> superArsenalCards = new ArrayList<>();
 
     // Контейнеры на руках (не вскрытые). Вскрытие — бесплатное действие.
+    /**
+     * СКОЛЬКО КОНТЕЙНЕРОВ У ИГРОКА. Всегда равно длине {@link #containerHand}:
+     * поле оставлено потому, что счёт спрашивают в восьми десятках мест, а
+     * коды карт нужны только показу и вскрытию.
+     */
     public int containers = 0;
+
+    /**
+     * КАКИЕ ИМЕННО КОНТЕЙНЕРЫ ЛЕЖАТ У ИГРОКА, рубашкой вверх.
+     *
+     * <p>Карта берётся из колоды В МОМЕНТ ПОЛУЧЕНИЯ контейнера, а не при
+     * вскрытии (заказ дизайнера 11.09.2026: «там же должен выдаваться
+     * конкретный контейнер»). Так это и на столе: взял — взял ту карту,
+     * которая легла, и она лежит перед тобой закрытой, пока её не вскроют.
+     *
+     * <p>Пока колода не кончилась, длина списка равна {@link #containers}.
+     * Кончилась — контейнер всё равно выдаётся счётчиком: правило «жетон не
+     * сгорает» старше любой колоды.
+     */
+    public final List<String> containerHand = new ArrayList<>();
 
     /**
      * ЖЕТОНЫ ЩИТА, ЛЕЖАЩИЕ НА СТРОКАХ ПЛАНШЕТА ВОЙСК (эффект «щит», 17.08.2026).
@@ -329,6 +348,7 @@ public final class PlayerState {
         p.storageTokens.addAll(storageTokens);
         p.superArsenalCards.addAll(superArsenalCards);
         p.containers = containers;
+        p.containerHand.addAll(containerHand);
         p.shieldedKinds.addAll(shieldedKinds);
         p.mandateArsenalCard = mandateArsenalCard;
         p.mandateContainers = mandateContainers;

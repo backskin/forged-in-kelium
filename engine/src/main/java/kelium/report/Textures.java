@@ -173,6 +173,24 @@ public final class Textures {
     }
 
     /**
+     * КАРТА КОНТЕЙНЕРА — печатное лицо или рубашка. Лежат в
+     * {@code card/container/}.
+     *
+     * <p>Лиц четырнадцать, а карт тридцать две: одно лицо на несколько карт.
+     * Поэтому картинка ищется по БУКВЕ ЛИЦА из набора ({@code a}…{@code n}), а
+     * не по коду карты. Рубашка общая — {@code back}.
+     */
+    public static BufferedImage containerCard(String... keys) {
+        List<String> list = new ArrayList<>(keys.length);
+        for (String k : keys) {
+            if (k != null && !k.isBlank()) {
+                list.add("card/container/" + k.toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        return find(list);
+    }
+
+    /**
      * КАРТА ПРИКАЗА — печатное лицо или рубашка. Лежат в {@code card/orders/}.
      *
      * <p>Имя лица — идентификатор карты из набора ({@code blue_infra},

@@ -166,7 +166,15 @@ public final class Objectives {
     private static void paySacrifice(GameState s, PlayerState p, String res, int amt,
                                      String playedCid) {
         switch (res) {
-            case "container" -> p.containers = Math.max(0, p.containers - amt);
+            case "container" -> {
+                int было = p.containers;
+                p.containers = Math.max(0, p.containers - amt);
+                // СГОРАЮТ КОНКРЕТНЫЕ КАРТЫ и уходят в сброс своей колоды,
+                // иначе колода тает молча и по ней не сойдётся счёт.
+                for (int i = было - p.containers; i > 0 && !p.containerHand.isEmpty(); i--) {
+                    s.decks.get("containers").discard(p.containerHand.remove(0));
+                }
+            }
             case "objective_cards" -> {
                 int left = amt;
                 List<String> hand = new ArrayList<>(p.objectiveHand);

@@ -330,6 +330,13 @@ public final class ReplayRecord {
          */
         public final List<String> shieldedKinds = new ArrayList<>();
         public int containers;
+
+        /**
+         * КАКИЕ ИМЕННО КОНТЕЙНЕРЫ ЛЕЖАТ У ИГРОКА, рубашкой вверх. Карта берётся
+         * из колоды в момент получения контейнера, поэтому разбор партии знает
+         * её ещё до вскрытия — и может показать лицом по щелчку.
+         */
+        public final List<String> containerHand = new ArrayList<>();
         public int containerCap;
         public int keliumCap;
         public int ammoCap;
@@ -792,6 +799,7 @@ public final class ReplayRecord {
             v.shieldedKinds.add(u.code);
         }
         v.containers = p.containers;
+        v.containerHand.addAll(p.containerHand);
         int cap = Storage.containerCapacity(s, p);
         v.containerCap = cap == Integer.MAX_VALUE ? -1 : cap;
         // раскладка ячеек склада по складским зданиям — см. Player.storageCells
@@ -1206,6 +1214,7 @@ public final class ReplayRecord {
             o.put("shields", p.shieldedKinds);
         }
         o.put("containers", p.containers);
+        o.put("contHand", p.containerHand);
         o.put("containerCap", p.containerCap);
         o.put("keliumCap", p.keliumCap);
         o.put("ammoCap", p.ammoCap);
@@ -1558,6 +1567,7 @@ public final class ReplayRecord {
         }
         p.shieldedKinds.addAll(Json.strings(o, "shields"));
         p.containers = Json.i(o, "containers");
+        p.containerHand.addAll(Json.strings(o, "contHand"));
         p.containerCap = Json.i(o, "containerCap");
         p.keliumCap = Json.i(o, "keliumCap");
         p.ammoCap = Json.i(o, "ammoCap");
