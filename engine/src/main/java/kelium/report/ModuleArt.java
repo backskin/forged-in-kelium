@@ -73,6 +73,29 @@ public final class ModuleArt {
         return key == null ? null : Textures.module(key);
     }
 
+    /**
+     * ЖЕТОН УНИЧТОЖЕННОГО ЦУ, лицом — он закрывает ячейку спец-атаки своего
+     * рода войск. Оборот у него один на все рода: три звезды над руинами.
+     *
+     * @param unit код рода: {@code infantry} | {@code vehicle} | {@code aircraft}
+     *             | {@code tower}; {@code null} — оборот (трофейная сторона)
+     */
+    public static BufferedImage cu(String unit) {
+        if (unit == null || unit.isBlank()) {
+            return Textures.module("mod_cu_trophy");
+        }
+        return Textures.module("mod_cu_" + unit.toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * ЖЕТОН ХРАНИЛИЩА, той стороной, какой его положили.
+     *
+     * @param energy {@code true} — сторона «энергия», {@code false} — «склад»
+     */
+    public static BufferedImage store(boolean energy) {
+        return Textures.module(energy ? "mod_store_energy" : "mod_store_cells");
+    }
+
     /** Картинка синего жетона (или null). */
     public static BufferedImage blue(int ammo, int units, String gild, boolean gold) {
         String key = blueKey(ammo, units, gild, gold);
@@ -93,7 +116,26 @@ public final class ModuleArt {
      */
     public static boolean paint(Graphics2D g, BufferedImage art, Color edge,
                                 double x, double y, double side) {
-        if (art == null || side <= 0) {
+        return paint(g, art, edge, x, y, side, side, true);
+    }
+
+    /**
+     * ТО ЖЕ, НО В ПРЯМОУГОЛЬНУЮ РАМКУ И БЕЗ ТОРЦА ПО ЖЕЛАНИЮ.
+     *
+     * <p>Рамки на планшете войск не квадратные: место Сборки вытянуто по высоте,
+     * место спец-атаки почти квадратное. Вписывать жетон в квадрат и центровать
+     * его в рамке значило класть его не туда — дизайнер видел это как «съехал
+     * вправо» (11.09.2026).
+     *
+     * @param торец рисовать ли кромку картона снизу. На печатной рамке она
+     *              мешает: паз нарисован, и толщина под жетоном читается как
+     *              грязь (заказ того же дня: «убери у них эффект блочной тени
+     *              вообще»)
+     */
+    public static boolean paint(Graphics2D g, BufferedImage art, Color edge,
+                                double x, double y, double ширинаМеста,
+                                double высотаМеста, boolean торец) {
+        if (art == null || ширинаМеста <= 0 || высотаМеста <= 0) {
             return false;
         }
         // ПРОПОРЦИИ. Красные модули нарисованы квадратом, синие — вытянутым
@@ -102,13 +144,13 @@ public final class ModuleArt {
         // картинка ВПИСЫВАЕТСЯ в отведённый квадрат по большей стороне и
         // центрируется в нём.
         double доля = (double) art.getWidth() / art.getHeight();
-        double ш = доля >= 1 ? side : side * доля;
-        double в = доля >= 1 ? side / доля : side;
-        double лx = x + (side - ш) / 2;
-        double лy = y + (side - в) / 2;
-        double lift = Math.max(1.0, side * 0.055);
+        double ш = Math.min(ширинаМеста, высотаМеста * доля);
+        double в = ш / доля;
+        double лx = x + (ширинаМеста - ш) / 2;
+        double лy = y + (высотаМеста - в) / 2;
+        double lift = Math.max(1.0, Math.min(ш, в) * 0.055);
         double arc = Math.min(ш, в) * 0.20;
-        if (edge != null) {
+        if (edge != null && торец) {
             // ТОРЕЦ ПРОТЯНУТ, А НЕ СМЕЩЁН: силуэт заливается на всём пути от
             // жетона до конца сдвига — получается боковая стенка картонки.
             // Одна смещённая копия читается как плоская тень под плоской

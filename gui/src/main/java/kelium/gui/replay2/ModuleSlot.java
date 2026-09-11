@@ -81,10 +81,34 @@ final class ModuleSlot {
      */
     static void paintOnPrint(Graphics2D g, ReplayRecord.Module m, Color colour,
                              double x, double y, double side) {
+        paintOnPrint(g, m, colour, x, y, side, side);
+    }
+
+    /**
+     * ТО ЖЕ В ПРЯМОУГОЛЬНУЮ РАМКУ. Места на планшете войск не квадратные:
+     * Сборка вытянута по высоте, спец-атака почти квадратная. Жетон вписывается
+     * в рамку по её форме и БЕЗ ТОРЦА: паз уже нарисован на печати, и кромка
+     * картона под жетоном читается как грязь (заказ дизайнера 11.09.2026).
+     */
+    static void paintOnPrint(Graphics2D g, ReplayRecord.Module m, Color colour,
+                             double x, double y, double ширина, double высота) {
+        paintOnPrint(g, m, colour, x, y, ширина, высота, null);
+    }
+
+    /** То же, зная род войск колонки (нужен жетону уничтоженного ЦУ). */
+    static void paintOnPrint(Graphics2D g, ReplayRecord.Module m, Color colour,
+                             double x, double y, double ширина, double высота,
+                             String unit) {
         if (m == null || m.id == null || m.id.isBlank()) {
             return;
         }
-        жетон(g, m, colour, x, y, side);
+        java.awt.image.BufferedImage art = арт(m, unit);
+        if (art != null && kelium.report.ModuleArt.paint(
+                g, art, colour, x, y, ширина, высота, false)) {
+            return;
+        }
+        double side = Math.min(ширина, высота);
+        жетон(g, m, colour, x + (ширина - side) / 2, y + (высота - side) / 2, side);
     }
 
     /**
@@ -154,8 +178,20 @@ final class ModuleSlot {
 
     /** Картинка этого жетона: красный ищется по паре целей, синий — по числам. */
     static java.awt.image.BufferedImage арт(ReplayRecord.Module m) {
+        return арт(m, null);
+    }
+
+    /**
+     * То же, но с родом войск КОЛОНКИ. Он нужен одному жетону — уничтоженного
+     * ЦУ: у него на каждый род своя печать (солдат, танк, самолёт, вышка под
+     * запрещающим знаком), а по самому жетону род не узнать — он один на все.
+     */
+    static java.awt.image.BufferedImage арт(ReplayRecord.Module m, String unit) {
         if (m == null) {
             return null;
+        }
+        if (kelium.core.PlayerState.CU_MODULE.equals(m.id)) {
+            return kelium.report.ModuleArt.cu(unit);
         }
         java.awt.image.BufferedImage art =
             kelium.report.ModuleArt.red(m.targets, m.gold);
@@ -215,43 +251,30 @@ final class ModuleSlot {
      */
     static void paintStorageToken(Graphics2D g, String token, double x, double y,
                                   double side) {
-        // Место — КВАДРАТНОЕ (как напечатано на планшете), сам жетон — круглый и
-        // лежит внутри с зазором (просьба дизайнера 15.08.2026).
+        if (token == null || token.isBlank()) {
+            return;                          // место есть, жетон на него не положен
+        }
+        // ПЕЧАТНАЯ КАРТИНКА ЖЕТОНА ХРАНИЛИЩА. Прежде он рисовался кружком с
+        // значком — теперь у жетона есть своя печать («энергия» с жёлтым кубиком
+        // и «склад» со звездой в ячейке), и на печатном месте лежит именно она.
+        // Торца нет: место напечатано на планшете, жетон в него вставлен.
+        boolean energy = token.contains("energy");
+        java.awt.image.BufferedImage art = kelium.report.ModuleArt.store(energy);
+        if (art != null && kelium.report.ModuleArt.paint(
+                g, art, null, x, y, side, side, false)) {
+            return;
+        }
+        // Печати нет — прежний рисованный вид: круглый жетон в квадратном месте.
         paintPlace(g, x, y, side);
         double d = side * 0.70;
         double cx = x + side / 2;
         double cy = y + side / 2;
-        if (token == null || token.isBlank()) {
-            return;                          // место есть, жетон на него не положен
-        }
-        boolean energy = token.contains("energy");
         g.setColor(energy ? Theme.points() : store());
         g.fill(new Ellipse2D.Double(cx - d / 2, cy - d / 2, d, d));
         g.setColor(Theme.alpha(Color.BLACK, 0.4));
         g.setStroke(new BasicStroke(1f));
         g.draw(new Ellipse2D.Double(cx - d / 2, cy - d / 2, d, d));
-        g.setColor(energy ? new Color(0x20, 0x20, 0x20) : Color.WHITE);
-        if (energy) {
-            double h = d * 0.46;
-            double wq = d * 0.17;
-            Path2D bolt = new Path2D.Double();
-            bolt.moveTo(cx + wq * 0.4, cy - h / 2);
-            bolt.lineTo(cx - wq, cy + h * 0.06);
-            bolt.lineTo(cx - wq * 0.05, cy + h * 0.06);
-            bolt.lineTo(cx - wq * 0.4, cy + h / 2);
-            bolt.lineTo(cx + wq, cy - h * 0.06);
-            bolt.lineTo(cx + wq * 0.05, cy - h * 0.06);
-            bolt.closePath();
-            g.fill(bolt);
-        } else {
-            double a = d * 0.42;
-            double t = Math.max(Theme.pxf(1.6), d * 0.13);
-            g.fill(new RoundRectangle2D.Double(cx - a / 2, cy - t / 2, a, t, t, t));
-            g.fill(new RoundRectangle2D.Double(cx - t / 2, cy - a / 2, t, a, t, t));
-        }
     }
-
-    // ==================== подписи ====================
 
     /** Человеческое имя стороны жетона хранилища. */
     static String storageTokenName(String token) {

@@ -60,91 +60,91 @@ boards:
   - id: storage-p1
     kind: storage
     side: p1
-    size: [1400, 802]
+    size: [1547, 886]
     cells:
-      - {group: miner, level: 1, type: U, box: [418, 32, 101, 102]}
-      - {group: miner, level: 2, type: U, box: [170, 162, 101, 101]}
-      - {group: miner, level: 3, type: U, box: [111, 449, 101, 101]}
-      - {group: miner, level: 3, type: U, box: [165, 563, 101, 101]}
-      - {group: miner, level: 4, type: U, box: [358, 664, 102, 101]}
-      - {group: miner, level: 4, type: U, box: [475, 664, 101, 101]}
-      - {group: plant, level: 1, type: U, box: [877, 32, 101, 101]}
-      - {group: plant, level: 2, type: U, box: [1116, 162, 101, 101]}
-      - {group: plant, level: 3, type: U, box: [1188, 449, 101, 101]}
-      - {group: plant, level: 3, type: U, box: [1135, 563, 101, 101]}
-      - {group: plant, level: 4, type: U, box: [824, 664, 102, 101]}
-      - {group: plant, level: 4, type: U, box: [940, 664, 102, 101]}
-      - {group: base, level: 0, type: U, box: [649, 375, 102, 101]}
-      - {group: base, level: 0, type: U, box: [649, 489, 102, 101]}
+      - {group: miner, level: 1, type: U, box: [461, 36, 112, 112]}
+      - {group: miner, level: 2, type: U, box: [188, 179, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [122, 496, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [182, 622, 112, 112]}
+      - {group: miner, level: 4, type: U, box: [396, 733, 112, 112]}
+      - {group: miner, level: 4, type: U, box: [524, 733, 112, 112]}
+      - {group: plant, level: 1, type: U, box: [969, 36, 112, 112]}
+      - {group: plant, level: 2, type: U, box: [1233, 179, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1313, 496, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
+      - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
+      - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
+      - {group: base, level: 0, type: U, box: [717, 414, 113, 112]}
+      - {group: base, level: 0, type: U, box: [717, 540, 113, 112]}
     stores:
-      - [391, 305, 193, 193]
-      - [817, 305, 192, 193]
+      - [432, 337, 213, 213]
+      - [902, 337, 213, 213]
   - id: storage-p2
     kind: storage
     side: p2
-    size: [1400, 802]
+    size: [1547, 886]
     cells:
-      - {group: miner, level: 1, type: U, box: [418, 33, 101, 101]}
-      - {group: miner, level: 2, type: U, box: [170, 162, 101, 101]}
-      - {group: miner, level: 3, type: U, box: [111, 449, 101, 101]}
-      - {group: miner, level: 3, type: U, box: [165, 563, 101, 101]}
-      - {group: miner, level: 4, type: U, box: [358, 664, 102, 101]}
-      - {group: miner, level: 4, type: U, box: [475, 664, 101, 101]}
-      - {group: plant, level: 1, type: U, box: [877, 33, 101, 101]}
-      - {group: plant, level: 2, type: U, box: [1116, 162, 101, 101]}
-      - {group: plant, level: 3, type: U, box: [1188, 449, 101, 101]}
-      - {group: plant, level: 3, type: U, box: [1135, 563, 101, 101]}
-      - {group: plant, level: 4, type: U, box: [824, 664, 102, 101]}
-      - {group: plant, level: 4, type: U, box: [940, 664, 102, 101]}
-      - {group: base, level: 0, type: U, box: [649, 375, 102, 101]}
-      - {group: base, level: 0, type: U, box: [649, 489, 102, 101]}
+      - {group: miner, level: 1, type: U, box: [461, 36, 112, 112]}
+      - {group: miner, level: 2, type: U, box: [188, 179, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [122, 496, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [182, 622, 112, 112]}
+      - {group: miner, level: 4, type: U, box: [396, 733, 112, 112]}
+      - {group: miner, level: 4, type: U, box: [524, 733, 112, 112]}
+      - {group: plant, level: 1, type: U, box: [969, 36, 112, 112]}
+      - {group: plant, level: 2, type: U, box: [1233, 179, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1313, 496, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
+      - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
+      - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
+      - {group: base, level: 0, type: U, box: [718, 414, 112, 112]}
+      - {group: base, level: 0, type: U, box: [718, 540, 112, 112]}
     stores:
-      - [391, 306, 192, 192]
-      - [817, 306, 192, 192]
+      - [432, 337, 213, 213]
+      - [902, 337, 213, 213]
   - id: storage-p3
     kind: storage
     side: p3
-    size: [1400, 802]
+    size: [1547, 886]
     cells:
-      - {group: miner, level: 1, type: U, box: [418, 32, 101, 102]}
-      - {group: miner, level: 2, type: U, box: [170, 162, 101, 101]}
-      - {group: miner, level: 3, type: U, box: [111, 449, 101, 101]}
-      - {group: miner, level: 3, type: U, box: [165, 563, 101, 101]}
-      - {group: miner, level: 4, type: U, box: [358, 664, 102, 101]}
-      - {group: miner, level: 4, type: U, box: [475, 664, 101, 101]}
-      - {group: plant, level: 1, type: U, box: [877, 33, 101, 101]}
-      - {group: plant, level: 2, type: U, box: [1116, 162, 101, 101]}
-      - {group: plant, level: 3, type: U, box: [1188, 449, 101, 101]}
-      - {group: plant, level: 3, type: U, box: [1135, 563, 101, 101]}
-      - {group: plant, level: 4, type: U, box: [824, 664, 102, 101]}
-      - {group: plant, level: 4, type: U, box: [940, 664, 102, 101]}
-      - {group: base, level: 0, type: U, box: [649, 375, 102, 101]}
-      - {group: base, level: 0, type: U, box: [649, 489, 102, 101]}
+      - {group: miner, level: 1, type: U, box: [461, 36, 112, 112]}
+      - {group: miner, level: 2, type: U, box: [188, 179, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [122, 496, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [182, 622, 112, 112]}
+      - {group: miner, level: 4, type: U, box: [396, 733, 112, 112]}
+      - {group: miner, level: 4, type: U, box: [524, 733, 112, 112]}
+      - {group: plant, level: 1, type: U, box: [969, 36, 112, 112]}
+      - {group: plant, level: 2, type: U, box: [1233, 179, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1313, 496, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
+      - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
+      - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
+      - {group: base, level: 0, type: U, box: [717, 414, 113, 112]}
+      - {group: base, level: 0, type: U, box: [718, 540, 112, 112]}
     stores:
-      - [391, 305, 192, 193]
-      - [817, 306, 192, 192]
+      - [432, 337, 213, 213]
+      - [902, 338, 213, 212]
   - id: storage-p4
     kind: storage
     side: p4
-    size: [1400, 802]
+    size: [1547, 886]
     cells:
-      - {group: miner, level: 1, type: U, box: [418, 32, 101, 102]}
-      - {group: miner, level: 2, type: U, box: [170, 162, 101, 101]}
-      - {group: miner, level: 3, type: U, box: [111, 449, 101, 101]}
-      - {group: miner, level: 3, type: U, box: [165, 563, 101, 101]}
-      - {group: miner, level: 4, type: U, box: [358, 664, 102, 101]}
-      - {group: miner, level: 4, type: U, box: [475, 664, 101, 101]}
-      - {group: plant, level: 1, type: U, box: [877, 32, 101, 102]}
-      - {group: plant, level: 2, type: U, box: [1116, 162, 101, 101]}
-      - {group: plant, level: 3, type: U, box: [1188, 449, 101, 101]}
-      - {group: plant, level: 3, type: U, box: [1135, 563, 101, 101]}
-      - {group: plant, level: 4, type: U, box: [824, 664, 102, 101]}
-      - {group: plant, level: 4, type: U, box: [940, 664, 102, 101]}
-      - {group: base, level: 0, type: U, box: [649, 375, 102, 101]}
-      - {group: base, level: 0, type: U, box: [649, 489, 102, 101]}
+      - {group: miner, level: 1, type: U, box: [461, 36, 112, 112]}
+      - {group: miner, level: 2, type: U, box: [188, 179, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [122, 496, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [182, 622, 112, 112]}
+      - {group: miner, level: 4, type: U, box: [396, 733, 112, 112]}
+      - {group: miner, level: 4, type: U, box: [524, 733, 112, 112]}
+      - {group: plant, level: 1, type: U, box: [969, 36, 112, 112]}
+      - {group: plant, level: 2, type: U, box: [1233, 179, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1313, 496, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
+      - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
+      - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
+      - {group: base, level: 0, type: U, box: [717, 414, 113, 112]}
+      - {group: base, level: 0, type: U, box: [718, 540, 112, 112]}
     stores:
-      - [391, 305, 193, 193]
-      - [816, 305, 193, 193]
+      - [432, 338, 213, 212]
+      - [902, 338, 213, 212]
   - id: troop-A
     kind: troop
     side: A
@@ -157,36 +157,100 @@ boards:
   - id: troop-p1
     kind: troop
     side: p1
-    size: [2400, 634]
+    size: [3354, 886]
     columns:
-      - {unit: infantry, building: barracks, attack: [335, 323, 215, 215], assembly: [467, 5, 146, 215], label: [198, 54, 184, 58]}
-      - {unit: vehicle, building: factory, attack: [935, 323, 215, 215], assembly: [1067, 5, 146, 215], label: [723, 54, 184, 58]}
-      - {unit: aircraft, building: airbase, attack: [1535, 323, 215, 215], assembly: [1667, 5, 146, 215], label: [1306, 54, 194, 58]}
-      - {unit: tower, building: command_center, attack: [2135, 323, 215, 215], assembly: [2267, 5, 146, 215], label: [1853, 49, 196, 87]}
+      - {unit: infantry, building: barracks, attack: [485, 461, 283, 284], assembly: [685, 17, 165, 283], label: [277, 75, 257, 81]}
+      - {unit: vehicle, building: factory, attack: [1293, 461, 283, 284], assembly: [1500, 17, 166, 283], label: [1010, 75, 257, 81]}
+      - {unit: aircraft, building: airbase, attack: [2107, 461, 283, 284], assembly: [2310, 17, 165, 283], label: [1825, 75, 271, 81]}
+      - {unit: tower, building: command_center, attack: [2929, 461, 283, 284], assembly: [3020, 17, 165, 283], label: [2590, 68, 274, 122]}
+    card_slots:
+      arsenal_back:
+        - [311, 841, 804, 521]
+        - [1277, 841, 804, 521]
+        - [2240, 841, 804, 521]
+      arsenal_open:
+        - [310, 829, 804, 388]
+        - [1273, 829, 804, 388]
+        - [2239, 829, 804, 388]
+      container:
+        - [300, 841, 402, 403]
+        - [721, 841, 403, 403]
+        - [1263, 841, 402, 403]
+        - [1684, 841, 402, 403]
+        - [2229, 841, 403, 403]
+        - [2651, 841, 402, 403]
   - id: troop-p2
     kind: troop
     side: p2
-    size: [2400, 634]
+    size: [3354, 886]
     columns:
-      - {unit: infantry, building: barracks, attack: [335, 323, 215, 215], assembly: [467, 5, 146, 215], label: [198, 54, 184, 58]}
-      - {unit: vehicle, building: factory, attack: [935, 323, 215, 215], assembly: [1067, 5, 146, 215], label: [723, 54, 184, 58]}
-      - {unit: aircraft, building: airbase, attack: [1535, 323, 215, 215], assembly: [1667, 5, 146, 215], label: [1306, 54, 194, 58]}
-      - {unit: tower, building: command_center, attack: [2135, 323, 215, 215], assembly: [2267, 5, 146, 215], label: [1853, 49, 196, 87]}
+      - {unit: infantry, building: barracks, attack: [485, 461, 283, 284], assembly: [685, 17, 165, 283], label: [277, 75, 257, 81]}
+      - {unit: vehicle, building: factory, attack: [1293, 461, 283, 284], assembly: [1500, 17, 166, 283], label: [1010, 75, 257, 81]}
+      - {unit: aircraft, building: airbase, attack: [2107, 461, 283, 284], assembly: [2310, 17, 165, 283], label: [1825, 75, 271, 81]}
+      - {unit: tower, building: command_center, attack: [2929, 461, 283, 284], assembly: [3020, 17, 165, 283], label: [2590, 68, 274, 122]}
+    card_slots:
+      arsenal_back:
+        - [311, 841, 804, 521]
+        - [1277, 841, 804, 521]
+        - [2240, 841, 804, 521]
+      arsenal_open:
+        - [310, 829, 804, 388]
+        - [1273, 829, 804, 388]
+        - [2239, 829, 804, 388]
+      container:
+        - [300, 841, 402, 403]
+        - [721, 841, 403, 403]
+        - [1263, 841, 402, 403]
+        - [1684, 841, 402, 403]
+        - [2229, 841, 403, 403]
+        - [2651, 841, 402, 403]
   - id: troop-p3
     kind: troop
     side: p3
-    size: [2400, 634]
+    size: [3354, 886]
     columns:
-      - {unit: infantry, building: barracks, attack: [335, 323, 215, 215], assembly: [467, 5, 146, 215], label: [198, 54, 184, 58]}
-      - {unit: vehicle, building: factory, attack: [935, 323, 215, 215], assembly: [1067, 5, 146, 215], label: [723, 54, 184, 58]}
-      - {unit: aircraft, building: airbase, attack: [1535, 323, 215, 215], assembly: [1667, 5, 146, 215], label: [1306, 54, 194, 58]}
-      - {unit: tower, building: command_center, attack: [2135, 323, 215, 215], assembly: [2267, 5, 146, 215], label: [1853, 49, 196, 87]}
+      - {unit: infantry, building: barracks, attack: [485, 461, 283, 284], assembly: [685, 17, 165, 283], label: [277, 75, 257, 81]}
+      - {unit: vehicle, building: factory, attack: [1293, 461, 283, 284], assembly: [1500, 17, 166, 283], label: [1010, 75, 257, 81]}
+      - {unit: aircraft, building: airbase, attack: [2107, 461, 283, 284], assembly: [2310, 17, 165, 283], label: [1825, 75, 271, 81]}
+      - {unit: tower, building: command_center, attack: [2929, 461, 283, 284], assembly: [3020, 17, 165, 283], label: [2590, 68, 274, 122]}
+    card_slots:
+      arsenal_back:
+        - [311, 841, 804, 521]
+        - [1277, 841, 804, 521]
+        - [2240, 841, 804, 521]
+      arsenal_open:
+        - [310, 829, 804, 388]
+        - [1273, 829, 804, 388]
+        - [2239, 829, 804, 388]
+      container:
+        - [300, 841, 402, 403]
+        - [721, 841, 403, 403]
+        - [1263, 841, 402, 403]
+        - [1684, 841, 402, 403]
+        - [2229, 841, 403, 403]
+        - [2651, 841, 402, 403]
   - id: troop-p4
     kind: troop
     side: p4
-    size: [2400, 634]
+    size: [3354, 886]
     columns:
-      - {unit: infantry, building: barracks, attack: [335, 323, 215, 215], assembly: [467, 5, 146, 215], label: [198, 54, 184, 58]}
-      - {unit: vehicle, building: factory, attack: [935, 323, 215, 215], assembly: [1067, 5, 146, 215], label: [723, 54, 184, 58]}
-      - {unit: aircraft, building: airbase, attack: [1535, 323, 215, 215], assembly: [1667, 5, 146, 215], label: [1306, 54, 194, 58]}
-      - {unit: tower, building: command_center, attack: [2135, 323, 215, 215], assembly: [2267, 5, 146, 215], label: [1853, 49, 196, 87]}
+      - {unit: infantry, building: barracks, attack: [485, 461, 283, 284], assembly: [685, 17, 165, 283], label: [277, 75, 257, 81]}
+      - {unit: vehicle, building: factory, attack: [1293, 461, 283, 284], assembly: [1500, 17, 166, 283], label: [1010, 75, 257, 81]}
+      - {unit: aircraft, building: airbase, attack: [2107, 461, 283, 284], assembly: [2310, 17, 165, 283], label: [1825, 75, 271, 81]}
+      - {unit: tower, building: command_center, attack: [2929, 461, 283, 284], assembly: [3020, 17, 165, 283], label: [2590, 68, 274, 122]}
+    card_slots:
+      arsenal_back:
+        - [311, 841, 804, 521]
+        - [1277, 841, 804, 521]
+        - [2240, 841, 804, 521]
+      arsenal_open:
+        - [310, 829, 804, 388]
+        - [1273, 829, 804, 388]
+        - [2239, 829, 804, 388]
+      container:
+        - [300, 841, 402, 403]
+        - [721, 841, 403, 403]
+        - [1263, 841, 402, 403]
+        - [1684, 841, 402, 403]
+        - [2229, 841, 403, 403]
+        - [2651, 841, 402, 403]

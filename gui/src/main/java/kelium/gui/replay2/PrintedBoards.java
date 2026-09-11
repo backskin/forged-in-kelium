@@ -136,11 +136,9 @@ final class PrintedBoards {
             // столе. Прежде он рисовался в 0,62 ячейки, и дизайнер это отбил
             // (09.09.2026): «жетоны красные и синие нихуя не закрывают собой
             // полностью ячейку, они милипиздрические какие-то».
-            int side = Math.min(box.width, box.height);
-            int sx = box.x + (box.width - side) / 2;
-            int sy = box.y + (box.height - side) / 2;
-            ModuleSlot.paintOnPrint(g, m, ModuleSlot.red(), sx, sy, side);
-            spots.put(new Rectangle(sx, sy, side, side),
+            ModuleSlot.paintOnPrint(g, m, ModuleSlot.red(), box.x, box.y,
+                box.width, box.height, c.unit());
+            spots.put(new Rectangle(box),
                 new Object[]{m, Boolean.TRUE, Names.unit(c.unit())});
             return;
         }
@@ -164,14 +162,11 @@ final class PrintedBoards {
             return;
         }
         Rectangle box = scale(x, y, k, c.bx(), c.by(), c.bw(), c.bh());
-        // Рамка Сборки ВЫТЯНУТАЯ, и синий жетон нарисован таким же. Меру берём
-        // по ВЫСОТЕ рамки: жетон встаёт в неё во весь рост и своей пропорцией,
-        // а не ужимается до квадратика в середине.
-        int side = box.height;
-        int sx = box.x + (box.width - side) / 2;
-        int sy = box.y + (box.height - side) / 2;
-        ModuleSlot.paintOnPrint(g, m, ModuleSlot.blue(), sx, sy, side);
-        spots.put(new Rectangle(sx, sy, side, side),
+        // Рамка Сборки ВЫТЯНУТАЯ, и синий жетон нарисован таким же — кладём его
+        // в рамку целиком, по её форме.
+        ModuleSlot.paintOnPrint(g, m, ModuleSlot.blue(), box.x, box.y,
+            box.width, box.height);
+        spots.put(new Rectangle(box),
             new Object[]{m, Boolean.FALSE,
                 kelium.gui.GameRecorder.buildingName(c.building())});
     }
@@ -214,8 +209,18 @@ final class PrintedBoards {
                   double хрМасштаб, double войX, double войY, double зданияH) {
     }
 
-    /** Рост жетона военного здания над планшетом, в пикселях печати. */
-    private static final double ЗДАНИЕ_H = 215;
+    /**
+     * РОСТ ЖЕТОНА ВОЕННОГО ЗДАНИЯ НАД ПЛАНШЕТОМ — по росту рамки Сборки.
+     *
+     * <p>Раньше здесь стояло число в пикселях печати, снятое со старого
+     * планшета. Художник перерисовал планшет крупнее, и жетон рядом с ним стал
+     * мелким. Рамка Сборки — напечатанная мера того же планшета, и она
+     * меняется вместе с ним.
+     */
+    private static double зданиеH(int seat) {
+        var cols = troopCols(seat);
+        return cols.isEmpty() ? 215 : cols.get(0).bh();
+    }
 
     /** Зазор между полосой зданий и кромкой планшета войск. */
     private static final double ЗДАНИЕ_ЗАЗОР = 18;
@@ -234,7 +239,7 @@ final class PrintedBoards {
         double[] угол = уголХранилища(хр);
         // РАВНАЯ ВЫСОТА — а не равный пиксель: см. про замер в шапке записи.
         double f = вой.getHeight() / (double) хр.getHeight();
-        double полоса = ЗДАНИЕ_H + ЗДАНИЕ_ЗАЗОР;
+        double полоса = зданиеH(seat) + ЗДАНИЕ_ЗАЗОР;
         double войX = угол[0] * f - выем[0];
         double войY = полоса + угол[1] * f - выем[1];
         return new Сцепка(войX + вой.getWidth(),
@@ -337,7 +342,8 @@ final class PrintedBoards {
     static void paintPair(Graphics2D g, int x, int y, double k, Сцепка с,
                           ReplayRecord.Player p, kelium.core.TroopSide troop,
                           Map<String, char[]> fill, char[] base, Set<String> covered,
-                          Set<String> вЗапасе, Map<Rectangle, Object[]> spots,
+                          Set<String> вЗапасе, Map<String, int[]> запас,
+                          Map<Rectangle, Object[]> spots,
                           Map<Rectangle, String> storeSpots) {
         BufferedImage хр = storageArt(p.seat);
         BufferedImage вой = troopArt(p.seat);
@@ -351,6 +357,70 @@ final class PrintedBoards {
         int войY = (int) Math.round(y + с.войY() * k);
         paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
         военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
+        // Блок запаса стоит В ТОЙ ЖЕ ПОЛОСЕ, что и жетоны военных зданий над
+        // планшетом войск: она начинается у самого верха сцепки и кончается там,
+        // где начинаются планшеты. Отсюда и «вровень по высоте».
+        запасВойск(g, (int) Math.round(x + с.хрX() * k), y,
+            (int) Math.round(хр.getWidth() * с.хрМасштаб() * k),
+            (int) Math.round((с.зданияH() - ЗДАНИЕ_ЗАЗОР) * k), запас, p.seat);
+    }
+
+    /**
+     * ЗАПАС ЖЕТОНОВ ВОЙСК — ЧЕТЫРЬМЯ СТОПКАМИ НАД ПЛАНШЕТОМ ХРАНИЛИЩА.
+     *
+     * <p>Заказ дизайнера 11.09.2026: убрать из-под планшета подписи «на поле 1 ·
+     * запас 3» и показать САМ ЖЕТОН войска картинкой, а числом — только сколько
+     * их в запасе. Четыре стопки во всю ширину зоны над хранилищем, ростом вровень
+     * с жетонами военных зданий над планшетом войск: полоса одна и та же.
+     *
+     * <p>Запас кончился — жетон гасится прозрачностью: на столе это видно по
+     * пустому месту, здесь по тусклой картинке.
+     *
+     * @param запас род → {@code [на поле, в запасе]}
+     */
+    private static void запасВойск(Graphics2D g, int x, int y, int width, int height,
+                                   Map<String, int[]> запас, int seat) {
+        if (запас == null || запас.isEmpty() || width <= 0 || height <= 0) {
+            return;
+        }
+        String[] роды = {"infantry", "vehicle", "aircraft", "tower"};
+        int colW = width / роды.length;
+        for (int i = 0; i < роды.length; i++) {
+            int[] c = запас.getOrDefault(роды[i], new int[]{0, 0});
+            int вЗапасе = c[1];
+            int всего = c[0] + c[1];
+            int cx = x + i * colW + colW / 2;
+            java.awt.Font шрифт = Theme.font(Math.max(9, height / 7), Font.BOLD);
+            g.setFont(шрифт);
+            int строка = g.getFontMetrics().getHeight();
+            int картинкаH = Math.max(8, height - строка * 2 - 2);
+            BufferedImage tex = Textures.unit(роды[i], seat);
+            java.awt.Composite было = g.getComposite();
+            if (вЗапасе == 0) {
+                g.setComposite(java.awt.AlphaComposite.getInstance(
+                    java.awt.AlphaComposite.SRC_OVER, 0.28f));
+            }
+            if (tex != null) {
+                double доля = tex.getWidth() / (double) tex.getHeight();
+                int th = картинкаH;
+                int tw = (int) Math.round(th * доля);
+                if (tw > colW - 4) {
+                    tw = colW - 4;
+                    th = (int) Math.round(tw / доля);
+                }
+                g.drawImage(tex, cx - tw / 2, y + (картинкаH - th) / 2, tw, th, null);
+            }
+            g.setComposite(было);
+            g.setColor(вЗапасе == 0 ? Theme.ink3() : Theme.ink2());
+            String имя = Names.unit(роды[i]);
+            g.drawString(имя, cx - g.getFontMetrics().stringWidth(имя) / 2,
+                y + картинкаH + строка - 2);
+            String счёт = вЗапасе + " из " + всего;
+            g.setFont(Theme.mono(Math.max(9, height / 7), Font.BOLD));
+            g.setColor(вЗапасе == 0 ? Theme.ink3() : Theme.ink());
+            g.drawString(счёт, cx - g.getFontMetrics().stringWidth(счёт) / 2,
+                y + картинкаH + строка * 2 - 2);
+        }
     }
 
     /**
@@ -375,7 +445,7 @@ final class PrintedBoards {
                 continue;
             }
             жетонЗдания(g, войX + c.labelCx() * k, войY - ЗДАНИЕ_ЗАЗОР * k,
-                ЗДАНИЕ_H * k, c.building(), p.seat, spots);
+                зданиеH(p.seat) * k, c.building(), p.seat, spots);
         }
     }
 

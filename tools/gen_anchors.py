@@ -167,6 +167,49 @@ def troop_label(w, h, i):
             int(round(lw * w)), int(round(lh * h)))
 
 
+#  МАСКИ ПЛАНШЕТА ВОЙСК — их рисует ДИЗАЙНЕР, а не находит детектор.
+#
+#  Печать на планшете густая: рамки модулей и пазы под карты сливаются с
+#  рисунком, и детектор пятен на них не годится — он то теряет рамку, то ловит
+#  половину печати. Поэтому места размечены масками: чёрным залит сам планшет
+#  (по нему видно, где у него верх), цветом — места.
+#
+#  Маска ВЫШЕ планшета: карты торчат из пазов вниз, и в маске это видно. Начало
+#  планшета находится по чёрному силуэту, и всё пересчитывается относительно
+#  него.
+#
+#  Три маски — три способа занять нижние пазы: закрытая карта арсенала, она же
+#  вскрытая и вставленная, и два контейнера в каждом пазу.
+МАСКИ = {'arsenal-back', 'arsenal-inserted', 'containers'}
+
+ЦВЕТА_МАСКИ = {
+    'attack': lambda r, g, b: r > 180 and g < 90 and b < 90,          # красный
+    'assembly': lambda r, g, b: b > 180 and r < 90 and g < 140,       # синий
+    'arsenal_back': lambda r, g, b: g > 180 and r < 110 and b < 110,  # зелёный
+    'arsenal_open': lambda r, g, b: r > 120 and b > 180 and g < 90,   # фиолетовый
+    'container': lambda r, g, b: 110 < r < 190 and 50 < g < 110 and b < 60,
+}
+
+
+def маска(имя):
+    """Прямоугольники маски по цветам, уже в координатах планшета."""
+    path = os.path.join(ART, имя + '.png')
+    if not os.path.isfile(path):
+        return None
+    im = Image.open(path).convert('RGB')
+    чёрное = components(im, lambda r, g, b: r < 40 and g < 40 and b < 40, 4, 50000)
+    if not чёрное:
+        return None
+    чёрное.sort(key=lambda c: -c[4])
+    верх = чёрное[0][1]          # где начинается сам планшет
+    out = {}
+    for ключ, pred in ЦВЕТА_МАСКИ.items():
+        cs = [c for c in components(im, pred, 4, 3000)]
+        cs.sort(key=lambda c: (c[1] // 80, c[0]))
+        out[ключ] = [(c[0], c[1] - верх, c[2], c[3]) for c in cs]
+    return out
+
+
 def storage_cells_colour(path):
     """
     ЯЧЕЙКИ ХРАНИЛИЩА НА ЦВЕТНОМ ПЛАНШЕТЕ — найденные на нём самом.
@@ -189,13 +232,21 @@ def storage_cells_colour(path):
     raw = components(
         im, lambda r, g, b: max(r, g, b) - min(r, g, b) <= 28
         and 150 <= min(r, g, b) <= 235, 3, 3000)
-    cells = []
+    годные = []
     for x, y, cw, ch, _ in raw:
-        if not (70 < cw < 150 and 70 < ch < 150):
-            continue
-        if abs(cw - ch) > max(cw, ch) * 0.18:
-            continue          # не квадрат — это не ячейка
-        cells.append((x, y, cw, ch))
+        if 70 < cw < 180 and 70 < ch < 180 and abs(cw - ch) <= max(cw, ch) * 0.18:
+            годные.append((x, y, cw, ch))
+    # ЯЧЕЙКИ НА ПЛАНШЕТЕ ОДНОГО РАЗМЕРА, и это лучший отсев: берём срединный
+    # размер и оставляем то, что от него не отличается. Так уходят пятна печати,
+    # похожие на ячейку по форме, но не по величине (на зелёном и песочном
+    # планшетах такое нашлось).
+    if not годные:
+        return (w, h), {'miner': [], 'plant': [], 'base': []}
+    размеры = sorted(c[2] for c in годные)
+    эталон = размеры[len(размеры) // 2]
+    cells = [c for c in годные
+             if abs(c[2] - эталон) <= эталон * 0.08
+             and abs(c[3] - эталон) <= эталон * 0.08]
     mid = w / 2.0
     groups = {'miner': [], 'plant': [], 'base': []}
     for c in cells:
@@ -270,24 +321,46 @@ def player_board(board_id, path, problems):
                              'box: [%d, %d, %d, %d]}' % ((grp, уровень(grp, i)) + c))
         lines += места_хранилища(board_id, path, problems)
         return lines
-    # ПЛАНШЕТ ВОЙСК: четыре колонки, в каждой два места под жетоны модулей.
+    # ПЛАНШЕТ ВОЙСК: четыре колонки, в каждой два места под жетоны модулей,
+    # плюс три паза под карты внизу. Всё это берётся ИЗ МАСОК дизайнера (см.
+    # МАСКИ выше): печать слишком густая, чтобы искать рамки детектором.
     units = ['infantry', 'vehicle', 'aircraft', 'tower']
     builds = ['barracks', 'factory', 'airbase', 'command_center']
+    осн = маска('arsenal-back')
+    вставл = маска('arsenal-inserted')
+    конт = маска('containers')
+    if осн is None:
+        problems.append('%s: нет маски arsenal-back — рамки модулей не размечены'
+                        % board_id)
+        return lines
     lines += ['  - id: %s' % board_id, '    kind: troop',
               '    side: %s' % board_id.split('-')[1],
               '    size: [%d, %d]' % (w, h), '    columns:']
-    шаг = w / float(PLAYER_TROOP['columns'])
-    for i in range(PLAYER_TROOP['columns']):
-        ax, ay, aw, ah = PLAYER_TROOP['attack']
-        bx, by, bw, bh = PLAYER_TROOP['assembly']
-        attack = (int(round(ax * w + шаг * i)), int(round(ay * h)),
-                  int(round(aw * w)), int(round(ah * h)))
-        assembly = (int(round(bx * w + шаг * i)), int(round(by * h)),
-                    int(round(bw * w)), int(round(bh * h)))
+    for имя, нужно in (('attack', 4), ('assembly', 4)):
+        if len(осн[имя]) != нужно:
+            problems.append('%s: в маске мест «%s» %d, а колонок %d'
+                            % (board_id, имя, len(осн[имя]), нужно))
+    for i in range(min(4, len(осн['attack']), len(осн['assembly']))):
         label = troop_label(w, h, i)
         lines.append('      - {unit: %s, building: %s, attack: [%d, %d, %d, %d], '
                      'assembly: [%d, %d, %d, %d], label: [%d, %d, %d, %d]}'
-                     % ((units[i], builds[i]) + attack + assembly + label))
+                     % ((units[i], builds[i]) + tuple(осн['attack'][i])
+                        + tuple(осн['assembly'][i]) + label))
+    # ПАЗЫ ПОД КАРТЫ: три штуки, и у каждого три вида содержимого. Карта торчит
+    # из паза вниз ЗА КРАЙ планшета — поэтому у рамок отрицательного верха нет,
+    # но низ уходит ниже высоты планшета, и это не ошибка.
+    lines.append('    card_slots:')
+    for ключ, данные, сколько in (('arsenal_back', осн, 3),
+                                  ('arsenal_open', вставл, 3),
+                                  ('container', конт, 6)):
+        боксы = (данные or {}).get(ключ, [])
+        if len(боксы) != сколько:
+            problems.append('%s: в маске мест «%s» %d, а ждали %d'
+                            % (board_id, ключ, len(боксы), сколько))
+            continue
+        lines.append('      %s:' % ключ)
+        for b in боксы:
+            lines.append('        - [%d, %d, %d, %d]' % b)
     return lines
 
 
@@ -478,7 +551,7 @@ def main():
         'boards:']
     problems = []
     for name in sorted(os.listdir(ART)):
-        if not name.endswith('.png'):
+        if not name.endswith('.png') or name[:-4] in МАСКИ:
             continue
         path = os.path.join(ART, name)
         # ОБЩИЕ ПЛАНШЕТЫ СТОЛА идут отдельным путём: у них нет стороны, а ячейки

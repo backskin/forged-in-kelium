@@ -270,10 +270,12 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 double k = full / сцепка.ширина();
                 PrintedBoards.paintPair(g, pad, y, k, сцепка, p, troopSide(p),
                     cellFill, startFill, coveredCells(buildingsOf(f, p.seat)),
-                    вЗапасе(f, p.seat), printedSpots, storeTokenSpots);
+                    вЗапасе(f, p.seat), запасВойск(f, p.seat),
+                    printedSpots, storeTokenSpots);
                 y += (int) Math.round(сцепка.высота() * k) + px(8);
             }
-            y = paintStockStrip(g, f, p, pad, y, full) + px(10);
+            // ПОДПИСЕЙ «на поле 1 · запас 3» ПОД ПЛАНШЕТОМ БОЛЬШЕ НЕТ: запас
+            // показан жетонами над планшетом хранилища (заказ 11.09.2026).
         }
         if (!printed) {
             y = paintTroops(g, f, p, pad, y, full) + px(12);
@@ -354,6 +356,36 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * ВОЕННЫЕ ЗДАНИЯ, ЧЬИ ЖЕТОНЫ ЕЩЁ НА ПЛАНШЕТЕ. Здание построено, захвачено
      * или разрушено — жетона на планшете нет, и место над подписью пустует.
      */
+    /**
+     * ЗАПАС ЖЕТОНОВ ВОЙСК: род → {@code [на поле, в запасе]}.
+     *
+     * <p>Сколько жетонов рода у игрока ВСЕГО, берётся из записи партии, а не из
+     * того, что видно на столе: погибший жетон уходит и с поля, и из запаса, а
+     * всего их у игрока всё равно четыре.
+     */
+    private Map<String, int[]> запасВойск(ReplayRecord.Frame f, int seat) {
+        String[] types = {"infantry", "vehicle", "aircraft", "tower"};
+        Map<String, int[]> out = new LinkedHashMap<>();
+        for (String t : types) {
+            out.put(t, new int[2]);
+        }
+        for (ReplayRecord.Tok t : f.snapshot.tokens) {
+            if (t.building || t.owner != seat || !t.alive) {
+                continue;
+            }
+            int[] pair = out.get(t.type);
+            if (pair != null) {
+                pair[t.hexId != null ? 0 : 1]++;
+            }
+        }
+        for (String t : types) {
+            int[] pair = out.get(t);
+            int всего = Math.max(session.record().unitStockOf(t), pair[0] + pair[1]);
+            pair[1] = Math.max(0, всего - pair[0]);
+        }
+        return out;
+    }
+
     private java.util.Set<String> вЗапасе(ReplayRecord.Frame f, int seat) {
         java.util.Set<String> out = new java.util.LinkedHashSet<>(
             List.of("command_center", "barracks", "factory", "airbase"));
