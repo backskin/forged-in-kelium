@@ -304,14 +304,19 @@ public final class ПолосаПланшетов extends JComponent implements 
             // ширине планшета она была втрое крупнее любой другой карты на
             // столе, хотя карта у них одна и та же.
             int хрX = x + (int) Math.round(р.с().хрX() * р.k());
+            int хрW = (int) Math.round(р.хр()[0] * р.с().хрМасштаб() * р.k());
             int хрНиз = y + (int) Math.round(
                 (р.с().хрY() + р.хр()[1] * р.с().хрМасштаб()) * р.k());
             int вW = высотаПланшета;
             int вH = (int) Math.round(высотаПланшета / BoardSheet.КАРТА_ПРИКАЗА);
+            // ПО ЦЕНТРУ ПЛАНШЕТА ХРАНИЛИЩА, а не по его левому краю: карта уже
+            // не во всю его ширину, и прижатая влево она выглядит съехавшей
+            // (замечание дизайнера 11.09.2026).
+            int вX = хрX + Math.max(0, (хрW - вW) / 2);
             int вY = хрНиз + BoardSheet.px(10);
-            BoardSheet.paintDestroyedCard(g, p, хрX, вY, вW, вH,
+            BoardSheet.paintDestroyedCard(g, p, вX, вY, вW, вH,
                 приказВскрыт ? лицоПриказа(p) : null);
-            местоПриказа = new Rectangle(хрX, вY + BoardSheet.px(14), вW, вH);
+            местоПриказа = new Rectangle(вX, вY + BoardSheet.px(14), вW, вH);
         }
         g.dispose();
     }
