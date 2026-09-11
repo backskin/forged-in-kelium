@@ -73,6 +73,62 @@ class ZonesTest {
                 + java.util.Arrays.toString(label));
     }
 
+    /**
+     * ПАЛИТРА ДИЗАЙНЕРА (11.09.2026). Он размечает своими цветами: жёлтым —
+     * ячейки энергии, белым — гнездо гарнизона, оранжевым — площадь свободной
+     * энергии. Прежние маски рисовала программа, и их палитра осталась в силе,
+     * поэтому читаться обязаны обе.
+     */
+    @Test
+    void designerPaletteIsUnderstood() {
+        BufferedImage mask = new BufferedImage(200, 120, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = mask.createGraphics();
+        g.setColor(new Color(0xEE, 0xEB, 0x00));
+        g.fillRect(10, 10, 30, 30);          // ячейка под энергию
+        g.setColor(new Color(0xFE, 0xFE, 0xFE));
+        g.fillRect(100, 20, 50, 50);         // гнездо гарнизона
+        g.setColor(new Color(0xF5, 0xC2, 0x55));
+        g.fillRect(10, 80, 60, 20);          // площадь свободной энергии
+        g.dispose();
+
+        Zones z = Zones.parse(mask);
+        assertEquals(1, z.slots().size(), "жёлтый квадрат — это ячейка под энергию");
+        assertNotNull(z.energyArea(), "оранжевое пятно — площадь появления энергии");
+        Zones.Area гнездо = z.garrison();
+        assertNotNull(гнездо, "белое пятно — гнездо гарнизона");
+        assertTrue(Math.abs(гнездо.cx() - 125) < 3 && Math.abs(гнездо.cy() - 45) < 3,
+            "жетон войска ложится в середину нарисованного гнезда, а получилось "
+                + гнездо);
+        assertTrue(Math.abs(гнездо.w() - 50) < 3,
+            "ширина гнезда берётся с маски: по ней жетон и подгоняется, а вышло "
+                + гнездо.w());
+    }
+
+    /**
+     * НАСТОЯЩИЕ МАСКИ ЖЕТОНОВ. Гнездо гарнизона напечатано у казарм, завода и
+     * авиабазы — войска сидят только в них. У ЦУ его нет: внутрь ЦУ войска не
+     * заходят, и лишнее гнездо увело бы жетон не туда.
+     */
+    @Test
+    void printedGarrisonNestIsMarkedOnMilitaryBuildings() {
+        java.nio.file.Path корень = java.nio.file.Path.of("..", "data", "textures");
+        if (!java.nio.file.Files.isDirectory(корень.resolve("token"))) {
+            return;                          // сборка без папки данных — не наше дело
+        }
+        Zones.forget();
+        for (String ключ : new String[]{"barracks_p1", "factory_p2", "airbase_p3"}) {
+            assertNotNull(Zones.of(ключ, корень).garrison(),
+                "у жетона " + ключ + " должно быть размечено гнездо гарнизона");
+        }
+        assertEquals(null, Zones.of("command_center_p1", корень).garrison(),
+            "внутрь ЦУ войска не заходят — гнезда гарнизона у него нет");
+        assertEquals(2, Zones.of("factory_p2", корень).slots().size(),
+            "у завода две ячейки энергии — столько же, сколько в boards");
+        assertEquals(1, Zones.of("barracks_p1", корень).slots().size(),
+            "у казарм одна ячейка энергии");
+        Zones.forget();
+    }
+
     @Test
     void emptyMaskMeansNoMarkup() {
         BufferedImage mask = new BufferedImage(40, 40, BufferedImage.TYPE_INT_ARGB);

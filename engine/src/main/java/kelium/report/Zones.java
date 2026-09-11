@@ -46,7 +46,7 @@ public final class Zones {
     }
 
     private static final Map<String, Zones> CACHE = new HashMap<>();
-    private static final Zones EMPTY = new Zones(0, 0, List.of(), null, null, null);
+    private static final Zones EMPTY = new Zones(0, 0, List.of(), null, null, null, null);
 
     private final int maskW;
     private final int maskH;
@@ -54,19 +54,30 @@ public final class Zones {
     private final Area energy;
     private final double[] label;
     private final Area hearts;
+    private final Area garrison;
 
     private Zones(int maskW, int maskH, List<Slot> slots, Area energy, double[] label,
-                  Area hearts) {
+                  Area hearts, Area garrison) {
         this.maskW = maskW;
         this.maskH = maskH;
         this.slots = slots;
         this.energy = energy;
         this.label = label;
         this.hearts = hearts;
+        this.garrison = garrison;
     }
 
     public boolean isEmpty() {
-        return slots.isEmpty() && energy == null && label == null && hearts == null;
+        return slots.isEmpty() && energy == null && label == null && hearts == null
+            && garrison == null;
+    }
+
+    /**
+     * ГНЕЗДО ГАРНИЗОНА — напечатанная ячейка под жетон войска внутри здания
+     * (или {@code null}, если на этом жетоне её не нарисовано, как у ЦУ).
+     */
+    public Area garrison() {
+        return garrison;
     }
 
     /** Напечатанные сердца прочности — куда класть отметки урона (или null). */
@@ -137,6 +148,7 @@ public final class Zones {
     private static final int BLUE = 1;
     private static final int GREEN = 2;
     private static final int PINK = 3;
+    private static final int GARRISON = 4;
 
     /** Разобрать готовую картинку маски — этим же пользуются тесты. */
     public static Zones parse(BufferedImage img) {
@@ -157,6 +169,7 @@ public final class Zones {
         List<double[]> bluePixels = new ArrayList<>();
         List<double[]> greenPixels = new ArrayList<>();
         List<double[]> pinkPixels = new ArrayList<>();
+        List<double[]> nestPixels = new ArrayList<>();
         for (int i = 0; i < kind.length; i++) {
             if (kind[i] == BLUE) {
                 bluePixels.add(new double[]{i % w, i / w});
@@ -164,6 +177,8 @@ public final class Zones {
                 greenPixels.add(new double[]{i % w, i / w});
             } else if (kind[i] == PINK) {
                 pinkPixels.add(new double[]{i % w, i / w});
+            } else if (kind[i] == GARRISON) {
+                nestPixels.add(new double[]{i % w, i / w});
             }
         }
         // КРАСНЫЕ ПЯТНА — по одному на ячейку, каждое считается отдельно: у них
@@ -194,7 +209,8 @@ public final class Zones {
             label = new double[]{g.cx(), g.cy()};
         }
         Area hearts = pinkPixels.isEmpty() ? null : principal(pinkPixels);
-        return new Zones(w, h, List.copyOf(slots), energy, label, hearts);
+        Area nest = nestPixels.isEmpty() ? null : principal(nestPixels);
+        return new Zones(w, h, List.copyOf(slots), energy, label, hearts, nest);
     }
 
     /** К какому смыслу отнести цвет пикселя; −1 — ни к какому. */
@@ -218,6 +234,17 @@ public final class Zones {
         }
         if (g > 120 && r < 130 && b < 130) {
             return GREEN;
+        }
+        // ПАЛИТРА ДИЗАЙНЕРА (11.09.2026). Она не пересекается с прежней: до сюда
+        // доходят только цвета, где и красного, и зелёного помногу.
+        if (r > 200 && g > 200 && b > 200) {
+            return GARRISON;           // белый — гнездо гарнизона
+        }
+        if (r > 140 && g > 140 && b < 60 && Math.abs(r - g) < 70) {
+            return RED;                // жёлтый — ячейка под энергию
+        }
+        if (r > 180 && g > 120 && g < 230 && b >= 40 && b < 160) {
+            return BLUE;               // оранжевый — площадь появления энергии
         }
         return -1;
     }
