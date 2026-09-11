@@ -203,7 +203,9 @@ public final class Setup {
             return null;
         }
         Integer face = config.cuFacing.get(seat);
-        if (face == null) {
+        // «Решает бот» стороной не является: подготовка ставит ЦУ автоматом, а
+        // спросят за него уже в начале партии, при живых агентах.
+        if (face == null || face == GameConfig.CU_FACING_BOT) {
             return null;
         }
         int a = Math.floorMod(face, 6);
@@ -433,20 +435,11 @@ public final class Setup {
         List<PlayerState> players = new ArrayList<>();
         int uid = 0;
         for (int seat = 0; seat < n; seat++) {
-            // СТОРОНЫ ПЛАНШЕТОВ — ПО ОТДЕЛЬНОСТИ. На столе игрок кладёт планшет
-            // войск одной стороной, а хранилища — какой захочет, и просьба
-            // дизайнера (13.08.2026) выбирать их независимо. Ничего не выбрано —
-            // обе стороны прежние, из правил.
+            // ПЛАНШЕТ ОДИН НА ВСЕХ: сторон «Б» не существует (решение
+            // дизайнера 09.09.2026, окончательное). Выбирать здесь нечего —
+            // какая сторона названа в наборе, та и берётся обоим планшетам.
             String side = sides.get(seat);
-            GameConfig.SeatPick pick = config.seatPick(seat);
-            String troopSide = pick.troopSide() == null ? side : pick.troopSide();
-            // СКЛАДСКИЕ СТОРОНЫ ЖИВУТ ОТДЕЛЬНО. Наборы «В» и «Г» (15.08.2026)
-            // меняют ТОЛЬКО планшет войск — таблицы атак и места под красные
-            // модули. Складских сторон с такими кодами не существует и не
-            // задумано, поэтому склад остаётся стороной А.
-            String storageSide = pick.storageSide() != null ? pick.storageSide()
-                : (side.startsWith("V") || side.startsWith("G") ? "A" : side);
-            PlayerBoard board = PlayerBoard.fromContent(boardsEntries, troopSide, storageSide);
+            PlayerBoard board = PlayerBoard.fromContent(boardsEntries, side, side);
             // Стартовые монеты: из ruleset (setup.start_coins), иначе умолчание —
             // 5 всем (решение 2026-08-12).
             int startCoins;

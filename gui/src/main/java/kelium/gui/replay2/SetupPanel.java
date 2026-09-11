@@ -352,16 +352,22 @@ public final class SetupPanel extends JPanel {
             levels[i].setToolTipText(Ui2.tip(GameRecorder.levelOptions().get(1).tip()));
             // СТОРОНЫ СВЕТА ВМЕСТО НОМЕРОВ. «Сторона 4» человеку ничего не говорит,
             // а «запад» видно на поле сразу (просьба дизайнера 13.08.2026).
-            String[] facings = new String[7];
+            // ТРИ ВИДА ПОВОРОТА ЦУ: «авто» (носом к центру поля, так ставит
+            // подготовка), «решает бот вначале» (спрашивают того, кто играет за
+            // это место, в самом начале партии — заказ дизайнера 11.09.2026) и
+            // точная сторона света.
+            String[] facings = new String[8];
             facings[0] = "авто";
+            facings[1] = "решает бот вначале";
             for (int s = 0; s < 6; s++) {
-                facings[s + 1] = compass(s);
+                facings[s + 2] = compass(s);
             }
             cuFacing[i] = new JComboBox<>(facings);
             cuFacing[i].setFont(Theme.body());
             cuFacing[i].setToolTipText(Ui2.tip("Стартовый ПОВОРОТ ЦУ этого места: куда "
                 + "смотрит «нос» центра управления — стык двух его стенок. «Авто» — "
-                + "к центру поля."));
+                + "к центру поля. «Решает бот вначале» — выбор делает тот, кто играет "
+                + "за это место, в начале партии."));
             cuFacing[i].addActionListener(e -> refresh());
 
             // ПЛАШКА ЦВЕТА МЕСТА вместо цветного текста: цветной шрифт сливался с
@@ -560,7 +566,9 @@ public final class SetupPanel extends JPanel {
         List<Integer> out = new ArrayList<>();
         for (int i = 0; i < playerCount(); i++) {
             int fi = cuFacing[i].getSelectedIndex();
-            out.add(fi <= 0 ? null : fi - 1);     // «авто» = null, «1» = сторона 0
+            // 0 «авто» → null; 1 «решает бот» → признак; дальше стороны 0..5.
+            out.add(fi <= 0 ? null
+                : fi == 1 ? kelium.dataio.GameConfig.CU_FACING_BOT : fi - 2);
         }
         return out;
     }
@@ -958,7 +966,14 @@ public final class SetupPanel extends JPanel {
                 if (levels[i].getItemCount() > 0) {
                     levels[i].setSelectedIndex(rng.nextInt(levels[i].getItemCount()));
                 }
-                cuFacing[i].setSelectedIndex(rng.nextInt(cuFacing[i].getItemCount()));
+            }
+            // ПОВОРОТ ЦУ И КОЛОДА ПРИКАЗОВ «ВСЕМ СЛУЧАЙНО» НЕ ПОДЧИНЯЮТСЯ
+            // (заказ дизайнера 11.09.2026). Поворот остаётся «авто», колода —
+            // цвета своего места; и то и другое меняют только руками, в окне
+            // настроек игроков. Случайными остаются характеры, уровни, число
+            // игроков, сид и раскладка.
+            for (int i = 0; i < 4; i++) {
+                cuFacing[i].setSelectedIndex(0);       // «авто»
             }
             TableDialog.randomise(String.valueOf(ruleset.getSelectedItem()),
                 playerCount(), rng);
@@ -1048,7 +1063,9 @@ public final class SetupPanel extends JPanel {
                     }
                 }
                 Integer f = i < rec.cuFacing.size() ? rec.cuFacing.get(i) : null;
-                cuFacing[i].setSelectedIndex(f == null ? 0 : Math.floorMod(f, 6) + 1);
+                cuFacing[i].setSelectedIndex(f == null ? 0
+                    : f == kelium.dataio.GameConfig.CU_FACING_BOT ? 1
+                    : Math.floorMod(f, 6) + 2);
             }
             enableSeats();
         } finally {

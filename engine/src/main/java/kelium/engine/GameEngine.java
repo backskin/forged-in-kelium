@@ -163,6 +163,7 @@ public final class GameEngine {
         bind(s, agents, this::emit);
 
         emit(ev("type", "game_start", "players", s.numPlayers(), "ruleset", rs.id));
+        offerCuFacing();
         dealStart();
         offerSealChoice();
         offerSuperPick();
@@ -315,10 +316,14 @@ public final class GameEngine {
     private static String seatColorPick(int seat) {
         java.util.List<kelium.dataio.GameConfig.SeatPick> all =
             kelium.dataio.GameConfig.seatPickAll();
-        if (seat >= all.size() || all.get(seat) == null) {
-            return null;
-        }
-        return all.get(seat).orderColor();
+        String выбрана = seat < all.size() && all.get(seat) != null
+            ? all.get(seat).orderColor() : null;
+        // НЕ ВЫБРАЛИ — БЕРЁМ КОЛОДУ СВОЕГО ЦВЕТА, а не то, что выпадет по сиду
+        // (заказ дизайнера 11.09.2026). Иначе за красным планшетом мог оказаться
+        // зелёный узор нижних приказов.
+        return выбрана != null ? выбрана
+            : kelium.dataio.GameConfig.orderDeckOfColour(
+                kelium.dataio.GameConfig.colourOfSeat(seat));
     }
 
     @SuppressWarnings("unchecked")
@@ -1539,6 +1544,84 @@ public final class GameEngine {
      * <p>Снесли твоё ЦУ — жетон уехал к захватчику, запись пропала, ячейка
      * открылась под ещё один красный жетон (см. CombatResolver.destroyCu).
      */
+    /**
+     * ПОВОРОТ ЦУ, КОТОРЫЙ РЕШАЕТ САМ ИГРОК (или бот за него) В НАЧАЛЕ ПАРТИИ.
+     *
+     * <p>Заказ дизайнера 11.09.2026: «выставление поворота ЦУ теперь в начале
+     * может решать бот, если выставлена настройка „решает бот вначале"».
+     *
+     * <p>Как это заведено. В настройках места поворот бывает трёх видов: точная
+     * сторона света, «авто» (носом к центру поля — так ставит подготовка) и
+     * «решает бот» — он и приходит сюда числом {@link GameConfig#CU_FACING_BOT}.
+     * Подготовка в этом случае ставит ЦУ как обычно, автоматом, а здесь — уже
+     * при живых агентах — место переспрашивают: ЦУ снимается со своих сторон и
+     * встаёт на выбранную пару. Спрашиваем ДО раздачи карт: поворот меняет, какие
+     * стенки закрыты, а значит и то, что игрок увидит в своей первой руке.
+     *
+     * <p>Предлагаются только те пары сторон, которые на гексе свободны. Свободной
+     * пары нет вовсе — молча оставляем как поставила подготовка.
+     */
+    private void offerCuFacing() {
+        GameState s = state;
+        List<Integer> заказ = s.config instanceof GameConfig gc ? gc.cuFacing : null;
+        if (заказ == null) {
+            return;
+        }
+        for (PlayerState p : s.players) {
+            if (p.seat >= заказ.size() || заказ.get(p.seat) == null
+                    || заказ.get(p.seat) != GameConfig.CU_FACING_BOT) {
+                continue;
+            }
+            BuildingToken цу = null;
+            for (BuildingToken b : p.buildings) {
+                if (b.type == kelium.core.BuildingType.COMMAND_CENTER && b.hexId != null) {
+                    цу = b;
+                    break;
+                }
+            }
+            if (цу == null) {
+                continue;
+            }
+            Hex h = s.field.get(цу.hexId);
+            if (h == null) {
+                continue;
+            }
+            // Свои стороны снимаем до перебора: иначе нынешняя пара сама себе
+            // мешает и в списке не окажется.
+            List<Integer> было = new ArrayList<>();
+            for (int i = 0; i < 6; i++) {
+                if (h.sideOwner[i] != null && h.sideOwner[i] == цу.uid) {
+                    было.add(i);
+                }
+            }
+            h.freeSidesByToken(цу.uid);
+            List<Choice> opts = new ArrayList<>();
+            for (int a = 0; a < 6; a++) {
+                int b = (a + 1) % 6;
+                if (h.sideOwner[a] == null && h.sideOwner[b] == null) {
+                    opts.add(new Choice("cu_facing", a, "носом на " + СТОРОНЫ_СВЕТА[a]));
+                }
+            }
+            if (opts.isEmpty()) {
+                h.occupySides(цу.uid, было);
+                continue;
+            }
+            Choice ch = agents.get(p.seat).choose(s, opts, ev("kind", "cu_facing"));
+            int face = ch.payload() instanceof Number n ? n.intValue() : opts.get(0).payload()
+                instanceof Number n2 ? n2.intValue() : 0;
+            face = Math.floorMod(face, 6);
+            if (!h.occupySides(цу.uid, List.of(face, (face + 1) % 6))) {
+                h.occupySides(цу.uid, было);
+                continue;
+            }
+            emit(ev("type", "cu_facing", "seat", p.seat, "side", face));
+        }
+    }
+
+    /** Подписи сторон для выбора поворота ЦУ — как на ленте настроек. */
+    private static final String[] СТОРОНЫ_СВЕТА =
+        {"северо-восток", "восток", "юго-восток", "юго-запад", "запад", "северо-запад"};
+
     private void offerSealChoice() {
         GameState s = state;
         if (!rs().getBool("command_center.destruction_token_seals_cell", false)) {

@@ -73,17 +73,64 @@ public final class GameConfig {
      * @param storageSide сторона планшета ХРАНИЛИЩА: «A», «B1»…«B4»
      * @param orderColor  цвет игрока и его колода приказов: «red», «blue», …
      */
-    public record SeatPick(String troopSide, String storageSide, String orderColor) {
+    /**
+     * ЧТО ИГРОК ВЫБРАЛ ЗА СВОИМ МЕСТОМ.
+     *
+     * <p>Сторон планшетов здесь больше нет: планшет один на всех (решение
+     * дизайнера 09.09.2026, подтверждено как окончательное). Выбирают две вещи:
+     * КОЛОДУ ПРИКАЗОВ (узор нижних приказов — главная асимметрия партии) и
+     * ЦВЕТ МЕСТА (краска жетонов и планшетов).
+     *
+     * @param orderColor код колоды приказов ({@code blue}…) или {@code null} —
+     *                   колода по умолчанию, то есть цвета этого места
+     * @param colorSlot  гнездо краски 0..3 или {@code null} — краска по номеру
+     *                   места
+     */
+    public record SeatPick(String orderColor, Integer colorSlot) {
         public boolean isEmpty() {
-            return troopSide == null && storageSide == null && orderColor == null;
+            return orderColor == null && colorSlot == null;
         }
+    }
+
+    /**
+     * КОЛОДА ПРИКАЗОВ ПО УМОЛЧАНИЮ — та, что цвета самого места.
+     *
+     * <p>Заказ дизайнера 11.09.2026: «колода приказов всегда должна
+     * соответствовать цвету игрока и его планшетов по умолчанию». Гнёзда
+     * краски идут в том же порядке, в каком раздаются планшеты и жетоны:
+     * 0 синий, 1 красный, 2 зелёный, 3 песочный.
+     */
+    public static String orderDeckOfColour(int colorSlot) {
+        return switch (Math.floorMod(colorSlot, 4)) {
+            case 0 -> "blue";
+            case 1 -> "red";
+            case 2 -> "green";
+            default -> "yellow";
+        };
+    }
+
+    /**
+     * ПОВОРОТ ЦУ «РЕШАЕТ БОТ» — не сторона света, а признак.
+     *
+     * <p>Обычный поворот это 0..5. Отрицательное число стороной быть не может,
+     * поэтому им и помечено «пусть решает тот, кто играет за это место»:
+     * подготовка ставит ЦУ автоматом, а движок в начале партии переспрашивает
+     * агента (см. {@code GameEngine.offerCuFacing}).
+     */
+    public static final int CU_FACING_BOT = -1;
+
+    /** Гнездо краски места: выбранное игроком или, если не выбирали, номер места. */
+    public static int colourOfSeat(int seat) {
+        java.util.List<SeatPick> all = seatPickAll();
+        SeatPick p = seat >= 0 && seat < all.size() ? all.get(seat) : null;
+        return p == null || p.colorSlot() == null ? Math.floorMod(seat, 4) : p.colorSlot();
     }
 
     /** Выбор на место {@code seat} — или пустой, если ничего не выбирали. */
     public SeatPick seatPick(int seat) {
         if (seatPicks == null || seat < 0 || seat >= seatPicks.size()
                 || seatPicks.get(seat) == null) {
-            return new SeatPick(null, null, null);
+            return new SeatPick(null, null);
         }
         return seatPicks.get(seat);
     }
@@ -277,13 +324,12 @@ public final class GameConfig {
         java.util.Collections.synchronizedList(new java.util.ArrayList<>());
 
     /** Выбрать место: стороны планшетов и цвет (любой аргумент null — «сам»). */
-    public static void pickSeat(int seat, String troopSide, String storageSide,
-                                String orderColor) {
+    public static void pickSeat(int seat, String orderColor, Integer colorSlot) {
         synchronized (SEAT_PICK) {
             while (SEAT_PICK.size() <= seat) {
                 SEAT_PICK.add(null);
             }
-            SeatPick p = new SeatPick(troopSide, storageSide, orderColor);
+            SeatPick p = new SeatPick(orderColor, colorSlot);
             SEAT_PICK.set(seat, p.isEmpty() ? null : p);
         }
     }

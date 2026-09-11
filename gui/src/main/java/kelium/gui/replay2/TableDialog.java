@@ -39,7 +39,15 @@ import kelium.gui.GameRecorder;
  */
 public final class TableDialog {
 
-    private static final String AUTO = "как раздастся";
+    /**
+     * ПЕРВЫЙ ПУНКТ СПИСКА КОЛОД — не «как раздастся», а «по умолчанию».
+     *
+     * <p>Заказ дизайнера 11.09.2026: «колода приказов теперь всегда должна
+     * соответствовать цвету игрока и его планшетов по умолчанию; только я сам
+     * могу зайти и поменять». Раньше невыбранная колода раздавалась по сиду —
+     * то есть за красным планшетом мог оказаться зелёный узор приказов.
+     */
+    private static final String ПО_УМОЛЧАНИЮ = "по умолчанию";
 
     private TableDialog() {
     }
@@ -71,14 +79,19 @@ public final class TableDialog {
         // СТОЛБЦОВ «ПЛАНШЕТ ВОЙСК» И «ПЛАНШЕТ ХРАНИЛИЩА» ЗДЕСЬ НЕТ. Сторон «Б»
         // не существует (решение дизайнера 09.09.2026): планшеты у всех
         // одинаковые, и выбирать было бы нечего.
+        boolean цветВыбирается = players < 4;
+        if (цветВыбирается) {
+            form.add(caption("цвет"));
+        }
         form.add(caption("колода приказов"), "wrap");
 
         List<JComboBox<String>> dc = new ArrayList<>();
+        List<JComboBox<String>> cc = new ArrayList<>();
         List<GameConfig.SeatPick> now = GameConfig.seatPickAll();
         for (int seat = 0; seat < players; seat++) {
             final int seatFinal = seat;
             GameConfig.SeatPick pick = seat < now.size() && now.get(seat) != null
-                ? now.get(seat) : new GameConfig.SeatPick(null, null, null);
+                ? now.get(seat) : new GameConfig.SeatPick(null, null);
 
             form.add(chips[seat]);
 
@@ -90,17 +103,27 @@ public final class TableDialog {
             form.add(dice(() -> randomCharacter.accept(seatFinal)));
             form.add(facingBoxes[seat], "growx");
 
-            JComboBox<String> d = deckBox(decks, pick.orderColor());
+            int цвет = pick.colorSlot() == null ? seat : pick.colorSlot();
+            if (цветВыбирается) {
+                JComboBox<String> c = colourBox(цвет);
+                c.setToolTipText(Ui2.tip("ЦВЕТ ЭТОГО МЕСТА: краска его жетонов и "
+                    + "планшетов. Втроём и вдвоём цвет выбирают, вчетвером на столе "
+                    + "и так все четыре. За цветом идёт и колода приказов, если её "
+                    + "не выбрали руками."));
+                form.add(c, "growx");
+                cc.add(c);
+            }
+
+            JComboBox<String> d = deckBox(decks, pick.orderColor(), цвет);
             d.setToolTipText(Ui2.tip("КОЛОДА ПРИКАЗОВ этого места: у каждой колоды свой "
                 + "узор нижних приказов (что откроется вскрытой картой) — это главная "
-                + "асимметрия партии. Цвет самого места на поле колода НЕ меняет — "
-                + "он всегда идёт по номеру места."));
+                + "асимметрия партии. «По умолчанию» — колода цвета этого места."));
             form.add(d, "growx, wrap");
             dc.add(d);
         }
         JLabel note = new JLabel("<html>Колода, выбранная за столом, остальным местам "
-            + "уже не достанется. На что колода не выбрана — раздаётся по сиду, как "
-            + "раньше. Характер бота и поворот ЦУ применяются сразу.</html>");
+            + "уже не достанется. На что колода не выбрана — берётся колода цвета "
+            + "этого места. Характер бота и поворот ЦУ применяются сразу.</html>");
         note.setFont(Theme.note(11));
         note.setForeground(Theme.ink3());
         form.add(note, "span 5, growx, gaptop " + Theme.px(6));
@@ -118,34 +141,34 @@ public final class TableDialog {
         boolean changed = false;
         for (int seat = 0; seat < players; seat++) {
             String deck = deckValue(dc.get(seat), decks);
+            Integer colour = цветВыбирается && seat < cc.size()
+                ? cc.get(seat).getSelectedIndex() : null;
             GameConfig.SeatPick was = seat < now.size() && now.get(seat) != null
-                ? now.get(seat) : new GameConfig.SeatPick(null, null, null);
-            if (!java.util.Objects.equals(was.orderColor(), deck)) {
+                ? now.get(seat) : new GameConfig.SeatPick(null, null);
+            if (!java.util.Objects.equals(was.orderColor(), deck)
+                    || !java.util.Objects.equals(was.colorSlot(), colour)) {
                 changed = true;
             }
-            GameConfig.pickSeat(seat, null, null, deck);
+            GameConfig.pickSeat(seat, deck, colour);
         }
         return changed;
     }
 
     /**
-     * РАЗДАТЬ КОЛОДЫ ПРИКАЗОВ СЛУЧАЙНО — по одной на место.
+     * СБРОСИТЬ ВЫБОР МЕСТ К УМОЛЧАНИЮ.
      *
-     * <p>Колоды берутся БЕЗ ПОВТОРОВ: двух одинаковых колод приказов за столом
-     * не бывает, и выдать их значило бы собрать партию, которую нельзя сыграть.
-     * Стороны планшетов не раздаются — их больше нет.
+     * <p>Заказ дизайнера 11.09.2026: «кнопка „все случайно" НЕ МЕНЯЕТ колоду,
+     * только я сам могу зайти и поменять». Поэтому случайной раздачи колод
+     * здесь больше нет — есть возврат к умолчанию, то есть к колоде цвета
+     * своего места. Цвет мест тоже возвращается к номерам.
+     *
+     * <p>Почему вообще что-то делаем, а не пропускаем кнопку мимо: выбор,
+     * сделанный для партии на четверых, иначе остался бы висеть на игре вдвоём,
+     * и колода ушла бы тому, кого за столом нет.
      */
     public static void randomise(String rulesetId, int players, java.util.Random rng) {
-        List<String> decks = new ArrayList<>(decks(rulesetId));
-        java.util.Collections.shuffle(decks, rng);
-        for (int seat = 0; seat < players; seat++) {
-            String c = seat < decks.size() ? decks.get(seat) : null;
-            GameConfig.pickSeat(seat, null, null, c);
-        }
-        // Лишние места чистим: иначе выбор от партии на четверых остался бы висеть
-        // на игре вдвоём и колода ушла бы тому, кого за столом нет.
-        for (int seat = players; seat < 4; seat++) {
-            GameConfig.pickSeat(seat, null, null, null);
+        for (int seat = 0; seat < 4; seat++) {
+            GameConfig.pickSeat(seat, null, null);
         }
     }
 
@@ -214,10 +237,12 @@ public final class TableDialog {
      * текста по тире, — иначе имя животного само содержало бы тире и
      * ломало разбор.
      */
-    private static JComboBox<String> deckBox(List<String> values, String chosen) {
+    private static JComboBox<String> deckBox(List<String> values, String chosen,
+                                            int colorSlot) {
         JComboBox<String> box = new JComboBox<>();
         box.setFont(Theme.body());
-        box.addItem(AUTO);
+        String своя = Names.orderDeck(Names.orderDeckOfColour(colorSlot));
+        box.addItem(ПО_УМОЛЧАНИЮ + " — " + своя);
         int sel = 0;
         for (int i = 0; i < values.size(); i++) {
             String v = values.get(i);
@@ -229,6 +254,20 @@ public final class TableDialog {
             }
         }
         box.setSelectedIndex(sel);
+        return box;
+    }
+
+    /**
+     * СПИСОК ЦВЕТОВ МЕСТА. Порядок гнёзд тот же, по которому раздаются планшеты
+     * и жетоны: синий, красный, зелёный, песочный.
+     */
+    private static JComboBox<String> colourBox(int chosen) {
+        JComboBox<String> box = new JComboBox<>();
+        box.setFont(Theme.body());
+        for (String имя : new String[]{"синий", "красный", "зелёный", "песочный"}) {
+            box.addItem(имя);
+        }
+        box.setSelectedIndex(Math.floorMod(chosen, 4));
         return box;
     }
 
