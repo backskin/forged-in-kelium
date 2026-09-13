@@ -49,15 +49,18 @@ class StarTokensTest {
             "но жетонов за них не выдают: до конца партии эти очки можно потерять");
     }
 
-    /** Выработанный ОБОРОТ тайла зарождения — звезда, и сразу. */
+    /**
+     * Выработанный оборот тайла зарождения звезды НЕ даёт: очков за него нет
+     * (свод 1.41.0, решение дизайнера 11.09.2026).
+     */
     @Test
-    void aFinishedSpawnTileBackHandsOutAStar() {
+    void aFinishedSpawnTileBackHandsOutNoStar() {
         GameState s = Fix.game();
         PlayerState p = s.player(0);
         int before = Scoring.starTokens(s, 0);
         p.claimedNormalTiles += 1;
-        assertEquals(before + 1, Scoring.starTokens(s, 0),
-            "последний келемий с оборота большого тайла = 1 жетон победного очка");
+        assertEquals(before, Scoring.starTokens(s, 0),
+            "последний келемий с оборота большого тайла очков и звезды не приносит");
     }
 
     /** Задание, награда которого — очки, тоже выдаёт звезду. */
@@ -81,8 +84,7 @@ class StarTokensTest {
         GameState s = Fix.game();
         PlayerState p = s.player(0);
         int totalBefore = Scoring.scorePlayer(s, 0).get("total");
-        p.claimedNormalTiles += 1;
-        p.objectiveCardVp += 3;
+        p.objectiveCardVp += 4;
         int totalAfter = Scoring.scorePlayer(s, 0).get("total");
         assertEquals(totalBefore + 4, totalAfter,
             "четыре новые звезды обязаны прибавить ровно четыре очка к итогу");
