@@ -158,7 +158,9 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
     private void paintPlayer(Graphics2D g, int x, int y, int w, int h,
                              ReplayRecord.Player p) {
         Color accent = FieldView.seatStroke(p.seat);
-        Map<String, Object> card = find(p.superObjective);
+        // Супер-заданий у игрока может быть несколько; панель показывает первое,
+        // а сколько их всего — говорит счётчик в заголовке.
+        Map<String, Object> card = find(первое(p));
 
         int headH = 30;
         g.setColor(accent);
@@ -169,9 +171,11 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
         String seatName = record != null && p.seat < record.seatLabels.size()
             ? record.seatLabels.get(p.seat) : "игрок " + (p.seat + 1);
         String name = card != null ? String.valueOf(card.get("name"))
-            : p.superObjective == null ? "супер-задание не выдано" : p.superObjective;
+            : первое(p) == null ? "супер-задание не выдано" : первое(p);
+        String счётчик = p.superObjectives.size() > 1
+            ? " (и ещё " + (p.superObjectives.size() - 1) + ")" : "";
         g.drawString(BoardsPanel.clip(g, "игрок " + (p.seat + 1) + " · " + seatName
-            + "  —  " + name, w - 16), x + 10, y + 21);
+            + "  —  " + name + счётчик, w - 16), x + 10, y + 21);
 
         // РАЗМЕР КАРТЫ — ОТ МЕНЬШЕЙ СТОРОНЫ: обе карты обязаны сохранить свои
         // пропорции, поэтому берём то, что помещается и по ширине, и по высоте.
@@ -237,7 +241,8 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
     private void paintFace(Graphics2D g, int x, int y, int w, int h,
                            ReplayRecord.Player p, Map<String, Object> card, Color accent) {
         cardFrame(g, x, y, w, h, accent,
-            p.superComplete ? BoardsPanel.wash(new Color(0x1E, 0x7A, 0x33)) : BoardsPanel.paper());
+            p.superDone.contains(первое(p)) ? BoardsPanel.wash(new Color(0x1E, 0x7A, 0x33))
+                : BoardsPanel.paper());
 
         int ty = y + 30;
         g.setColor(accent.darker());
@@ -267,7 +272,7 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
         g.setColor(BoardsPanel.ink());
         g.setFont(kelium.gui.replay2.Theme.display(20));
         String name = card != null ? String.valueOf(card.get("name"))
-            : p.superObjective == null ? "не выдано" : p.superObjective;
+            : первое(p) == null ? "не выдано" : первое(p);
         g.drawString(BoardsPanel.clip(g, name, w - 24), x + 12, ty);
         if (card != null && card.get("subtitle") != null) {
             ty += 22;
@@ -279,11 +284,11 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
 
         ty += 30;
         g.setFont(bold(10));
-        // НИЗ КАРТЫ: жёсткое требование и разовая награда за него. Прежней
-        // сборки по частям и счётчика запуска нет — механика снесена
-        // 09.09.2026, и показывать тут нечего, кроме «взята награда или нет».
-        g.setColor(p.superComplete ? new Color(0x1E, 0x7A, 0x33) : new Color(0x99, 0x66, 0x11));
-        g.drawString(p.superComplete ? "НИЗ ОТРАБОТАН" : "низ ещё не отработан", x + 12, ty);
+        // НИЗ КАРТЫ: жёсткое требование и разовая награда за него — показываем,
+        // взята награда или нет.
+        boolean отработан = p.superDone.contains(первое(p));
+        g.setColor(отработан ? new Color(0x1E, 0x7A, 0x33) : new Color(0x99, 0x66, 0x11));
+        g.drawString(отработан ? "НИЗ ОТРАБОТАН" : "низ ещё не отработан", x + 12, ty);
         if (card == null) {
             return;
         }
@@ -399,6 +404,11 @@ public final class SuperObjectivesPanel extends JPanel implements javax.swing.Sc
         };
         return base + ". Проверка узора в движке пока заглушка: развёртывание "
             + "записывается, но геометрия не сверяется.";
+    }
+
+    /** Первое супер-задание игрока, или {@code null}, если карт нет. */
+    private static String первое(ReplayRecord.Player p) {
+        return p.superObjectives.isEmpty() ? null : p.superObjectives.get(0);
     }
 
     private Map<String, Object> find(String id) {

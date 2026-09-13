@@ -68,7 +68,7 @@ public final class СуперЗадания {
         java.util.Collections.shuffle(pool, rng);
         for (PlayerState p : s.players) {
             if (!pool.isEmpty()) {
-                p.superObjective = pool.remove(pool.size() - 1);
+                p.superObjectives.add(pool.remove(pool.size() - 1));
             }
         }
     }
@@ -110,11 +110,12 @@ public final class СуперЗадания {
      * Карта при этом остаётся на столе и продолжает давать множитель верха.
      */
     public static Map<String, Object> наградаНиза(GameState s, PlayerState p, Agent agent,
-                                                  java.util.function.Consumer<Map<String, Object>> emit) {
-        if (p.superObjective == null) {
+                                                  java.util.function.Consumer<Map<String, Object>> emit,
+                                                  String id) {
+        if (id == null || !p.superObjectives.contains(id)) {
             return new HashMap<>();
         }
-        return выдать(s, p, agent, emit, p.superObjective);
+        return выдать(s, p, agent, emit, id);
     }
 
     private static Map<String, Object> выдать(GameState s, PlayerState p, Agent agent,
@@ -464,10 +465,17 @@ public final class СуперЗадания {
      */
     public static int stockpileVp(GameState s, int seat) {
         PlayerState p = s.player(seat);
-        if (p.superObjective == null) {
-            return 0;
+        int всего = 0;
+        for (String id : p.superObjectives) {
+            всего += множительОднойКарты(s, p, id);
         }
-        return switch (p.superObjective) {
+        return всего;
+    }
+
+    /** Множитель финала ОДНОЙ карты: супер-заданий у игрока может быть несколько. */
+    private static int множительОднойКарты(GameState s, PlayerState p, String id) {
+        int seat = p.seat;
+        return switch (id) {
             case "s5_01" -> {
                 java.util.Set<UnitType> роды = new java.util.HashSet<>();
                 for (UnitToken u : p.unitsOnField()) {
@@ -583,12 +591,12 @@ public final class СуперЗадания {
      * <p>ЧЕРНОВИК СОСТАВА: сами требования подобраны под темы карт и ждут ревью
      * дизайнера; механика от их точных чисел не зависит.
      */
-    public static boolean требованиеВыполнено(GameState s, int seat) {
+    public static boolean требованиеВыполнено(GameState s, int seat, String id) {
         PlayerState p = s.player(seat);
-        if (p.superObjective == null) {
+        if (id == null || !p.superObjectives.contains(id)) {
             return false;
         }
-        switch (p.superObjective) {
+        switch (id) {
             case "s5_15":
             case "s5_01": {
                 // Три РАЗНЫХ рода на одном гексе — смотр в прямом смысле.

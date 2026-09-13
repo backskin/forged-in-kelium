@@ -366,6 +366,7 @@ public final class RuleWords {
             // ---------- Наука ----------
             case "tech.tracks" -> "треки науки";
             case "tech.steps_per_track" -> "шагов на треке";
+            case "tech.steps_in_order" -> "шаги трека берутся подряд, с первого";
             case "tech.step_cells" -> "ячеек на шагах";
             case "tech.step_capacity" -> "сколько игроков влезает на шаг";
             case "tech.step_cost_trophy" -> "трофеев за шаг (тратится общий пул)";

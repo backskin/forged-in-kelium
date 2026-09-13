@@ -671,9 +671,10 @@ public final class Drawer extends JPanel {
             + (p.arsenalInstalled.isEmpty() ? "нет" : cards(p.arsenalInstalled))));
         sb.append(row("Задания", p.objectiveHand.isEmpty() ? "рука пуста"
             : cards(p.objectiveHand)));
-        sb.append(row("Супер-задание", p.superObjective == null ? "не выдано"
-            : "«" + esc(Names.card(rec, p.superObjective)) + "»"
-              + (p.superComplete ? ", СОБРАНО" : "")));
+        sb.append(row("Супер-задания", p.superObjectives.isEmpty() ? "не выдано"
+            : esc(cards(p.superObjectives))
+              + (p.superDone.isEmpty() ? ""
+                 : ", низов отработало " + p.superDone.size())));
         sb.append(row("Жетоны ЦУ", "свой " + (p.ownCuToken ? "цел" : "потерян")
             + " · захвачено чужих " + p.cuTokens));
         sb.append("</body></html>");

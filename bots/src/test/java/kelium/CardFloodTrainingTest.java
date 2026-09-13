@@ -63,7 +63,13 @@ class CardFloodTrainingTest {
     void floodsCardsWhenRateIsSet() {
         GameConfig base = LayoutLibrary.configFor(4, 7L);
         Ruleset rules = base.ruleset.copy();
-        rules.override("training.card_flood_rate", 0.6);
+        // СТОРОЖ ПРОВЕРЯЕТ ЗАЛИВКУ, А НЕ РАЗМЕР РУКИ, поэтому предел руки здесь
+        // поднимается явно. Заливка заданий срабатывает, только пока рука МЕНЬШЕ
+        // rounds.objective_hand_limit; в действующем своде предел — две карты, и
+        // свободного места в руке не возникает вовсе. Без этой правки сторож
+        // ловил ноль не потому, что ключ мёртв, а потому, что лить было некуда.
+        rules.override("training.card_flood_rate", 1.0);
+        rules.override("rounds.objective_hand_limit", 6);
         GameConfig cfg = new GameConfig(rules, base.content, 4, 7L, base.dataRoot,
             base.boardSides, base.scenarioId, base.cuFacing, base.scenarioFile);
         GameState s = Setup.buildGame(cfg);

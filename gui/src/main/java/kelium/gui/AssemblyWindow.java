@@ -360,6 +360,37 @@ public final class AssemblyWindow extends JPanel {
     }
 
     /**
+     * ПОДОБРАТЬ СБОРКУ БЕЗ ОКНА — для снимков раскладок в справочник.
+     *
+     * <p>Обычный {@link #resolve()} считает в {@code SwingWorker} и рисует
+     * результат, когда тот вернётся; снимку ждать нечем — окна нет, цикла
+     * событий тоже. Здесь тот же подбор, но синхронно: вернулись из
+     * {@code solveVariants} — сборка готова, можно рисовать слои.
+     *
+     * <p>Числа блоков приходят снаружи, а не из полей ввода: у безоконного
+     * вызова их нет, а набор коробки задаёт тот, кто делает снимок.
+     *
+     * @return нашлась ли сборка
+     */
+    boolean подобратьБезОкна(int big, int small, int black) {
+        Set<Cell> playable = new HashSet<>();
+        for (LHex h : model.hexes.values()) {
+            if (!"forbidden".equals(h.content)) {
+                playable.add(new Cell(h.q, h.r));
+            }
+        }
+        List<Result> найдено = kelium.engine.BlockAssembler.solveVariants(
+            playable, big, small, black, BUDGET_MS, 1);
+        if (найдено.isEmpty()) {
+            return false;
+        }
+        view.playable = playable;
+        view.result = найдено.get(0);
+        пересобратьКартонки();
+        return true;
+    }
+
+    /**
      * Показать СЛЕДУЮЩИЙ вариант сборки. Порядок случайный, но каждый вариант
      * встречается ровно один раз за круг; когда круг кончился — тасуем заново.
      */

@@ -70,26 +70,29 @@ public final class Супер5 {
             GameEngine.playGame(s, ags, ev -> { });
             раундов += s.round;
             for (PlayerState p : s.players) {
-                if (p.superObjective == null) {
-                    continue;
-                }
-                Карта k = итог.computeIfAbsent(p.superObjective, x -> new Карта());
-                if (k.имя.isEmpty()) {
-                    var e = cfg.content.get("super_objectives").find(p.superObjective);
-                    k.имя = e == null ? p.superObjective : String.valueOf(e.get("name"));
-                }
-                k.роздано++;
-                if (p.superObjectiveComplete) {
-                    k.требованиеВзято++;
-                }
-                if (kelium.engine.СуперЗадания.требованиеВыполнено(s, p.seat)) {
-                    k.требованиеБылоГотово++;
-                }
-                // В 6.0 множитель платит всегда — карта не сжигается.
-                k.очковНакопителя += Scoring.scorePlayer(s, p.seat)
+                // Супер-заданий у игрока может быть несколько: одно с подготовки
+                // и по одному за третий шаг каждого трека науки.
+                int множителиИгрока = Scoring.scorePlayer(s, p.seat)
                     .getOrDefault("super5_stockpile", 0);
-                if (s.winner != null && s.winner == p.seat) {
-                    k.побед++;
+                for (String sid : p.superObjectives) {
+                    Карта k = итог.computeIfAbsent(sid, x -> new Карта());
+                    if (k.имя.isEmpty()) {
+                        var e = cfg.content.get("super_objectives").find(sid);
+                        k.имя = e == null ? sid : String.valueOf(e.get("name"));
+                    }
+                    k.роздано++;
+                    if (p.superObjectivesDone.contains(sid)) {
+                        k.требованиеВзято++;
+                    }
+                    if (kelium.engine.СуперЗадания.требованиеВыполнено(s, p.seat, sid)) {
+                        k.требованиеБылоГотово++;
+                    }
+                    // В 6.0 множитель платит всегда — карта не сжигается. Счёт у
+                    // Scoring общий на игрока, поэтому делим между его картами.
+                    k.очковНакопителя += множителиИгрока / p.superObjectives.size();
+                    if (s.winner != null && s.winner == p.seat) {
+                        k.побед++;
+                    }
                 }
             }
         }

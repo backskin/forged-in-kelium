@@ -302,11 +302,7 @@ public final class GameEngine {
      * цветная колода приказов — 4 карты (по одной на каждый верхний приказ) плюс
      * одна карта БЕЗОПАСНОСТЬ. Именно принадлежность колоде задаёт асимметрию
      * нижних приказов (голубой цикл вперёд, алый назад, зелёный обмен, жёлтый —
-<<<<<<< HEAD
-     * зеркало на Наступления). Цвета раздаются игрокам СЛУЧАЙНО по сиду.
-=======
      * зеркало на Наступлении). Цвета раздаются игрокам СЛУЧАЙНО по сиду.
->>>>>>> origin/main
      */
     /**
      * Цвет, выбранный за столом на это место, или {@code null} — «раздай сам».
@@ -1276,10 +1272,15 @@ public final class GameEngine {
         // после этого продолжает считаться. Именно это ограничение и просил
         // дизайнер: разовым эффектом больше нельзя воспользоваться сразу же,
         // сперва надо довести партию до нужного состояния.
-        if (p.superObjective != null && !p.superObjectiveComplete && СуперЗадания.on6(s)
-                && СуперЗадания.требованиеВыполнено(s, p.seat)) {
-            opts.add(new Choice("spec_super6_claim", p.superObjective,
-                "СУПЕР-НАГРАДА " + p.superObjective));
+        // Карт у игрока может быть несколько — своё предложение на каждую, у
+        // которой низ ещё не отработал и требование уже выстроено.
+        if (СуперЗадания.on6(s)) {
+            for (String sid : p.superObjectives) {
+                if (!p.superObjectivesDone.contains(sid)
+                        && СуперЗадания.требованиеВыполнено(s, p.seat, sid)) {
+                    opts.add(new Choice("spec_super6_claim", sid, "СУПЕР-НАГРАДА " + sid));
+                }
+            }
         }
         // СПОСОБНОСТИ АРСЕНАЛА сами кладут свои варианты в меню СПЕЦ: движок не
         // знает про карты, он спрашивает «что добавить?». Так карта даёт НОВОЕ
@@ -1332,10 +1333,12 @@ public final class GameEngine {
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
             case "spec_super6_claim" -> {
-                p.superObjectiveComplete = true;
-                Map<String, Object> got = СуперЗадания.наградаНиза(s, p, agents.get(p.seat), this::emit);
+                String sid = (String) ch.payload();
+                p.superObjectivesDone.add(sid);
+                Map<String, Object> got = СуперЗадания.наградаНиза(
+                    s, p, agents.get(p.seat), this::emit, sid);
                 emit(ev("type", "super6_claim", "seat", p.seat,
-                    "card", ch.payload(), "got", got));
+                    "card", sid, "got", got));
             }
             case "spec_combat" -> {
                 // Плата вперёд, и только потом бой: не хватило — предложения бы и
@@ -1468,7 +1471,7 @@ public final class GameEngine {
     private void offerSuperPick() {
         GameState s = state;
         for (PlayerState p : s.players) {
-            if (p.superObjective != null || p.superObjectiveOffer.size() < 2) {
+            if (!p.superObjectives.isEmpty() || p.superObjectiveOffer.size() < 2) {
                 continue;
             }
             List<Choice> opts = new ArrayList<>();
@@ -1481,7 +1484,7 @@ public final class GameEngine {
                 ev("kind", "super_pick", "seat", p.seat));
             String chosen = ch.payload() instanceof String cid ? cid
                 : p.superObjectiveOffer.get(0);
-            p.superObjective = chosen;
+            p.superObjectives.add(chosen);
             emit(ev("type", "super_pick", "seat", p.seat, "card", chosen,
                 "offered", new ArrayList<>(p.superObjectiveOffer)));
         }

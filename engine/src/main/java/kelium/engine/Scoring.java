@@ -123,8 +123,13 @@ public final class Scoring {
         // Награда за войну, стало быть, не «втрое больше», а единственная: за
         // сохранённое своё ЦУ не платят ничем.
         int cuTokenVp = p.cuDestructionTokens * rs.getInt("command_center.destruction_token_vp");
-        if (p.ownCuTokenAvailable) {
-            cuTokenVp += ((Number) rs.get("command_center.own_token_vp_if_cu_never_destroyed", 0)).intValue();
+        // ОЧКИ ПЕЧАТАЮТСЯ ТОЛЬКО НА ОБОРОТЕ ЖЕТОНА: их получает тот, кто снёс
+        // чужое ЦУ и перевернул забранный жетон. Свой жетон, оставшийся лицом,
+        // не стоит ничего — ключ в действующем своде равен нулю.
+        int свой = ((Number) rs.get(
+            "command_center.own_token_vp_if_cu_never_destroyed", 0)).intValue();
+        if (p.ownCuTokenAvailable && свой != 0) {
+            cuTokenVp += свой;
         }
         breakdown.put("cu_tokens", cuTokenVp);
         // ЭКСПЕРИМЕНТАЛЬНЫЙ КЛЮЧ (по умолчанию 0 — правила не меняются): очки за

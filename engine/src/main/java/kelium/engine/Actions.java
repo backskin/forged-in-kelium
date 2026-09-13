@@ -1856,11 +1856,17 @@ public final class Actions {
         /**
          * МОЖНО ЛИ ЗАБРАТЬ ВСЁ ОБРАТНО НА ЭТОТ ИСТОЧНИК.
          *
-         * <p>Забрать разрешено только «до полного»: источник должен заполниться
-         * целиком, иначе активация не состоится. Считаем его кубики, лежащие
-         * сейчас на потребителях, и складываем с теми, что уже простаивают на нём
-         * самом. Не хватает — значит часть кубиков ушла из игры вместе с погибшим
-         * зданием, и вернуть источник в полный вид уже нечем.
+         * <p>ПО СВОДУ, А НЕ ПО КОДУ. Ключ
+         * {@code actions.energy_swap.take_back_must_fill_source} решает, обязан
+         * ли источник заполниться целиком. Прежде правило было зашито здесь, и
+         * ключ в своде на него не влиял вовсе — расхождение свода с движком.
+         *
+         * <p>Ключ включён: забрать можно, только если источник наберётся полным.
+         * Не хватает — часть кубиков ушла из игры с погибшим зданием.
+         *
+         * <p>Ключ выключен (карточки-памятки 11.09.2026, «вернуть на источник с
+         * ЛЮБЫХ ячеек»): забрать можно всё, что лежит на потребителях, сколько
+         * бы его ни было.
          */
         private boolean canTakeBack(PlayerState player, BuildingToken src) {
             int cap = Power.sourceCubes(state, src);
@@ -1871,7 +1877,9 @@ public final class Actions {
             for (BuildingToken c : player.buildingsOnField()) {
                 away += c.energyBySource.getOrDefault(src.uid, 0);
             }
-            return src.energyIdle + away >= cap;
+            boolean доПолного = rs.getBool(
+                "actions.energy_swap.take_back_must_fill_source", true);
+            return доПолного ? src.energyIdle + away >= cap : away > 0;
         }
 
         /** Снять кубики источника с потребителей и вернуть их на него. */
@@ -2847,8 +2855,13 @@ public final class Actions {
                     // считаются за ВСЕ пройденные шаги, поэтому прыжок не обкрадывает
                     // игрока по очкам. Смысл: если впереди столпились соперники,
                     // можно накопить трофеи и перегнать их всех разом.
+                    // ШАГИ ПОДРЯД ИЛИ С ПРЫЖКОМ — решает свод
+                    // ({@code tech.steps_in_order}). Подряд: предлагается ровно
+                    // следующая ячейка, и занятая впереди останавливает трек.
+                    boolean подряд = rs.getBool("tech.steps_in_order", false);
+                    int предел = подряд ? Math.min(step + 1, tech.steps) : tech.steps;
                     int paid = 0;
-                    for (int to = step + 1; to <= tech.steps; to++) {
+                    for (int to = step + 1; to <= предел; to++) {
                         paid += sciStepCost(player, costs, to - 1, stepsMade);
                         Integer cap = caps.get(to - 1);
                         boolean full = cap != null
@@ -3084,11 +3097,9 @@ public final class Actions {
          * ({@code tech.super_objective_on_step}), а не зашит в код: у прошлых
          * редакций этого ключа нет, и они играются как раньше.
          *
-         * <p>ПРОЕКТ У ИГРОКА ОДИН. Супер-задание — это проект под планшетом со
-         * своим счётчиком, и второго счётчика в игре нет. Поэтому пришедшая
-         * карта либо занимает пустое место, либо ЗАМЕНЯЕТ прежнюю по выбору
-         * игрока, и прежняя уходит из игры. Уже СОБРАННЫЙ проект не меняется:
-         * менять выполненное значило бы отнимать заработанное.
+         * <p>КАРТЫ НАКАПЛИВАЮТСЯ. Пришедшая ложится к тем, что у игрока уже
+         * есть, и работает наравне с ними: каждая считает свой множитель в
+         * финале и каждая один раз за партию отдаёт награду за своё требование.
          */
         private static void картаСуперЗаданияЗаШаг(GameState state, GameConfig cfg,
                                                    PlayerState player, Agent agent,
@@ -3096,8 +3107,7 @@ public final class Actions {
             Ruleset rs = cfg.ruleset;
             int шаг = rs.getInt("tech.super_objective_on_step", 0);
             if (шаг <= 0 || reached != шаг
-                    || !kelium.engine.Setup.expansionOn(rs, "super_objectives")
-                    || player.superObjectiveComplete) {
+                    || !kelium.engine.Setup.expansionOn(rs, "super_objectives")) {
                 return;
             }
             var колода = state.decks.get("super_objectives");
@@ -3114,7 +3124,7 @@ public final class Actions {
                 }
                 boolean занята = false;
                 for (PlayerState p : state.players) {
-                    занята |= тянем.equals(p.superObjective);
+                    занята |= p.superObjectives.contains(тянем);
                 }
                 if (!занята) {
                     cid = тянем;
@@ -3123,23 +3133,8 @@ public final class Actions {
             if (cid == null) {
                 return;
             }
-            if (player.superObjective == null) {
-                player.superObjective = cid;
-                player.superObjectiveOffer.clear();
-                player.superObjectiveOffer.add(cid);
-                return;
-            }
-            // ВЫБОР ЗА ИГРОКОМ: проект стоит очков и определяет, чем он занят до
-            // конца партии, поэтому подменять его молча нельзя.
-            List<Choice> opts = List.of(
-                new Choice("super_objective_keep", player.superObjective, "оставить прежнее"),
-                new Choice("super_objective_take", cid, "взять новое"));
-            Choice pick = agent.choose(state, opts, Map.of("kind", "super_objective_swap"));
-            if ("super_objective_take".equals(pick.kind())) {
-                player.superObjective = cid;
-                player.superObjectiveOffer.clear();
-                player.superObjectiveOffer.add(cid);
-            }
+            player.superObjectives.add(cid);
+            player.superObjectiveOffer.add(cid);
         }
 
         /**

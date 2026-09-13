@@ -561,7 +561,7 @@ public final class Setup {
                 }
                 // Одна карта в предложении = выбора нет, ставим сразу.
                 if (ps.superObjectiveOffer.size() == 1) {
-                    ps.superObjective = ps.superObjectiveOffer.get(0);
+                    ps.superObjectives.add(ps.superObjectiveOffer.get(0));
                 }
             }
         }

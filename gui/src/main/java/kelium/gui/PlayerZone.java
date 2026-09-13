@@ -172,9 +172,10 @@ public final class PlayerZone extends JPanel {
 
         set("objectives", p.objectiveHand.isEmpty() ? "рука пуста" : names(p.objectiveHand));
 
-        set("super", p.superObjective == null ? "не выдано"
-            : "«" + Names.card(record, p.superObjective) + "» — частей внесено "
-              + (p.superComplete ? " — низ отработан" : ""));
+        set("super", p.superObjectives.isEmpty() ? "не выдано"
+            : names(p.superObjectives)
+              + (p.superDone.isEmpty() ? ""
+                 : " — низов отработало " + p.superDone.size()));
 
         set("cu", "свой жетон " + (p.ownCuToken ? "цел" : "потерян")
             + " · захвачено чужих " + p.cuTokens);

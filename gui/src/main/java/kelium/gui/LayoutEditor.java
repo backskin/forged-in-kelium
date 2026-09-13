@@ -692,8 +692,8 @@ public final class LayoutEditor {
      * <p>Слоёв несколько, а геометрия ОДНА ({@link #sharedFit}): холсты разные,
      * и без общего масштаба со сдвигом они разъехались бы на доли гекса.
      */
-    private static java.awt.image.BufferedImage fuseLayers(int fw, int fh,
-                                                           PngExport.Options options) {
+    static java.awt.image.BufferedImage fuseLayers(int fw, int fh,
+                                                   PngExport.Options options) {
         double[] fit = sharedFit(model, fw, fh);
         java.awt.image.BufferedImage out =
             assemblyTab.renderBlocksLayer(fw, fh, fit[0], fit[1], fit[2], true);
@@ -718,6 +718,24 @@ public final class LayoutEditor {
         }
         g.dispose();
         return out;
+    }
+
+    /**
+     * ЗАВЕСТИ ПОЛОТНО И ВКЛАДКУ СБОРКИ БЕЗ ОКНА — для снимков раскладок.
+     *
+     * <p>Слияние рисуют те же холсты, что и живой конструктор, а они висят на
+     * статических полях, которые заполняет сборка окна. Снимку окно не нужно,
+     * но поля нужны — здесь они и заводятся, ровно один раз.
+     */
+    static AssemblyWindow подготовитьБезОкна() {
+        if (canvas == null) {
+            canvas = new Canvas();
+            canvas.model = model;
+        }
+        if (assemblyTab == null) {
+            assemblyTab = new AssemblyWindow(model);
+        }
+        return assemblyTab;
     }
 
     private static PngExport.Content layoutContent() {

@@ -1448,12 +1448,13 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // КНОПОК АРСЕНАЛА ЗДЕСЬ НЕТ: карты арсенала лежат в трёх пазах внизу
         // планшета войск, и читать их открывают щелчком прямо оттуда (заказ
         // дизайнера 11.09.2026).
-        if (p.superObjective != null) {
-            // Карта супер-задания: множитель очков в финале и требование низа.
-            // Взята ли награда низа — говорит подпись.
+        if (!p.superObjectives.isEmpty()) {
+            // Карты супер-заданий: у каждой множитель очков в финале и требование
+            // низа. Сколько низов уже отработало — говорит подпись.
             out.add(new Object[]{
-                p.superComplete ? "супер-задание (низ отработан)" : "супер-задание",
-                1, "super_objectives", java.util.List.of(p.superObjective)});
+                p.superDone.isEmpty() ? "супер-задания"
+                    : "супер-задания (низов отработало " + p.superDone.size() + ")",
+                p.superObjectives.size(), "super_objectives", p.superObjectives});
         }
         return out;
     }

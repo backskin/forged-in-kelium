@@ -187,9 +187,9 @@ public final class PublicView {
          */
         public final Map<String, Integer> vp = new LinkedHashMap<>();
 
-        // --- супер-задание (открыто с подготовки) ---
-        public String superObjective;
-        public boolean superComplete;
+        // --- супер-задания (открыты с подготовки) ---
+        public final List<String> superObjectives = new ArrayList<>();
+        public final List<String> superDone = new ArrayList<>();
         /** Ячеек счётчика запуска ещё не погашено (−1 — вторая часть не начата). */
         /** Символы на ячейках счётчика. */
         /** Части первой половины: часть → сколько положено. */
@@ -342,8 +342,8 @@ public final class PublicView {
         st.startHex = p.startHex;
         st.vp.putAll(p.vp);
 
-        st.superObjective = p.superObjective;
-        st.superComplete = p.superComplete;
+        st.superObjectives.addAll(p.superObjectives);
+        st.superDone.addAll(p.superDone);
         st.superArsenal.addAll(p.superArsenal);
 
         st.arsenalInstalled.addAll(p.arsenalInstalled);
@@ -542,8 +542,8 @@ public final class PublicView {
         o.put("ownCuToken", st.ownCuToken);
         o.put("startHex", st.startHex);
         o.put("vp", st.vp);
-        o.put("superObjective", st.superObjective);
-        o.put("superComplete", st.superComplete);
+        o.put("superObjectives", st.superObjectives);
+        o.put("superDone", st.superDone);
         o.put("superArsenal", st.superArsenal);
         o.put("arsenalInstalled", st.arsenalInstalled);
         o.put("orderPlayed", st.orderPlayed);
