@@ -280,12 +280,12 @@ CSS = r"""
   .задняя .две-кол { column-count: 2; column-gap: 3mm; }
   .задняя .ничья { font: 500 7pt/1.2 "Tektur Narrow", sans-serif; color: var(--крем2); margin: .8mm 0 0; padding-top: .7mm; border-top: .25mm dashed var(--кант-т); }
 
-  .задняя .подвал { position: absolute; left: 8mm; right: 8mm; top: 202mm; height: 12mm; z-index: 2; display: flex; align-items: center; gap: 5mm; }
+  .задняя .подвал { position: absolute; left: 8mm; right: 8mm; top: 202mm; height: 12mm; z-index: 2; display: flex; align-items: center; gap: 3mm; }
   .стр.обложка.задняя .лого { height: 11.5mm; width: auto; flex: none; display: block; clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm); }
   .задняя .легенда { display: flex; gap: 2.4mm; flex: 1; justify-content: center; }
   .задняя .легенда div { display: flex; flex-direction: column; align-items: center; gap: .6mm; font: 500 5.6pt/1 "Tektur Narrow", sans-serif; color: var(--крем2); text-transform: uppercase; letter-spacing: .03em; }
   .стр.обложка.задняя .легенда .и { height: 5.4mm; vertical-align: 0; padding: .35mm; }
-  .задняя .ссылки { display: grid; grid-template-columns: auto auto auto auto; gap: .5mm 2.4mm; font: 500 6.2pt/1.15 "Tektur Narrow", sans-serif; color: var(--крем2); flex: none; align-items: center; }
+  .задняя .ссылки { display: grid; grid-template-columns: auto auto auto auto; gap: .35mm 1.7mm; font: 500 5.7pt/1.14 "Tektur Narrow", sans-serif; color: var(--крем2); flex: none; align-items: center; }
   .задняя .ссылки b { color: var(--охра); font-weight: 800; }
   .задняя .ссылки > b { grid-column: 1 / -1; font: 800 6.6pt "Tektur", sans-serif; color: var(--зел); text-transform: uppercase; letter-spacing: .1em; }
 """

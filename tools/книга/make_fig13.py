@@ -62,7 +62,7 @@ canvas.paste(cont, (x3b, y3), cont)
 canvas.paste(board, (0, 0), board)
 # РЕЗАТЬ НИЖЕ СТРОКИ ПОДПИСЕЙ РОДОВ ВОЙСК: на 380 картинка рассекала их
 # пополам, и это читалось как брак кадрирования, а не как приём.
-CROP = 440
+CROP = 610
 canvas = canvas.crop((0, CROP, W, H + EXTRA))
 png = os.path.join(D, "_ячейки-планшета.png")
 canvas.save(png)
@@ -80,5 +80,5 @@ marks = [
     ("В", x3b + cont.width // 2, y3 + 240 - CROP, x3b + cont.width // 2, низ_знач),
     ("Г", 2980, 816 - CROP, 3120, низ_знач),
 ]
-figure("ячейки-планшета", png, 1800, vw, vh, marks, css_w="84%", pad="3.6mm 0 7.8mm")
+figure("ячейки-планшета", png, 1800, vw, vh, marks, css_w="100%", pad="1.0mm 0 1.6mm")
 print("ok")

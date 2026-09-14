@@ -17,5 +17,5 @@ subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
                 "-cp", РАННЕР, "kelium.gui.replay2.СнимокПримера", png, "150"],
                check=True, capture_output=True, cwd=КОРЕНЬ)
 vw, vh = Image.open(png).size
-figure("пример-хода", png, 1600, vw, vh, [], css_w="71%", pad="1mm 0 1mm")
+figure("пример-хода", png, 1600, vw, vh, [], css_w="74%", pad="1mm 0 1mm")
 print("ok", vw, vh)

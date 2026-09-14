@@ -130,7 +130,16 @@ def blocks(md):
             if "уточнить" in inner:
                 cur.append(f'        <p><span class="уточнить">{inline(inner)}</span></p>')
             else:
-                cur.append(f'        <div class="заглушка рисунок" style="height:30mm">[{inline(inner.upper())}]</div>')
+                # ВЫСОТА ЗАГЛУШКИ ЗАДАЁТСЯ ПОСЛЕ «|»: «[ИЛЛЮСТРАЦИЯ — … | 62мм]».
+                # Без этого пустое место на полосе закрывать нечем — заглушка
+                # всегда была ростом 30 мм (просьба дизайнера 15.09.2026).
+                высота = "30mm"
+                if "|" in inner:
+                    inner, хвост = inner.rsplit("|", 1)
+                    inner = inner.strip()
+                    высота = хвост.strip().replace("мм", "mm")
+                cur.append(f'        <div class="заглушка рисунок" style="height:{высота}">'
+                           f'[{inline(inner.upper())}]</div>')
             continue
         if ln.startswith("|"):
             rows = []
@@ -173,7 +182,7 @@ def blocks(md):
     # из девяти пунктов не помещается на полосу, а рисунок ужимать некуда.
     for k in range(1, len(res)):
         предыдущий = res[k - 1]
-        if "рисунок-во-всю" in предыдущий and ("<ul>" in res[k] or "<ol>" in res[k])                 and "<h2>" not in res[k] and "<h3>" not in res[k]:
+        if "рисунок-во-всю" in предыдущий and ("<ul>" in res[k] or "<ol>" in res[k])                 and "<h2>" not in res[k]:
             res[k] = res[k].replace('<div class="блок">', '<div class="блок легенда">', 1)
     return res
 

@@ -28,18 +28,18 @@ figure = ns["figure"]
 # ЗАПУСК ИЗ КОРНЯ РЕПОЗИТОРИЯ: движок ищет data/ относительно рабочей папки,
 # и без этого текстуры жетонов не находятся — гексы выходят силуэтами.
 subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
-                "-cp", РАННЕР, "kelium.gui.replay2.СнимокЖетонов", гексы, "260"],
+                "-cp", РАННЕР, "kelium.gui.replay2.СнимокЖетонов", гексы, "340"],
                check=True, capture_output=True, cwd=КОРЕНЬ)
 
-H = 520
+H = 360
 GAP = 92
 ims = []
 for f, _ in ВОЙСКА:
     im = Image.open(os.path.join(ТОКЕНЫ, f + ".png")).convert("RGBA")
     ims.append(im.resize((round(im.width * H / im.height), H), Image.LANCZOS))
 
-шрифт = ImageFont.truetype(ШРИФТ, 62)
-подпись_h = 92
+шрифт = ImageFont.truetype(ШРИФТ, 50)
+подпись_h = 74
 строка_w = sum(i.width for i in ims) + GAP * (len(ims) - 1)
 
 низ = Image.open(гексы).convert("RGBA")
@@ -61,5 +61,5 @@ canvas.save(png)
 vw, vh = canvas.size
 print("холст", canvas.size)
 
-figure("войска", png, 1800, vw, vh, [], css_w="86%", pad="0.6mm 0 1.2mm")
+figure("войска", png, 1800, vw, vh, [], css_w="79%", pad="0.4mm 0 1.0mm")
 print("ok")
