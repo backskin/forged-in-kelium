@@ -464,7 +464,22 @@ public final class Setup {
             // есть предел науки за партию. Ключа нет - остаётся -1, и наука
             // играет по-старому: кубик один на трек, он переставляется.
             if (ruleset.getBool("tech.cubes_are_permanent", false)) {
-                ps.techCubesLeft = ruleset.getInt("tech.cube_supply", 8);
+                // КУБИКОВ ПО СОСТАВУ (решение дизайнера 13.09.2026): в коробке 8,
+                // но берут вдвоём 8, втроём 7, вчетвером 6 — чтобы кубиков в сумме
+                // было примерно столько же, сколько ячеек на трёх треках, и трек
+                // при любом составе оставался гонкой за места.
+                int supply = ruleset.getInt("tech.cube_supply", 8);
+                Object поСоставу = ruleset.get("tech.cube_supply_by_players", null);
+                if (поСоставу instanceof java.util.Map<?, ?> m) {
+                    Object v = m.get(String.valueOf(n));
+                    if (v == null) {
+                        v = m.get(n);
+                    }
+                    if (v instanceof Number num) {
+                        supply = num.intValue();
+                    }
+                }
+                ps.techCubesLeft = supply;
             }
             Hex sh = field.get(startHex);
 

@@ -59,6 +59,11 @@ public final class RuleWords {
         if (known != null) {
             return known;
         }
+        // Кубиков науки по составу: tech.cube_supply_by_players.<игроков>.
+        if (path.startsWith("tech.cube_supply_by_players.")) {
+            String n = path.substring("tech.cube_supply_by_players.".length());
+            return "кубиков науки у каждого при " + n + " игроках";
+        }
         // Приз за первый шаг трека: путь собран из трека, очереди и ресурса.
         if (path.startsWith("tech.step1_prize.")) {
             String[] p = path.split("\\.");

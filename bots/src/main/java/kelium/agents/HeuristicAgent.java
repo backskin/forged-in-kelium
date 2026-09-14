@@ -564,6 +564,12 @@ public class HeuristicAgent extends Agent {
             case "destroyed_pay" -> (s, o) -> {
                 int remaining = ctx != null && ctx.get("remaining") instanceof Number n
                     ? n.intValue() : 1;
+                if (o.payload() == null) {
+                    // КУБИКАМИ ТРОФЕЕВ (выбор игрока, 14.09.2026): без переплаты,
+                    // зато жетоны остаются на свалке до Возвращения. Ровно как
+                    // жетон точной ценности.
+                    return 10.0;
+                }
                 int v = ((kelium.core.Token) o.payload()).trophyValue();
                 return v >= remaining ? 10.0 - (v - remaining) : 1.0 + v * 0.1;
             };

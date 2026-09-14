@@ -2855,13 +2855,14 @@ public final class Actions {
                     // считаются за ВСЕ пройденные шаги, поэтому прыжок не обкрадывает
                     // игрока по очкам. Смысл: если впереди столпились соперники,
                     // можно накопить трофеи и перегнать их всех разом.
-                    // ШАГИ ПОДРЯД ИЛИ С ПРЫЖКОМ — решает свод
-                    // ({@code tech.steps_in_order}). Подряд: предлагается ровно
-                    // следующая ячейка, и занятая впереди останавливает трек.
-                    boolean подряд = rs.getBool("tech.steps_in_order", false);
-                    int предел = подряд ? Math.min(step + 1, tech.steps) : tech.steps;
+                    // СТУПЕНИ ПО ПОРЯДКУ, ПРЫЖОК ТОЛЬКО ЧЕРЕЗ ПОЛНОСТЬЮ ЗАНЯТУЮ
+                    // (решение дизайнера 13.09.2026): следующая ступень со
+                    // свободной ячейкой — единственное предложение трека; занятую
+                    // целиком ступень перепрыгивают, платя и за неё, и за ту, куда
+                    // встал кубик. Перепрыгнуть ступень со свободной ячейкой
+                    // нельзя. Ключ tech.steps_in_order больше ничего не меняет.
                     int paid = 0;
-                    for (int to = step + 1; to <= предел; to++) {
+                    for (int to = step + 1; to <= tech.steps; to++) {
                         paid += sciStepCost(player, costs, to - 1, stepsMade);
                         Integer cap = caps.get(to - 1);
                         boolean full = cap != null
@@ -2870,11 +2871,12 @@ public final class Actions {
                             break;      // дальше уже не по карману
                         }
                         if (full) {
-                            continue;   // ячейка занята — её можно только перепрыгнуть
+                            continue;   // ступень занята целиком — только перепрыгнуть
                         }
                         opts.add(new Choice("sci_track", new Object[]{track, to},
                             track + " -> шаг " + to + " (цена " + paid
                                 + (to > step + 1 ? ", прыжок через " + (to - step - 1) + ")" : ")")));
+                        break;          // дальше первой свободной ступени не прыгают
                     }
                     continue;
                 }
@@ -3271,17 +3273,29 @@ public final class Actions {
             boolean keliumOk = kelium.engine.ability.RuleQuery
                 .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                 .base(0).ask() >= 1.0;
+            // ЧЕМ ПЛАТИТЬ — РЕШАЕТ ИГРОК (решение дизайнера 13.09.2026): кубиками
+            // трофеев из хранилища или жетоном со своей свалки целиком, без
+            // сдачи. Жетоны предлагаются рядом с кубиками, а не тратятся первыми.
             while (remaining > 0 && !player.destroyedTokens.isEmpty()) {
                 kelium.core.Token tok;
-                if (agent != null && player.destroyedTokens.size() > 1) {
+                boolean кубиковХватает = player.resources.trophy() >= remaining;
+                if (agent != null && (player.destroyedTokens.size() > 1 || кубиковХватает)) {
                     List<Choice> opts = new ArrayList<>();
                     for (kelium.core.Token t : player.destroyedTokens) {
                         opts.add(new Choice("destroyed_pay", t,
                             "token worth " + t.trophyValue()));
                     }
+                    if (кубиковХватает) {
+                        opts.add(new Choice("pay_cubes", null, "кубиками трофеев"));
+                    }
                     Choice pick = agent.choose(state, opts,
                         Map.of("kind", "destroyed_pay", "remaining", remaining));
+                    if (pick.payload() == null) {
+                        break;          // платит кубиками — ниже
+                    }
                     tok = (kelium.core.Token) pick.payload();
+                } else if (кубиковХватает) {
+                    break;              // без агента — кубиками
                 } else {
                     // жадно СНИЗУ: наименьшая ценность первой (минимум потерь)
                     tok = player.destroyedTokens.get(0);
