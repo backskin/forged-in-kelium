@@ -110,8 +110,8 @@ public final class СуперЗадания {
             case "kelium_4" -> Math.min(4, p.resources.kelium());
             case "trophy_tokens_4" -> Math.min(4, p.destroyedTokens.size());
             case "tech_steps_4" -> Math.min(4, занятыеСтупени(p));
-            case "red_modules" -> жетонов(p.redTokens.size(), p.redModules);
-            case "blue_modules" -> жетонов(p.blueTokens.size(), p.blueModules);
+            case "red_modules" -> жетоновНаПланшете(p.redPlacements.values());
+            case "blue_modules" -> жетоновНаПланшете(p.bluePlacements.values());
             case "units_at_enemy" -> войскаУЧужихЗданий(s, p);
             case "coins_4" -> p.resources.coin() / 4;
             case "ammo_kelium_pairs" -> Math.min(p.resources.ammo(), p.resources.kelium());
@@ -122,11 +122,19 @@ public final class СуперЗадания {
     }
 
     /**
-     * Сколько у игрока жетонов модуля этого цвета. С мешками считаются
-     * ВЫТЯНУТЫЕ жетоны, без мешков — прежний счётчик выданных.
+     * Сколько жетонов модуля лежит на планшете. Жетонов модулей в запасе не
+     * бывает (правило дизайнера 14.09.2026): вытянутый жетон сразу ложится на
+     * ячейку, поэтому считать больше нечего. Глухой жетон уничтожения ЦУ —
+     * не модуль и в счёт не идёт.
      */
-    private static int жетонов(int вытянуто, int счётчик) {
-        return вытянуто > 0 ? вытянуто : счётчик;
+    private static int жетоновНаПланшете(java.util.Collection<Map<String, Object>> раскладка) {
+        int n = 0;
+        for (Map<String, Object> pl : раскладка) {
+            if (!Boolean.TRUE.equals(pl.get("blocks"))) {
+                n++;
+            }
+        }
+        return n;
     }
 
     /**

@@ -170,10 +170,12 @@ public final class Modules {
     }
 
     /**
-     * ПОЛОЖИТЬ ТОЛЬКО ЧТО ВЫТЯНУТЫЙ ЖЕТОН на одну из свободных ячеек его цвета.
-     * Куда — выбирает игрок. Свободных ячеек нет — жетон лежит в запасе
-     * ({@link PlayerState#redTokens}/{@link PlayerState#blueTokens} без записи в
-     * раскладке).
+     * ПОЛОЖИТЬ ТОЛЬКО ЧТО ВЫТЯНУТЫЙ ЖЕТОН НА ПЛАНШЕТ. Куда — выбирает игрок:
+     * на свободную ячейку его цвета, а если свободных нет — вместо своего
+     * лежащего жетона, строго на его место (снятый уходит обратно в мешочек).
+     *
+     * <p>ЖЕТОНОВ МОДУЛЕЙ В ЗАПАСЕ НЕ БЫВАЕТ (правило дизайнера 14.09.2026):
+     * вытянутый жетон всегда оказывается на планшете.
      *
      * @return ячейка (род войск или здание), куда лёг жетон, либо null
      */
@@ -203,13 +205,13 @@ public final class Modules {
                     }
                 }
                 if (opts.isEmpty()) {
-                    return null;
+                    return null;   // физически не бывает: ячейки заняты — значит есть что заменить
                 }
-                opts.add(new Choice("pass", null, "оставить в запасе"));
                 Choice ch = agent.choose(s, opts, Map.of("kind", "module_replace_red"));
-                if (!(ch.payload() instanceof Map<?, ?> pick)) {
-                    return null;
-                }
+                // ЖЕТОН ОБЯЗАН ЛЕЧЬ НА ПЛАНШЕТ: запаса у модулей нет, отказаться
+                // нельзя — молчание агента значит первый вариант.
+                Map<?, ?> pick = ch.payload() instanceof Map<?, ?> m ? m
+                    : (Map<?, ?>) opts.get(0).payload();
                 UnitType slot = (UnitType) pick.get("unit");
                 Map<String, Object> снятый = p.redPlacements.get(slot);
                 placement.put("gold", Boolean.TRUE.equals(снятый.get("gold")));
@@ -244,13 +246,11 @@ public final class Modules {
                     id + " вместо " + e.getValue().get("id") + " на " + e.getKey().code));
             }
             if (opts.isEmpty()) {
-                return null;
+                return null;       // физически не бывает: ячейки заняты — значит есть что заменить
             }
-            opts.add(new Choice("pass", null, "оставить в запасе"));
             Choice ch = agent.choose(s, opts, Map.of("kind", "module_replace_blue"));
-            if (!(ch.payload() instanceof Map<?, ?> pick)) {
-                return null;
-            }
+            Map<?, ?> pick = ch.payload() instanceof Map<?, ?> m ? m
+                : (Map<?, ?>) opts.get(0).payload();
             BuildingType slot = (BuildingType) pick.get("building");
             Map<String, Object> снятый = p.bluePlacements.get(slot);
             placement.put("gold", Boolean.TRUE.equals(снятый.get("gold")));
@@ -307,16 +307,6 @@ public final class Modules {
         placement.put("gild", spec.get("gild"));
         placement.put("gold", false);
         return placement;
-    }
-
-    /** Жетоны игрока этого цвета, которые вытянуты, но не лежат на планшете. */
-    public static List<String> unplacedTokens(PlayerState p, boolean red) {
-        List<String> out = new ArrayList<>(red ? p.redTokens : p.blueTokens);
-        var placed = red ? p.redPlacements.values() : p.bluePlacements.values();
-        for (Map<String, Object> pl : placed) {
-            out.remove(String.valueOf(pl.get("id")));
-        }
-        return out;
     }
 
     /** Сколько золотых модулей лежит на планшете игрока (глухой жетон не в счёт). */
@@ -628,28 +618,12 @@ public final class Modules {
             picks.add(new Choice("move_blue", e.getKey(),
                 e.getValue().get("id") + " с " + e.getKey().code));
         }
-        // ЖЕТОН ИЗ ЗАПАСА: вытянут, когда свободной ячейки не было, — за тот же
-        // трофей его можно положить на освободившуюся ячейку.
-        for (String id : unplacedTokens(p, true)) {
-            picks.add(new Choice("place_red", id, id + " из запаса"));
-        }
-        for (String id : unplacedTokens(p, false)) {
-            picks.add(new Choice("place_blue", id, id + " из запаса"));
-        }
         if (picks.isEmpty()) {
             return;
         }
         picks.add(new Choice("pass", null, "cancel"));
         Choice pick = agent.choose(s, picks, Map.of("kind", "module_move_pick"));
         if (pick.payload() == null) {
-            return;
-        }
-        if ("place_red".equals(pick.kind())) {
-            placeNewToken(s, p, agent, (String) pick.payload(), true);
-            return;
-        }
-        if ("place_blue".equals(pick.kind())) {
-            placeNewToken(s, p, agent, (String) pick.payload(), false);
             return;
         }
         if ("move_red".equals(pick.kind())) {
