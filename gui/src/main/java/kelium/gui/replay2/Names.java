@@ -43,6 +43,7 @@ public final class Names {
             case "units_on_field" -> "войска";
             case "tech" -> "наука";
             case "gold_modules" -> "золотые модули";
+            case "storage_cell_stars" -> "пустые ячейки жетонов хранилища";
             case "spawn_tiles" -> "тайлы";
             case "cu_tokens" -> "жетоны ЦУ";
             case "war_track" -> "военный трек";
@@ -329,7 +330,7 @@ public final class Names {
             case "give_trophy" -> "отдать трофеев: " + v;
             case "get_coin" -> "получить монет: " + v;
             case "trophy_to_coin" -> "трофеи в монеты";
-            case "move_module" -> "переставить модуль";
+            case "move_module" -> "смена модуля";
             case "draw_arsenal", "draw2_keep1" -> "взять две карты арсенала, оставить одну";
             case "gild_module" -> "озолотить модуль";
             default -> unknown(key) + (v.isBlank() ? "" : " " + v);

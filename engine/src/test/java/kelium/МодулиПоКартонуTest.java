@@ -68,7 +68,7 @@ class МодулиПоКартонуTest {
         public Choice choose(GameState s, List<Choice> options, Map<String, Object> ctx) {
             Object k = ctx.get("kind");
             for (Choice c : options) {
-                if (kind.equals(k) && payload.equals(c.payload())) {
+                if (kind.equals(k) && payload != null && payload.equals(c.payload())) {
                     return c;
                 }
                 if (kind2 != null && kind2.equals(k) && c.payload() instanceof Map<?, ?> m
@@ -108,19 +108,46 @@ class МодулиПоКартонуTest {
     }
 
     @Test
-    void безСвободнойЯчейкиЖетонОстаётсяВЗапасе() {
+    void безСвободнойЯчейкиНовыйЖетонЗаменяетЛежащийИНаследуетЗолото() {
         GameState s = Fix.game(2, 42L);
         PlayerState p = s.player(0);
         for (BuildingType b : Modules.MIL_BUILDINGS) {
             p.blueTokens.add("Z" + b.code);
-            p.bluePlacements.put(b, синий("Z" + b.code, false));
+            p.bluePlacements.put(b, синий("Z" + b.code, b == BuildingType.FACTORY));
         }
+        p.goldModules = 1;
+        // агент заменяет золотой жетон на заводе
+        s.agents.set(0, new Хочу("module_replace_blue", null, "module_replace_blue",
+            BuildingType.FACTORY));
         String drew = Modules.awardModule(s, p, "blue");
         assertNotNull(drew);
         assertEquals(Modules.MIL_BUILDINGS.length, p.bluePlacements.size(),
-            "лежащие жетоны никто не снимал");
-        assertTrue(Modules.unplacedTokens(p, false).contains(drew),
-            "новый жетон ждёт в запасе");
+            "ячеек столько же: новый лёг строго на место снятого");
+        Map<String, Object> наЗаводе = p.bluePlacements.get(BuildingType.FACTORY);
+        assertEquals(drew, наЗаводе.get("id"), "новый жетон лежит на месте снятого");
+        assertTrue(Boolean.TRUE.equals(наЗаводе.get("gold")),
+            "снят золотой — новый сразу золотой стороной");
+        assertFalse(p.blueTokens.contains("Z" + BuildingType.FACTORY.code),
+            "снятый жетон ушёл из игры");
+        assertEquals(1, p.goldModules);
+    }
+
+    @Test
+    void обменМестамиДвухМодулейОднаСменаМодуля() {
+        GameState s = Fix.game(2, 42L);
+        PlayerState p = s.player(0);
+        p.blueTokens.add("X");
+        p.blueTokens.add("Y");
+        p.bluePlacements.put(BuildingType.BARRACKS, синий("X", true));
+        p.bluePlacements.put(BuildingType.FACTORY, синий("Y", false));
+
+        Modules.moveOneModule(s, 0, new Хочу("module_move_pick", BuildingType.BARRACKS,
+            "module_place_blue", BuildingType.FACTORY));
+        assertEquals("Y", p.bluePlacements.get(BuildingType.BARRACKS).get("id"));
+        assertEquals("X", p.bluePlacements.get(BuildingType.FACTORY).get("id"));
+        assertTrue(Boolean.TRUE.equals(p.bluePlacements.get(BuildingType.FACTORY).get("gold")),
+            "золото уехало вместе с X");
+        assertEquals(2, p.bluePlacements.size());
     }
 
     @Test

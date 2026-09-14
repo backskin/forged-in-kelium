@@ -192,7 +192,30 @@ public final class Modules {
                 }
             }
             if (opts.isEmpty()) {
-                return null;
+                // СВОБОДНОЙ ЯЧЕЙКИ НЕТ (решение дизайнера 14.09.2026): можно
+                // заменить новым жетоном любой свой лежащий (кроме глухого),
+                // строго на его место; снят золотой — новый кладётся золотым.
+                for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
+                    if (!Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                        opts.add(new Choice("red_replace", Map.of("module", id, "unit", e.getKey()),
+                            id + " вместо " + e.getValue().get("id") + " на " + e.getKey().code));
+                    }
+                }
+                if (opts.isEmpty()) {
+                    return null;
+                }
+                opts.add(new Choice("pass", null, "оставить в запасе"));
+                Choice ch = agent.choose(s, opts, Map.of("kind", "module_replace_red"));
+                if (!(ch.payload() instanceof Map<?, ?> pick)) {
+                    return null;
+                }
+                UnitType slot = (UnitType) pick.get("unit");
+                Map<String, Object> снятый = p.redPlacements.get(slot);
+                placement.put("gold", Boolean.TRUE.equals(снятый.get("gold")));
+                p.redTokens.remove(String.valueOf(снятый.get("id")));   // снятый уходит из игры
+                p.redPlacements.put(slot, placement);
+                p.goldModules = countGold(p);
+                return slot;
             }
             Choice ch = agent.choose(s, opts, Map.of("kind", "module_place_red"));
             if (!(ch.payload() instanceof Map<?, ?> pick)) {
@@ -213,7 +236,25 @@ public final class Modules {
             }
         }
         if (opts.isEmpty()) {
-            return null;
+            for (Map.Entry<BuildingType, Map<String, Object>> e : p.bluePlacements.entrySet()) {
+                opts.add(new Choice("blue_replace", Map.of("module", id, "building", e.getKey()),
+                    id + " вместо " + e.getValue().get("id") + " на " + e.getKey().code));
+            }
+            if (opts.isEmpty()) {
+                return null;
+            }
+            opts.add(new Choice("pass", null, "оставить в запасе"));
+            Choice ch = agent.choose(s, opts, Map.of("kind", "module_replace_blue"));
+            if (!(ch.payload() instanceof Map<?, ?> pick)) {
+                return null;
+            }
+            BuildingType slot = (BuildingType) pick.get("building");
+            Map<String, Object> снятый = p.bluePlacements.get(slot);
+            placement.put("gold", Boolean.TRUE.equals(снятый.get("gold")));
+            p.blueTokens.remove(String.valueOf(снятый.get("id")));
+            p.bluePlacements.put(slot, placement);
+            p.goldModules = countGold(p);
+            return slot;
         }
         Choice ch = agent.choose(s, opts, Map.of("kind", "module_place_blue"));
         if (!(ch.payload() instanceof Map<?, ?> pick)) {
@@ -610,10 +651,14 @@ public final class Modules {
             UnitType from = (UnitType) pick.payload();
             Map<String, Object> placement = p.redPlacements.remove(from);
             List<Choice> slots = new ArrayList<>();
+            // ЗАНЯТАЯ ЯЧЕЙКА ТОЖЕ ГОДИТСЯ: два своих жетона меняются местами, и
+            // это одна смена модуля (решение дизайнера 14.09.2026).
             for (UnitType t : UnitType.values()) {
-                if (t != from && redSlotsFor(p, t) > 0 && !p.redPlacements.containsKey(t)) {
+                if (t != from && redSlotsFor(p, t) > 0) {
+                    Map<String, Object> там = p.redPlacements.get(t);
                     slots.add(new Choice("red_slot", Map.of("module",
-                        placement.get("id"), "unit", t), placement.get("id") + "->" + t.code));
+                        placement.get("id"), "unit", t), placement.get("id") + "->" + t.code
+                        + (там == null ? "" : " (обмен с " + там.get("id") + ")")));
                 }
             }
             if (slots.isEmpty()) {
@@ -622,15 +667,22 @@ public final class Modules {
             }
             Choice slot = agent.choose(s, slots, Map.of("kind", "module_place_red"));
             Map<String, Object> sp = (Map<String, Object>) slot.payload();
-            p.redPlacements.put((UnitType) sp.get("unit"), placement);
+            UnitType to = (UnitType) sp.get("unit");
+            Map<String, Object> другой = p.redPlacements.remove(to);
+            if (другой != null) {
+                p.redPlacements.put(from, другой);
+            }
+            p.redPlacements.put(to, placement);
         } else {
             BuildingType from = (BuildingType) pick.payload();
             Map<String, Object> placement = p.bluePlacements.remove(from);
             List<Choice> slots = new ArrayList<>();
             for (BuildingType b : MIL_BUILDINGS) {
-                if (b != from && !p.bluePlacements.containsKey(b)) {
+                if (b != from) {
+                    Map<String, Object> там = p.bluePlacements.get(b);
                     slots.add(new Choice("blue_slot", Map.of("module",
-                        placement.get("id"), "building", b), placement.get("id") + "->" + b.code));
+                        placement.get("id"), "building", b), placement.get("id") + "->" + b.code
+                        + (там == null ? "" : " (обмен с " + там.get("id") + ")")));
                 }
             }
             if (slots.isEmpty()) {
@@ -639,7 +691,12 @@ public final class Modules {
             }
             Choice slot = agent.choose(s, slots, Map.of("kind", "module_place_blue"));
             Map<String, Object> sp = (Map<String, Object>) slot.payload();
-            p.bluePlacements.put((BuildingType) sp.get("building"), placement);
+            BuildingType to = (BuildingType) sp.get("building");
+            Map<String, Object> другой = p.bluePlacements.remove(to);
+            if (другой != null) {
+                p.bluePlacements.put(from, другой);
+            }
+            p.bluePlacements.put(to, placement);
         }
     }
 

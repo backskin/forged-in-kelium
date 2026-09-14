@@ -101,6 +101,22 @@ public final class Scoring {
         breakdown.put("tech", techVp);
 
         breakdown.put("gold_modules", p.goldModules);
+        // ЗВЕЗДА НА СТОРОНЕ ЯЧЕЙКИ ЖЕТОНА ХРАНИЛИЩА (решение дизайнера
+        // 14.09.2026): 1 ПО, если эта ячейка в момент подсчёта ПУСТА. Кубики по
+        // планшету не переставляются, поэтому в движке, где ячейки не
+        // поимённые, считается так: свободных ячеек хватает на звезду — она
+        // есть; звёзд не больше, чем таких жетонов и чем свободных ячеек.
+        int cellTokens = 0;
+        for (String tok : p.storageTokens) {
+            if ("+1_universal_cell".equals(tok)) {
+                cellTokens++;
+            }
+        }
+        if (cellTokens > 0) {
+            int free = Storage.totalMax(state, p) - p.resources.kelium()
+                - p.resources.ammo() - p.resources.trophy();
+            breakdown.put("storage_cell_stars", Math.max(0, Math.min(cellTokens, free)));
+        }
         // ПОБЕДНЫЕ ОЧКИ ЗА ТАЙЛЫ ЗАРОЖДЕНИЯ (правило дизайнера 12.08.2026):
         // очко даёт ТОЛЬКО ВЫРАБОТАННЫЙ ДО КОНЦА (оборот) БОЛЬШОЙ тайл — игрок
         // сохраняет его в запасе как очко. Малое (стартовое) зарождение очков не
