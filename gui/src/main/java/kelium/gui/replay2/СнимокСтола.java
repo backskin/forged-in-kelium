@@ -61,7 +61,7 @@ public final class СнимокСтола {
     private static final double СТОЛ_Ш = 1500;
     private static final double СТОЛ_В = 978;
     /** Сколько сукна оставить вокруг разложенной игры. */
-    private static final double ПОЛЯ_ММ = 34;
+    private static final double ПОЛЯ_ММ = 22;
 
     /**
      * РАДИУС ГЕКСА НА ПЕЧАТИ. Жетон гекса зарождения уходит в типографию как
@@ -221,15 +221,16 @@ public final class СнимокСтола {
 
 
         g.dispose();
-        return наСукно(слой);
+        return обрезать(слой);
     }
 
     /**
-     * ОБРЕЗАТЬ ПО КОМПОНЕНТАМ И ПОЛОЖИТЬ НА СУКНО. Рамка берётся по тому, что
-     * нарисовано, плюс поля; потом она растягивается до пропорции разворота —
-     * так на картинке нет ни обрезанных краёв, ни гектаров пустого стола.
+     * ОБРЕЗАТЬ ПО КОМПОНЕНТАМ. Рамка берётся по тому, что нарисовано, плюс
+     * поля. Ни пропорция разворота, ни столешница по умолчанию не добавляются:
+     * книге нужен PNG с прозрачным фоном, чтобы компоненты легли прямо на
+     * бумагу полосы, а вёрстка сама подберёт окно под пропорцию картинки.
      */
-    private static BufferedImage наСукно(BufferedImage слой) {
+    private static BufferedImage обрезать(BufferedImage слой) {
         int x0 = слой.getWidth();
         int y0 = слой.getHeight();
         int x1 = 0;
@@ -250,29 +251,29 @@ public final class СнимокСтола {
             x1 = слой.getWidth() - 1;
             y1 = слой.getHeight() - 1;
         }
+        // ПОЛЯ ТОЛЬКО ТЕ, ЧТО НУЖНЫ. Пропорция картинки НЕ подгоняется под
+        // разворот: пустое сукно по бокам уезжало под подложку текстовых
+        // столбцов и выглядело грязью (замечание дизайнера 14.09.2026).
+        // Вёрстка сама подбирает окно под пропорцию того, что получилось.
         int поле = px(ПОЛЯ_ММ);
         x0 -= поле;
         y0 -= поле;
         x1 += поле;
         y1 += поле;
-        double нужно = СТОЛ_Ш / СТОЛ_В;
-        double w = x1 - x0;
-        double h = y1 - y0;
-        if (w / h < нужно) {
-            double добавка = (h * нужно - w) / 2;
-            x0 -= добавка;
-            x1 += добавка;
-        } else {
-            double добавка = (w / нужно - h) / 2;
-            y0 -= добавка;
-            y1 += добавка;
-        }
         int ш = (int) Math.round(x1 - x0);
         int в = (int) Math.round(y1 - y0);
-        BufferedImage img = new BufferedImage(ш, в, BufferedImage.TYPE_INT_RGB);
+        // БЕЗ СТОЛА — ПРОЗРАЧНЫЙ ФОН (просьба дизайнера 14.09.2026). Компоненты
+        // с их тенями ложатся прямо на бумагу разворота, и никакого чужого
+        // прямоугольника на полосе не появляется. Столешница остаётся только
+        // для отдельной картинки: ключ запуска wood / cloth / light.
+        boolean сВерхом = !"none".equals(сукно);
+        BufferedImage img = new BufferedImage(ш, в,
+            сВерхом ? BufferedImage.TYPE_INT_RGB : BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         качество(g);
-        стол(g, ш, в);
+        if (сВерхом) {
+            стол(g, ш, в);
+        }
         g.drawImage(слой, (int) Math.round(-x0), (int) Math.round(-y0), null);
         g.dispose();
         for (int[] точка : ЯКОРЯ.values()) {
@@ -297,9 +298,10 @@ public final class СнимокСтола {
      * компоненты в неё проваливаются. По умолчанию дерево: книга печатается на
      * кремовой бумаге, и тёплый стол ложится в её палитру, а тёмно-серое сукно
      * (ключ {@code cloth}) даёт больший контраст. {@code light} — светлый стол,
-     * оставлен для сравнения.
+     * оставлен для сравнения. {@code none} (по умолчанию) — вовсе без стола:
+     * прозрачный PNG для книги.
      */
-    static String сукно = "wood";
+    static String сукно = "none";
 
     private static void стол(Graphics2D g, int w, int h) {
         Color верх;
@@ -365,7 +367,7 @@ public final class СнимокСтола {
         gg.dispose();
         int x0 = px(cxМм) - w / 2;
         int y0 = px(cyМм) - h / 2;
-        положить(g, слой, x0, y0, w, h, 3.0);
+        положить(g, слой, x0, y0, w, h, 5.0);
 
         // ЯКОРЯ НА ПОЛЕ — по настоящим гексам, а не на глаз. Смещение то же, с
         // каким поле нарисовано: (1,5·size − min) внутри слоя плюс угол слоя.
@@ -384,10 +386,14 @@ public final class СнимокСтола {
             double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
             double hx = c[0] + dx;
             double hy = c[1] + dy;
-            if (hex.hasSpawnTile() && !ЯКОРЯ.containsKey("2")) {
+            // САМЫЙ ЛЕВЫЙ тайл зарождения и САМЫЙ ПРАВЫЙ нейтрал: середина
+            // картинки уходит в сгиб разворота, и выноска туда не читается.
+            if (hex.hasSpawnTile()
+                    && (!ЯКОРЯ.containsKey("2") || hx < ЯКОРЯ.get("2")[0])) {
                 якорьТ("2", hx, hy);
             }
-            if (hex.hasNeutral() && !ЯКОРЯ.containsKey("3")) {
+            if (hex.hasNeutral()
+                    && (!ЯКОРЯ.containsKey("3") || hx > ЯКОРЯ.get("3")[0])) {
                 // Нейтрал лежит НЕ в центре гекса, а полосой по своим сторонам:
                 // выноска должна смотреть на сам картон, а не на пустую середину.
                 List<Integer> углы = hex.neutrals.get(0).corners;
@@ -918,7 +924,7 @@ public final class СнимокСтола {
             Graphics2D gg = (Graphics2D) g.create();
             gg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                 RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            gg.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.42f));
+            gg.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
             int р = px(мм);
             gg.drawImage(s, x - р / 2, y + р / 3, w + р, h + р, null);
             gg.dispose();
