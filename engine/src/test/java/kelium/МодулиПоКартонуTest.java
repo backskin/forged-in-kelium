@@ -128,7 +128,9 @@ class МодулиПоКартонуTest {
         assertTrue(Boolean.TRUE.equals(наЗаводе.get("gold")),
             "снят золотой — новый сразу золотой стороной");
         assertFalse(p.blueTokens.contains("Z" + BuildingType.FACTORY.code),
-            "снятый жетон ушёл из игры");
+            "снятый жетон больше не у игрока");
+        assertTrue(s.blueBag.contains("Z" + BuildingType.FACTORY.code),
+            "снятый жетон вернулся в мешочек");
         assertEquals(1, p.goldModules);
     }
 

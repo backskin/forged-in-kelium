@@ -195,6 +195,7 @@ public final class Modules {
                 // СВОБОДНОЙ ЯЧЕЙКИ НЕТ (решение дизайнера 14.09.2026): можно
                 // заменить новым жетоном любой свой лежащий (кроме глухого),
                 // строго на его место; снят золотой — новый кладётся золотым.
+                // Снятый жетон возвращается в мешочек своего цвета.
                 for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
                     if (!Boolean.TRUE.equals(e.getValue().get("blocks"))) {
                         opts.add(new Choice("red_replace", Map.of("module", id, "unit", e.getKey()),
@@ -212,7 +213,9 @@ public final class Modules {
                 UnitType slot = (UnitType) pick.get("unit");
                 Map<String, Object> снятый = p.redPlacements.get(slot);
                 placement.put("gold", Boolean.TRUE.equals(снятый.get("gold")));
-                p.redTokens.remove(String.valueOf(снятый.get("id")));   // снятый уходит из игры
+                String снятId = String.valueOf(снятый.get("id"));
+                p.redTokens.remove(снятId);
+                s.redBag.add(снятId);           // снятый возвращается в мешочек
                 p.redPlacements.put(slot, placement);
                 p.goldModules = countGold(p);
                 return slot;
@@ -251,7 +254,9 @@ public final class Modules {
             BuildingType slot = (BuildingType) pick.get("building");
             Map<String, Object> снятый = p.bluePlacements.get(slot);
             placement.put("gold", Boolean.TRUE.equals(снятый.get("gold")));
-            p.blueTokens.remove(String.valueOf(снятый.get("id")));
+            String снятId = String.valueOf(снятый.get("id"));
+            p.blueTokens.remove(снятId);
+            s.blueBag.add(снятId);              // снятый возвращается в мешочек
             p.bluePlacements.put(slot, placement);
             p.goldModules = countGold(p);
             return slot;
