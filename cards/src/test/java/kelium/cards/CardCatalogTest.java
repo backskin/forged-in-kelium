@@ -41,12 +41,14 @@ class CardCatalogTest {
     }
 
     /**
-     * СУПЕР-ЗАДАНИЯ «ОДНА КАРТА ВТАЙНЕ» КЛАССОВ НЕ ИМЕЮТ: их половины
-     * разыгрывает {@code kelium.engine.Super5}, разбирая номер карты. Отличаем
-     * их по полям, которых нет ни у одной другой формы супер-задания.
+     * СУПЕР-ЗАДАНИЯ КЛАССОВ НЕ ИМЕЮТ. В редакции 8.0 карта — это ПАРА
+     * КАТЕГОРИЙ СЧЁТА и ничего больше: её нельзя выполнить или сжечь, значит и
+     * кода у неё нет. Прежние редакции («множитель верха», «накопитель»)
+     * узнаются по своим полям.
      */
-    private static boolean втайне(Map<String, Object> card) {
-        return card.containsKey("multiplier") || card.containsKey("stockpile");
+    private static boolean безКода(Map<String, Object> card) {
+        return card.containsKey("categories")
+            || card.containsKey("multiplier") || card.containsKey("stockpile");
     }
 
     @Test
@@ -58,19 +60,29 @@ class CardCatalogTest {
     }
 
     /**
-     * ...А У СУПЕР-ЗАДАНИЙ «ВТАЙНЕ» — ВЕТКА В ДВИЖКЕ. Класса у них нет, но
-     * молча ничего не делающая карта — беда та же, поэтому сторожим отдельно.
+     * ...А У СУПЕР-ЗАДАНИЙ — КАТЕГОРИИ СЧЁТА. Класса у карты нет, но
+     * неизвестная движку категория молча платит ноль и выглядит рабочей —
+     * сторожим её отдельно. Заодно проверяем, что категорий на карте ровно
+     * две и они разные.
      */
     @Test
-    void каждоеСуперЗаданиеВтайнеДвижокЗнает() {
-        java.util.List<String> нет = new java.util.ArrayList<>();
+    void каждуюКатегориюСуперЗаданияДвижокСчитает() {
+        java.util.List<String> беды = new java.util.ArrayList<>();
         for (Map<String, Object> card : entries("super_objectives")) {
-            if (втайне(card) && !kelium.engine.СуперЗадания.знает(String.valueOf(card.get("id")))) {
-                нет.add(String.valueOf(card.get("id")));
+            if (!(card.get("categories") instanceof java.util.List<?> cats)) {
+                continue;
+            }
+            String id = String.valueOf(card.get("id"));
+            if (cats.size() != 2 || cats.get(0).equals(cats.get(1))) {
+                беды.add(id + ": на карте должна быть пара РАЗНЫХ категорий, а стоит " + cats);
+            }
+            for (Object c : cats) {
+                if (!kelium.engine.СуперЗадания.знаетКатегорию(String.valueOf(c))) {
+                    беды.add(id + ": движок не знает категорию " + c);
+                }
             }
         }
-        assertTrue(нет.isEmpty(),
-            "супер-задания есть в данных, но движок их не разыгрывает: " + нет);
+        assertTrue(беды.isEmpty(), "супер-задания в данных не считаются: " + беды);
     }
 
     /** Связать ВСЕ переехавшие семейства: иначе часть карт останется без данных. */
@@ -81,7 +93,7 @@ class CardCatalogTest {
         CardRegistry.bindAll("market", entries("market"));
         // Карты «втайне» связывать не с чем — классов у них нет по устройству.
         CardRegistry.bindAll("super_objectives", entries("super_objectives").stream()
-            .filter(c -> !втайне(c)).toList());
+            .filter(c -> !безКода(c)).toList());
         CardRegistry.bindAll("super_arsenal", entries("super_arsenal"));
     }
 

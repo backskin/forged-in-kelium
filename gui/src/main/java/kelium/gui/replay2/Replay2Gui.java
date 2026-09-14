@@ -35,7 +35,6 @@ import javax.swing.WindowConstants;
 import kelium.gui.BoardsPanel;
 import kelium.gui.GameRecorder;
 import kelium.gui.PathDialog;
-import kelium.gui.SuperObjectivesPanel;
 import kelium.report.ReplayRecord;
 
 /**
@@ -96,7 +95,6 @@ public final class Replay2Gui {
     private final JLabel thought = new JLabel();
     private final JLabel status = new JLabel();
     private final BoardsPanel boards = new BoardsPanel();
-    private final SuperObjectivesPanel supers = new SuperObjectivesPanel();
     private ResultsPanel results;
     private JButton setupButton;
 
@@ -326,7 +324,6 @@ public final class Replay2Gui {
         bgSurface(stage);
         stage.add(field, "field");
         stage.add(scrolled(boards), "boards");
-        stage.add(supersWithOverlay(), "supers");
         stage.add(scrolled(decks), "decks");
         stage.add(scrolled(results), "results");
 
@@ -353,7 +350,6 @@ public final class Replay2Gui {
     private static final String[][] STAGES = {
         {"field", "Поле"},
         {"boards", "Наука и рынок"},
-        {"supers", "Супер-задания"},
         {"decks", "Карты"},
         {"results", "Итоги партии"},
     };
@@ -383,31 +379,6 @@ public final class Replay2Gui {
             p.add(b);
         }
         return p;
-    }
-
-    /**
-     * Карточка вкладки «Супер-задания» со своим оверлеем затемнения поверх —
-     * см. {@link #updateSupersAvailability()}. {@link javax.swing.OverlayLayout}
-     * укладывает оба ребёнка друг на друга; тот, что добавлен ПЕРВЫМ, рисуется
-     * ПОСЛЕДНИМ (Swing красит контейнер в обратном порядке компонентов) —
-     * поэтому оверлей добавлен раньше содержимого.
-     */
-    private JComponent supersWithOverlay() {
-        JPanel stack = new JPanel();
-        stack.setLayout(new javax.swing.OverlayLayout(stack));
-        supersOverlay = disabledOverlay(
-            "Дополнение «Супер задания» выключено",
-            "Включите тумблер «Супер задания» в разделе «Дополнения» на ленте "
-                + "настроек, чтобы увидеть эту вкладку.");
-        supersOverlay.setAlignmentX(0.5f);
-        supersOverlay.setAlignmentY(0.5f);
-        supersOverlay.setVisible(false);
-        JComponent content = scrolled(supers);
-        content.setAlignmentX(0.5f);
-        content.setAlignmentY(0.5f);
-        stack.add(supersOverlay);
-        stack.add(content);
-        return stack;
     }
 
     /** Полупрозрачное затемнение с центрированным сообщением — карта дополнения. */
@@ -703,7 +674,6 @@ public final class Replay2Gui {
         study.add(item("Лог", "L", () -> openDrawer(Drawer.View.LOG)));
         study.add(item("График партии", "G", () -> openDrawer(Drawer.View.CHART)));
         study.add(item("Планшеты науки и рынка", "S", () -> showStage("boards")));
-        study.add(item("Супер-задания", null, () -> showStage("supers")));
         study.add(item("Карты: колоды и сбросы", "K", () -> showStage("decks")));
         study.add(item("Итоги партии", "T", () -> showStage("results")));
         study.addSeparator();
@@ -1027,11 +997,10 @@ public final class Replay2Gui {
         if (b != null) {
             b.setSelected(true);      // вкладка подсвечена и когда её открыли клавишей
         }
-        if ("boards".equals(card) || "supers".equals(card) || "decks".equals(card)) {
+        if ("boards".equals(card) || "decks".equals(card)) {
             ReplayRecord.Frame f = session.frame();
             if (f != null) {
                 boards.show(session.record(), f.snapshot);
-                supers.show(session.record(), f.snapshot);
                 decks.show(session.record(), f.snapshot);
             }
             say("Планшет открыт. Esc — вернуться к полю.");
@@ -1205,12 +1174,10 @@ public final class Replay2Gui {
         // ПАНЕЛИ ЭКРАНОВ ОБНОВЛЯЮТСЯ ВМЕСТЕ С ЛЕНТОЙ ВРЕМЕНИ, иначе прокрутка
         // партии показывала бы старое состояние: колоды и сбросы меняются каждый
         // ход, и «покрутить и посмотреть историю» без этого не работает.
-        if ("boards".equals(currentCard) || "supers".equals(currentCard)
-                || "decks".equals(currentCard)) {
+        if ("boards".equals(currentCard) || "decks".equals(currentCard)) {
             ReplayRecord.Frame f = session.frame();
             if (f != null) {
                 boards.show(session.record(), f.snapshot);
-                supers.show(session.record(), f.snapshot);
                 decks.show(session.record(), f.snapshot);
             }
         }
@@ -1348,39 +1315,13 @@ public final class Replay2Gui {
                     ? kelium.dataio.GameConfig.DEFAULT_RULESET : rec.ruleset,
                 Math.max(2, rec.players), 0L, null, null);
             boards.setRules(cfg.ruleset, cfg.content);
-            supers.setContent(cfg.content);
             decks.setContent(cfg.content);
             session.setContent(cfg.content);
         } catch (RuntimeException e) {
             // Не загрузилось — панели честно напишут «не задано», а не выдумают числа
             boards.setRules(null, null);
-            supers.setContent(null);
             decks.setContent(null);
             session.setContent(null);
-        }
-        updateSupersAvailability();
-    }
-
-    /** Оверлей вкладки «Супер-задания», когда это дополнение выключено. */
-    private JPanel supersOverlay;
-
-    /**
-     * Б1 (заказ дизайнера 17.08.2026): тумблер «Супер задания» гасит вкладку
-     * СРАЗУ, без отдельного пересчёта партии — вкладка недоступна для клика, а
-     * если человек уже на ней, поверх содержимого всплывает затемнение с
-     * объяснением. Зовётся из {@link #loadRules}, а тот зовётся и из
-     * {@link #preview()} (сразу по щелчку тумблера — превью пересобирается на
-     * каждое изменение настроек), и из конца {@link #startGame()}.
-     */
-    private void updateSupersAvailability() {
-        boolean on = kelium.gui.Expansions.on(
-            kelium.dataio.AppSettings.of("replay2"), kelium.gui.Expansions.SUPER_OBJECTIVES);
-        javax.swing.JToggleButton b = stageButtons.get("supers");
-        if (b != null) {
-            b.setEnabled(on);
-        }
-        if (supersOverlay != null) {
-            supersOverlay.setVisible(!on);
         }
     }
 

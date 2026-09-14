@@ -99,13 +99,7 @@ class BoardsTabsTest {
         boards.setSize(1000, 620);
         boards.show(rec, last);
 
-        SuperObjectivesPanel supers = new SuperObjectivesPanel();
-        supers.setContent(cfg.content);
-        supers.setSize(1000, 620);
-        supers.show(rec, last);
-
         assertTrue(inkOf(boards) > 4000, "планшеты науки и рынка нарисованы почти пусто");
-        assertTrue(inkOf(supers) > 4000, "карты супер-заданий нарисованы почти пусто");
     }
 
     /** Сколько пикселей отличается от белого фона — «сколько чернил» на панели. */

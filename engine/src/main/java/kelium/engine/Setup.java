@@ -559,30 +559,17 @@ public final class Setup {
         //   none     — без стартовых заданий вообще.
         // Начальные задания (kind: starting) в любом режиме изымаются из ОБЩЕЙ
         // колоды заданий: это отдельный модуль старта, а не обычные карты.
-        int deal = Math.max(1, ((Number) ruleset.get("super_objectives.deal", 1)).intValue());
-        // СУПЕР-ЗАДАНИЯ 5.0 (mode: solo5): по ОДНОЙ карте втайне, без вскрытия
-        // и счётчика; раздачу делает Super5 ниже, когда GameState уже собран.
-        // Прежняя раздача (несколько карт на выбор, вскрытие, счётчик) не
-        // действует ни в 5.0, ни в 6.0: там игроку идёт ОДНА карта втайне.
-        String режимСупер = String.valueOf(ruleset.get("super_objectives.mode", ""));
-        boolean одинокаяКарта = "solo5".equals(режимСупер) || "solo6".equals(режимСупер);
-        if (!одинокаяКарта && expansionOn(ruleset, "super_objectives")) {
-            List<String> superIds = new ArrayList<>(content.get("super_objectives").ids());
-            Collections.shuffle(superIds, rng);
-            int at = 0;
-            for (PlayerState ps : players) {
-                for (int k = 0; k < deal && at < superIds.size(); k++, at++) {
-                    ps.superObjectiveOffer.add(superIds.get(at));
-                }
-                // Одна карта в предложении = выбора нет, ставим сразу.
-                if (ps.superObjectiveOffer.size() == 1) {
-                    ps.superObjectives.add(ps.superObjectiveOffer.get(0));
-                }
-            }
-        }
+        // СУПЕР-ЗАДАНИЯ 8.0 (14.09.2026): каждому ОДНА карта втайне, без выбора
+        // из нескольких и без вскрытия. Раздача — ниже, когда GameState собран
+        // (СуперЗадания.deal): здесь партии ещё нет.
         // НЕЗАВИСИМЫЙ ТУМБЛЕР: начальные задания включаются отдельно и МОГУТ
         // играться вместе с супер заданиями (решение дизайнера 17.08.2026).
         if (expansionOn(ruleset, "starting_objectives")) {
+            // ОДНА КАРТА НАЧАЛЬНОГО ЗАДАНИЯ В РУКУ (подготовка, шаг 16). Прежде
+            // число бралось из ключа супер-заданий — он к начальным отношения
+            // не имеет и вместе с их редакцией 8.0 исчез.
+            int deal = Math.max(1,
+                ((Number) ruleset.get("starting_objectives.deal", 1)).intValue());
             List<String> starters = new ArrayList<>();
             for (Map<String, Object> e : content.get("objectives").entries) {
                 if ("starting".equals(e.get("kind"))) {
@@ -818,14 +805,10 @@ public final class Setup {
                 // контента может не быть в старых версиях правил — играем без вершин
             }
         }
-        // СУПЕР-ЗАДАНИЯ: по одной карте втайне каждому. Верх карты — множитель
-        // победных очков в финале, низ — жёсткое требование с разовой наградой;
-        // и то и другое разыгрывает СуперЗадания (класс Super5 по прежнему
-        // имени). РАЗДАЧА СПРАШИВАЕТ ТУМБЛЕР ДОПОЛНЕНИЯ, а не только режим:
-        // иначе выключенное дополнение всё равно раздавало карты, и это ловил
-        // StartModesAndBagsTest.
-        String суперРежим = String.valueOf(ruleset.get("super_objectives.mode", ""));
-        if ("solo6".equals(суперРежим) && expansionOn(ruleset, "super_objectives")) {
+        // СУПЕР-ЗАДАНИЯ: по одной карте втайне каждому. Карта только считает
+        // очки в конце партии (СуперЗадания.vp). Раздача спрашивает тумблер
+        // дополнения: выключено — карт нет вовсе.
+        if (expansionOn(ruleset, "super_objectives")) {
             try {
                 СуперЗадания.deal(s, content.get("super_objectives").ids(), rng);
             } catch (RuntimeException e) {

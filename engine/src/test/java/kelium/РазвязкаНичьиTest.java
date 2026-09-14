@@ -18,8 +18,9 @@ import kelium.support.Fix;
 
 /**
  * РАЗВЯЗКА НИЧЬИ ПО ОЧКАМ (правило дизайнера 14.09.2026): больше гексов, на
- * которых стоят жетоны игрока; затем больше трофеев (жетоны на свалке плюс
- * кубики трофеев); затем больше келемия; иначе победу делят.
+ * которых стоят жетоны игрока; затем больше трофеев (жетоны на свалке по
+ * напечатанному на них числу плюс кубики трофеев); затем больше келемия;
+ * иначе победу делят.
  *
  * <p>Прежняя развязка движка (келемий, затем монеты) была его выдумкой.
  */
@@ -74,19 +75,22 @@ class РазвязкаНичьиTest {
     }
 
     @Test
-    void жетонНаСвалкеСчитаетсяЗаОдинТрофей() {
+    void жетонНаСвалкеСчитаетсяПоНапечатанномуЧислу() {
         GameState s = Fix.game(2, 42L);
         очистить(s);
         Fix.unit(s, 0, UnitType.INFANTRY, s.player(0).startHex);
         Fix.unit(s, 1, UnitType.INFANTRY, s.player(1).startHex);
-        // У места 0 на свалке жетон завода: он стоит 1 трофей, как и кубик.
-        s.player(0).destroyedTokens.add(
-            Fix.building(s, 1, BuildingType.FACTORY, s.player(1).startHex, null));
-        s.player(1).resources.add(Resource.TROPHY, 1);
+        // У места 0 на свалке жетон завода: он стоит столько трофеев, сколько
+        // напечатано на его трофейной стороне. Столько же кубиков — у места 1.
+        var жетон = Fix.building(s, 1, BuildingType.FACTORY, s.player(1).startHex, null);
+        жетон.hexId = null;
+        s.player(0).destroyedTokens.add(жетон);
+        s.player(1).resources.add(Resource.TROPHY, жетон.trophyValue());
 
         Map<String, Object> итог = доиграть(s);
         assertTrue(итог.get("winners") instanceof List<?> l && l.size() == 2,
-            "жетон на свалке равен кубику трофея — полная ничья, победу делят: " + итог);
+            "жетон считается по напечатанному числу (" + жетон.trophyValue()
+                + ") — трофеи равны, победу делят: " + итог);
     }
 
     @Test
