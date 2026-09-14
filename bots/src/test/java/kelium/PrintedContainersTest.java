@@ -183,15 +183,16 @@ class PrintedContainersTest {
     }
 
     @Test
-    void everyPlayerAlwaysStartsWithExactlyOneContainer() {
-        // Стартовая карта выдаётся ИЗ ЗАПАСА и не зависит от того, что легло на
-        // стартовый гекс: иначе старт был бы неравным из-за случайной раскладки.
+    void никакихСтартовыхКонтейнеров() {
+        // ПРАВИЛО ДИЗАЙНЕРА 13.09.2026: «карты контейнера на старте нет».
+        // Прежняя раздача (по одной каждому) была тестовой и расходилась с
+        // книгой правил — ключ setup.start_containers теперь ноль.
         for (long seed : new long[]{25L, 26L, 27L}) {
             GameState s = game(seed);
             for (int seat = 0; seat < 4; seat++) {
-                assertEquals(1, s.player(seat).containers,
+                assertEquals(0, s.player(seat).containers,
                     "сид " + seed + ", место " + (seat + 1)
-                        + ": стартовый контейнер получают все и ровно один");
+                        + ": на подготовке карт контейнера не выдают");
             }
         }
     }

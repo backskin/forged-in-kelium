@@ -687,6 +687,51 @@ public final class Modules {
      * «В» и «Г»: старые планшеты не должны менять поведение.
      */
     /**
+     * РАЗДАТЬ ГЛУХИЕ ЖЕТОНЫ НА ПОДГОТОВКЕ (книга правил, глава 3, шаг 14).
+     *
+     * <p>«Перемешайте модули блокировки боя стороной с 3 очками вверх. Каждый
+     * берёт один, переворачивает и кладёт на специальную атаку рода войск с
+     * модуля.» Род достаётся случайно — выбора у игрока нет, поэтому шаг и не
+     * спрашивает агента и спокойно живёт рядом с остальной подготовкой.
+     *
+     * <p>Лежит здесь, а не в {@link Setup}: всё про модули на планшете — в
+     * одном классе, и правило «жетон занимает ячейку по-настоящему» читается
+     * рядом с тем кодом, который его соблюдает.
+     *
+     * @param emit приёмник событий записи (может быть {@code null})
+     */
+    public static void раздатьГлухиеЖетоны(GameState s,
+                                           Consumer<Map<String, Object>> emit) {
+        if (!Ctx.rules(s).getBool("command_center.destruction_token_seals_cell", false)) {
+            return;
+        }
+        List<UnitType> мешок = new ArrayList<>();
+        for (UnitType t : UnitType.values()) {
+            if (s.player(0).board.troop.specializedTarget(t) != null) {
+                мешок.add(t);
+            }
+        }
+        java.util.Collections.shuffle(мешок, s.rng);
+        for (PlayerState p : s.players) {
+            if (мешок.isEmpty()) {
+                break;      // игроков больше, чем жетонов — остальные без него
+            }
+            UnitType род = мешок.remove(0);
+            Map<String, Object> жетон = new java.util.HashMap<>();
+            жетон.put("id", PlayerState.CU_MODULE);
+            жетон.put("blocks", true);
+            p.redPlacements.put(род, жетон);
+            if (emit != null) {
+                Map<String, Object> ev = new java.util.HashMap<>();
+                ev.put("type", "seal_unit");
+                ev.put("seat", p.seat);
+                ev.put("unit", род.code);
+                emit.accept(ev);
+            }
+        }
+    }
+
+    /**
      * ГЛУХОЙ ЖЕТОН НА ЭТОЙ ЯЧЕЙКЕ? Пока он у игрока, ячейка занята, и рабочий
      * красный модуль туда не положить. Уехал к захватчику за снесённое ЦУ —
      * место освободилось.

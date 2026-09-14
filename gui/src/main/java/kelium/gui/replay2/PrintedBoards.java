@@ -367,6 +367,13 @@ final class PrintedBoards {
     }
 
     /**
+     * ПОДПИСИ ПОД СТОПКАМИ ЗАПАСА («пехота», «3 из 4»). На столе таких цифр нет:
+     * там просто лежат оставшиеся жетоны. Прибору они нужны, картинке стола для
+     * книги правил — нет, поэтому выключаются на время снимка.
+     */
+    static boolean подписиЗапаса = true;
+
+    /**
      * ЗАПАС ЖЕТОНОВ ВОЙСК — ЧЕТЫРЬМЯ СТОПКАМИ НАД ПЛАНШЕТОМ ХРАНИЛИЩА.
      *
      * <p>Заказ дизайнера 11.09.2026: убрать из-под планшета подписи «на поле 1 ·
@@ -379,6 +386,27 @@ final class PrintedBoards {
      *
      * @param запас род → {@code [на поле, в запасе]}
      */
+    /** Оставшиеся жетоны рода стопкой внахлёст — вид со стола. */
+    private static void стопкаЖетонов(Graphics2D g, BufferedImage tex, int cx, int y,
+                                      int colW, int высота, int сколько) {
+        if (tex == null || сколько <= 0) {
+            return;
+        }
+        double доля = tex.getWidth() / (double) tex.getHeight();
+        int th = высота;
+        int tw = (int) Math.round(th * доля);
+        if (tw > colW - 6) {
+            tw = colW - 6;
+            th = (int) Math.round(tw / доля);
+        }
+        int сдвиг = Math.max(1, th / 9);
+        int всего = (сколько - 1) * сдвиг;
+        for (int i = сколько - 1; i >= 0; i--) {
+            g.drawImage(tex, cx - tw / 2 - всего / 2 + i * сдвиг,
+                y + (высота - th) / 2 - i * сдвиг / 2, tw, th, null);
+        }
+    }
+
     private static void запасВойск(Graphics2D g, int x, int y, int width, int height,
                                    Map<String, int[]> запас, int seat) {
         if (запас == null || запас.isEmpty() || width <= 0 || height <= 0) {
@@ -393,9 +421,15 @@ final class PrintedBoards {
             int cx = x + i * colW + colW / 2;
             java.awt.Font шрифт = Theme.font(Math.max(9, height / 7), Font.BOLD);
             g.setFont(шрифт);
-            int строка = g.getFontMetrics().getHeight();
+            int строка = подписиЗапаса ? g.getFontMetrics().getHeight() : 0;
             int картинкаH = Math.max(8, height - строка * 2 - 2);
             BufferedImage tex = Textures.unit(роды[i], seat);
+            if (!подписиЗапаса) {
+                // СТОЛ: лежат САМИ ОСТАВШИЕСЯ ЖЕТОНЫ, стопкой внахлёст, — и
+                // сколько их, видно по стопке, а не по цифре.
+                стопкаЖетонов(g, tex, cx, y, colW, картинкаH, вЗапасе);
+                continue;
+            }
             java.awt.Composite было = g.getComposite();
             if (вЗапасе == 0) {
                 g.setComposite(java.awt.AlphaComposite.getInstance(

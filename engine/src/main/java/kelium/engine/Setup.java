@@ -375,6 +375,20 @@ public final class Setup {
      * (ЦУ, добытчик №1, 1 пехота), раздаёт по одному супер-заданию, создаёт
      * тех-планшет и колоды (с отбраковкой карт под число игроков).
      */
+    /**
+     * СТАРТОВЫЙ РЕСУРС ПО МЕСТУ ЗА СТОЛОМ. Ключ свода может быть одним числом
+     * (всем поровну) или списком по местам — тогда берётся элемент своего
+     * места. Нет ключа — печатное умолчание.
+     */
+    private static int поМесту(Ruleset ruleset, String key, int seat, int умолчание) {
+        Object cfg = ruleset.get(key, null);
+        if (cfg instanceof List<?> lst) {
+            return seat < lst.size() && lst.get(seat) instanceof Number n
+                ? n.intValue() : умолчание;
+        }
+        return cfg instanceof Number n ? n.intValue() : умолчание;
+    }
+
     public static GameState buildGame(GameConfig config) {
         return buildGame(config, null);
     }
@@ -442,21 +456,18 @@ public final class Setup {
             PlayerBoard board = PlayerBoard.fromContent(boardsEntries, side, side);
             // Стартовые монеты: из ruleset (setup.start_coins), иначе умолчание —
             // 5 всем (решение 2026-08-12).
-            int startCoins;
-            Object coinsCfg = ruleset.get("setup.start_coins", null);
-            if (coinsCfg instanceof List<?> lst && seat < lst.size()
-                    && lst.get(seat) instanceof Number cn) {
-                startCoins = cn.intValue();
-            } else {
-                startCoins = seat < START_COINS.length ? START_COINS[seat] : 4;
-            }
+            int startCoins = поМесту(ruleset, "setup.start_coins", seat,
+                seat < START_COINS.length ? START_COINS[seat] : 4);
             // Стартовые келемий и боеприпасы — тем же путём, что монеты: из
             // свода, если ключ задан, иначе печатное умолчание. Меню запуска
             // правит их для ТРЕНИРОВОЧНОЙ партии, не трогая файлы правил.
-            int startKelium = ruleset.get("setup.start_kelium", null) instanceof Number kn
-                ? kn.intValue() : START_KELIUM;
-            int startAmmo = ruleset.get("setup.start_ammo", null) instanceof Number an
-                ? an.intValue() : START_AMMO;
+            //
+            // КЕЛЕМИЙ ТОЖЕ ПО МЕСТУ ЗА СТОЛОМ (решение дизайнера 13.09.2026):
+            // первый игрок ходит первым и начинает без келемия, остальным он
+            // компенсирует очередь. Раньше ключ принимал только одно число на
+            // всех, и движок выдавал по келемию даже первому игроку.
+            int startKelium = поМесту(ruleset, "setup.start_kelium", seat, START_KELIUM);
+            int startAmmo = поМесту(ruleset, "setup.start_ammo", seat, START_AMMO);
             Resources res = new Resources(startCoins, startKelium, startAmmo, 0);
             String startHex = startHexes.get(seat);
             PlayerState ps = new PlayerState(seat, board, res, startHex);
@@ -786,8 +797,14 @@ public final class Setup {
         // гексов), а мог достаться воздушный, до которого наземным жетонам не
         // дотянуться. Привязывать стартовую карту к раскладке — значит делать
         // старт неравным на ровном месте, поэтому она выдаётся безусловно.
+        // 13.09.2026: КАРТЫ КОНТЕЙНЕРА НА СТАРТЕ НЕТ (правило дизайнера).
+        // Раздача была тестовой и расходилась с правилами. Ключ оставлен ради
+        // старых сводов: они играются по-прежнему, по одной карте каждому.
+        int стартКонтейнеров = ruleset.getInt("setup.start_containers", 1);
         for (PlayerState p : players) {
-            Storage.addContainersCapped(s, p, 1, "подготовка");
+            if (стартКонтейнеров > 0) {
+                Storage.addContainersCapped(s, p, стартКонтейнеров, "подготовка");
+            }
         }
 
         // Супер-арсенал (треки 2.0): из 9 карт выложить В ОТКРЫТУЮ по одной на

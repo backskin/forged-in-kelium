@@ -172,6 +172,9 @@ public final class RuleWords {
             // ---------- Подготовка ----------
             case "setup.start_miner" -> "добытчик стоит на поле с самого начала";
             case "setup.start_coins" -> "монеты на старте, по местам";
+            case "setup.start_kelium" -> "келемий на старте, по местам";
+            case "setup.start_ammo" -> "боеприпасы на старте";
+            case "setup.start_containers" -> "карты контейнера на старте";
 
             // ---------- Экономика ----------
             case "economy.coins_per_vp" -> "монет за одно победное очко";

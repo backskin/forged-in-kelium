@@ -1628,28 +1628,7 @@ public final class GameEngine {
         {"северо-восток", "восток", "юго-восток", "юго-запад", "запад", "северо-запад"};
 
     private void offerSealChoice() {
-        GameState s = state;
-        if (!rs().getBool("command_center.destruction_token_seals_cell", false)) {
-            return;
-        }
-        List<UnitType> мешок = new ArrayList<>();
-        for (UnitType t : UnitType.values()) {
-            if (s.player(0).board.troop.specializedTarget(t) != null) {
-                мешок.add(t);
-            }
-        }
-        Collections.shuffle(мешок, s.rng);
-        for (PlayerState p : s.players) {
-            if (мешок.isEmpty()) {
-                break;      // игроков больше, чем жетонов — остальные без него
-            }
-            UnitType род = мешок.remove(0);
-            Map<String, Object> жетон = new HashMap<>();
-            жетон.put("id", PlayerState.CU_MODULE);
-            жетон.put("blocks", true);
-            p.redPlacements.put(род, жетон);
-            emit(ev("type", "seal_unit", "seat", p.seat, "unit", род.code));
-        }
+        Modules.раздатьГлухиеЖетоны(state, this::emit);
     }
 
 
