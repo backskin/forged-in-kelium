@@ -257,22 +257,34 @@ public final class GameEngine {
         if (s.winner == null) {
             int best = 0;
             for (int i = 1; i < s.numPlayers(); i++) {
-                if (better(scores, s, i, best)) {
+                if (compareEnd(scores, s, i, best) > 0) {
                     best = i;
                 }
             }
-            s.winner = best;
-            if (s.winCondition == null) {
-                s.winCondition = "victory_points";
+            // ПОБЕДУ ДЕЛЯТ, если после всей развязки игроки равны (правило
+            // дизайнера 14.09.2026).
+            s.winners.clear();
+            for (int i = 0; i < s.numPlayers(); i++) {
+                if (compareEnd(scores, s, i, best) == 0) {
+                    s.winners.add(i);
+                }
             }
+            s.winner = s.winners.isEmpty() ? best : s.winners.get(0);
+            if (s.winCondition == null) {
+                s.winCondition = s.winners.size() > 1 ? "shared_victory" : "victory_points";
+            }
+        } else if (s.winners.isEmpty()) {
+            s.winners.add(s.winner);
         }
         s.finished = true;
         emit(ev("type", "game_end", "winner", s.winner, "condition", s.winCondition,
+            "winners", new ArrayList<>(s.winners),
             "spawn_left", s.spawnLeftAtEnd, "spawn_threshold", s.spawnThreshold,
             "scores", scores));
 
         Map<String, Object> result = new HashMap<>();
         result.put("winner", s.winner);
+        result.put("winners", new ArrayList<>(s.winners));
         result.put("condition", s.winCondition);
         result.put("spawn_left", s.spawnLeftAtEnd);
         result.put("spawn_threshold", s.spawnThreshold);
@@ -281,19 +293,58 @@ public final class GameEngine {
         return result;
     }
 
-    // Больше очков; ничья ломается по келемию, затем по монетам.
-    private static boolean better(Map<Integer, Map<String, Integer>> scores, GameState s, int i, int best) {
-        int ti = scores.get(i).get("total");
-        int tb = scores.get(best).get("total");
-        if (ti != tb) {
-            return ti > tb;
+    /**
+     * КТО ВЫШЕ В ИТОГЕ (правило дизайнера 14.09.2026): больше победных очков;
+     * при равенстве — больше ГЕКСОВ, на которых стоят жетоны игрока; дальше —
+     * больше ТРОФЕЕВ (уничтоженные жетоны на свалке плюс кубики трофеев в
+     * хранилище); дальше — больше КЕЛЕМИЯ в хранилище. Всё равно — победу
+     * делят, и сравнение возвращает 0.
+     *
+     * <p>Прежняя развязка (келемий, затем монеты) была выдумкой движка.
+     *
+     * @return {@code >0}, если i выше best; {@code <0}, если ниже; 0 — делят
+     */
+    private static int compareEnd(Map<Integer, Map<String, Integer>> scores,
+                                  GameState s, int i, int best) {
+        int d = Integer.compare(scores.get(i).get("total"), scores.get(best).get("total"));
+        if (d != 0) {
+            return d;
         }
-        int ki = s.players.get(i).resources.kelium();
-        int kb = s.players.get(best).resources.kelium();
-        if (ki != kb) {
-            return ki > kb;
+        d = Integer.compare(hexesHeld(s.players.get(i)), hexesHeld(s.players.get(best)));
+        if (d != 0) {
+            return d;
         }
-        return s.players.get(i).resources.coin() > s.players.get(best).resources.coin();
+        d = Integer.compare(trophiesHeld(s.players.get(i)), trophiesHeld(s.players.get(best)));
+        if (d != 0) {
+            return d;
+        }
+        return Integer.compare(s.players.get(i).resources.kelium(),
+            s.players.get(best).resources.kelium());
+    }
+
+    /** На скольких РАЗНЫХ гексах стоят жетоны игрока — здания и войска вместе. */
+    private static int hexesHeld(PlayerState p) {
+        java.util.Set<String> hexes = new java.util.HashSet<>();
+        for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+            if (b.hexId != null) {
+                hexes.add(b.hexId);
+            }
+        }
+        for (kelium.core.UnitToken u : p.unitsOnField()) {
+            if (u.hexId != null) {
+                hexes.add(u.hexId);
+            }
+        }
+        return hexes.size();
+    }
+
+    /**
+     * ТРОФЕИ НА КОНЕЦ ПАРТИИ: жетоны на свалке плюс кубики трофеев в хранилище.
+     * Жетон считается за один трофей — ровно так он и конвертируется в
+     * Возвращении, сколько бы ни было напечатано на его трофейной стороне.
+     */
+    private static int trophiesHeld(PlayerState p) {
+        return p.destroyedTokens.size() + p.resources.trophy();
     }
 
     // ---- помощники подготовки --------------------------------------------

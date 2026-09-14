@@ -80,6 +80,12 @@ public final class GameState {
     public final int[][] marketCells = {{-1, -1}, {-1, -1}};
     public boolean finished = false;
     public Integer winner = null;
+    /**
+     * ВСЕ ПОБЕДИТЕЛИ. Обычно один — он же {@link #winner}; при полной ничьей
+     * (равны очки и все три признака развязки) победу делят, и здесь их
+     * несколько (правило дизайнера 14.09.2026).
+     */
+    public final java.util.List<Integer> winners = new java.util.ArrayList<>();
     public String winCondition = null;
     /**
      * СКОЛЬКО ИСТОЧНИКОВ КЕЛЕМИЯ ОСТАЛОСЬ, когда партия кончилась по ним, и при
@@ -181,6 +187,7 @@ public final class GameState {
         }
         s.finished = finished;
         s.winner = winner;
+        s.winners.addAll(winners);
         s.winCondition = winCondition;
         s.spawnLeftAtEnd = spawnLeftAtEnd;
         s.spawnThreshold = spawnThreshold;
@@ -255,6 +262,8 @@ public final class GameState {
         }
         finished = fresh.finished;
         winner = fresh.winner;
+        winners.clear();
+        winners.addAll(fresh.winners);
         winCondition = fresh.winCondition;
         spawnLeftAtEnd = fresh.spawnLeftAtEnd;
         spawnThreshold = fresh.spawnThreshold;
