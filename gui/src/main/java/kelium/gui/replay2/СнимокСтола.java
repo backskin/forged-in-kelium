@@ -128,6 +128,9 @@ public final class СнимокСтола {
             ? Path.of(args[2])
             : root.resolve("scenarios/new/сценарий 3 игрока 1.kmap");
         long сид = args.length > 3 ? Long.parseLong(args[3]) : 7L;
+        if (args.length > 4 && !args[4].isBlank()) {
+            сукно = args[4];
+        }
 
         GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 3, сид,
             root, null, null, null, раскладка);
@@ -289,15 +292,42 @@ public final class СнимокСтола {
             RenderingHints.VALUE_STROKE_PURE);
     }
 
-    /** Сукно стола: тёмное, чтобы светлый картон на нём читался. */
+    /**
+     * ПОВЕРХНОСТЬ СТОЛА. Картон у игры светлый, и подложка нужна тёмная, иначе
+     * компоненты в неё проваливаются. По умолчанию дерево: книга печатается на
+     * кремовой бумаге, и тёплый стол ложится в её палитру, а тёмно-серое сукно
+     * (ключ {@code cloth}) даёт больший контраст. {@code light} — светлый стол,
+     * оставлен для сравнения.
+     */
+    static String сукно = "wood";
+
     private static void стол(Graphics2D g, int w, int h) {
-        g.setPaint(new java.awt.GradientPaint(0, 0, new Color(0x3E4440),
-            w, h, new Color(0x1F2326)));
+        Color верх;
+        Color низ;
+        Color блик;
+        switch (сукно) {
+            case "wood" -> {
+                верх = new Color(0x6B4A2C);
+                низ = new Color(0x3A2616);
+                блик = new Color(255, 236, 200, 26);
+            }
+            case "light" -> {
+                верх = new Color(0xC9BFA6);
+                низ = new Color(0x8E8571);
+                блик = new Color(255, 255, 255, 34);
+            }
+            default -> {
+                верх = new Color(0x3E4440);
+                низ = new Color(0x1F2326);
+                блик = new Color(255, 255, 255, 16);
+            }
+        }
+        g.setPaint(new java.awt.GradientPaint(0, 0, верх, w, h, низ));
         g.fillRect(0, 0, w, h);
         g.setPaint(new java.awt.RadialGradientPaint(
             new java.awt.geom.Point2D.Double(w / 2.0, h * 0.45), (float) (w * 0.60),
             new float[]{0.45f, 1f},
-            new Color[]{new Color(255, 255, 255, 16), new Color(0, 0, 0, 130)}));
+            new Color[]{блик, new Color(0, 0, 0, 130)}));
         g.fillRect(0, 0, w, h);
     }
 
