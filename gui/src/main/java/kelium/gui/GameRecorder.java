@@ -335,6 +335,31 @@ public final class GameRecorder {
     }
 
     /** Общая шапка записи: кто играет, на чём и какое поле. */
+    /**
+     * ЗАПИСЬ ПОДГОТОВЛЕННОЙ ПАРТИИ — один кадр и ни одного хода.
+     *
+     * <p>Нужна картинке «стол перед первым ходом» для книги правил. Играть ради
+     * неё целую партию нельзя: после первого же круга на поле уже стоят
+     * постройки, а показать надо ровно подготовку. Шапка и снимок берутся тем
+     * же кодом, что у настоящей партии, поэтому картинка не может разойтись с
+     * тем, что движок считает подготовленным столом.
+     *
+     * @param seatIds подписи мест (боты не запускаются — ходов нет)
+     */
+    public static ReplayRecord setupOnly(GameConfig cfg, GameState state, long seed,
+                                         List<String> seatIds) {
+        ReplayRecord rec = header(cfg, state, state.numPlayers(), seed,
+            seatIds == null ? List.of() : seatIds, cfg.scenarioId, cfg.cuFacing);
+        ReplayRecord.Frame f = new ReplayRecord.Frame();
+        f.type = "setup";
+        f.round = state.round;
+        f.circle = state.circle;
+        f.snapshot = ReplayRecord.snapshotOf(state, null);
+        rec.frames.add(f);
+        rec.rounds = state.round;
+        return rec;
+    }
+
     private static ReplayRecord header(GameConfig cfg, GameState state, int players, long seed,
                                        List<String> seatIds, String scenarioId,
                                        List<Integer> cuFacing) {

@@ -321,6 +321,44 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * их собой; построил — ячейки открылись и в них видно, что лежит. Ровно так это
      * работает на столе.
      */
+    /**
+     * СЦЕПКА ПЕЧАТНЫХ ПЛАНШЕТОВ ИГРОКА В ЧУЖОЙ ХОЛСТ.
+     *
+     * <p>То же самое, что лист личной зоны рисует у себя наверху, но без шапки,
+     * списков и прочей обвязки прибора: только два планшета так, как они лежат
+     * на столе. Нужно картинке подготовленной партии для книги правил — рисовать
+     * её отдельным кодом значило бы завести второй источник правды о том, где на
+     * планшете что лежит.
+     *
+     * @param width ширина всей сцепки в точках холста
+     * @return высота сцепки (0 — печатных планшетов у этого места нет)
+     */
+    int печатнаяСцепка(Graphics2D g, int x, int y, int width) {
+        ReplayRecord.Frame f = session.frame();
+        if (f == null || f.snapshot == null || seat >= f.snapshot.players.size()
+            || !PrintedBoards.available(seat)) {
+            return 0;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(seat);
+        var сцепка = PrintedBoards.сцепка(seat);
+        if (сцепка == null) {
+            return 0;
+        }
+        List<ReplayRecord.Tok> all = buildingsOf(f, seat);
+        planCells(p, all);
+        double k = width / сцепка.ширина();
+        PrintedBoards.paintPair(g, x, y, k, сцепка, p, troopSide(p),
+            cellFill, startFill, coveredCells(all), вЗапасе(f, seat), запасВойск(f, seat),
+            new LinkedHashMap<>(), new LinkedHashMap<>());
+        return (int) Math.round(сцепка.высота() * k);
+    }
+
+    /** Каких пропорций сцепка печатных планшетов: ширина к высоте. */
+    double пропорцияСцепки() {
+        var с = PrintedBoards.сцепка(seat);
+        return с == null ? 0 : с.ширина() / с.высота();
+    }
+
     private int paintBuildings(Graphics2D g, ReplayRecord.Frame f, ReplayRecord.Player p,
                                int x, int y, int w, boolean печатный) {
         buildingSpots.clear();
