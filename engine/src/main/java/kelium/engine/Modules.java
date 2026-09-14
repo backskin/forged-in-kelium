@@ -21,9 +21,9 @@ import kelium.dataio.Ctx;
  * какие из своих задействовать.
  *
  * <p>КРАСНЫЕ (атака) M1–M4: накладываются на строку ВТР рода войск, заменяя цель
- * ВЫБОРОМ из двух (каждая из 4 целей встречается ровно дважды). Урон 1, цена
- * печатная (2 БП). ЗОЛОТО: стреляют ОБЕ цели (каждая оплачивается отдельно, бьют
- * по разным жетонам), модуль даёт +1 ПО.
+ * ВЫБОРОМ из двух. Урон 1, цена жетона (1 БП). ЗОЛОТО (по печати жетона,
+ * 14.09.2026): ОДНА атака за 1 боеприпас наносит по 1 урону одному жетону КАЖДОГО
+ * из двух типов на выбранном гексе; модуль даёт +1 ПО.
  *
  * <p>СИНИЕ (сборка) C1–C4 (спека дизайнера 2026-08-10, картинки): жетон накрывает
  * ВСЮ зону сборки здания и задаёт СВОИ выходы «X боеприпасов ИЛИ Y войск»
@@ -156,14 +156,192 @@ public final class Modules {
             p.blueTokens.add(id);
             p.blueModules += 1;
         }
-        // ПОЛУЧЕННЫЙ ЖЕТОН СРАЗУ ЛОЖИТСЯ НА ПЛАНШЕТ. Смены модулей в Обновление
-        // нет, значит раскладка происходит в момент получения. ВРЕМЕННО: как
-        // именно кладётся новый жетон и можно ли при этом трогать уже лежащие,
-        // дизайнер ещё не сказал — пока игрок раскладывает всё заново.
+        // ПОЛУЧЕННЫЙ ЖЕТОН СРАЗУ ЛОЖИТСЯ НА СВОБОДНУЮ ЯЧЕЙКУ (решение дизайнера
+        // 14.09.2026). Лежащие жетоны при этом НЕ трогаются: смены модулей в
+        // раунде нет, а перекладка — платный обмен планшета науки. Прежде
+        // движок при каждом получении раскладывал все модули заново — так
+        // нельзя. Свободной ячейки нет — жетон остаётся в запасе игрока и
+        // ставится позже обменом «перемещение модуля» (пока дизайнер не решил
+        // иначе).
         if (s.agents != null && p.seat < s.agents.size() && s.agents.get(p.seat) != null) {
-            moduleSwap(s, p.seat, s.agents.get(p.seat), ev -> { });
+            placeNewToken(s, p, s.agents.get(p.seat), id, red);
         }
         return id;
+    }
+
+    /**
+     * ПОЛОЖИТЬ ТОЛЬКО ЧТО ВЫТЯНУТЫЙ ЖЕТОН на одну из свободных ячеек его цвета.
+     * Куда — выбирает игрок. Свободных ячеек нет — жетон лежит в запасе
+     * ({@link PlayerState#redTokens}/{@link PlayerState#blueTokens} без записи в
+     * раскладке).
+     *
+     * @return ячейка (род войск или здание), куда лёг жетон, либо null
+     */
+    public static Object placeNewToken(GameState s, PlayerState p, Agent agent,
+                                       String id, boolean red) {
+        List<Choice> opts = new ArrayList<>();
+        if (red) {
+            Map<String, Object> placement = redPlacementFor(s, id);
+            if (placement == null) {
+                return null;
+            }
+            for (UnitType t : UnitType.values()) {
+                if (redSlotsFor(p, t) > 0 && !p.redPlacements.containsKey(t)) {
+                    opts.add(new Choice("red_slot", Map.of("module", id, "unit", t),
+                        id + "->" + t.code));
+                }
+            }
+            if (opts.isEmpty()) {
+                return null;
+            }
+            Choice ch = agent.choose(s, opts, Map.of("kind", "module_place_red"));
+            if (!(ch.payload() instanceof Map<?, ?> pick)) {
+                return null;
+            }
+            UnitType slot = (UnitType) pick.get("unit");
+            p.redPlacements.put(slot, placement);
+            return slot;
+        }
+        Map<String, Object> placement = bluePlacementFor(s, id);
+        if (placement == null) {
+            return null;
+        }
+        for (BuildingType b : MIL_BUILDINGS) {
+            if (!p.bluePlacements.containsKey(b)) {
+                opts.add(new Choice("blue_slot", Map.of("module", id, "building", b),
+                    id + "->" + b.code));
+            }
+        }
+        if (opts.isEmpty()) {
+            return null;
+        }
+        Choice ch = agent.choose(s, opts, Map.of("kind", "module_place_blue"));
+        if (!(ch.payload() instanceof Map<?, ?> pick)) {
+            return null;
+        }
+        BuildingType slot = (BuildingType) pick.get("building");
+        p.bluePlacements.put(slot, placement);
+        return slot;
+    }
+
+    /** Запись раскладки красного жетона по его id, обычной стороной; null — жетон неизвестен. */
+    public static Map<String, Object> redPlacementFor(GameState s, String id) {
+        Map<String, Object> placement = new HashMap<>();
+        placement.put("id", id);
+        placement.put("gold", false);
+        Target[] pair = RED_MODULES.get(id);
+        if (pair != null) {
+            placement.put("targets", new String[]{pair[0].code, pair[1].code});
+            return placement;
+        }
+        var tok = ModuleSets.token(ModuleSets.of(s), id);
+        if (tok != null && !tok.targets().isEmpty()) {
+            placement.put("targets", tok.targets().toArray(new String[0]));
+            placement.put("ammo", tok.ammo());
+            return placement;
+        }
+        if (tok != null && tok.stat() != null) {
+            placement.put("stat", tok.stat());
+            placement.put("plus", tok.plus());
+            return placement;
+        }
+        return null;
+    }
+
+    /** Запись раскладки синего жетона по его id, обычной стороной; null — жетон неизвестен. */
+    public static Map<String, Object> bluePlacementFor(GameState s, String id) {
+        Map<String, Object> spec = blueSpec(s, id);
+        if (spec == null) {
+            return null;
+        }
+        Map<String, Object> placement = new HashMap<>();
+        placement.put("id", id);
+        placement.put("ammo", spec.get("ammo"));
+        placement.put("units", spec.get("units"));
+        placement.put("gild", spec.get("gild"));
+        placement.put("gold", false);
+        return placement;
+    }
+
+    /** Жетоны игрока этого цвета, которые вытянуты, но не лежат на планшете. */
+    public static List<String> unplacedTokens(PlayerState p, boolean red) {
+        List<String> out = new ArrayList<>(red ? p.redTokens : p.blueTokens);
+        var placed = red ? p.redPlacements.values() : p.bluePlacements.values();
+        for (Map<String, Object> pl : placed) {
+            out.remove(String.valueOf(pl.get("id")));
+        }
+        return out;
+    }
+
+    /** Сколько золотых модулей лежит на планшете игрока (глухой жетон не в счёт). */
+    public static int countGold(PlayerState p) {
+        int n = 0;
+        for (Map<String, Object> pl : p.redPlacements.values()) {
+            if (Boolean.TRUE.equals(pl.get("gold")) && !Boolean.TRUE.equals(pl.get("blocks"))) {
+                n++;
+            }
+        }
+        for (Map<String, Object> pl : p.bluePlacements.values()) {
+            if (Boolean.TRUE.equals(pl.get("gold"))) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** Есть ли у игрока лежащий модуль, который ещё можно позолотить. */
+    public static boolean canGild(PlayerState p) {
+        for (Map<String, Object> pl : p.redPlacements.values()) {
+            if (!Boolean.TRUE.equals(pl.get("gold")) && !Boolean.TRUE.equals(pl.get("blocks"))) {
+                return true;
+            }
+        }
+        for (Map<String, Object> pl : p.bluePlacements.values()) {
+            if (!Boolean.TRUE.equals(pl.get("gold"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * ПОЗОЛОТА: перевернуть ОДИН лежащий модуль золотой стороной. Какой —
+     * выбирает игрок. Золото — свойство конкретного жетона: оно лежит в его
+     * записи раскладки и переезжает вместе с ним. Прежний общий счётчик
+     * {@link PlayerState#goldModules} держится равным числу золотых записей,
+     * потому что его читают подсчёт очков, отчёты и боты.
+     *
+     * @return true, если позолотили
+     */
+    public static boolean gildOne(GameState s, PlayerState p, Agent agent) {
+        List<Choice> opts = new ArrayList<>();
+        for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
+            Map<String, Object> pl = e.getValue();
+            if (!Boolean.TRUE.equals(pl.get("gold")) && !Boolean.TRUE.equals(pl.get("blocks"))) {
+                opts.add(new Choice("gild_red", e.getKey(), pl.get("id") + " на " + e.getKey().code));
+            }
+        }
+        for (Map.Entry<BuildingType, Map<String, Object>> e : p.bluePlacements.entrySet()) {
+            if (!Boolean.TRUE.equals(e.getValue().get("gold"))) {
+                opts.add(new Choice("gild_blue", e.getKey(),
+                    e.getValue().get("id") + " на " + e.getKey().code));
+            }
+        }
+        if (opts.isEmpty()) {
+            return false;
+        }
+        Choice ch = opts.size() == 1 || agent == null ? opts.get(0)
+            : agent.choose(s, opts, Map.of("kind", "module_gild_pick"));
+        if (ch == null || ch.payload() == null) {
+            ch = opts.get(0);
+        }
+        if ("gild_red".equals(ch.kind())) {
+            p.redPlacements.get((UnitType) ch.payload()).put("gold", true);
+        } else {
+            p.bluePlacements.get((BuildingType) ch.payload()).put("gold", true);
+        }
+        p.goldModules = countGold(p);
+        return true;
     }
 
     /**
@@ -218,6 +396,21 @@ public final class Modules {
                 break;
             }
         }
+        // ЗОЛОТО ПРИНАДЛЕЖИТ ЖЕТОНУ, а не месту и не порядковому номеру:
+        // запоминаем, какие именно жетоны лежали золотой стороной, и кладём их
+        // золотыми же. Прежде золото «прилипало» к первым разложенным и при
+        // перекладке перетекало с красного на синий.
+        java.util.Set<String> золотые = new java.util.HashSet<>();
+        for (Map<String, Object> pl : p.redPlacements.values()) {
+            if (Boolean.TRUE.equals(pl.get("gold")) && !Boolean.TRUE.equals(pl.get("blocks"))) {
+                золотые.add(String.valueOf(pl.get("id")));
+            }
+        }
+        for (Map<String, Object> pl : p.bluePlacements.values()) {
+            if (Boolean.TRUE.equals(pl.get("gold"))) {
+                золотые.add(String.valueOf(pl.get("id")));
+            }
+        }
         p.redPlacements.clear();
         p.bluePlacements.clear();
         if (глухой != null) {
@@ -239,7 +432,6 @@ public final class Modules {
             ? java.util.Arrays.asList(RED_NAMES) : new ArrayList<>(p.redTokens);
         int redAvail = p.redTokens.isEmpty()
             ? Math.min(p.redModules, RED_NAMES.length) : p.redTokens.size();
-        int goldRed = Math.min(p.goldModules, Math.max(p.redModules, redAvail));
         java.util.Set<String> usedModules = new java.util.HashSet<>();
         for (int i = 0; i < redAvail; i++) {
             List<Choice> topts = new ArrayList<>();
@@ -279,7 +471,7 @@ public final class Modules {
             UnitType slot = (UnitType) pick.get("unit");
             Map<String, Object> placement = new HashMap<>();
             placement.put("id", mod);
-            placement.put("gold", i < goldRed);
+            placement.put("gold", золотые.contains(mod));
             Target[] pair = RED_MODULES.get(mod);
             if (pair != null) {
                 placement.put("targets", new String[]{pair[0].code, pair[1].code});
@@ -313,7 +505,6 @@ public final class Modules {
             ? java.util.Arrays.asList(BLUE_NAMES) : new ArrayList<>(p.blueTokens);
         int blueAvail = p.blueTokens.isEmpty()
             ? Math.min(p.blueModules, BLUE_NAMES.length) : p.blueTokens.size();
-        int goldBlue = Math.max(0, p.goldModules - goldRed);
         java.util.Set<String> usedBlue = new java.util.HashSet<>();
         for (int i = 0; i < blueAvail; i++) {
             List<Choice> bopts = new ArrayList<>();
@@ -350,10 +541,11 @@ public final class Modules {
             placement.put("ammo", spec.get("ammo"));
             placement.put("units", spec.get("units"));
             placement.put("gild", spec.get("gild"));
-            placement.put("gold", i < goldBlue);
+            placement.put("gold", золотые.contains(mod));
             usedBlue.add(mod);
             p.bluePlacements.put(slot, placement);
         }
+        p.goldModules = countGold(p);
 
         // ЧТО ИМЕННО ПОСТАВЛЕНО — в событие. Без этих полей отчёт по модулям
         // читает пустоту и показывает «ни один модуль не поставлен», хотя жетоны
@@ -390,6 +582,14 @@ public final class Modules {
             picks.add(new Choice("move_blue", e.getKey(),
                 e.getValue().get("id") + " с " + e.getKey().code));
         }
+        // ЖЕТОН ИЗ ЗАПАСА: вытянут, когда свободной ячейки не было, — за тот же
+        // трофей его можно положить на освободившуюся ячейку.
+        for (String id : unplacedTokens(p, true)) {
+            picks.add(new Choice("place_red", id, id + " из запаса"));
+        }
+        for (String id : unplacedTokens(p, false)) {
+            picks.add(new Choice("place_blue", id, id + " из запаса"));
+        }
         if (picks.isEmpty()) {
             return;
         }
@@ -398,15 +598,27 @@ public final class Modules {
         if (pick.payload() == null) {
             return;
         }
+        if ("place_red".equals(pick.kind())) {
+            placeNewToken(s, p, agent, (String) pick.payload(), true);
+            return;
+        }
+        if ("place_blue".equals(pick.kind())) {
+            placeNewToken(s, p, agent, (String) pick.payload(), false);
+            return;
+        }
         if ("move_red".equals(pick.kind())) {
             UnitType from = (UnitType) pick.payload();
             Map<String, Object> placement = p.redPlacements.remove(from);
             List<Choice> slots = new ArrayList<>();
             for (UnitType t : UnitType.values()) {
-                if (!p.redPlacements.containsKey(t)) {
+                if (t != from && redSlotsFor(p, t) > 0 && !p.redPlacements.containsKey(t)) {
                     slots.add(new Choice("red_slot", Map.of("module",
                         placement.get("id"), "unit", t), placement.get("id") + "->" + t.code));
                 }
+            }
+            if (slots.isEmpty()) {
+                p.redPlacements.put(from, placement);   // переложить некуда — остаётся
+                return;
             }
             Choice slot = agent.choose(s, slots, Map.of("kind", "module_place_red"));
             Map<String, Object> sp = (Map<String, Object>) slot.payload();
@@ -416,10 +628,14 @@ public final class Modules {
             Map<String, Object> placement = p.bluePlacements.remove(from);
             List<Choice> slots = new ArrayList<>();
             for (BuildingType b : MIL_BUILDINGS) {
-                if (!p.bluePlacements.containsKey(b)) {
+                if (b != from && !p.bluePlacements.containsKey(b)) {
                     slots.add(new Choice("blue_slot", Map.of("module",
                         placement.get("id"), "building", b), placement.get("id") + "->" + b.code));
                 }
+            }
+            if (slots.isEmpty()) {
+                p.bluePlacements.put(from, placement);
+                return;
             }
             Choice slot = agent.choose(s, slots, Map.of("kind", "module_place_blue"));
             Map<String, Object> sp = (Map<String, Object>) slot.payload();

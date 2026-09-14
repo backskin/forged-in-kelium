@@ -3064,7 +3064,7 @@ public final class Actions {
                 // курсом. Десять монет здесь были бы вдвое слабее: 10 МОН это
                 // 2 ПО, а вершина стоит четырёх трофеев.
                 if (!kelium.engine.Setup.expansionOn(rs, "super_arsenal")) {
-                    topPrizeWithoutSuperArsenal(player, kind);
+                    topPrizeWithoutSuperArsenal(player, kind, agent);
                     return;
                 }
                 // Вершина трека: забрать выложенную В ОТКРЫТУЮ карту супер-арсенала
@@ -3157,16 +3157,15 @@ public final class Actions {
          *
          * @param kind род модулей трека из данных доски: red | blue | storage
          */
-        private void topPrizeWithoutSuperArsenal(PlayerState player, String kind) {
+        private void topPrizeWithoutSuperArsenal(PlayerState player, String kind, Agent agent) {
             switch (kind == null ? "storage" : kind) {
                 case "red" -> Modules.awardModule(state, player, "red");
                 case "blue" -> Modules.awardModule(state, player, "blue");
                 default -> {
-                    // ПОЗОЛОТА: улучшить один уже выданный жетон. Если золотить
-                    // нечего, приз пропадает — как и всякая недоступная награда.
-                    if (player.redModules + player.blueModules > player.goldModules) {
-                        player.goldModules += 1;
-                    }
+                    // ПОЗОЛОТА: перевернуть один лежащий жетон золотой стороной.
+                    // Если золотить нечего, приз пропадает — как и всякая
+                    // недоступная награда.
+                    Modules.gildOne(state, player, agent);
                 }
             }
         }
@@ -3381,8 +3380,7 @@ public final class Actions {
             // нет, остаётся прежняя тройка — числа сыгранных партий не должны
             // меняться задним числом.
             int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();
-            if (позолота && pool >= gildCost
-                    && (player.redModules + player.blueModules) > player.goldModules) {
+            if (позолота && pool >= gildCost && Modules.canGild(player)) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "gild");
                 ex.put("give", gildCost);
@@ -3432,7 +3430,7 @@ public final class Actions {
                     return id + ":" + tookArsenal;
                 }
             } else if ("gild".equals(id)) {
-                player.goldModules += 1;
+                Modules.gildOne(state, player, agent);
             } else if ("move_module".equals(id)) {
                 Modules.moveOneModule(state, player.seat, agent);
             }

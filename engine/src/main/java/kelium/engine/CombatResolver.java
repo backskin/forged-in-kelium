@@ -166,8 +166,16 @@ public final class CombatResolver {
         return false;
     }
 
-    /** Одна строка атаки: ключ строки, стоимость боеприпасов, категория цели. */
-    private record AttackRow(String row, int ammoCost, Target target) {
+    /**
+     * Одна строка атаки: ключ строки, стоимость боеприпасов, категория цели.
+     * {@code target2} — вторая цель ЗОЛОТОГО красного модуля: одна атака за одну
+     * плату бьёт по одному жетону каждого из двух типов (печать жетона,
+     * 14.09.2026). У обычных строк второй цели нет.
+     */
+    private record AttackRow(String row, int ammoCost, Target target, Target target2) {
+        AttackRow(String row, int ammoCost, Target target) {
+            this(row, ammoCost, target, null);
+        }
     }
 
     /**
@@ -250,8 +258,8 @@ public final class CombatResolver {
             if (t1 == null) {
                 rows.add(new AttackRow("secondary", modCost, t0));
             } else if (Boolean.TRUE.equals(mod.get("gold"))) {
-                rows.add(new AttackRow("secondary_a", modCost, t0));
-                rows.add(new AttackRow("secondary_b", modCost, t1));
+                // ЗОЛОТО: одна атака, одна плата, по 1 урону жетону каждого типа.
+                rows.add(new AttackRow("secondary", modCost, t0, t1));
             } else {
                 rows.add(new AttackRow("secondary", modCost, t0));
                 rows.add(new AttackRow("secondary", modCost, t1));
@@ -365,12 +373,11 @@ public final class CombatResolver {
             if (t1 == null) {
                 rows.add(new AttackRow("specialized", modCost, t0));
             } else if (Boolean.TRUE.equals(mod.get("gold"))) {
-                // ЗОЛОТО В БОЮ 2.0: ОДНА цена на ОБЕ цели суммарно (заказ
-                // дизайнера) — первая стоит modCost, вторая идёт бесплатно.
-                // В старой системе (не dual_cell) золото оплачивало каждую
-                // цель отдельно — здесь это НАМЕРЕННО дешевле.
-                rows.add(new AttackRow("specialized_gold_a", modCost, t0));
-                rows.add(new AttackRow("specialized_gold_b", 0, t1));
+                // ЗОЛОТО (печать жетона: один кубик боеприпаса, две стрелки к
+                // двум целям): ОДНА атака за 1 боеприпас наносит по 1 урону
+                // одному жетону каждого из двух типов на выбранном гексе. Это
+                // одна строка и один выстрел жетона, а не две атаки.
+                rows.add(new AttackRow("specialized", modCost, t0, t1));
             } else {
                 rows.add(new AttackRow("specialized", modCost, t0));
                 rows.add(new AttackRow("specialized", modCost, t1));
@@ -392,6 +399,9 @@ public final class CombatResolver {
         java.util.Set<Target> out = new java.util.LinkedHashSet<>();
         for (AttackRow r : attackRows(seat, unit)) {
             out.add(r.target());
+            if (r.target2() != null) {
+                out.add(r.target2());
+            }
         }
         return out;
     }
@@ -465,7 +475,8 @@ public final class CombatResolver {
                         continue;
                     }
                     if (pickVictimCategory(target, attackerSeat, ar.target(), null, closed, u)
-                            != null) {
+                            != null || (ar.target2() != null && pickVictimCategory(target,
+                                attackerSeat, ar.target2(), null, closed, u) != null)) {
                         return true;
                     }
                     if (ar.target() == Target.BUILDINGS_TOWERS
@@ -685,7 +696,12 @@ public final class CombatResolver {
                         }
                         Token victim = pickVictimCategory(цель, attackerSeat, ar.target(),
                             restrictTargetOwner, closed, u);
-                        if (victim != null) {
+                        // ЗОЛОТОЙ КРАСНЫЙ: атака состоится, если на гексе есть
+                        // жетон хотя бы одного из двух типов.
+                        Token victim2 = ar.target2() == null ? null
+                            : pickVictimCategory(цель, attackerSeat, ar.target2(),
+                                restrictTargetOwner, closed, u);
+                        if (victim != null || victim2 != null) {
                             Map<String, Object> pl = new HashMap<>();
                             pl.put("uid", u.uid);
                             pl.put("row", ar.row());
@@ -693,9 +709,13 @@ public final class CombatResolver {
                             pl.put("surcharge", доплата);
                             pl.put("base_ammo", ar.ammoCost());
                             pl.put("tcat", ar.target().code);
+                            if (ar.target2() != null) {
+                                pl.put("tcat2", ar.target2().code);
+                            }
                             pl.put("target", цель);
                             options.add(new Choice("attack", pl,
                                 u.type.code + "." + ar.row() + "->" + ar.target().code
+                                    + (ar.target2() == null ? "" : "+" + ar.target2().code)
                                     + "@" + цель));
                         } else if (ar.target() == Target.BUILDINGS_TOWERS
                                 && s.field.get(цель).hasNeutral()
@@ -832,9 +852,20 @@ public final class CombatResolver {
                 continue;
             }
 
+            // ЗОЛОТОЙ КРАСНЫЙ МОДУЛЬ бьёт по одному жетону КАЖДОГО из двух типов
+            // за одну плату: категорий в атаке одна или две, плата берётся один
+            // раз — при первом найденном жетоне.
+            List<Target> категории = new ArrayList<>();
+            категории.add(tcat);
+            if (pl.get("tcat2") instanceof String tc2) {
+                категории.add(Target.fromCode(tc2));
+            }
+            boolean оплачено = false;
+            usedRows.add(key);
+            for (Target кат : категории) {
             // K4: жертву внутри категории выбирает ИГРОК (поимённо): важно для
             // добивания раненых и выбора, ЧЕЙ жетон бить (кто получит ответку).
-            List<Token> victims = victimCandidates(target, attackerSeat, tcat,
+            List<Token> victims = victimCandidates(target, attackerSeat, кат,
                 restrictTargetOwner, closed, unit);
             Token victim;
             if (victims.isEmpty()) {
@@ -853,13 +884,14 @@ public final class CombatResolver {
                 victim = (Token) vpick.payload();
             }
             if (victim == null) {
-                usedRows.add(key);
                 continue;
             }
-            p.resources.pay(Resource.AMMO, ammo);
-            стреляли.add(uid);
-            firstAttackUsed[0] = true;
-            usedRows.add(key);
+            if (!оплачено) {
+                p.resources.pay(Resource.AMMO, ammo);
+                стреляли.add(uid);
+                firstAttackUsed[0] = true;
+                оплачено = true;
+            }
             // РИКОШЕТ — после того как цель назначена и атака оплачена: удар
             // состоялся, спор идёт лишь о том, кому он достался. Потому карта и
             // не отменяет атаку — она её ПЕРЕВОДИТ.
@@ -967,6 +999,7 @@ public final class CombatResolver {
                 // именно того, кто его снял.
                 хрип(victim, unit, attackerSeat);
             }
+            }   // конец перебора категорий одной атаки
         }
         if (killsThisBattle > journal().of(attackerSeat).maxKillsOneBattle) {
             journal().of(attackerSeat).maxKillsOneBattle = killsThisBattle;
@@ -1121,7 +1154,9 @@ public final class CombatResolver {
                 if (!p.resources.canPay(Resource.AMMO, cost)) {
                     continue;
                 }
-                if (pickVictimCategory(target, attackerSeat, ar.target(), null, closed, u) != null) {
+                if (pickVictimCategory(target, attackerSeat, ar.target(), null, closed, u) != null
+                        || (ar.target2() != null && pickVictimCategory(target, attackerSeat,
+                            ar.target2(), null, closed, u) != null)) {
                     return true;
                 }
                 if (ar.target() == Target.BUILDINGS_TOWERS

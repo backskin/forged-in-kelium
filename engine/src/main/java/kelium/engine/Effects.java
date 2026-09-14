@@ -300,8 +300,7 @@ public final class Effects {
             got.put("module", drew == null ? colour : drew);
         }
         if (Boolean.TRUE.equals(p.get("gild_module"))) {
-            if (pl.redModules + pl.blueModules > pl.goldModules) {
-                pl.goldModules += 1;
+            if (Modules.gildOne(s, pl, agentFor(s, seat))) {
                 got.put("gild_module", true);
             }
         }
@@ -1468,8 +1467,7 @@ public final class Effects {
      */
     static Map<String, Object> gildModule(GameState s, int seat, Map<String, Object> p) {
         PlayerState pl = s.player(seat);
-        int placed = pl.redPlacements.size() + pl.bluePlacements.size();
-        if (pl.goldModules >= placed) {
+        if (!Modules.canGild(pl)) {
             return Map.of("gilded", 0, "reason", "все разложенные жетоны уже золотые");
         }
         Resource pay;
@@ -1483,7 +1481,7 @@ public final class Effects {
             return Map.of("gilded", 0, "reason", "нечем заплатить");
         }
         pl.resources.pay(pay, price);
-        pl.goldModules++;
+        Modules.gildOne(s, pl, agentFor(s, seat));
         return Map.of("gilded", 1, "paid", pay.code + ":" + price);
     }
 
