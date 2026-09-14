@@ -35,6 +35,13 @@ h = open(HTML, encoding="utf-8").read()
 head, body = h.split("<body>", 1)
 pages = pages_of(body)
 
+# ХВОСТ КНИГИ — выходные данные и задняя обложка — не участвует в разбивке на
+# развороты: это не главы, их собирают свои сборщики (make_credits.py,
+# make_back.py), и пересборка главы не имеет права их терять.
+хвост = []
+while pages and ("обложка задняя" in pages[-1] or "выходные" in pages[-1]):
+    хвост.insert(0, pages.pop())
+
 title = re.match(r"# (Глава \d+\.)", open(md, encoding="utf-8").read()).group(1)
 ГЛАВА = re.compile(r'<div class="глава">(?:<span class="гл-н">)?(Глава \d+)[.<]')
 
@@ -57,6 +64,10 @@ for idx, p in enumerate(pages, start=1):
     p = re.sub(r'<div class="колонцифра"><span>\d+</span></div>', f'<div class="колонцифра"><span>{idx}</span></div>', p)
     p = re.sub(r'<div class="стр фон\d', f'<div class="стр фон{(idx % 4) + 1}', p, count=1) if 'обложка' not in p and 'подготовка' not in p else p
     final.append(p)
+for k, p in enumerate(хвост):
+    if "выходные" in p:
+        хвост[k] = re.sub(r'<div class="колонцифра"><span>\d+</span></div>',
+                          f'<div class="колонцифра"><span>{len(final) + 1}</span></div>', p)
 setup = [i for i, p in enumerate(final, start=1) if "левая-подг" in p]
 assert setup and setup[0] % 2 == 0, f"разворот подготовки начинается на нечётной стр. {setup}"
 
@@ -64,7 +75,9 @@ items = []
 for idx, p in enumerate(final, start=1):
     for m in re.finditer(r'<div class="глава">(?:<span class="гл-н">)?Глава (\d+)(?:</span><span class="гл-т">|\. )([^<]+)</(?:span></div|div)>', p):
         items.append((int(m.group(1)), m.group(2), idx))
-later = [(15, "Словарь")]
+# СЛОВАРЬ В КНИГЕ ПРАВИЛ НЕ БУДЕТ (решение дизайнера 14.09.2026): он уходит
+# в справочник целиком, и обещать его в оглавлении книги больше нечем.
+later = []
 done = {n for n, _, _ in items}
 rows = "".join(f'<li><span class="н">{n}</span><span class="т">{t}</span><span class="с">{s}</span></li>' for n, t, s in items)
 rows += "".join(f'<li class="будет"><span class="н">{n}</span><span class="т">{t}</span><span class="с">—</span></li>'
@@ -80,5 +93,9 @@ for k in range(1, len(final), 2):
     out.append(f'<!-- ============ РАЗВОРОТ {a}–{a + 1} ============ -->\n'
                f'<p class="подпись-разворота">Разворот · страницы {a}–{a + 1}</p>\n'
                f'<div class="{cls}">\n\n  ' + "\n\n  ".join(grp) + "\n</div>\n\n")
+for p in хвост:
+    подпись = "Выходные данные" if "выходные" in p else "Задняя сторона обложки · памятка"
+    out.append(f'<p class="подпись-разворота">{подпись}</p>\n'
+               f'<div class="разворот одна">\n\n  ' + p + "\n</div>\n\n")
 open(HTML, "w", encoding="utf-8").write(head + "<body>\n\n" + "".join(out) + "</body>\n</html>\n")
-print("страниц:", len(final), "глава", title, "стр.", start + 1, "–", start + len(new))
+print("страниц:", len(final) + len(хвост), "глава", title, "стр.", start + 1, "–", start + len(new))

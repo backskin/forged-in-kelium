@@ -141,9 +141,27 @@ def мед(name):
     ("контейнер", "контейнер"),
 ]
 
-ССЫЛКИ = [("Ход игры", 19), ("Инфраструктура", 27), ("Разработка", 28),
-          ("Наступление", 29), ("Приобретения", 31), ("Модули", 32),
-          ("Планшет науки", 34), ("Карты", 37), ("Конец игры", 40)]
+# НОМЕРА СТРАНИЦ БЕРУТСЯ ИЗ САМОЙ КНИГИ, а не пишутся здесь руками: вставили
+# страницу — памятка на обложке обязана указать на неё, а не на соседнюю.
+НУЖНЫ = ["Ход игры", "Инфраструктура", "Разработка", "Наступление",
+         "Приобретения", "Модули", "Планшет науки", "Карты",
+         "Конец игры и подсчёт очков"]
+КОРОТКО = {"Конец игры и подсчёт очков": "Конец игры"}
+
+
+def ссылки():
+    import re
+    t = io.open(КНИГА, encoding="utf-8").read()
+    стр = {}
+    for m in re.finditer(r'<li[^>]*><span class="н">\d+</span>'
+                         r'<span class="т">([^<]+)</span><span class="с">([^<]+)</span>', t):
+        стр[m.group(1)] = m.group(2)
+    out = []
+    for имя in НУЖНЫ:
+        n = стр.get(имя)
+        if n and n.strip("—-").strip():
+            out.append((КОРОТКО.get(имя, имя), n))
+    return out
 
 
 def действие(k):
@@ -155,7 +173,7 @@ def действие(k):
 def страница():
     сетка = "".join(действие(k) for k in range(8))
     легенда = "".join(f'<div>{и(a)}<span>{b}</span></div>' for a, b in ЛЕГЕНДА)
-    ссылки = "".join(f'<span>{a} <b>{b}</b></span>' for a, b in ССЫЛКИ)
+    ссыл = "".join(f'<span>{a} <b>{b}</b></span>' for a, b in ссылки())
     return f"""{МАРКЕР}
 <p class="подпись-разворота">Задняя сторона обложки · памятка</p>
 <div class="разворот одна">
@@ -182,7 +200,7 @@ def страница():
     <div class="подвал">
       <img class="лого" src="{b64('логотип', 340)}" alt="">
       <div class="легенда">{легенда}</div>
-      <div class="ссылки"><b>стр.</b>{ссылки}</div>
+      <div class="ссылки"><b>стр.</b>{ссыл}</div>
     </div>
   </div>
 </div>
@@ -192,40 +210,42 @@ def страница():
 CSS = r"""
   /* ---- задняя сторона обложки: командная панель ---- */
   .стр.обложка.задняя {
-    --графит: #23272B; --панель: #2E3338; --панель2: #353B41; --кант: #3FBF62;
-    --кант-т: #1E6B37; --крем: #ECE4CF; --крем2: #C9C0AA; --зел: #8BDD6B; --охра: #E3B54A;
-    background: var(--графит); color: var(--крем); padding: 0; overflow: hidden;
+    --графит: #F7F1E1; --панель: rgba(247, 241, 225, .93); --панель2: rgba(255, 252, 244, .82); --кант: #186C24;
+    --кант-т: rgba(42, 35, 24, .38); --крем: #2A2318; --крем2: #5E5139; --зел: #186C24; --охра: #6B4413;
+    color: var(--крем); padding: 0; overflow: hidden;
+    background: var(--графит) url("ЗАДНИК") center / cover no-repeat;
     font-family: "Tektur Narrow", "Tektur", sans-serif;
   }
-  .задняя .сетка-фон { position: absolute; inset: 0; z-index: 0; opacity: .55;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='52' height='90' viewBox='0 0 52 90'><path d='M26 1 L50 15 L50 45 L26 59 L2 45 L2 15 Z M26 61 L50 75 L50 105 M26 61 L2 75 L2 105' fill='none' stroke='%23ffffff' stroke-opacity='.06' stroke-width='1.2'/></svg>");
+  .задняя .сетка-фон { position: absolute; inset: 0; z-index: 0; opacity: 1;
+    background-color: rgba(247, 241, 225, .62);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='52' height='90' viewBox='0 0 52 90'><path d='M26 1 L50 15 L50 45 L26 59 L2 45 L2 15 Z M26 61 L50 75 L50 105 M26 61 L2 75 L2 105' fill='none' stroke='%232A2318' stroke-opacity='.07' stroke-width='1.1'/></svg>");
     background-size: 13mm 22.5mm; }
   .задняя .сетка-фон::after { content: ""; position: absolute; inset: 0;
-    background: repeating-linear-gradient(135deg, transparent 0 2.2mm, rgba(255,255,255,.025) 2.2mm 2.7mm); }
+    background: repeating-linear-gradient(135deg, transparent 0 2.2mm, rgba(42,35,24,.02) 2.2mm 2.7mm); }
   .задняя .рамка-техно { position: absolute; inset: 4.5mm; z-index: 1; pointer-events: none;
-    border: .3mm solid var(--кант-т);
+    border: .45mm solid #2A2318;
     clip-path: polygon(6mm 0, 100% 0, 100% calc(100% - 6mm), calc(100% - 6mm) 100%, 0 100%, 0 6mm); }
   .задняя .рамка-техно::before, .задняя .рамка-техно::after { content: ""; position: absolute; width: 14mm; height: 14mm; border: .7mm solid var(--кант); }
   .задняя .рамка-техно::before { right: -.3mm; top: -.3mm; border-left: 0; border-bottom: 0; }
   .задняя .рамка-техно::after { left: -.3mm; bottom: -.3mm; border-right: 0; border-top: 0; }
 
   .задняя .титул { position: absolute; left: 8mm; top: 8.5mm; right: 8mm; height: 14mm; z-index: 2; display: flex; align-items: center; gap: 4mm; }
-  .задняя .титул-плашка { background: var(--кант); color: #10200F; font: 900 20pt/1 "Tektur", sans-serif; letter-spacing: .08em; text-transform: uppercase;
+  .задняя .титул-плашка { background: var(--кант); color: #F7F1E1; font: 900 20pt/1 "Tektur", sans-serif; letter-spacing: .08em; text-transform: uppercase;
     padding: 2.6mm 7mm 2.2mm 5mm; clip-path: polygon(0 0, 100% 0, calc(100% - 4mm) 100%, 0 100%); }
   .задняя .титул-линия { flex: 1; display: flex; align-items: center; gap: 3mm; font: 600 8pt "Tektur", sans-serif; color: var(--крем2); text-transform: uppercase; letter-spacing: .12em; }
   .задняя .титул-линия::before, .задняя .титул-линия span + span::before { content: ""; display: inline-block; width: 1.6mm; height: 1.6mm; background: var(--охра); transform: rotate(45deg); margin-right: 3mm; vertical-align: middle; }
-  .задняя .титул-линия::after { content: ""; flex: 1; height: .3mm; background: var(--кант-т); margin-left: 2mm; }
+  .задняя .титул-линия::after { content: ""; flex: 1; height: .5mm; background: var(--кант); margin-left: 2mm; }
 
   .задняя .пан { position: absolute; z-index: 2; background: var(--кант-т);
     clip-path: polygon(3.6mm 0, 100% 0, 100% calc(100% - 3.6mm), calc(100% - 3.6mm) 100%, 0 100%, 0 3.6mm); }
   .задняя .пан-в { position: absolute; inset: .35mm; background: var(--панель); padding: 2mm 2.6mm 1.6mm;
     clip-path: polygon(3.35mm 0, 100% 0, 100% calc(100% - 3.35mm), calc(100% - 3.35mm) 100%, 0 100%, 0 3.35mm); }
-  .задняя .пан-в::after { content: ""; position: absolute; right: 2.2mm; top: 2.2mm; width: 9mm; height: .4mm; background: var(--кант); opacity: .8; }
+  .задняя .пан-в::after { content: ""; position: absolute; right: 2.2mm; top: 2.2mm; width: 9mm; height: .45mm; background: var(--кант); }
 
   .задняя .шапка { display: flex; align-items: center; gap: 2mm; margin: 0 0 1.4mm; }
-  .задняя .шапка::after { content: ""; flex: 1; height: .28mm; background: var(--кант-т); }
+  .задняя .шапка::after { content: ""; flex: 1; height: .3mm; background: var(--кант); opacity: .8; }
   .задняя .шапка i { font: 500 6.8pt "Tektur Narrow", sans-serif; color: var(--крем2); font-style: normal; }
-  .задняя .таб { display: inline-block; background: var(--кант); color: #10200F; font: 800 8.6pt/1 "Tektur", sans-serif; text-transform: uppercase; letter-spacing: .06em;
+  .задняя .таб { display: inline-block; background: var(--кант); color: #F7F1E1; font: 800 8.6pt/1 "Tektur", sans-serif; text-transform: uppercase; letter-spacing: .06em;
     padding: 1.2mm 3.2mm 1mm 2.4mm; white-space: nowrap; clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
 
   .задняя ul { list-style: none; margin: 0; padding: 0; }
@@ -235,7 +255,7 @@ CSS = r"""
   /* Обложка растягивает любой img на всю страницу — здесь картинки мелкие,
      и правило обложки перебивается более точным селектором. */
   .стр.обложка.задняя img { width: auto; height: auto; object-fit: contain; display: inline-block; }
-  .стр.обложка.задняя .и { height: 4.1mm; width: auto; vertical-align: -1.1mm; margin: 0 .25mm; background: #E4E7DE; border-radius: .7mm; padding: .25mm; box-sizing: border-box; }
+  .стр.обложка.задняя .и { height: 4.1mm; width: auto; vertical-align: -1.1mm; margin: 0 .25mm; background: rgba(255,255,255,.7); border-radius: .7mm; padding: .25mm; box-sizing: border-box; outline: .15mm solid rgba(42,35,24,.25); }
 
   .задняя .фаза { display: flex; align-items: baseline; gap: 1.8mm; margin: 1.6mm 0 .9mm; border-bottom: .25mm solid var(--кант-т); padding-bottom: .5mm; }
   .задняя .фаза b { font: 900 10pt/1 "Tektur", sans-serif; color: var(--охра); min-width: 5mm; }
@@ -243,9 +263,9 @@ CSS = r"""
   .задняя .фаза i { margin-left: auto; font: 500 6.6pt "Tektur Narrow", sans-serif; color: var(--крем2); font-style: normal; }
 
   .задняя .дей-сетка { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 3mm; }
-  .задняя .дей { display: flex; gap: 2mm; align-items: flex-start; background: var(--панель2); padding: 1.4mm 1.8mm 1mm 1.6mm;
+  .задняя .дей { display: flex; gap: 2mm; align-items: flex-start; background: var(--панель2); outline: .15mm solid var(--кант-т); outline-offset: -.15mm; padding: 1.4mm 1.8mm 1mm 1.6mm;
     clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm); min-height: 24mm; }
-  .стр.обложка.задняя .мед { width: 11.5mm; height: 11.5mm; border-radius: 50%; border: .4mm solid var(--кант); background: #E4E7DE; flex: none; margin-top: .6mm; }
+  .стр.обложка.задняя .мед { width: 11.5mm; height: 11.5mm; border-radius: 50%; border: .4mm solid var(--кант); background: #F3EFE3; flex: none; margin-top: .6mm; }
   .задняя .дей-т { flex: 1; min-width: 0; }
   .задняя .дей-имя { font: 800 9.5pt/1 "Tektur", sans-serif; color: var(--зел); text-transform: uppercase; letter-spacing: .04em; margin: .3mm 0 1.1mm; display: flex; align-items: baseline; gap: 1.6mm; }
   .задняя .дей-имя span { font: 500 6.4pt "Tektur Narrow", sans-serif; color: var(--охра); text-transform: none; letter-spacing: .02em; }
@@ -268,18 +288,42 @@ CSS = r"""
 """
 
 
+ЗАДНИК = r"C:\Users\backskin\Desktop\фон рулбука\задник рулбука.png"
+
+
+def задник():
+    im = Image.open(ЗАДНИК).convert("RGB")
+    im = im.resize((2000, round(im.height * 2000 / im.width)), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=86, optimize=True)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
 def main():
     t = io.open(КНИГА, encoding="utf-8").read()
+    css = CSS.replace("ЗАДНИК", задник())
     # CSS — один раз, перед </style>
     if ".стр.обложка.задняя" not in t:
-        t = t.replace("\n</style>", CSS + "\n</style>", 1)
+        t = t.replace("\n</style>", css + "\n</style>", 1)
     else:
         a = t.index("  /* ---- задняя сторона обложки")
         b = t.index("</style>", a)
-        t = t[:a] + CSS.lstrip("\n") + "\n" + t[b:]
-    # страница — заменить прежнюю, если была
-    if МАРКЕР in t:
-        a = t.index(МАРКЕР)
+        t = t[:a] + css.lstrip("\n") + "\n" + t[b:]
+    # СТАРУЮ СТРАНИЦУ УБРАТЬ ПО САМОЙ СТРАНИЦЕ, А НЕ ПО КОММЕНТАРИЮ: reflow
+    # пересобирает тело книги и комментарии-маяки не сохраняет, из-за чего
+    # обложка приклеивалась второй раз.
+    метки = [МАРКЕР, '<p class="подпись-разворота">Задняя сторона обложки']
+    for метка in метки:
+        while метка in t:
+            a = t.index(метка)
+            # хвост страницы — до конца её разворота
+            b = t.index('<div class="стр обложка задняя">', a)
+            k = t.index("</div>", t.index('<div class="колонцифра"', b) if '<div class="колонцифра"' in t[b:t.index("</body>", b)] else b)
+            b = t.index("</body>", a)
+            t = t[:a] + t[b:]
+    while '<div class="стр обложка задняя">' in t:
+        a = t.rindex('<p class="подпись-разворота">', 0,
+                     t.index('<div class="стр обложка задняя">'))
         b = t.index("</body>", a)
         t = t[:a] + t[b:]
     j = t.rindex("</body>")
