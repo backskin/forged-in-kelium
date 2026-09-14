@@ -105,7 +105,7 @@ public final class PlayerState {
     public final List<String> blueTokens = new ArrayList<>();
     public int goldModules = 0;
 
-    // Размещения модулей на доске (выбираются в фазе смены модулей):
+    // Размещения модулей на доске (выбираются при смене модулей):
     // redPlacements[UnitType] = модуль поверх вторичного ряда атаки этого юнита.
     // bluePlacements[BuildingType] = модуль поверх сборочной «1» этого здания.
     public final Map<UnitType, Map<String, Object>> redPlacements = new HashMap<>();

@@ -295,9 +295,6 @@ public final class RuleWords {
 
             // ---------- Бой ----------
             case "combat_model.all_attacks_damage" -> "любая атака наносит урон";
-            case "combat_model.damage_persists_until_refresh" ->
-                "урон держится до этапа обновления";
-            case "combat_model.heal_per_refresh" -> "сколько урона снимается в обновление";
             case "combat_model.walls_block_shots" -> "стенка не пропускает выстрел";
 
             // ---------- Центр управления ----------

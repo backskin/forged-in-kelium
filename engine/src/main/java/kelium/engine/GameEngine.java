@@ -470,7 +470,6 @@ public final class GameEngine {
         GameState s = state;
         if (rnd == 1) {
             s.marketActive = s.decks.get("market").draw(s.rng);
-            moduleSwapAll();
             emit(ev("type", "refresh", "round", rnd, "skipped", true));
             return;
         }
@@ -514,23 +513,7 @@ public final class GameEngine {
         // столько и убыло, тайл истощается за партию и потом уходит с поля.
         // (Раньше здесь стояло ежераундовое восстановление — это была ошибка
         // движка, а не правило игры.)
-        // Обновление: с КАЖДОГО жетона снимается ОДИН кубик урона (не весь).
-        // Урон копится по раундам — штурм ЦУ можно вести несколько раундов.
-        // Сколько кубиков урона снимается в Обновление. Правило — ОДИН (СВОД),
-        // и это значение по умолчанию. Ключ вынесен в ruleset НЕ ради изменения
-        // правила, а чтобы балансовый стенд ({@code kelium.RuleExperiment}) мог
-        // проверить, что будет при другом числе: скорость лечения напрямую решает,
-        // возможна ли многораундовая осада, а угадывать это по рассуждению нельзя.
-        int heal = ((Number) rs().get("combat_model.heal_per_refresh", 1)).intValue();
         for (PlayerState p : s.players) {
-            for (int i = 0; i < heal; i++) {
-                for (UnitToken t : p.units) {
-                    t.healOneDamage();
-                }
-                for (BuildingToken t : p.buildings) {
-                    t.healOneDamage();
-                }
-            }
             // ТОЧКА ПРАВИЛ: доход в Обновление от карт арсенала (например
             // «энергостанции платят монетами за каждый кубик энергии»).
             int income = (int) Math.round(kelium.engine.ability.RuleQuery
@@ -551,21 +534,9 @@ public final class GameEngine {
             emit(ev("type", "containers_laid", "round", rnd, "count", laid,
                 "on_field", TokenContainers.onField(s)));
         }
-        moduleSwapAll();
         // Накопитель «Штабной игры» (супер-задания 5.0): раунды первым игроком.
         s.player(s.firstPlayer).roundsFirstPlayer += 1;
         emit(ev("type", "refresh", "round", rnd, "first_player", s.firstPlayer));
-    }
-
-    /** Провести бесплатную смену модулей для всех игроков, у кого они есть. */
-    private void moduleSwapAll() {
-        GameState s = state;
-        for (int seat = 0; seat < s.numPlayers(); seat++) {
-            PlayerState p = s.player(seat);
-            if (p.redModules > 0 || p.blueModules > 0) {
-                Modules.moduleSwap(s, seat, agents.get(seat), this::emit);
-            }
-        }
     }
 
     private void refillContainers() {

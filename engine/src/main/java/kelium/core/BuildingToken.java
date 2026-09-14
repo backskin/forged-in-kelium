@@ -69,7 +69,7 @@ public final class BuildingToken implements Token {
         damage = 0;
     }
 
-    /** Обновление: снять ОДИН кубик урона (не весь урон). Урон копится по раундам. */
+    /** Эффект карты: снять ОДИН кубик урона. */
     @Override
     public void healOneDamage() {
         if (damage > 0) {

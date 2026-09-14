@@ -3389,8 +3389,7 @@ public final class Actions {
                 opts.add(new Choice("sci_exchange", ex,
                     gildCost + " trophy -> gild a module"));
             }
-            // Вечный курс: 1 трофей -> 1 перемещение модуля (перестановка
-            // посреди раунда, не дожидаясь Смены модулей в Обновление).
+            // Вечный курс: 1 трофей -> 1 перемещение модуля.
             if (переставить && pool >= 1
                     && (!player.redPlacements.isEmpty() || !player.bluePlacements.isEmpty())) {
                 Map<String, Object> ex = new HashMap<>();
