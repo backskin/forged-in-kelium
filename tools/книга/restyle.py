@@ -143,24 +143,27 @@ CSS = r"""
   .стр.обложка img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
   .колонцифра {
-    position: absolute; bottom: 7.6mm; left: 0; right: 0; text-align: center; z-index: 6;
-    font: 700 11pt/1 "Tektur", sans-serif; color: var(--страница);
+    position: absolute; bottom: 5.8mm; left: 0; right: 0; text-align: center; z-index: 6;
+    font: 700 10pt/1 "Tektur", sans-serif; color: var(--страница);
   }
-  .колонцифра span { display: inline-block; background: var(--чернила); padding: 1.1mm 4.2mm .9mm;
+  .колонцифра span { display: inline-block; background: var(--чернила); padding: .9mm 3.8mm .75mm;
     clip-path: polygon(1.6mm 0, 100% 0, calc(100% - 1.6mm) 100%, 0 100%); }
   .подготовка.левая-подг .колонцифра { text-align: left; left: 13mm; }
   .подготовка.правая-подг .колонцифра { text-align: right; right: 13mm; }
 
-  /* подложка под блоками текста: кремовая панель с тонким кантом */
-  .блок { background: var(--подложка); padding: 1.6mm 2.4mm; margin: 0 -2.4mm 2mm; outline: .18mm solid var(--кант); outline-offset: -.18mm; }
+  /* ПОДЛОЖКА ПОД ТЕКСТОМ. Три правила, все три — просьба дизайнера
+     14.09.2026: воздух от края текста, одинаковые поля слева и справа (никаких
+     отрицательных отступов, из-за которых колонки выглядели по-разному) и
+     заливка полупрозрачная, чтобы бумага и гекс-сетка проступали. */
+  .блок { background: rgba(247, 241, 225, .66); padding: 1.9mm 2.7mm 1.6mm;
+    margin: 0 0 2.1mm; outline: .18mm solid var(--кант); outline-offset: -.18mm; }
+  .блок > :last-child { margin-bottom: 0; }
 
   /* ---- заголовок главы: плашка с номером, заголовок, линия с ромбом ---- */
   .глава {
     display: flex; align-items: center; gap: 3mm; position: relative;
     font: 700 17pt/1.15 "Tektur", sans-serif; color: var(--охра);
-    padding: 1.4mm 3mm 1.4mm 0; margin: 0 -2.4mm 3.8mm;
-    background: var(--подложка); outline: .18mm solid var(--кант); outline-offset: -.18mm;
-    clip-path: СКОС28;
+    padding: 0 0 1.6mm; margin: 0 0 3.6mm;
   }
   .глава::after { content: ""; flex: 1; height: .5mm; background: var(--келемий); position: relative; }
   .глава .гл-н { flex: none; background: var(--келемий); color: var(--страница); font: 800 9pt/1 "Tektur", sans-serif;
@@ -178,6 +181,11 @@ CSS = r"""
   h3::before { content: ""; display: inline-block; width: 1.7mm; height: 1.9mm; background: var(--келемий);
     clip-path: polygon(0 0, 100% 50%, 0 100%); margin-right: 1.5mm; vertical-align: -.05mm; }
   p, li { font: 9.5pt/1.3 "Tektur", sans-serif; margin: 0 0 1.4mm; hyphens: auto; }
+  /* ВВОДНЫЙ АБЗАЦ ГЛАВЫ — крупнее и без подложки: он задаёт тон полосе, а не
+     спорит с блоками правил (просьба дизайнера 14.09.2026). */
+  .вводка { background: none; outline: 0; padding: 0 1mm 1mm; margin: 0 0 3.4mm; column-span: all; }
+  .вводка p { font: 10.5pt/1.34 "Tektur", sans-serif; color: var(--чернила); }
+  .вводка p:last-child { margin-bottom: 0; }
   ol, ul { margin: 0 0 1.4mm; padding-left: 4.5mm; }
   li { margin-bottom: .8mm; }
   ul li::marker { color: var(--келемий); content: "▸ "; }
@@ -186,7 +194,10 @@ CSS = r"""
   .ссылка { color: var(--серый); }
 
   .две { column-count: 2; column-gap: 6mm; column-fill: balance; }
-  .две .блок { break-inside: auto; }
+  /* БЛОК НЕ РВЁТСЯ МЕЖДУ КОЛОНКАМИ. Прежде заголовок с одной фразой
+     оставался внизу первой колонки, а продолжение уезжало во вторую
+     отдельной рамкой и читалось как другой раздел. */
+  .две .блок { break-inside: avoid; }
   .две .пример, .две h2, .две h3, .две table, .две .заглушка, .две svg { break-inside: avoid; }
   .две h2, .две h3 { break-after: avoid; }
   .звезда, .две li, .две p { break-inside: avoid; }
@@ -214,6 +225,10 @@ CSS = r"""
   }
   .заглушка .метка { display: block; font: 700 9pt "Tektur Narrow", sans-serif; color: var(--охра); margin-bottom: .8mm; letter-spacing: .02em; }
   .заглушка.рисунок { display: flex; flex-direction: column; justify-content: center; text-align: center; }
+  /* ЗАПОЛНИТЕЛЬ ВЫНУЖДЕННОЙ ПУСТОТЫ: где полоса не набирается текстом, стоит
+     место под художественную иллюстрацию — дизайнер вставит её в конце работы. */
+  .добор { column-span: all; margin-top: 2mm; }
+  .добор .заглушка { height: 100%; min-height: 34mm; margin: 0; }
   .уточнить { font: 700 9pt "Tektur Narrow", sans-serif; color: var(--уточнить); }
   .звезда { display: flex; gap: 2.5mm; align-items: center; margin: .5mm 0 1.4mm; }
   .звезда p { margin: 0; }
@@ -259,15 +274,15 @@ CSS = r"""
   .схема .метка-илл { fill: var(--охра); font: 700 3.8px "Tektur Narrow", sans-serif; text-anchor: middle; }
 
   /* ---- врезки: Пример, Важно!, Совет — панель со скосами и ярлык-плашка ---- */
-  .пример { position: relative; background: var(--пример-кант); padding: .3mm; margin: 1.6mm -2.4mm 2.4mm; break-inside: avoid;
+  .пример { position: relative; background: var(--пример-кант); padding: .3mm; margin: 1.4mm 0 2.4mm; break-inside: avoid;
     clip-path: СКОС28; }
   .пример > * { position: relative; }
   .пример::before { content: ""; position: absolute; inset: .3mm; background: var(--пример); clip-path: СКОС25; }
   .пример .метка { display: inline-block; font: 800 8.4pt/1 "Tektur", sans-serif; color: var(--страница); text-transform: uppercase; letter-spacing: .08em;
     background: var(--пример-кант); padding: 1.2mm 3.2mm 1mm 2.6mm; margin: 0 0 1.2mm 0;
     clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
-  .пример p, .пример li { font-size: 9.5pt; padding: 0 2.6mm; }
-  .пример > p:last-child, .пример > ul:last-child, .пример > ol:last-child { padding-bottom: 1.8mm; margin-bottom: 0; }
+  .пример p, .пример li { font-size: 9.5pt; padding: 0 2.9mm; }
+  .пример > p:last-child, .пример > ul:last-child, .пример > ol:last-child { padding-bottom: 2mm; margin-bottom: 0; }
   .пример ul, .пример ol { padding-left: 6.6mm; }
   .пример ul li, .пример ol li { padding: 0 2.6mm 0 0; }
   .пример.важно { background: var(--важно-кант); }
@@ -281,8 +296,9 @@ CSS = r"""
     column-span: all; break-inside: avoid; }
   .фазы > div { position: relative; background: var(--подложка); border-top: 1mm solid var(--келемий); padding: 1.8mm 2.4mm;
     outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: СКОС2; }
-  .фазы b { display: block; font: 700 10pt "Tektur", sans-serif; color: var(--охра); margin-bottom: .6mm; }
-  .фазы p { margin: 0; font-size: 9.5pt; }
+  .фазы > div { padding: 2.1mm 2.6mm; }
+  .фазы b { display: block; font: 700 11pt "Tektur", sans-serif; color: var(--охра); margin-bottom: .8mm; }
+  .фазы p { margin: 0; font: 9.8pt/1.28 "Tektur", sans-serif; }
 
   .разворот.левая { justify-content: flex-start; }
   .схема-гекса { display: block; width: 62mm; margin: 1mm auto 2mm; }
@@ -317,6 +333,11 @@ CSS = r"""
   .рис .черта { stroke: var(--келемий); fill: none; }
   .рис .выноска-л { stroke: var(--келемий); }
   .рис .выноска-т { fill: var(--келемий); }
+  /* ЛЕГЕНДА ПОД РИСУНКОМ: две колонки. Список из девяти пунктов одной
+     колонкой не помещается на полосу, а рисунок ужимать уже некуда. */
+  .блок.легенда { column-count: 2; column-gap: 5mm; }
+  .блок.легенда > ul, .блок.легенда > ol { margin: 0; }
+  .блок.легенда li { break-inside: avoid; }
   .легенда-цифры { margin: 1mm 0 0; padding-left: 5mm; }
   .легенда-цифры li { font-size: 9pt; margin-bottom: .4mm; }
 

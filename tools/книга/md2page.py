@@ -83,6 +83,15 @@ def blocks(md):
         #   :фазы:
         #   I. Обновление | стол готовится к новому раунду
         #   :конец:
+        # :добор: подпись — заполнитель вынужденной пустоты на полосе.
+        # Дизайнер вставит сюда художественную иллюстрацию в конце работы.
+        if ln.strip().startswith(":добор:"):
+            подпись = ln.strip()[len(":добор:"):].strip() or "ИЛЛЮСТРАЦИЯ"
+            flush()
+            res.append('      <div class="добор"><div class="заглушка рисунок">'
+                       + f"[{inline(подпись.upper())}]</div></div>")
+            i += 1
+            continue
         if ln.strip() == ":фазы:":
             i += 1
             ячейки = []
@@ -160,6 +169,12 @@ def blocks(md):
             i += 1
         cur.append(f"        <p>{inline(' '.join(p))}</p>")
     flush()
+    # ЛЕГЕНДА ПОД РИСУНКОМ НА ВСЮ ШИРИНУ — в две колонки. Одной колонкой список
+    # из девяти пунктов не помещается на полосу, а рисунок ужимать некуда.
+    for k in range(1, len(res)):
+        предыдущий = res[k - 1]
+        if "рисунок-во-всю" in предыдущий and ("<ul>" in res[k] or "<ol>" in res[k])                 and "<h2>" not in res[k] and "<h3>" not in res[k]:
+            res[k] = res[k].replace('<div class="блок">', '<div class="блок легенда">', 1)
     return res
 
 
@@ -169,7 +184,15 @@ html_pages = []
 for k, chunk in enumerate(pages):
     n = first + k
     head = f'    {заголовок_главы(title)}\n\n' if k == 0 else ""
-    inner = "\n\n".join(blocks(chunk))
+    куски = blocks(chunk)
+    # ВВОДНЫЙ АБЗАЦ ГЛАВЫ: один короткий абзац в начале главы набирается
+    # крупнее и без подложки — это зачин полосы, а не правило.
+    if (k == 0 and куски and len(куски) > 1
+            and куски[0].count("<p>") == 1
+            and "<h2>" not in куски[0] and "<h3>" not in куски[0]):
+        куски[0] = куски[0].replace('<div class="блок">',
+                                    '<div class="блок вводка">', 1)
+    inner = (chr(10) * 2).join(куски)
     html_pages.append(f'  <div class="стр {fons[n % 4]}">\n    {КАЙМА}\n{head}    <div class="две">\n{inner}\n    </div>\n\n'
                       f'    <div class="колонцифра"><span>{n}</span></div>\n  </div>\n')
 

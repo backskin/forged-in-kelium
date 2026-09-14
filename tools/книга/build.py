@@ -3,6 +3,7 @@
 python build.py [фрагмент.html]
 """
 import glob
+import io
 import os
 import subprocess
 import sys
@@ -42,3 +43,20 @@ S = Image.new("RGB", (ims[0].width * 2, ims[0].height))
 S.paste(ims[0], (0, 0))
 S.paste(ims[1], (ims[0].width, 0))
 S.save(os.path.join(D, "sp.png"))
+
+
+# ЛЁГКАЯ КОПИЯ ДЛЯ ПРОСМОТРА. Книга с врезками настоящих компонентов весит
+# под полсотни мегабайт: на печать это правильно, а переслать и полистать
+# нечем. Поэтому рядом кладётся копия, где каждая полоса — картинка 150 dpi.
+лёгкий = os.path.join(D, "book-lite.pdf")
+мал = pymupdf.open()
+for i in range(len(doc)):
+    pm = doc[i].get_pixmap(dpi=150)
+    буфер = io.BytesIO()
+    Image.frombytes("RGB", (pm.width, pm.height), pm.samples).save(
+        буфер, "JPEG", quality=78, optimize=True)
+    стр = мал.new_page(width=doc[i].rect.width, height=doc[i].rect.height)
+    стр.insert_image(стр.rect, stream=буфер.getvalue())
+мал.save(лёгкий, deflate=True, garbage=4)
+мал.close()
+print("лёгкая копия: %.1f МБ" % (os.path.getsize(лёгкий) / 1e6))

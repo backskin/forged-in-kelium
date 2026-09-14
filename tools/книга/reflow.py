@@ -39,7 +39,7 @@ pages = pages_of(body)
 # развороты: это не главы, их собирают свои сборщики (make_credits.py,
 # make_back.py), и пересборка главы не имеет права их терять.
 хвост = []
-while pages and ("обложка задняя" in pages[-1] or "выходные" in pages[-1]):
+while pages and ("обложка задняя" in pages[-1] or "создатели" in pages[-1]):
     хвост.insert(0, pages.pop())
 
 title = re.match(r"# (Глава \d+\.)", open(md, encoding="utf-8").read()).group(1)
@@ -65,7 +65,7 @@ for idx, p in enumerate(pages, start=1):
     p = re.sub(r'<div class="стр фон\d', f'<div class="стр фон{(idx % 4) + 1}', p, count=1) if 'обложка' not in p and 'подготовка' not in p else p
     final.append(p)
 for k, p in enumerate(хвост):
-    if "выходные" in p:
+    if "создатели" in p:
         хвост[k] = re.sub(r'<div class="колонцифра"><span>\d+</span></div>',
                           f'<div class="колонцифра"><span>{len(final) + 1}</span></div>', p)
 setup = [i for i, p in enumerate(final, start=1) if "левая-подг" in p]
@@ -94,7 +94,7 @@ for k in range(1, len(final), 2):
                f'<p class="подпись-разворота">Разворот · страницы {a}–{a + 1}</p>\n'
                f'<div class="{cls}">\n\n  ' + "\n\n  ".join(grp) + "\n</div>\n\n")
 for p in хвост:
-    подпись = "Выходные данные" if "выходные" in p else "Задняя сторона обложки · памятка"
+    подпись = "Создатели игры" if "создатели" in p else "Задняя сторона обложки · памятка"
     out.append(f'<p class="подпись-разворота">{подпись}</p>\n'
                f'<div class="разворот одна">\n\n  ' + p + "\n</div>\n\n")
 open(HTML, "w", encoding="utf-8").write(head + "<body>\n\n" + "".join(out) + "</body>\n</html>\n")

@@ -143,10 +143,13 @@ def мед(name):
 
 # НОМЕРА СТРАНИЦ БЕРУТСЯ ИЗ САМОЙ КНИГИ, а не пишутся здесь руками: вставили
 # страницу — памятка на обложке обязана указать на неё, а не на соседнюю.
-НУЖНЫ = ["Ход игры", "Инфраструктура", "Разработка", "Наступление",
-         "Приобретения", "Модули", "Планшет науки", "Карты",
+НУЖНЫ = ["Об игре", "Состав игры", "Подготовка к игре", "Основы игры",
+         "Ход игры", "Энергия и хранилище", "Инфраструктура", "Разработка",
+         "Наступление", "Приобретения", "Модули", "Планшет науки", "Карты",
          "Конец игры и подсчёт очков"]
-КОРОТКО = {"Конец игры и подсчёт очков": "Конец игры"}
+КОРОТКО = {"Конец игры и подсчёт очков": "Конец игры",
+           "Подготовка к игре": "Подготовка",
+           "Энергия и хранилище": "Хранилище"}
 
 
 def ссылки():
@@ -282,7 +285,7 @@ CSS = r"""
   .задняя .легенда { display: flex; gap: 2.4mm; flex: 1; justify-content: center; }
   .задняя .легенда div { display: flex; flex-direction: column; align-items: center; gap: .6mm; font: 500 5.6pt/1 "Tektur Narrow", sans-serif; color: var(--крем2); text-transform: uppercase; letter-spacing: .03em; }
   .стр.обложка.задняя .легенда .и { height: 5.4mm; vertical-align: 0; padding: .35mm; }
-  .задняя .ссылки { display: grid; grid-template-columns: auto auto auto; gap: .5mm 2.4mm; font: 500 6.2pt/1.15 "Tektur Narrow", sans-serif; color: var(--крем2); flex: none; align-items: center; }
+  .задняя .ссылки { display: grid; grid-template-columns: auto auto auto auto; gap: .5mm 2.4mm; font: 500 6.2pt/1.15 "Tektur Narrow", sans-serif; color: var(--крем2); flex: none; align-items: center; }
   .задняя .ссылки b { color: var(--охра); font-weight: 800; }
   .задняя .ссылки > b { grid-column: 1 / -1; font: 800 6.6pt "Tektur", sans-serif; color: var(--зел); text-transform: uppercase; letter-spacing: .1em; }
 """
