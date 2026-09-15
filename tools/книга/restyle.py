@@ -335,7 +335,31 @@ CSS = r"""
   .рис .выноска-т { fill: var(--келемий); }
   /* ЛЕГЕНДА ПОД РИСУНКОМ: две колонки. Список из девяти пунктов одной
      колонкой не помещается на полосу, а рисунок ужимать уже некуда. */
+  /* ---- создатели игры ---- */
+  .создатели .строки { margin: .5mm 0 0; }
+  .создатели .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
+    border-bottom: .2mm dotted var(--пример-кант); }
+  .создатели .кто:last-child { border-bottom: 0; }
+  .создатели .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
+    color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
+  .создатели .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
+  .создатели h2 { font-size: 10.5pt; }
+  .создатели p, .создатели li { font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
+  .создатели .пример p { font-size: 8.4pt; }
+  .создатели .пример .метка { font-size: 8pt; }
+  .создатели .права p { font: 8pt/1.22 "Tektur Narrow", sans-serif; color: var(--серый); }
+  /* МЕСТО ПОД ЛОГОТИП занимает ВСЮ оставшуюся высоту полосы и отбито от блоков
+     текста сверху (просьба дизайнера 15.09.2026). */
+  .создатели .марка { position: absolute; left: 15mm; right: 15mm;
+    top: 126mm; bottom: 22mm; }
+  .создатели .марка .заглушка { height: 100%; width: 100%; margin: 0; }
   .блок.легенда { column-count: 2; column-gap: 5mm; column-span: all; }
+  /* БЛОК ПОПОЛАМ: во всю ширину полосы, слева рисунки, справа текст. */
+  .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    column-gap: 5mm; align-items: start; }
+  .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  .блок.надвое .половина > *:first-child { margin-top: 0; }
+  .блок.надвое .половина > ul, .блок.надвое .половина > ol { margin-top: 0; }
   .блок.легенда h3 { column-span: all; }
   .блок.легенда > ul, .блок.легенда > ol { margin: 0; }
   .блок.легенда li { break-inside: avoid; }

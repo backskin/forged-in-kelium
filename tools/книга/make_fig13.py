@@ -22,7 +22,7 @@ figure, карта = ns["figure"], ns["карта"]
 G = r"C:\shared\Yandex.Disk\Forged in Kelium"
 ЯКОРЯ = r"C:\shared\forged-in-kelium\data\textures\board\anchors.yaml"
 
-доска = os.path.join(G, "Компоненты игрока", "экспорт-планшеты", "планшет-войск-new-1.png")
+доска = os.path.join(G, "Компоненты игрока", "экспорт-планшеты", "планшет-войск-new-2.png")
 board = Image.open(доска).convert("RGBA")
 W, H = board.size                      # 3354×886
 

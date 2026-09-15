@@ -22,5 +22,5 @@ subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
 
 from PIL import Image
 vw, vh = Image.open(png).size
-figure("стройка", png, 2000, vw, vh, [], css_w="94%", pad="1.0mm 0 1.4mm")
+figure("стройка", png, 2000, vw, vh, [], css_w="100%", pad="1.4mm 0 1.6mm")
 print("ok", (vw, vh))

@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 D = os.path.dirname(os.path.abspath(__file__))
 DIR = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*")[0]
@@ -97,5 +98,15 @@ for p in хвост:
     подпись = "Создатели игры" if "создатели" in p else "Задняя сторона обложки · памятка"
     out.append(f'<p class="подпись-разворота">{подпись}</p>\n'
                f'<div class="разворот одна">\n\n  ' + p + "\n</div>\n\n")
-open(HTML, "w", encoding="utf-8").write(head + "<body>\n\n" + "".join(out) + "</body>\n</html>\n")
+# ЗАПИСЬ С ПОВТОРОМ: файл вёрстки иногда занят (его держит просмотрщик),
+# и Windows отвечает OSError 22 — из-за этого пересборка главы срывалась.
+готово = head + "<body>\n\n" + "".join(out) + "</body>\n</html>\n"
+for попытка in range(12):
+    try:
+        open(HTML, "w", encoding="utf-8").write(готово)
+        break
+    except OSError:
+        if попытка == 11:
+            raise
+        time.sleep(0.4)
 print("страниц:", len(final) + len(хвост), "глава", title, "стр.", start + 1, "–", start + len(new))
