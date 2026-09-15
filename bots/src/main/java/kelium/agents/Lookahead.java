@@ -273,8 +273,9 @@ public final class Lookahead {
         h = mix(h, p.objectiveHand.size());
         h = mix(h, p.arsenalHand.size());
         h = mix(h, p.arsenalInstalled.size());
-        // У супер-задания состояний ровно два: награда низа взята или нет.
-        h = mix(h, p.superObjectiveComplete ? 1 : 0);
+        // Супер-задания: сколько их на руках и у скольких низ уже отработал.
+        h = mix(h, p.superObjectives.size());
+        h = mix(h, p.superObjectivesDone.size());
         h = mix(h, p.cuDestructionTokens);
         h = mix(h, p.cuKills);
         h = mix(h, p.flippedStartTiles + p.flippedNormalTiles);

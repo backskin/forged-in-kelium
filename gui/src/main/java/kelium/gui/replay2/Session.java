@@ -357,7 +357,7 @@ public final class Session {
             return false;
         }
         for (ReplayRecord.Player p : f.snapshot.players) {
-            if (p.superComplete) {
+            if (!p.superDone.isEmpty()) {
                 return true;
             }
         }
@@ -545,7 +545,7 @@ public final class Session {
                     // Значок ставим на ПЕРВЫЙ кадр, где задание собралось: дальше
                     // флаг остаётся поднятым до конца партии, и значок печатался бы
                     // на каждом кадре, заливая дорожку сплошной полосой.
-                    if (p.superComplete && superDoneAt.add(p.seat)) {
+                    if (!p.superDone.isEmpty() && superDoneAt.add(p.seat)) {
                         marks.add(new Mark(i, Mark.Kind.SUPER, p.seat, 2));
                     }
                 }
@@ -638,7 +638,7 @@ public final class Session {
                 }
             }
             for (ReplayRecord.Player p : f.snapshot.players) {
-                if (p.superComplete && found.stream().noneMatch(
+                if (!p.superDone.isEmpty() && found.stream().noneMatch(
                         m -> m.text().contains("супер-задание игрока " + (p.seat + 1)))) {
                     found.add(new Moment(i, "шаг " + (i + 1) + " · Р" + f.round
                         + " · закрыто супер-задание игрока " + (p.seat + 1)));

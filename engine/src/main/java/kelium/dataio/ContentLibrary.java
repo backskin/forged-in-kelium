@@ -101,17 +101,19 @@ public final class ContentLibrary {
     /**
      * ОТБРОСИТЬ КАРТЫ, У КОТОРЫХ КЛАССА НЕТ ПО УСТРОЙСТВУ.
      *
-     * <p>Супер-задания семейства «одна карта втайне» (поля {@code multiplier} и
-     * {@code stockpile}) разыгрывает {@code kelium.engine.Super5}, разбирая
-     * номер карты: классов-карт у них нет и не задумывалось. Просить реестр
-     * связать их значило бы записать их в «карты без кода» — и сторож, который
-     * ищет НАСТОЯЩИЕ пропуски кода, начинал бы врать на каждой партии.
+     * <p>СУПЕР-ЗАДАНИЯ 8.0 (поле {@code categories}) — это пара категорий
+     * счёта и ничего больше: карту нельзя ни выполнить, ни сжечь, поэтому и
+     * класса у неё нет. Прежние редакции («множитель верха» {@code multiplier},
+     * «накопитель» {@code stockpile}) тоже играл сам движок. Просить реестр
+     * связать такие карты значило бы записать их в «карты без кода» — и сторож,
+     * который ищет НАСТОЯЩИЕ пропуски кода, начинал бы врать на каждой партии.
      */
     private static java.util.List<Map<String, Object>> безКлассов(
             java.util.List<Map<String, Object>> entries) {
         java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
         for (Map<String, Object> e : entries) {
-            if (!e.containsKey("multiplier") && !e.containsKey("stockpile")) {
+            if (!e.containsKey("categories") && !e.containsKey("multiplier")
+                    && !e.containsKey("stockpile")) {
                 out.add(e);
             }
         }

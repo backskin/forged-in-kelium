@@ -59,6 +59,11 @@ public final class RuleWords {
         if (known != null) {
             return known;
         }
+        // Кубиков науки по составу: tech.cube_supply_by_players.<игроков>.
+        if (path.startsWith("tech.cube_supply_by_players.")) {
+            String n = path.substring("tech.cube_supply_by_players.".length());
+            return "кубиков науки у каждого при " + n + " игроках";
+        }
         // Приз за первый шаг трека: путь собран из трека, очереди и ресурса.
         if (path.startsWith("tech.step1_prize.")) {
             String[] p = path.split("\\.");
@@ -167,6 +172,9 @@ public final class RuleWords {
             // ---------- Подготовка ----------
             case "setup.start_miner" -> "добытчик стоит на поле с самого начала";
             case "setup.start_coins" -> "монеты на старте, по местам";
+            case "setup.start_kelium" -> "келемий на старте, по местам";
+            case "setup.start_ammo" -> "боеприпасы на старте";
+            case "setup.start_containers" -> "карты контейнера на старте";
 
             // ---------- Экономика ----------
             case "economy.coins_per_vp" -> "монет за одно победное очко";
@@ -295,9 +303,6 @@ public final class RuleWords {
 
             // ---------- Бой ----------
             case "combat_model.all_attacks_damage" -> "любая атака наносит урон";
-            case "combat_model.damage_persists_until_refresh" ->
-                "урон держится до этапа обновления";
-            case "combat_model.heal_per_refresh" -> "сколько урона снимается в обновление";
             case "combat_model.walls_block_shots" -> "стенка не пропускает выстрел";
 
             // ---------- Центр управления ----------
@@ -366,6 +371,7 @@ public final class RuleWords {
             // ---------- Наука ----------
             case "tech.tracks" -> "треки науки";
             case "tech.steps_per_track" -> "шагов на треке";
+            case "tech.steps_in_order" -> "шаги трека берутся подряд, с первого";
             case "tech.step_cells" -> "ячеек на шагах";
             case "tech.step_capacity" -> "сколько игроков влезает на шаг";
             case "tech.step_cost_trophy" -> "трофеев за шаг (тратится общий пул)";

@@ -300,8 +300,7 @@ public final class Effects {
             got.put("module", drew == null ? colour : drew);
         }
         if (Boolean.TRUE.equals(p.get("gild_module"))) {
-            if (pl.redModules + pl.blueModules > pl.goldModules) {
-                pl.goldModules += 1;
+            if (Modules.gildOne(s, pl, agentFor(s, seat))) {
                 got.put("gild_module", true);
             }
         }
@@ -1468,8 +1467,7 @@ public final class Effects {
      */
     static Map<String, Object> gildModule(GameState s, int seat, Map<String, Object> p) {
         PlayerState pl = s.player(seat);
-        int placed = pl.redPlacements.size() + pl.bluePlacements.size();
-        if (pl.goldModules >= placed) {
+        if (!Modules.canGild(pl)) {
             return Map.of("gilded", 0, "reason", "все разложенные жетоны уже золотые");
         }
         Resource pay;
@@ -1483,7 +1481,7 @@ public final class Effects {
             return Map.of("gilded", 0, "reason", "нечем заплатить");
         }
         pl.resources.pay(pay, price);
-        pl.goldModules++;
+        Modules.gildOne(s, pl, agentFor(s, seat));
         return Map.of("gilded", 1, "paid", pay.code + ":" + price);
     }
 
@@ -1736,6 +1734,20 @@ public final class Effects {
             victim.objectiveHand.clear();
             s.player(seat).objectiveHand.addAll(taken);
             got.put("taken_objectives", taken.size());
+        }
+        // take_objective_cards: СКОЛЬКО КАРТ отобрать, а не всю руку разом
+        // (решение дизайнера 14.09.2026, карты рынка 3.0). Забрать у соседа все
+        // бумаги — не торговля, а разбой по одному человеку за столом, выбранному
+        // жребием колоды; одна карта несёт ту же мысль без обиды. Карты берутся
+        // с начала руки: соперник её не показывает, и выбирать вор не может.
+        if (p.get("take_objective_cards") instanceof Number on
+                && was != seat && was < s.numPlayers()) {
+            PlayerState victim = s.player(was);
+            int take = Math.min(on.intValue(), victim.objectiveHand.size());
+            for (int i = 0; i < take; i++) {
+                s.player(seat).objectiveHand.add(victim.objectiveHand.remove(0));
+            }
+            got.put("taken_objectives", take);
         }
         return got;
     }

@@ -98,8 +98,7 @@ window.KR_DATA = {
    }
   },
   "combat_model": {
-   "all_attacks_damage": 1,
-   "damage_persists_until_refresh": true
+   "all_attacks_damage": 1
   },
   "tech": {
    "tracks": 3,

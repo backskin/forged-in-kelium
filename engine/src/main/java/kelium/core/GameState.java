@@ -78,8 +78,26 @@ public final class GameState {
      * остальных сузилось. Сбрасываются на Обновлении вместе со сменой карты.
      */
     public final int[][] marketCells = {{-1, -1}, {-1, -1}};
+    /**
+     * ЯЧЕЙКА ОБНОВЛЕНИЯ КАРТЫ РЫНКА — место игрока, чей кубик келемия в ней
+     * стоит, либо −1 (свободна). Нарисована на планшете рынка слева от слота
+     * карты со значком обновления и есть в печатной игре с самого начала;
+     * в правилах и в движке её до 15.09.2026 не было вовсе.
+     *
+     * <p>Игрок кладёт в неё келемий действием Рынок — открытая карта тут же
+     * уходит из игры вместе со всеми кубиками на её ячейках предложений, и
+     * открывается следующая, со свободными ячейками. Ячейка одна и чистится на
+     * Обновлении, поэтому карту рынка обновляют не больше раза за раунд.
+     */
+    public int marketRefreshCell = -1;
     public boolean finished = false;
     public Integer winner = null;
+    /**
+     * ВСЕ ПОБЕДИТЕЛИ. Обычно один — он же {@link #winner}; при полной ничьей
+     * (равны очки и все три признака развязки) победу делят, и здесь их
+     * несколько (правило дизайнера 14.09.2026).
+     */
+    public final java.util.List<Integer> winners = new java.util.ArrayList<>();
     public String winCondition = null;
     /**
      * СКОЛЬКО ИСТОЧНИКОВ КЕЛЕМИЯ ОСТАЛОСЬ, когда партия кончилась по ним, и при
@@ -179,8 +197,10 @@ public final class GameState {
             System.arraycopy(marketCells[side], 0, s.marketCells[side], 0,
                 marketCells[side].length);
         }
+        s.marketRefreshCell = marketRefreshCell;
         s.finished = finished;
         s.winner = winner;
+        s.winners.addAll(winners);
         s.winCondition = winCondition;
         s.spawnLeftAtEnd = spawnLeftAtEnd;
         s.spawnThreshold = spawnThreshold;
@@ -253,8 +273,11 @@ public final class GameState {
             System.arraycopy(fresh.marketCells[side], 0, marketCells[side], 0,
                 fresh.marketCells[side].length);
         }
+        marketRefreshCell = fresh.marketRefreshCell;
         finished = fresh.finished;
         winner = fresh.winner;
+        winners.clear();
+        winners.addAll(fresh.winners);
         winCondition = fresh.winCondition;
         spawnLeftAtEnd = fresh.spawnLeftAtEnd;
         spawnThreshold = fresh.spawnThreshold;

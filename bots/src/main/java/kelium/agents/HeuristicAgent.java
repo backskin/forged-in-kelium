@@ -564,6 +564,12 @@ public class HeuristicAgent extends Agent {
             case "destroyed_pay" -> (s, o) -> {
                 int remaining = ctx != null && ctx.get("remaining") instanceof Number n
                     ? n.intValue() : 1;
+                if (o.payload() == null) {
+                    // КУБИКАМИ ТРОФЕЕВ (выбор игрока, 14.09.2026): без переплаты,
+                    // зато жетоны остаются на свалке до Возвращения. Ровно как
+                    // жетон точной ценности.
+                    return 10.0;
+                }
                 int v = ((kelium.core.Token) o.payload()).trophyValue();
                 return v >= remaining ? 10.0 - (v - remaining) : 1.0 + v * 0.1;
             };
@@ -2251,6 +2257,20 @@ public class HeuristicAgent extends Agent {
             // Келемий сам по себе очковый, поэтому «не торговать» — достойный
             // вариант. Но при пустом кошельке он хуже любой сделки.
             return me.resources.coin() <= 1 ? 0.4 : 2.0;
+        }
+        if ("market_refresh".equals(o.kind())) {
+            // СМЕНА КАРТЫ РЫНКА за келемий (ячейка обновления планшета).
+            // Обновление не даёт ничего само по себе: оно только открывает
+            // следующую карту — и стоит того лишь когда брать с нынешней уже
+            // нечего. Поэтому считаем по свободным ячейкам, а не по выгоде.
+            boolean естьЧтоБрать = kelium.engine.Actions.freeMarketCellOpen(state, "left")
+                || kelium.engine.Actions.freeMarketCellOpen(state, "right");
+            if (естьЧтоБрать) {
+                return 0.3;
+            }
+            // Ячеек не осталось, а келемий есть — открыть свежую карту разумно,
+            // но только если после обновления хватит и на само предложение.
+            return kel >= 2 ? 1.8 : 0.2;
         }
         if ("market_rate".equals(o.kind())) {
             Map<String, Object> pl = (Map<String, Object>) o.payload();

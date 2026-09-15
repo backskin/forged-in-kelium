@@ -63,7 +63,100 @@ public final class BlockAssembler {
         public int smallUsed() {
             return (int) blocks.stream().filter(b -> b.size() == 5).count();
         }
+
+        /** Все клетки под картоном: игровое поле вместе с чёрными накладками. */
+        public Set<Cell> covered() {
+            Set<Cell> out = new LinkedHashSet<>();
+            for (Placement p : blocks) {
+                out.addAll(p.cells());
+            }
+            return out;
+        }
+
+        /**
+         * ВЫТЯНУТОСТЬ СОБРАННОГО ПОЛЯ: 1.0 — квадрат, больше — «колбаса».
+         *
+         * <p>Считается по настоящим размерам картона, а не по осевым
+         * координатам: гекс шире, чем выше, поэтому равные q и r дали бы
+         * неверную оценку. Длинная сторона делится на короткую.
+         */
+        public double elongation() {
+            Set<Cell> cov = covered();
+            if (cov.isEmpty()) {
+                return 1.0;
+            }
+            double minX = Double.MAX_VALUE;
+            double maxX = -Double.MAX_VALUE;
+            double minY = Double.MAX_VALUE;
+            double maxY = -Double.MAX_VALUE;
+            for (Cell c : cov) {
+                double x = 1.5 * c.q();
+                double y = Math.sqrt(3.0) * (c.r() + c.q() / 2.0);
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+            }
+            double w = maxX - minX + 2.0;
+            double h = maxY - minY + Math.sqrt(3.0);
+            return Math.max(w, h) / Math.min(w, h);
+        }
+
+        /** Площадь описанного прямоугольника — при равной вытянутости меньше лучше. */
+        public double boundingArea() {
+            Set<Cell> cov = covered();
+            if (cov.isEmpty()) {
+                return 0.0;
+            }
+            double minX = Double.MAX_VALUE;
+            double maxX = -Double.MAX_VALUE;
+            double minY = Double.MAX_VALUE;
+            double maxY = -Double.MAX_VALUE;
+            for (Cell c : cov) {
+                double x = 1.5 * c.q();
+                double y = Math.sqrt(3.0) * (c.r() + c.q() / 2.0);
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+            }
+            return (maxX - minX + 2.0) * (maxY - minY + Math.sqrt(3.0));
+        }
+
+        /**
+         * НАСКОЛЬКО РОВНО ПОДЕЛЕНЫ БЛОКИ. 0 — поровну больших и малых.
+         *
+         * <p>Сборка без единого большого блока штрафуется отдельно: дизайнер
+         * просил всегда пускать в дело хотя бы один большой, если это не
+         * ухудшает накладки и форму.
+         */
+        public int imbalance() {
+            int big = bigUsed();
+            int small = smallUsed();
+            int штраф = big == 0 && small > 0 ? 100 : 0;
+            return штраф + Math.abs(big - small);
+        }
     }
+
+    /**
+     * ЧЕМ СБОРКА ЛУЧШЕ. Порядок требований задал дизайнер (15.09.2026):
+     *
+     * <ol>
+     *   <li>меньше чёрных накладок — поле не должно зарастать заглушками;</li>
+     *   <li>форма ближе к квадрату — вытянутое поле неудобно на столе,
+     *       и именно на нём ловится блок, повёрнутый «вдоль», а не «поперёк»;</li>
+     *   <li>ровный расход блоков, и хотя бы один большой в деле;</li>
+     *   <li>при прочих равных — меньше площадь.</li>
+     * </ol>
+     *
+     * <p>Вытянутость округляется до сотых: иначе разница в тысячную,
+     * не видимая глазом, перебивала бы баланс блоков.
+     */
+    public static final Comparator<Result> ПО_КАЧЕСТВУ =
+        Comparator.comparingInt((Result r) -> r.blacks().size())
+            .thenComparingLong(r -> Math.round(r.elongation() * 100.0))
+            .thenComparingInt(Result::imbalance)
+            .thenComparingLong(r -> Math.round(r.boundingArea() * 10.0));
 
     /** Чем закончился перебор. */
     public enum Status { OK, IMPOSSIBLE, TIMEOUT, EMPTY }
@@ -145,7 +238,9 @@ public final class BlockAssembler {
      */
     public static Result solve(Set<Cell> playable, int maxBig, int maxSmall,
                                int maxBlack, long budgetMs) {
-        return solve(playable, maxBig, maxSmall, maxBlack, budgetMs, null);
+        // ЛУЧШАЯ, А НЕ ПЕРВАЯ: одиночный перебор отдаёт любую сборку с минимумом
+        // накладок, а их бывает много и форма у них разная (см. ПО_КАЧЕСТВУ).
+        return solveVariants(playable, maxBig, maxSmall, maxBlack, budgetMs, 1).get(0);
     }
 
     /**
@@ -173,7 +268,13 @@ public final class BlockAssembler {
         out.add(first);
         seen.add(signature(first));
         int target = first.blacks().size();
-        for (long seed = 1; out.size() < wanted; seed++) {
+        // НАБИРАЕМ ЗАПАС ВАРИАНТОВ, А НЕ РОВНО СКОЛЬКО ПРОСИЛИ. Раньше перебор
+        // отдавал первую попавшуюся сборку с минимумом накладок, и поле выходило
+        // вытянутым: блок ложился «вдоль» просто потому, что это положение
+        // встретилось раньше. Теперь из нескольких равных по накладкам сборок
+        // выбирается лучшая по форме и расходу блоков (см. ПО_КАЧЕСТВУ).
+        int запас = Math.max(wanted, 12);
+        for (long seed = 1; out.size() < запас; seed++) {
             if (System.currentTimeMillis() - t0 > budgetMs * 3 || seed > 60) {
                 break;
             }
@@ -185,7 +286,8 @@ public final class BlockAssembler {
                 out.add(r);
             }
         }
-        return out;
+        out.sort(ПО_КАЧЕСТВУ);
+        return out.size() > wanted ? new ArrayList<>(out.subList(0, wanted)) : out;
     }
 
     /** Отпечаток сборки: набор блоков без учёта порядка их постановки. */

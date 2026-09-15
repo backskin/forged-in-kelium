@@ -237,6 +237,7 @@ public final class Commentator implements Consumer<Map<String, Object>> {
             case "units_on_field" -> "армия на поле";
             case "tech" -> "треки науки";
             case "gold_modules" -> "золотые модули";
+            case "storage_cell_stars" -> "пустые ячейки жетонов хранилища";
             case "spawn_tiles" -> "захваченные тайлы зарождения";
             case "cu_tokens" -> "уничтожение вражеских ЦУ";
             case "level4_stars" -> "здания 4-го уровня";

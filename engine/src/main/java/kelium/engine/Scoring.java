@@ -101,6 +101,22 @@ public final class Scoring {
         breakdown.put("tech", techVp);
 
         breakdown.put("gold_modules", p.goldModules);
+        // ЗВЕЗДА НА СТОРОНЕ ЯЧЕЙКИ ЖЕТОНА ХРАНИЛИЩА (решение дизайнера
+        // 14.09.2026): 1 ПО, если эта ячейка в момент подсчёта ПУСТА. Кубики по
+        // планшету не переставляются, поэтому в движке, где ячейки не
+        // поимённые, считается так: свободных ячеек хватает на звезду — она
+        // есть; звёзд не больше, чем таких жетонов и чем свободных ячеек.
+        int cellTokens = 0;
+        for (String tok : p.storageTokens) {
+            if ("+1_universal_cell".equals(tok)) {
+                cellTokens++;
+            }
+        }
+        if (cellTokens > 0) {
+            int free = Storage.totalMax(state, p) - p.resources.kelium()
+                - p.resources.ammo() - p.resources.trophy();
+            breakdown.put("storage_cell_stars", Math.max(0, Math.min(cellTokens, free)));
+        }
         // ПОБЕДНЫЕ ОЧКИ ЗА ТАЙЛЫ ЗАРОЖДЕНИЯ (правило дизайнера 12.08.2026):
         // очко даёт ТОЛЬКО ВЫРАБОТАННЫЙ ДО КОНЦА (оборот) БОЛЬШОЙ тайл — игрок
         // сохраняет его в запасе как очко. Малое (стартовое) зарождение очков не
@@ -123,8 +139,13 @@ public final class Scoring {
         // Награда за войну, стало быть, не «втрое больше», а единственная: за
         // сохранённое своё ЦУ не платят ничем.
         int cuTokenVp = p.cuDestructionTokens * rs.getInt("command_center.destruction_token_vp");
-        if (p.ownCuTokenAvailable) {
-            cuTokenVp += ((Number) rs.get("command_center.own_token_vp_if_cu_never_destroyed", 0)).intValue();
+        // ОЧКИ ПЕЧАТАЮТСЯ ТОЛЬКО НА ОБОРОТЕ ЖЕТОНА: их получает тот, кто снёс
+        // чужое ЦУ и перевернул забранный жетон. Свой жетон, оставшийся лицом,
+        // не стоит ничего — ключ в действующем своде равен нулю.
+        int свой = ((Number) rs.get(
+            "command_center.own_token_vp_if_cu_never_destroyed", 0)).intValue();
+        if (p.ownCuTokenAvailable && свой != 0) {
+            cuTokenVp += свой;
         }
         breakdown.put("cu_tokens", cuTokenVp);
         // ЭКСПЕРИМЕНТАЛЬНЫЙ КЛЮЧ (по умолчанию 0 — правила не меняются): очки за
@@ -160,9 +181,9 @@ public final class Scoring {
         // рубашка так и не сложилась: иначе вложенное в первую часть пропадает.
         // Супер-задания 5.0: накопитель платит, только если карта дожила до
         // конца партии нетронутой; сожжённая уже расплатилась суперутилём.
-        int super5 = kelium.engine.СуперЗадания.stockpileVp(state, seat);
-        if (super5 != 0) {
-            breakdown.put("super5_stockpile", super5);
+        int супер = kelium.engine.СуперЗадания.vp(state, seat);
+        if (супер != 0) {
+            breakdown.put("super_objectives", супер);
         }
         // КАРТЫ-ЦЕЛИ АРСЕНАЛА (2.1.0): установленная карта может не менять правил,
         // а считать очки в конце партии. Такого канала в игре не было вовсе —

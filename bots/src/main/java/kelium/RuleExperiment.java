@@ -395,11 +395,6 @@ public final class RuleExperiment {
         variants.add(new Variant("уничтожение НАВСЕГДА",
             "убитые жетоны не возвращаются владельцу в Возврат",
             Map.of("return_step.return_destroyed_tokens", false)));
-        // Раньше здесь стоял вариант «урон НЕ лечится» (heal 0). С 1.7.0 это и есть
-        // действующее правило, поэтому вариант был холостым. Сравнение развёрнуто.
-        variants.add(new Variant("ВЕРНУТЬ лечение",
-            "в Обновление снова снимается 1 кубик урона — как было до свода 1.7.0",
-            Map.of("combat_model.heal_per_refresh", 1)));
         variants.add(new Variant("выстрел вдвое дешевле",
             "вторичный ряд атак стоит 1 боеприпас вместо 2",
             Map.of("actions.combat.secondary_row_ammo_cost", 1)));
@@ -431,23 +426,17 @@ public final class RuleExperiment {
         variants.add(new Variant("ЦУ прочность 2",
             "штурм ЦУ становится вдвое короче: 2 кубика урона вместо 3",
             Map.of(), null, Map.of("command_center", 2)));
-        variants.add(new Variant("дольше + урон не лечится",
-            "партия все 8 раундов и осада копится — время на войну",
-            Map.of("end_conditions.last_spawn_tile_threshold", -1,
-                "combat_model.heal_per_refresh", 0)));
-        variants.add(new Variant("ВОЙНА: дольше + ЦУ 2 + осада",
-            "всё вместе против ЦУ: длинная партия, прочность 2, урон не лечится",
-            Map.of("end_conditions.last_spawn_tile_threshold", -1,
-                "combat_model.heal_per_refresh", 0), null, Map.of("command_center", 2)));
+        variants.add(new Variant("ВОЙНА: дольше + ЦУ 2",
+            "всё вместе против ЦУ: длинная партия и прочность 2",
+            Map.of("end_conditions.last_spawn_tile_threshold", -1),
+            null, Map.of("command_center", 2)));
         variants.add(new Variant("ВСЁ ВМЕСТЕ",
-            "уничтожение навсегда + урон не лечится + дешёвый выстрел",
+            "уничтожение навсегда + дешёвый выстрел",
             Map.of("return_step.return_destroyed_tokens", false,
-                "combat_model.heal_per_refresh", 0,
                 "actions.combat.secondary_row_ammo_cost", 1)));
         variants.add(new Variant("ПЛАТИТЬ + ВСЁ ВМЕСТЕ",
             "то же плюс 1 очко за уничтожение",
             Map.of("return_step.return_destroyed_tokens", false,
-                "combat_model.heal_per_refresh", 0,
                 "actions.combat.secondary_row_ammo_cost", 1,
                 "economy.vp_per_kill", 1)));
         // ГЕОМЕТРИЯ: те же правила, но КОНКРЕТНЫЕ раскладки дизайнера — самая
@@ -606,15 +595,6 @@ public final class RuleExperiment {
         variants.add(new Variant("КОРОЧЕ: потолок 5",
             "контрольный образец в другую сторону — партия заведомо короче",
             Map.of("rounds.reserve_cap", 5)));
-        // ВНИМАНИЕ, ЛОВУШКА (обжёгся 14.08.2026). Свод 1.7.0 УЖЕ содержит
-        // heal_per_refresh: 0 — лечение отключено решением дизайнера 13.08.2026.
-        // Поэтому вариант «урон не лечится» выставляет то, что и так стоит, и даёт
-        // побитово те же числа, что точка отсчёта. Полчаса ушло на поиск
-        // несуществующей ошибки в стенде. Осмысленное сравнение теперь ОБРАТНОЕ:
-        // вернуть лечение и посмотреть, сколько игра на нём теряла.
-        variants.add(new Variant("ВЕРНУТЬ лечение",
-            "в Обновление снова снимается 1 кубик урона (правило до 1.7.0)",
-            Map.of("combat_model.heal_per_refresh", 1)));
     }
 
     private static void runAll(List<Variant> variants, int players, int games, String set)

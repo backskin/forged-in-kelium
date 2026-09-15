@@ -6,7 +6,7 @@ import java.util.List;
 import kelium.engine.cards.Card;
 import kelium.engine.cards.CardRegistry;
 
-/** Реестр карт сделок на рынке: набор 1.2.0 и набор 2.0.0. */
+/** Реестр карт сделок на рынке: наборы 1.2.0, 2.0.0 и 3.0.0. */
 public final class MarketPack implements CardRegistry.CardPack {
 
     @Override
@@ -30,6 +30,9 @@ public final class MarketPack implements CardRegistry.CardPack {
         out.add(new СделкиНаРынке2.ВоеннаяТревога());
         out.add(new СделкиНаРынке2.ШтабКорпуса());
         out.add(new СделкиНаРынке2.ГражданскийПодряд());
+        // НАБОР 3.0.0 (решения 14–15.09.2026) — десять карт m3_*, по одному
+        // ресурсному и одному действенному предложению на карте.
+        out.addAll(СделкиНаРынке3.все());
         return out;
     }
 }

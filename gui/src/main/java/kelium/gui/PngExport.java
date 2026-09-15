@@ -36,23 +36,49 @@ public final class PngExport {
     private static final Color MUTED = new Color(0x6d6a5e);
     private static final Color RULE = new Color(0xDDDAD0);
 
-    /** Одна строка легенды: цветной образец + подпись. */
-    public record Item(Color fill, Color edge, String shape, String text, String letter) {
+    /**
+     * Одна строка легенды: образец + подпись.
+     *
+     * @param colours образцы для строк, где их несколько (ряд мест игроков);
+     *                у одиночных фигур пустой список
+     */
+    public record Item(Color fill, Color edge, String shape, String text, String letter,
+                       List<Color> colours) {
         public static Item hex(Color fill, String text) {
-            return new Item(fill, MUTED, "hex", text, null);
+            return new Item(fill, MUTED, "hex", text, null, List.of());
         }
 
         public static Item circle(Color fill, String text) {
-            return new Item(fill, MUTED, "circle", text, null);
+            return new Item(fill, MUTED, "circle", text, null, List.of());
         }
 
         public static Item square(Color fill, String text) {
-            return new Item(fill, MUTED, "square", text, null);
+            return new Item(fill, MUTED, "square", text, null, List.of());
         }
 
         /** Кружок с буквой места (P1, P2…) — для персональной легенды игрока. */
         public static Item seat(Color fill, String letter, String text) {
-            return new Item(fill, MUTED, "seat", text, letter);
+            return new Item(fill, MUTED, "seat", text, letter, List.of());
+        }
+
+        /**
+         * РЯД МЕСТ ОДНОЙ СТРОКОЙ: P1 P2 P3 P4 подряд. На раскладке кружок места
+         * — самый частый знак, а отдельной строкой на каждого игрока легенда
+         * раздувается вчетверо и всё равно говорит одно и то же.
+         */
+        public static Item seats(List<Color> colours, String text) {
+            return new Item(colours.isEmpty() ? MUTED : colours.get(0), MUTED,
+                "seats", text, null, List.copyOf(colours));
+        }
+
+        /**
+         * НЕЙТРАЛЬНАЯ ПОСТРОЙКА — её НАСТОЯЩАЯ форма: полоса по краю гекса,
+         * малая на ОДНУ стенку, большая на ДВЕ. Серый квадрат на её месте не
+         * говорит игроку ничего: на столе он ищет глазами именно эту дугу.
+         */
+        public static Item neutral(Color fill, boolean big, String text) {
+            return new Item(fill, MUTED, big ? "neutral3" : "neutral2", text,
+                null, List.of());
         }
     }
 
@@ -280,11 +306,12 @@ public final class PngExport {
         Font font = new Font(Font.SANS_SERIF, Font.PLAIN, LEGEND_SIZE);
         java.awt.FontMetrics fm = g.getFontMetrics(font);
         int colW = (w - 56) / cols;
-        int textW = colW - SAMPLE - 12 - 10;
         int lineH = LEGEND_SIZE + 6;
         int gap = 10;
         int[] colY = new int[cols];
         for (Item it : legend) {
+            int образецW = sampleWidth(it);
+            int textW = colW - образецW - 12 - 10;
             List<String> lines = wrap(fm, it.text(), textW);
             int itemH = Math.max(SAMPLE, lines.size() * lineH);
             int col = 0;
@@ -301,7 +328,7 @@ public final class PngExport {
                 g.setFont(font);
                 int ty = ry + fm.getAscent();
                 for (String line : lines) {
-                    g.drawString(line, x + SAMPLE + 12, ty);
+                    g.drawString(line, x + образецW + 12, ty);
                     ty += lineH;
                 }
             }
@@ -417,7 +444,96 @@ public final class PngExport {
         return y + maxColY + 10;
     }
 
+    /**
+     * Сколько места занимает образец. У ряда мест он во столько раз шире,
+     * сколько в ряду кружков, — иначе подпись налезает на последние.
+     */
+    private static int sampleWidth(Item it) {
+        if ("seats".equals(it.shape()) && !it.colours().isEmpty()) {
+            return (int) Math.round(SAMPLE * (0.86 * it.colours().size() + 0.14));
+        }
+        return SAMPLE;
+    }
+
+    /** Ряд кружков мест: P1 P2 P3 P4 подряд, каждый своим цветом. */
+    private static void seatsRow(Graphics2D g, Item it, int x, int y) {
+        int d = (int) Math.round(SAMPLE * 0.86);
+        int шаг = (int) Math.round(SAMPLE * 0.86);
+        Font f = new Font(Font.SANS_SERIF, Font.BOLD, (int) Math.round(SAMPLE * 0.42));
+        var fm = g.getFontMetrics(f);
+        for (int i = 0; i < it.colours().size(); i++) {
+            int cx = x + i * шаг;
+            int cy = y + (SAMPLE - d) / 2;
+            g.setColor(it.colours().get(i));
+            g.fillOval(cx, cy, d, d);
+            g.setColor(it.edge());
+            g.drawOval(cx, cy, d, d);
+            g.setColor(Color.WHITE);
+            g.setFont(f);
+            String n = String.valueOf(i + 1);
+            g.drawString(n, cx + (d - fm.stringWidth(n)) / 2,
+                cy + (d + fm.getAscent()) / 2 - 1);
+        }
+    }
+
+    /**
+     * Нейтральная постройка: дуга по краю гекса на две или три стенки — ровно
+     * та форма, какой жетон лежит на столе. Под ней бледный контур гекса,
+     * чтобы было видно, к чему она прижата.
+     */
+    private static void neutralShape(Graphics2D g, Item it, int x, int y, int walls) {
+        double cx = x + SAMPLE / 2.0;
+        double cy = y + SAMPLE / 2.0;
+        double r = SAMPLE / 2.0;
+        java.awt.Polygon гекс = new java.awt.Polygon();
+        for (int k = 0; k < 6; k++) {
+            double a = Math.toRadians(60 * k - 90 + kelium.report.FieldGeometry.TILT);
+            гекс.addPoint((int) Math.round(cx + r * Math.cos(a)),
+                (int) Math.round(cy + r * Math.sin(a)));
+        }
+        g.setColor(new Color(0xF4F2EC));
+        g.fillPolygon(гекс);
+        g.setColor(new Color(0xBEBAB0));
+        g.drawPolygon(гекс);
+
+        java.awt.Polygon полоса = new java.awt.Polygon();
+        double снаружи = 0.98;
+        double внутри = 0.56;
+        for (int i = 0; i <= walls; i++) {
+            double a = Math.toRadians(60 * i - 90 + kelium.report.FieldGeometry.TILT);
+            полоса.addPoint((int) Math.round(cx + r * снаружи * Math.cos(a)),
+                (int) Math.round(cy + r * снаружи * Math.sin(a)));
+        }
+        for (int i = walls; i >= 0; i--) {
+            double a = Math.toRadians(60 * i - 90 + kelium.report.FieldGeometry.TILT);
+            полоса.addPoint((int) Math.round(cx + r * внутри * Math.cos(a)),
+                (int) Math.round(cy + r * внутри * Math.sin(a)));
+        }
+        // Заливка ТЁМНАЯ: на образце 26 пикселей светло-серая дуга сливается с
+        // контуром гекса, и дизайнер видит вместо постройки пустой гекс.
+        g.setColor(walls >= 2 ? it.fill().darker().darker() : it.fill().darker());
+        g.fillPolygon(полоса);
+        g.setColor(new Color(0x3C4148));
+        g.setStroke(new java.awt.BasicStroke(1.4f));
+        g.drawPolygon(полоса);
+    }
+
     private static void sample(Graphics2D g, Item it, int x, int y) {
+        switch (it.shape()) {
+            case "seats" -> {
+                seatsRow(g, it, x, y);
+                return;
+            }
+            case "neutral2" -> {
+                neutralShape(g, it, x, y, 1);   // малая — ОДНА стенка
+                return;
+            }
+            case "neutral3" -> {
+                neutralShape(g, it, x, y, 2);   // большая — ДВЕ стенки
+                return;
+            }
+            default -> { }
+        }
         g.setColor(it.fill());
         switch (it.shape()) {
             case "circle", "seat" -> g.fillOval(x, y, SAMPLE, SAMPLE);

@@ -375,6 +375,20 @@ public final class Setup {
      * (ЦУ, добытчик №1, 1 пехота), раздаёт по одному супер-заданию, создаёт
      * тех-планшет и колоды (с отбраковкой карт под число игроков).
      */
+    /**
+     * СТАРТОВЫЙ РЕСУРС ПО МЕСТУ ЗА СТОЛОМ. Ключ свода может быть одним числом
+     * (всем поровну) или списком по местам — тогда берётся элемент своего
+     * места. Нет ключа — печатное умолчание.
+     */
+    private static int поМесту(Ruleset ruleset, String key, int seat, int умолчание) {
+        Object cfg = ruleset.get(key, null);
+        if (cfg instanceof List<?> lst) {
+            return seat < lst.size() && lst.get(seat) instanceof Number n
+                ? n.intValue() : умолчание;
+        }
+        return cfg instanceof Number n ? n.intValue() : умолчание;
+    }
+
     public static GameState buildGame(GameConfig config) {
         return buildGame(config, null);
     }
@@ -442,21 +456,18 @@ public final class Setup {
             PlayerBoard board = PlayerBoard.fromContent(boardsEntries, side, side);
             // Стартовые монеты: из ruleset (setup.start_coins), иначе умолчание —
             // 5 всем (решение 2026-08-12).
-            int startCoins;
-            Object coinsCfg = ruleset.get("setup.start_coins", null);
-            if (coinsCfg instanceof List<?> lst && seat < lst.size()
-                    && lst.get(seat) instanceof Number cn) {
-                startCoins = cn.intValue();
-            } else {
-                startCoins = seat < START_COINS.length ? START_COINS[seat] : 4;
-            }
+            int startCoins = поМесту(ruleset, "setup.start_coins", seat,
+                seat < START_COINS.length ? START_COINS[seat] : 4);
             // Стартовые келемий и боеприпасы — тем же путём, что монеты: из
             // свода, если ключ задан, иначе печатное умолчание. Меню запуска
             // правит их для ТРЕНИРОВОЧНОЙ партии, не трогая файлы правил.
-            int startKelium = ruleset.get("setup.start_kelium", null) instanceof Number kn
-                ? kn.intValue() : START_KELIUM;
-            int startAmmo = ruleset.get("setup.start_ammo", null) instanceof Number an
-                ? an.intValue() : START_AMMO;
+            //
+            // КЕЛЕМИЙ ТОЖЕ ПО МЕСТУ ЗА СТОЛОМ (решение дизайнера 13.09.2026):
+            // первый игрок ходит первым и начинает без келемия, остальным он
+            // компенсирует очередь. Раньше ключ принимал только одно число на
+            // всех, и движок выдавал по келемию даже первому игроку.
+            int startKelium = поМесту(ruleset, "setup.start_kelium", seat, START_KELIUM);
+            int startAmmo = поМесту(ruleset, "setup.start_ammo", seat, START_AMMO);
             Resources res = new Resources(startCoins, startKelium, startAmmo, 0);
             String startHex = startHexes.get(seat);
             PlayerState ps = new PlayerState(seat, board, res, startHex);
@@ -464,7 +475,22 @@ public final class Setup {
             // есть предел науки за партию. Ключа нет - остаётся -1, и наука
             // играет по-старому: кубик один на трек, он переставляется.
             if (ruleset.getBool("tech.cubes_are_permanent", false)) {
-                ps.techCubesLeft = ruleset.getInt("tech.cube_supply", 8);
+                // КУБИКОВ ПО СОСТАВУ (решение дизайнера 13.09.2026): в коробке 8,
+                // но берут вдвоём 8, втроём 7, вчетвером 6 — чтобы кубиков в сумме
+                // было примерно столько же, сколько ячеек на трёх треках, и трек
+                // при любом составе оставался гонкой за места.
+                int supply = ruleset.getInt("tech.cube_supply", 8);
+                Object поСоставу = ruleset.get("tech.cube_supply_by_players", null);
+                if (поСоставу instanceof java.util.Map<?, ?> m) {
+                    Object v = m.get(String.valueOf(n));
+                    if (v == null) {
+                        v = m.get(n);
+                    }
+                    if (v instanceof Number num) {
+                        supply = num.intValue();
+                    }
+                }
+                ps.techCubesLeft = supply;
             }
             Hex sh = field.get(startHex);
 
@@ -544,30 +570,17 @@ public final class Setup {
         //   none     — без стартовых заданий вообще.
         // Начальные задания (kind: starting) в любом режиме изымаются из ОБЩЕЙ
         // колоды заданий: это отдельный модуль старта, а не обычные карты.
-        int deal = Math.max(1, ((Number) ruleset.get("super_objectives.deal", 1)).intValue());
-        // СУПЕР-ЗАДАНИЯ 5.0 (mode: solo5): по ОДНОЙ карте втайне, без вскрытия
-        // и счётчика; раздачу делает Super5 ниже, когда GameState уже собран.
-        // Прежняя раздача (несколько карт на выбор, вскрытие, счётчик) не
-        // действует ни в 5.0, ни в 6.0: там игроку идёт ОДНА карта втайне.
-        String режимСупер = String.valueOf(ruleset.get("super_objectives.mode", ""));
-        boolean одинокаяКарта = "solo5".equals(режимСупер) || "solo6".equals(режимСупер);
-        if (!одинокаяКарта && expansionOn(ruleset, "super_objectives")) {
-            List<String> superIds = new ArrayList<>(content.get("super_objectives").ids());
-            Collections.shuffle(superIds, rng);
-            int at = 0;
-            for (PlayerState ps : players) {
-                for (int k = 0; k < deal && at < superIds.size(); k++, at++) {
-                    ps.superObjectiveOffer.add(superIds.get(at));
-                }
-                // Одна карта в предложении = выбора нет, ставим сразу.
-                if (ps.superObjectiveOffer.size() == 1) {
-                    ps.superObjective = ps.superObjectiveOffer.get(0);
-                }
-            }
-        }
+        // СУПЕР-ЗАДАНИЯ 8.0 (14.09.2026): каждому ОДНА карта втайне, без выбора
+        // из нескольких и без вскрытия. Раздача — ниже, когда GameState собран
+        // (СуперЗадания.deal): здесь партии ещё нет.
         // НЕЗАВИСИМЫЙ ТУМБЛЕР: начальные задания включаются отдельно и МОГУТ
         // играться вместе с супер заданиями (решение дизайнера 17.08.2026).
         if (expansionOn(ruleset, "starting_objectives")) {
+            // ОДНА КАРТА НАЧАЛЬНОГО ЗАДАНИЯ В РУКУ (подготовка, шаг 16). Прежде
+            // число бралось из ключа супер-заданий — он к начальным отношения
+            // не имеет и вместе с их редакцией 8.0 исчез.
+            int deal = Math.max(1,
+                ((Number) ruleset.get("starting_objectives.deal", 1)).intValue());
             List<String> starters = new ArrayList<>();
             for (Map<String, Object> e : content.get("objectives").entries) {
                 if ("starting".equals(e.get("kind"))) {
@@ -713,6 +726,23 @@ public final class Setup {
                     ids = more;
                 }
             }
+            if ("market".equals(ctype)) {
+                // СКОЛЬКО КАРТ РЫНКА КЛАДУТ НА ПЛАНШЕТ (решение дизайнера
+                // 15.09.2026). В колоде их десять, а в партии участвуют восемь:
+                // перемешали, отсчитали сколько нужно, остальные в коробку не
+                // глядя. Партия каждый раз собирается из другого набора.
+                //
+                // ЭТО И ЕСТЬ РЕГУЛЯТОР ДЛИНЫ ПАРТИИ: карты рынка кончились —
+                // партия кончилась, поэтому сколько карт положили, столько
+                // раундов максимум и будет. Ноль или больше, чем есть в
+                // колоде, — берётся вся колода.
+                int вКолоду = ((Number) ruleset.get("market.deck_size", 0)).intValue();
+                if (вКолоду > 0 && вКолоду < ids.size()) {
+                    List<String> перемешанные = new ArrayList<>(ids);
+                    java.util.Collections.shuffle(перемешанные, rng);
+                    ids = new ArrayList<>(перемешанные.subList(0, вКолоду));
+                }
+            }
             if ("market".equals(ctype) && !expansionOn(ruleset, "market_cards")) {
                 // КАРТЫ РЫНКА ВЫКЛЮЧЕНЫ: колода не собирается вовсе, активной
                 // карты в партии нет, и на планшете рынка остаётся только
@@ -784,8 +814,14 @@ public final class Setup {
         // гексов), а мог достаться воздушный, до которого наземным жетонам не
         // дотянуться. Привязывать стартовую карту к раскладке — значит делать
         // старт неравным на ровном месте, поэтому она выдаётся безусловно.
+        // 13.09.2026: КАРТЫ КОНТЕЙНЕРА НА СТАРТЕ НЕТ (правило дизайнера).
+        // Раздача была тестовой и расходилась с правилами. Ключ оставлен ради
+        // старых сводов: они играются по-прежнему, по одной карте каждому.
+        int стартКонтейнеров = ruleset.getInt("setup.start_containers", 1);
         for (PlayerState p : players) {
-            Storage.addContainersCapped(s, p, 1, "подготовка");
+            if (стартКонтейнеров > 0) {
+                Storage.addContainersCapped(s, p, стартКонтейнеров, "подготовка");
+            }
         }
 
         // Супер-арсенал (треки 2.0): из 9 карт выложить В ОТКРЫТУЮ по одной на
@@ -803,14 +839,10 @@ public final class Setup {
                 // контента может не быть в старых версиях правил — играем без вершин
             }
         }
-        // СУПЕР-ЗАДАНИЯ: по одной карте втайне каждому. Верх карты — множитель
-        // победных очков в финале, низ — жёсткое требование с разовой наградой;
-        // и то и другое разыгрывает СуперЗадания (класс Super5 по прежнему
-        // имени). РАЗДАЧА СПРАШИВАЕТ ТУМБЛЕР ДОПОЛНЕНИЯ, а не только режим:
-        // иначе выключенное дополнение всё равно раздавало карты, и это ловил
-        // StartModesAndBagsTest.
-        String суперРежим = String.valueOf(ruleset.get("super_objectives.mode", ""));
-        if ("solo6".equals(суперРежим) && expansionOn(ruleset, "super_objectives")) {
+        // СУПЕР-ЗАДАНИЯ: по одной карте втайне каждому. Карта только считает
+        // очки в конце партии (СуперЗадания.vp). Раздача спрашивает тумблер
+        // дополнения: выключено — карт нет вовсе.
+        if (expansionOn(ruleset, "super_objectives")) {
             try {
                 СуперЗадания.deal(s, content.get("super_objectives").ids(), rng);
             } catch (RuntimeException e) {

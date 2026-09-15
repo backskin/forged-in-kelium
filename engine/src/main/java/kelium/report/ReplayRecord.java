@@ -376,10 +376,10 @@ public final class ReplayRecord {
         public String orderSetAside;
         public String orderColor;
         public final List<String> storageTokens = new ArrayList<>();
-        /** Карта супер-задания игрока: множитель очков в финале плюс требование. */
-        public String superObjective;
-        /** Низ карты отработан: разовая награда за жёсткое требование взята. */
-        public boolean superComplete;
+        /** Супер-задания игрока: множитель очков в финале плюс требование у каждой. */
+        public final List<String> superObjectives = new ArrayList<>();
+        /** Карты, у которых низ отработал: разовая награда за требование взята. */
+        public final List<String> superDone = new ArrayList<>();
         public int cuTokens;
         public boolean ownCuToken = true;
         public String startHex = "";
@@ -835,8 +835,8 @@ public final class ReplayRecord {
         v.orderSetAside = p.orderSetAside;
         v.orderColor = p.orderColor;
         v.storageTokens.addAll(p.storageTokens);
-        v.superObjective = p.superObjective;
-        v.superComplete = p.superObjectiveComplete;
+        v.superObjectives.addAll(p.superObjectives);
+        v.superDone.addAll(p.superObjectivesDone);
         v.cuTokens = p.cuDestructionTokens;
         v.ownCuToken = p.ownCuTokenAvailable;
         v.startHex = p.startHex;
@@ -1238,8 +1238,8 @@ public final class ReplayRecord {
         o.put("ordAside", p.orderSetAside);
         o.put("ordColor", p.orderColor);
         o.put("store", p.storageTokens);
-        o.put("super", p.superObjective);
-        o.put("superComplete", p.superComplete);
+        o.put("super", p.superObjectives);
+        o.put("superDone", p.superDone);
         o.put("cuTokens", p.cuTokens);
         o.put("ownCu", p.ownCuToken);
         o.put("startHex", p.startHex);
@@ -1584,8 +1584,8 @@ public final class ReplayRecord {
         p.orderSetAside = Json.s(o, "ordAside");
         p.orderColor = Json.s(o, "ordColor");
         p.storageTokens.addAll(Json.strings(o, "store"));
-        p.superObjective = Json.s(o, "super");
-        p.superComplete = Json.b(o, "superComplete");
+        p.superObjectives.addAll(Json.strings(o, "super"));
+        p.superDone.addAll(Json.strings(o, "superDone"));
         p.cuTokens = Json.i(o, "cuTokens");
         p.ownCuToken = Json.b(o, "ownCu");
         p.startHex = orEmpty(Json.s(o, "startHex"));

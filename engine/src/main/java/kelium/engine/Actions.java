@@ -819,6 +819,21 @@ public final class Actions {
     }
 
     /**
+     * ЕСТЬ ЛИ У ПРЕДЛОЖЕНИЯ СВОБОДНАЯ ЯЧЕЙКА. Нужно ботам и проигрывателю:
+     * вопрос «можно ли вообще взять эту половину» задаётся снаружи действия.
+     */
+    public static boolean freeMarketCellOpen(GameState s, String side) {
+        int[] cells = s.marketCells["right".equals(side) ? 1 : 0];
+        int open = Math.min(cells.length, marketCellsOpen(s.numPlayers()));
+        for (int i = 0; i < open; i++) {
+            if (cells[i] < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * СТАНЦИЯ СЪЕХАЛА — ПЕРЕСЧИТАТЬ ЕЁ ВЫРАБОТКУ.
      *
      * <p>У энергостанции выработка зависит от сектора, на котором она стоит:
@@ -1856,11 +1871,17 @@ public final class Actions {
         /**
          * МОЖНО ЛИ ЗАБРАТЬ ВСЁ ОБРАТНО НА ЭТОТ ИСТОЧНИК.
          *
-         * <p>Забрать разрешено только «до полного»: источник должен заполниться
-         * целиком, иначе активация не состоится. Считаем его кубики, лежащие
-         * сейчас на потребителях, и складываем с теми, что уже простаивают на нём
-         * самом. Не хватает — значит часть кубиков ушла из игры вместе с погибшим
-         * зданием, и вернуть источник в полный вид уже нечем.
+         * <p>ПО СВОДУ, А НЕ ПО КОДУ. Ключ
+         * {@code actions.energy_swap.take_back_must_fill_source} решает, обязан
+         * ли источник заполниться целиком. Прежде правило было зашито здесь, и
+         * ключ в своде на него не влиял вовсе — расхождение свода с движком.
+         *
+         * <p>Ключ включён: забрать можно, только если источник наберётся полным.
+         * Не хватает — часть кубиков ушла из игры с погибшим зданием.
+         *
+         * <p>Ключ выключен (карточки-памятки 11.09.2026, «вернуть на источник с
+         * ЛЮБЫХ ячеек»): забрать можно всё, что лежит на потребителях, сколько
+         * бы его ни было.
          */
         private boolean canTakeBack(PlayerState player, BuildingToken src) {
             int cap = Power.sourceCubes(state, src);
@@ -1871,7 +1892,9 @@ public final class Actions {
             for (BuildingToken c : player.buildingsOnField()) {
                 away += c.energyBySource.getOrDefault(src.uid, 0);
             }
-            return src.energyIdle + away >= cap;
+            boolean доПолного = rs.getBool(
+                "actions.energy_swap.take_back_must_fill_source", true);
+            return доПолного ? src.energyIdle + away >= cap : away > 0;
         }
 
         /** Снять кубики источника с потребителей и вернуть их на него. */
@@ -2532,6 +2555,21 @@ public final class Actions {
                     opts.add(new Choice("market_rate", rate("energy", 1),
                         "1 КЕЛ -> кубик НАВСЕГДА в ячейку " + needsEnergy.type.code));
                 }
+                // ---- ОБНОВЛЕНИЕ КАРТЫ РЫНКА за келемий ----
+                // Ячейка слева от слота карты. Кладёшь в неё келемий — открытая
+                // карта немедленно уходит из игры со всеми кубиками на её
+                // ячейках предложений, и открывается следующая. Ячейка одна и
+                // чистится на Обновлении, поэтому за раунд карту меняют раз.
+                //
+                // ОБНОВЛЕНИЕ НЕ ЕСТЬ ПРЕДЛОЖЕНИЕ: обновив карту, тем же
+                // действием берут предложение с новой — но платят за него
+                // отдельным келемием, и весь заход стоит два.
+                if (s.marketRefreshCell < 0 && s.marketActive != null
+                        && ctx.exchangeOnlyLimit == 0
+                        && s.decks.get("market").size() > 0) {
+                    opts.add(new Choice("market_refresh", Map.of(),
+                        "1 КЕЛ -> сменить карту рынка"));
+                }
                 // ---- предложение КАРТЫ: только один раз за действие ----
                 String active = s.marketActive;
                 // ОБЕ ПОЛОВИНЫ КАРТЫ РЫНКА (утиль «Двойная сделка», 21.08.2026):
@@ -2548,24 +2586,13 @@ public final class Actions {
                             // предложения две ячейки, вторая открыта только при
                             // 3–4 игроках. Все ячейки заняты — предложение
                             // недоступно, как и за столом.
-                            // ПОМЕТКА «БЕЗ ЯЧЕЙКИ» (карты рынка 2.0, заказ
-                            // 02.09.2026) — предложение ячейки не занимает и
-                            // потому не кончается: его может взять каждый и
-                            // сколько угодно раз за раунд. Такие предложения
-                            // нарочно мелкие (келемий вместо энергии, келемий за
-                            // монету) и держат планшет живым, когда обе ячейки
-                            // крупных предложений уже разобрали.
-                            boolean безЯчейки = card.get(side) instanceof Map<?, ?> om
-                                && Boolean.TRUE.equals(om.get("no_cell"));
-                            if (!безЯчейки && freeMarketCell(s, side) < 0) {
-                                continue;
-                            }
-                            // КАЖДАЯ ПОЛОВИНА — ПО ОДНОМУ РАЗУ. «Обе половины»
-                            // значит левую и правую, а не одну и ту же дважды:
-                            // на четверых у предложения две ячейки, и без этой
-                            // проверки карта позволяла бы взять одно и то же
-                            // предложение два раза.
-                            if (offerSides.contains(side)) {
+                            // ПОМЕТКА «БЕЗ ЯЧЕЙКИ» ОТМЕНЕНА дизайнером
+                            // 14.09.2026: ячейку занимает КАЖДОЕ предложение,
+                            // исключений нет. Предложение кончается ячейками и
+                            // ничем иным — ни счётчиком на игрока, ни памятью о
+                            // том, кто что брал в этом раунде. За столом такое
+                            // всё равно никто не помнит, а кубик в ячейке видно.
+                            if (freeMarketCell(s, side) < 0) {
                                 continue;
                             }
                             if (card.get(side) instanceof Map<?, ?> off) {
@@ -2610,6 +2637,19 @@ public final class Actions {
                 deals++;
                 f.usedMarket = true;
 
+                if ("market_refresh".equals(pick.kind())) {
+                    s.marketRefreshCell = player.seat;
+                    String next = s.decks.get("market").draw(s.rng);
+                    if (next != null) {
+                        s.marketActive = next;
+                        for (int[] side : s.marketCells) {
+                            java.util.Arrays.fill(side, -1);
+                        }
+                    }
+                    f.usedMarketRefresh = true;
+                    detail.append("смена карты рынка; ");
+                    continue;
+                }
                 if ("market_rate".equals(pick.kind())) {
                     f.usedMarketPrintedRate = true;
                     Map<String, Object> pl = (Map<String, Object>) pick.payload();
@@ -2679,8 +2719,7 @@ public final class Actions {
                 // КУБИК КЕЛЕМИЯ ЛОЖИТСЯ В ЯЧЕЙКУ предложения: он и есть плата за
                 // ячейку (келемий за сделку уже списан выше), и по нему за столом
                 // видно, кто предложение занял.
-                int cell = Boolean.TRUE.equals(offer.get("no_cell"))
-                    ? -1 : freeMarketCell(s, String.valueOf(pl.get("side")));
+                int cell = freeMarketCell(s, String.valueOf(pl.get("side")));
                 if (cell >= 0) {
                     s.marketCells["right".equals(pl.get("side")) ? 1 : 0][cell] = player.seat;
                 }
@@ -2847,6 +2886,12 @@ public final class Actions {
                     // считаются за ВСЕ пройденные шаги, поэтому прыжок не обкрадывает
                     // игрока по очкам. Смысл: если впереди столпились соперники,
                     // можно накопить трофеи и перегнать их всех разом.
+                    // СТУПЕНИ ПО ПОРЯДКУ, ПРЫЖОК ТОЛЬКО ЧЕРЕЗ ПОЛНОСТЬЮ ЗАНЯТУЮ
+                    // (решение дизайнера 13.09.2026): следующая ступень со
+                    // свободной ячейкой — единственное предложение трека; занятую
+                    // целиком ступень перепрыгивают, платя и за неё, и за ту, куда
+                    // встал кубик. Перепрыгнуть ступень со свободной ячейкой
+                    // нельзя. Ключ tech.steps_in_order больше ничего не меняет.
                     int paid = 0;
                     for (int to = step + 1; to <= tech.steps; to++) {
                         paid += sciStepCost(player, costs, to - 1, stepsMade);
@@ -2857,11 +2902,12 @@ public final class Actions {
                             break;      // дальше уже не по карману
                         }
                         if (full) {
-                            continue;   // ячейка занята — её можно только перепрыгнуть
+                            continue;   // ступень занята целиком — только перепрыгнуть
                         }
                         opts.add(new Choice("sci_track", new Object[]{track, to},
                             track + " -> шаг " + to + " (цена " + paid
                                 + (to > step + 1 ? ", прыжок через " + (to - step - 1) + ")" : ")")));
+                        break;          // дальше первой свободной ступени не прыгают
                     }
                     continue;
                 }
@@ -3051,7 +3097,7 @@ public final class Actions {
                 // курсом. Десять монет здесь были бы вдвое слабее: 10 МОН это
                 // 2 ПО, а вершина стоит четырёх трофеев.
                 if (!kelium.engine.Setup.expansionOn(rs, "super_arsenal")) {
-                    topPrizeWithoutSuperArsenal(player, kind);
+                    topPrizeWithoutSuperArsenal(player, kind, agent);
                     return;
                 }
                 // Вершина трека: забрать выложенную В ОТКРЫТУЮ карту супер-арсенала
@@ -3084,11 +3130,9 @@ public final class Actions {
          * ({@code tech.super_objective_on_step}), а не зашит в код: у прошлых
          * редакций этого ключа нет, и они играются как раньше.
          *
-         * <p>ПРОЕКТ У ИГРОКА ОДИН. Супер-задание — это проект под планшетом со
-         * своим счётчиком, и второго счётчика в игре нет. Поэтому пришедшая
-         * карта либо занимает пустое место, либо ЗАМЕНЯЕТ прежнюю по выбору
-         * игрока, и прежняя уходит из игры. Уже СОБРАННЫЙ проект не меняется:
-         * менять выполненное значило бы отнимать заработанное.
+         * <p>КАРТЫ НАКАПЛИВАЮТСЯ. Пришедшая ложится к тем, что у игрока уже
+         * есть, и работает наравне с ними: каждая считает свой множитель в
+         * финале и каждая один раз за партию отдаёт награду за своё требование.
          */
         private static void картаСуперЗаданияЗаШаг(GameState state, GameConfig cfg,
                                                    PlayerState player, Agent agent,
@@ -3096,8 +3140,7 @@ public final class Actions {
             Ruleset rs = cfg.ruleset;
             int шаг = rs.getInt("tech.super_objective_on_step", 0);
             if (шаг <= 0 || reached != шаг
-                    || !kelium.engine.Setup.expansionOn(rs, "super_objectives")
-                    || player.superObjectiveComplete) {
+                    || !kelium.engine.Setup.expansionOn(rs, "super_objectives")) {
                 return;
             }
             var колода = state.decks.get("super_objectives");
@@ -3114,7 +3157,7 @@ public final class Actions {
                 }
                 boolean занята = false;
                 for (PlayerState p : state.players) {
-                    занята |= тянем.equals(p.superObjective);
+                    занята |= p.superObjectives.contains(тянем);
                 }
                 if (!занята) {
                     cid = тянем;
@@ -3123,23 +3166,8 @@ public final class Actions {
             if (cid == null) {
                 return;
             }
-            if (player.superObjective == null) {
-                player.superObjective = cid;
-                player.superObjectiveOffer.clear();
-                player.superObjectiveOffer.add(cid);
-                return;
-            }
-            // ВЫБОР ЗА ИГРОКОМ: проект стоит очков и определяет, чем он занят до
-            // конца партии, поэтому подменять его молча нельзя.
-            List<Choice> opts = List.of(
-                new Choice("super_objective_keep", player.superObjective, "оставить прежнее"),
-                new Choice("super_objective_take", cid, "взять новое"));
-            Choice pick = agent.choose(state, opts, Map.of("kind", "super_objective_swap"));
-            if ("super_objective_take".equals(pick.kind())) {
-                player.superObjective = cid;
-                player.superObjectiveOffer.clear();
-                player.superObjectiveOffer.add(cid);
-            }
+            player.superObjectives.add(cid);
+            player.superObjectiveOffer.add(cid);
         }
 
         /**
@@ -3162,16 +3190,15 @@ public final class Actions {
          *
          * @param kind род модулей трека из данных доски: red | blue | storage
          */
-        private void topPrizeWithoutSuperArsenal(PlayerState player, String kind) {
+        private void topPrizeWithoutSuperArsenal(PlayerState player, String kind, Agent agent) {
             switch (kind == null ? "storage" : kind) {
                 case "red" -> Modules.awardModule(state, player, "red");
                 case "blue" -> Modules.awardModule(state, player, "blue");
                 default -> {
-                    // ПОЗОЛОТА: улучшить один уже выданный жетон. Если золотить
-                    // нечего, приз пропадает — как и всякая недоступная награда.
-                    if (player.redModules + player.blueModules > player.goldModules) {
-                        player.goldModules += 1;
-                    }
+                    // ПОЗОЛОТА: перевернуть один лежащий жетон золотой стороной.
+                    // Если золотить нечего, приз пропадает — как и всякая
+                    // недоступная награда.
+                    Modules.gildOne(state, player, agent);
                 }
             }
         }
@@ -3277,17 +3304,29 @@ public final class Actions {
             boolean keliumOk = kelium.engine.ability.RuleQuery
                 .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                 .base(0).ask() >= 1.0;
+            // ЧЕМ ПЛАТИТЬ — РЕШАЕТ ИГРОК (решение дизайнера 13.09.2026): кубиками
+            // трофеев из хранилища или жетоном со своей свалки целиком, без
+            // сдачи. Жетоны предлагаются рядом с кубиками, а не тратятся первыми.
             while (remaining > 0 && !player.destroyedTokens.isEmpty()) {
                 kelium.core.Token tok;
-                if (agent != null && player.destroyedTokens.size() > 1) {
+                boolean кубиковХватает = player.resources.trophy() >= remaining;
+                if (agent != null && (player.destroyedTokens.size() > 1 || кубиковХватает)) {
                     List<Choice> opts = new ArrayList<>();
                     for (kelium.core.Token t : player.destroyedTokens) {
                         opts.add(new Choice("destroyed_pay", t,
                             "token worth " + t.trophyValue()));
                     }
+                    if (кубиковХватает) {
+                        opts.add(new Choice("pay_cubes", null, "кубиками трофеев"));
+                    }
                     Choice pick = agent.choose(state, opts,
                         Map.of("kind", "destroyed_pay", "remaining", remaining));
+                    if (pick.payload() == null) {
+                        break;          // платит кубиками — ниже
+                    }
                     tok = (kelium.core.Token) pick.payload();
+                } else if (кубиковХватает) {
+                    break;              // без агента — кубиками
                 } else {
                     // жадно СНИЗУ: наименьшая ценность первой (минимум потерь)
                     tok = player.destroyedTokens.get(0);
@@ -3386,16 +3425,14 @@ public final class Actions {
             // нет, остаётся прежняя тройка — числа сыгранных партий не должны
             // меняться задним числом.
             int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();
-            if (позолота && pool >= gildCost
-                    && (player.redModules + player.blueModules) > player.goldModules) {
+            if (позолота && pool >= gildCost && Modules.canGild(player)) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "gild");
                 ex.put("give", gildCost);
                 opts.add(new Choice("sci_exchange", ex,
                     gildCost + " trophy -> gild a module"));
             }
-            // Вечный курс: 1 трофей -> 1 перемещение модуля (перестановка
-            // посреди раунда, не дожидаясь Смены модулей в Обновление).
+            // Вечный курс: 1 трофей -> 1 перемещение модуля.
             if (переставить && pool >= 1
                     && (!player.redPlacements.isEmpty() || !player.bluePlacements.isEmpty())) {
                 Map<String, Object> ex = new HashMap<>();
@@ -3438,7 +3475,7 @@ public final class Actions {
                     return id + ":" + tookArsenal;
                 }
             } else if ("gild".equals(id)) {
-                player.goldModules += 1;
+                Modules.gildOne(state, player, agent);
             } else if ("move_module".equals(id)) {
                 Modules.moveOneModule(state, player.seat, agent);
             }

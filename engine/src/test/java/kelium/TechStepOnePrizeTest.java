@@ -40,26 +40,26 @@ class TechStepOnePrizeTest {
             "вдвоём открыты те же ячейки, что и втроём");
     }
 
-    /** Трек красных модулей: 3 боеприпаса на первой ячейке, 1 на второй. */
+    /** Трек красных модулей: 2 боеприпаса на первой ячейке, 1 на второй (печать 14.09.2026). */
     @Test
-    void theRedModuleTrackPaysThreeThenOneAmmo() {
+    void theRedModuleTrackPaysTwoThenOneAmmo() {
         Ruleset rs = Ctx.rules(Fix.game());
-        assertEquals(3, prize(rs, "left", "first", "ammo"),
-            "первая ячейка шага 1 трека красных модулей — 3 боеприпаса");
+        assertEquals(2, prize(rs, "left", "first", "ammo"),
+            "первая ячейка шага 1 трека красных модулей — 2 боеприпаса");
         assertEquals(1, prize(rs, "left", "second", "ammo"),
             "вторая ячейка — 1 боеприпас");
         assertNull(rs.get("tech.step1_prize.left.third", null),
             "третьей награды на красном треке нет: ячейка есть, приза на ней нет");
     }
 
-    /** Трек синих модулей: 4 · 2 · 1 монета по трём ячейкам. */
+    /** Трек синих модулей: 2 и 1 монета; третья ячейка («4И») без приза. */
     @Test
-    void theBlueModuleTrackPaysFourThenTwoThenOneCoin() {
+    void theBlueModuleTrackPaysTwoThenOneCoin() {
         Ruleset rs = Ctx.rules(Fix.game());
-        assertEquals(4, prize(rs, "right", "first", "coin"), "первая ячейка — 4 монеты");
-        assertEquals(2, prize(rs, "right", "second", "coin"), "вторая ячейка — 2 монеты");
-        assertEquals(1, prize(rs, "right", "third", "coin"),
-            "третья ячейка — 1 монета; она открыта только вчетвером, но приз на ней есть");
+        assertEquals(2, prize(rs, "right", "first", "coin"), "первая ячейка — 2 монеты");
+        assertEquals(1, prize(rs, "right", "second", "coin"), "вторая ячейка — 1 монета");
+        assertNull(rs.get("tech.step1_prize.right.third", null),
+            "третья ячейка открыта только вчетвером, приза на ней нет");
     }
 
     /**

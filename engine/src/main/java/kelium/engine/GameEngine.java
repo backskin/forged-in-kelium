@@ -100,6 +100,14 @@ public final class GameEngine {
         // зависеть от того, что мы успели запрограммировать.
         try {
             int printed = kelium.dataio.Ctx.cfg(state).content.get("market").entries.size();
+            // НА ПЛАНШЕТ КЛАДУТ НЕ ВСЮ КОЛОДУ (решение дизайнера 15.09.2026):
+            // карт напечатано десять, в партию идут восемь. Предел раундов
+            // считается по тому, сколько карт ЛЕЖИТ НА ПЛАНШЕТЕ, иначе партия
+            // тянулась бы до числа печатных карт, а карты кончились бы раньше.
+            int вКолоду = ((Number) rs().get("market.deck_size", 0)).intValue();
+            if (вКолоду > 0 && (printed <= 0 || вКолоду < printed)) {
+                return вКолоду;
+            }
             if (printed > 0) {
                 return printed;
             }
@@ -257,22 +265,34 @@ public final class GameEngine {
         if (s.winner == null) {
             int best = 0;
             for (int i = 1; i < s.numPlayers(); i++) {
-                if (better(scores, s, i, best)) {
+                if (compareEnd(scores, s, i, best) > 0) {
                     best = i;
                 }
             }
-            s.winner = best;
-            if (s.winCondition == null) {
-                s.winCondition = "victory_points";
+            // ПОБЕДУ ДЕЛЯТ, если после всей развязки игроки равны (правило
+            // дизайнера 14.09.2026).
+            s.winners.clear();
+            for (int i = 0; i < s.numPlayers(); i++) {
+                if (compareEnd(scores, s, i, best) == 0) {
+                    s.winners.add(i);
+                }
             }
+            s.winner = s.winners.isEmpty() ? best : s.winners.get(0);
+            if (s.winCondition == null) {
+                s.winCondition = s.winners.size() > 1 ? "shared_victory" : "victory_points";
+            }
+        } else if (s.winners.isEmpty()) {
+            s.winners.add(s.winner);
         }
         s.finished = true;
         emit(ev("type", "game_end", "winner", s.winner, "condition", s.winCondition,
+            "winners", new ArrayList<>(s.winners),
             "spawn_left", s.spawnLeftAtEnd, "spawn_threshold", s.spawnThreshold,
             "scores", scores));
 
         Map<String, Object> result = new HashMap<>();
         result.put("winner", s.winner);
+        result.put("winners", new ArrayList<>(s.winners));
         result.put("condition", s.winCondition);
         result.put("spawn_left", s.spawnLeftAtEnd);
         result.put("spawn_threshold", s.spawnThreshold);
@@ -281,19 +301,58 @@ public final class GameEngine {
         return result;
     }
 
-    // Больше очков; ничья ломается по келемию, затем по монетам.
-    private static boolean better(Map<Integer, Map<String, Integer>> scores, GameState s, int i, int best) {
-        int ti = scores.get(i).get("total");
-        int tb = scores.get(best).get("total");
-        if (ti != tb) {
-            return ti > tb;
+    /**
+     * КТО ВЫШЕ В ИТОГЕ (правило дизайнера 14.09.2026): больше победных очков;
+     * при равенстве — больше ГЕКСОВ, на которых стоят жетоны игрока; дальше —
+     * больше ТРОФЕЕВ (уничтоженные жетоны на свалке плюс кубики трофеев в
+     * хранилище); дальше — больше КЕЛЕМИЯ в хранилище. Всё равно — победу
+     * делят, и сравнение возвращает 0.
+     *
+     * <p>Прежняя развязка (келемий, затем монеты) была выдумкой движка.
+     *
+     * @return {@code >0}, если i выше best; {@code <0}, если ниже; 0 — делят
+     */
+    private static int compareEnd(Map<Integer, Map<String, Integer>> scores,
+                                  GameState s, int i, int best) {
+        int d = Integer.compare(scores.get(i).get("total"), scores.get(best).get("total"));
+        if (d != 0) {
+            return d;
         }
-        int ki = s.players.get(i).resources.kelium();
-        int kb = s.players.get(best).resources.kelium();
-        if (ki != kb) {
-            return ki > kb;
+        d = Integer.compare(hexesHeld(s.players.get(i)), hexesHeld(s.players.get(best)));
+        if (d != 0) {
+            return d;
         }
-        return s.players.get(i).resources.coin() > s.players.get(best).resources.coin();
+        d = Integer.compare(trophiesHeld(s.players.get(i)), trophiesHeld(s.players.get(best)));
+        if (d != 0) {
+            return d;
+        }
+        return Integer.compare(s.players.get(i).resources.kelium(),
+            s.players.get(best).resources.kelium());
+    }
+
+    /** На скольких РАЗНЫХ гексах стоят жетоны игрока — здания и войска вместе. */
+    private static int hexesHeld(PlayerState p) {
+        java.util.Set<String> hexes = new java.util.HashSet<>();
+        for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+            if (b.hexId != null) {
+                hexes.add(b.hexId);
+            }
+        }
+        for (kelium.core.UnitToken u : p.unitsOnField()) {
+            if (u.hexId != null) {
+                hexes.add(u.hexId);
+            }
+        }
+        return hexes.size();
+    }
+
+    /**
+     * ТРОФЕИ НА КОНЕЦ ПАРТИИ: жетоны на свалке плюс кубики трофеев в хранилище.
+     * Жетон считается за СТОЛЬКО ТРОФЕЕВ, СКОЛЬКО НА НЁМ НАПЕЧАТАНО (правило
+     * дизайнера 14.09.2026) — то есть по его трофейной стороне.
+     */
+    private static int trophiesHeld(PlayerState p) {
+        return p.destroyedValue() + p.resources.trophy();
     }
 
     // ---- помощники подготовки --------------------------------------------
@@ -302,11 +361,7 @@ public final class GameEngine {
      * цветная колода приказов — 4 карты (по одной на каждый верхний приказ) плюс
      * одна карта БЕЗОПАСНОСТЬ. Именно принадлежность колоде задаёт асимметрию
      * нижних приказов (голубой цикл вперёд, алый назад, зелёный обмен, жёлтый —
-<<<<<<< HEAD
-     * зеркало на Наступления). Цвета раздаются игрокам СЛУЧАЙНО по сиду.
-=======
      * зеркало на Наступлении). Цвета раздаются игрокам СЛУЧАЙНО по сиду.
->>>>>>> origin/main
      */
     /**
      * Цвет, выбранный за столом на это место, или {@code null} — «раздай сам».
@@ -474,7 +529,6 @@ public final class GameEngine {
         GameState s = state;
         if (rnd == 1) {
             s.marketActive = s.decks.get("market").draw(s.rng);
-            moduleSwapAll();
             emit(ev("type", "refresh", "round", rnd, "skipped", true));
             return;
         }
@@ -514,27 +568,14 @@ public final class GameEngine {
                 java.util.Arrays.fill(side, -1);
             }
         }
+        // ЯЧЕЙКА ОБНОВЛЕНИЯ чистится каждое Обновление, как и ячейки
+        // предложений: обновить карту рынка можно раз за раунд.
+        s.marketRefreshCell = -1;
         // Келемий на тайлах зарождения НЕ восстанавливается: сколько выкопали —
         // столько и убыло, тайл истощается за партию и потом уходит с поля.
         // (Раньше здесь стояло ежераундовое восстановление — это была ошибка
         // движка, а не правило игры.)
-        // Обновление: с КАЖДОГО жетона снимается ОДИН кубик урона (не весь).
-        // Урон копится по раундам — штурм ЦУ можно вести несколько раундов.
-        // Сколько кубиков урона снимается в Обновление. Правило — ОДИН (СВОД),
-        // и это значение по умолчанию. Ключ вынесен в ruleset НЕ ради изменения
-        // правила, а чтобы балансовый стенд ({@code kelium.RuleExperiment}) мог
-        // проверить, что будет при другом числе: скорость лечения напрямую решает,
-        // возможна ли многораундовая осада, а угадывать это по рассуждению нельзя.
-        int heal = ((Number) rs().get("combat_model.heal_per_refresh", 1)).intValue();
         for (PlayerState p : s.players) {
-            for (int i = 0; i < heal; i++) {
-                for (UnitToken t : p.units) {
-                    t.healOneDamage();
-                }
-                for (BuildingToken t : p.buildings) {
-                    t.healOneDamage();
-                }
-            }
             // ТОЧКА ПРАВИЛ: доход в Обновление от карт арсенала (например
             // «энергостанции платят монетами за каждый кубик энергии»).
             int income = (int) Math.round(kelium.engine.ability.RuleQuery
@@ -555,21 +596,9 @@ public final class GameEngine {
             emit(ev("type", "containers_laid", "round", rnd, "count", laid,
                 "on_field", TokenContainers.onField(s)));
         }
-        moduleSwapAll();
         // Накопитель «Штабной игры» (супер-задания 5.0): раунды первым игроком.
         s.player(s.firstPlayer).roundsFirstPlayer += 1;
         emit(ev("type", "refresh", "round", rnd, "first_player", s.firstPlayer));
-    }
-
-    /** Провести бесплатную смену модулей для всех игроков, у кого они есть. */
-    private void moduleSwapAll() {
-        GameState s = state;
-        for (int seat = 0; seat < s.numPlayers(); seat++) {
-            PlayerState p = s.player(seat);
-            if (p.redModules > 0 || p.blueModules > 0) {
-                Modules.moduleSwap(s, seat, agents.get(seat), this::emit);
-            }
-        }
     }
 
     private void refillContainers() {
@@ -1271,16 +1300,9 @@ public final class GameEngine {
                 opts.add(new Choice("spec_arsenal_use", cid, "SPEC " + passive + " (" + cid + ")"));
             }
         }
-        // СУПЕР-ЗАДАНИЕ 6.0: низ карты. Карта НЕ сжигается — награда выдаётся за
-        // ВЫПОЛНЕННОЕ жёсткое требование, один раз за партию, и множитель верха
-        // после этого продолжает считаться. Именно это ограничение и просил
-        // дизайнер: разовым эффектом больше нельзя воспользоваться сразу же,
-        // сперва надо довести партию до нужного состояния.
-        if (p.superObjective != null && !p.superObjectiveComplete && СуперЗадания.on6(s)
-                && СуперЗадания.требованиеВыполнено(s, p.seat)) {
-            opts.add(new Choice("spec_super6_claim", p.superObjective,
-                "СУПЕР-НАГРАДА " + p.superObjective));
-        }
+        // СУПЕР-ЗАДАНИЕ СПЕЦ-ДЕЙСТВИЯ НЕ ДАЁТ (правило дизайнера 14.09.2026):
+        // карту нельзя ни выполнить, ни сжечь — она только считает очки в конце
+        // партии. Прежний низ с жёстким требованием и разовой наградой удалён.
         // СПОСОБНОСТИ АРСЕНАЛА сами кладут свои варианты в меню СПЕЦ: движок не
         // знает про карты, он спрашивает «что добавить?». Так карта даёт НОВОЕ
         // спец-действие без правки движка (13.08.2026).
@@ -1331,12 +1353,6 @@ public final class GameEngine {
             case "spec_mandate_containers" -> mandateAllocateContainers(p, (Integer) ch.payload());
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
-            case "spec_super6_claim" -> {
-                p.superObjectiveComplete = true;
-                Map<String, Object> got = СуперЗадания.наградаНиза(s, p, agents.get(p.seat), this::emit);
-                emit(ev("type", "super6_claim", "seat", p.seat,
-                    "card", ch.payload(), "got", got));
-            }
             case "spec_combat" -> {
                 // Плата вперёд, и только потом бой: не хватило — предложения бы и
                 // не было (см. проверку выше), а порядок важен для журнала.
@@ -1468,7 +1484,7 @@ public final class GameEngine {
     private void offerSuperPick() {
         GameState s = state;
         for (PlayerState p : s.players) {
-            if (p.superObjective != null || p.superObjectiveOffer.size() < 2) {
+            if (!p.superObjectives.isEmpty() || p.superObjectiveOffer.size() < 2) {
                 continue;
             }
             List<Choice> opts = new ArrayList<>();
@@ -1481,7 +1497,7 @@ public final class GameEngine {
                 ev("kind", "super_pick", "seat", p.seat));
             String chosen = ch.payload() instanceof String cid ? cid
                 : p.superObjectiveOffer.get(0);
-            p.superObjective = chosen;
+            p.superObjectives.add(chosen);
             emit(ev("type", "super_pick", "seat", p.seat, "card", chosen,
                 "offered", new ArrayList<>(p.superObjectiveOffer)));
         }
@@ -1623,28 +1639,7 @@ public final class GameEngine {
         {"северо-восток", "восток", "юго-восток", "юго-запад", "запад", "северо-запад"};
 
     private void offerSealChoice() {
-        GameState s = state;
-        if (!rs().getBool("command_center.destruction_token_seals_cell", false)) {
-            return;
-        }
-        List<UnitType> мешок = new ArrayList<>();
-        for (UnitType t : UnitType.values()) {
-            if (s.player(0).board.troop.specializedTarget(t) != null) {
-                мешок.add(t);
-            }
-        }
-        Collections.shuffle(мешок, s.rng);
-        for (PlayerState p : s.players) {
-            if (мешок.isEmpty()) {
-                break;      // игроков больше, чем жетонов — остальные без него
-            }
-            UnitType род = мешок.remove(0);
-            Map<String, Object> жетон = new HashMap<>();
-            жетон.put("id", PlayerState.CU_MODULE);
-            жетон.put("blocks", true);
-            p.redPlacements.put(род, жетон);
-            emit(ev("type", "seal_unit", "seat", p.seat, "unit", род.code));
-        }
+        Modules.раздатьГлухиеЖетоны(state, this::emit);
     }
 
 

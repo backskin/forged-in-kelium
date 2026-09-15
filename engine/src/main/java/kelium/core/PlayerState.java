@@ -64,11 +64,19 @@ public final class PlayerState {
      * ней нельзя: оно принадлежит игроку, а не способности.
      */
     public final Map<String, Integer> arsenalCardKelium = new HashMap<>();
-    public String superObjective = null;
+    /**
+     * СУПЕР-ЗАДАНИЯ ИГРОКА — их может быть несколько, и они НАКАПЛИВАЮТСЯ.
+     *
+     * <p>Одну карту игрок получает в подготовку, ещё по одной выдаёт третий шаг
+     * каждого трека науки. Пришедшая карта ложится к прежним и работает наравне
+     * с ними: каждая считает свой множитель в финале и каждая один раз за партию
+     * отдаёт награду за своё требование.
+     */
+    public final List<String> superObjectives = new ArrayList<>();
     /**
      * ПРЕДЛОЖЕНИЕ супер заданий: карты, разданные игроку на выбор (правило 2.0,
      * 12.08.2026 — раздаём две, игрок оставляет одну). Пока выбор не сделан,
-     * {@link #superObjective} равен null.
+     * {@link #superObjectives} пуст.
      */
     public final List<String> superObjectiveOffer = new ArrayList<>();
     /**
@@ -78,13 +86,11 @@ public final class PlayerState {
      */
     public final List<String> startObjectiveOffer = new ArrayList<>();
     /**
-     * НИЗ СУПЕР-ЗАДАНИЯ ОТРАБОТАН. Награда за жёсткое требование берётся один
-     * раз за партию, поэтому нужен один флаг — и больше ничего. Прежняя
-     * механика (четыре ячейки, счётчик запуска, жетон супероружия, символы под
-     * планшетом) снесена по требованию дизайнера 09.09.2026: верх карты это
-     * множитель победных очков в финале, низ — требование с разовой наградой.
+     * НИЗЫ, КОТОРЫЕ УЖЕ ОТРАБОТАЛИ. Награда за жёсткое требование берётся один
+     * раз за партию — но у каждой карты своя, поэтому флаг нужен ПОКАРТОЧНЫЙ:
+     * супер-заданий у игрока может быть несколько ({@link #superObjectives}).
      */
-    public boolean superObjectiveComplete = false;
+    public final java.util.Set<String> superObjectivesDone = new java.util.HashSet<>();
 
     // Модули в резерве (ещё не размещены). red/blue; gold = позолочённые.
     public int redModules = 0;
@@ -99,7 +105,7 @@ public final class PlayerState {
     public final List<String> blueTokens = new ArrayList<>();
     public int goldModules = 0;
 
-    // Размещения модулей на доске (выбираются в фазе смены модулей):
+    // Размещения модулей на доске (выбираются при смене модулей):
     // redPlacements[UnitType] = модуль поверх вторичного ряда атаки этого юнита.
     // bluePlacements[BuildingType] = модуль поверх сборочной «1» этого здания.
     public final Map<UnitType, Map<String, Object>> redPlacements = new HashMap<>();
@@ -302,10 +308,10 @@ public final class PlayerState {
         p.arsenalHand.addAll(arsenalHand);
         p.arsenalInstalled.addAll(arsenalInstalled);
         p.arsenalCardKelium.putAll(arsenalCardKelium);
-        p.superObjective = superObjective;
+        p.superObjectives.addAll(superObjectives);
         p.superObjectiveOffer.addAll(superObjectiveOffer);
         p.startObjectiveOffer.addAll(startObjectiveOffer);
-        p.superObjectiveComplete = superObjectiveComplete;
+        p.superObjectivesDone.addAll(superObjectivesDone);
         p.redModules = redModules;
         p.blueModules = blueModules;
         p.redTokens.addAll(redTokens);
@@ -342,12 +348,10 @@ public final class PlayerState {
         p.warTrackVp = warTrackVp;
         p.cuKills = cuKills;
         p.killsTotal = killsTotal;
-        p.superObjective = superObjective;
         p.roundsFirstPlayer = roundsFirstPlayer;
         p.cuEverLost = cuEverLost;
         p.cuTokenRemoved = cuTokenRemoved;
         p.objectivesCompleted = objectivesCompleted;
-        p.superObjectiveComplete = superObjectiveComplete;
         return p;
     }
 

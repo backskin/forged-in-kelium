@@ -19,21 +19,13 @@ import kelium.engine.Setup;
 /**
  * SiegeProbe — БЫВАЕТ ЛИ В ИГРЕ МНОГОРАУНДОВАЯ ОСАДА?
  *
- * <p>Повод. Балансовый стенд 14.08.2026 показал невозможное: вариант «урон не
- * лечится в Обновление» ({@code combat_model.heal_per_refresh: 0}) дал ПОБИТОВО
- * те же числа, что и правила без правки — 11.0 боёв, 4.84 уничтожения, 1.5%
- * военных побед на 200 партий. Совпадение до третьего знака на такой выборке
- * невозможно, если ключ хоть на что-то влияет.
+ * <p>Урон лежит на жетоне до уничтожения, поэтому штурм ЦУ можно вести несколько
+ * раундов. Пробник проверяет, пользуются ли этим: сколько раненых жетонов стоит
+ * на поле в начале каждого нового раунда. Если почти нисколько — жетон либо
+ * добивают в тот же ход, либо он не получает урона вовсе, и военную победу
+ * нельзя подготовить заранее, только успеть за один ход.
  *
- * <p>Гипотеза, которую проверяет пробник: снимать в Обновление НЕЧЕГО, потому что
- * раненых жетонов к этому моменту не остаётся. Урон копится только внутри одного
- * хода: жетон либо добивают сразу, либо он не получает урона вовсе. Тогда правило
- * «урон копится по раундам, штурм ЦУ можно вести несколько раундов» существует
- * только в тексте СВОДа, а в игре его нет — и это объясняет, почему военная
- * победа не случается: её нельзя подготовить заранее, только успеть за один ход.
- *
- * <p>Считается в момент НАЧАЛА Обновления, ДО лечения (движок испускает событие
- * {@code refresh} перед тем, как снимать кубики).
+ * <p>Считается в момент Обновления (событие {@code refresh}).
  *
  * <p>Запуск: {@code kelium.SiegeProbe [игроков] [партий]}.
  */
@@ -66,11 +58,6 @@ public final class SiegeProbe {
             java.io.FileDescriptor.out), true, java.nio.charset.StandardCharsets.UTF_8));
         int players = args.length > 0 ? Integer.parseInt(args[0]) : 4;
         int games = args.length > 1 ? Integer.parseInt(args[1]) : 200;
-        // Третий аргумент — сколько урона снимать в Обновление (по умолчанию как в
-        // правилах, 1). Это КОНТРОЛЬНАЯ ПРОВЕРКА самого стенда: при 0 раненых
-        // обязано стать заметно больше. Если числа не сдвинулись — правка правил
-        // не доезжает до движка, и все замеры с этим ключом ничего не значат.
-        Integer heal = args.length > 2 ? Integer.parseInt(args[2]) : null;
         List<String> lineup = List.of("hawk", "dove", "balanced", "opportunist");
 
         Tally total = new Tally();
@@ -78,14 +65,7 @@ public final class SiegeProbe {
 
         for (int g = 0; g < games; g++) {
             long seed = 1000L + g;
-            GameConfig base = LayoutLibrary.configFor(players, seed);
-            GameConfig cfg = base;
-            if (heal != null) {
-                kelium.rules.Ruleset rules = base.ruleset.copy();
-                rules.override("combat_model.heal_per_refresh", heal);
-                cfg = new GameConfig(rules, base.content, players, seed, base.dataRoot,
-                    base.boardSides, base.scenarioId, base.cuFacing, base.scenarioFile);
-            }
+            GameConfig cfg = LayoutLibrary.configFor(players, seed);
             GameState s = Setup.buildGame(cfg);
             List<Agent> agents = new ArrayList<>();
             for (int i = 0; i < players; i++) {
@@ -143,14 +123,12 @@ public final class SiegeProbe {
         System.out.printf("раненых войск за Обновление:  %.3f%n", total.woundedUnits / r);
         System.out.printf("раненых зданий за Обновление: %.3f%n", total.woundedBuildings / r);
         System.out.printf("раненых ЦУ за Обновление:     %.3f%n", total.woundedCu / r);
-        System.out.printf("наибольший урон на ЦУ, доживший до Обновления: %d (прочность 3)%n",
+        System.out.printf("наибольший урон на ЦУ в начале раунда: %d (прочность 3)%n",
             total.maxCuDamage);
-        System.out.printf("партий, где хоть раз кто-то дожил до Обновления раненым: %d (%.1f%%)%n",
+        System.out.printf("партий, где раненый жетон хоть раз пережил раунд: %d (%.1f%%)%n",
             gamesWithWound, 100.0 * gamesWithWound / Math.max(1, games));
         System.out.println();
-        System.out.println("Все числа около нуля = правило «урон копится по раундам» в игре");
-        System.out.println("не работает: жетон либо добивают в тот же ход, либо он не получает");
-        System.out.println("урона вовсе. Тогда heal_per_refresh мёртв не из-за ошибки стенда,");
-        System.out.println("а потому что лечить нечего — и осады как механики в игре нет.");
+        System.out.println("Все числа около нуля = осады как механики в игре нет: жетон либо");
+        System.out.println("добивают в тот же ход, либо он не получает урона вовсе.");
     }
 }

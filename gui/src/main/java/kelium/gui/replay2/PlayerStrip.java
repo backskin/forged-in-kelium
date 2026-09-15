@@ -649,9 +649,11 @@ public final class PlayerStrip extends JComponent {
         items.add(markItem("arsenal", "ARSENAL",
             p.arsenalHand.size() + "+" + p.arsenalInstalled.size(), Theme.ink3(), "00+00"));
         items.add(ordersItem(played));
-        if (p.superObjective != null) {
-            items.add(markItem("super", "SUPER", p.superComplete ? "✓" : "—",
-                p.superComplete ? Theme.points() : Theme.ink3(), "00"));
+        if (!p.superObjectives.isEmpty()) {
+            boolean естьОтработавшие = !p.superDone.isEmpty();
+            items.add(markItem("super", "SUPER",
+                p.superDone.size() + "/" + p.superObjectives.size(),
+                естьОтработавшие ? Theme.points() : Theme.ink3(), "00"));
         }
 
         // ОДНА СТРОКА ВАЖНЕЕ СЛОВА «НАУКА». Если ряд со словом в строку не
@@ -948,8 +950,9 @@ public final class PlayerStrip extends JComponent {
                         ? " Под Мандатом (sa8): " + p.mandateContainers + " места под контейнеры."
                         : "");
             case "orders" -> "Сейчас сыграно " + p.orderPlayed.size() + " из 4.";
-            case "super" -> p.superComplete ? "Задание ЗАКРЫТО — потому значок золотой."
-                : "Низ карты ещё не отработан.";
+            case "super" -> "Супер-заданий " + p.superObjectives.size()
+                + ", низов отработало " + p.superDone.size()
+                + (p.superDone.isEmpty() ? "." : " — потому значок золотой.");
             default -> "";
         };
         return head + "\n\n" + what + (now.isEmpty() ? "" : "\n\n" + now);

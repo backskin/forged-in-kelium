@@ -19,7 +19,6 @@ import kelium.dataio.ContentLibrary;
 import kelium.dataio.GameConfig;
 import kelium.gui.BoardsPanel;
 import kelium.gui.GameRecorder;
-import kelium.gui.SuperObjectivesPanel;
 import kelium.report.ReplayRecord;
 import kelium.rules.Ruleset;
 
@@ -98,7 +97,6 @@ public final class HelpShots {
         shot(made, outDir, "strip", () -> strip(session));
         shot(made, outDir, "zone", () -> zone(session, battle));
         shot(made, outDir, "boards", () -> boards(rec));
-        shot(made, outDir, "supers", () -> supers(rec));
         shot(made, outDir, "results", () -> results(session));
         shot(made, outDir, "timeline", () -> timeline(session));
         // ВТОРОЙ СПРАВОЧНИК — правила игры. Наглядность ему нужна не меньше, а
@@ -197,22 +195,6 @@ public final class HelpShots {
         b.setSize(Theme.px(1000), Theme.px(660));
         layoutTree(b);
         return paint(b);
-    }
-
-    private static BufferedImage supers(ReplayRecord rec) {
-        if (rec.frames.isEmpty()) {
-            return null;
-        }
-        ContentLibrary lib = contentOf(rec);
-        if (lib == null) {
-            return null;
-        }
-        SuperObjectivesPanel p = new SuperObjectivesPanel();
-        p.setContent(lib);
-        p.show(rec, rec.frame(rec.frames.size() - 1).snapshot);
-        p.setSize(Theme.px(1000), Theme.px(620));
-        layoutTree(p);
-        return paint(p);
     }
 
     /**
