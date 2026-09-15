@@ -486,9 +486,19 @@ public final class Session {
         if (record == null || record.frames.isEmpty()) {
             return;
         }
-        int n = record.frames.size();
+        // СНИМОК КАДРОВ, А НЕ ЖИВОЙ СПИСОК. В живой партии «Командного пункта»
+        // кадры дописывает поток движка, а разбор идёт на потоке Swing: обход
+        // итератором ловил ConcurrentModificationException прямо посреди партии
+        // (поймано роботом за экраном 15.09.2026). Копия снимается ИНДЕКСОМ —
+        // список только растёт, поэтому такой обход не спотыкается ни о
+        // дописанный кадр, ни о выход за край.
+        List<ReplayRecord.Frame> frames = new ArrayList<>();
+        for (int i = 0; i < record.frames.size(); i++) {
+            frames.add(record.frames.get(i));
+        }
+        int n = frames.size();
         int maxRound = 0;
-        for (ReplayRecord.Frame f : record.frames) {
+        for (ReplayRecord.Frame f : frames) {
             maxRound = Math.max(maxRound, f.round);
         }
         roundStart = new int[maxRound + 2];
@@ -501,7 +511,7 @@ public final class Session {
         int prevTotal = -1;
         int lastCircle = -1;
         for (int i = 0; i < n; i++) {
-            ReplayRecord.Frame f = record.frames.get(i);
+            ReplayRecord.Frame f = frames.get(i);
             if (f.round >= 0 && f.round < roundStart.length && roundStart[f.round] < 0) {
                 roundStart[f.round] = i;
             }

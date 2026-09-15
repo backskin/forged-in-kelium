@@ -364,6 +364,7 @@ public final class RuleWords {
                 "энергия без источника разрешена";
 
             // ---------- Рынок ----------
+            case "market.deck_size" -> "карт рынка кладут на планшет";
             case "market.cell_cost_kelium" -> "келемия за одну ячейку предложения";
             case "market.base_exchanges" -> "печатные обмены рынка";
             case "market.pair_bonus_coin" -> "монет за парный обмен";

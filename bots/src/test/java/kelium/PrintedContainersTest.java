@@ -205,14 +205,21 @@ class PrintedContainersTest {
         PlayerState p = s.player(0);
         List<Hex> ground = new ArrayList<>();
         for (Hex h : s.field.hexes.values()) {
-            if (PrintedContainers.groundContainerFree(s, h)) {
+            // Гексы берём ПУСТЫЕ: действующий свод выдаёт печатный контейнер
+            // только тому, кто пришёл на гекс без чужих и своих жетонов
+            // (containers.printed_requires_empty_hex). Раньше сторож брал первые
+            // попавшиеся контейнерные гексы и держался на том, что они случайно
+            // оказывались пустыми; после сборки поля «по лучшей форме»
+            // (15.09.2026) на первых двух стоят стартовые войска, и сторож падал
+            // не на своём правиле, а на чужом.
+            if (PrintedContainers.groundContainerFree(s, h) && h.groundTokens.isEmpty()) {
                 ground.add(h);
             }
             if (ground.size() == 2) {
                 break;
             }
         }
-        assertEquals(2, ground.size(), "нашлись две контейнерные ячейки");
+        assertEquals(2, ground.size(), "нашлись две пустые контейнерные ячейки");
         Hex a = ground.get(0);
         Hex b = ground.get(1);
 
