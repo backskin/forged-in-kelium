@@ -33,10 +33,15 @@ subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
 
 H = 360
 GAP = 92
-ims = []
-for f, _ in ВОЙСКА:
-    im = Image.open(os.path.join(ТОКЕНЫ, f + ".png")).convert("RGBA")
-    ims.append(im.resize((round(im.width * H / im.height), H), Image.LANCZOS))
+# ОДИН МАСШТАБ НА ВСЕ ЖЕТОНЫ. Печатные жетоны разного размера (пехота 213×213,
+# техника 461×337, авиация 255×236, вышка 378×246 — и экспорт дизайнера, и набор
+# текстур сходятся в этих числах). Выравнивать их по высоте — врать о размере:
+# пехота становилась ростом с технику (замечание дизайнера 15.09.2026).
+исходные = [Image.open(os.path.join(ТОКЕНЫ, f + ".png")).convert("RGBA")
+            for f, _ in ВОЙСКА]
+к = H / max(im.height for im in исходные)     # техника — самый крупный жетон
+ims = [im.resize((round(im.width * к), round(im.height * к)), Image.LANCZOS)
+       for im in исходные]
 
 шрифт = ImageFont.truetype(ШРИФТ, 50)
 подпись_h = 74
@@ -50,7 +55,7 @@ canvas = Image.new("RGBA", (W, H + подпись_h + разрыв + низ.heig
 x = (W - строка_w) // 2
 d = ImageDraw.Draw(canvas)
 for im, (_, имя) in zip(ims, ВОЙСКА):
-    canvas.paste(im, (x, 0), im)
+    canvas.paste(im, (x, H - im.height), im)
     w = d.textlength(имя, font=шрифт)
     d.text((x + im.width / 2 - w / 2, H + 14), имя, font=шрифт, fill=(42, 35, 24, 255))
     x += im.width + GAP

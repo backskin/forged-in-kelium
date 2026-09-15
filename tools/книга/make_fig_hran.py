@@ -26,8 +26,10 @@ H = 300
 for номер, имя in СТОРОНЫ:
     im = Image.open(SRC % номер).convert("RGBA")
     im = im.resize((round(im.width * H / im.height), H), Image.LANCZOS)
-    к = Image.new("RGBA", (im.width, H + 54), (0, 0, 0, 0))
-    к.paste(im, (0, 0), im)
+    мерка = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    к = Image.new("RGBA", (max(im.width, round(мерка.textlength(имя, font=подпись)) + 24),
+                           H + 54), (0, 0, 0, 0))
+    к.paste(im, ((к.width - im.width) // 2, 0), im)
     d = ImageDraw.Draw(к)
     ш = d.textlength(имя, font=подпись)
     d.text(((к.width - ш) / 2, H + 8), имя, font=подпись, fill=(42, 35, 24, 255))

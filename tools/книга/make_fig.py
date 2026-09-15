@@ -3,6 +3,8 @@
 import os
 from PIL import Image
 
+import стрелка
+
 D = os.path.dirname(os.path.abspath(__file__))
 ns = {"__file__": os.path.join(D, "figs.py")}
 exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# планшет войск")[0], ns)
@@ -11,6 +13,9 @@ figure = ns["figure"]
 SRC = r"C:\shared\Yandex.Disk\Forged in Kelium\Общие компоненты\экспорт-жетоны-модулей"
 H = 600
 GAP = 40
+# МЕЖДУ ОБЫЧНОЙ И ЗОЛОТОЙ СТОРОНОЙ — СТРЕЛКА: это один и тот же жетон,
+# перевёрнутый (просьба дизайнера 15.09.2026). Поэтому зазор внутри пары шире.
+ПАРА = 190
 files = ["Жетон прокачки атаки-1.png", "Жетон прокачки атаки-7.png",
          "Жетон прокачки найма-3.png", "Жетон прокачки найма-7.png"]
 ims = []
@@ -23,11 +28,14 @@ xs = []
 x = 0
 for k, im in enumerate(ims):
     xs.append(x)
-    x += im.width + (GAP * 3 if k == 1 else GAP)
+    x += im.width + (GAP * 3 if k == 1 else ПАРА)
 W = x - GAP
 canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 for im, x0 in zip(ims, xs):
     canvas.paste(im, (x0, 0), im)
+for пара in (0, 2):
+    стрелка.нарисовать(canvas, xs[пара] + ims[пара].width + round(ПАРА * 0.22),
+                       xs[пара + 1] - round(ПАРА * 0.18), H // 2)
 png = os.path.join(D, "_модули.png")
 canvas.save(png)
 print("canvas", canvas.size, xs)
