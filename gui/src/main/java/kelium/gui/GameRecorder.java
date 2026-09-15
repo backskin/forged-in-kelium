@@ -862,9 +862,16 @@ public final class GameRecorder {
                 case "maneuver":
                     return who(ev.get("seat")) + " воспользовался манёвром: жетон переведён на "
                         + ev.get("to");
-                case "container":
-                    return who(ev.get("seat")) + " вскрыл контейнер «" + card(ev.get("card"))
-                        + "», выбрал вариант " + ("a".equals(ev.get("variant")) ? "А" : "Б");
+                case "container": {
+                    // Выбора у контейнера нет (правило 31.08.2026): что напечатано,
+                    // то и получено. Печатное требование берём из метки эффекта.
+                    String name = card(ev.get("card"));
+                    String label = String.valueOf(ev.getOrDefault("label", "")).trim();
+                    // В колоде 6.0.0 имя карты и есть её награда — не повторять.
+                    boolean same = label.isEmpty() || label.equals(name);
+                    return who(ev.get("seat")) + " вскрыл контейнер «" + name + "»"
+                        + (same ? "" : " — " + label);
+                }
                 case "objective":
                     return "ЗАДАНИЕ. " + who(ev.get("seat")) + " выполнил задание «" + card(ev.get("card"))
                         + "»" + (Boolean.TRUE.equals(ev.get("enhanced")) ? " с усилением" : "");

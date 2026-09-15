@@ -200,6 +200,8 @@ public final class HotSeatWindow {
     private volatile boolean stopped;
     /** Партия доиграна до конца — закрывать её можно без вопросов. */
     private volatile boolean finished;
+    /** Ошибка, оборвавшая партию (null — партия не ломалась). */
+    private volatile Throwable failure;
     /**
      * ЛЕНТА ПРИНЯТЫХ РЕШЕНИЙ — из неё складывается сохранение партии. Пишется
      * на каждом решении любого места; см. {@link MoveLog}.
@@ -888,6 +890,7 @@ public final class HotSeatWindow {
             saveJournal(rec, "-прервана");
             return;
         } catch (Throwable t) {
+            failure = t;
             if (stopped) {
                 return;      // окно уже закрыто, жаловаться некому
             }
@@ -979,6 +982,31 @@ public final class HotSeatWindow {
     /** Место с пометкой «вы» (−1 — ни у кого) — для прогонщиков и тестов. */
     int mySeatForTest() {
         return mySeat;
+    }
+
+    /** Партия доиграна или оборвана — для прогонщиков и тестов. */
+    boolean finishedForTest() {
+        return finished;
+    }
+
+    /** Чем оборвалась партия (null — ничем) — для прогонщиков и тестов. */
+    Throwable failureForTest() {
+        return failure;
+    }
+
+    /**
+     * ОТВЕТИТЬ НА ТЕКУЩУЮ ТОЧКУ РЕШЕНИЯ МЕСТА ТЕМ ЖЕ ПУТЁМ, ЧТО КНОПКА ОКНА —
+     * для робота-прогонщика, который играет за живого игрока целую партию
+     * через настоящее окно. Звать на потоке Swing. Если движок уже ушёл с
+     * этой точки, ответ молча не считается: робот спросит снова.
+     */
+    void answerForTest(int seat, int index) {
+        kelium.core.UndoableAgent agent = humansBySeat.get(seat);
+        if (agent == null || agent.pending() == null) {
+            return;
+        }
+        agent.submitIndex(index);
+        clearDecision();
     }
 
     private void saveJournal(ReplayRecord r, String suffix) {

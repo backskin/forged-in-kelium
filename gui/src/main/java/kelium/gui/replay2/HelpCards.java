@@ -41,7 +41,7 @@ public final class HelpCards {
         group(root, content, dataRoot, "super_arsenal", "Супер-арсенал",
             HelpCards::superArsenalGroup);
         group(root, content, dataRoot, "super_objectives", "Супер-задания", c -> "");
-        group(root, content, dataRoot, "containers", "Контейнеры", HelpCards::tierGroup);
+        group(root, content, dataRoot, "containers", "Контейнеры", HelpCards::containerGroup);
         group(root, content, dataRoot, "market", "Рынок", c -> "");
         return root;
     }
@@ -208,13 +208,31 @@ public final class HelpCards {
         };
     }
 
-    private static String tierGroup(Map<String, Object> card) {
-        return switch (String.valueOf(card.get("tier"))) {
-            case "common" -> "простые";
-            case "good" -> "хорошие";
-            case "rare" -> "редкие";
-            default -> "не описано";
-        };
+    /**
+     * КОНТЕЙНЕРЫ РАСКЛАДЫВАЮТСЯ ПО ТОМУ, ЧТО ДАЮТ, а не по редкости: разрядов
+     * common/good/rare на картах колоды 6.0.0 нет. Одна награда, две награды,
+     * карта арсенала, жетон войска — так игрок и читает лицо карты.
+     */
+    @SuppressWarnings("unchecked")
+    private static String containerGroup(Map<String, Object> card) {
+        Object a = card.get("a");
+        if (!(a instanceof Map<?, ?> side)) {
+            return "не описано";
+        }
+        String effect = String.valueOf(side.get("effect"));
+        if ("landing".equals(effect) || "deploy_units".equals(effect)) {
+            return "жетоны войск";
+        }
+        Map<String, Object> params = side.get("params") instanceof Map<?, ?> m
+            ? (Map<String, Object>) m : Map.of();
+        if (params.containsKey("arsenal")) {
+            return "карта арсенала";
+        }
+        int total = 0;
+        for (Object v : params.values()) {
+            total += v instanceof Number n ? n.intValue() : 0;
+        }
+        return total >= 2 ? "две награды" : "одна награда";
     }
 
     // ==================== названия карт ====================

@@ -77,7 +77,11 @@ class CardCatalogTest {
     private static void bindAll() {
         CardRegistry.bindAll("objectives", entries("objectives"));
         CardRegistry.bindAll("arsenal", entries("arsenal"));
-        CardRegistry.bindAll("containers", entries("containers"));
+        // КОНТЕЙНЕРЫ КЛАССОВ НЕ ИМЕЮТ И НЕ СВЯЗЫВАЮТСЯ: у контейнера нет
+        // поведения, только напечатанная награда, и движок читает её прямо из
+        // данных (containers.*.yaml, см. ContentLibrary.bindCardsInCode).
+        // Раньше здесь связывалась колода в коде c01-c32 с названиями и
+        // выбором из двух сторон — она отменена дизайнером целиком.
         CardRegistry.bindAll("market", entries("market"));
         // Карты «втайне» связывать не с чем — классов у них нет по устройству.
         CardRegistry.bindAll("super_objectives", entries("super_objectives").stream()

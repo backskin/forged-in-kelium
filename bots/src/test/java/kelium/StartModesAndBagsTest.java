@@ -37,7 +37,7 @@ import kelium.engine.Setup;
 class StartModesAndBagsTest {
 
     /** Свод, на котором стоят эти сторожа: действующий. */
-    private static final String СВОД = "1.41.0";
+    private static final String СВОД = "1.42.0";
 
     /**
      * Партия с заданными тумблерами дополнений.
