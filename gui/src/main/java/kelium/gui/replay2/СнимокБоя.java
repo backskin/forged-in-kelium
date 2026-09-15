@@ -84,12 +84,8 @@ public final class СнимокБоя {
         жетоны.add(нашаТ);
         жетоны.add(нашаП);
         жетоны.add(нашаВ);
-        состояния.get("h0_0").sideOwner =
-            new int[]{врагП.uid, врагТ.uid, врагТ.uid, -1, -1, -1};
-        состояния.get("h1_0").sideOwner =
-            new int[]{-1, -1, нашаТ.uid, нашаТ.uid, -1, -1};
-        состояния.get("h1_-1").sideOwner =
-            new int[]{-1, -1, -1, нашаП.uid, нашаВ.uid, -1};
+        // Стороны гекса не размечаются: в sideOwner место только зданиям,
+        // а войска FieldPainter рассаживает сам по свободным сторонам.
 
         BufferedImage img = нарисовать(size, состояния, жетоны);
         Path dir = out.toAbsolutePath().getParent();

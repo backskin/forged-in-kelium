@@ -329,6 +329,10 @@ CSS = r"""
   .оглавление .будет .н { background: var(--серый); }
 
   .рисунок-во-всю { column-span: all; break-inside: avoid; }
+  /* Врезка сразу под широким рисунком тоже идёт во всю ширину: в колонке
+     она валится под рисунок и уезжает за полосу (15.09.2026). */
+  .рисунок-во-всю + .пример { column-span: all; }
+  td .дст, .две td b + .и { white-space: nowrap; }
   /* ЗАГОЛОВОК ПЕРЕД РИСУНКОМ НА ВСЮ ШИРИНУ — тоже на всю ширину: иначе
      подложка заголовка обрывается посреди полосы (замечание дизайнера). */
   .две .блок:has(+ .рисунок-во-всю) { column-span: all; break-after: avoid; }
@@ -368,10 +372,21 @@ CSS = r"""
   /* ИКОНКА В СТРОКЕ ТЕКСТА — настоящая иконка игры, не заглушка. */
   .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm; }
   td .и, th .и { vertical-align: -1.3mm; height: 4.8mm; }
+  /* Ячейка «иконка + подпись»: иконка крупно, подпись по центру под ней. */
+  .дст { display: flex; flex-direction: column; align-items: center;
+    gap: .5mm; text-align: center; line-height: 1.1; }
+  .дст .и { height: 8mm; width: auto; vertical-align: 0; margin: 0; }
+  .дст b { font-weight: 700; }
   .и.крупно { height: 8.4mm; vertical-align: middle; margin: 0 2mm 0 0; }
   .иконка-строка { display: flex; align-items: center; margin: 1.2mm 0; }
   .блок.легенда { column-count: 2; column-gap: 5mm; column-span: all; }
   /* БЛОК ПОПОЛАМ: во всю ширину полосы, слева рисунки, справа текст. */
+  .блок.вовсю { column-span: all; }
+  /* Блок на ступень крупнее: когда на полосе остаётся воздух, текст
+     лучше дать больше, чем растягивать пустоту (15.09.2026). */
+  .блок.крупно p, .блок.крупно li { font-size: 10.4pt; line-height: 1.32; }
+  .блок.крупно h2 { font-size: 13pt; }
+  .блок.крупно li { margin-bottom: 1.2mm; }
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }

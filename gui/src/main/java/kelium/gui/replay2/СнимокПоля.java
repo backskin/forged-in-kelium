@@ -86,8 +86,10 @@ public final class СнимокПоля {
         с.жетоны.add(цу);
         с.жетоны.add(казарма);
         с.жетоны.add(вышка);
+        // В sideOwner попадают ТОЛЬКО здания: войска painter рассаживает сам
+        // по свободным сторонам, а «занятая» сторона выталкивает их с гекса.
         с.состояния.get("h0_0").sideOwner = new int[]{
-            цу.uid, цу.uid, вышка.uid, казарма.uid, казарма.uid, -1};
+            цу.uid, цу.uid, -1, казарма.uid, казарма.uid, -1};
         с.состояния.get("h0_0").ownerTint = 0;
         с.состояния.get("h0_0").ownerBuilt = true;
 
@@ -95,8 +97,7 @@ public final class СнимокПоля {
         ReplayRecord.Tok чужаяТ = жетон("vehicle", 1, "h1_0", false);
         с.жетоны.add(чужаяП);
         с.жетоны.add(чужаяТ);
-        с.состояния.get("h1_0").sideOwner = new int[]{
-            -1, -1, чужаяП.uid, чужаяТ.uid, чужаяТ.uid, -1};
+
 
         ReplayRecord.Tok авиация = жетон("aircraft", 0, "h1_-1", false);
         с.жетоны.add(авиация);

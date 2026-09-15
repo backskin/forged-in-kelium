@@ -56,7 +56,14 @@ def и(name):
 
 
 def мед(name):
-    return f'<img class="мед" src="{b64(name, 300)}" alt="">'
+    """Медальон действия: печатный кружок «действие» и поверх — само действие.
+
+    Своя зелёная обводка заменена настоящей иконкой действия из экспорта
+    (просьба дизайнера 15.09.2026). Иконке действия позволено чуть вылезти
+    за край кружка — обе картинки центрированы друг относительно друга.
+    """
+    return (f'<span class="мед"><img class="мед-круг" src="{b64("действие", 300)}" alt="">'
+            f'<img class="мед-знак" src="{b64(name, 300)}" alt=""></span>')
 
 
 # ---------------------------------------------------------------- тексты
@@ -294,7 +301,13 @@ CSS = r"""
   .задняя .дей-сетка { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 3mm; }
   .задняя .дей { display: flex; gap: 2mm; align-items: flex-start; background: var(--панель2); outline: .15mm solid var(--кант-т); outline-offset: -.15mm; padding: 1.4mm 1.8mm 1mm 1.6mm;
     clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm); min-height: 24mm; }
-  .стр.обложка.задняя .мед { width: 11.5mm; height: 11.5mm; border-radius: 50%; border: .4mm solid var(--кант); background: #F3EFE3; flex: none; margin-top: .6mm; }
+  .задняя .мед { position: relative; width: 13.4mm; height: 13.4mm; flex: none;
+    margin-top: .4mm; display: block; }
+  .стр.обложка.задняя .мед .мед-круг { position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: contain; }
+  .стр.обложка.задняя .мед .мед-знак { position: absolute; left: 50%; top: 50%;
+    width: 122%; height: 122%; transform: translate(-50%, -50%);
+    object-fit: contain; }
   .задняя .дей-т { flex: 1; min-width: 0; }
   .задняя .дей-имя { font: 800 9.5pt/1 "Tektur", sans-serif; color: var(--зел); text-transform: uppercase; letter-spacing: .04em; margin: .3mm 0 1.1mm; display: flex; align-items: baseline; gap: 1.6mm; }
   .задняя .дей-имя span { font: 500 6.4pt "Tektur Narrow", sans-serif; color: var(--охра); text-transform: none; letter-spacing: .02em; }

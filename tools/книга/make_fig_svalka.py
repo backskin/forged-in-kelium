@@ -28,39 +28,41 @@ figure, скруглить = ns["figure"], ns["скруглить"]
 
 КШ = 700
 КВ = round(КШ * 1028 / 661)
-ПОЛЕ = 90
-подпись = ImageFont.truetype(ШРИФТ, 40)
-
-# ХОЛСТ ШИРЕ ПОДПИСИ: иначе строка под картой обрезается по краю рисунка.
-мерка = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+ПОЛЕ = 40
+подпись = ImageFont.truetype(ШРИФТ, 54)
 ТЕКСТ = "карта приказов рубашкой вверх · жетоны оборотом вверх"
-W = max(КШ + ПОЛЕ * 2, round(мерка.textlength(ТЕКСТ, font=подпись)) + 40)
-H = КВ + ПОЛЕ * 2 + 56
-холст = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 
+# СВАЛКА ЛЕЖИТ ГОРИЗОНТАЛЬНО. Карта приказов на столе кладётся набок
+# (просьба дизайнера 15.09.2026): так она занимает меньше высоты полосы,
+# и жетоны на ней можно дать крупнее.
 карта = Image.open(РУБАШКА).convert("RGBA").resize((КШ, КВ), Image.LANCZOS)
 карта = скруглить(карта, 56.0)
-# лёгкая тень, чтобы карта не сливалась с полосой книги
-тень = Image.new("RGBA", (КШ, КВ), (42, 35, 24, 60))
-тень = скруглить(тень, 56.0)
-ЛЕВО = (W - КШ) // 2
-холст.alpha_composite(тень, (ЛЕВО + 10, ПОЛЕ + 12))
-холст.alpha_composite(карта, (ЛЕВО, ПОЛЕ))
-
+слой = Image.new("RGBA", (КШ, КВ), (0, 0, 0, 0))
+слой.alpha_composite(карта, (0, 0))
 for файл, доля, cx, cy, угол in ЖЕТОНЫ:
     im = Image.open(os.path.join(ТОКЕНЫ, файл)).convert("RGBA")
     ш = round(КШ * доля)
     im = im.resize((ш, round(im.height * ш / im.width)), Image.LANCZOS)
     im = im.rotate(угол, resample=Image.BICUBIC, expand=True)
-    x = ЛЕВО + round(КШ * cx) - im.width // 2
-    y = ПОЛЕ + round(КВ * cy) - im.height // 2
-    холст.alpha_composite(im, (x, y))
+    слой.alpha_composite(im, (round(КШ * cx) - im.width // 2,
+                              round(КВ * cy) - im.height // 2))
+слой = слой.rotate(90, expand=True)          # против часовой стрелки
+
+мерка = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+W = max(слой.width + ПОЛЕ * 2, round(мерка.textlength(ТЕКСТ, font=подпись)) + 40)
+H = слой.height + ПОЛЕ * 2 + 74
+холст = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+тень = Image.new("RGBA", (слой.width, слой.height), (0, 0, 0, 0))
+ЛЕВО = (W - слой.width) // 2
+холст.alpha_composite(слой, (ЛЕВО, ПОЛЕ))
 
 d = ImageDraw.Draw(холст)
 ш = d.textlength(ТЕКСТ, font=подпись)
-d.text(((W - ш) / 2, КВ + ПОЛЕ * 2 + 4), ТЕКСТ, font=подпись, fill=(107, 68, 19, 255))
+d.text(((W - ш) / 2, слой.height + ПОЛЕ * 2 + 4), ТЕКСТ, font=подпись,
+       fill=(107, 68, 19, 255))
 
 png = os.path.join(D, "_свалка.png")
 холст.save(png)
-figure("свалка", png, 1100, W, H, [], css_w="44%", pad="1.0mm 0 1.0mm", в_колонке=True)
+figure("свалка", png, 1400, W, H, [], css_w="100%", pad="1.0mm 0 1.0mm",
+       в_колонке=True)
 print("ok", (W, H))

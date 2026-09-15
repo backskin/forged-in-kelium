@@ -68,6 +68,25 @@ def _иконка_в_тексте(m):
     return '<span class="уточнить">[иконка: %s]</span>' % html.escape(имя)
 
 
+def ячейка_с_иконкой(текст):
+    """«[иконка: бой] Бой» в ячейке таблицы — иконка крупно, подпись под ней.
+
+    Мелкая иконка в строку в таблице не читается (замечание дизайнера
+    15.09.2026), поэтому такая ячейка набирается столбиком по центру.
+    """
+    m = re.fullmatch(r"\[иконка:\s*([^\]]+)\]\s*(.+)", текст.strip())
+    # Столбиком набирается только ячейка с ОБЫЧНОЙ подписью. Там, где подпись
+    # жирная (таблица ресурсов), значок остаётся в строке: иначе таблица
+    # растёт вдвое и не помещается на полосу.
+    if not m or m.group(2).startswith("**"):
+        return None
+    з = значок(m.group(1).split("—")[0].strip())
+    if not з:
+        return None
+    return ('<span class="дст">' + з.replace('class="и"', 'class="и"')
+            + "<b>" + inline(m.group(2)) + "</b></span>")
+
+
 def inline(s):
     s = html.escape(s, quote=False)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
@@ -93,6 +112,8 @@ def blocks(md):
     """md-кусок -> список html-блоков (каждый .блок / .пример / .заглушка)."""
     res, cur = [], []
     надвое = [False]
+    вовсю = [False]
+    крупно = [False]
 
     def flush():
         if not cur:
@@ -159,6 +180,16 @@ def blocks(md):
         # :надвое: — раздел идёт блоком во всю ширину: рисунки слева, текст справа.
         if ln.strip() == ":надвое:":
             надвое[0] = True
+            i += 1
+            continue
+        # :крупно: — блок набирается на ступень крупнее обычного.
+        if ln.strip() == ":крупно:":
+            крупно[0] = True
+            i += 1
+            continue
+        # :вовсю: — раздел идёт блоком во всю ширину полосы.
+        if ln.strip() == ":вовсю:":
+            вовсю[0] = True
             i += 1
             continue
         if ln.strip().startswith(":добор:"):
@@ -242,7 +273,9 @@ def blocks(md):
             head, data = rows[0], [r for r in rows[1:] if not set("".join(r)) <= set("-: ")]
             t = ['        <table>', "          <tr>" + "".join(f"<th>{inline(h.capitalize())}</th>" for h in head) + "</tr>"]
             for r in data:
-                t.append("          <tr>" + "".join(f"<td>{inline(c)}</td>" for c in r) + "</tr>")
+                t.append("          <tr>" + "".join(
+                    "<td>%s</td>" % (ячейка_с_иконкой(c) or inline(c)) for c in r)
+                    + "</tr>")
             t.append("        </table>")
             cur.extend(t)
             continue
