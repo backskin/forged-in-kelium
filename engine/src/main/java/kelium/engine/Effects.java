@@ -1735,6 +1735,20 @@ public final class Effects {
             s.player(seat).objectiveHand.addAll(taken);
             got.put("taken_objectives", taken.size());
         }
+        // take_objective_cards: СКОЛЬКО КАРТ отобрать, а не всю руку разом
+        // (решение дизайнера 14.09.2026, карты рынка 3.0). Забрать у соседа все
+        // бумаги — не торговля, а разбой по одному человеку за столом, выбранному
+        // жребием колоды; одна карта несёт ту же мысль без обиды. Карты берутся
+        // с начала руки: соперник её не показывает, и выбирать вор не может.
+        if (p.get("take_objective_cards") instanceof Number on
+                && was != seat && was < s.numPlayers()) {
+            PlayerState victim = s.player(was);
+            int take = Math.min(on.intValue(), victim.objectiveHand.size());
+            for (int i = 0; i < take; i++) {
+                s.player(seat).objectiveHand.add(victim.objectiveHand.remove(0));
+            }
+            got.put("taken_objectives", take);
+        }
         return got;
     }
 

@@ -819,6 +819,21 @@ public final class Actions {
     }
 
     /**
+     * ЕСТЬ ЛИ У ПРЕДЛОЖЕНИЯ СВОБОДНАЯ ЯЧЕЙКА. Нужно ботам и проигрывателю:
+     * вопрос «можно ли вообще взять эту половину» задаётся снаружи действия.
+     */
+    public static boolean freeMarketCellOpen(GameState s, String side) {
+        int[] cells = s.marketCells["right".equals(side) ? 1 : 0];
+        int open = Math.min(cells.length, marketCellsOpen(s.numPlayers()));
+        for (int i = 0; i < open; i++) {
+            if (cells[i] < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * СТАНЦИЯ СЪЕХАЛА — ПЕРЕСЧИТАТЬ ЕЁ ВЫРАБОТКУ.
      *
      * <p>У энергостанции выработка зависит от сектора, на котором она стоит:
@@ -2540,6 +2555,21 @@ public final class Actions {
                     opts.add(new Choice("market_rate", rate("energy", 1),
                         "1 КЕЛ -> кубик НАВСЕГДА в ячейку " + needsEnergy.type.code));
                 }
+                // ---- ОБНОВЛЕНИЕ КАРТЫ РЫНКА за келемий ----
+                // Ячейка слева от слота карты. Кладёшь в неё келемий — открытая
+                // карта немедленно уходит из игры со всеми кубиками на её
+                // ячейках предложений, и открывается следующая. Ячейка одна и
+                // чистится на Обновлении, поэтому за раунд карту меняют раз.
+                //
+                // ОБНОВЛЕНИЕ НЕ ЕСТЬ ПРЕДЛОЖЕНИЕ: обновив карту, тем же
+                // действием берут предложение с новой — но платят за него
+                // отдельным келемием, и весь заход стоит два.
+                if (s.marketRefreshCell < 0 && s.marketActive != null
+                        && ctx.exchangeOnlyLimit == 0
+                        && s.decks.get("market").size() > 0) {
+                    opts.add(new Choice("market_refresh", Map.of(),
+                        "1 КЕЛ -> сменить карту рынка"));
+                }
                 // ---- предложение КАРТЫ: только один раз за действие ----
                 String active = s.marketActive;
                 // ОБЕ ПОЛОВИНЫ КАРТЫ РЫНКА (утиль «Двойная сделка», 21.08.2026):
@@ -2556,24 +2586,13 @@ public final class Actions {
                             // предложения две ячейки, вторая открыта только при
                             // 3–4 игроках. Все ячейки заняты — предложение
                             // недоступно, как и за столом.
-                            // ПОМЕТКА «БЕЗ ЯЧЕЙКИ» (карты рынка 2.0, заказ
-                            // 02.09.2026) — предложение ячейки не занимает и
-                            // потому не кончается: его может взять каждый и
-                            // сколько угодно раз за раунд. Такие предложения
-                            // нарочно мелкие (келемий вместо энергии, келемий за
-                            // монету) и держат планшет живым, когда обе ячейки
-                            // крупных предложений уже разобрали.
-                            boolean безЯчейки = card.get(side) instanceof Map<?, ?> om
-                                && Boolean.TRUE.equals(om.get("no_cell"));
-                            if (!безЯчейки && freeMarketCell(s, side) < 0) {
-                                continue;
-                            }
-                            // КАЖДАЯ ПОЛОВИНА — ПО ОДНОМУ РАЗУ. «Обе половины»
-                            // значит левую и правую, а не одну и ту же дважды:
-                            // на четверых у предложения две ячейки, и без этой
-                            // проверки карта позволяла бы взять одно и то же
-                            // предложение два раза.
-                            if (offerSides.contains(side)) {
+                            // ПОМЕТКА «БЕЗ ЯЧЕЙКИ» ОТМЕНЕНА дизайнером
+                            // 14.09.2026: ячейку занимает КАЖДОЕ предложение,
+                            // исключений нет. Предложение кончается ячейками и
+                            // ничем иным — ни счётчиком на игрока, ни памятью о
+                            // том, кто что брал в этом раунде. За столом такое
+                            // всё равно никто не помнит, а кубик в ячейке видно.
+                            if (freeMarketCell(s, side) < 0) {
                                 continue;
                             }
                             if (card.get(side) instanceof Map<?, ?> off) {
@@ -2618,6 +2637,19 @@ public final class Actions {
                 deals++;
                 f.usedMarket = true;
 
+                if ("market_refresh".equals(pick.kind())) {
+                    s.marketRefreshCell = player.seat;
+                    String next = s.decks.get("market").draw(s.rng);
+                    if (next != null) {
+                        s.marketActive = next;
+                        for (int[] side : s.marketCells) {
+                            java.util.Arrays.fill(side, -1);
+                        }
+                    }
+                    f.usedMarketRefresh = true;
+                    detail.append("смена карты рынка; ");
+                    continue;
+                }
                 if ("market_rate".equals(pick.kind())) {
                     f.usedMarketPrintedRate = true;
                     Map<String, Object> pl = (Map<String, Object>) pick.payload();
@@ -2687,8 +2719,7 @@ public final class Actions {
                 // КУБИК КЕЛЕМИЯ ЛОЖИТСЯ В ЯЧЕЙКУ предложения: он и есть плата за
                 // ячейку (келемий за сделку уже списан выше), и по нему за столом
                 // видно, кто предложение занял.
-                int cell = Boolean.TRUE.equals(offer.get("no_cell"))
-                    ? -1 : freeMarketCell(s, String.valueOf(pl.get("side")));
+                int cell = freeMarketCell(s, String.valueOf(pl.get("side")));
                 if (cell >= 0) {
                     s.marketCells["right".equals(pl.get("side")) ? 1 : 0][cell] = player.seat;
                 }

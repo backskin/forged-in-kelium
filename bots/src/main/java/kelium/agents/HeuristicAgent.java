@@ -2258,6 +2258,20 @@ public class HeuristicAgent extends Agent {
             // вариант. Но при пустом кошельке он хуже любой сделки.
             return me.resources.coin() <= 1 ? 0.4 : 2.0;
         }
+        if ("market_refresh".equals(o.kind())) {
+            // СМЕНА КАРТЫ РЫНКА за келемий (ячейка обновления планшета).
+            // Обновление не даёт ничего само по себе: оно только открывает
+            // следующую карту — и стоит того лишь когда брать с нынешней уже
+            // нечего. Поэтому считаем по свободным ячейкам, а не по выгоде.
+            boolean естьЧтоБрать = kelium.engine.Actions.freeMarketCellOpen(state, "left")
+                || kelium.engine.Actions.freeMarketCellOpen(state, "right");
+            if (естьЧтоБрать) {
+                return 0.3;
+            }
+            // Ячеек не осталось, а келемий есть — открыть свежую карту разумно,
+            // но только если после обновления хватит и на само предложение.
+            return kel >= 2 ? 1.8 : 0.2;
+        }
         if ("market_rate".equals(o.kind())) {
             Map<String, Object> pl = (Map<String, Object>) o.payload();
             String what = String.valueOf(pl.get("what"));

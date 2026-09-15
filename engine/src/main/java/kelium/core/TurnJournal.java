@@ -190,6 +190,8 @@ public final class TurnJournal {
         // Движение/рынок: подбор контейнера войском (o30), предложение карты (o33).
         public int containersPickedByUnit = 0;
         public boolean usedMarketCardOffer = false;
+        /** Менял ли игрок карту рынка за келемий (ячейка обновления планшета). */
+        public boolean usedMarketRefresh = false;
         // Бой: жирные жертвы (o22-прочность больше не нужна — Зачистка), нейтралы
         // (o22 «Зачистка»), экономный килл (o24), блицкриг (o26), урон зданиям (o25).
         public int neutralsRazed = 0;
@@ -333,6 +335,7 @@ public final class TurnJournal {
             energySwapSameHexCube = o.energySwapSameHexCube;
             containersPickedByUnit = o.containersPickedByUnit;
             usedMarketCardOffer = o.usedMarketCardOffer;
+            usedMarketRefresh = o.usedMarketRefresh;
             neutralsRazed = o.neutralsRazed;
             razedNeutralAndHitEnemySameBattle = o.razedNeutralAndHitEnemySameBattle;
             minKillAmmoCost = o.minKillAmmoCost;
@@ -433,6 +436,7 @@ public final class TurnJournal {
             energySwapSameHexCube = false;
             containersPickedByUnit = 0;
             usedMarketCardOffer = false;
+            usedMarketRefresh = false;
             neutralsRazed = 0;
             razedNeutralAndHitEnemySameBattle = false;
             minKillAmmoCost = Integer.MAX_VALUE;
