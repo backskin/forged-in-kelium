@@ -135,7 +135,7 @@ def мед(name):
 <li>{и('флаг')} На поле остался последний тайл зарождения.</li>
 <li>{и('флаг')} Заняты вершины всех трёх треков технологий.</li>
 <li>{и('флаг')} В Обновлении нечем открыть новую карту рынка.</li>
-<li class="победа"><b>Военная победа</b> {и('уничтожение')} — уничтожить ЦУ, уже имея перевёрнутый модуль блокировки боя.</li>
+<li class="победа"><b>Военная победа</b> — уничтожить ЦУ, уже имея перевёрнутый модуль блокировки боя.</li>
 </ul>
 """
 
@@ -154,8 +154,8 @@ def мед(name):
 
 ЛЕГЕНДА = [
     ("монета", "монета"), ("келемий", "келемий"), ("боеприпас", "боеприпас"),
-    ("трофей", "трофей"), ("энергия", "энергия"), ("по", "очко"),
-    ("кубик-технологий", "кубик<br>техно"), ("действие", "действие"),
+    ("трофей", "кубик<br>трофея"), ("иконка-трофея", "трофей"),
+    ("энергия", "энергия"), ("по", "очко"), ("действие", "действие"),
     ("спец-действие", "спец-<br>действие"), ("чужой-приказ", "чужой<br>приказ"),
     ("флаг", "конец<br>партии"),
     ("карта-задания", "задание"), ("карта-супер-задания", "супер-<br>задание"),
@@ -163,6 +163,7 @@ def мед(name):
     ("контейнер", "контейнер"), ("жетон-войск", "жетон<br>войск"),
     ("военное-здание", "военное<br>здание"), ("ячейка-энергии", "ячейка<br>энергии"),
     ("круг-энергии", "круг<br>энергии"), ("прочность", "прочность"), ("урон", "урон"),
+    ("уничтожение", "уничто-<br>жение"),
 ]
 
 # НОМЕРА СТРАНИЦ БЕРУТСЯ ИЗ САМОЙ КНИГИ, а не пишутся здесь руками: вставили
@@ -215,16 +216,15 @@ def страница():
     <div class="пан" style="left:8mm;top:26mm;width:63mm;height:102mm"><div class="пан-в">{РАУНД}</div></div>
     <div class="пан" style="left:8mm;top:131mm;width:63mm;height:65mm"><div class="пан-в">{ПРИКАЗ}</div></div>
 
-    <div class="пан дейпан" style="left:74mm;top:26mm;width:138mm;height:128mm"><div class="пан-в">
+    <div class="пан дейпан" style="left:74mm;top:26mm;width:138mm;height:130mm"><div class="пан-в">
       <div class="шапка"><span class="таб">Восемь действий</span><i>по два на каждый приказ</i></div>
       <div class="дей-сетка">{сетка}</div>
     </div></div>
 
-    <div class="пан низ" style="left:74mm;top:156.5mm;width:63mm;height:40mm"><div class="пан-в">{КОНЕЦ}</div></div>
-    <div class="пан низ" style="left:140mm;top:156.5mm;width:72mm;height:40mm"><div class="пан-в">{ОЧКИ}</div></div>
+    <div class="пан низ" style="left:74mm;top:158mm;width:63mm;height:41mm"><div class="пан-в">{КОНЕЦ}</div></div>
+    <div class="пан низ" style="left:140mm;top:158mm;width:72mm;height:41mm"><div class="пан-в">{ОЧКИ}</div></div>
 
-    <div class="пан значки" style="left:8mm;top:197.8mm;width:204mm;height:19.6mm"><div class="пан-в">
-      <div class="шапка"><span class="таб">Значки</span></div>
+    <div class="пан значки" style="left:9.5mm;top:199.6mm;width:201mm;height:15.4mm"><div class="пан-в">
       <div class="легенда">{легенда}</div>
     </div></div>
   </div>
@@ -274,13 +274,17 @@ CSS = r"""
     padding: 1.2mm 3.2mm 1mm 2.4mm; white-space: nowrap; clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
 
   .задняя ul { list-style: none; margin: 0; padding: 0; }
+  .задняя li::marker { content: ""; }
   .задняя li { font: 500 7.4pt/1.2 "Tektur Narrow", sans-serif; color: var(--крем); margin: 0 0 .85mm; padding-left: 2.8mm; position: relative; break-inside: avoid; }
   .задняя li::before { content: ""; position: absolute; left: 0; top: 1.05mm; width: 1.5mm; height: 1.5mm; background: var(--зел); clip-path: polygon(0 0, 100% 50%, 0 100%); }
   .задняя li b { color: var(--зел); font-weight: 700; }
   /* Обложка растягивает любой img на всю страницу — здесь картинки мелкие,
      и правило обложки перебивается более точным селектором. */
   .стр.обложка.задняя img { width: auto; height: auto; object-fit: contain; display: inline-block; }
-  .стр.обложка.задняя .и { height: 4.1mm; width: auto; vertical-align: -1.1mm; margin: 0 .25mm; background: rgba(255,255,255,.7); border-radius: .7mm; padding: .25mm; box-sizing: border-box; outline: .15mm solid rgba(42,35,24,.25); }
+  /* ИКОНКА В СТРОКЕ — БЕЗ ПОДЛОЖКИ И ОБВОДКИ: рамка съедала место, которое
+     лучше отдать самой иконке (просьба дизайнера 15.09.2026). */
+  .стр.обложка.задняя .и { height: 4.6mm; width: auto; vertical-align: -1.2mm;
+    margin: 0 .3mm; background: none; border-radius: 0; padding: 0; outline: 0; }
 
   .задняя .фаза { display: flex; align-items: baseline; gap: 1.8mm; margin: 1.6mm 0 .9mm; border-bottom: .25mm solid var(--кант-т); padding-bottom: .5mm; }
   .задняя .фаза b { font: 900 10pt/1 "Tektur", sans-serif; color: var(--охра); min-width: 5mm; }
@@ -304,12 +308,16 @@ CSS = r"""
 
   /* ПАНЕЛЬ ЗНАЧКОВ ВНИЗУ ПАМЯТКИ. Заняла место логотипа и списка страниц:
      дизайнер попросил убрать их и добавить значков (15.09.2026). */
-  .задняя .легенда { display: grid; grid-template-columns: repeat(22, 1fr);
-    gap: 0 .5mm; align-items: start; margin-top: .4mm; }
+  /* ПОЛОСА ЗНАЧКОВ БЕЗ УКРАШЕНИЙ: ни заголовка, ни угловой чёрточки —
+     они съедали высоту и висели над строкой без дела (15.09.2026). */
+  .задняя .значки .пан-в { padding: 1.5mm 3.4mm 1.2mm; }
+  .задняя .значки .пан-в::after { display: none; }
+  .задняя .легенда { display: grid; grid-template-columns: repeat(23, 1fr);
+    gap: 0 .5mm; align-items: start; margin-top: 0; }
   .задняя .легенда div { display: flex; flex-direction: column; align-items: center;
-    gap: .3mm; font: 500 4.6pt/1.04 "Tektur Narrow", sans-serif; color: var(--крем2);
+    gap: .35mm; font: 500 4.8pt/1.04 "Tektur Narrow", sans-serif; color: var(--крем2);
     text-transform: uppercase; letter-spacing: .01em; text-align: center; }
-  .стр.обложка.задняя .легенда .и { height: 5.9mm; width: auto; vertical-align: 0;
+  .стр.обложка.задняя .легенда .и { height: 6.4mm; width: auto; vertical-align: 0;
     padding: 0; background: none; border-radius: 0; outline: 0; }
 """
 
