@@ -36,9 +36,18 @@ public final class TurnContext implements kelium.core.TurnUndo {
     // использован ли бесплатный ход ЦУ?
     public boolean cuFreeMoveUsed = false;
 
+    /**
+     * ПРЕДЕЛ СПЕЦ-ДЕЙСТВИЙ, ПОСЧИТАННЫЙ НА ВХОДЕ В ХОД, — без прибавок, которые
+     * дают утили посреди хода. Нужен, чтобы прибавка не накапливалась: ход
+     * пересчитывает предел перед каждым предложением СПЕЦ, и складывать её с
+     * уже сложенным значением значило бы расти на каждый круг предложения.
+     */
+    public final int specLimitBase;
+
     public TurnContext(int seat, int specLimit) {
         this.seat = seat;
         this.specLimit = specLimit;
+        this.specLimitBase = specLimit;
     }
 
     /**

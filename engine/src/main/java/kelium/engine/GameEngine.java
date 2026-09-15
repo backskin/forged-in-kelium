@@ -525,6 +525,18 @@ public final class GameEngine {
         }
     }
 
+    /**
+     * ПРОГНАТЬ ФАЗУ ОБНОВЛЕНИЯ ОТДЕЛЬНО — только для сторожей.
+     *
+     * <p>Способности, срабатывающие в Обновление («Ремонтная база»), иначе
+     * проверялись бы целой партией, а партия показывает лишь то, что бот
+     * СОГЛАСИЛСЯ картой воспользоваться. Точка входа та же, что у самой игры, —
+     * подменного пути тут нет.
+     */
+    public void refreshForTest(int rnd) {
+        refresh(rnd);
+    }
+
     private void refresh(int rnd) {
         GameState s = state;
         if (rnd == 1) {
@@ -584,6 +596,24 @@ public final class GameEngine {
             if (income > 0) {
                 p.resources.add(kelium.core.Resource.COIN, income);
                 emit(ev("type", "refresh_income", "seat", p.seat, "coin", income));
+            }
+            // «РЕМОНТНАЯ БАЗА» (арсенал 6.0.0): в Обновление весь урон со своих
+            // жетонов снимается. По книге (глава 9) урон лежит на жетоне до его
+            // гибели и не сходит сам — эта карта единственное, что его снимает.
+            if (Passives.hasPassive(s, p.seat, "repair_all_in_refresh")) {
+                int снято = 0;
+                for (kelium.core.UnitToken u : p.unitsOnField()) {
+                    снято += u.damage;
+                    u.resetDamage();
+                }
+                for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+                    снято += b.damage;
+                    b.resetDamage();
+                }
+                if (снято > 0) {
+                    emit(ev("type", "ability_reaction", "seat", p.seat,
+                        "ability", "repair_all_in_refresh", "damage_cleared", снято));
+                }
             }
             payArsenalUpkeep(p);
             floodTrainingCards(p);
@@ -1226,6 +1256,10 @@ public final class GameEngine {
         // лимит на остаток хода. Флаг живёт в журнале: эффект карты не видит
         // контекст хода, а «до конца хода» — ровно срок жизни журнала.
         ctx.specUnlimited = state.journal.of(p.seat).unlimitedSpec;
+        // УТИЛЬ «ТРИ СПЕЦ-ДЕЙСТВИЯ» прибавляет к пределу, а не снимает его.
+        // Считается от базы, посчитанной на входе в ход: иначе прибавка
+        // складывалась бы с собой на каждом предложении СПЕЦ.
+        ctx.specLimit = ctx.specLimitBase + state.journal.of(p.seat).specBonus;
         if (!ctx.canSpec()) {
             return;
         }

@@ -65,6 +65,16 @@ public final class PlayerState {
      */
     public final Map<String, Integer> arsenalCardKelium = new HashMap<>();
     /**
+     * ЭНЕРГИЯ, ЛЕЖАЩАЯ НА УСТАНОВЛЕННОЙ КАРТЕ АРСЕНАЛА: id карты → сколько
+     * кубиков энергии на ней сейчас. Устроено так же и по той же причине, что
+     * {@link #arsenalCardKelium}, но валюта другая: «Разрядник» (арсенал 6.0.0)
+     * копит на себе энергию и разменивает её на выстрел без боеприпасов.
+     *
+     * <p>Кубики на карте НЕ считаются энергией здания: пока они здесь, здание
+     * их не получает, и источник, с которого они сняты, их не держит.
+     */
+    public final Map<String, Integer> arsenalCardEnergy = new HashMap<>();
+    /**
      * СУПЕР-ЗАДАНИЯ ИГРОКА — их может быть несколько, и они НАКАПЛИВАЮТСЯ.
      *
      * <p>Одну карту игрок получает в подготовку, ещё по одной выдаёт третий шаг
@@ -308,6 +318,7 @@ public final class PlayerState {
         p.arsenalHand.addAll(arsenalHand);
         p.arsenalInstalled.addAll(arsenalInstalled);
         p.arsenalCardKelium.putAll(arsenalCardKelium);
+        p.arsenalCardEnergy.putAll(arsenalCardEnergy);
         p.superObjectives.addAll(superObjectives);
         p.superObjectiveOffer.addAll(superObjectiveOffer);
         p.startObjectiveOffer.addAll(startObjectiveOffer);

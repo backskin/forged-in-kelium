@@ -84,6 +84,7 @@ public final class Effects {
             case "convert" -> convert(s, seat, p);
             case "discard_enemy_arsenal" -> discardEnemyArsenal(s, seat, p);
             case "unlimited_spec" -> unlimitedSpec(s, seat, p);
+            case "three_spec_actions" -> threeSpecActions(s, seat, p);
             case "market_card_from_discard" -> marketCardFromDiscard(s, seat, p);
             case "swap_order_card" -> swapOrderCard(s, seat, p);
             // === УТИЛЬ 3.0 (заказ дизайнера 21.08.2026) ===
@@ -138,6 +139,8 @@ public final class Effects {
                  "shield", "landing", "speed_boost", "energy_or_modules", "convert",
                  "discard_enemy_arsenal", "unlimited_spec",
                  "market_card_from_discard", "swap_order_card",
+                 // Утиль арсенала 6.0.0 (14.09.2026): три СПЕЦ-действия за ход.
+                 "three_spec_actions",
                  // ШЕСТЬ ЭФФЕКТОВ УТИЛЯ 3.0 (21.08.2026): плата за положение на
                  // поле, две кражи, бесплатная перестройка, обновление витрины и
                  // золочение жетона модуля.
@@ -1497,6 +1500,22 @@ public final class Effects {
         return Map.of("unlimited_spec", true);
     }
 
+    /**
+     * ТРИ СПЕЦ-ДЕЙСТВИЯ В ЭТОТ ХОД (утиль арсенала 6.0.0).
+     *
+     * <p>Отличие от {@code unlimited_spec} — в потолке: там лимит снимается
+     * вовсе, здесь их ровно три. Своё СПЕЦ-действие, которым карту сожгли, уже
+     * потрачено, поэтому прибавка — ДВА: считая сожжение, за ход выходит три.
+     *
+     * <p>Живёт в журнале хода по той же причине, что и снятый лимит: предел
+     * считается на входе в ход, а утиль играется в середине.
+     */
+    static Map<String, Object> threeSpecActions(GameState s, int seat, Map<String, Object> p) {
+        int сколько = p.get("spec_actions") instanceof Number n ? n.intValue() : 3;
+        s.journal.of(seat).specBonus += Math.max(0, сколько - 1);
+        return Map.of("spec_actions", сколько);
+    }
+
     /** ВЕРНУТЬ НА РЫНОК сброшенную карту сделок на рынке. */
     static Map<String, Object> marketCardFromDiscard(GameState s, int seat, Map<String, Object> p) {
         var deck = s.decks.get("market");
@@ -1828,8 +1847,18 @@ public final class Effects {
     static Map<String, Object> buildNeutral(GameState s, int seat, Map<String, Object> p) {
         Agent agent = agentFor(s, seat);
         List<Choice> opts = new ArrayList<>();
+        // ОГРАНИЧЕНИЯ КАРТЫ (арсенал 6.0.0, «Подрядчик»): ставить только рядом
+        // со своим зданием и только в один сектор. Утиль, у которого этих
+        // параметров нет, работает как прежде — где угодно и хоть на два
+        // сектора: ограничения задаёт карта, а не эффект.
+        boolean толькоУСвоих = Boolean.TRUE.equals(p.get("near_own_building"));
+        int максСекторов = p.get("max_sectors") instanceof Number n ? n.intValue() : 2;
+        java.util.Set<String> уСвоих = толькоУСвоих ? гексыУСвоихЗданий(s, seat) : null;
         for (var e : s.field.hexes.entrySet()) {
             kelium.core.Hex h = e.getValue();
+            if (уСвоих != null && !уСвоих.contains(e.getKey())) {
+                continue;
+            }
             // ГДЕ УГОДНО, В ТОМ ЧИСЛЕ ПОВЕРХ ЧУЖОГО (правило дизайнера
             // 17.08.2026). Годятся и свободные секторы, и занятые ЧУЖИМИ
             // зданиями: подрядчик приходит и застраивает участок, а стоявшее
@@ -1845,7 +1874,7 @@ public final class Effects {
                 one.put("sectors", List.of(i));
                 opts.add(new Choice("neutral", one, "нейтрал 1 сектор @" + e.getKey() + "/" + i));
                 int next = (i + 1) % 6;
-                if (sectorTakeable(s, h, next, seat)) {
+                if (максСекторов >= 2 && sectorTakeable(s, h, next, seat)) {
                     Map<String, Object> two = new HashMap<>();
                     two.put("hex", e.getKey());
                     two.put("sectors", List.of(i, next));
@@ -1897,7 +1926,18 @@ public final class Effects {
         }
         // Отрицательные uid — соглашение движка для нейтралов (см. Scenario):
         // они не принадлежат никому и не пересекаются с жетонами игроков.
-        int uid = -1000 - h.neutrals.size() - s.round;
+        //
+        // НОМЕР БЕРЁТСЯ НИЖЕ ВСЕХ УЖЕ СТОЯЩИХ, а не считается от числа нейтралов
+        // на ЭТОМ гексе и номера раунда: прежняя формула выдавала один и тот же
+        // номер постройкам на разных гексах, поставленным в один раунд, — и две
+        // разные стенки становились неразличимы для всего, что ищет нейтрала по
+        // номеру.
+        int uid = -1000;
+        for (kelium.core.Hex любой : s.field.hexes.values()) {
+            for (kelium.core.Hex.NeutralBuilding nb : любой.neutrals) {
+                uid = Math.min(uid, nb.uid - 1);
+            }
+        }
         h.neutrals.add(new kelium.core.Hex.NeutralBuilding(uid, false, List.copyOf(sectors)));
         for (Integer i : sectors) {
             h.sideOwner[i] = -1;   // сектор занят нейтралом
@@ -1906,7 +1946,26 @@ public final class Effects {
     }
 
     /**
-     * МОЖНО ЛИ ЗАСТРОИТЬ этот сектор нейтралом «Восстановления».
+     * ГЕКСЫ, СОСЕДНИЕ С ТВОИМИ ЗДАНИЯМИ, и сами гексы твоих зданий. Соседство
+     * берётся по всем сторонам гекса, а не только по стенкам: карта говорит
+     * «на гексе, СОСЕДНЕМ с твоим зданием», а не «за твоей стенкой» — это
+     * разные вещи, и зона стройки (глава 7) здесь ни при чём.
+     */
+    private static java.util.Set<String> гексыУСвоихЗданий(GameState s, int seat) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (kelium.core.BuildingToken b : s.player(seat).buildingsOnField()) {
+            kelium.core.Hex h = b.hexId == null ? null : s.field.get(b.hexId);
+            if (h == null) {
+                continue;
+            }
+            out.add(h.id);
+            out.addAll(h.neighbors);
+        }
+        return out;
+    }
+
+    /**
+     * МОЖНО ЛИ ЗАСТРОИТЬ этот сектор нейтралом.
      *
      * <p>Да, если он свободен либо занят ЧУЖИМ зданием. Нет, если там своё
      * здание (себя не сносим) или уже стоит нейтрал (стенка поверх стенки

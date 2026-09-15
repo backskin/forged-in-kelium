@@ -471,7 +471,7 @@ public final class CombatResolver {
                     boolean[] firstAttackUsed = {false};
                     int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
                         firstAttackUsed);
-                    if (!p.resources.canPay(Resource.AMMO, cost)) {
+                    if (!можетОплатитьАтаку(p, cost)) {
                         continue;
                     }
                     if (pickVictimCategory(target, attackerSeat, ar.target(), null, closed, u)
@@ -491,6 +491,65 @@ public final class CombatResolver {
 
     public boolean runBattle(int seat, Agent agent) {
         return runBattle(seat, agent, false, null);
+    }
+
+    // ==================================================================
+    //  ЧЕМ ПЛАТЯТ ЗА АТАКУ (арсенал 6.0.0)
+    // ==================================================================
+
+    /**
+     * ЕСТЬ ЛИ У ИГРОКА ОПЛАЧЕННАЯ, НО НЕ ИСТРАЧЕННАЯ АТАКА («Разрядник»: две
+     * энергии с карты покупают один выстрел). Такая атака не стоит ничего.
+     */
+    private boolean естьБесплатнаяАтака(int seat) {
+        return state.journal != null && state.journal.of(seat).freeAttacks > 0;
+    }
+
+    /** Разрешает ли карта платить за атаку келемием вместо боеприпасов. */
+    private boolean келемийВместоБоеприпасов(int seat) {
+        return Passives.hasPassive(state, seat, "kelium_instead_of_ammo_in_operation");
+    }
+
+    /**
+     * МОЖЕТ ЛИ ИГРОК ОПЛАТИТЬ АТАКУ. Три кошелька по порядку: даровая атака с
+     * карты, боеприпасы, келемий (если карта это разрешает). Цена при этом не
+     * меняется ни на единицу — меняется только то, чем её платят.
+     */
+    private boolean можетОплатитьАтаку(PlayerState p, int cost) {
+        if (cost <= 0 || естьБесплатнаяАтака(p.seat)) {
+            return true;
+        }
+        if (p.resources.canPay(Resource.AMMO, cost)) {
+            return true;
+        }
+        return келемийВместоБоеприпасов(p.seat)
+            && p.resources.canPay(Resource.KELIUM, cost);
+    }
+
+    /** Снять плату за атаку тем кошельком, который доступен (см. выше). */
+    private void оплатитьАтаку(PlayerState p, int cost) {
+        if (cost <= 0) {
+            return;
+        }
+        if (естьБесплатнаяАтака(p.seat)) {
+            state.journal.of(p.seat).freeAttacks -= 1;
+            emit("type", "ability_reaction", "seat", p.seat,
+                "ability", "spec_energy_on_card_free_attack", "saved_ammo", cost);
+            return;
+        }
+        if (p.resources.canPay(Resource.AMMO, cost)) {
+            p.resources.pay(Resource.AMMO, cost);
+            return;
+        }
+        if (келемийВместоБоеприпасов(p.seat)
+                && p.resources.canPay(Resource.KELIUM, cost)) {
+            p.resources.pay(Resource.KELIUM, cost);
+            emit("type", "ability_reaction", "seat", p.seat,
+                "ability", "kelium_instead_of_ammo_in_operation", "kelium", cost);
+            return;
+        }
+        // Сюда не попасть: оплата спрашивается только после можетОплатитьАтаку.
+        p.resources.pay(Resource.AMMO, cost);
     }
 
     /**
@@ -691,7 +750,7 @@ public final class CombatResolver {
                         }
                         int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, цель,
                             firstAttackUsed) + доплата;
-                        if (!p.resources.canPay(Resource.AMMO, cost)) {
+                        if (!можетОплатитьАтаку(p, cost)) {
                             continue;
                         }
                         Token victim = pickVictimCategory(цель, attackerSeat, ar.target(),
@@ -815,7 +874,7 @@ public final class CombatResolver {
                     usedRows.add(key);
                     continue;
                 }
-                p.resources.pay(Resource.AMMO, ammo);
+                оплатитьАтаку(p, ammo);
                 usedRows.add(key);
                 // K4: если нейтралов на гексе несколько — какой сносить, выбирает игрок
                 Hex.NeutralBuilding nb;
@@ -887,7 +946,7 @@ public final class CombatResolver {
                 continue;
             }
             if (!оплачено) {
-                p.resources.pay(Resource.AMMO, ammo);
+                оплатитьАтаку(p, ammo);
                 стреляли.add(uid);
                 firstAttackUsed[0] = true;
                 оплачено = true;
@@ -1011,6 +1070,44 @@ public final class CombatResolver {
         }
         evacuateShieldedEconomy(damagedOwners);
 
+        // ОТВЕТНЫЙ БОЙ ПО КАРТЕ (арсенал 6.0.0, «Ответный огонь»): за 1 боеприпас
+        // пострадавший немедленно бьёт в ответ — но только по обидчику.
+        //
+        // Отдельно от правила ниже и ДО него: правило ответного боя выключено с
+        // 04.09.2026 («вся оборона переехала в карты»), и книга правил его не
+        // знает вовсе. Карта возвращает ответ одному игроку и уже не даром,
+        // поэтому спрашивается она независимо от того, включено ли правило.
+        if (didDamage && !isRetaliation) {
+            for (int owner : clockwise(attackerSeat, damagedOwners)) {
+                if (owner == attackerSeat
+                        || !Passives.hasPassive(s, owner, "counter_battle_for_ammo")) {
+                    continue;
+                }
+                PlayerState жертва = s.player(owner);
+                if (!жертва.resources.canPay(Resource.AMMO, 1)) {
+                    continue;
+                }
+                Agent a = agentFor(owner);
+                List<Choice> opts = List.of(
+                    new Choice("counter_battle", Boolean.TRUE,
+                        "1 боеприпас: ответный бой против места " + (attackerSeat + 1)),
+                    new Choice("counter_battle", Boolean.FALSE, "не отвечать"));
+                Choice pick = a == null ? opts.get(1)
+                    : a.choose(s, opts, Map.of("kind", "counter_battle",
+                        "attacker", attackerSeat));
+                if (pick == null || !Boolean.TRUE.equals(pick.payload())) {
+                    continue;
+                }
+                жертва.resources.pay(Resource.AMMO, 1);
+                emit("type", "ability_reaction", "seat", owner,
+                    "ability", "counter_battle_for_ammo", "attacker", attackerSeat);
+                runBattle(owner, a, true, attackerSeat);
+                if (s.finished) {
+                    break;
+                }
+            }
+        }
+
         // Шаг 6 / §4: ответный бой (один раз, не для самой ответки).
         if (didDamage && !isRetaliation && rs.getBool("actions.combat.retaliation_enabled", true)) {
             boolean gotRetaliated = false;
@@ -1085,7 +1182,7 @@ public final class CombatResolver {
             for (AttackRow ar : attackRows(attackerSeat, u)) {
                 int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
                     firstAttackUsed);
-                if (p.resources.canPay(Resource.AMMO, cost)) {
+                if (можетОплатитьАтаку(p, cost)) {
                     anyAffordable = true;
                 }
             }
@@ -1151,7 +1248,7 @@ public final class CombatResolver {
             for (AttackRow ar : attackRows(attackerSeat, u)) {
                 int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
                     new boolean[]{true});
-                if (!p.resources.canPay(Resource.AMMO, cost)) {
+                if (!можетОплатитьАтаку(p, cost)) {
                     continue;
                 }
                 if (pickVictimCategory(target, attackerSeat, ar.target(), null, closed, u) != null

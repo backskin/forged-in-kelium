@@ -267,6 +267,19 @@ public final class TurnJournal {
         public String speedBoostKind = null;
         /** Снят лимит СПЕЦ-действий до конца хода (эффект unlimited_spec). */
         public boolean unlimitedSpec = false;
+        /**
+         * ЛИШНИЕ СПЕЦ-ДЕЙСТВИЯ ДО КОНЦА ХОДА (утиль «три СПЕЦ-действия»,
+         * арсенал 6.0.0). Живёт здесь по той же причине, что и снятый лимит:
+         * предел считается на входе в ход, а утиль играется в середине и до
+         * контекста хода не дотягивается.
+         */
+        public int specBonus = 0;
+        /**
+         * БЕСПЛАТНЫЕ АТАКИ, ОПЛАЧЕННЫЕ НЕ БОЕПРИПАСАМИ («Разрядник», арсенал
+         * 6.0.0: две энергии с карты покупают один выстрел). Счётчик расходуется
+         * боем по одной атаке; неистраченная атака сгорает вместе с ходом.
+         */
+        public int freeAttacks = 0;
 
         /**
          * Скопировать в себя все факты из {@code o} — нужно копии состояния для
@@ -371,6 +384,8 @@ public final class TurnJournal {
             lowerOrderOpen = o.lowerOrderOpen;
             speedBoostKind = o.speedBoostKind;
             unlimitedSpec = o.unlimitedSpec;
+            specBonus = o.specBonus;
+            freeAttacks = o.freeAttacks;
         }
 
         void reset() {
@@ -462,6 +477,8 @@ public final class TurnJournal {
             lowerOrderOpen = false;
             speedBoostKind = null;
             unlimitedSpec = false;
+            specBonus = 0;
+            freeAttacks = 0;
         }
     }
 

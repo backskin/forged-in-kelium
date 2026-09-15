@@ -47,6 +47,7 @@ public final class Abilities {
         Arsenal2Abilities.install();
         Arsenal3Abilities.install();
         Arsenal5Abilities.install();
+        Arsenal6Abilities.install();
     }
 
     /** Зарегистрировать способность (обычно из статического блока набора). */
