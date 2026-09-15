@@ -43,6 +43,13 @@ def набор(семья, версия):
     return d.get(семья) or []
 
 
+def набор_ключ(семья, версия, ключ):
+    """Служебный раздел файла набора — например, словарь категорий счёта."""
+    путь = 'data/cards/%s.%s.yaml' % (семья, версия)
+    d = yaml.safe_load(io.open(путь, encoding='utf-8'))
+    return d.get(ключ) or {}
+
+
 def версии(свод_id):
     s = io.open('data/rulesets/%s.yaml' % свод_id, encoding='utf-8').read()
     блок = re.search(r'(?ms)^content_versions:\s*\n(.*?)(?=^\S|\Z)', s)
