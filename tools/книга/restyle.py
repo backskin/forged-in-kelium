@@ -141,6 +141,15 @@ CSS = r"""
   .разворот.левая > .стр .к-хвп { display: block; }
   .стр.обложка { padding: 0; background: #222; }
   .стр.обложка img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* ТЕХНО-РАМКА ОБЛОЖКИ — один в один с памяткой на задней стороне. */
+  .стр.обложка .рамка-техно { position: absolute; inset: 4.5mm; z-index: 3;
+    pointer-events: none; border: .45mm solid #2A2318;
+    clip-path: polygon(6mm 0, 100% 0, 100% calc(100% - 6mm), calc(100% - 6mm) 100%, 0 100%, 0 6mm); }
+  .стр.обложка .рамка-техно::before, .стр.обложка .рамка-техно::after {
+    content: ""; position: absolute; width: 14mm; height: 14mm;
+    border: .7mm solid var(--келемий); }
+  .стр.обложка .рамка-техно::before { right: -.3mm; top: -.3mm; border-left: 0; border-bottom: 0; }
+  .стр.обложка .рамка-техно::after { left: -.3mm; bottom: -.3mm; border-right: 0; border-top: 0; }
 
   .колонцифра {
     position: absolute; bottom: 5.8mm; left: 0; right: 0; text-align: center; z-index: 6;
@@ -412,6 +421,10 @@ def патч_разметки(t, кайма_svg):
             return m.group(0)
         return m.group(0) + "\n    " + кайма_svg
     t = re.sub(r'<div class="стр ([^"]*)">', вставить, t)
+    # РАМКА НА ПЕРЕДНЕЙ ОБЛОЖКЕ — та же техно-рамка, что на памятке
+    # (просьба дизайнера 15.09.2026). Ставится поверх иллюстрации.
+    t = re.sub(r'(<div class="стр обложка">)(?!<div class="рамка-техно")',
+               r'\1<div class="рамка-техно"></div>', t)
     return t
 
 
