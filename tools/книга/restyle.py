@@ -353,6 +353,11 @@ CSS = r"""
   .создатели .марка { position: absolute; left: 15mm; right: 15mm;
     top: 126mm; bottom: 22mm; }
   .создатели .марка .заглушка { height: 100%; width: 100%; margin: 0; }
+  /* ИКОНКА В СТРОКЕ ТЕКСТА — настоящая иконка игры, не заглушка. */
+  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm; }
+  td .и, th .и { vertical-align: -1.3mm; height: 4.8mm; }
+  .и.крупно { height: 8.4mm; vertical-align: middle; margin: 0 2mm 0 0; }
+  .иконка-строка { display: flex; align-items: center; margin: 1.2mm 0; }
   .блок.легенда { column-count: 2; column-gap: 5mm; column-span: all; }
   /* БЛОК ПОПОЛАМ: во всю ширину полосы, слева рисунки, справа текст. */
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;

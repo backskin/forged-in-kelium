@@ -7,10 +7,16 @@
 
 python md2page.py <глава.md> <первая страница> <выход.html>
 """
+import base64
+import glob
 import html
+import io
 import os
 import re
 import sys
+
+КОРЕНЬ_КНИГ = os.path.dirname(glob.glob(
+    r"C:\shared\forged-in-kelium\rules\Книга правил*")[0])
 
 src, first, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 text = open(src, encoding="utf-8").read()
@@ -19,9 +25,53 @@ title = re.match(r"# (.+)", text).group(1)
 body = text.split("\n", 1)[1]
 
 
+# НАСТОЯЩИЕ ИКОНКИ ИГРЫ. `[иконка: монета]` в тексте превращается в саму
+# иконку из экспорта дизайнера (`rules/иконки-экспорт`), а не в заглушку.
+# Чего в экспорте нет, ищется среди врезок с карт-памяток (`rules/иконки`);
+# не нашлось нигде — остаётся видимая пометка «уточнить».
+ПАПКИ_ИКОНОК = [
+    os.path.join(КОРЕНЬ_КНИГ, "иконки-экспорт"),
+    os.path.join(КОРЕНЬ_КНИГ, "иконки"),
+]
+_иконки_кэш = {}
+
+
+def значок(имя):
+    ключ = имя.strip().lower().replace(" ", "-")
+    if ключ in _иконки_кэш:
+        return _иконки_кэш[ключ]
+    путь = None
+    for папка in ПАПКИ_ИКОНОК:
+        п = os.path.join(папка, ключ + ".png")
+        if os.path.exists(п):
+            путь = п
+            break
+    if путь is None:
+        _иконки_кэш[ключ] = None
+        return None
+    from PIL import Image
+    im = Image.open(путь).convert("RGBA")
+    ш = 96
+    im = im.resize((ш, max(1, round(im.height * ш / im.width))), Image.LANCZOS)
+    буфер = io.BytesIO()
+    im.save(буфер, "PNG", optimize=True)
+    код = base64.b64encode(буфер.getvalue()).decode()
+    _иконки_кэш[ключ] = '<img class="и" src="data:image/png;base64,%s" alt="">' % код
+    return _иконки_кэш[ключ]
+
+
+def _иконка_в_тексте(m):
+    имя = m.group(1).split("—")[0].strip()
+    з = значок(имя)
+    if з:
+        return з
+    return '<span class="уточнить">[иконка: %s]</span>' % html.escape(имя)
+
+
 def inline(s):
     s = html.escape(s, quote=False)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
+    s = re.sub(r"\[иконка:\s*([^\]]+)\]", _иконка_в_тексте, s)
     return s
 
 
@@ -148,11 +198,28 @@ def blocks(md):
             continue
         if ln.startswith("["):
             q = [ln]
-            while not q[-1].rstrip().endswith("]") and i + 1 < len(lines):
+            # КВАДРАТНАЯ СКОБКА НЕ ГЛОТАЕТ ГЛАВУ: раньше сбор шёл до ближайшей
+            # закрывающей скобки и на строке вида «[иконка: …].» съедал всё
+            # до конца полосы (15.09.2026). Теперь сбор кончается на пустой
+            # строке и на заголовке.
+            while (not q[-1].rstrip().endswith("]") and i + 1 < len(lines)
+                   and lines[i + 1].strip()
+                   and not lines[i + 1].startswith(("#", ">", "|", "-", "<!--"))):
                 i += 1
                 q.append(lines[i])
             i += 1
             inner = " ".join(x.strip() for x in q)[1:-1]
+            # ОТДЕЛЬНОЙ СТРОКОЙ `[иконка: имя — подпись]` — сама иконка крупно
+            # и подпись рядом, а не заглушка во всю ширину блока.
+            if inner.lower().startswith("иконка:"):
+                имя, _, подпись = inner.split(":", 1)[1].partition("—")
+                з = значок(имя)
+                if з:
+                    cur.append('        <p class="иконка-строка">'
+                               + з.replace('class="и"', 'class="и крупно"')
+                               + "<span>" + inline(подпись.strip() or имя.strip())
+                               + "</span></p>")
+                    continue
             if "уточнить" in inner:
                 cur.append(f'        <p><span class="уточнить">{inline(inner)}</span></p>')
             else:
