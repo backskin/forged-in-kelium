@@ -54,6 +54,47 @@ def b64(путь, ширина=None):
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
+def карта_поля(путь, ширина=900):
+    """Раскладка, обрезанная по самой карте.
+
+    Картинка конструктора — квадрат 1500×1500, где карта занимает середину,
+    а вокруг лежит пустая гекс-сетка. В книге это треть высоты полосы впустую,
+    поэтому фон отбрасывается: считаются пиксели, заметно отличающиеся от
+    цвета бумаги, и по ним берётся рамка.
+    """
+    from PIL import Image
+    im = Image.open(путь).convert("RGB")
+    px = im.load()
+    x0, y0, x1, y1 = im.width, im.height, 0, 0
+    # Ищем НЕ «непохожее на фон» — бледная гекс-сетка тоже непохожа, — а то,
+    # из чего сделана карта: тёмные контуры гексов и насыщенные метки.
+    for y in range(0, im.height, 2):
+        for x in range(0, im.width, 2):
+            r, g, b = px[x, y]
+            тёмный = r + g + b < 330
+            цветной = max(r, g, b) - min(r, g, b) > 46
+            if тёмный or цветной:
+                if x < x0:
+                    x0 = x
+                if x > x1:
+                    x1 = x
+                if y < y0:
+                    y0 = y
+                if y > y1:
+                    y1 = y
+    if x1 <= x0 or y1 <= y0:
+        return b64(путь, ширина)
+    поле = 16
+    im = im.crop((max(0, x0 - поле), max(0, y0 - поле),
+                  min(im.width, x1 + поле), min(im.height, y1 + поле)))
+    if im.width > ширина:
+        im = im.resize((ширина, round(im.height * ширина / im.width)),
+                       Image.LANCZOS)
+    буфер = io.BytesIO()
+    im.save(буфер, "JPEG", quality=88, optimize=True)
+    return "data:image/jpeg;base64," + base64.b64encode(буфер.getvalue()).decode()
+
+
 _кэш = {}
 
 
@@ -84,7 +125,7 @@ class Книга:
         n = len(self.страницы) + 1
         if раздел:
             self.разделы.append((раздел[0], раздел[1], n))
-        фон = "фон%d" % ((n % 4) + 1)
+        фон = "спр фон%d" % ((n % 4) + 1)
         цифра = ('    <div class="колонцифра"><span>%d</span></div>\n' % n
                  if колонцифра else "")
         self.страницы.append(
@@ -108,63 +149,119 @@ class Книга:
 
 
 ДОБАВКА = r"""
-  /* ---- справочник: карточки колод, иконки, словарь ---- */
-  .прил { display: flex; align-items: center; gap: 3mm; margin: 0 0 3mm;
-    padding: 0 3mm 0 0; }
-  .прил .бк { flex: none; align-self: stretch; display: flex; align-items: center;
-    background: var(--охра); color: var(--страница); font: 800 13pt/1 "Tektur", sans-serif;
-    padding: 1.8mm 4.4mm 1.6mm 3.4mm; clip-path: polygon(0 0, 100% 0, calc(100% - 2.6mm) 100%, 0 100%); }
-  .прил .им { font: 700 15pt/1.15 "Tektur", sans-serif; color: var(--охра); }
-  .прил .счёт { font: 500 8.4pt "Tektur Narrow", sans-serif; color: var(--серый);
-    text-transform: uppercase; letter-spacing: .05em; }
-  .прил::after { content: ""; flex: 1; height: .5mm; background: var(--келемий); }
 
-  .карточки { column-count: 2; column-gap: 5mm; }
-  .кк { break-inside: avoid; background: rgba(247,241,225,.66);
-    outline: .18mm solid var(--кант); outline-offset: -.18mm;
-    padding: 1.4mm 2.2mm 1.3mm; margin: 0 0 2mm;
-    clip-path: polygon(1.8mm 0, 100% 0, 100% calc(100% - 1.8mm), calc(100% - 1.8mm) 100%, 0 100%, 0 1.8mm); }
-  .кк .имя { font: 700 9.4pt/1.15 "Tektur", sans-serif; color: var(--охра);
-    margin-bottom: .8mm; display: flex; align-items: baseline; gap: 1.8mm; }
-  .кк .имя small { font: 500 6.6pt "Tektur Narrow", sans-serif; color: var(--серый);
-    text-transform: uppercase; letter-spacing: .04em; margin-left: auto; }
-  .кк p { font: 8.2pt/1.2 "Tektur Narrow", sans-serif; margin: 0 0 .6mm; }
+  /* ================= СПРАВОЧНИК =================
+     Это не книга правил: её читают подряд, а справочник открывают посреди
+     партии на нужной карте. Отсюда три решения (15.09.2026):
+     1) полосы без фоновой графики — за плотным текстом она мешает читать,
+        остаётся только едва заметная гекс-сетка;
+     2) единый шаг отступов 1.6 мм: поля карточки, промежутки, колонки —
+        всё кратно ему, иначе страница «дышит» вразнобой;
+     3) ярлык у каждой строки карточки одной ширины, чтобы тексты вставали
+        в колонку и глаз находил нужную строку не читая. */
+  :root { --шаг: 1.6mm; --карточка: rgba(255, 252, 243, .86); }
+
+  .стр.спр { background-image: none; background-color: var(--страница); }
+  .стр.спр::after { opacity: .5; }
+
+  /* ---- шапка раздела ---- */
+  .прил { display: flex; align-items: stretch; gap: 0; margin: 0 0 calc(var(--шаг) * 2.5); }
+  .прил .бк { flex: none; display: flex; align-items: center; background: var(--охра);
+    color: var(--страница); font: 800 13pt/1 "Tektur", sans-serif;
+    padding: 1.9mm 4.6mm 1.7mm 3.4mm; letter-spacing: .04em;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.8mm) 100%, 0 100%); }
+  .прил .им { display: flex; align-items: center; font: 700 15pt/1 "Tektur", sans-serif;
+    color: var(--охра); padding: 0 3mm 0 3.4mm; }
+  .прил .счёт { display: flex; align-items: center; font: 700 7.4pt/1 "Tektur Narrow", sans-serif;
+    color: var(--серый); text-transform: uppercase; letter-spacing: .08em;
+    padding: .9mm 2.2mm .7mm; border: .18mm solid var(--кант); align-self: center; }
+  .прил .черта { flex: 1; align-self: center; height: .45mm; background: var(--келемий);
+    margin-left: 3mm; }
+
+  /* ---- карточка карты ---- */
+  .карточки { column-count: 2; column-gap: calc(var(--шаг) * 3.5); }
+  .кк { break-inside: avoid; background: var(--карточка);
+    border: .18mm solid var(--кант); border-left: .9mm solid var(--келемий);
+    padding: calc(var(--шаг) * .95) calc(var(--шаг) * 1.4) var(--шаг);
+    margin: 0 0 calc(var(--шаг) * 1.5); }
+  .кк.нач { border-left-color: var(--охра); }
+  .кк .имя { display: flex; align-items: baseline; gap: 2mm;
+    font: 700 9.6pt/1.1 "Tektur", sans-serif; color: var(--чернила);
+    padding-bottom: calc(var(--шаг) * .55); margin-bottom: calc(var(--шаг) * .7);
+    border-bottom: .18mm solid var(--кант); }
+  .кк .имя small { margin-left: auto; flex: none; font: 700 6.2pt/1 "Tektur Narrow", sans-serif;
+    color: var(--серый); text-transform: uppercase; letter-spacing: .07em;
+    border: .16mm solid var(--кант); padding: .6mm 1.2mm .45mm; }
+  .кк p { display: flex; gap: 1.6mm; font: 8.3pt/1.24 "Tektur Narrow", sans-serif;
+    margin: 0 0 calc(var(--шаг) * .45); }
   .кк p:last-child { margin-bottom: 0; }
-  .кк .кл { font: 700 7.2pt "Tektur Narrow", sans-serif; color: var(--келемий);
-    text-transform: uppercase; letter-spacing: .04em; margin-right: 1.2mm; }
-  .кк .низ { border-top: .22mm dotted var(--пример-кант); margin-top: .8mm; padding-top: .8mm; }
+  .кк .кл { flex: none; width: 13mm; font: 700 6.6pt/1.5 "Tektur Narrow", sans-serif;
+    color: var(--келемий); text-transform: uppercase; letter-spacing: .06em; }
+  .кк .кл.о { color: var(--охра); }
 
-  .икс { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.6mm 4mm; }
-  .икс .ряд { display: flex; align-items: center; gap: 2.2mm; padding: .9mm 0;
-    border-bottom: .22mm dotted var(--пример-кант); break-inside: avoid; }
-  .икс .ряд img.ик { width: 8.4mm; height: 8.4mm; object-fit: contain; flex: none; }
-  .икс .ик-нет { width: 8.4mm; height: 8.4mm; flex: none; background: var(--место-иконки);
-    border: .25mm dashed var(--пример-кант); font: 5pt/8.4mm "Tektur Narrow", sans-serif;
+  /* ---- иконки ---- */
+  .икс { display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 0 calc(var(--шаг) * 3); }
+  .икс .ряд { display: flex; align-items: center; gap: 2.4mm;
+    padding: calc(var(--шаг) * .62) 0; border-bottom: .18mm solid var(--кант);
+    break-inside: avoid; }
+  .икс .группа { border-bottom: 0; padding-top: calc(var(--шаг) * 1.5);
+    padding-bottom: calc(var(--шаг) * .3); }
+  .икс .группа b { font: 800 7.6pt/1 "Tektur", sans-serif; color: var(--келемий);
+    text-transform: uppercase; letter-spacing: .1em; }
+  .икс .ряд img.ик { width: 8.6mm; height: 8.6mm; object-fit: contain; flex: none; }
+  .икс .ик-нет { width: 8.6mm; height: 8.6mm; flex: none; background: var(--место-иконки);
+    border: .25mm dashed var(--пример-кант); font: 5pt/8.6mm "Tektur Narrow", sans-serif;
     color: var(--серый); text-align: center; }
   .икс .тек { flex: 1; min-width: 0; }
   .икс .тек b { display: block; font: 700 8.2pt/1.12 "Tektur", sans-serif; color: var(--чернила); }
-  .икс .тек span { font: 7.2pt/1.12 "Tektur Narrow", sans-serif; color: var(--серый); }
+  .икс .тек span { font: 7.2pt/1.14 "Tektur Narrow", sans-serif; color: var(--серый); }
 
-  .словарь { column-count: 2; column-gap: 5mm; }
-  .словарь div { break-inside: avoid; margin: 0 0 1.8mm; }
-  .словарь b { font: 700 9.2pt "Tektur", sans-serif; color: var(--охра); }
-  .словарь p { font: 8.4pt/1.22 "Tektur Narrow", sans-serif; margin: .2mm 0 0; }
+  /* ---- раскладки поля ---- */
+  .раскл { display: grid; grid-template-columns: 1fr 1fr;
+    gap: calc(var(--шаг) * 2.5) calc(var(--шаг) * 3); }
+  .раскл figure { margin: 0; background: var(--карточка);
+    border: .18mm solid var(--кант); padding: var(--шаг); }
+  .раскл img { display: block; width: 100%; height: auto; }
+  .раскл figcaption { font: 700 7.6pt/1 "Tektur Narrow", sans-serif; color: var(--келемий);
+    text-transform: uppercase; letter-spacing: .08em; margin-top: calc(var(--шаг) * .7);
+    text-align: center; }
+  .легенда-поля { margin-top: calc(var(--шаг) * 2); border: .18mm solid var(--кант);
+    background: var(--карточка); padding: calc(var(--шаг) * 1.2); }
+  .легенда-поля img { display: block; width: 100%; height: auto; }
 
-  .титул-спр { position: absolute; inset: 26mm 18mm; display: flex;
-    flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 5mm; }
-  .титул-спр img { width: 128mm; height: auto; }
-  .титул-спр .под { font: 800 24pt "Tektur", sans-serif; color: var(--охра);
-    letter-spacing: .06em; text-transform: uppercase; }
-  .титул-спр p { font: 10pt/1.35 "Tektur Narrow", sans-serif; color: var(--серый); max-width: 120mm; }
+  /* ---- словарь ---- */
+  .словарь { column-count: 2; column-gap: calc(var(--шаг) * 3.5); }
+  .словарь div { break-inside: avoid; margin: 0 0 calc(var(--шаг) * 1.3);
+    padding-left: 3mm; border-left: .5mm solid var(--кант); }
+  .словарь b { display: block; font: 700 8.8pt/1.15 "Tektur", sans-serif; color: var(--охра);
+    text-transform: uppercase; letter-spacing: .02em; }
+  .словарь p { font: 8.3pt/1.24 "Tektur Narrow", sans-serif; margin: .3mm 0 0; }
 
-  .огл-спр { list-style: none; margin: 0; padding: 3mm 5mm; background: var(--подложка);
-    outline: .18mm solid var(--кант); outline-offset: -.18mm; }
-  .огл-спр li { display: flex; align-items: baseline; gap: 2.4mm; padding: 1.1mm 0;
-    border-bottom: .22mm dotted var(--пример-кант); font: 10pt "Tektur", sans-serif; }
+  /* ---- титул и содержание ---- */
+  .титул-спр { position: absolute; inset: 24mm 20mm; display: flex;
+    flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; gap: 6mm; }
+  .титул-спр img { width: 130mm; height: auto; }
+  .титул-спр .под { font: 800 26pt/1 "Tektur", sans-serif; color: var(--охра);
+    letter-spacing: .14em; text-transform: uppercase;
+    border-top: .5mm solid var(--келемий); border-bottom: .5mm solid var(--келемий);
+    padding: 3mm 8mm; }
+  .титул-спр p { font: 10pt/1.4 "Tektur Narrow", sans-serif; color: var(--серый);
+    max-width: 118mm; margin: 0; }
+
+  .огл-спр { list-style: none; margin: 0; padding: 0; }
+  .огл-спр li { display: flex; align-items: center; gap: 3mm;
+    padding: calc(var(--шаг) * 1.05) 0; border-bottom: .18mm solid var(--кант);
+    font: 11pt/1 "Tektur", sans-serif; }
   .огл-спр li:last-child { border-bottom: 0; }
-  .огл-спр .б { flex: none; width: 7mm; font-weight: 800; color: var(--охра); }
+  .огл-спр .б { flex: none; width: 8mm; height: 8mm; display: flex;
+    align-items: center; justify-content: center; background: var(--охра);
+    color: var(--страница); font: 800 9.4pt/1 "Tektur", sans-serif;
+    clip-path: polygon(1.4mm 0, 100% 0, 100% calc(100% - 1.4mm), calc(100% - 1.4mm) 100%, 0 100%, 0 1.4mm); }
   .огл-спр .т { flex: 1; }
-  .огл-спр .с { font-weight: 700; color: var(--келемий); }
+  .огл-спр .с { flex: none; width: 10mm; text-align: right; font-weight: 800;
+    color: var(--келемий); }
 """
 
 
@@ -176,18 +273,19 @@ def стиль_книги():
 def шапка(буква, имя, счёт=""):
     доп = '<span class="счёт">%s</span>' % счёт if счёт else ""
     return ('    <div class="прил"><span class="бк">%s</span>'
-            '<span class="им">%s</span>%s</div>' % (буква, имя, доп))
+            '<span class="им">%s</span>%s<span class="черта"></span></div>'
+            % (буква, имя, доп))
 
 
 def карточки(куски):
     return '    <div class="карточки">\n' + "\n".join(куски) + "\n    </div>"
 
 
-def карточка(имя, метка, строки):
-    низ = "".join('<p>%s</p>' % s for s in строки)
+def карточка(имя, метка, строки, класс=""):
+    низ = "".join("<p>%s</p>" % s for s in строки)
     м = "<small>%s</small>" % метка if метка else ""
-    return ('      <div class="кк"><div class="имя">%s%s</div>%s</div>'
-            % (имя, м, низ))
+    return ('      <div class="кк %s"><div class="имя"><span>%s</span>%s</div>%s</div>'
+            % (класс, имя, м, низ))
 
 
 def разбить(список, по):
@@ -223,12 +321,12 @@ def задания(книга, версии):
                 '<span class="кл">награда</span>%s' % данные.награда(c.get("base_reward")),
             ]
             if c.get("enhanced"):
-                строки.append('<span class="кл">усиление</span>%s — %s'
+                строки.append('<span class="кл о">усиление</span>%s — %s'
                               % (текст(c["enhanced"]),
                                  данные.награда(c.get("special_reward"))))
             куски.append(карточка(c["name"], ВИД_ЗАДАНИЯ.get(c.get("type"), ""),
-                                  строки))
-        for k, кусок in enumerate(разбить(куски, 12)):
+                                  строки, "нач" if буква == "Б" else ""))
+        for k, кусок in enumerate(разбить(куски, 10)):
             книга.стр(
                 (шапка(буква, имя, "%d карт" % len(набор_карт)) if k == 0 else "")
                 + "\n" + карточки(кусок),
@@ -246,8 +344,8 @@ def арсенал(книга, версии):
             куски.append(карточка(c["name"], "", [
                 '<span class="кл">верх</span>%s' % текст(c.get("top")),
                 '<span class="кл">низ</span>%s' % текст(c.get("bottom")),
-            ]))
-        for k, кусок in enumerate(разбить(куски, 14)):
+            ], "нач" if буква == "Г" else ""))
+        for k, кусок in enumerate(разбить(куски, 12)):
             книга.стр(
                 (шапка(буква, имя, "%d карт" % len(набор_карт)) if k == 0 else "")
                 + "\n" + карточки(кусок),
@@ -259,7 +357,7 @@ def контейнеры(книга, версии):
     куски = [карточка(c["name"], ЯРУС.get(c.get("tier"), ""),
                       ['<span class="кл">даёт</span>%s' % текст(c.get("a"))])
              for c in из]
-    for k, кусок in enumerate(разбить(куски, 22)):
+    for k, кусок in enumerate(разбить(куски, 20)):
         книга.стр((шапка("Д", "Карты контейнеров", "%d карт" % len(из))
                    if k == 0 else "") + "\n" + карточки(кусок),
                   раздел=("Д", "Карты контейнеров") if k == 0 else None)
@@ -276,7 +374,7 @@ def рынок(книга, версии):
             '<span class="кл">%s</span>%s' % (прав.get("name", "справа"),
                                               текст(прав)),
         ]))
-    for k, кусок in enumerate(разбить(куски, 12)):
+    for k, кусок in enumerate(разбить(куски, 10)):
         книга.стр((шапка("Е", "Карты рынка", "%d карт" % len(из))
                    if k == 0 else "") + "\n" + карточки(кусок),
                   раздел=("Е", "Карты рынка") if k == 0 else None)
@@ -302,19 +400,61 @@ def супер(книга, версии):
 def иконки(книга):
     ряды = []
     for группа, список in данные.ИКОНКИ:
-        ряды.append(('<div class="ряд" style="border:0"><div class="тек">'
-                     '<b style="color:var(--келемий)">%s</b></div></div>' % группа))
+        ряды.append('<div class="ряд группа"><div class="тек"><b>%s</b></div></div>'
+                    % группа)
         for ключ, имя, пояснение in список:
             ряды.append('<div class="ряд">%s<div class="тек"><b>%s</b>'
                         '<span>%s</span></div></div>'
                         % (иконка(ключ), имя, пояснение))
     сколько = sum(len(с) for _, с in данные.ИКОНКИ)
-    for k, кусок in enumerate(разбить(ряды, 39)):
+    for k, кусок in enumerate(разбить(ряды, 36)):
         книга.стр((шапка("И", "Иконки игры", "%d значков" % сколько)
                    if k == 0 else "")
                   + '\n    <div class="икс">\n' + "\n".join(кусок)
                   + "\n    </div>",
                   раздел=("И", "Иконки игры") if k == 0 else None)
+
+
+# ------------------------------------------------------------------ раскладки
+
+РАСКЛАДКИ = [
+    ("Вдвоём", "2и", 4),
+    ("Втроём", "3и", 4),
+    ("Вчетвером", "4и", 4),
+]
+
+
+def раскладки(книга):
+    """Готовые раскладки поля: по четыре на состав, с общими обозначениями.
+
+    Картинки рисует конструктор поля (`tools/раскладки-в-png.ps1`), здесь они
+    только раскладываются по полосам — по одной композиции на полосу, чтобы
+    четыре карты состава читались одним взглядом.
+    """
+    папка = os.path.join(КОРЕНЬ, "docs", "раскладки")
+    легенда = os.path.join(папка, "легенда.png")
+    первая = True
+    for состав, ключ, сколько in РАСКЛАДКИ:
+        клетки = []
+        for n in range(1, сколько + 1):
+            путь = os.path.join(папка, "%s-%d.png" % (ключ, n))
+            if not os.path.exists(путь):
+                continue
+            клетки.append('      <figure><img src="%s" alt="">'
+                          "<figcaption>Раскладка %d</figcaption></figure>"
+                          % (карта_поля(путь, 900), n))
+        if not клетки:
+            continue
+        низ = ""
+        if os.path.exists(легенда):
+            низ = ('\n    <div class="легенда-поля"><img src="%s" alt=""></div>'
+                   % b64(легенда, 1400))
+        книга.стр(шапка("К", "Раскладки поля · " + состав,
+                        "%d раскладки" % len(клетки))
+                  + '\n    <div class="раскл">\n' + "\n".join(клетки)
+                  + "\n    </div>" + низ,
+                  раздел=("К", "Раскладки поля") if первая else None)
+        первая = False
 
 
 СЛОВАРЬ = [
@@ -359,11 +499,11 @@ def иконки(книга):
 def словарь(книга):
     куски = ['      <div><b>%s</b><p>%s</p></div>' % (т, о) for т, о in СЛОВАРЬ]
     for k, кусок in enumerate(разбить(куски, 24)):
-        книга.стр((шапка("К", "Словарь игры", "%d слов" % len(СЛОВАРЬ))
+        книга.стр((шапка("Л", "Словарь игры", "%d слов" % len(СЛОВАРЬ))
                    if k == 0 else "")
                   + '\n    <div class="словарь">\n' + "\n".join(кусок)
                   + "\n    </div>",
-                  раздел=("К", "Словарь игры") if k == 0 else None)
+                  раздел=("Л", "Словарь игры") if k == 0 else None)
 
 
 def титул(книга):
@@ -398,6 +538,7 @@ def main():
     рынок(книга, в)
     супер(книга, в)
     иконки(книга)
+    раскладки(книга)
     словарь(книга)
     содержание(книга, книга.разделы)
 
