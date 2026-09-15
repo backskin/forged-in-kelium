@@ -361,6 +361,9 @@ CSS = r"""
      текста сверху (просьба дизайнера 15.09.2026). */
   .создатели .марка { position: absolute; left: 15mm; right: 15mm;
     top: 126mm; bottom: 22mm; }
+  .создатели .марка { display: flex; align-items: center; justify-content: center; }
+  .создатели .марка img { max-width: 100%; max-height: 100%; width: auto; height: auto;
+    object-fit: contain; display: block; }
   .создатели .марка .заглушка { height: 100%; width: 100%; margin: 0; }
   /* ИКОНКА В СТРОКЕ ТЕКСТА — настоящая иконка игры, не заглушка. */
   .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm; }
