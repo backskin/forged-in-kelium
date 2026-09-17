@@ -1965,6 +1965,13 @@ public final class Actions {
             for (int i = 0; i < pool; i++) {
                 List<Choice> opts = new ArrayList<>();
                 for (BuildingToken c : player.buildingsOnField()) {
+                    // ЦУ САМО СЕБЕ КУБИК НЕ ПЕРЕКЛАДЫВАЕТ (правило дизайнера
+                    // 17.09.2026): оно запитано любым кубиком на своём жетоне,
+                    // и вариант «отдать самому себе» — ход из руки в ту же руку.
+                    if (src != null && c.uid == src.uid
+                            && c.type == BuildingType.COMMAND_CENTER) {
+                        continue;
+                    }
                     if (c.energySlots > c.energyPlaced) {
                         opts.add(new Choice("energy_place", c.uid,
                             c.type.code + (c.level != null ? " L" + c.level : "") + " @" + c.hexId));

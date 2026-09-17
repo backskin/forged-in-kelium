@@ -213,6 +213,8 @@ public final class RuleWords {
             case "rounds.circles_per_round" -> "кругов в раунде";
             case "rounds.reserve_cap" ->
                 "предел раундов: сколько кругов вообще отпущено партии";
+            case "energy.cu_powered_by_any_cube" ->
+                "ЦУ запитано любым кубиком на своём жетоне";
             case "energy.plant_off_cell_gives" ->
                 "сколько энергии даёт станция ВНЕ жёлтой ячейки (на ней — номинал уровня)";
             case "rounds.order_hand_size" -> "приказов в руке";
