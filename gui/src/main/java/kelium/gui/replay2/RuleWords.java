@@ -31,6 +31,8 @@ public final class RuleWords {
             case "asymmetry" -> "Асимметрия планшетов";
             case "actions" -> "Действия";
             case "combat_model" -> "Бой";
+            case "field" -> "Поле: чужие войска и небо гекса";
+            case "objectives" -> "Задания";
             case "command_center" -> "Центр управления";
             case "building_compensation_containers" -> "Контейнеры за снесённые здания";
             case "containers" -> "Контейнеры";
@@ -192,6 +194,8 @@ public final class RuleWords {
                 "трофеев за исчерпанное лицо большого тайла зарождения";
             case "economy.spawn_face_trophy_small" ->
                 "трофеев за исчерпанное лицо малого тайла зарождения";
+            case "economy.spawn_back_big_free_tech_step" ->
+                "оборот большого тайла даёт даровое исследование";
             case "economy.spawn_back_trophy_big" ->
                 "трофеев за исчерпанный оборот большого тайла";
             case "economy.spawn_back_trophy_small" ->
@@ -305,6 +309,14 @@ public final class RuleWords {
             case "combat_model.all_attacks_damage" -> "любая атака наносит урон";
             case "combat_model.walls_block_shots" -> "стенка не пропускает выстрел";
 
+            // ---------- Поле ----------
+            case "objectives.enhanced_reward_replaces_base" ->
+                "усиленная награда задания даётся ВМЕСТО базовой, на выбор";
+            case "field.sky_single_owner" ->
+                "в небе гекса сколько угодно авиации, но одного игрока";
+            case "field.enemy_units_block_build" ->
+                "чужие войска на гексе не дают строить, сносить и выводить нанятых";
+
             // ---------- Центр управления ----------
             case "command_center.build_price_coins" -> "цена постройки центра управления";
             case "command_center.respawns" -> "снесённый центр управления возвращается в игру";
@@ -340,6 +352,11 @@ public final class RuleWords {
             case "containers.mode" -> "откуда берутся контейнеры";
             case "containers.printed_requires_empty_hex" ->
                 "печатный контейнер берут только с пустого гекса";
+            case "containers.mining_needs_adjacent_sector" ->
+                "Добыча берёт контейнер только с сектора, соседнего "
+                    + "с сектором добытчика";
+            case "containers.mining_air_cell" ->
+                "воздушную ячейку Добыча не берёт никогда";
             case "containers_storage.arsenal_cells" ->
                 "ячеек под контейнеры на картах арсенала";
             case "symbols.tuck_is_free" ->
@@ -380,6 +397,8 @@ public final class RuleWords {
             case "tech.step_rewards" -> "награды шагов трека (перебивает доску)";
             case "end_conditions.last_spawn_tile_threshold" ->
                 "сколько источников келемия осталось, когда партия кончается";
+            case "end_conditions.peaks_by_one_player" ->
+                "вершины треков кончают партию только у одного игрока";
             case "tech.science_exchanges" -> "постоянные обмены научного отдела";
             case "tech.science_one_step_per_track_per_action" ->
                 "за одно действие — не больше шага на трек";

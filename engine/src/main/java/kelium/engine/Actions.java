@@ -104,15 +104,15 @@ public final class Actions {
      * @param fp сколько смежных сторон займёт здание
      */
     public static boolean roomForBuildingAndUnit(GameState state, String hexId,
-                                                 int fp, UnitType unit) {
+                                                 int fp, UnitType unit, int seat) {
         Hex h = state.field.get(hexId);
         if (h == null) {
             return false;
         }
         if (unit == UnitType.AIRCRAFT) {
             // У авиации свой сектор Неба: он не спорит с наземными ячейками,
-            // спорит только с чужой авиацией на этом же гексе.
-            return roomForUnit(state, hexId, UnitType.AIRCRAFT)
+            // спорит только с ЧУЖОЙ авиацией на этом же гексе.
+            return roomForUnit(state, hexId, UnitType.AIRCRAFT, seat)
                 && h.fitsWithRepack(fp, groundLoad(state, hexId, -1)[0],
                     groundLoad(state, hexId, -1)[1]);
         }
@@ -138,10 +138,11 @@ public final class Actions {
      * @param sides стороны, которые займёт здание
      */
     public static boolean roomAfterFootprint(GameState state, String hexId,
-                                             java.util.List<Integer> sides, UnitType unit) {
+                                             java.util.List<Integer> sides, UnitType unit,
+                                             int seat) {
         Hex h = state.field.get(hexId);
         if (h == null || unit == UnitType.AIRCRAFT) {
-            return h != null && roomForUnit(state, hexId, UnitType.AIRCRAFT);
+            return h != null && roomForUnit(state, hexId, UnitType.AIRCRAFT, seat);
         }
         int сторон = h.sideOwner.length;
         boolean[] свободно = new boolean[сторон];
@@ -587,10 +588,17 @@ public final class Actions {
                 // K7: здание можно ПРОПУСТИТЬ («Пропустить здание можно»).
                 boolean roomForUnit;
                 if (unitType == UnitType.TOWER) {
-                    // вышке доступна вся зона стройки, не только гекс ЦУ
+                    // ВЫШКЕ ДОСТУПНЫ ГЕКСЫ СВОИХ ЗДАНИЙ — ровно те же, что
+                    // перебирает place() ниже. Раньше доступность считалась
+                    // по ЗОНЕ СТРОЙКИ (buildableHexes), а она ШИРЕ: в неё
+                    // входит и соседний гекс, на который здание смотрит
+                    // стенкой. Если место было только там, движок предлагал
+                    // «сделать вышку», игрок соглашался, place() возвращал
+                    // false — жетон не появлялся, а ЦУ уже считалось
+                    // израсходованным (buildingsUsed++). Ход сгорал впустую.
                     roomForUnit = false;
-                    for (String hid : buildableHexes(state, player.seat)) {
-                        if (hasRoomForUnit(player, hid, UnitType.TOWER)) {
+                    for (BuildingToken own : player.buildingsOnField()) {
+                        if (hasRoomForUnit(player, own.hexId, UnitType.TOWER)) {
                             roomForUnit = true;
                             break;
                         }
@@ -709,7 +717,17 @@ public final class Actions {
                                 jf.producedUnitBuildingTypes.add(b.type.code);
                             }
                         } else {
-                            ammoMade += Storage.addAmmoCapped(state, player, 1);
+                            // ЗАПАС РОДА КОНЧИЛСЯ — И НИЧЕГО НЕ ВЫХОДИТ. Правило
+                            // книги (глава 8): «Жетонов каждого рода у вас ровно
+                            // 4. Все четыре на поле или внутри зданий — жетон
+                            // этого рода сделать нельзя, и ничем это
+                            // не заменяется».
+                            //
+                            // Прежде здесь молча выдавался 1 боеприпас: здание
+                            // выбрало войска, войск не нашлось — и игрок всё равно
+                            // что-то получал. Это отменяло весь смысл предела
+                            // жетонов: кончившийся запас перестал быть потерей.
+                            continue;
                         }
                     }
                 }
@@ -806,9 +824,17 @@ public final class Actions {
             return true;
         }
 
-        /** Есть ли на гексе место под юнит данного типа (ячейка по размеру). */
+        /**
+         * Можно ли поставить нанятый жетон ПРЯМО НА ГЕКС: есть ячейка по размеру
+         * И гекс не заперт чужими войсками.
+         *
+         * <p>Чужие войска на гексе найм не отменяют — они отменяют ВЫХОД жетона
+         * на грунт (правило дизайнера 16.09.2026). Нанятый садится гарнизоном
+         * внутрь здания, которое его сделало; исключение — вышка, которой внутрь
+         * нельзя, и она не нанимается вовсе.
+         */
         private boolean hasRoomForUnit(PlayerState player, String hexId, UnitType t) {
-            return Actions.roomForUnit(state, hexId, t);
+            return Placement.canHireOn(state, player, hexId, t);
         }
     }
 
@@ -887,17 +913,13 @@ public final class Actions {
      * требование двух секторов технике — это правила ДВИЖЕНИЯ, и «Эвакуация» их
      * не соблюдает, потому что она не движение.
      */
-    static boolean roomForUnit(GameState state, String hexId, UnitType t) {
+    static boolean roomForUnit(GameState state, String hexId, UnitType t, int seat) {
         Hex h = state.field.get(hexId);
         if (t == UnitType.AIRCRAFT) {
-            for (PlayerState pl : state.players) {
-                for (UnitToken u : pl.units) {
-                    if (u.type == UnitType.AIRCRAFT && hexId.equals(u.hexId)) {
-                        return false;   // сектор Неба на гексе занят
-                    }
-                }
-            }
-            return true;
+            // НЕБО ВМЕЩАЕТ СКОЛЬКО УГОДНО СВОЕЙ АВИАЦИИ И НИ ОДНОЙ ЧУЖОЙ
+            // (правило дизайнера 16.09.2026). Правило одно на всю игру и живёт
+            // в Placement.skyOpen — второй копии быть не должно.
+            return Placement.skyOpen(state, hexId, seat, -1);
         }
         int[] load = groundLoad(state, hexId, -1);
         return h.fitsWithRepack(t == UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
@@ -1094,6 +1116,11 @@ public final class Actions {
                 if (одноНаЗдание && тронутые.contains(b.uid)) {
                     continue;
                 }
+                // ЧУЖИЕ ВОЙСКА НА ГЕКСЕ ЗАПРЕЩАЮТ И СНОС (правило дизайнера
+                // 16.09.2026): пока они стоят, на гексе не меняется ничего.
+                if (Placement.enemyUnitsLockHex(state, b.hexId, player.seat)) {
+                    continue;
+                }
                 if (сносСтоит > 0 && !player.resources.canPay(Resource.COIN, сносСтоит)) {
                     continue;                       // нечем платить за снос
                 }
@@ -1211,7 +1238,13 @@ public final class Actions {
             // на себе». ЭС — кубики простаивают на станции до Смены энергии;
             // ЦУ — сам себе источник и потребитель, запитывается сразу.
             if (btype == BuildingType.COMMAND_CENTER) {
-                int gives = state.tokenStats.buildingEnergyGives(BuildingType.COMMAND_CENTER);
+                // ЧЕРЕЗ Power.sourceCubes, А НЕ ЧЕРЕЗ НОМИНАЛ ЖЕТОНА: к выработке
+                // ЦУ прибавляются жетоны модулей хранилища стороной энергии
+                // (правило дизайнера 04.09.2026), и Power их считает. Прежде
+                // здесь стоял голый buildingEnergyGives — и отстроенное после
+                // уничтожения ЦУ приходило БЕЗ этих кубиков: игрок терял их
+                // навсегда, хотя жетоны продолжали лежать на его планшете.
+                int gives = Power.sourceCubes(state, b);
                 int self = Math.min(gives, b.energySlots);
                 b.addEnergyFrom(b.uid, self);
                 b.energyIdle = gives - self;
@@ -2279,17 +2312,14 @@ public final class Actions {
                 if (h.hasSpawnTile()) {
                     return Passives.aircraftSpeedOverride(state, seat) != null;
                 }
-                // G3: воздушная ячейка гекса одна — В НЕЙ один жетон авиации
-                // (любого игрока). Считаем вживую, поле airToken упразднено.
-                for (PlayerState pl : state.players) {
-                    for (UnitToken u : pl.units) {
-                        if (u.type == UnitType.AIRCRAFT && u.uid != unit.uid
-                                && hexId.equals(u.hexId)) {
-                            return false;
-                        }
-                    }
-                }
-                return true;
+                // НЕБО ГЕКСА — ОДНОГО ХОЗЯИНА (правило дизайнера 16.09.2026).
+                // В небе помещается сколько угодно жетонов авиации, но только
+                // одного игрока: рядом со своей — без счёта, к чужой — нельзя.
+                //
+                // ЧУЖИЕ НАЗЕМНЫЕ ВОЙСКА АВИАЦИИ НЕ МЕШАЮТ: она садится в небо
+                // над ними. Обратное неверно — чужая авиация запирает гекс для
+                // наземных (проверка enemyUnitsOn ниже считает и её).
+                return Placement.skyOpen(state, hexId, seat, unit.uid);
             }
             if (h.hasSpawnTile()) {
                 // ТОЧКА ПРАВИЛ: карта арсенала «Десантные тропы» разрешает пехоте
@@ -2510,6 +2540,9 @@ public final class Actions {
             int coinRate = intRate(cfg, "kelium_to_coin", "per_kelium_coin", 3);
             int ammoRate = intRate(cfg, "kelium_to_ammo", "per_kelium_ammo", 2);
             int cardRate = intRate(cfg, "kelium_to_objective", "per_kelium_cards", 2);
+            // СКОЛЬКО ИЗ ВЫТЯНУТЫХ ОСТАЁТСЯ В РУКЕ. 0 — оставить все (прежнее
+            // поведение свода, где keep_cards не задан).
+            int keepCards = intRate(cfg, "kelium_to_objective", "keep_cards", 0);
 
             boolean cardOfferUsed = false;
             int deals = 0;
@@ -2561,7 +2594,10 @@ public final class Actions {
                 }
                 if (наЗад) {
                     opts.add(new Choice("market_rate", rate("objective_cards", cardRate),
-                        "1 КЕЛ -> " + cardRate + " карты задания"));
+                        keepCards > 0
+                            ? "1 КЕЛ -> посмотреть " + cardRate + " карты задания, "
+                                + "оставить " + keepCards
+                            : "1 КЕЛ -> " + cardRate + " карты задания"));
                 }
                 BuildingToken needsEnergy = наЭнр ? firstHungryBuilding(player) : null;
                 if (needsEnergy != null) {
@@ -2688,14 +2724,33 @@ public final class Actions {
                             detail.append(added).append(" БПР; ");
                         }
                         case "objective_cards" -> {
-                            int drawn = 0;
+                            // ВЗЯЛ ДВЕ — ОСТАВЬ ОДНУ (правило дизайнера
+                            // 17.09.2026). Прежде обе карты уходили в руку, и
+                            // обмен давал и выбор, и запас разом. Теперь он даёт
+                            // только выбор: остальные карты идут в сброс.
+                            //
+                            // keep_cards не задан — старое поведение: сколько
+                            // вытянул, столько и оставил.
+                            List<String> вытянуто = new ArrayList<>();
                             for (int i = 0; i < amount; i++) {
                                 String c = s.decks.get("objectives").draw(s.rng);
                                 if (c == null) {
                                     break;
                                 }
+                                вытянуто.add(c);
+                            }
+                            int оставить = keepCards > 0
+                                ? Math.min(keepCards, вытянуто.size()) : вытянуто.size();
+                            int drawn = 0;
+                            while (drawn < оставить) {
+                                String c = вытянуто.size() == 1 ? вытянуто.get(0)
+                                    : выбратьЗадание(вытянуто, agent);
+                                вытянуто.remove(c);
                                 player.objectiveHand.add(c);
                                 drawn++;
+                            }
+                            for (String c : вытянуто) {
+                                s.decks.get("objectives").discard(c);
                             }
                             cardsGot += drawn;
                             detail.append(drawn).append(" карт; ");
@@ -2803,6 +2858,31 @@ public final class Actions {
         }
 
         @SuppressWarnings("unchecked")
+        /**
+         * ВЫБРАТЬ ОДНУ КАРТУ ЗАДАНИЯ ИЗ ВЫТЯНУТЫХ. Обмен «келемий на задания»
+         * показывает две верхние карты, одну игрок берёт в руку, остальные
+         * уходят в сброс (правило дизайнера 17.09.2026).
+         *
+         * <p>Без агента (символьные прогоны, чтение записи) берётся первая:
+         * выбор всё равно делать некому, а обмен обязан состояться.
+         */
+        private String выбратьЗадание(List<String> карты, Agent agent) {
+            if (agent == null || карты.size() == 1) {
+                return карты.get(0);
+            }
+            List<Choice> opts = new ArrayList<>();
+            for (String cid : карты) {
+                Map<String, Object> card = Ctx.cards(state, "objectives").find(cid);
+                String label = card == null ? cid
+                    : String.valueOf(card.getOrDefault("name", cid));
+                opts.add(new Choice("objective_keep", cid, label));
+            }
+            Choice pick = agent.choose(state, opts,
+                Map.of("kind", "objective_keep", "drawn", карты.size()));
+            return pick != null && pick.payload() instanceof String c && карты.contains(c)
+                ? c : карты.get(0);
+        }
+
         private static int intRate(GameConfig cfg, String id, String key, int def) {
             Object raw = cfg.ruleset.get("market.base_exchanges", null);
             if (!(raw instanceof List<?> list)) {
@@ -3497,40 +3577,55 @@ public final class Actions {
     }
 
     /**
-     * ЗАБРАТЬ КАРТУ АРСЕНАЛА С ВИТРИНЫ и тут же пополнить витрину.
+     * ОБМЕН НАУЧНОГО ОТДЕЛА: 2 трофея — карта арсенала.
      *
-     * <p>Витрина — часть стола: карта на ней ФИЗИЧЕСКИ ушла из колоды, и вытянуть
-     * её вслепую нельзя, пока она лежит открытой. Освободившееся место
-     * пополняется немедленно, с верха колоды.
+     * <p>Игрок берёт ДВЕ верхние карты колоды арсенала, одну оставляет себе
+     * взакрытую, вторую возвращает ПОД НИЗ колоды (`draw2_keep1` в своде,
+     * глава 10 книги).
      *
-     * <p>Если витрина пуста (колода и сброс исчерпаны) — игрок не получает
-     * ничего. Это законный конец колоды, а не ошибка: карты кончились так же, как
-     * кончились бы за столом.
+     * <p>Витрины из двух открытых карт больше нет: правило 15.08.2026 отменено
+     * дизайнером 13.09.2026, и книга её нигде не упоминает — ни в подготовке,
+     * ни в обменах. Движок при этом продолжал её выкладывать и пополнять, то
+     * есть за столом и в симуляторе шли разные игры.
+     *
+     * <p>Свободной ячейки под планшетом войск нет — обмен недоступен, карты
+     * из колоды не тянутся вовсе. Колода и сброс исчерпаны — игрок не получает
+     * ничего: это законный конец колоды, а не ошибка.
      */
     static String takeFromArsenalDisplay(GameState state, PlayerState player, Agent agent) {
-        // ЯЧЕЙКИ ПОД ПЛАНШЕТОМ ЗАНЯТЫ — брать некуда, и витрину трогать незачем.
+        // ЯЧЕЙКИ ПОД ПЛАНШЕТОМ ЗАНЯТЫ — брать некуда, колоду не трогаем.
         if (!kelium.engine.Storage.arsenalCellFree(state, player)) {
             return null;
         }
-        if (state.arsenalDisplay.isEmpty()) {
-            kelium.engine.Setup.refillArsenalDisplay(state);
-        }
-        if (state.arsenalDisplay.isEmpty()) {
+        kelium.core.Deck deck = state.decks.get("arsenal");
+        if (deck == null) {
             return null;
         }
-        List<Choice> opts = new ArrayList<>();
-        for (String cid : state.arsenalDisplay) {
-            Map<String, Object> card = Ctx.cards(state, "arsenal").find(cid);
-            String label = card == null ? cid : String.valueOf(card.getOrDefault("name", cid));
-            opts.add(new Choice("arsenal_display", cid, label));
+        List<String> пара = deck.drawN(2, state.rng);
+        if (пара.isEmpty()) {
+            return null;
         }
-        Choice pick = agent == null ? opts.get(0)
-            : agent.choose(state, opts, Map.of("kind", "arsenal_display"));
-        String taken = pick != null && pick.payload() instanceof String c
-            ? c : state.arsenalDisplay.get(0);
-        state.arsenalDisplay.remove(taken);
+        String taken = пара.get(0);
+        if (пара.size() > 1) {
+            List<Choice> opts = new ArrayList<>();
+            for (String cid : пара) {
+                Map<String, Object> card = Ctx.cards(state, "arsenal").find(cid);
+                String label = card == null ? cid : String.valueOf(card.getOrDefault("name", cid));
+                opts.add(new Choice("arsenal_draw2", cid, label));
+            }
+            Choice pick = agent == null ? opts.get(0)
+                : agent.choose(state, opts, Map.of("kind", "arsenal_draw2"));
+            if (pick != null && pick.payload() instanceof String c && пара.contains(c)) {
+                taken = c;
+            }
+            for (String cid : пара) {
+                if (!cid.equals(taken)) {
+                    deck.putUnder(cid);
+                }
+            }
+        }
         player.arsenalHand.add(taken);
-        kelium.engine.Setup.refillArsenalDisplay(state);
         return taken;
     }
+
 }

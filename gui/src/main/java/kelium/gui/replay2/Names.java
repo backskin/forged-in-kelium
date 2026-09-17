@@ -320,6 +320,7 @@ public final class Names {
             case "per_kelium_coin" -> "за 1 келемий — " + v + " монет";
             case "per_kelium_ammo" -> "за 1 келемий — " + v + " боеприпасов";
             case "per_kelium_cards" -> "за 1 келемий — " + v + " карт заданий";
+            case "keep_cards" -> "из них остаётся в руке — " + v;
             case "kelium_to_coin" -> "келемий в монеты";
             case "kelium_to_ammo" -> "келемий в боеприпасы";
             case "kelium_to_objective" -> "келемий в карты заданий";

@@ -544,14 +544,12 @@ public final class GameEngine {
             emit(ev("type", "refresh", "round", rnd, "skipped", true));
             return;
         }
-        // ПРИОРИТЕТ (карта рынка «Штаб корпуса») отменяет передачу по кругу ровно
-        // один раз: игрок, взявший жетон, начинает и следующий раунд. Флаг
-        // снимается здесь же — на второй раунд он уже не действует.
-        if (s.firstPlayerHeld) {
-            s.firstPlayerHeld = false;
-        } else {
-            s.firstPlayer = (s.firstPlayer + 1) % s.numPlayers();
-        }
+        // ПОРЯДОК ШАГОВ ОБНОВЛЕНИЯ (решение дизайнера 16.09.2026): рынок, потом
+        // первый игрок, и последним — выбор карты под свалку. Выбор свалки в
+        // движке не моделируется (это бумажный шаг: игрок откладывает одну из
+        // пяти своих карт приказов), но порядок двух первых шагов обязан
+        // совпадать с книгой — иначе свод, движок и текст расходятся.
+        //
         // КАРТА РЫНКА УХОДИТ ИЗ ИГРЫ НАВСЕГДА (правило дизайнера 15.08.2026).
         // Колода рынка тасуется на подготовке, каждый раунд с неё снимается одна
         // карта — и больше в игру не возвращается. Восемь карт = восемь раундов,
@@ -580,8 +578,17 @@ public final class GameEngine {
                 java.util.Arrays.fill(side, -1);
             }
         }
-        // ЯЧЕЙКА ОБНОВЛЕНИЯ чистится каждое Обновление, как и ячейки
-        // предложений: обновить карту рынка можно раз за раунд.
+        // ШАГ 2 — ПЕРВЫЙ ИГРОК, ПОСЛЕ РЫНКА (порядок 16.09.2026).
+        // ПРИОРИТЕТ (карта рынка «Штаб корпуса») отменяет передачу по кругу
+        // ровно один раз: игрок, взявший жетон, начинает и следующий раунд.
+        // Флаг снимается здесь же — на второй раунд он уже не действует.
+        if (s.firstPlayerHeld) {
+            s.firstPlayerHeld = false;
+        } else {
+            s.firstPlayer = (s.firstPlayer + 1) % s.numPlayers();
+        }
+        // ЯЧЕЙКА СМЕНЫ КАРТЫ РЫНКА чистится каждое Обновление, как и ячейки
+        // предложений: сменить карту рынка можно раз за раунд.
         s.marketRefreshCell = -1;
         // Келемий на тайлах зарождения НЕ восстанавливается: сколько выкопали —
         // столько и убыло, тайл истощается за партию и потом уходит с поля.
@@ -1268,6 +1275,13 @@ public final class GameEngine {
         List<Choice> opts = new ArrayList<>();
         for (String cid : Objectives.playableObjectives(s, p.seat, j)) {
             opts.add(new Choice("spec_objective", cid, "complete " + cid));
+            // УСИЛЕНИЕ — ОТДЕЛЬНАЯ ВОЗМОЖНОСТЬ, а не прибавка к первой (правило
+            // дизайнера 16.09.2026: усиленная награда даётся ВМЕСТО базовой).
+            // Развилка обязана быть видна в момент выбора: у заданий-жертв
+            // усиление стоит доплаты, и платить её вслепую нельзя.
+            if (Objectives.enhancedAvailable(s, p.seat, j, cid)) {
+                opts.add(new Choice("spec_objective_enh", cid, "complete+ " + cid));
+            }
         }
         // Верхний утилизационный эффект: любую карту задания в руке можно СЖЕЧЬ
         // ради мгновенного верхнего эффекта (вместо выполнения низа). Доступно
@@ -1379,6 +1393,8 @@ public final class GameEngine {
         }
         switch (ch.kind()) {
             case "spec_objective" -> Objectives.playObjective(s, p.seat, j, (String) ch.payload(), this::emit);
+            case "spec_objective_enh" -> Objectives.playObjective(
+                s, p.seat, j, (String) ch.payload(), this::emit, true);
             case "spec_objective_burn" -> objectiveBurnTop(p, (String) ch.payload());
             case "spec_arsenal_burn" -> arsenalBurn(p, (String) ch.payload());
             case "spec_arsenal_install" -> arsenalInstall(p, (String) ch.payload(), agents.get(p.seat));
@@ -2087,21 +2103,28 @@ public final class GameEngine {
                 }
             }
         }
-        // Пополнение заданий: в конце раунда игрок получает РОВНО ОДНУ новую карту,
-        // только если у него сейчас СТРОГО МЕНЬШЕ трёх. Предела руки в середине
-        // раунда нет — лимит проверяется только здесь.
+        // ПОПОЛНЕНИЕ ЗАДАНИЙ ДО ПРЕДЕЛА РУКИ, а не одной картой за раунд.
+        // Ключ свода так и назван — return_step.refill_objectives_to_limit, «до
+        // предела», — и глава 5 книги говорит то же. Прежде здесь бралась РОВНО
+        // ОДНА карта, и игрок с пустой рукой восстанавливался два раунда вместо
+        // одного. Предела руки в середине раунда нет — он проверяется только здесь.
         int limit = rs.getInt("rounds.objective_hand_limit");
+        boolean доПредела = rs.getBool("return_step.refill_objectives_to_limit", true);
         for (PlayerState p : s.players) {
             // Пассив objective_hand_plus1 (стартовая карта «Штаб связи»):
             // лимит руки заданий для пополнения +1.
             int myLimit = limit
                 + (Passives.hasPassive(s, p.seat, "objective_hand_plus1") ? 1 : 0);
-            if (p.objectiveHand.size() < myLimit) {
+            while (p.objectiveHand.size() < myLimit) {
                 String c = s.decks.get("objectives").draw(s.rng);
-                if (c != null) {
-                    p.objectiveHand.add(c);
-                    emit(ev("type", "objective_drawn", "seat", p.seat, "card", c,
-                        "hand", p.objectiveHand.size(), "source", "round_end"));
+                if (c == null) {
+                    break;                    // колода и сброс исчерпаны
+                }
+                p.objectiveHand.add(c);
+                emit(ev("type", "objective_drawn", "seat", p.seat, "card", c,
+                    "hand", p.objectiveHand.size(), "source", "round_end"));
+                if (!доПредела) {
+                    break;                    // старое поведение: ровно одна карта
                 }
             }
         }
@@ -2139,8 +2162,9 @@ public final class GameEngine {
      * Мирные условия конца партии (дизайнер, ПРОБЛЕМА 2). Партия заканчивается,
      * когда выполнено ЛЮБОЕ из:
      * <ol>
-     *   <li>заняты все ТРИ последние (верхние, шаг 5) ячейки на трёх тех-треках
-     *       — {@code tech.allPeaksOccupied()};</li>
+     *   <li>ОДИН игрок занял верхние ступени всех трёх тех-треков
+     *       — {@code tech.allPeaksByOneSeat()} (правило дизайнера 17.09.2026;
+     *       прежде хватало трёх вершин, занятых кем угодно);</li>
      *   <li>на поле остался ПОСЛЕДНИЙ источник келемия: не более 1 гекса типа
      *       SPAWN с {@code kelium > 0} и не убранного ({@code !spawnRemoved}).</li>
      * </ol>
@@ -2150,7 +2174,7 @@ public final class GameEngine {
      */
     private boolean peacefulEnd() {
         GameState s = state;
-        if (s.tech.allPeaksOccupied()) {
+        if (s.tech.allPeaksByOneSeat()) {
             s.winCondition = "all_peaks_occupied";
             return true;
         }

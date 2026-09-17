@@ -119,13 +119,37 @@ public final class TechBoard {
         return !occupancy.get(track).get(steps - 1).isEmpty();
     }
 
-    /** Заняты ли верхние шаги всех треков (условие окончания по науке). */
-    public boolean allPeaksOccupied() {
-        for (String t : tracks) {
-            if (!peakOccupied(t)) {
-                return false;
+    /**
+     * МЕСТО, ЗАНЯВШЕЕ ВЕРШИНЫ ВСЕХ ТРЁХ ТРЕКОВ, или {@code null}.
+     *
+     * <p>Это условие конца партии по науке (правило дизайнера 17.09.2026):
+     * вершины должны быть заняты ОДНИМ игроком. Прежде здесь стояло
+     * {@code allPeaksOccupied()} — «все вершины заняты кем угодно», — и условие
+     * складывалось само: трое дошли каждый до своей вершины, и партия
+     * обрывалась ни для кого. Теперь это достижение одного, и оно видно
+     * за столом: у вершины трека стоит чужой кубик.
+     *
+     * <p>Вершина вмещает один кубик, так что искать достаточно среди тех, кто
+     * стоит на вершине первого трека.
+     */
+    public Integer seatOnAllPeaks() {
+        for (Integer seat : occupancy.get(tracks.get(0)).get(steps - 1)) {
+            boolean всюду = true;
+            for (String t : tracks) {
+                if (!occupancy.get(t).get(steps - 1).contains(seat)) {
+                    всюду = false;
+                    break;
+                }
+            }
+            if (всюду) {
+                return seat;
             }
         }
-        return true;
+        return null;
+    }
+
+    /** Занял ли ОДИН игрок вершины всех треков — условие конца партии. */
+    public boolean allPeaksByOneSeat() {
+        return seatOnAllPeaks() != null;
     }
 }
