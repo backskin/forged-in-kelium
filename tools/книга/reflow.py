@@ -109,4 +109,10 @@ for попытка in range(12):
         if попытка == 11:
             raise
         time.sleep(0.4)
+# ВЫНОС КАРТИНОК — СРАЗУ ЗА ЗАПИСЬЮ. md2page вставляет свежие рисунки и
+# значки как `data:image/...;base64`, и без этого шага вёрстка снова пухнет
+# до десятков мегабайт, а гит хранит ещё одну её копию целиком. Шаг
+# идемпотентный: уже вынесенное он не трогает.
+subprocess.run([sys.executable, os.path.join(D, "вынести_картинки.py")],
+               check=True, capture_output=True)
 print("страниц:", len(final) + len(хвост), "глава", title, "стр.", start + 1, "–", start + len(new))

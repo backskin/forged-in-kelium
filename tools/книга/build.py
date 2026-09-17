@@ -26,6 +26,15 @@ if len(sys.argv) > 1:
 
 book = os.path.join(D, "book.html")
 pdf = os.path.join(D, "book.pdf")
+
+# КАРТИНКИ ЛЕЖАТ РЯДОМ С ВЁРСТКОЙ, А ПЕЧАТАЕМ МЫ КОПИЮ. В самой вёрстке
+# ссылки относительные — `илл/…`, — и рядом с копией в tools/книга их нет:
+# Chrome напечатал бы пустые места. Поэтому в копии путь разворачивается
+# в абсолютный file:/// каталога вёрстки (см. вынести_картинки.py).
+илл = os.path.join(os.path.dirname(SRC), "илл").replace("\\", "/")
+t = t.replace('"илл/', '"file:///' + илл + '/')
+t = t.replace("'илл/", "'file:///" + илл + "/")
+
 open(book, "w", encoding="utf-8").write(t)
 if os.path.exists(pdf):
     os.remove(pdf)
