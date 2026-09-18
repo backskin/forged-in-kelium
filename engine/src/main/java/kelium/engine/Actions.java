@@ -3222,21 +3222,33 @@ public final class Actions {
                         }
                     }
                 }
-            } else if ("module".equals(reward)) {
+                // ЖЕТОН УЖЕ НА ПЕРВОМ ШАГЕ (решение дизайнера 19.09.2026):
+                // «раздавать жетоны модулей сразу на первом же шаге треков —
+                // итого у игроков будет сразу сходу до трёх жетонов. Исключение
+                // зелёный трек: на нём каждая ступень выдаёт карту арсенала».
+                //
+                // Зачем. Замер темпа 18.09 показал, что модуль сборки приходит
+                // в среднем на 6.25 раунде из восьми, а 81% мест не получают его
+                // вовсе: он сидел на ВТОРОМ шаге одного конкретного трека, то
+                // есть стоил 1+2 трофея именно туда. Половина колоды заданий
+                // (позолота, усиленные награды) при этом опирается на модули и
+                // потому лежала мёртвым грузом — позолота игралась в 17% случаев,
+                // потому что золотить было нечего.
+                //
+                // Приз-кубик первого шага при этом ОСТАЁТСЯ: он печатный, лежит
+                // на планшете и достаётся первому пришедшему. Жетон идёт сверх.
+                if ("prize_cube".equals(reward) && модульНаПервомШаге(cfg)) {
+                    выдатьЖетонТрека(player, kind, agent);
+                }
+            }
+            if ("module".equals(reward)) {
                 if ("red".equals(kind)) {
                     // «Модули 2.0»: награда трека = тянуть жетон из мешка
                     Modules.awardModule(state, player, "red");
                 } else if ("blue".equals(kind)) {
                     Modules.awardModule(state, player, "blue");
-                } else if ("storage".equals(kind) && player.storageTokens.size() < 2) {
-                    // Жетон хранилища: выбор стороны НАВСЕГДА (ячейка ресурса
-                    // или вечный кубик энергии).
-                    List<Choice> opts = List.of(
-                        new Choice("storage_side", "+1_universal_cell",
-                            "universal resource cell"),
-                        new Choice("storage_side", "+1_energy", "permanent energy cube"));
-                    Choice pick = agent.choose(state, opts, Map.of("kind", "storage_side"));
-                    player.storageTokens.add(String.valueOf(pick.payload()));
+                } else if ("storage".equals(kind)) {
+                    выдатьЖетонТрека(player, kind, agent);
                 }
             } else if ("super_arsenal_card".equals(reward)) {
                 // ВЕРШИНА ТРЕКА БЕЗ СУПЕР-АРСЕНАЛА (дополнение выключено, решение
@@ -3346,6 +3358,32 @@ public final class Actions {
          *
          * @param kind род модулей трека из данных доски: red | blue | storage
          */
+        /**
+         * ЖЕТОН ЗА ШАГ ТРЕКА — тот, который этот трек печатает.
+         *
+         * <p>Красный трек даёт модуль атаки, синий — модуль сборки, зелёный —
+         * КАРТУ АРСЕНАЛА (решение дизайнера 19.09.2026). Прежде зелёный выдавал
+         * жетон хранилища, и их было всего два на партию: третий и дальнейшие
+         * шаги зелёного трека не давали ничего вовсе.
+         */
+        private void выдатьЖетонТрека(PlayerState player, String kind, Agent agent) {
+            switch (kind == null ? "" : kind) {
+                case "red" -> Modules.awardModule(state, player, "red");
+                case "blue" -> Modules.awardModule(state, player, "blue");
+                default -> {
+                    String c = state.decks.get("arsenal").draw(state.rng);
+                    if (c != null) {
+                        Storage.takeArsenalCard(state, player, c);
+                    }
+                }
+            }
+        }
+
+        /** Читается ли свод как «жетон выдаётся уже на первом шаге». */
+        private boolean модульНаПервомШаге(GameConfig cfg) {
+            return Boolean.TRUE.equals(cfg.ruleset.get("tech.token_on_step1", Boolean.FALSE));
+        }
+
         private void topPrizeWithoutSuperArsenal(PlayerState player, String kind, Agent agent) {
             switch (kind == null ? "storage" : kind) {
                 case "red" -> Modules.awardModule(state, player, "red");

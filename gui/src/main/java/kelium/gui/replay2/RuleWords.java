@@ -350,6 +350,11 @@ public final class RuleWords {
             case "building_compensation_containers.power_station_by_level" ->
                 "контейнеров за энергостанцию, по уровням";
 
+            case "rounds.first_player_counterclockwise" ->
+                "жетон первого игрока идёт против часовой, вскрытие — по часовой";
+            case "tech.token_on_step1" ->
+                "жетон трека выдаётся уже на первом шаге";
+
             case "actions.assembly.return_units_to_reserve" ->
                 "в Снаряжении можно вернуть в запас любое число своих войск";
 
