@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import kelium.core.Agent;
 import kelium.core.GameState;
 import kelium.core.PlayerState;
 import kelium.core.Resource;
@@ -546,6 +547,35 @@ public final class Objectives {
                     }
                     into.merge("objective_card", drawn,
                         (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
+                }
+                // === НАГРАДА-ДЕЙСТВИЕ (ревизия заданий 18.09.2026) ===
+                //
+                // Дизайнер: «не ресурсы ебаные давать заданием, а именно
+                // действия — те, которые ты не успел отыграть». Выполнил
+                // задание — играешь полноценное действие прямо сейчас, сверх
+                // двух своих приказов. Ресурс остаётся только в усиленной
+                // награде, и она теперь берётся ВМЕСТЕ с базовой.
+                //
+                // Почему через freeAction, а не своей веткой: это ровно тот же
+                // подарок, что раздаёт утиль и карты арсенала, — со своим
+                // контекстом, своим журналом и своей телеметрией. Вторая правда
+                // о бесплатном действии здесь никому не нужна.
+                case "action" -> {
+                    String имя = String.valueOf(e.getValue());
+                    Map<String, Object> итог = Effects.freeAction(s, p.seat,
+                        java.util.Map.of("action", имя));
+                    into.put("action", имя);
+                    into.put("action_ran", итог.get("ran"));
+                }
+                // ПОЗОЛОЧЕНИЕ МОДУЛЯ — восьмая награда ревизии. Не действие, но и
+                // не ресурс: это прогресс, который дизайнер просил в награды
+                // отдельно. Золотить нечего — награда пропадает, как всякая
+                // недоступная (то же делает вершина зелёного трека).
+                case "gild" -> {
+                    Agent агент = s.agents == null || p.seat >= s.agents.size()
+                        ? null : s.agents.get(p.seat);
+                    boolean позолотил = Modules.gildOne(s, p, агент);
+                    into.put("gild", позолотил ? 1 : 0);
                 }
                 default -> { }
             }
