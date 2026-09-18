@@ -292,6 +292,11 @@ public final class EngineCardContext implements CardContext {
             Map.of("count", count)).isEmpty();
     }
 
+    @Override public boolean deployUnits(int count) {
+        return !kelium.engine.Effects.apply("deploy_units", state, seat,
+            Map.of("count", count)).isEmpty();
+    }
+
     @Override public boolean energyOrModules() {
         return !kelium.engine.Effects.apply("energy_or_modules", state, seat, Map.of()).isEmpty();
     }

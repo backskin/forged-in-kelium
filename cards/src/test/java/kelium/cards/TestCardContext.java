@@ -153,6 +153,11 @@ public final class TestCardContext implements CardContext {
         return true;
     }
 
+    @Override public boolean deployUnits(int count) {
+        log.add(Map.of("deploy_units", count));
+        return true;
+    }
+
     @Override public boolean energyOrModules() {
         log.add(Map.of("energy_or_modules", true));
         return true;
