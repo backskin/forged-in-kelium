@@ -70,11 +70,18 @@ public final class PlannerTrainer {
         // своими чемпионами — иначе кандидат учился бы играть сам с собой и
         // подгонялся под собственные повадки.
         String only = args.length > 5 && !"-".equals(args[5]) ? args[5] : null;
-        if (only != null && !roster.contains(only)) {
-            throw new IllegalArgumentException("характера нет в составе: " + only
-                + " (есть: " + roster + ")");
-        }
+        // ЛИНИЯ БЕЗ ХАРАКТЕРА (заказ дизайнера 19.09.2026: «мне не нужен характер,
+        // мне нужен наиболее успешный бот»). Имя вне действующего состава заводит
+        // НОВУЮ линию: она начинает с уравновешенных весов, садится за стол пятой
+        // и учится против всех четверых. Прежде такое имя отвергалось — учить
+        // можно было только готовый характер, то есть только с перекосом.
         List<String> learning = only == null ? roster : List.of(only);
+        // ЦЕЛЬ ОБУЧЕНИЯ. «победа» — только отрыв и победа, без надбавок за
+        // поведение: именно её просят, когда нужен сильнейший, а не образцовый.
+        // Надбавки («сноси жетоны», «ставь арсенал», «выполняй задания») задают
+        // потолок нашими же представлениями о правильной игре — бот учится быть
+        // похожим на них, а не выигрывать.
+        boolean чистаяЦель = args.length > 6 && "победа".equals(args[6]);
 
         Path reportDir = Path.of("reports", "training");
         Files.createDirectories(reportDir);
@@ -92,6 +99,9 @@ public final class PlannerTrainer {
         Map<String, Genome> champs = new LinkedHashMap<>();
         for (String ch : roster) {
             champs.put(ch, PlannerAgent.plannerGenome(ch, players));
+        }
+        for (String ch : learning) {
+            champs.computeIfAbsent(ch, k -> PlannerAgent.plannerGenome(k, players));
         }
         Random rng = new Random(20260907L);
         ExecutorService pool = Executors.newFixedThreadPool(threads);
@@ -113,7 +123,7 @@ public final class PlannerTrainer {
                     for (Genome cand : cands) {
                         final Genome g = cand;
                         futures.add(pool.submit(() -> evaluate(players, base, gamesPer, ch, g,
-                            champs, roster)));
+                            champs, roster, чистаяЦель)));
                     }
                     double[] best = null;
                     int bestIdx = -1;
@@ -153,9 +163,11 @@ public final class PlannerTrainer {
                         final Genome чемпион = champs.get(ch);
                         final String имя = ch;
                         Future<double[]> fч = pool.submit(() ->
-                            evaluate(players, отл, gamesPer, имя, чемпион, champs, roster));
+                            evaluate(players, отл, gamesPer, имя, чемпион, champs, roster,
+                                чистаяЦель));
                         Future<double[]> fл = pool.submit(() ->
-                            evaluate(players, отл, gamesPer, имя, претендент, champs, roster));
+                            evaluate(players, отл, gamesPer, имя, претендент, champs, roster,
+                                чистаяЦель));
                         чекЧемп = fч.get();
                         чекЛучш = fл.get();
                         accepted = чекЛучш[0] > чекЧемп[0] + 0.05;
@@ -230,6 +242,18 @@ public final class PlannerTrainer {
      */
     static double[] evaluate(int players, long base, int games, String character, Genome cand,
                              Map<String, Genome> champs, List<String> roster) {
+        return evaluate(players, base, games, character, cand, champs, roster, false);
+    }
+
+    /**
+     * @param чистаяЦель считать ТОЛЬКО отрыв и победу, без надбавок за поведение.
+     *     Надбавки нужны, когда бот учится ВЕСТИ СЕБЯ как задумано; когда нужен
+     *     сильнейший — они мешают, потому что задают потолок нашими же
+     *     представлениями о правильной игре.
+     */
+    static double[] evaluate(int players, long base, int games, String character, Genome cand,
+                             Map<String, Genome> champs, List<String> roster,
+                             boolean чистаяЦель) {
         double fit = 0;
         double vp = 0;
         double wins = 0;
@@ -242,7 +266,9 @@ public final class PlannerTrainer {
             int seat = g % players;
             Outcome o = playOne(players, seed, seat, character, cand, champs, roster);
             fit += o.margin() + (o.win() ? 5.0 : 0.0)
-                + 0.4 * (0.5 * o.objDone() + 0.4 * o.kills() + 0.3 * o.arsInstall() + 0.15 * o.units());
+                + (чистаяЦель ? 0.0
+                    : 0.4 * (0.5 * o.objDone() + 0.4 * o.kills()
+                        + 0.3 * o.arsInstall() + 0.15 * o.units()));
             vp += o.vp();
             wins += o.win() ? 1 : 0;
             obj += o.objDone();
