@@ -64,6 +64,17 @@ public final class PlannerTrainer {
         int threads = args.length > 4 ? Integer.parseInt(args[4])
             : Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
         List<String> roster = Bots.ROSTER_4;
+        // ОДИН ХАРАКТЕР ЗА ПРОГОН (заказ дизайнера 19.09.2026: «возьми только
+        // один характер, самый агрессивный, и обучи хорошенько»). Учится геном
+        // названного характера, а СОПЕРНИКАМИ за столом остаётся весь состав со
+        // своими чемпионами — иначе кандидат учился бы играть сам с собой и
+        // подгонялся под собственные повадки.
+        String only = args.length > 5 && !"-".equals(args[5]) ? args[5] : null;
+        if (only != null && !roster.contains(only)) {
+            throw new IllegalArgumentException("характера нет в составе: " + only
+                + " (есть: " + roster + ")");
+        }
+        List<String> learning = only == null ? roster : List.of(only);
 
         Path reportDir = Path.of("reports", "training");
         Files.createDirectories(reportDir);
@@ -88,9 +99,11 @@ public final class PlannerTrainer {
             for (int gen = 1; gen <= generations; gen++) {
                 long base = 100_000L * gen;
                 log.append("## Поколение ").append(gen).append("\n\n");
-                log.append("| характер | чемпион | лучший | принят | ПО | побед | задания | убито | арсенал | войска |\n");
-                log.append("|---|---:|---:|:--:|---:|---:|---:|---:|---:|---:|\n");
-                for (String ch : roster) {
+                log.append("| характер | отбор: чемпион | отбор: лучший "
+                    + "| проверка чемп./претенд. | принят | ПО | побед | задания "
+                    + "| убито | арсенал | войска |\n");
+                log.append("|---|---:|---:|:--:|:--:|---:|---:|---:|---:|---:|---:|\n");
+                for (String ch : learning) {
                     List<Genome> cands = new ArrayList<>();
                     cands.add(champs.get(ch));
                     for (int i = 1; i < population; i++) {
@@ -115,7 +128,38 @@ public final class PlannerTrainer {
                             bestIdx = i;
                         }
                     }
-                    boolean accepted = bestIdx > 0 && best[0] > champScore[0] + 0.05;
+                    // ОТЛОЖЕННАЯ ПРОВЕРКА (19.09.2026). Прежде чемпион сменялся,
+                    // если лучший из двенадцати мутантов обошёл его НА ТЕХ ЖЕ
+                    // раздачах, — и сменялся каждое поколение без исключений.
+                    //
+                    // Почему это было не обучение. Шум одного замера (16 партий)
+                    // больше, чем разница между весами, а максимум из двенадцати
+                    // шумных чисел почти всегда выше правды. Победитель обходил
+                    // чемпиона везением, а не игрой, и следующим поколением
+                    // проваливался: в прогоне 19.09 принятый с 2.80 намерил потом
+                    // 1.13, а затем 0.12. Двадцать поколений такого отбора — это
+                    // случайное блуждание по весам, а не рост силы.
+                    //
+                    // Теперь претендент обязан обыграть чемпиона ВТОРОЙ раз, на
+                    // раздачах, которых отбор не видел. Ровно так устроены
+                    // SelfPlayTrainer и эволюция стратегов; наивным из трёх
+                    // тренеров оставался только этот.
+                    boolean accepted = false;
+                    double[] чекЧемп = null;
+                    double[] чекЛучш = null;
+                    if (bestIdx > 0 && best[0] > champScore[0] + 0.05) {
+                        final long отл = 700_000_000L + 100_000L * gen;
+                        final Genome претендент = cands.get(bestIdx);
+                        final Genome чемпион = champs.get(ch);
+                        final String имя = ch;
+                        Future<double[]> fч = pool.submit(() ->
+                            evaluate(players, отл, gamesPer, имя, чемпион, champs, roster));
+                        Future<double[]> fл = pool.submit(() ->
+                            evaluate(players, отл, gamesPer, имя, претендент, champs, roster));
+                        чекЧемп = fч.get();
+                        чекЛучш = fл.get();
+                        accepted = чекЛучш[0] > чекЧемп[0] + 0.05;
+                    }
                     if (accepted) {
                         champs.put(ch, cands.get(bestIdx));
                         cands.get(bestIdx).saveJson(PlannerAgent.savedPath(ch, players));
@@ -123,12 +167,18 @@ public final class PlannerTrainer {
                     }
                     double[] show = accepted ? best : champScore;
                     log.append(String.format(Locale.ROOT,
-                        "| %s | %.2f | %.2f | %s | %.1f | %.0f%% | %.2f | %.2f | %.2f | %.2f |\n",
-                        ch, champScore[0], best[0], accepted ? "да" : "—",
+                        "| %s | %.2f | %.2f | %s | %s | %.1f | %.0f%% | %.2f | %.2f | %.2f | %.2f |\n",
+                        ch, champScore[0], best[0],
+                        чекЧемп == null ? "—" : String.format(Locale.ROOT, "%.2f / %.2f",
+                            чекЧемп[0], чекЛучш[0]),
+                        accepted ? "да" : "—",
                         show[1], 100 * show[2], show[3], show[4], show[5], show[6]));
                     System.out.printf(Locale.ROOT,
-                        "поколение %d %s: чемпион %.2f, лучший %.2f%s%n",
-                        gen, ch, champScore[0], best[0], accepted ? " — ПРИНЯТ" : "");
+                        "поколение %d %s: отбор %.2f -> %.2f | проверка %s%s%n",
+                        gen, ch, champScore[0], best[0],
+                        чекЧемп == null ? "не понадобилась"
+                            : String.format(Locale.ROOT, "%.2f -> %.2f", чекЧемп[0], чекЛучш[0]),
+                        accepted ? " — ПРИНЯТ" : " — отклонён");
                 }
                 log.append("\n");
                 for (String ch : roster) {
@@ -141,7 +191,9 @@ public final class PlannerTrainer {
         } finally {
             pool.shutdown();
         }
-        for (String ch : roster) {
+        // Сохраняем ТОЛЬКО обучавшихся: чемпионы остальных пришли с диска
+        // нетронутыми, и переписывать их файл значит выдать старое за новое.
+        for (String ch : learning) {
             champs.get(ch).saveJson(PlannerAgent.savedPath(ch, players));
         }
         Files.writeString(report, log, StandardCharsets.UTF_8);
