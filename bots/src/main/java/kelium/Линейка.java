@@ -67,22 +67,24 @@ public final class Линейка {
         int игроков = args.length > 1 ? Integer.parseInt(args[1]) : 4;
         int горизонт = args.length > 2 ? Integer.parseInt(args[2]) : 0;
         String характер = args.length > 3 ? args[3] : "punisher";
+        int проб = args.length > 4 ? Integer.parseInt(args[4]) : 1;
+        double вес = args.length > 5 ? Double.parseDouble(args[5]) : 0.5;
         int потоков = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
 
         out.printf("ЛИНЕЙКА СИЛЫ · свод %s · %d раздач × 2 партии · %d игроков%n",
             GameConfig.DEFAULT_RULESET, раздач, игроков);
         out.println("поля: " + LayoutLibrary.describePool(игроков));
         out.printf("испытуемый: гроссмейстер «%s»%n", характер);
-        out.printf("правка: горизонт %d %s%n%n", горизонт,
-            горизонт == 0 ? "(то же самое — проверка линейки на нулевую разницу)"
-                : "раундов доигрывания при оценке хода");
+        out.printf("правка: горизонт %d %s, доигрываний %d, вес доигрывания %.2f%n%n",
+            горизонт, горизонт == 0 ? "(то же самое — проверка линейки)"
+                : "раундов при оценке хода", проб, вес);
 
         ExecutorService пул = Executors.newFixedThreadPool(потоков);
         try {
             List<Future<Пара>> будущее = new ArrayList<>();
             for (int g = 0; g < раздач; g++) {
                 final int номер = g;
-                будущее.add(пул.submit(раздача(номер, игроков, горизонт, характер)));
+                будущее.add(пул.submit(раздача(номер, игроков, горизонт, характер, проб, вес)));
             }
             int победЭталона = 0;
             int победПравки = 0;
@@ -153,19 +155,19 @@ public final class Линейка {
     }
 
     private static Callable<Пара> раздача(int номер, int игроков, int горизонт,
-                                          String характер) {
+                                          String характер, int проб, double вес) {
         return () -> {
             long seed = 5_500_000L + номер;
             int место = номер % игроков;
-            double[] эт = партия(seed, игроков, место, характер, 0);
-            double[] пр = партия(seed, игроков, место, характер, горизонт);
+            double[] эт = партия(seed, игроков, место, характер, 0, 1, 0.5);
+            double[] пр = партия(seed, игроков, место, характер, горизонт, проб, вес);
             return new Пара(эт[0] > 0, эт[1], пр[0] > 0, пр[1], (int) эт[2]);
         };
     }
 
     /** Одна партия. Возвращает {победа, отрыв, раундов}. */
     private static double[] партия(long seed, int игроков, int место, String характер,
-                                   int горизонт) {
+                                   int горизонт, int проб, double вес) {
         GameState s = Setup.buildGame(LayoutLibrary.configFor(игроков, seed));
         List<String> прочие = new ArrayList<>(Bots.ROSTER_4);
         прочие.remove(характер);
@@ -177,6 +179,8 @@ public final class Линейка {
                 new Random(seed * 31 + i), игроков);
             if (i == место && горизонт > 0 && a instanceof PlannerAgent пл) {
                 пл.horizonRounds = горизонт;
+                пл.horizonSamples = проб;
+                пл.horizonWeight = вес;
             }
             agents.add(a);
         }
