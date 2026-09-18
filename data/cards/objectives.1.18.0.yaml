@@ -1,0 +1,1013 @@
+# CONTENT: objectives  version 1.18.0
+#
+# ВЫГРУЗКА ИЗ КЛАССОВ (tools/собрать-задания-1-16-0.py). Источник правды —
+# классы kelium.cards.objectives; этот файл читают люди и таблицы.
+#
+# Выработка:       o04 o05 o40 o08 o01
+# Засада:          o29 o03 o07 o27 o63
+# Обеспечение:     o33 o36 o34 o64
+# Развёртывание:   o17 o11 o18 o65 o15 o12 o20
+# Расплата:        o66 o67 o10 o06
+# Устранение:      o68 o69 o42 o25 o70 o71 o72 o21 o43 o73
+# Экспансия:       o74 o75 o02 o76 o77
+
+meta:
+  id: 1.18.0
+  type: objectives
+  выгружено: 'задания 1.18.0: занесены по таблице дизайнера от 18.09.2026 — условия, усиления, утиль и
+    обе награды. «Движение 2 войсками» заменено полным Манёвром, «атака одним войском» — полноценным Боем
+    (решение того же дня после онлайн-теста). Описания собраны заново из колонок.'
+objectives:
+- id: o04
+  name: Жила
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей на поле два своих добытчика с полной энергией, примыкающих к разным зарождениям
+  enhanced:
+    условие: Оба примыкают к большим зарождениям
+  base_reward:
+    coin: 3
+  special_reward:
+    module: attack
+  top:
+    label: 'ЗАГРАДИТЕЛЬНЫЙ ОГОНЬ: твоё уничтоженное здание наносит 1 урон убийце'
+    effect: reaction
+    params:
+      kind: barrage
+  описание: 'Имей на поле два своих добытчика с полной энергией, примыкающих к разным зарождениям — награда
+    3 монеты. Оба примыкают к большим зарождениям — условие усилено: жетон модуля атаки.'
+- id: o05
+  name: Выработка
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД забери последний келемий с зарождения
+  enhanced:
+    условие: ты исчерпал зарождение - оно ушло с поля
+  base_reward:
+    coin: 3
+  special_reward:
+    module: assembly
+  top:
+    label: 'ОТХОД: в чужой Бой уведи один свой жетон из атакуемого гекса на один гекс'
+    effect: reaction
+    params:
+      kind: withdraw
+  описание: 'В ЭТОТ ХОД забери последний келемий с зарождения — награда 3 монеты. Ты исчерпал зарождение
+    - оно ушло с поля — условие усилено: жетон модуля сборки.'
+- id: o40
+  name: Ва-банк
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей одновременно ноль монет и ноль боеприпасов
+  enhanced:
+    условие: Не имей даже келемий
+  base_reward:
+    coin: 2
+    ammo: 1
+  special_reward:
+    trophy: 1
+  top:
+    label: 'ПОГЛОЩЕНИЕ: отбери 1 боеприпас'
+    effect: steal_resource
+    params:
+      resource: ammo
+      amount: 1
+  описание: 'Имей одновременно ноль монет и ноль боеприпасов — награда 2 монеты и 1 боеприпас. Не имей
+    даже келемий — условие усилено: 1 трофей.'
+- id: o08
+  name: Разведка недр
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД забери 3 контейнера (добытчиками или войсками)
+  base_reward:
+    coin: 2
+    ammo: 1
+  top:
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
+  описание: В ЭТОТ ХОД забери 3 контейнера (добытчиками или войсками) — награда 2 монеты и 1 боеприпас.
+- id: o01
+  name: Полный залп
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД произведи только боеприпасы и ни одного войска
+  enhanced:
+    условие: Эти здания - завод и авиабаза
+  base_reward:
+    coin: 2
+    objective_card: 1
+  special_reward:
+    arsenal: 1
+  top:
+    label: 1 ОБМЕН В НАУКЕ (не трек) ИЛИ 1 ОБМЕН НА РЫНКЕ (не карта)
+    effect: exchange_science_or_market
+    params:
+      amount: 1
+  описание: 'В ЭТОТ ХОД произведи только боеприпасы и ни одного войска — награда 2 монеты и 1 карта задания.
+    Эти здания - завод и авиабаза — условие усилено: карта арсенала.'
+- id: o29
+  name: Пустой двор
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей 3 своих войска на гексах, где нет твоих зданий
+  enhanced:
+    условие: Четыре - и все стоят на разных гексах
+  base_reward:
+    coin: 2
+    objective_card: 1
+  special_reward:
+    module: assembly
+  top:
+    label: РЕМОНТ ГЕКСА
+    effect: heal_hex
+  описание: 'Имей 3 своих войска на гексах, где нет твоих зданий — награда 2 монеты и 1 карта задания.
+    Четыре - и все стоят на разных гексах — условие усилено: жетон модуля сборки.'
+- id: o03
+  name: Опорный пункт
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей на поле 2 свои вышки на разных гексах (обе не на гексе с ЦУ)
+  enhanced:
+    условие: Одна из вышек стоит на гексе с жетонами врага
+  base_reward:
+    coin: 1
+    ammo: 2
+  special_reward:
+    trophy: 1
+  top:
+    label: 'ОТВЕТНЫЙ ОГОНЬ: твоё уничтоженное войско наносит 1 урон убийце'
+    effect: reaction
+    params:
+      kind: return_fire
+  описание: 'Имей на поле 2 свои вышки на разных гексах (обе не на гексе с ЦУ) — награда 1 монета и 2
+    боеприпаса. Одна из вышек стоит на гексе с жетонами врага — условие усилено: 1 трофей.'
+- id: o07
+  name: Засада
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей военное здание с войском внутри, по соседству с гексом, где есть жетоны врага
+  enhanced:
+    условие: два таких военных здания
+  base_reward:
+    coin: 1
+    ammo: 2
+  special_reward:
+    arsenal: 1
+  top:
+    label: 'ЗАГРАДИТЕЛЬНЫЙ ОГОНЬ: твоё уничтоженное здание наносит 1 урон убийце'
+    effect: reaction
+    params:
+      kind: barrage
+  описание: 'Имей военное здание с войском внутри, по соседству с гексом, где есть жетоны врага — награда
+    1 монета и 2 боеприпаса. Два таких военных здания — условие усилено: карта арсенала.'
+- id: o27
+  name: На чужом дворе
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей своё войско на гексе, где есть здания врага
+  enhanced:
+    условие: Имей на одном таком гексе два своих войска
+  base_reward:
+    ammo: 3
+  special_reward:
+    arsenal: 1
+  top:
+    label: 'РИКОШЕТ: атака по твоему жетону переходит на любой другой жетон в том же гексе'
+    effect: reaction
+    params:
+      kind: ricochet
+  описание: 'Имей своё войско на гексе, где есть здания врага — награда 3 боеприпаса. Имей на одном таком
+    гексе два своих войска — условие усилено: карта арсенала.'
+- id: o63
+  name: Голый запас
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей в запасе 0 войск одного вида
+  enhanced:
+    условие: Двух видов
+  base_reward:
+    ammo: 2
+    objective_card: 1
+  special_reward:
+    trophy: 1
+  top:
+    label: 'ОТВЕТНЫЙ ОГОНЬ: твоё уничтоженное войско наносит 1 урон убийце'
+    effect: reaction
+    params:
+      kind: return_fire
+  описание: 'Имей в запасе 0 войск одного вида — награда 2 боеприпаса и 1 карта задания. Двух видов —
+    условие усилено: 1 трофей.'
+- id: o33
+  name: Биржа
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД потрать на Рынке келемий двумя разными способами
+  base_reward:
+    coin: 1
+    ammo: 1
+    objective_card: 1
+  top:
+    label: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ
+    effect: gain
+    params:
+      order: operation
+      ammo: 1
+  cull: '[3+]'
+  описание: В ЭТОТ ХОД потрать на Рынке келемий двумя разными способами — награда 1 монета, 1 боеприпас
+    и 1 карта задания.
+- id: o36
+  name: Научный рывок
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Дойди до второй ступени хотя бы в одном треке технологий
+  enhanced:
+    условие: на двух разных треках
+  base_reward:
+    coin: 2
+    objective_card: 1
+  special_reward:
+    module: attack
+  top:
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
+  описание: 'Дойди до второй ступени хотя бы в одном треке технологий — награда 2 монеты и 1 карта задания.
+    На двух разных треках — условие усилено: жетон модуля атаки.'
+- id: o34
+  name: Научный отдел
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД потрать в Научном отделе трофеи тремя разными способами
+  base_reward:
+    coin: 1
+    ammo: 2
+  top:
+    label: 'ЗАКРОМА: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ'
+    effect: gain
+    params:
+      order: operation
+      ammo: 1
+  описание: В ЭТОТ ХОД потрать в Научном отделе трофеи тремя разными способами — награда 1 монета и 2
+    боеприпаса.
+- id: o64
+  name: Разнос трофеев
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД потрать в Научном отделе трофеи тремя разными способами
+  base_reward:
+    coin: 1
+    objective_card: 2
+  special_reward:
+    arsenal: 1
+  top:
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
+  описание: В ЭТОТ ХОД потрать в Научном отделе трофеи тремя разными способами — награда 1 монета и 2
+    карты задания.
+- id: o17
+  name: Штаб на передовой
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей своё здание на гексе, соседнем с гексом со зданием врага
+  enhanced:
+    условие: с гексом с ЦУ врага
+  base_reward:
+    coin: 3
+  special_reward:
+    trophy: 1
+  top:
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
+  описание: 'Имей своё здание на гексе, соседнем с гексом со зданием врага — награда 3 монеты. С гексом
+    с ЦУ врага — условие усилено: 1 трофей.'
+- id: o11
+  name: Передовая база
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД построй свое здание на гексе, соседнем с гексом, где есть войска врага
+  enhanced:
+    условие: На том же соседнем гексе есть здание врага
+  base_reward:
+    coin: 3
+  special_reward:
+    arsenal: 1
+  top:
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
+    params:
+      action: movement
+  описание: 'В ЭТОТ ХОД построй свое здание на гексе, соседнем с гексом, где есть войска врага — награда
+    3 монеты. На том же соседнем гексе есть здание врага — условие усилено: карта арсенала.'
+- id: o18
+  name: Полная нагрузка
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Все твои здания, требующие энергию, запитаны (не менее 3)
+  enhanced:
+    условие: Не менее 4 зданий
+  base_reward:
+    coin: 3
+  special_reward:
+    arsenal: 1
+  top:
+    label: РАЗЫГРАЙ БОЙ ПЕРЕД ЧУЖИМ БОЕМ
+    effect: reaction
+    params:
+      kind: battle_first
+  описание: 'Все твои здания, требующие энергию, запитаны (не менее 3) — награда 3 монеты. Не менее 4
+    зданий — условие усилено: карта арсенала.'
+- id: o65
+  name: Перестройка
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД снеси своё здание и построй другое
+  enhanced:
+    условие: Построенное встало на тот же гекс, где стояло снесённое
+  base_reward:
+    coin: 2
+    objective_card: 1
+  special_reward:
+    trophy: 1
+  top:
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
+  описание: 'В ЭТОТ ХОД снеси своё здание и построй другое — награда 2 монеты и 1 карта задания. Построенное
+    встало на тот же гекс, где стояло снесённое — условие усилено: 1 трофей.'
+- id: o15
+  name: Стройбум
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД построй 2 здания на разных гексах
+  enhanced:
+    условие: 3 здания на разных и несоседних между собой гексах
+  base_reward:
+    ammo: 3
+  special_reward:
+    trophy: 1
+  top:
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
+  описание: 'В ЭТОТ ХОД построй 2 здания на разных гексах — награда 3 боеприпаса. 3 здания на разных и
+    несоседних между собой гексах — условие усилено: 1 трофей.'
+- id: o12
+  name: Наглая стройка
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД построй 2 здания на разных гексах
+  enhanced:
+    условие: оба на расстоянии 3 от ЦУ
+  base_reward:
+    coin: 3
+  special_reward:
+    module: attack
+  top:
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
+  описание: 'В ЭТОТ ХОД построй 2 здания на разных гексах — награда 3 монеты. Оба на расстоянии 3 от ЦУ
+    — условие усилено: жетон модуля атаки.'
+- id: o20
+  name: Коммутация
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей на двух зданиях - источниках энергии ровно один свободный кубик
+  enhanced:
+    условие: На трех источниках энергии
+  base_reward:
+    coin: 3
+  top:
+    label: РЕМОНТ ГЕКСА
+    effect: heal_hex
+  описание: 'Имей на двух зданиях - источниках энергии ровно один свободный кубик — награда 3 монеты.
+    На трех источниках энергии — условие усилено: ничего.'
+- id: o66
+  name: Списание
+  kind: regular
+  type: sacrifice
+  checked_by: card
+  requirement:
+    условие: Сбрось карту арсенала
+  base_reward:
+    module: attack
+  top:
+    label: 'ОТВЕТНЫЙ ОГОНЬ: твоё уничтоженное войско наносит 1 урон убийце'
+    effect: reaction
+    params:
+      kind: return_fire
+  sacrifice:
+    amount: 1
+    resource: arsenal_cards
+  описание: Сбрось карту арсенала — награда жетон модуля атаки.
+- id: o67
+  name: Разрядка
+  kind: regular
+  type: sacrifice
+  checked_by: card
+  requirement:
+    условие: Сдай в общий запас 3 боеприпаса
+  base_reward:
+    trophy: 1
+  top:
+    label: 'ОТХОД: в чужой Бой уведи один свой жетон из атакуемого гекса на один гекс'
+    effect: reaction
+    params:
+      kind: withdraw
+  sacrifice:
+    amount: 2
+    resource: ammo
+  описание: Сдай в общий запас 3 боеприпаса — награда 1 трофей.
+- id: o10
+  name: Разоружение
+  kind: regular
+  type: sacrifice
+  checked_by: card
+  requirement:
+    условие: Верни в запас 2 своих войска с поля
+  enhanced:
+    условие: Технику и/или авиацию - и с одного гекса
+  base_reward:
+    ammo: 3
+  special_reward:
+    module: assembly
+  top:
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
+  sacrifice:
+    amount: 2
+    resource: units_on_field
+  описание: 'Верни в запас 2 своих войска с поля — награда 3 боеприпаса. Технику и/или авиацию - и с одного
+    гекса — условие усилено: жетон модуля сборки.'
+- id: o06
+  name: Отгрузка
+  kind: regular
+  type: sacrifice
+  checked_by: card
+  requirement:
+    условие: Сдай два своих неоткрытых контейнера
+  base_reward:
+    coin: 1
+    ammo: 1
+    objective_card: 1
+  top:
+    label: 'ЗАКРОМА: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ'
+    effect: gain
+    params:
+      order: operation
+      ammo: 1
+  sacrifice:
+    amount: 2
+    resource: container
+  описание: Сдай два своих неоткрытых контейнера — награда 1 монета, 1 боеприпас и 1 карта задания.
+- id: o68
+  name: Бронебой
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД уничтожь технику или авиацию врага
+  enhanced:
+    условие: и еще 2 жетона любого врага
+  base_reward:
+    coin: 3
+  special_reward:
+    arsenal: 1
+  top:
+    label: РАЗЫГРАЙ БОЙ ПЕРЕД ЧУЖИМ БОЕМ
+    effect: reaction
+    params:
+      kind: battle_first
+  описание: 'В ЭТОТ ХОД уничтожь технику или авиацию врага — награда 3 монеты. И еще 2 жетона любого врага
+    — условие усилено: карта арсенала.'
+- id: o69
+  name: Зачистка гекса
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД уничтожь все жетоны врага на одном гексе
+  enhanced:
+    условие: их на этом гексе не менее 3
+  base_reward:
+    coin: 2
+    ammo: 1
+  special_reward:
+    module: attack
+  top:
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
+    params:
+      action: movement
+  описание: 'В ЭТОТ ХОД уничтожь все жетоны врага на одном гексе — награда 2 монеты и 1 боеприпас. Их
+    на этом гексе не менее 3 — условие усилено: жетон модуля атаки.'
+- id: o42
+  name: Разорение
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД уничтожь добытчик противника
+  enhanced:
+    условие: этот добытчик примыкал к стартовому зарождению
+  base_reward:
+    coin: 2
+    objective_card: 1
+  special_reward:
+    module: attack
+  top:
+    label: 1 ОБМЕН В НАУКЕ (не трек) ИЛИ 1 ОБМЕН НА РЫНКЕ (не карта)
+    effect: exchange_science_or_market
+    params:
+      amount: 1
+  описание: 'В ЭТОТ ХОД уничтожь добытчик противника — награда 2 монеты и 1 карта задания. Этот добытчик
+    примыкал к стартовому зарождению — условие усилено: жетон модуля атаки.'
+- id: o25
+  name: Осада
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей у себя на свалке хотя бы 1 жетон здания врага
+  enhanced:
+    условие: два жетона, один из них - энергостанция
+  base_reward:
+    coin: 3
+  special_reward:
+    module: attack
+  top:
+    label: 'ЭВАКУАЦИЯ ТРОФЕЕВ: Если атакуют твой жетон, ты можешь вернуть его в свой запас (не отдавая
+      в трофеи)'
+    effect: reaction
+    params:
+      kind: evacuate_trophy
+  описание: 'Имей у себя на свалке хотя бы 1 жетон здания врага — награда 3 монеты. Два жетона, один из
+    них - энергостанция — условие усилено: жетон модуля атаки.'
+- id: o70
+  name: Обесточивание
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей среди уничтоженных жетонов хотя бы 2 жетона врага
+  enhanced:
+    условие: Один из них — военное здание
+  base_reward:
+    coin: 3
+  special_reward:
+    module: assembly
+  top:
+    label: 'ЗАГРАДИТЕЛЬНЫЙ ОГОНЬ: твоё уничтоженное здание наносит 1 урон убийце'
+    effect: reaction
+    params:
+      kind: barrage
+  описание: 'Имей среди уничтоженных жетонов хотя бы 2 жетона врага — награда 3 монеты. Один из них —
+    военное здание — условие усилено: жетон модуля сборки.'
+- id: o71
+  name: Две войны
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей среди уничтоженных жетонов хотя бы 2 жетона врага
+  enhanced:
+    условие: эти жетоны - техника и/или авиация
+  base_reward:
+    coin: 3
+  special_reward:
+    module: assembly
+  top:
+    label: 1 ОБМЕН В НАУКЕ (не трек) ИЛИ 1 ОБМЕН НА РЫНКЕ (не карта)
+    effect: exchange_science_or_market
+    params:
+      amount: 1
+  описание: 'Имей среди уничтоженных жетонов хотя бы 2 жетона врага — награда 3 монеты. Эти жетоны - техника
+    и/или авиация — условие усилено: жетон модуля сборки.'
+- id: o72
+  name: Против сильнейшего
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше войск, чем у тебя
+  enhanced:
+    условие: хотя бы 2 жетона войск
+  base_reward:
+    coin: 1
+    ammo: 1
+    objective_card: 1
+  special_reward:
+    trophy: 1
+  top:
+    label: РЕМОНТ ГЕКСА
+    effect: heal_hex
+  описание: 'В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше войск, чем у тебя — награда 1
+    монета, 1 боеприпас и 1 карта задания. Хотя бы 2 жетона войск — условие усилено: 1 трофей.'
+- id: o21
+  name: Первая кровь
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше зданий, чем у тебя
+  enhanced:
+    условие: В ЭТОТ ХОД у одного из уничтоженных прочность была 2 или больше
+  base_reward:
+    coin: 4
+  special_reward:
+    arsenal: 1
+  top:
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
+    params:
+      action: movement
+  описание: 'В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше зданий, чем у тебя — награда
+    4 монеты. В ЭТОТ ХОД у одного из уничтоженных прочность была 2 или больше — условие усилено: карта
+    арсенала.'
+- id: o43
+  name: Охота на сильного
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше зданий, чем у тебя
+  enhanced:
+    условие: В ЭТОТ ХОД уничтоженный жетон был добытчиком
+  base_reward:
+    ammo: 2
+    objective_card: 1
+  special_reward:
+    trophy: 1
+  top:
+    label: 'ЭВАКУАЦИЯ ТРОФЕЕВ: твой уничтоженный жетон уходит в твой запас'
+    effect: reaction
+    params:
+      kind: evacuate_trophy
+  описание: 'В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше зданий, чем у тебя — награда
+    2 боеприпаса и 1 карта задания. В ЭТОТ ХОД уничтоженный жетон был добытчиком — условие усилено: 1
+    трофей.'
+- id: o73
+  name: Диверсия
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД уничтожь энергостанцию противника
+  enhanced:
+    условие: Это была энергостанция 3 или 4 уровня.
+  base_reward:
+    ammo: 2
+    objective_card: 1
+  special_reward:
+    module: attack
+  top:
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
+    params:
+      action: movement
+  описание: 'В ЭТОТ ХОД уничтожь энергостанцию противника — награда 2 боеприпаса и 1 карта задания. Это
+    была энергостанция 3 или 4 уровня — условие усилено: жетон модуля атаки.'
+- id: o74
+  name: Энергосеть
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей на поле все свои 4 здания энергостанций
+  base_reward:
+    coin: 1
+    objective_card: 2
+  top:
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
+  описание: Имей на поле все свои 4 здания энергостанций — награда 1 монета и 2 карты задания.
+- id: o75
+  name: Рудный двор
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД найми два войска разных родов
+  base_reward:
+    coin: 2
+    objective_card: 1
+  top:
+    label: 'ПОГЛОЩЕНИЕ: отбери 1 боеприпас'
+    effect: steal_resource
+    params:
+      resource: ammo
+      amount: 1
+  описание: 'В ЭТОТ ХОД найми два войска разных родов — награда 2 монеты и 1 карта задания. Среди нанятых
+    есть авиация и нет ни одной вышки — условие усилено: 1 трофей.'
+  enhanced:
+    условие: Среди нанятых есть авиация и нет ни одной вышки
+  special_reward:
+    trophy: 1
+- id: o02
+  name: Конвейер
+  kind: regular
+  type: incident
+  checked_by: card
+  requirement:
+    условие: Имей на поле все свои 4 здания добытчиков
+  base_reward:
+    coin: 1
+    objective_card: 2
+  top:
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
+  описание: Имей на поле все свои 4 здания добытчиков — награда 1 монета и 2 карты задания.
+- id: o76
+  name: Расселение
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Займи 4 разных гекса войсками хотя бы 2 видов
+  enhanced:
+    условие: 6 гексов
+  base_reward:
+    coin: 3
+  special_reward:
+    trophy: 1
+  top:
+    label: 'ЗАКРОМА: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ'
+    effect: gain
+    params:
+      order: operation
+      ammo: 1
+  описание: 'Займи 4 разных гекса войсками хотя бы 2 видов — награда 3 монеты. 6 гексов — условие усилено:
+    1 трофей.'
+- id: o77
+  name: Растяжка
+  kind: regular
+  type: state
+  checked_by: card
+  requirement:
+    условие: Займи войсками 5 разных гексов
+  enhanced:
+    условие: На 2 из них есть здания противника
+  base_reward:
+    ammo: 2
+    objective_card: 1
+  special_reward:
+    arsenal: 1
+  top:
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
+  описание: 'Займи войсками 5 разных гексов — награда 2 боеприпаса и 1 карта задания. На 2 из них есть
+    здания противника — условие усилено: карта арсенала.'
+- id: n1
+  name: Подъём
+  kind: starting
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей на поле не меньше трёх своих зданий, считая ЦУ
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 монета
+    effect: gain
+    params:
+      coin: 1
+  описание: Имей на поле не меньше трёх своих зданий, считая ЦУ, — награда трофей и карта задания. Считается
+    и ЦУ, поэтому от подготовки до выполнения ровно две стройки.
+- id: n2
+  name: Первый боец
+  kind: starting
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД найми войско любого рода, кроме вышки
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 боеприпас
+    effect: gain
+    params:
+      ammo: 1
+  описание: 'В ЭТОТ ХОД найми войско любого рода, кроме вышки, — награда трофей и карта задания. Вышка
+    не считается: её ЦУ собирает даром, и наймом это назвать нельзя.'
+- id: n3
+  name: Патроны
+  kind: starting
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей не меньше трёх боеприпасов
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 монета
+    effect: gain
+    params:
+      coin: 1
+  описание: 'Имей не меньше трёх боеприпасов — награда трофей и карта задания. Порог три, а не два: один
+    боеприпас у тебя уже есть с подготовки.'
+- id: n4
+  name: Первая сделка
+  kind: starting
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД воспользуйся предложением карты сделок на рынке
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 боеприпас
+    effect: gain
+    params:
+      ammo: 1
+  описание: 'В ЭТОТ ХОД воспользуйся предложением карты сделок на рынке — награда трофей и карта задания.
+    Напечатанный курс не подходит: карта требует именно предложения карты сделок.'
+- id: n5
+  name: Коммутация
+  kind: starting
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей на поле запитанное здание, стоящее не на гексе с твоим ЦУ
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 монета
+    effect: gain
+    params:
+      coin: 1
+  описание: 'Имей на поле запитанное здание, стоящее не на гексе с твоим ЦУ, — награда трофей и карта
+    задания. Энергия до соседнего гекса сама не дотянется: её надо туда перекинуть Сменой энергии.'
+- id: n6
+  name: Выход
+  kind: starting
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей на поле своё войско на расстоянии двух и больше гексов от гекса с твоим ЦУ
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 боеприпас
+    effect: gain
+    params:
+      ammo: 1
+  описание: Имей на поле своё войско на расстоянии двух и больше гексов от гекса с твоим ЦУ — награда
+    трофей и карта задания. Вышка неподвижна, так что выйти придётся кем-то живым.
+- id: n7
+  name: Жила
+  kind: starting
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей не меньше трёх келемия
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 монета
+    effect: gain
+    params:
+      coin: 1
+  описание: Имей не меньше трёх келемия — награда трофей и карта задания. Келемий равен победному очку,
+    поэтому держать его дорого, а тратить жалко.
+- id: n8
+  name: Находка
+  kind: starting
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей у себя не меньше двух неоткрытых контейнеров
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 боеприпас
+    effect: gain
+    params:
+      ammo: 1
+  описание: Имей у себя не меньше двух неоткрытых контейнеров — награда трофей и карта задания. Вскрытый
+    контейнер сразу уходит, так что придётся терпеть и не открывать.
+- id: n9
+  name: Первый шаг
+  kind: starting
+  type: state
+  checked_by: card
+  requirement:
+    условие: Стой хотя бы на первом шаге любого трека технологий
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 монета
+    effect: gain
+    params:
+      coin: 1
+  описание: Стой хотя бы на первом шаге любого трека технологий — награда трофей и карта задания. За действие
+    Наука больше одного шага на трек не сделать, поэтому начинают все с одного и того же.
+- id: n10
+  name: Первый трофей
+  kind: starting
+  type: state
+  checked_by: card
+  requirement:
+    условие: Имей среди уничтоженных жетонов хотя бы один жетон
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 боеприпас
+    effect: gain
+    params:
+      ammo: 1
+  описание: Имей среди уничтоженных жетонов хотя бы один жетон — награда трофей и карта задания. Трофей
+    берут только с боя, поэтому карта платит за первый настоящий выстрел.
+- id: n11
+  name: Второй заход
+  kind: starting
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД получи действие с нижнего приказа своей карты приказа
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 монета
+    effect: gain
+    params:
+      coin: 1
+  описание: В ЭТОТ ХОД получи действие с нижнего приказа своей карты приказа — награда трофей и карта
+    задания. Нижний приказ открывается не всегда, так что карту держат до подходящего раунда.
+- id: n12
+  name: В унисон
+  kind: starting
+  type: incident
+  checked_by: card
+  requirement:
+    условие: В ЭТОТ ХОД сыграй верхом тот же приказ, что и другой игрок
+  base_reward:
+    trophy: 1
+    objective_card: 1
+  top:
+    label: +1 боеприпас
+    effect: gain
+    params:
+      ammo: 1
+  описание: В ЭТОТ ХОД сыграй верхом тот же приказ, что и другой игрок, — награда трофей и карта задания.
+    Совпавший приказ не срабатывает, так что эта карта — плата за потерянное действие.
