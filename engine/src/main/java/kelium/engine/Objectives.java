@@ -18,10 +18,24 @@ import kelium.dataio.Ctx;
  * forge/engine/objectives.py.
  *
  * <p>Задание в руке играбельно, если выполнено его базовое требование (предикат
- * по состоянию + журналу). При розыгрыше базовая награда даётся всегда
- * (расходники — правило цепочки); если выполнено и усиленное требование,
- * дополнительно даётся особая награда (очковая вещь + свежая карта задания) —
- * награды СКЛАДЫВАЮТСЯ. Задания-жертвы (Ж) сначала платят цену.
+ * по состоянию + журналу). Задания-жертвы (Ж) сначала платят цену.
+ *
+ * <p><b>УСИЛЕННАЯ НАГРАДА — ВМЕСТО БАЗОВОЙ, А НЕ СВЕРХ НЕЁ</b> (правило
+ * дизайнера 16.09.2026). Игрок, выполнивший усиленное требование, получает
+ * ОДНУ награду НА ВЫБОР: базовую или усиленную. Прежде награды складывались, и
+ * усиление было чистой прибавкой — теперь это развилка: усиленная награда
+ * обычно очковая и дальняя, базовая — ресурсная и сейчас.
+ *
+ * <p>Выбор делается ДО оплаты: у заданий-жертв усиление стоит доплаты, и
+ * платить её, не собираясь брать усиленную награду, незачем. Поэтому движок
+ * предлагает две отдельные возможности — «выполнить» и «выполнить усиленно», —
+ * а не спрашивает после.
+ *
+ * <p>Ключ свода {@code objectives.enhanced_reward_replaces_base}. Выключенный
+ * возвращает прежнее сложение: это нужно, чтобы мерить правку отдельно.
+ *
+ * <p>У карт, где блока {@code enhanced} нет вовсе (начальные задания), развилки
+ * нет: обе награды выдаются вместе, как и раньше.
  */
 public final class Objectives {
 
@@ -354,10 +368,58 @@ public final class Objectives {
         return out;
     }
 
-    /** Завершить задание: оплатить жертву, выдать базовую (+особую) награду. */
+    /**
+     * ДОСТУПНО ЛИ УСИЛЕНИЕ этой карты прямо сейчас — то есть надо ли предлагать
+     * игроку вторую возможность, «выполнить усиленно».
+     *
+     * <p>Для жертвы усиление доступно, когда игроку есть чем доплатить разницу;
+     * для остальных — когда выполнено усиленное требование. У карты без блока
+     * {@code enhanced} усиления нет: развилки не будет.
+     */
     @SuppressWarnings("unchecked")
+    public static boolean enhancedAvailable(GameState s, int seat, TurnJournal j, String cid) {
+        Map<String, Object> card = Ctx.cards(s, "objectives").byId(cid);
+        if (card == null) {
+            return false;
+        }
+        Object enh = card.get("enhanced");
+        if (!(enh instanceof Map<?, ?> enhMap)) {
+            return false;
+        }
+        if ("sacrifice_enhanced".equals(enhMap.get("predicate"))) {
+            Object sacObj = card.get("sacrifice");
+            if (!(sacObj instanceof Map<?, ?> sac) || sac.get("resource") == null) {
+                return false;
+            }
+            int sacBase = sac.get("amount") instanceof Number n ? n.intValue() : 0;
+            Object ep = enhMap.get("params");
+            int enhAmt = ep instanceof Map<?, ?> em && em.get("amount") instanceof Number en
+                ? en.intValue() : sacBase;
+            int diff = enhAmt - sacBase;
+            return diff <= 0
+                || sacrificeCapacity(s, s.player(seat), sac.get("resource").toString()) >= diff;
+        }
+        return "card".equals(card.get("checked_by"))
+            ? cardRequirementMet(s, seat, cid, true)
+            : requirementMet(s, seat, j, (Map<String, Object>) enh);
+    }
+
+    /** Завершить задание базовой наградой. */
     public static Map<String, Object> playObjective(GameState s, int seat, TurnJournal j,
                                                      String cid, Consumer<Map<String, Object>> emit) {
+        return playObjective(s, seat, j, cid, emit, false);
+    }
+
+    /**
+     * Завершить задание: оплатить жертву и выдать награду.
+     *
+     * @param усиленно взять УСИЛЕННУЮ награду вместо базовой (и доплатить, если
+     *                 усиление карты — доплата жертвы)
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> playObjective(GameState s, int seat, TurnJournal j,
+                                                     String cid, Consumer<Map<String, Object>> emit,
+                                                     boolean усиленно) {
         PlayerState p = s.player(seat);
         var content = Ctx.cards(s, "objectives");
         Map<String, Object> card = content.byId(cid);
@@ -378,34 +440,51 @@ public final class Objectives {
 
         Map<String, Object> base = new HashMap<>();
         Map<String, Object> special = new HashMap<>();
-        grantBase(s, p, (Map<String, Object>) card.getOrDefault("base_reward", Map.of()), base);
+
+        // ВМЕСТО ИЛИ СВЕРХ. По правилу 16.09.2026 усиленная награда заменяет
+        // базовую, и тогда выдаётся ровно одна из двух. Ключ свода оставлен,
+        // чтобы прежнее сложение можно было померить отдельно.
+        boolean вместо = Boolean.TRUE.equals(Ctx.rules(s)
+                .get("objectives.enhanced_reward_replaces_base", Boolean.TRUE));
 
         boolean enhancedOk = false;
         Object enh = card.get("enhanced");
-        if (enh instanceof Map<?, ?> enhMap && "sacrifice_enhanced".equals(enhMap.get("predicate"))
-                && sacRes != null) {
-            // Усиленная жертва: ДОПЛАТА разницы до усиленной суммы (а не
-            // фантомная проверка «можешь ли»). Бот доплачивает всегда, когда может.
-            Object ep = enhMap.get("params");
-            int enhAmt = ep instanceof Map<?, ?> em && em.get("amount") instanceof Number en
-                ? en.intValue() : sacBase;
-            int diff = enhAmt - sacBase;
-            if (diff > 0 && sacrificeCapacity(s, p, sacRes) >= diff) {
-                paySacrifice(s, p, sacRes, diff, cid);
-                enhancedOk = true;
-            }
-        } else if (enh instanceof Map<?, ?> && ("card".equals(card.get("checked_by"))
-                ? cardRequirementMet(s, seat, cid, true)
-                : requirementMet(s, seat, j, (Map<String, Object>) enh))) {
-            enhancedOk = true;
-        } else if (enh == null) {
+        if (enh == null) {
             // У НАЧАЛЬНЫХ карт усиления нет вовсе (каталог: «без усиления и
             // верха»), и их награда лежит в special_reward. Без этой ветки она
             // не выдавалась НИКОГДА — все восемь начальных заданий выполнялись
-            // впустую. Нет блока enhanced => награда положена за выполнение.
+            // впустую. Нет блока enhanced => развилки нет, выдаётся всё.
             enhancedOk = true;
+            усиленно = false;
+        } else if (усиленно || !вместо) {
+            if (enh instanceof Map<?, ?> enhMap && "sacrifice_enhanced".equals(enhMap.get("predicate"))
+                    && sacRes != null) {
+                // Усиленная жертва: ДОПЛАТА разницы до усиленной суммы (а не
+                // фантомная проверка «можешь ли»).
+                Object ep = enhMap.get("params");
+                int enhAmt = ep instanceof Map<?, ?> em && em.get("amount") instanceof Number en
+                    ? en.intValue() : sacBase;
+                int diff = enhAmt - sacBase;
+                if (diff <= 0) {
+                    enhancedOk = true;
+                } else if (sacrificeCapacity(s, p, sacRes) >= diff) {
+                    paySacrifice(s, p, sacRes, diff, cid);
+                    enhancedOk = true;
+                }
+            } else if (enh instanceof Map<?, ?> && ("card".equals(card.get("checked_by"))
+                    ? cardRequirementMet(s, seat, cid, true)
+                    : requirementMet(s, seat, j, (Map<String, Object>) enh))) {
+                enhancedOk = true;
+            }
         }
-        if (enhancedOk) {
+        // ЗАПРОСИЛИ УСИЛЕНИЕ, А ОНО НЕ ВЫШЛО — карта всё равно выполняется, но
+        // по базовой награде: игрок не должен остаться ни с чем из-за того, что
+        // между предложением и розыгрышем что-то изменилось.
+        boolean толькоУсиленная = вместо && усиленно && enhancedOk;
+        if (!толькоУсиленная) {
+            grantBase(s, p, (Map<String, Object>) card.getOrDefault("base_reward", Map.of()), base);
+        }
+        if (enhancedOk && (!вместо || усиленно)) {
             grantSpecial(s, p, (Map<String, Object>) card.getOrDefault("special_reward", Map.of()), special);
         }
 
@@ -420,7 +499,8 @@ public final class Objectives {
         ev.put("type", "objective");
         ev.put("seat", seat);
         ev.put("card", cid);
-        ev.put("enhanced", enhancedOk);
+        ev.put("enhanced", enhancedOk && (!вместо || усиленно));
+        ev.put("enhanced_instead", толькоУсиленная);
         ev.put("round", s.round);
         ev.put("granted", granted);
         emit.accept(ev);

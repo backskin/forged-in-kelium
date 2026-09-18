@@ -245,14 +245,14 @@ class PrintedContainersTest {
 
     @Test
     void minerSeesContainersOnItsOwnHexAndOnNeighbours() {
-        // ПРАВИЛО ДИЗАЙНЕРА (16.09.2026, дословно): «добытчик добывает контейнер,
-        // ЕСЛИ ТОТ НАПЕЧАТАН НА СОСЕДНЕМ С ДОБЫТЧИКОМ СЕКТОРЕ. И НЕ ВОЗДУШНОМ.
-        // И НЕ ПРОСТО НА ГЕКСЕ. ПЛЮС ОН МОЖЕТ БЫТЬ НА СОСЕДНЕМ ГЕКСЕ».
+        // ПРАВИЛО ДИЗАЙНЕРА (12.08.2026, возвращено 18.09.2026): добытчик берёт
+        // ОТКРЫТЫЙ контейнер со своего гекса, а если своего нет — с гекса,
+        // к которому стоит стенкой. Сектор контейнера не смотрят вовсе.
         //
-        // До этой даты движок отдавал контейнер с ЛЮБОГО сектора своего гекса —
-        // добытчик дотягивался через весь гекс, — и с любого сектора соседа.
-        // Здесь проверяется примыкание: сектор контейнера соседний с сектором
-        // добытчика по кругу, а на соседнем гексе — смотрящий на добытчика.
+        // 16.09.2026 правило сужали до «сектор контейнера соседний с сектором
+        // добытчика», и этот тест охранял сужение. Онлайн-тест 18.09.2026 его
+        // отменил, поэтому проверки перевёрнуты: теперь дальний сектор ОБЯЗАН
+        // добываться. Что осталось неизменным — накрытый контейнер не виден.
         GameState s = null;
         Hex withContainer = null;
         for (long seed = 29; seed < 90 && withContainer == null; seed++) {
@@ -268,22 +268,19 @@ class PrintedContainersTest {
         assertTrue(withContainer != null, "на поле есть открытый наземный контейнер");
         int cell = withContainer.containerCell;
 
-        // СОСЕДНИЙ СЕКТОР СВОЕГО ГЕКСА — добывается
+        // СВОЙ ГЕКС, ЛЮБОЙ СЕКТОР — добывается, и соседний, и дальний.
         kelium.core.BuildingToken here = s.tokenStats.makeBuilding(
             kelium.core.BuildingType.MINER, 0, 9200, 2);
         here.hexId = withContainer.id;
-        withContainer.sideOwner[(cell + 1) % 6] = here.uid;
-        assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, here),
-            "контейнер на секторе рядом с добытчиком добывается");
+        for (int сдвиг : new int[] {1, 2, 3}) {
+            withContainer.sideOwner[(cell + сдвиг) % 6] = here.uid;
+            assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, here),
+                "на своём гексе добытчик дотягивается до любого сектора (сдвиг "
+                    + сдвиг + ")");
+            withContainer.sideOwner[(cell + сдвиг) % 6] = null;
+        }
 
-        // ДАЛЬНИЙ СЕКТОР ТОГО ЖЕ ГЕКСА — не добывается
-        withContainer.sideOwner[(cell + 1) % 6] = null;
-        withContainer.sideOwner[(cell + 3) % 6] = here.uid;
-        assertNull(PrintedContainers.minableContainerHex(s, here),
-            "через весь гекс добытчик не дотягивается");
-        withContainer.sideOwner[(cell + 3) % 6] = null;
-
-        // СОСЕДНИЙ ГЕКС — только через сектор, смотрящий на добытчика. Сосед
+        // СОСЕДНИЙ ГЕКС — тоже любой сектор, важна только общая стенка. Сосед
         // берётся такой, у которого своего контейнера нет: иначе добытчик
         // увидит контейнер на своём гексе, и это будет верный ответ, а не ошибка.
         Hex nbHex = null;
@@ -310,14 +307,12 @@ class PrintedContainersTest {
             kelium.core.BuildingType.MINER, 0, 9201, 2);
         next.hexId = nbHex.id;
         nbHex.occupySides(next.uid, java.util.List.of(facing));
-        // сектор соседа, смотрящий на добытчика, — это (facing + 3) % 6 у гекса
-        // с контейнером; правило срабатывает только если контейнер стоит там
-        withContainer.containerCell = (facing + 3) % 6;
+        withContainer.containerCell = (facing + 3) % 6;      // смотрит на добытчика
         assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, next),
-            "с соседнего гекса добывается контейнер на смотрящем секторе");
-        withContainer.containerCell = ((facing + 3) % 6 + 2) % 6;
-        assertNull(PrintedContainers.minableContainerHex(s, next),
-            "дальний сектор соседнего гекса добытчику не достаётся");
+            "с соседнего гекса контейнер добывается");
+        withContainer.containerCell = ((facing + 3) % 6 + 2) % 6;   // дальний сектор
+        assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, next),
+            "сектор на соседнем гексе не важен: добытчик стоит к нему стенкой");
 
         // накрыли ячейку зданием — контейнер больше не виден
         withContainer.containerCell = cell;

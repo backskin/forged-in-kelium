@@ -567,6 +567,12 @@ public final class Actions {
             // телеметрию: по ней мерится, какие рода игрок вообще производит.
             Map<String, Integer> madeByType = new HashMap<>();
             int[] paid = {0, 0};
+            // ВОЗВРАТ ВОЙСК В ЗАПАС — ДО производства (дизайнер, 18.09.2026):
+            // «в действие Снаряжение игрок может вернуть в запас с поля любое
+            // число войск». Именно до, а не после: освободившийся жетон рода
+            // тут же годится в производство, и в этом весь смысл — иначе
+            // возврат был бы просто уборкой поля.
+            int returnedUnits = returnUnitsToReserve(player, agent);
             // ПРЕДЕЛ С КАРТЫ: бесплатная Сборка бывает «не более чем N зданиями».
             int buildingLimit = ctx.objectLimit(name());
             int buildingsUsed = 0;
@@ -739,7 +745,57 @@ public final class Actions {
             tel.put("power_coins", paid[0]);
             tel.put("power_offers", paid[1]);
             tel.put("ammo", ammoMade);
+            tel.put("returned_units", returnedUnits);
             return ActionResult.ok("assembled " + unitsMade + " units, " + ammoMade + " ammo", tel);
+        }
+
+        /**
+         * ВЕРНУТЬ В ЗАПАС ЛЮБОЕ ЧИСЛО СВОИХ ВОЙСК (дизайнер, 18.09.2026).
+         *
+         * <p>Даром, без перемещения и без условий: игрок раз за разом называет
+         * жетон, который снимает с поля, пока не откажется. «Любое число» здесь
+         * буквальное — предела нет, вплоть до пустого поля.
+         *
+         * <p>Возврат в запас — это НЕ гибель: трофея никто не получает, урон
+         * с жетона снимается, и жетон снова годится в производство
+         * ({@code hexId == null} — ровно то, что ищет ветка переиспользования
+         * ниже). Гарнизон внутри здания выходит вместе с гексом, это делает
+         * {@code setHexId(null)}.
+         *
+         * @return сколько жетонов вернулось в запас
+         */
+        private int returnUnitsToReserve(PlayerState player, Agent agent) {
+            if (!Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                    .get("actions.assembly.return_units_to_reserve", Boolean.FALSE))) {
+                return 0;
+            }
+            int returned = 0;
+            while (true) {
+                List<UnitToken> onField = player.unitsOnField();
+                if (onField.isEmpty()) {
+                    return returned;
+                }
+                List<Choice> opts = new ArrayList<>();
+                for (UnitToken u : onField) {
+                    opts.add(new Choice("return_unit", u.uid,
+                        u.type.code + "@" + u.hexId + "->запас"));
+                }
+                opts.add(new Choice("pass", null, "никого не возвращать"));
+                Choice pick = agent.choose(state, opts,
+                    Map.of("kind", "return_unit", "on_field", onField.size()));
+                if (pick == null || pick.payload() == null) {
+                    return returned;
+                }
+                int uid = ((Number) pick.payload()).intValue();
+                for (UnitToken u : onField) {
+                    if (u.uid == uid) {
+                        u.setHexId(null);
+                        u.resetDamage();
+                        returned++;
+                        break;
+                    }
+                }
+            }
         }
 
         /**

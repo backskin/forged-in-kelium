@@ -79,7 +79,7 @@ public final class БесполезныеЗдания {
                     }
                     int[] c = счёт.computeIfAbsent(b.type.code, k -> new int[2]);
                     c[0]++;
-                    if (!Actions.roomForBuildingAndUnit(s, b.hexId, 0, род)) {
+                    if (!Actions.roomForBuildingAndUnit(s, b.hexId, 0, род, p.seat)) {
                         c[1]++;
                     }
                 }

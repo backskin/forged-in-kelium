@@ -1637,12 +1637,20 @@ public final class HotSeatWindow {
         List<kelium.gui.kp.CardMenu.Card> cards = new ArrayList<>();
         for (String id : p.objectiveHand) {
             Integer доВыполнения = indexOfSpec(opts, "spec_objective", id);
+            Integer доУсиления = indexOfSpec(opts, "spec_objective_enh", id);
             Integer доСожжения = indexOfSpec(opts, "spec_objective_burn", id);
             List<kelium.gui.kp.CardMenu.Act> acts = new ArrayList<>();
             acts.add(new kelium.gui.kp.CardMenu.Act("Выполнить задание",
                 objectiveReward(id), доВыполнения != null,
                 "условие ещё не выполнено",
                 доВыполнения == null ? () -> { } : () -> submitSpec(agent, доВыполнения)));
+            // УСИЛЕНИЕ — ОТДЕЛЬНАЯ КНОПКА (правило 16.09.2026): усиленная награда
+            // даётся ВМЕСТО базовой, значит это развилка, а не галочка. Кнопки
+            // нет вовсе, пока движок не предложил усиление.
+            acts.add(new kelium.gui.kp.CardMenu.Act("Выполнить усиленно",
+                objectiveBonus(id), доУсиления != null,
+                "усиленное условие ещё не выполнено",
+                доУсиления == null ? () -> { } : () -> submitSpec(agent, доУсиления)));
             String утиль = objectiveTop(id);
             acts.add(new kelium.gui.kp.CardMenu.Act("Сжечь ради утиля",
                 утиль == null ? "" : утиль, доСожжения != null,

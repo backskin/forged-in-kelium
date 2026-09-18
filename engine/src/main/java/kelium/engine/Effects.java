@@ -2115,7 +2115,7 @@ public final class Effects {
             }
             // ЕДИНСТВЕННАЯ ПРОВЕРКА — место. Правила проходимости не спрашиваются:
             // это телепорт, а не движение.
-            if (!Actions.roomForUnit(s, target, u.type)) {
+            if (!Actions.roomForUnit(s, target, u.type, pl.seat)) {
                 continue;
             }
             boolean wasInside = u.inside();

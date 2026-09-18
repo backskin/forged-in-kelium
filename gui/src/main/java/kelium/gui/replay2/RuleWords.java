@@ -350,15 +350,17 @@ public final class RuleWords {
             case "building_compensation_containers.power_station_by_level" ->
                 "контейнеров за энергостанцию, по уровням";
 
+            case "actions.assembly.return_units_to_reserve" ->
+                "в Снаряжении можно вернуть в запас любое число своих войск";
+
             // ---------- Контейнеры ----------
             case "containers.mode" -> "откуда берутся контейнеры";
             case "containers.printed_requires_empty_hex" ->
                 "печатный контейнер берут только с пустого гекса";
             case "containers.mining_needs_adjacent_sector" ->
-                "Добыча берёт контейнер только с сектора, соседнего "
-                    + "с сектором добытчика";
+                "Добыча смотрит на сектор контейнера, а не только на гекс";
             case "containers.mining_air_cell" ->
-                "воздушную ячейку Добыча не берёт никогда";
+                "Добыча берёт и воздушную ячейку";
             case "containers_storage.arsenal_cells" ->
                 "ячеек под контейнеры на картах арсенала";
             case "symbols.tuck_is_free" ->

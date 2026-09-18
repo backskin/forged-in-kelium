@@ -475,6 +475,15 @@ public class PlannerAgent extends Agent {
      *   <li>4 и дальше — то же по кругу, но с шумом.</li>
      * </ul>
      */
+    /**
+     * ВЫПОЛНЕНИЕ ЗАДАНИЯ — любой из двух вариантов. С правила 16.09.2026
+     * («усиленная награда вместо базовой») движок предлагает выполнить задание
+     * двумя способами, и сценарию «ход ради задания» годятся оба.
+     */
+    private static boolean выполнение(kelium.core.Choice o) {
+        return "spec_objective".equals(o.kind()) || "spec_objective_enh".equals(o.kind());
+    }
+
     private Agent policy(int i, long seed) {
         Random r = new Random(seed);
         StrategicAgent base = new StrategicAgent(seat, r, genome, character);
@@ -483,7 +492,7 @@ public class PlannerAgent extends Agent {
             a = new NoisyAgent(base, 0.2, r);
         }
         return switch (i % 5) {
-            case 1 -> new Prefer(a, Map.of("spec", o -> "spec_objective".equals(o.kind())));
+            case 1 -> new Prefer(a, Map.of("spec", PlannerAgent::выполнение));
             case 2 -> new Prefer(a, Map.of("spec", o -> "spec_arsenal_install".equals(o.kind())));
             case 3 -> aggressive(a);
             // ХОД РАДИ ЗАДАНИЯ. У исполнителя есть наведение по заданиям — оно
@@ -497,7 +506,7 @@ public class PlannerAgent extends Agent {
                 StrategicAgent ради = new StrategicAgent(seat, r,
                     genome.with("objective.pursuit", genome.get("objective.pursuit", 3.0) * 3.0),
                     character);
-                yield new Prefer(ради, Map.of("spec", o -> "spec_objective".equals(o.kind())));
+                yield new Prefer(ради, Map.of("spec", PlannerAgent::выполнение));
             }
             default -> a;
         };

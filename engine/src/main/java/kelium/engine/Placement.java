@@ -167,6 +167,15 @@ public final class Placement {
             if (h.kind == HexKind.FORBIDDEN || h.hasSpawnTile()) {
                 continue;
             }
+            // ЧУЖИЕ ВОЙСКА ЗАПИРАЮТ ГЕКС ДЛЯ СТРОЙКИ (правило дизайнера
+            // 16.09.2026). Войско имеет право стоять на гексе с вашим зданием —
+            // и ничего страшного, — но пока оно там, на этом гексе не появится
+            // ничего нового и не исчезнет ничего старого: ни постройки, ни
+            // сноса. Снос ходит через тот же список гексов, поэтому правило
+            // стоит здесь одно на обе операции.
+            if (enemyUnitsLockHex(state, hid, seat)) {
+                continue;
+            }
             // НЕЙТРАЛЬНОЕ ЗДАНИЕ САМО ПО СЕБЕ НЕ ЗАКРЫВАЕТ ГЕКС (баг найден
             // дизайнером 14.08.2026): оно занимает СВОИ стороны гекса, и если
             // общее ребро с ЦУ (или другим своим зданием) не среди них, проход
@@ -224,17 +233,76 @@ public final class Placement {
             return false;
         }
         if (t == kelium.core.UnitType.AIRCRAFT) {
-            for (PlayerState pl : state.players) {
-                for (kelium.core.UnitToken u : pl.units) {
-                    if (u.type == kelium.core.UnitType.AIRCRAFT && hexId.equals(u.hexId)) {
-                        return false;   // воздушная ячейка занята
-                    }
-                }
-            }
-            return true;
+            return skyOpen(state, hexId, player.seat, -1);
         }
         int[] load = groundLoad(state, hexId, -1);
         return h.fitsWithRepack(t == kelium.core.UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
+    }
+
+    /**
+     * ОТКРЫТО ЛИ НЕБО ГЕКСА для авиации игрока {@code seat}
+     * (правило дизайнера 16.09.2026).
+     *
+     * <p>Прежде в небе гекса помещался РОВНО ОДИН жетон авиации, чей угодно.
+     * Теперь небо вмещает СКОЛЬКО УГОДНО жетонов — но только ОДНОГО игрока:
+     * встать в небо, где уже стоит чужая авиация, нельзя, а рядом со своей —
+     * можно без счёта.
+     *
+     * <p>Ключ свода {@code field.sky_single_owner}. Выключенный возвращает
+     * прежнее правило «одна авиация на гекс».
+     *
+     * @param excludeUid жетон, который сейчас входит или выходит (не считать);
+     *                   {@code -1} — считать все
+     */
+    public static boolean skyOpen(GameState state, String hexId, int seat, int excludeUid) {
+        boolean одинХозяин = Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                .get("field.sky_single_owner", Boolean.TRUE));
+        for (PlayerState pl : state.players) {
+            for (UnitToken u : pl.units) {
+                if (u.type != UnitType.AIRCRAFT || u.uid == excludeUid
+                        || !hexId.equals(u.hexId) || !u.alive() || u.inside()) {
+                    continue;
+                }
+                if (!одинХозяин || pl.seat != seat) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * ЗАПИРАЮТ ЛИ ЧУЖИЕ ВОЙСКА ГЕКС ДЛЯ СТРОЙКИ И НАЙМА
+     * (правило дизайнера 16.09.2026).
+     *
+     * <p>Чужие войска — наземные и авиация в небе — не мешают стоять на гексе
+     * чужому ЗДАНИЮ: войско спокойно встаёт на гекс с вашей постройкой. Но пока
+     * оно там стоит, на этом гексе нельзя:
+     * <ul>
+     *   <li>построить что бы то ни было новое;</li>
+     *   <li>снести своё здание (снос — такая же операция Стройки);</li>
+     *   <li>поставить нанятый жетон НА ГЕКС — он садится гарнизоном в здание.</li>
+     * </ul>
+     *
+     * <p>Ключ свода {@code field.enemy_units_block_build}.
+     */
+    public static boolean enemyUnitsLockHex(GameState state, String hexId, int seat) {
+        if (!Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                .get("field.enemy_units_block_build", Boolean.TRUE))) {
+            return false;
+        }
+        return Passability.enemyUnitsOn(state, hexId, seat);
+    }
+
+    /**
+     * МОЖНО ЛИ ПОСТАВИТЬ НА ГЕКС нанятый жетон: есть место И гекс не заперт
+     * чужими войсками. Нанимают не только Снаряжением, но и карты арсенала —
+     * правило одно на всех, иначе карта тихо обходит его.
+     */
+    public static boolean canHireOn(GameState state, PlayerState player,
+                                    String hexId, kelium.core.UnitType t) {
+        return !enemyUnitsLockHex(state, hexId, player.seat)
+            && hasRoomOnHex(state, player, hexId, t);
     }
 
     public static int nextUid(GameState state) {

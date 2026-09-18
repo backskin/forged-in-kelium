@@ -56,7 +56,7 @@ class МестоПодТехникуTest {
         GameState s = стол();
         String hex = пустойГекс(s);
         int след = Actions.buildingFootprint(BuildingType.FACTORY);
-        assertTrue(Actions.roomForBuildingAndUnit(s, hex, след, UnitType.VEHICLE),
+        assertTrue(Actions.roomForBuildingAndUnit(s, hex, след, UnitType.VEHICLE, 0),
             "на пустом гексе завод и техника обязаны уместиться");
     }
 
@@ -73,14 +73,14 @@ class МестоПодТехникуTest {
             h.sideOwner[i] = 99;
         }
         // Здание встало посередине свободной дуги — техника уже не влезет.
-        assertFalse(Actions.roomAfterFootprint(s, hex, List.of(1, 2), UnitType.VEHICLE),
+        assertFalse(Actions.roomAfterFootprint(s, hex, List.of(1, 2), UnitType.VEHICLE, 0),
             "след посреди свободной дуги режет место под технику");
         // Здание прижалось к краю дуги — две смежные ячейки остались... нет,
         // осталась одна: значит и этот поворот плох, и правило это видит.
-        assertFalse(Actions.roomAfterFootprint(s, hex, List.of(0, 1), UnitType.VEHICLE),
+        assertFalse(Actions.roomAfterFootprint(s, hex, List.of(0, 1), UnitType.VEHICLE, 0),
             "после двухклеточного здания на трёх свободных ячейках техники не будет");
         // А пехоте одной ячейки хватает — и правило обязано это различать.
-        assertTrue(Actions.roomAfterFootprint(s, hex, List.of(0, 1), UnitType.INFANTRY),
+        assertTrue(Actions.roomAfterFootprint(s, hex, List.of(0, 1), UnitType.INFANTRY, 0),
             "пехоте достаточно одной свободной ячейки");
     }
 
@@ -95,7 +95,7 @@ class МестоПодТехникуTest {
             h.sideOwner[i] = 99;
         }
         int след = Actions.buildingFootprint(BuildingType.FACTORY);
-        assertFalse(Actions.roomForBuildingAndUnit(s, hex, след, UnitType.VEHICLE),
+        assertFalse(Actions.roomForBuildingAndUnit(s, hex, след, UnitType.VEHICLE, 0),
             "гекс, где после завода не остаётся места технике, годным считаться не может");
     }
 }

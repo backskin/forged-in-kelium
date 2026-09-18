@@ -164,6 +164,12 @@ public final class Genome {
         // мог его выбрать, а карта на перестройку — выполниться. Снос теперь
         // ВОЗВРАЩАЕТ монету (свод 1.39.0), так что выгода вполне может быть.
         w.put("build.demolish", 0.06);
+        // УСИЛЕННАЯ НАГРАДА ВМЕСТО БАЗОВОЙ (правило 16.09.2026). У выполнимого
+        // задания теперь две развилки, и какую брать — вопрос характера, а не
+        // автора кода: усиленная награда обычно очковая и дальняя, базовая —
+        // ресурсная и сейчас. Вес множит оценку выполнения; около единицы, чтобы
+        // обе ветки были живыми с первого поколения.
+        w.put("objective.enhanced", 1.15);
         w.put("build.strike_building", 5.0);    // строить завод/авиабазу (техника/авиация бьют ЦУ)
         w.put("assemble.strike_unit", 4.0);     // производить технику/авиацию (единственные, кто бьёт ЦУ)
         w.put("combat.hit_leader", 5.0);        // бонус за удар по токенам лидера
@@ -362,6 +368,7 @@ public final class Genome {
             "combat.kill_value", "combat.building_bonus", "combat.cu_bonus",
             "combat.raze_neutral", "combat.hit_leader",
             "build.strike_building", "build.demolish", "assemble.strike_unit",
+            "objective.enhanced",
             "plan.value.kelium", "plan.value.sell", "plan.value.tech",
             "plan.value.army", "plan.value.economy", "plan.value.objective",
             "plan.chain_penalty", "plan.focus",

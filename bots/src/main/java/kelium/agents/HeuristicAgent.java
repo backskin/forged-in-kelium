@@ -380,6 +380,31 @@ public class HeuristicAgent extends Agent {
                 }
                 return 4.0 * (ценаНовой - ценаСтарой);
             };
+            // ВЕРНУТЬ ВОЙСКО В ЗАПАС (Снаряжение, правило 18.09.2026). Без
+            // оценки эта точка выбора разоружала бота: при пустом оценщике он
+            // берёт ЛЮБОЙ вариант кроме отказа — то есть каждое Снаряжение
+            // сметал бы с поля всю свою армию до последнего жетона.
+            //
+            // Отказ стоит дорого: возврат осмыслен ровно в одном случае —
+            // запас рода кончился, а жетон этого рода стоит на поле без дела,
+            // и производство из-за него встало. Раненый жетон возвращается
+            // охотнее: в запасе с него снимается урон.
+            case "return_unit" -> (s, o) -> {
+                if (o.payload() == null) {
+                    return 1.0;                 // никого не возвращать
+                }
+                int uid = ((Number) o.payload()).intValue();
+                for (kelium.core.UnitToken u : s.player(seat).unitsOnField()) {
+                    if (u.uid != uid) {
+                        continue;
+                    }
+                    boolean запасКончился = s.player(seat).unitsOfKind(u.type)
+                        >= s.tokenStats.unitStock(u.type);
+                    double цена = запасКончился ? 1.2 : 0.0;
+                    return цена + (u.damage > 0 ? 0.6 : 0.0) - 2.0 * польза(s, u.type);
+                }
+                return 0.0;
+            };
             case "module_place_red" -> (s, o) -> scoreModuleRed(s, o);
             // ЧТО СНИМАТЬ ПРИ ПЕРЕНОСЕ. Раньше у этих двух шагов не было оценки
             // вовсе: бот брал первый попавшийся вариант. Снимать надо ГЛУХОЙ
@@ -1527,7 +1552,7 @@ public class HeuristicAgent extends Agent {
             kelium.core.BuildingType бт = kelium.core.BuildingType.fromCode(btype);
             UnitType род = kelium.engine.Actions.ASSEMBLY_UNIT.get(бт);
             if (род != null && !kelium.engine.Actions.roomForBuildingAndUnit(
-                    state, hid, kelium.engine.Actions.buildingFootprint(бт), род)) {
+                    state, hid, kelium.engine.Actions.buildingFootprint(бт), род, seat)) {
                 return 0.05;
             }
             // УДАРНОЕ ЗДАНИЕ СТАВИМ БЛИЖЕ К ПРОТИВНИКУ. Раньше этот метод не
@@ -1671,7 +1696,7 @@ public class HeuristicAgent extends Agent {
         kelium.core.BuildingType бт = kelium.core.BuildingType.fromCode(btype);
         UnitType род = бт == null ? null : kelium.engine.Actions.ASSEMBLY_UNIT.get(бт);
         if (род != null && род != UnitType.AIRCRAFT && род != UnitType.TOWER
-                && !kelium.engine.Actions.roomAfterFootprint(state, hid, sides, род)) {
+                && !kelium.engine.Actions.roomAfterFootprint(state, hid, sides, род, seat)) {
             v -= 10.0;
         }
         return v;
@@ -2443,6 +2468,11 @@ public class HeuristicAgent extends Agent {
             case "pass" -> 0.2;
             case "spec_super_deploy" -> 100.0;
             case "spec_objective" -> scoreObjectiveComplete(state, (String) o.payload());
+            // ВЫПОЛНИТЬ УСИЛЕННО — отдельный вариант, а не прибавка: усиленная
+            // награда даётся ВМЕСТО базовой (правило 16.09.2026). Какую из двух
+            // брать, решает отбор, а не константа в коде.
+            case "spec_objective_enh" -> scoreObjectiveComplete(state, (String) o.payload())
+                * wget("objective.enhanced");
             case "spec_objective_burn" -> scoreObjectiveBurn(state, (String) o.payload());
             case "spec_super" -> 3.0;
             case "spec_arsenal_install" -> scoreArsenalInstall(state, (String) o.payload());

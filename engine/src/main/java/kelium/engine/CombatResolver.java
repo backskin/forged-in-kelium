@@ -2000,7 +2000,7 @@ public final class CombatResolver {
             List<Choice> opts = new ArrayList<>();
             for (UnitToken u : свои) {
                 for (String куда : state.field.neighbors(hexId)) {
-                    if (Actions.roomForUnit(state, куда, u.type)) {
+                    if (Actions.roomForUnit(state, куда, u.type, pl.seat)) {
                         opts.add(new Choice("withdraw_to", new Object[]{u, куда},
                             u.type.code + " -> " + куда));
                     }
