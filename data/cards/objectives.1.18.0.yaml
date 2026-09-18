@@ -32,10 +32,8 @@ objectives:
   special_reward:
     module: attack
   top:
-    label: 'ЗАГРАДИТЕЛЬНЫЙ ОГОНЬ: твоё уничтоженное здание наносит 1 урон убийце'
-    effect: reaction
-    params:
-      kind: barrage
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
   описание: 'Имей на поле два своих добытчика с полной энергией, примыкающих к разным зарождениям — награда
     3 монеты. Оба примыкают к большим зарождениям — условие усилено: жетон модуля атаки.'
 - id: o05
@@ -52,10 +50,8 @@ objectives:
   special_reward:
     module: assembly
   top:
-    label: 'ОТХОД: в чужой Бой уведи один свой жетон из атакуемого гекса на один гекс'
-    effect: reaction
-    params:
-      kind: withdraw
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
   описание: 'В ЭТОТ ХОД забери последний келемий с зарождения — награда 3 монеты. Ты исчерпал зарождение
     - оно ушло с поля — условие усилено: жетон модуля сборки.'
 - id: o40
@@ -73,11 +69,11 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: 'ПОГЛОЩЕНИЕ: отбери 1 боеприпас'
-    effect: steal_resource
+    label: 'ЗАКРОМА: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ'
+    effect: gain
     params:
-      resource: ammo
-      amount: 1
+      order: operation
+      ammo: 1
   описание: 'Имей одновременно ноль монет и ноль боеприпасов — награда 2 монеты и 1 боеприпас. Не имей
     даже келемий — условие усилено: 1 трофей.'
 - id: o08
@@ -91,10 +87,10 @@ objectives:
     coin: 2
     ammo: 1
   top:
-    label: ПОЛНОЦЕННЫЙ БОЙ
-    effect: free_action
+    label: 'РАЗВЁРТЫВАНИЕ: поставь 1 войско из запаса'
+    effect: deploy_units
     params:
-      action: combat
+      count: 1
   описание: В ЭТОТ ХОД забери 3 контейнера (добытчиками или войсками) — награда 2 монеты и 1 боеприпас.
 - id: o01
   name: Полный залп
@@ -132,8 +128,10 @@ objectives:
   special_reward:
     module: assembly
   top:
-    label: РЕМОНТ ГЕКСА
-    effect: heal_hex
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
   описание: 'Имей 3 своих войска на гексах, где нет твоих зданий — награда 2 монеты и 1 карта задания.
     Четыре - и все стоят на разных гексах — условие усилено: жетон модуля сборки.'
 - id: o03
@@ -151,10 +149,10 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: 'ОТВЕТНЫЙ ОГОНЬ: твоё уничтоженное войско наносит 1 урон убийце'
-    effect: reaction
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
     params:
-      kind: return_fire
+      action: combat
   описание: 'Имей на поле 2 свои вышки на разных гексах (обе не на гексе с ЦУ) — награда 1 монета и 2
     боеприпаса. Одна из вышек стоит на гексе с жетонами врага — условие усилено: 1 трофей.'
 - id: o07
@@ -172,10 +170,10 @@ objectives:
   special_reward:
     arsenal: 1
   top:
-    label: 'ЗАГРАДИТЕЛЬНЫЙ ОГОНЬ: твоё уничтоженное здание наносит 1 урон убийце'
+    label: 'РИКОШЕТ: атака по твоему жетону переходит на любой другой жетон в том же гексе'
     effect: reaction
     params:
-      kind: barrage
+      kind: ricochet
   описание: 'Имей военное здание с войском внутри, по соседству с гексом, где есть жетоны врага — награда
     1 монета и 2 боеприпаса. Два таких военных здания — условие усилено: карта арсенала.'
 - id: o27
@@ -192,10 +190,10 @@ objectives:
   special_reward:
     arsenal: 1
   top:
-    label: 'РИКОШЕТ: атака по твоему жетону переходит на любой другой жетон в том же гексе'
+    label: 'ОТВЕТНЫЙ ОГОНЬ: твоё уничтоженное войско наносит 1 урон убийце'
     effect: reaction
     params:
-      kind: ricochet
+      kind: return_fire
   описание: 'Имей своё войско на гексе, где есть здания врага — награда 3 боеприпаса. Имей на одном таком
     гексе два своих войска — условие усилено: карта арсенала.'
 - id: o63
@@ -213,10 +211,10 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: 'ОТВЕТНЫЙ ОГОНЬ: твоё уничтоженное войско наносит 1 урон убийце'
-    effect: reaction
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
     params:
-      kind: return_fire
+      action: movement
   описание: 'Имей в запасе 0 войск одного вида — награда 2 боеприпаса и 1 карта задания. Двух видов —
     условие усилено: 1 трофей.'
 - id: o33
@@ -231,7 +229,7 @@ objectives:
     ammo: 1
     objective_card: 1
   top:
-    label: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ
+    label: 'ЗАКРОМА: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ'
     effect: gain
     params:
       order: operation
@@ -254,10 +252,10 @@ objectives:
   special_reward:
     module: attack
   top:
-    label: ПОЛНОЦЕННЫЙ БОЙ
-    effect: free_action
+    label: 'РАЗВЁРТЫВАНИЕ: поставь 1 войско из запаса'
+    effect: deploy_units
     params:
-      action: combat
+      count: 1
   описание: 'Дойди до второй ступени хотя бы в одном треке технологий — награда 2 монеты и 1 карта задания.
     На двух разных треках — условие усилено: жетон модуля атаки.'
 - id: o34
@@ -271,11 +269,10 @@ objectives:
     coin: 1
     ammo: 2
   top:
-    label: 'ЗАКРОМА: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ'
-    effect: gain
+    label: 'РАЗВЁРТЫВАНИЕ: поставь 1 войско из запаса'
+    effect: deploy_units
     params:
-      order: operation
-      ammo: 1
+      count: 1
   описание: В ЭТОТ ХОД потрать в Научном отделе трофеи тремя разными способами — награда 1 монета и 2
     боеприпаса.
 - id: o64
@@ -291,10 +288,8 @@ objectives:
   special_reward:
     arsenal: 1
   top:
-    label: ПОЛНОЦЕННЫЙ БОЙ
-    effect: free_action
-    params:
-      action: combat
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
   описание: В ЭТОТ ХОД потрать в Научном отделе трофеи тремя разными способами — награда 1 монета и 2
     карты задания.
 - id: o17
@@ -311,8 +306,10 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
-    effect: energy_or_modules
+    label: 'РАЗВЁРТЫВАНИЕ: поставь 1 войско из запаса'
+    effect: deploy_units
+    params:
+      count: 1
   описание: 'Имей своё здание на гексе, соседнем с гексом со зданием врага — награда 3 монеты. С гексом
     с ЦУ врага — условие усилено: 1 трофей.'
 - id: o11
@@ -329,10 +326,10 @@ objectives:
   special_reward:
     arsenal: 1
   top:
-    label: ПОЛНЫЙ МАНЁВР
-    effect: free_action
+    label: 'РАЗВЁРТЫВАНИЕ: поставь 1 войско из запаса'
+    effect: deploy_units
     params:
-      action: movement
+      count: 1
   описание: 'В ЭТОТ ХОД построй свое здание на гексе, соседнем с гексом, где есть войска врага — награда
     3 монеты. На том же соседнем гексе есть здание врага — условие усилено: карта арсенала.'
 - id: o18
@@ -349,10 +346,10 @@ objectives:
   special_reward:
     arsenal: 1
   top:
-    label: РАЗЫГРАЙ БОЙ ПЕРЕД ЧУЖИМ БОЕМ
-    effect: reaction
+    label: 'РАЗВЁРТЫВАНИЕ: поставь 1 войско из запаса'
+    effect: deploy_units
     params:
-      kind: battle_first
+      count: 1
   описание: 'Все твои здания, требующие энергию, запитаны (не менее 3) — награда 3 монеты. Не менее 4
     зданий — условие усилено: карта арсенала.'
 - id: o65
@@ -370,10 +367,10 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: ПОЛНОЦЕННЫЙ БОЙ
+    label: ПОЛНЫЙ МАНЁВР
     effect: free_action
     params:
-      action: combat
+      action: movement
   описание: 'В ЭТОТ ХОД снеси своё здание и построй другое — награда 2 монеты и 1 карта задания. Построенное
     встало на тот же гекс, где стояло снесённое — условие усилено: 1 трофей.'
 - id: o15
@@ -390,8 +387,10 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
-    effect: energy_or_modules
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
+    params:
+      action: movement
   описание: 'В ЭТОТ ХОД построй 2 здания на разных гексах — награда 3 боеприпаса. 3 здания на разных и
     несоседних между собой гексах — условие усилено: 1 трофей.'
 - id: o12
@@ -424,8 +423,8 @@ objectives:
   base_reward:
     coin: 3
   top:
-    label: РЕМОНТ ГЕКСА
-    effect: heal_hex
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
   описание: 'Имей на двух зданиях - источниках энергии ровно один свободный кубик — награда 3 монеты.
     На трех источниках энергии — условие усилено: ничего.'
 - id: o66
@@ -438,10 +437,10 @@ objectives:
   base_reward:
     module: attack
   top:
-    label: 'ОТВЕТНЫЙ ОГОНЬ: твоё уничтоженное войско наносит 1 урон убийце'
+    label: 'ЗАГРАДИТЕЛЬНЫЙ ОГОНЬ: твоё уничтоженное здание наносит 1 урон убийце'
     effect: reaction
     params:
-      kind: return_fire
+      kind: barrage
   sacrifice:
     amount: 1
     resource: arsenal_cards
@@ -456,10 +455,10 @@ objectives:
   base_reward:
     trophy: 1
   top:
-    label: 'ОТХОД: в чужой Бой уведи один свой жетон из атакуемого гекса на один гекс'
+    label: 'ЭВАКУАЦИЯ ТРОФЕЕВ: твой уничтоженный жетон уходит в твой запас'
     effect: reaction
     params:
-      kind: withdraw
+      kind: evacuate_trophy
   sacrifice:
     amount: 2
     resource: ammo
@@ -478,8 +477,10 @@ objectives:
   special_reward:
     module: assembly
   top:
-    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
-    effect: energy_or_modules
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
   sacrifice:
     amount: 2
     resource: units_on_field
@@ -497,11 +498,8 @@ objectives:
     ammo: 1
     objective_card: 1
   top:
-    label: 'ЗАКРОМА: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ'
-    effect: gain
-    params:
-      order: operation
-      ammo: 1
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
   sacrifice:
     amount: 2
     resource: container
@@ -520,10 +518,10 @@ objectives:
   special_reward:
     arsenal: 1
   top:
-    label: РАЗЫГРАЙ БОЙ ПЕРЕД ЧУЖИМ БОЕМ
-    effect: reaction
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
     params:
-      kind: battle_first
+      action: combat
   описание: 'В ЭТОТ ХОД уничтожь технику или авиацию врага — награда 3 монеты. И еще 2 жетона любого врага
     — условие усилено: карта арсенала.'
 - id: o69
@@ -541,10 +539,10 @@ objectives:
   special_reward:
     module: attack
   top:
-    label: ПОЛНЫЙ МАНЁВР
+    label: ПОЛНОЦЕННЫЙ БОЙ
     effect: free_action
     params:
-      action: movement
+      action: combat
   описание: 'В ЭТОТ ХОД уничтожь все жетоны врага на одном гексе — награда 2 монеты и 1 боеприпас. Их
     на этом гексе не менее 3 — условие усилено: жетон модуля атаки.'
 - id: o42
@@ -562,10 +560,10 @@ objectives:
   special_reward:
     module: attack
   top:
-    label: 1 ОБМЕН В НАУКЕ (не трек) ИЛИ 1 ОБМЕН НА РЫНКЕ (не карта)
-    effect: exchange_science_or_market
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
     params:
-      amount: 1
+      action: combat
   описание: 'В ЭТОТ ХОД уничтожь добытчик противника — награда 2 монеты и 1 карта задания. Этот добытчик
     примыкал к стартовому зарождению — условие усилено: жетон модуля атаки.'
 - id: o25
@@ -582,11 +580,10 @@ objectives:
   special_reward:
     module: attack
   top:
-    label: 'ЭВАКУАЦИЯ ТРОФЕЕВ: Если атакуют твой жетон, ты можешь вернуть его в свой запас (не отдавая
-      в трофеи)'
-    effect: reaction
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
     params:
-      kind: evacuate_trophy
+      action: combat
   описание: 'Имей у себя на свалке хотя бы 1 жетон здания врага — награда 3 монеты. Два жетона, один из
     них - энергостанция — условие усилено: жетон модуля атаки.'
 - id: o70
@@ -603,10 +600,10 @@ objectives:
   special_reward:
     module: assembly
   top:
-    label: 'ЗАГРАДИТЕЛЬНЫЙ ОГОНЬ: твоё уничтоженное здание наносит 1 урон убийце'
-    effect: reaction
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
     params:
-      kind: barrage
+      action: movement
   описание: 'Имей среди уничтоженных жетонов хотя бы 2 жетона врага — награда 3 монеты. Один из них —
     военное здание — условие усилено: жетон модуля сборки.'
 - id: o71
@@ -623,10 +620,10 @@ objectives:
   special_reward:
     module: assembly
   top:
-    label: 1 ОБМЕН В НАУКЕ (не трек) ИЛИ 1 ОБМЕН НА РЫНКЕ (не карта)
-    effect: exchange_science_or_market
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
     params:
-      amount: 1
+      action: movement
   описание: 'Имей среди уничтоженных жетонов хотя бы 2 жетона врага — награда 3 монеты. Эти жетоны - техника
     и/или авиация — условие усилено: жетон модуля сборки.'
 - id: o72
@@ -645,8 +642,10 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: РЕМОНТ ГЕКСА
-    effect: heal_hex
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
+    params:
+      action: movement
   описание: 'В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше войск, чем у тебя — награда 1
     монета, 1 боеприпас и 1 карта задания. Хотя бы 2 жетона войск — условие усилено: 1 трофей.'
 - id: o21
@@ -663,10 +662,10 @@ objectives:
   special_reward:
     arsenal: 1
   top:
-    label: ПОЛНЫЙ МАНЁВР
-    effect: free_action
+    label: 'РАЗВЁРТЫВАНИЕ: поставь 1 войско из запаса'
+    effect: deploy_units
     params:
-      action: movement
+      count: 1
   описание: 'В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше зданий, чем у тебя — награда
     4 монеты. В ЭТОТ ХОД у одного из уничтоженных прочность была 2 или больше — условие усилено: карта
     арсенала.'
@@ -685,10 +684,8 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: 'ЭВАКУАЦИЯ ТРОФЕЕВ: твой уничтоженный жетон уходит в твой запас'
-    effect: reaction
-    params:
-      kind: evacuate_trophy
+    label: РЕМОНТ ГЕКСА
+    effect: heal_hex
   описание: 'В ЭТОТ ХОД уничтожь жетон игрока, у которого на поле больше зданий, чем у тебя — награда
     2 боеприпаса и 1 карта задания. В ЭТОТ ХОД уничтоженный жетон был добытчиком — условие усилено: 1
     трофей.'
@@ -707,10 +704,10 @@ objectives:
   special_reward:
     module: attack
   top:
-    label: ПОЛНЫЙ МАНЁВР
-    effect: free_action
+    label: 1 ОБМЕН В НАУКЕ (не трек) ИЛИ 1 ОБМЕН НА РЫНКЕ (не карта)
+    effect: exchange_science_or_market
     params:
-      action: movement
+      amount: 1
   описание: 'В ЭТОТ ХОД уничтожь энергостанцию противника — награда 2 боеприпаса и 1 карта задания. Это
     была энергостанция 3 или 4 уровня — условие усилено: жетон модуля атаки.'
 - id: o74
@@ -724,10 +721,10 @@ objectives:
     coin: 1
     objective_card: 2
   top:
-    label: ПОЛНОЦЕННЫЙ БОЙ
+    label: ПОЛНЫЙ МАНЁВР
     effect: free_action
     params:
-      action: combat
+      action: movement
   описание: Имей на поле все свои 4 здания энергостанций — награда 1 монета и 2 карты задания.
 - id: o75
   name: Рудный двор
@@ -740,11 +737,10 @@ objectives:
     coin: 2
     objective_card: 1
   top:
-    label: 'ПОГЛОЩЕНИЕ: отбери 1 боеприпас'
-    effect: steal_resource
+    label: ПОЛНЫЙ МАНЁВР
+    effect: free_action
     params:
-      resource: ammo
-      amount: 1
+      action: movement
   описание: 'В ЭТОТ ХОД найми два войска разных родов — награда 2 монеты и 1 карта задания. Среди нанятых
     есть авиация и нет ни одной вышки — условие усилено: 1 трофей.'
   enhanced:
@@ -762,8 +758,10 @@ objectives:
     coin: 1
     objective_card: 2
   top:
-    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
-    effect: energy_or_modules
+    label: ПОЛНОЦЕННЫЙ БОЙ
+    effect: free_action
+    params:
+      action: combat
   описание: Имей на поле все свои 4 здания добытчиков — награда 1 монета и 2 карты задания.
 - id: o76
   name: Расселение
@@ -779,11 +777,8 @@ objectives:
   special_reward:
     trophy: 1
   top:
-    label: 'ЗАКРОМА: +1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ'
-    effect: gain
-    params:
-      order: operation
-      ammo: 1
+    label: СМЕНА ЭНЕРГИИ ИЛИ СМЕНА МОДУЛЕЙ
+    effect: energy_or_modules
   описание: 'Займи 4 разных гекса войсками хотя бы 2 видов — награда 3 монеты. 6 гексов — условие усилено:
     1 трофей.'
 - id: o77
@@ -801,10 +796,8 @@ objectives:
   special_reward:
     arsenal: 1
   top:
-    label: ПОЛНОЦЕННЫЙ БОЙ
-    effect: free_action
-    params:
-      action: combat
+    label: РЕМОНТ ГЕКСА
+    effect: heal_hex
   описание: 'Займи войсками 5 разных гексов — награда 2 боеприпаса и 1 карта задания. На 2 из них есть
     здания противника — условие усилено: карта арсенала.'
 - id: n1
