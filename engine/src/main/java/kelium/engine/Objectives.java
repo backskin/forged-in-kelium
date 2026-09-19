@@ -618,7 +618,9 @@ public final class Objectives {
                 case "storage_token" -> {
                     // o13 «Расчистка» (решение 8.0): жетон хранилища как особая
                     // награда; слотов на планшете два — лишний жетон пропадает.
-                    if (p.storageTokens.size() < 2) {
+                    int ячеек = Ctx.rules(s).get("storage.module_slots", null)
+                        instanceof Number сколько ? сколько.intValue() : 3;
+                    if (p.storageTokens.size() < ячеек) {
                         p.storageTokens.add("+1_universal_cell");
                         into.put("storage_token", 1);
                     }

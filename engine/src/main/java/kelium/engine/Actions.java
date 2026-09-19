@@ -3371,15 +3371,33 @@ public final class Actions {
                 case "red" -> Modules.awardModule(state, player, "red");
                 case "blue" -> Modules.awardModule(state, player, "blue");
                 default -> {
-                    String c = state.decks.get("arsenal").draw(state.rng);
-                    if (c != null) {
-                        Storage.takeArsenalCard(state, player, c);
+                    // ЗЕЛЁНЫЙ ТРЕК — ЖЕТОН ХРАНИЛИЩА (уточнение дизайнера
+                    // 19.09.2026, отменяет вчерашнюю карту арсенала): «все первые
+                    // три ступени каждого трека дают жетон модуля — и сборки, и
+                    // боя, и хранилища». Ячеек под жетон хранилища на планшете
+                    // стало ТРИ, по числу этих ступеней.
+                    int ячеек = (int) числоПравила(state, "storage.module_slots", 3);
+                    if (player.storageTokens.size() < ячеек) {
+                        List<Choice> opts = List.of(
+                            new Choice("storage_side", "+1_universal_cell",
+                                "universal resource cell"),
+                            new Choice("storage_side", "+1_energy",
+                                "permanent energy cube"));
+                        Choice pick = agent.choose(state, opts,
+                            Map.of("kind", "storage_side"));
+                        player.storageTokens.add(String.valueOf(pick.payload()));
                     }
                 }
             }
         }
 
-        /** Читается ли свод как «жетон выдаётся уже на первом шаге». */
+        /** Число из свода, с запасным значением. */
+        private double числоПравила(GameState s, String ключ, double запас) {
+            Object v = kelium.dataio.Ctx.rules(s).get(ключ, null);
+            return v instanceof Number n ? n.doubleValue() : запас;
+        }
+
+        /** Читается ли свод как «жетон трека выдаётся уже на первом шаге». */
         private boolean модульНаПервомШаге(GameConfig cfg) {
             return Boolean.TRUE.equals(cfg.ruleset.get("tech.token_on_step1", Boolean.FALSE));
         }

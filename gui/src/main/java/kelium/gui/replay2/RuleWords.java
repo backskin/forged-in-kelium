@@ -37,6 +37,7 @@ public final class RuleWords {
             case "building_compensation_containers" -> "Контейнеры за снесённые здания";
             case "containers" -> "Контейнеры";
             case "containers_storage" -> "Где держат контейнеры";
+            case "storage" -> "Планшет хранилища";
             case "symbols" -> "Символы супер-заданий";
             case "contested_cards" -> "Спорные карты";
             case "market" -> "Рынок";
@@ -354,6 +355,8 @@ public final class RuleWords {
                 "жетон первого игрока идёт против часовой, вскрытие — по часовой";
             case "tech.token_on_step1" ->
                 "жетон трека выдаётся уже на первом шаге";
+            case "storage.module_slots" ->
+                "ячеек под жетон модуля хранилища на планшете";
 
             case "actions.assembly.return_units_to_reserve" ->
                 "в Снаряжении можно вернуть в запас любое число своих войск";
