@@ -127,7 +127,17 @@ public final class Locations {
      * никто не собирается играть.
      */
     public static Path builtinLayoutFolder() {
-        return GameConfig.resolveDataRoot(null).resolve("scenarios").resolve("new");
+        // ПАПКА РАСКЛАДОК ИЗ ЗАПУСКА: -Dkelium.layouts.dir=old (или полный путь).
+        // Нужно замерам: дизайнер просил сравнивать НОВЫЕ поля со СТАРЫМИ, а без
+        // переключателя это делается только правкой кода между прогонами —
+        // верный способ забыть откатить и сравнить не то с тем.
+        String своя = System.getProperty("kelium.layouts.dir", "").trim();
+        Path корень = GameConfig.resolveDataRoot(null).resolve("scenarios");
+        if (!своя.isEmpty()) {
+            Path путь = Paths.get(своя);
+            return путь.isAbsolute() ? путь : корень.resolve(своя);
+        }
+        return корень.resolve("new");
     }
 
     /** Все папки, где ищутся раскладки: сначала авторская, затем добавленные. */
