@@ -137,18 +137,84 @@ public class HeuristicAgent extends Agent {
             return reals.isEmpty() ? opts.get(0) : reals.get(rng.nextInt(reals.size()));
         }
         double best = Double.NEGATIVE_INFINITY;
+        double второй = Double.NEGATIVE_INFINITY;
         List<Choice> top = new ArrayList<>();
         for (Choice o : opts) {
             double sc = scorer.apply(state, o) + наведениеПоЗаданиям(state, kind, o, context);
             if (sc > best) {
+                второй = best;
                 best = sc;
                 top.clear();
                 top.add(o);
             } else if (sc == best) {
                 top.add(o);
+            } else if (sc > второй) {
+                второй = sc;
             }
         }
+        Диагностика.записать(kind, best, второй, opts.size());
         return top.get(rng.nextInt(top.size()));
+    }
+
+    /**
+     * ДИАГНОСТИКА РЕШЕНИЙ — насколько выбор был безальтернативным.
+     *
+     * <p>Зачем. Самая ценная находка про ботов за 19.09.2026 была сделана
+     * глазами: энергостанция при нехватке энергии оценивается в 12.0, а военное
+     * здание в 3.6, и военные здания проигрывают сравнение ВСЕГДА. Такие заторы
+     * не видны ни в одном итоговом числе — их видно только в разрыве между
+     * лучшим вариантом и вторым. Где разрыв велик и постоянен, там выбора нет:
+     * либо правило мёртвое, либо в оценке ошибка.
+     *
+     * <p>Включается настройкой запуска {@code -Dkelium.bot.diag=true} и печатается
+     * вызовом {@link Диагностика#напечатать}. По умолчанию не стоит ничего:
+     * счётчики не трогаются вовсе.
+     */
+    public static final class Диагностика {
+        private static final boolean ВКЛ =
+            Boolean.parseBoolean(System.getProperty("kelium.bot.diag", "false"));
+        /** вид решения -> {решений, сумма разрыва, безальтернативных, сумма вариантов} */
+        private static final Map<String, double[]> ПО_ВИДАМ =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+        private Диагностика() {
+        }
+
+        static void записать(String вид, double лучший, double второй, int вариантов) {
+            if (!ВКЛ || вариантов < 2 || Double.isInfinite(второй)) {
+                return;
+            }
+            double[] с = ПО_ВИДАМ.computeIfAbsent(вид, k -> new double[4]);
+            synchronized (с) {
+                с[0]++;
+                с[1] += лучший - второй;
+                // «Безальтернативно» — когда лучший вдвое дороже второго: такой
+                // разрыв решение уже не решение, а предопределённость.
+                if (второй <= 0 ? лучший > 0 : лучший / второй >= 2.0) {
+                    с[2]++;
+                }
+                с[3] += вариантов;
+            }
+        }
+
+        /** Печать отчёта: где у бота выбора нет. */
+        public static void напечатать(java.io.PrintStream out) {
+            if (ПО_ВИДАМ.isEmpty()) {
+                out.println("диагностика решений выключена (-Dkelium.bot.diag=true)");
+                return;
+            }
+            out.println("ДИАГНОСТИКА РЕШЕНИЙ: где у бота нет выбора");
+            out.printf("%-20s %8s %10s %12s %10s%n", "вид решения", "решений",
+                "вариантов", "разрыв 1-2", "безальт.");
+            ПО_ВИДАМ.entrySet().stream()
+                .sorted((a, b) -> Double.compare(b.getValue()[2] / Math.max(1, b.getValue()[0]),
+                    a.getValue()[2] / Math.max(1, a.getValue()[0])))
+                .forEach(e -> {
+                    double[] с = e.getValue();
+                    out.printf("%-20s %8.0f %10.1f %12.2f %9.0f%%%n", e.getKey(), с[0],
+                        с[3] / с[0], с[1] / с[0], 100 * с[2] / с[0]);
+                });
+        }
     }
 
     /**
