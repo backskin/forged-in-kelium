@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import kelium.core.Agent;
 import kelium.core.BuildingType;
+import kelium.core.Choice;
 import kelium.core.GameState;
 import kelium.core.PlayerState;
 import kelium.core.Target;
@@ -145,9 +147,36 @@ public final class Modules {
             }
             return null;
         }
-        String id = ModuleSets.draw(red ? s.redBag : s.blueBag, s.rng);
+        // ТЯНУТ ДВА, ОСТАВЛЯЮТ ОДИН (обязательное правило дизайнера 19.09.2026).
+        // Второй жетон возвращается в мешок. Прежде тянули вслепую один, и
+        // жетон был чистой лотереей: выпал глухой — носи глухой. Теперь это
+        // решение, и решение осмысленное — жетоны разных наборов бьют разные
+        // цели, а цели на поле у каждого свои.
+        //
+        // Возврат в мешок, а не в сброс: набор жетонов конечен и известен, и
+        // «извлечён навсегда» относится только к тому, что игрок ОСТАВИЛ.
+        List<String> мешок = red ? s.redBag : s.blueBag;
+        String id = ModuleSets.draw(мешок, s.rng);
         if (id == null) {
             return null;                  // мешок пуст — модулей больше нет
+        }
+        String второй = ModuleSets.draw(мешок, s.rng);
+        if (второй != null) {
+            Agent агент = s.agents == null || p.seat >= s.agents.size()
+                ? null : s.agents.get(p.seat);
+            if (агент == null) {
+                мешок.add(второй);        // некому выбирать — оставляем первый
+            } else {
+                List<Choice> варианты = List.of(
+                    new Choice("module_keep", id, id),
+                    new Choice("module_keep", второй, второй));
+                Choice взял = агент.choose(s, варианты,
+                    Map.of("kind", "module_keep", "colour", colour));
+                String оставлен = взял != null && взял.payload() instanceof String в
+                    && (в.equals(id) || в.equals(второй)) ? в : id;
+                мешок.add(оставлен.equals(id) ? второй : id);
+                id = оставлен;
+            }
         }
         if (red) {
             p.redTokens.add(id);

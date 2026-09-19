@@ -132,7 +132,7 @@ boards:
       aircraft: vehicle             # авиация — технику
       tower:    infantry            # вышка — пехоту
     speeds: {infantry: 1, vehicle: 1, aircraft: 2, tower: 0}
-    building_prices: {barracks: 1, factory: 2, airbase: 3}   # заказ 25.08.2026: завод 2, авиабаза 3
+    building_prices: {barracks: 1, factory: 2, airbase: 2}   # 19.09.2026: авиабаза 3 -> 2, вровень с заводом
 
   # -- Планшет хранилища ----------------------------------------------------
   # cells: list per level 1..4; each is a string of cell types (У/К/Б) →

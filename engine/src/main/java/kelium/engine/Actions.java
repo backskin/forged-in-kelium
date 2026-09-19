@@ -1806,7 +1806,7 @@ public final class Actions {
             // авиация 2.6%, то есть её нет в игре вовсе. Вторая казарма и второй
             // завод дают чем занять Снаряжение, вторая авиабаза — шанс, что
             // авиацию хоть когда-нибудь построят.
-            int пределМил = ((Number) rs.get("build.military_copies", 1)).intValue();
+            int пределМил = ((Number) rs.get("actions.build.military_copies", 1)).intValue();
             for (int i = 0; i < mil.length; i++) {
                 BuildingType bt = mil[i][0];
                 if (счётМил.getOrDefault(bt, 0) < пределМил) {
