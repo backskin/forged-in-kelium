@@ -1909,11 +1909,40 @@ public final class Actions {
                             "забрать всё обратно на " + src.type));
                     }
                 }
+                // КЕЛЕМИЙ КАК ЭНЕРГИЯ (правило-вариант 19.09.2026, третье
+                // применение джокера). Кубик келемия из хранилища кладётся на
+                // свободную ячейку энергии любого своего здания и работает там
+                // как обычный кубик. Отдельного источника не заводим: келемий
+                // уходит из хранилища насовсем, поэтому «забрать обратно» для
+                // него не предлагается — это трата, а не перекладка.
+                boolean джокер = келемийДжокер(state) && player.resources.kelium() > 0;
+                if (джокер) {
+                    boolean естьКуда = false;
+                    for (BuildingToken b : player.buildingsOnField()) {
+                        естьКуда |= b.energySlots > b.energyPlaced;
+                    }
+                    if (естьКуда) {
+                        opts.add(new Choice("energy_kelium", "kelium",
+                            "положить келемий на ячейку энергии"));
+                    }
+                }
                 if (opts.isEmpty()) {
                     break;
                 }
                 opts.add(new Choice("energy_done", null, "закончить"));
                 Choice pick = agent.choose(state, opts, Map.of("kind", "energy_activation"));
+                if (pick != null && "energy_kelium".equals(pick.kind())) {
+                    Map<String, Object> итог = kelium.engine.Effects.apply(
+                        "place_on_energy_cell", state, player.seat,
+                        Map.of("pay_kelium", true));
+                    if (итог.get("placed") instanceof Number n && n.intValue() > 0) {
+                        placedTotal += n.intValue();
+                        activations++;
+                        ctx.recordOp("energy_swap");
+                        continue;
+                    }
+                    break;
+                }
                 if (pick == null || pick.payload() == null) {
                     break;
                 }
@@ -2966,6 +2995,19 @@ public final class Actions {
         }
     }
 
+    /**
+     * КЕЛЕМИЙ-ДЖОКЕР (правило-вариант дизайнера 19.09.2026): «келемий это
+     * одновременно и боеприпас, и трофей, и энергия».
+     *
+     * <p>Пути оплаты келемием в движке уже были — как способности карт
+     * («Военный подряд» в бою, «Научный подряд» в науке, установка на ячейку
+     * энергии с карты рынка). Свод только снимает с них ограничение «по карте».
+     */
+    static boolean келемийДжокер(GameState s) {
+        return Boolean.TRUE.equals(kelium.dataio.Ctx.rules(s)
+            .get("economy.kelium_is_joker", Boolean.FALSE));
+    }
+
     static final class ScienceAction extends Action {
         ScienceAction(GameState state) {
             super(state);
@@ -3497,7 +3539,8 @@ public final class Actions {
                 // трофеев не хватило, точка молчит почти всегда, и «способность
                 // подключена» становится правдой лишь иногда. Это поймал сторож
                 // AbilityFrameworkTest, а не партия.
-                boolean keliumOkHere = kelium.engine.ability.RuleQuery
+                boolean keliumOkHere = келемийДжокер(state)
+                    || kelium.engine.ability.RuleQuery
                     .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                     .base(0).ask() >= 1.0;
                 int pay = Math.min(remaining, player.resources.trophy());
@@ -3518,7 +3561,8 @@ public final class Actions {
             // ТОЧКА ПРАВИЛ спрашивается ЗАРАНЕЕ и всегда: иначе она срабатывала бы
             // только в редкой ветке «трофеев не хватило», и объявление «точка
             // подключена» было бы правдой лишь иногда.
-            boolean keliumOk = kelium.engine.ability.RuleQuery
+            boolean keliumOk = келемийДжокер(state)
+                || kelium.engine.ability.RuleQuery
                 .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                 .base(0).ask() >= 1.0;
             // ЧЕМ ПЛАТИТЬ — РЕШАЕТ ИГРОК (решение дизайнера 13.09.2026): кубиками
