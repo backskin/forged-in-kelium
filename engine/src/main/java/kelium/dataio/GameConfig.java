@@ -249,8 +249,49 @@ public final class GameConfig {
                                    Path dataRoot, java.util.List<String> boardSides) {
         Path root = resolveDataRoot(dataRoot);
         Ruleset ruleset = Ruleset.loadById(rulesetId, root.resolve("rulesets"));
+        применитьПравки(ruleset);
         ContentLibrary content = ContentLibrary.forRuleset(ruleset, root);
         return new GameConfig(ruleset, content, numPlayers, seed, root, boardSides);
+    }
+
+    /**
+     * ПРАВКИ СВОДА ИЗ КОМАНДНОЙ СТРОКИ: {@code -Dkelium.rules=ключ=значение,...}.
+     *
+     * <p>Зачем. Правило-вариант («келемий — джокер», «по два военных здания»)
+     * надо сравнить со старым правилом на ОДНОМ и том же своде, иначе в замер
+     * попадут заодно все прочие отличия версий. Править файл свода между
+     * прогонами нельзя: это меняет его для всех и легко забывается откатить.
+     *
+     * <p>Значение читается как число, как {@code true}/{@code false} или как
+     * строка — в таком порядке. Пример:
+     * {@code -Dkelium.rules=economy.kelium_is_joker=true,actions.build.military_copies=2}
+     */
+    private static void применитьПравки(Ruleset ruleset) {
+        String строка = System.getProperty("kelium.rules", "").trim();
+        if (строка.isEmpty()) {
+            return;
+        }
+        for (String кусок : строка.split(",")) {
+            int знак = кусок.indexOf('=');
+            if (знак <= 0) {
+                continue;
+            }
+            String ключ = кусок.substring(0, знак).trim();
+            String значение = кусок.substring(знак + 1).trim();
+            Object v;
+            if ("true".equalsIgnoreCase(значение) || "false".equalsIgnoreCase(значение)) {
+                v = Boolean.parseBoolean(значение);
+            } else {
+                try {
+                    v = значение.contains(".") ? (Object) Double.parseDouble(значение)
+                        : (Object) Integer.parseInt(значение);
+                } catch (NumberFormatException нет) {
+                    v = значение;
+                }
+            }
+            ruleset.override(ключ, v);
+            System.out.println("[СВОД] правка запуска: " + ключ + " = " + v);
+        }
     }
 
     /** Собрать конфигурацию с настройками по умолчанию. */
@@ -363,9 +404,14 @@ public final class GameConfig {
         Path root = resolveDataRoot(dataRoot);
         // ВЫБРАННЫЕ ВРУЧНУЮ КОЛОДЫ входят в ключ кэша: иначе партия на других
         // заданиях получила бы набор, загруженный для прошлой (см. contentPick).
-        String key = rulesetId + "@" + root + "#" + contentKey();
+        String key = rulesetId + "@" + root + "#" + contentKey()
+            + "#" + System.getProperty("kelium.rules", "");
         Object[] rc = CACHE.computeIfAbsent(key, k -> {
             Ruleset rs = Ruleset.loadById(rulesetId, root.resolve("rulesets"));
+            // ПРАВКИ ЗАПУСКА применяются и здесь: почти все стенды ходят через
+            // buildCached, и без этой строки -Dkelium.rules молча не работал бы
+            // ровно там, где он и нужен.
+            применитьПравки(rs);
             for (java.util.Map.Entry<String, String> e : CONTENT_PICK.entrySet()) {
                 rs.override("content_versions." + e.getKey(), e.getValue());
             }

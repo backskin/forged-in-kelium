@@ -355,6 +355,10 @@ public final class RuleWords {
                 "жетон первого игрока идёт против часовой, вскрытие — по часовой";
             case "tech.token_on_step1" ->
                 "жетон трека выдаётся уже на первом шаге";
+            case "objectives.play_is_free_action" ->
+                "выполнение задания не тратит спец-действие";
+            case "build.military_copies", "actions.build.military_copies" ->
+                "сколько военных зданий одного типа можно иметь";
             case "economy.kelium_is_joker" ->
                 "келемий платит и за атаку, и за науку, и ложится как энергия";
             case "storage.module_slots" ->

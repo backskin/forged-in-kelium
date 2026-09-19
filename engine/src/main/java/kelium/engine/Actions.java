@@ -1788,16 +1788,28 @@ public final class Actions {
                 }
             }
             Set<BuildingType> builtMil = new java.util.HashSet<>();
+            Map<BuildingType, Integer> счётМил = new java.util.EnumMap<>(BuildingType.class);
             for (BuildingToken b : player.buildingsOnField()) {   // B2
                 builtMil.add(b.type);
+                счётМил.merge(b.type, 1, Integer::sum);
             }
             BuildingType[][] mil = {
                 {BuildingType.BARRACKS}, {BuildingType.FACTORY}, {BuildingType.AIRBASE}
             };
             String[] keys = {"barracks", "factory", "airbase"};
+            // СКОЛЬКО ВОЕННЫХ ЗДАНИЙ ОДНОГО ТИПА МОЖНО ИМЕТЬ (правило-вариант
+            // дизайнера 19.09.2026: «сделать два экземпляра казарм, завода и
+            // авиабазы у игрока, посмотреть, что будет»).
+            //
+            // Зачем пробуем: замер 19.09 показал перекос производства — вышки
+            // 36% всего выпуска (их делает ЦУ, которому нечем заняться), а
+            // авиация 2.6%, то есть её нет в игре вовсе. Вторая казарма и второй
+            // завод дают чем занять Снаряжение, вторая авиабаза — шанс, что
+            // авиацию хоть когда-нибудь построят.
+            int пределМил = ((Number) rs.get("build.military_copies", 1)).intValue();
             for (int i = 0; i < mil.length; i++) {
                 BuildingType bt = mil[i][0];
-                if (!builtMil.contains(bt)) {
+                if (счётМил.getOrDefault(bt, 0) < пределМил) {
                     int c = player.board.troop.buildingPrice(keys[i]) + surcharge;
                     if (c <= coin) {
                         Map<String, Object> m = new HashMap<>();
