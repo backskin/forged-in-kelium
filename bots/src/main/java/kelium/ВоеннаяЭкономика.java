@@ -73,6 +73,7 @@ public final class ВоеннаяЭкономика {
         double раундов = 0;
         // Кого сносят: подпись жертвы -> сколько раз.
         Map<String, Integer> жертвы = new TreeMap<>();
+        Map<String, Integer> произведено = new TreeMap<>();
         // Худшая доля: сколько жетонов потерял самый побитый игрок партии.
         double худшийСредний = 0;
         int худшийЗаВсё = 0;
@@ -130,6 +131,15 @@ public final class ВоеннаяЭкономика {
                         String имя = String.valueOf(ev.get("action"));
                         if ("assembly".equals(имя) && место >= 0 && место < игроков) {
                             бпрСделано[место] += чис(м.get("ammo"));
+                            // ЧТО ИМЕННО ПРОИЗВОДЯТ. Авиация — 0.3% всех потерь;
+                            // надо понять, её не сносят или её не делают вовсе.
+                            if (м.get("units_by_type") instanceof Map<?, ?> род) {
+                                for (var e : род.entrySet()) {
+                                    произведено.merge(String.valueOf(e.getKey()),
+                                        e.getValue() instanceof Number n2 ? n2.intValue() : 0,
+                                        Integer::sum);
+                                }
+                            }
                         }
                         if ("science".equals(имя) && место >= 0 && место < игроков) {
                             трофеиВНауку[место] += чис(м.get("trophy_spent"));
@@ -238,6 +248,13 @@ public final class ВоеннаяЭкономика {
             зданий / партий, 100 * зданий / Math.max(1, всегоЖертв),
             (всегоЖертв - зданий) / партий,
             100 * (всегоЖертв - зданий) / Math.max(1, всегоЖертв));
+
+        out.println("\nЧТО ПРОИЗВОДЯТ (на игрока за партию)");
+        int всегоВойск = произведено.values().stream().mapToInt(Integer::intValue).sum();
+        произведено.entrySet().stream()
+            .sorted((a, b) -> b.getValue() - a.getValue())
+            .forEach(e -> out.printf("    %-10s %5.2f  (%4.1f%%)%n", e.getKey(),
+                e.getValue() / мест, 100.0 * e.getValue() / Math.max(1, всегоВойск)));
 
         out.println("\nТРОФЕИ (на игрока за партию)");
         // «Всего получено» намеренно НЕ печатается: движок такого счётчика не
