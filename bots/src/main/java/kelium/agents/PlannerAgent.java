@@ -346,9 +346,14 @@ public class PlannerAgent extends Agent {
 
         List<List<String>> sequences = sequences(s, topNames, remaining, bottomNames, joker,
             cardId, coincided, bottomOpen);
-        double best = Double.NEGATIVE_INFINITY;
-        TurnSim.Result bestRes = null;
-        List<String> bestSeq = null;
+        // ДВА ЗАХОДА, А НЕ ОДИН. Сценариев на ход десятки, и доигрывать ответный
+        // раунд за каждый — это цена в разы: замер 20.09.2026 показал рост
+        // времени партии примерно в двадцать раз, когда горизонт включили всем
+        // четверым игрокам сразу. Но горизонт и не нужен всем: подавляющее
+        // большинство сценариев статика отбрасывает уверенно, и спорят между
+        // собой единицы. Поэтому сперва все сценарии считаются дёшево
+        // (статика), а доигрывание тратится только на ГОРСТКУ ЛУЧШИХ.
+        List<Кандидат> лучшие = new ArrayList<>();
         for (List<String> seq : sequences) {
             for (int i = 0; i < samples; i++) {
                 long seed = rng.nextLong();
@@ -358,12 +363,21 @@ public class PlannerAgent extends Agent {
                 if (r == null) {
                     continue;
                 }
-                double v = оценить(r.after(), seed) + rng.nextDouble() * 0.01;
-                if (v > best) {
-                    best = v;
-                    bestRes = r;
-                    bestSeq = seq;
-                }
+                double статика = PositionValue.value(r.after(), seat, genome, intents)
+                    + rng.nextDouble() * 0.01;
+                добавить(лучшие, new Кандидат(статика, r, seq, seed),
+                    horizonRounds > 0 ? ГОРСТКА : 1);
+            }
+        }
+        double best = Double.NEGATIVE_INFINITY;
+        TurnSim.Result bestRes = null;
+        List<String> bestSeq = null;
+        for (Кандидат к : лучшие) {
+            double v = оценить(к.результат.after(), к.seed, к.статика);
+            if (v > best) {
+                best = v;
+                bestRes = к.результат;
+                bestSeq = к.порядок;
             }
         }
         if (bestRes == null) {
@@ -398,6 +412,39 @@ public class PlannerAgent extends Agent {
      * Ставится извне ({@code kelium.Линейка}), по умолчанию выключено, чтобы
      * прежнее поведение осталось ровно прежним, пока замер не скажет иначе.
      */
+    /**
+     * СКОЛЬКО ЛУЧШИХ СЦЕНАРИЕВ ДОИГРЫВАТЬ. Горизонт нужен там, где статика
+     * сомневается, а сомневается она между немногими верхними сценариями:
+     * остальные отстают настолько, что ответный раунд их не подымет. Четыре
+     * — запас поверх обычного разрыва в верхушке; цена при этом перестаёт
+     * зависеть от числа сценариев и становится постоянной.
+     */
+    private static final int ГОРСТКА = 4;
+
+    /** Сценарий с его дешёвой оценкой — пока не решено, доигрывать ли его. */
+    private record Кандидат(double статика, TurnSim.Result результат,
+                              List<String> порядок, long seed) {
+    }
+
+    /**
+     * Держит список отсортированным по убыванию и не длиннее предела. Список
+     * короткий (единицы), поэтому вставка на место дешевле любой очереди, а
+     * лишние копии стола сразу выбрасываются и память не растёт.
+     */
+    private static void добавить(List<Кандидат> список, Кандидат к, int предел) {
+        int место = список.size();
+        while (место > 0 && список.get(место - 1).статика() < к.статика()) {
+            место--;
+        }
+        if (место >= предел) {
+            return;
+        }
+        список.add(место, к);
+        while (список.size() > предел) {
+            список.remove(список.size() - 1);
+        }
+    }
+
     public int horizonRounds = 0;
 
     /**
@@ -423,8 +470,7 @@ public class PlannerAgent extends Agent {
      * как было. С горизонтом — доигрывание на N раундов: соперники отвечают, и
      * оценивается то, что осталось ПОСЛЕ ответа.
      */
-    private double оценить(GameState после, long seed) {
-        double статика = PositionValue.value(после, seat, genome, intents);
+    private double оценить(GameState после, long seed, double статика) {
         if (horizonRounds <= 0) {
             return статика;
         }
