@@ -76,15 +76,40 @@ public final class Modules {
      * числа жетона; золото добавляет +1 к помеченному стрелкой параметру.
      */
     public static int assemblyOutput(PlayerState player, BuildingType btype, String kind) {
+        return assemblyOutput(null, player, btype, kind);
+    }
+
+    /**
+     * ВЫХОД СНАРЯЖЕНИЯ — с оглядкой на свод.
+     *
+     * <p>Печатное число на планшете — единица. Правило-вариант
+     * {@code actions.assembly.ammo_base} поднимает БАЗОВУЮ выдачу боеприпасов,
+     * не трогая войска и не трогая жетоны модулей.
+     *
+     * <p>Зачем проверять. Замер 19.09.2026: боеприпасов делается 4.5-5.7 за
+     * партию на игрока, а тратится 7-8; 77-83% холостых боёв — «цель была, но
+     * нечем платить». При этом характер, поставивший на армию (каратель),
+     * выигрывает 7.5% партий против 38.8% у снабженца. Похоже, что война просто
+     * не окупается, и проверить это дешевле всего удвоением выдачи.
+     */
+    public static int assemblyOutput(GameState s, PlayerState player,
+                                     BuildingType btype, String kind) {
+        int база = 1;
+        if (s != null && "ammo".equals(kind)) {
+            Object v = kelium.dataio.Ctx.rules(s).get("actions.assembly.ammo_base", null);
+            if (v instanceof Number n) {
+                база = Math.max(1, n.intValue());
+            }
+        }
         Map<String, Object> place = player.bluePlacements.get(btype);
         if (place == null) {
-            return 1;
+            return база;
         }
         boolean gold = Boolean.TRUE.equals(place.get("gold"));
         String gild = String.valueOf(place.get("gild"));
         if ("ammo".equals(kind)) {
-            int v = place.get("ammo") instanceof Number n ? n.intValue() : 1;
-            return v + (gold && "ammo".equals(gild) ? 1 : 0);
+            int v = place.get("ammo") instanceof Number n ? n.intValue() : база;
+            return Math.max(v, база) + (gold && "ammo".equals(gild) ? 1 : 0);
         }
         int v = place.get("units") instanceof Number n ? n.intValue() : 1;
         return v + (gold && "units".equals(gild) ? 1 : 0);

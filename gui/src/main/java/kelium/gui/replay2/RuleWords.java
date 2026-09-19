@@ -366,6 +366,8 @@ public final class RuleWords {
             case "storage.module_slots" ->
                 "ячеек под жетон модуля хранилища на планшете";
 
+            case "actions.assembly.ammo_base" ->
+                "сколько боеприпасов даёт здание за Снаряжение";
             case "actions.assembly.return_units_to_reserve" ->
                 "в Снаряжении можно вернуть в запас любое число своих войск";
 

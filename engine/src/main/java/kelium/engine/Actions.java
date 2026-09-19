@@ -626,7 +626,7 @@ public final class Actions {
                     .about(b).base(Modules.assemblyOutput(player, b.type, "unit")).ask();
                 int ammoOut = kelium.engine.ability.RuleQuery
                     .of(state, player.seat, kelium.engine.ability.Hook.ASSEMBLY_AMMO_OUT)
-                    .about(b).base(Modules.assemblyOutput(player, b.type, "ammo")).ask();
+                    .about(b).base(Modules.assemblyOutput(state, player, b.type, "ammo")).ask();
                 List<Choice> opts = new ArrayList<>();
                 if (roomForUnit) {
                     opts.add(new Choice("assemble", Map.of("kind", "unit", "building", b.uid),
