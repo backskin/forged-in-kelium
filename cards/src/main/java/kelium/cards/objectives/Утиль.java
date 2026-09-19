@@ -29,9 +29,41 @@ import kelium.engine.cards.CardContext;
 public enum Утиль {
 
     /** Свободное перемещение — приказ Маневр даром. */
-    ДВИЖЕНИЕ("СВОБОДНОЕ ДВИЖЕНИЕ", "movement"),
+    /**
+     * ПОЛНЫЙ МАНЁВР — или манёвр ОДНИМ жетоном, если включено правило-вариант
+     * {@code objectives.util_limited}.
+     *
+     * <p>Зачем вариант. Замер 19.09.2026: карт заданий сжигают в 2.4 раза чаще,
+     * чем выполняют (43.6 против 17.9 за партию). Причина считается из правил:
+     * утиль даёт ПОЛНОЕ действие, и награда даёт ПОЛНОЕ действие — но утиль не
+     * требует выполнять условие. Выполнять становится строго хуже, кроме случая,
+     * когда нужен ресурс усиления. Ограниченный утиль возвращает смысл нижней
+     * половине карты, оставаясь провокацией боя.
+     */
+    ДВИЖЕНИЕ("СВОБОДНОЕ ДВИЖЕНИЕ", "movement") {
+        @Override
+        public boolean сыграть(CardContext ctx) {
+            if (урезанный(ctx)) {
+                ctx.freeAction("movement", Map.of("free_units", 1));
+            } else {
+                ctx.freeAction("movement");
+            }
+            return true;
+        }
+    },
     /** Свободный бой. */
-    БОЙ("СВОБОДНЫЙ БОЙ", "combat"),
+    /** Полноценный Бой — или бой ОДНИМ жетоном при {@code objectives.util_limited}. */
+    БОЙ("СВОБОДНЫЙ БОЙ", "combat") {
+        @Override
+        public boolean сыграть(CardContext ctx) {
+            if (урезанный(ctx)) {
+                ctx.freeAction("combat", Map.of("attack_tokens", 1));
+            } else {
+                ctx.freeAction("combat");
+            }
+            return true;
+        }
+    },
     /** Свободный обмен в Научном отделе. */
     НАУКА("СВОБОДНАЯ НАУКА", "science"),
     /** Свободный обмен на Рынке. */
@@ -254,6 +286,18 @@ public enum Утиль {
         }
         ctx.freeAction(String.valueOf(параметры.get("action")));
         return true;
+    }
+
+    /**
+     * ВКЛЮЧЁН ЛИ УРЕЗАННЫЙ УТИЛЬ (свод {@code objectives.util_limited}).
+     *
+     * <p>Правило-вариант: полные действия в утиле сжимаются до одного жетона.
+     * Проверяется гипотеза, что карты сжигают потому, что утиль не слабее
+     * награды, а условия не требует.
+     */
+    static boolean урезанный(CardContext ctx) {
+        return Boolean.TRUE.equals(kelium.dataio.Ctx.rules(ctx.state())
+            .get("objectives.util_limited", Boolean.FALSE));
     }
 
     /** Найти утиль по печатной метке — для чтения старых наборов и таблиц. */

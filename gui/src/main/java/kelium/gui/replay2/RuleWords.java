@@ -355,6 +355,8 @@ public final class RuleWords {
                 "жетон первого игрока идёт против часовой, вскрытие — по часовой";
             case "tech.token_on_step1" ->
                 "жетон трека выдаётся уже на первом шаге";
+            case "objectives.util_limited" ->
+                "утиль даёт действие ОДНИМ жетоном, а не полное";
             case "objectives.play_is_free_action" ->
                 "выполнение задания не тратит спец-действие";
             case "build.military_copies", "actions.build.military_copies" ->
