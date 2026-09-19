@@ -489,6 +489,45 @@ public final class CombatResolver {
         return false;
     }
 
+    /**
+     * ЕСТЬ ЛИ ЦЕЛЬ В ДОСЯГАЕМОСТИ — БЕЗ ОГЛЯДКИ НА БОЕПРИПАСЫ.
+     *
+     * <p>Зачем отдельно от {@link #anyAttackPossible}. Та проверка включает
+     * «могу ли оплатить атаку», и в отчётах обе беды сливались в одну строку
+     * «бить некого». Замер 19.09.2026 показал, что это вводит в заблуждение:
+     * 43% действий Бой холостые, «некого» в 99% случаев, — а армии при этом
+     * стоят вплотную (среднее расстояние 0.8 гекса, чужой жетон в досягаемости
+     * в 91–97% замеров). Значит цель была, не было боеприпаса. Разница
+     * решающая: первое лечится геометрией, второе — экономикой.
+     */
+    public boolean anyTargetInReach(int attackerSeat) {
+        GameState s = state;
+        for (UnitToken u : s.player(attackerSeat).units) {
+            if (u.hexId == null || !u.alive()) {
+                continue;
+            }
+            for (String target : targetHexesFrom(u.hexId)) {
+                if (!validTarget(target, attackerSeat, null)
+                        || !Passability.canShootAcross(s, u, target)) {
+                    continue;
+                }
+                boolean closed = hexClosedAgainst(target, attackerSeat);
+                for (AttackRow ar : attackRows(attackerSeat, u)) {
+                    if (pickVictimCategory(target, attackerSeat, ar.target(), null, closed, u)
+                            != null || (ar.target2() != null && pickVictimCategory(target,
+                                attackerSeat, ar.target2(), null, closed, u) != null)) {
+                        return true;
+                    }
+                    if (ar.target() == Target.BUILDINGS_TOWERS
+                            && s.field.get(target).hasNeutral()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     public boolean runBattle(int seat, Agent agent) {
         return runBattle(seat, agent, false, null);
     }

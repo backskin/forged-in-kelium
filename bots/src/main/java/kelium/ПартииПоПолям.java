@@ -81,6 +81,13 @@ public final class ПартииПоПолям {
         double войскВКонце;
         double контейнеров;
         double шагов;
+        // КОНТАКТ: как далеко армии друг от друга. Замер 19.09.2026 показал, что
+        // 43% действий Бой уходят вхолостую, и в 99% этих случаев стрелять было
+        // НЕКОГО — то есть дело не в решениях бота, а в расстоянии.
+        double суммаРасстояний;
+        int замеровРасстояния;
+        double ходовСКонтактом;      // у игрока есть чужой жетон на соседнем гексе
+        int замеровКонтакта;
         double модулейБоя;
         double модулейСборки;
         double монетВКонце;
@@ -190,6 +197,9 @@ public final class ПартииПоПолям {
                 }
                 case "cu_destroyed" -> п.цуСнесено++;
                 case "container" -> п.контейнеров++;
+                // КОНЕЦ РАУНДА — снимок расстояний между армиями. Прежде этот
+                // замер был написан, но НЕ ВЫЗЫВАЛСЯ, и отчёт печатал нули.
+                case "return" -> замерКонтакта(s, п);
                 default -> { }
             }
         }).run();
@@ -235,6 +245,88 @@ public final class ПартииПоПолям {
         if (очки.size() > 1) {
             п.разрывПобедителя += очки.get(0) - очки.get(1);
         }
+    }
+
+    /**
+     * КАК ДАЛЕКО АРМИИ. Для каждого игрока берётся ближайшее расстояние от его
+     * жетона до чужого — в гексах, поиском в ширину по полю. Ноль означает, что
+     * жетоны стоят на одном гексе, единица — на соседних (то есть в досягаемости
+     * наземного удара).
+     */
+    private static void замерКонтакта(GameState s, Поле п) {
+        for (PlayerState p : s.players) {
+            List<String> мои = new ArrayList<>();
+            for (kelium.core.Token t : p.unitsOnField()) {
+                if (t.hexId() != null) {
+                    мои.add(t.hexId());
+                }
+            }
+            if (мои.isEmpty()) {
+                continue;
+            }
+            java.util.Set<String> чужие = new java.util.HashSet<>();
+            for (PlayerState o : s.players) {
+                if (o.seat == p.seat) {
+                    continue;
+                }
+                for (kelium.core.Token t : o.unitsOnField()) {
+                    if (t.hexId() != null) {
+                        чужие.add(t.hexId());
+                    }
+                }
+                for (kelium.core.BuildingToken b : o.buildingsOnField()) {
+                    if (b.hexId != null) {
+                        чужие.add(b.hexId);
+                    }
+                }
+            }
+            if (чужие.isEmpty()) {
+                continue;
+            }
+            int лучшее = Integer.MAX_VALUE;
+            for (String от : мои) {
+                лучшее = Math.min(лучшее, вШирину(s, от, чужие, лучшее));
+            }
+            if (лучшее == Integer.MAX_VALUE) {
+                continue;
+            }
+            п.суммаРасстояний += лучшее;
+            п.замеровРасстояния++;
+            п.замеровКонтакта++;
+            if (лучшее <= 1) {
+                п.ходовСКонтактом++;
+            }
+        }
+    }
+
+    /** Кратчайший путь по гексам от {@code от} до ближайшего из {@code цели}. */
+    private static int вШирину(GameState s, String от, java.util.Set<String> цели,
+                               int неХужеЧем) {
+        if (цели.contains(от)) {
+            return 0;
+        }
+        java.util.Deque<String> очередь = new java.util.ArrayDeque<>();
+        java.util.Map<String, Integer> глубина = new java.util.HashMap<>();
+        очередь.add(от);
+        глубина.put(от, 0);
+        while (!очередь.isEmpty()) {
+            String h = очередь.poll();
+            int d = глубина.get(h);
+            if (d >= неХужеЧем) {
+                continue;             // дальше уже не улучшим
+            }
+            for (String nb : s.field.neighbors(h)) {
+                if (глубина.containsKey(nb)) {
+                    continue;
+                }
+                if (цели.contains(nb)) {
+                    return d + 1;
+                }
+                глубина.put(nb, d + 1);
+                очередь.add(nb);
+            }
+        }
+        return Integer.MAX_VALUE;
     }
 
     private static void печать(PrintStream out, Поле п, int игроков) {
@@ -307,13 +399,16 @@ public final class ПартииПоПолям {
         out.println("СВОДКА: ЧЕМ ПОЛЯ ОТЛИЧАЮТСЯ ДРУГ ОТ ДРУГА");
         out.println("=".repeat(78));
         out.println("поле                         | раундов | снесено | залпов | войск "
-            + "| заданий | очки поб.");
+            + "| заданий | очки поб. | дистанция | контакт");
         for (Поле п : итоги.values()) {
             double n = Math.max(1, п.партий);
-            out.printf("%-28s |  %5.1f  |  %5.2f  | %6.2f | %5.2f |  %5.2f  |  %5.1f%n",
+            out.printf("%-28s |  %5.1f  |  %5.2f  | %6.2f | %5.2f |  %5.2f  |  %5.1f    "
+                    + "|   %5.2f   |  %3.0f%%%n",
                 п.имя.length() > 28 ? п.имя.substring(0, 28) : п.имя,
                 п.раундов / n, п.сносов / n, п.боёв / n,
-                п.войск / (n * игроков), п.заданийВыполнено / n, п.очковПобедителя / n);
+                п.войск / (n * игроков), п.заданийВыполнено / n, п.очковПобедителя / n,
+                п.замеровРасстояния == 0 ? 0 : п.суммаРасстояний / п.замеровРасстояния,
+                п.замеровКонтакта == 0 ? 0 : 100 * п.ходовСКонтактом / п.замеровКонтакта);
         }
     }
 

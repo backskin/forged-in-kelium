@@ -2459,6 +2459,10 @@ public final class Actions {
             // отчёты отличают «бой не состоялся, потому что некого» от
             // «бой был возможен, но бот его не провёл».
             boolean couldFight = resolver.anyAttackPossible(player.seat);
+            // ЦЕЛЬ БЫЛА, А БОЕПРИПАСА НЕ БЫЛО — это не то же, что «бить некого»,
+            // и в отчётах сливалось в одну строку. Считаем досягаемость отдельно
+            // от платёжеспособности: первое лечится геометрией, второе экономикой.
+            boolean targetsInReach = resolver.anyTargetInReach(player.seat);
             int killsBefore = player.killsTotal;
             int battles = 0;
             while (true) {
@@ -2517,6 +2521,7 @@ public final class Actions {
             Map<String, Object> tel = new HashMap<>();
             tel.put("battle", battles);
             tel.put("could_fight", couldFight);
+            tel.put("targets_in_reach", targetsInReach);
             if (battles == 0) {
                 return ActionResult.ok(couldFight
                     ? "combat: не стал бить (цели были)" : "combat: бить некого", tel);
