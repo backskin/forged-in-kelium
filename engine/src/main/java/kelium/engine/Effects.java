@@ -66,6 +66,7 @@ public final class Effects {
             case "heal_hex" -> healHex(s, seat, p);
             case "free_action" -> freeAction(s, seat, p);
             case "move_unit" -> moveUnit(s, seat, p);
+            case "redeploy_hex" -> redeployHex(s, seat, p);
             case "deploy_units" -> deployUnits(s, seat, p);
             case "place_damage" -> placeDamage(s, seat, p);
             case "grab_containers" -> grabContainers(s, seat, p);
@@ -127,7 +128,8 @@ public final class Effects {
         }
         return switch (eid) {
             case "gain", "heal_one", "heal_all_own", "heal_hex", "free_action",
-                 "move_unit", "deploy_units", "place_damage", "grab_containers",
+                 "move_unit", "redeploy_hex", "deploy_units", "place_damage",
+                 "grab_containers",
                  // Пять эффектов, дописанных 15.08.2026. До этого они стояли
                  // заглушкой noop, и ШЕСТЬ КАРТ (четыре контейнера и две карты
                  // рынка) молча изымались из колод на подготовке: игрок их не
@@ -1575,6 +1577,103 @@ public final class Effects {
             }
         }
         return Map.of("deployed", placed);
+    }
+
+    /**
+     * ПЕРЕБРОСКА — все свои войска с ОДНОГО гекса на любой гекс без чужих войск.
+     *
+     * <p>Верх карты задания (диктовка дизайнера 20.09.2026). Не движение:
+     * смежность не проверяется, отряд снимается и ставится где угодно. Поэтому
+     * и «все с одного гекса», а не «сколько хочешь откуда хочешь» — цена в том,
+     * что снимается ВЕСЬ узел целиком, включая то, что игрок оставлять не
+     * собирался.
+     *
+     * <p>Решается в ДВА выбора, а не в один: сперва откуда, потом куда. Пар
+     * «гекс-гекс» на среднем поле выходит под три сотни, и валить их одним
+     * списком значит завалить и бота, и человека в проигрывателе.
+     *
+     * <p>Жетоны со СКОРОСТЬЮ 0 остаются на месте. Вышка ЦУ — дот: она стоит
+     * там, где поставлена, и это то самое правило, нарушение которого дизайнер
+     * поймал в картах 12.08.2026. Переброска его не отменяет.
+     */
+    static Map<String, Object> redeployHex(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        Agent agent = agentFor(s, seat);
+
+        // ОТКУДА: гексы, где стоит хоть один способный двигаться свой жетон.
+        Map<String, List<UnitToken>> поГексам = new java.util.LinkedHashMap<>();
+        for (UnitToken u : pl.unitsOnField()) {
+            if (kelium.engine.Speed.of(s, pl.seat, u) <= 0) {
+                continue;
+            }
+            поГексам.computeIfAbsent(u.hexId, k -> new ArrayList<>()).add(u);
+        }
+        if (поГексам.isEmpty()) {
+            return Map.of("moved", 0, "reason", "нечего перебрасывать");
+        }
+        List<Choice> откуда = new ArrayList<>();
+        for (Map.Entry<String, List<UnitToken>> e : поГексам.entrySet()) {
+            откуда.add(new Choice("from", e.getKey(),
+                e.getKey() + " (жетонов " + e.getValue().size() + ")"));
+        }
+        откуда.add(new Choice("pass", null, "не перебрасывать"));
+        Choice выбор = agent != null
+            ? agent.choose(s, откуда, Map.of("kind", "redeploy_from")) : откуда.get(0);
+        if (выбор.payload() == null) {
+            return Map.of("moved", 0);
+        }
+        String исток = String.valueOf(выбор.payload());
+        List<UnitToken> отряд = поГексам.get(исток);
+
+        // КУДА: любой гекс без ЧУЖИХ войск, куда влезет весь отряд целиком.
+        // Частичная переброска запрещена: «перенести все свои войска» значит
+        // все, и гекс, куда влезут не все, не годится вовсе.
+        java.util.Set<String> чужие = new java.util.HashSet<>();
+        for (PlayerState opp : s.players) {
+            if (opp.seat == seat) {
+                continue;
+            }
+            for (UnitToken u : opp.unitsOnField()) {
+                чужие.add(u.hexId);
+            }
+        }
+        List<Choice> куда = new ArrayList<>();
+        for (String hex : s.field.hexes.keySet()) {
+            if (hex.equals(исток) || чужие.contains(hex)) {
+                continue;
+            }
+            boolean влезут = true;
+            for (UnitToken u : отряд) {
+                if (!Actions.canEnterHex(s, u, hex, seat)) {
+                    влезут = false;
+                    break;
+                }
+            }
+            if (влезут) {
+                куда.add(new Choice("to", hex, hex));
+            }
+        }
+        if (куда.isEmpty()) {
+            return Map.of("moved", 0, "reason", "некуда перебрасывать");
+        }
+        куда.add(new Choice("pass", null, "остаться на месте"));
+        Choice цель = agent != null
+            ? agent.choose(s, куда, Map.of("kind", "redeploy_to")) : куда.get(0);
+        if (цель.payload() == null) {
+            return Map.of("moved", 0);
+        }
+        String кудаГекс = String.valueOf(цель.payload());
+        int перенесено = 0;
+        for (UnitToken u : отряд) {
+            String был = u.hexId;
+            boolean внутри = u.inside();
+            u.setHexId(кудаГекс);
+            // Печатные контейнеры срабатывают так же, как при обычном ходе:
+            // жетон встал на ячейку — ячейка накрыта.
+            PrintedContainers.onUnitMoved(s, pl, был, u.hexId, u.type, внутри);
+            перенесено++;
+        }
+        return Map.of("moved", перенесено, "from", исток, "to", кудаГекс);
     }
 
     static Map<String, Object> placeDamage(GameState s, int seat, Map<String, Object> p) {

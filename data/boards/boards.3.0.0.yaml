@@ -122,7 +122,11 @@ boards:
     energy_invariant: {sources: 10, consumer_slots: 12, deficit: 2}
     modules:
       red_per_player: 4    # attack modules, overlay secondary row
-      blue_per_player: 4   # assembly modules, overlay printed "1" -> 2 (gold 3)
+      # СИНИЕ ЖЕТОНЫ (ассортимент 20.09.2026): две печатные пары «боеприпасы /
+      # войска» — 2/2 и 3/1, — и у каждой две стороны позолоты, в войска или в
+      # боеприпас. Итого 2/2→2/3, 3/1→3/2, 2/2→3/2, 3/1→4/1. Числа живут в
+      # kelium.engine.Modules.BLUE_MODULES.
+      blue_per_player: 4   # сборочные модули, накрывают печатное число здания
 
   # -- Планшет войск (dual_cell) ---------------------------------------------
   # attacks: {unit: target} — ОДНА печатная цель (специализированная ячейка).

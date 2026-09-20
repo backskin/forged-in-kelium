@@ -61,10 +61,20 @@ public final class Modules {
         RED_MODULES.put("M3", new Target[]{Target.AIRCRAFT, Target.BUILDINGS_TOWERS});
         RED_MODULES.put("M4", new Target[]{Target.BUILDINGS_TOWERS, Target.INFANTRY});
 
-        BLUE_MODULES.put("C1", Map.of("ammo", 2, "units", 1, "gild", "units"));
-        BLUE_MODULES.put("C2", Map.of("ammo", 2, "units", 1, "gild", "ammo"));
-        BLUE_MODULES.put("C3", Map.of("ammo", 1, "units", 2, "gild", "units"));
-        BLUE_MODULES.put("C4", Map.of("ammo", 1, "units", 2, "gild", "ammo"));
+        // АССОРТИМЕНТ СИНИХ ЖЕТОНОВ (диктовка дизайнера 20.09.2026):
+        //   C1  2 БПР / 2 войска → позолота 2/3
+        //   C2  3 БПР / 1 войско → позолота 3/2
+        //   C3  2 БПР / 2 войска → позолота 3/2
+        //   C4  3 БПР / 1 войско → позолота 4/1
+        // Две печатные пары (2/2 и 3/1), у каждой две стороны позолоты —
+        // в войска или в боеприпас. Прежний набор был беднее: печатные числа
+        // 2/1 и 1/2 при базовой выдаче 1, то есть жетон всегда что-то да
+        // прибавлял. Теперь, когда здание и без модуля делает 2 боеприпаса,
+        // жетоны с двойкой по боеприпасу берут не им, а войсками.
+        BLUE_MODULES.put("C1", Map.of("ammo", 2, "units", 2, "gild", "units"));
+        BLUE_MODULES.put("C2", Map.of("ammo", 3, "units", 1, "gild", "units"));
+        BLUE_MODULES.put("C3", Map.of("ammo", 2, "units", 2, "gild", "ammo"));
+        BLUE_MODULES.put("C4", Map.of("ammo", 3, "units", 1, "gild", "ammo"));
     }
 
     private static final String[] RED_NAMES = {"M1", "M2", "M3", "M4"};
@@ -95,7 +105,11 @@ public final class Modules {
     public static int assemblyOutput(GameState s, PlayerState player,
                                      BuildingType btype, String kind) {
         int база = 1;
-        if (s != null && "ammo".equals(kind)) {
+        // ПОДНЯТАЯ БАЗА БОЕПРИПАСОВ — ВСЕМ ЗДАНИЯМ, КРОМЕ ЦУ (решение дизайнера
+        // 20.09.2026). ЦУ и так единственное здание, которое есть у игрока с
+        // первого хода и которое не надо строить; дать ему ту же выдачу значит
+        // подарить боеприпас даром и обесценить военные здания.
+        if (s != null && "ammo".equals(kind) && btype != BuildingType.COMMAND_CENTER) {
             Object v = kelium.dataio.Ctx.rules(s).get("actions.assembly.ammo_base", null);
             if (v instanceof Number n) {
                 база = Math.max(1, n.intValue());
