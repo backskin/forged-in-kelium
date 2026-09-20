@@ -28,7 +28,55 @@ public final class TroopSide {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> speedsMap() {
-        return (Map<String, Object>) raw.get("speeds");
+        Map<String, Object> печатные = (Map<String, Object>) raw.get("speeds");
+        return Переопределение.наложить(печатные);
+    }
+
+    /**
+     * СКОРОСТИ ИЗ ЗАПУСКА: {@code -Dkelium.speeds=infantry:2,vehicle:2,aircraft:3}.
+     *
+     * <p>Скорость напечатана на планшете войск, и менять её в файле досок ради
+     * одного замера значит смешивать проверку с решением: пока не измерено,
+     * правки в печатном компоненте быть не должно. Переключатель накладывается
+     * поверх печатных значений и по умолчанию не делает ничего.
+     *
+     * <p>Разбор строки делается ОДИН РАЗ на процесс: {@code speedsMap()}
+     * зовётся на каждое движение каждого жетона, и разбирать её там заново
+     * стоило бы дороже самого хода.
+     */
+    private static final class Переопределение {
+
+        private static final Map<String, Object> ИЗ_ЗАПУСКА = разобрать();
+
+        private Переопределение() {
+        }
+
+        private static Map<String, Object> разобрать() {
+            String строка = System.getProperty("kelium.speeds", "").trim();
+            if (строка.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, Object> итог = new java.util.LinkedHashMap<>();
+            for (String кусок : строка.split(",")) {
+                int двоеточие = кусок.indexOf(':');
+                if (двоеточие <= 0) {
+                    throw new IllegalArgumentException(
+                        "kelium.speeds: ожидался вид infantry:2, а было «" + кусок + "»");
+                }
+                итог.put(кусок.substring(0, двоеточие).trim(),
+                    Integer.parseInt(кусок.substring(двоеточие + 1).trim()));
+            }
+            return Map.copyOf(итог);
+        }
+
+        static Map<String, Object> наложить(Map<String, Object> печатные) {
+            if (ИЗ_ЗАПУСКА.isEmpty()) {
+                return печатные;
+            }
+            Map<String, Object> итог = new java.util.LinkedHashMap<>(печатные);
+            итог.putAll(ИЗ_ЗАПУСКА);
+            return итог;
+        }
     }
 
     /** Скорость движения указанного типа юнита на этой стороне. */
