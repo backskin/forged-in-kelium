@@ -88,12 +88,17 @@ public final class LayoutLibrary {
 
     // Список читается ОДИН раз на процесс: обучение делает сотни тысяч партий, и
     // лезть на диск в каждой — чистая потеря времени.
-    private static final java.util.Map<Integer, List<Entry>> POOL =
+    // Ключ включает ПАПКУ, а не только число игроков: стенд гоняет старые и
+    // новые поля в одном процессе, и на одном лишь числе игроков второй набор
+    // достался бы из кэша первого.
+    private static final java.util.Map<String, List<Entry>> POOL =
         new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Раскладки для замеров и обучения на {@code players} игроков. */
     public static List<Entry> pool(int players) {
-        return POOL.computeIfAbsent(players, n -> {
+        String ключ = players + "@" + poolFolders();
+        return POOL.computeIfAbsent(ключ, k -> {
+            int n = players;
             List<Entry> out = new ArrayList<>();
             for (Path dir : poolFolders()) {
                 if (!Files.isDirectory(dir)) {

@@ -267,6 +267,14 @@ public final class GameConfig {
      * {@code -Dkelium.rules=economy.kelium_is_joker=true,actions.build.military_copies=2}
      */
     private static void применитьПравки(Ruleset ruleset) {
+        // ПРАВКИ ВАРИАНТА (стенд) идут первыми, правки запуска — поверх них:
+        // строка запуска задаётся человеком вручную и должна побеждать.
+        Вариант в = Вариант.сейчас();
+        if (в != null) {
+            for (java.util.Map.Entry<String, Object> e : в.правкиСвода().entrySet()) {
+                ruleset.override(e.getKey(), e.getValue());
+            }
+        }
         String строка = System.getProperty("kelium.rules", "").trim();
         if (строка.isEmpty()) {
             return;
@@ -404,8 +412,12 @@ public final class GameConfig {
         Path root = resolveDataRoot(dataRoot);
         // ВЫБРАННЫЕ ВРУЧНУЮ КОЛОДЫ входят в ключ кэша: иначе партия на других
         // заданиях получила бы набор, загруженный для прошлой (см. contentPick).
+        // ПОДПИСЬ ВАРИАНТА В КЛЮЧЕ: стенд гоняет несколько вариантов свода в
+        // одном процессе, и без неё второй вариант забрал бы правила первого
+        // из кэша — молча и без единого признака в отчёте.
         String key = rulesetId + "@" + root + "#" + contentKey()
-            + "#" + System.getProperty("kelium.rules", "");
+            + "#" + System.getProperty("kelium.rules", "")
+            + "#" + Вариант.подписьТекущего();
         Object[] rc = CACHE.computeIfAbsent(key, k -> {
             Ruleset rs = Ruleset.loadById(rulesetId, root.resolve("rulesets"));
             // ПРАВКИ ЗАПУСКА применяются и здесь: почти все стенды ходят через

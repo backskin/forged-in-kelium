@@ -131,7 +131,12 @@ public final class Locations {
         // Нужно замерам: дизайнер просил сравнивать НОВЫЕ поля со СТАРЫМИ, а без
         // переключателя это делается только правкой кода между прогонами —
         // верный способ забыть откатить и сравнить не то с тем.
-        String своя = System.getProperty("kelium.layouts.dir", "").trim();
+        // ВАРИАНТ НА ПОТОКЕ побеждает: стенд гоняет старые и новые поля в одном
+        // процессе, и системное свойство там задать нечем.
+        Вариант в = Вариант.сейчас();
+        String своя = в != null && в.папкаПолей() != null
+            ? в.папкаПолей().trim()
+            : System.getProperty("kelium.layouts.dir", "").trim();
         Path корень = GameConfig.resolveDataRoot(null).resolve("scenarios");
         if (!своя.isEmpty()) {
             Path путь = Paths.get(своя);

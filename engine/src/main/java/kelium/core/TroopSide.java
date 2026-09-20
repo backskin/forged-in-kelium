@@ -70,10 +70,13 @@ public final class TroopSide {
         }
 
         static Map<String, Object> наложить(Map<String, Object> печатные) {
-            if (ИЗ_ЗАПУСКА.isEmpty()) {
+            kelium.dataio.Вариант в = kelium.dataio.Вариант.сейчас();
+            Map<String, Object> изВарианта = в == null ? Map.of() : в.скорости();
+            if (ИЗ_ЗАПУСКА.isEmpty() && изВарианта.isEmpty()) {
                 return печатные;
             }
             Map<String, Object> итог = new java.util.LinkedHashMap<>(печатные);
+            итог.putAll(изВарианта);
             итог.putAll(ИЗ_ЗАПУСКА);
             return итог;
         }
@@ -129,10 +132,14 @@ public final class TroopSide {
     @SuppressWarnings("unchecked")
     private Map<String, Object> таблицаЦелей() {
         Map<String, Object> печатная = (Map<String, Object>) raw.get("attacks");
-        if (печатная == null || ЦелиИзЗапуска.СПИСОК.isEmpty() || !dualCell()) {
+        kelium.dataio.Вариант в = kelium.dataio.Вариант.сейчас();
+        Map<String, String> изВарианта = в == null ? Map.of() : в.цели();
+        boolean нечего = ЦелиИзЗапуска.СПИСОК.isEmpty() && изВарианта.isEmpty();
+        if (печатная == null || нечего || !dualCell()) {
             return печатная;
         }
         Map<String, Object> итог = new java.util.LinkedHashMap<>(печатная);
+        итог.putAll(изВарианта);
         итог.putAll(ЦелиИзЗапуска.СПИСОК);
         return итог;
     }
