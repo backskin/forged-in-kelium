@@ -90,7 +90,7 @@ boards:
       #
       # Перенос выравнивает очередь: авиабаза встаёт наравне с бывшей казармой,
       # а казарма перестаёт быть безусловно самой дешёвой постройкой.
-      barracks:   {energy_slots: 2, hp: 2, assembly: [infantry, ammo], trophy: 2}
+      barracks:   {energy_slots: 1, hp: 2, assembly: [infantry, ammo], trophy: 2}
       factory:    {energy_slots: 2, hp: 2, assembly: [vehicle, ammo],  trophy: 3}
       # АВИАБАЗА: 2 ячейки энергии вместо 3, цена постройки +1 монета на всех
       # сторонах (решение дизайнера 13.08.2026). Замер показывал, что при трёх
@@ -115,8 +115,11 @@ boards:
       - {level: 2, hp: 1, energy_gives: 2, cost: 2, trophy: 1}
       - {level: 3, hp: 2, energy_gives: 2, cost: 3, trophy: 2}
       - {level: 4, hp: 2, energy_gives: 3, cost: 4, trophy: 3, vp_on_field: true}
-    # Energy invariant: sources give 8 (1+2+2+3) + CU 2 = 10; consumers hold 13 → deficit 3.
-    energy_invariant: {sources: 10, consumer_slots: 13, deficit: 3}
+    # ПОТОЛОК ЯЧЕЕК ЭНЕРГИИ НА ЗДАНИИ — ДВЕ (ограничение рисунка на жетоне,
+    # решение дизайнера 20.09.2026). Общий планшет: казарма 1, завод 2,
+    # авиабаза 2. Источников 8 (1+2+2+3) плюс ЦУ 2 = 10; мест потребления
+    # 6 у шахт + 5 у военных + 1 у ЦУ = 12 → дефицит 2.
+    energy_invariant: {sources: 10, consumer_slots: 12, deficit: 2}
     modules:
       red_per_player: 4    # attack modules, overlay secondary row
       blue_per_player: 4   # assembly modules, overlay printed "1" -> 2 (gold 3)
