@@ -177,7 +177,11 @@ public final class Линейка {
             String ch = i == место ? характер : прочие.get(k++ % прочие.size());
             Agent a = Bots.create(ch, Bots.Level.ГРОССМЕЙСТЕР, i,
                 new Random(seed * 31 + i), игроков);
-            if (i == место && горизонт > 0 && a instanceof PlannerAgent пл) {
+            // ГОРИЗОНТ ВЫСТАВЛЯЕТСЯ ВСЕГДА, А НЕ ТОЛЬКО КОГДА ОН БОЛЬШЕ НУЛЯ.
+            // С тех пор как горизонт включён гроссмейстеру по умолчанию, «ноль»
+            // здесь означал не «эталон без горизонта», а «оставить как у всех»,
+            // и линейка сравнивала правку саму с собой.
+            if (i == место && a instanceof PlannerAgent пл) {
                 пл.horizonRounds = горизонт;
                 пл.horizonSamples = проб;
                 пл.horizonWeight = вес;
