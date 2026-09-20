@@ -119,25 +119,40 @@ public final class PlannerTrainer {
                     for (int i = 1; i < population; i++) {
                         cands.add(mutate(champs.get(ch), rng, gen));
                     }
-                    List<Future<double[]>> futures = new ArrayList<>();
+                    List<Future<Замер>> futures = new ArrayList<>();
                     for (Genome cand : cands) {
                         final Genome g = cand;
-                        futures.add(pool.submit(() -> evaluate(players, base, gamesPer, ch, g,
+                        futures.add(pool.submit(() -> замерить(players, base, gamesPer, ch, g,
                             champs, roster, чистаяЦель)));
                     }
                     double[] best = null;
                     int bestIdx = -1;
                     double[] champScore = null;
+                    double[] поИграмЛучш = null;
+                    double[] поИграмЧемп = null;
                     for (int i = 0; i < futures.size(); i++) {
-                        double[] r = futures.get(i).get();
+                        Замер z = futures.get(i).get();
+                        double[] r = z.сводка();
                         if (i == 0) {
                             champScore = r;
+                            поИграмЧемп = z.поИграм();
                         }
                         if (best == null || r[0] > best[0]) {
                             best = r;
                             bestIdx = i;
+                            поИграмЛучш = z.поИграм();
                         }
                     }
+                    // ПОРОГ ОТБОРА — ПАРНЫЙ, А НЕ АБСОЛЮТНЫЙ. Раздачи у кандидатов
+                    // общие, значит про каждого можно сказать не «на сколько он
+                    // выше», а «насколько уверенно он выше»: разница считается по
+                    // раздачам и делится на свою же погрешность. Прежний порог
+                    // 0,05 приспособленности был взят с потолка и на шумном
+                    // замере пропускал любого, кому повезло на паре полей.
+                    // Здесь порог мягкий (перевес больше одной погрешности):
+                    // это лишь пропуск на отложенную проверку, где спрос строже.
+                    double[] перевесОтбора = bestIdx > 0
+                        ? перевес(поИграмЛучш, поИграмЧемп) : new double[]{0, 0};
                     // ОТЛОЖЕННАЯ ПРОВЕРКА (19.09.2026). Прежде чемпион сменялся,
                     // если лучший из двенадцати мутантов обошёл его НА ТЕХ ЖЕ
                     // раздачах, — и сменялся каждое поколение без исключений.
@@ -157,20 +172,29 @@ public final class PlannerTrainer {
                     boolean accepted = false;
                     double[] чекЧемп = null;
                     double[] чекЛучш = null;
-                    if (bestIdx > 0 && best[0] > champScore[0] + 0.05) {
+                    double проверкаZ = 0;
+                    if (bestIdx > 0 && перевесОтбора[1] > 1.0) {
                         final long отл = 700_000_000L + 100_000L * gen;
                         final Genome претендент = cands.get(bestIdx);
                         final Genome чемпион = champs.get(ch);
                         final String имя = ch;
-                        Future<double[]> fч = pool.submit(() ->
-                            evaluate(players, отл, gamesPer, имя, чемпион, champs, roster,
+                        Future<Замер> fч = pool.submit(() ->
+                            замерить(players, отл, gamesPer, имя, чемпион, champs, roster,
                                 чистаяЦель));
-                        Future<double[]> fл = pool.submit(() ->
-                            evaluate(players, отл, gamesPer, имя, претендент, champs, roster,
+                        Future<Замер> fл = pool.submit(() ->
+                            замерить(players, отл, gamesPer, имя, претендент, champs, roster,
                                 чистаяЦель));
-                        чекЧемп = fч.get();
-                        чекЛучш = fл.get();
-                        accepted = чекЛучш[0] > чекЧемп[0] + 0.05;
+                        Замер zч = fч.get();
+                        Замер zл = fл.get();
+                        чекЧемп = zч.сводка();
+                        чекЛучш = zл.сводка();
+                        // СПРОС НА ОТЛОЖЕННОЙ ПРОВЕРКЕ — ЗНАЧИМОСТЬ, А НЕ ЗНАК.
+                        // Раздачи здесь тоже общие, и «претендент выше чемпиона»
+                        // без погрешности означает лишь то, что монета упала той
+                        // стороной. Порог два — обычная граница значимости.
+                        double[] п = перевес(zл.поИграм(), zч.поИграм());
+                        проверкаZ = п[1];
+                        accepted = п[1] > 2.0;
                     }
                     if (accepted) {
                         champs.put(ch, cands.get(bestIdx));
@@ -179,10 +203,10 @@ public final class PlannerTrainer {
                     }
                     double[] show = accepted ? best : champScore;
                     log.append(String.format(Locale.ROOT,
-                        "| %s | %.2f | %.2f | %s | %s | %.1f | %.0f%% | %.2f | %.2f | %.2f | %.2f |\n",
-                        ch, champScore[0], best[0],
-                        чекЧемп == null ? "—" : String.format(Locale.ROOT, "%.2f / %.2f",
-                            чекЧемп[0], чекЛучш[0]),
+                        "| %s | %.2f | %.2f (z=%+.1f) | %s | %s | %.1f | %.0f%% | %.2f | %.2f | %.2f | %.2f |\n",
+                        ch, champScore[0], best[0], перевесОтбора[1],
+                        чекЧемп == null ? "—" : String.format(Locale.ROOT, "%.2f / %.2f (z=%+.1f)",
+                            чекЧемп[0], чекЛучш[0], проверкаZ),
                         accepted ? "да" : "—",
                         show[1], 100 * show[2], show[3], show[4], show[5], show[6]));
                     System.out.printf(Locale.ROOT,
@@ -300,6 +324,92 @@ public final class PlannerTrainer {
         }
         return new double[]{fit / games, vp / games, wins / games, obj / games, kills / games,
             ars / games, units / games};
+    }
+
+    /**
+     * ПРИСПОСОБЛЕННОСТЬ ПО КАЖДОЙ ПАРТИИ, а не только средняя.
+     *
+     * <p>Зачем отдельный вход. Раздачи у всех кандидатов ОДНИ И ТЕ ЖЕ, и это
+     * самое ценное, что есть в стенде обучения: разброс между полями доходит до
+     * 140%, и на разных раздачах разницу в весах не разглядеть никакими
+     * средствами. Но пока наружу отдавалось одно среднее, вся эта парность
+     * пропадала: отбор сравнивал два числа с порогом 0,05, взятым с потолка, и
+     * не мог отличить «кандидат лучше» от «кандидату повезло на третьей
+     * раздаче». Имея приспособленность по партиям, можно считать РАЗНИЦУ ПО
+     * РАЗДАЧАМ и её погрешность — то есть отвечать не «больше ли», а «больше ли
+     * настолько, что это не шум».
+     */
+    /** Сводка по варианту и его приспособленность ПО КАЖДОЙ ПАРТИИ. */
+    record Замер(double[] сводка, double[] поИграм) {
+    }
+
+    /**
+     * ТО ЖЕ, ЧТО {@code evaluate}, НО С ПРИСПОСОБЛЕННОСТЬЮ ПО КАЖДОЙ ПАРТИИ.
+     *
+     * <p>Зачем. Раздачи у всех кандидатов ОДНИ И ТЕ ЖЕ, и это самое ценное, что
+     * есть в стенде обучения: разброс между полями доходит до 140%, и на разных
+     * раздачах разницу в весах не разглядеть ничем. Но пока наружу отдавалось
+     * одно среднее, парность пропадала: отбор сравнивал два числа с порогом
+     * 0,05, взятым с потолка, и не мог отличить «кандидат лучше» от «кандидату
+     * повезло на третьей раздаче». Имея приспособленность по партиям, можно
+     * считать РАЗНИЦУ ПО РАЗДАЧАМ и её погрешность — то есть отвечать не
+     * «больше ли», а «больше ли настолько, что это не шум».
+     */
+    static Замер замерить(int players, long base, int games, String character,
+                            Genome cand, Map<String, Genome> champs,
+                            List<String> roster, boolean чистаяЦель) {
+        double[] поИграм = new double[games];
+        double vp = 0;
+        double wins = 0;
+        double obj = 0;
+        double kills = 0;
+        double ars = 0;
+        double units = 0;
+        for (int g = 0; g < games; g++) {
+            Outcome o = playOne(players, base + g, g % players, character, cand, champs, roster);
+            поИграм[g] = o.margin() + (o.win() ? 5.0 : 0.0)
+                + (чистаяЦель ? 0.0
+                    : 0.4 * (0.5 * o.objDone() + 0.4 * o.kills()
+                        + 0.3 * o.arsInstall() + 0.15 * o.units()));
+            vp += o.vp();
+            wins += o.win() ? 1 : 0;
+            obj += o.objDone();
+            kills += o.kills();
+            ars += o.arsInstall();
+            units += o.units();
+        }
+        double fit = 0;
+        for (double v : поИграм) {
+            fit += v;
+        }
+        return new Замер(new double[]{fit / games, vp / games, wins / games,
+            obj / games, kills / games, ars / games, units / games}, поИграм);
+    }
+
+    /**
+     * НАСКОЛЬКО УВЕРЕННО первый набор лучше второго НА ОДНИХ РАЗДАЧАХ.
+     * Возвращает {средняя разница, z}. Значимо примерно при |z| больше двух.
+     *
+     * <p>Считается именно разница по раздачам, а не разность средних: раздачи
+     * общие, и парная разница шумит многократно меньше каждого среднего в
+     * отдельности. Разность средних выбрасывает ровно то, ради чего общие
+     * раздачи и заведены.
+     */
+    static double[] перевес(double[] первый, double[] второй) {
+        int n = Math.min(первый.length, второй.length);
+        if (n < 2) {
+            return new double[]{0, 0};
+        }
+        double сумма = 0;
+        double квадратов = 0;
+        for (int i = 0; i < n; i++) {
+            double d = первый[i] - второй[i];
+            сумма += d;
+            квадратов += d * d;
+        }
+        double ср = сумма / n;
+        double дисп = Math.max(1e-9, (квадратов - n * ср * ср) / (n - 1));
+        return new double[]{ср, ср / Math.sqrt(дисп / n)};
     }
 
     static Outcome playOne(int players, long seed, int seat, String character, Genome cand,
