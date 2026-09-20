@@ -113,12 +113,67 @@ public final class TroopSide {
     }
 
     /**
+     * ТАБЛИЦА ПЕЧАТНЫХ ЦЕЛЕЙ, с поправкой из запуска:
+     * {@code -Dkelium.targets=infantry:vehicle,vehicle:aircraft,
+     * aircraft:buildings_towers,tower:infantry}.
+     *
+     * <p>Цели напечатаны на планшете войск, и переставлять их в файле досок
+     * ради замера значит менять компонент раньше, чем измерено. Поправка
+     * накладывается поверх печатной таблицы по роду войск и по умолчанию не
+     * делает ничего. Коды целей — {@link Target#code}.
+     *
+     * <p>Поправка работает только на сторонах с {@link #dualCell()}, где
+     * {@code attacks:} хранит одну цель на род: у старых досок там пара, и
+     * подменять половину пары строкой запуска было бы тихой ошибкой.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> таблицаЦелей() {
+        Map<String, Object> печатная = (Map<String, Object>) raw.get("attacks");
+        if (печатная == null || ЦелиИзЗапуска.СПИСОК.isEmpty() || !dualCell()) {
+            return печатная;
+        }
+        Map<String, Object> итог = new java.util.LinkedHashMap<>(печатная);
+        итог.putAll(ЦелиИзЗапуска.СПИСОК);
+        return итог;
+    }
+
+    /** Разбор {@code kelium.targets} — один раз на процесс. */
+    private static final class ЦелиИзЗапуска {
+
+        static final Map<String, Object> СПИСОК = разобрать();
+
+        private ЦелиИзЗапуска() {
+        }
+
+        private static Map<String, Object> разобрать() {
+            String строка = System.getProperty("kelium.targets", "").trim();
+            if (строка.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, Object> итог = new java.util.LinkedHashMap<>();
+            for (String кусок : строка.split(",")) {
+                int двоеточие = кусок.indexOf(':');
+                if (двоеточие <= 0) {
+                    throw new IllegalArgumentException(
+                        "kelium.targets: ожидался вид infantry:vehicle, а было «" + кусок + "»");
+                }
+                String род = кусок.substring(0, двоеточие).trim();
+                String цель = кусок.substring(двоеточие + 1).trim();
+                UnitType.fromCode(род);            // падём сразу на опечатке
+                Target.fromCode(цель);
+                итог.put(род, цель);
+            }
+            return Map.copyOf(итог);
+        }
+    }
+
+    /**
      * ОДНА печатная цель специализированной ячейки (только для {@link
      * #dualCell()} сторон — {@code attacks:} там хранит скаляр, не пару).
      */
     @SuppressWarnings("unchecked")
     public Target specializedTarget(UnitType unit) {
-        Map<String, Object> tbl = (Map<String, Object>) raw.get("attacks");
+        Map<String, Object> tbl = таблицаЦелей();
         if (tbl == null) {
             return null;
         }
@@ -129,11 +184,10 @@ public final class TroopSide {
     /** Цели (основная, вторичная) для юнита, если полная таблица атак задана; иначе null. */
     @SuppressWarnings("unchecked")
     public Target[] attacks(UnitType unit) {
-        Object tblObj = raw.get("attacks");
-        if (tblObj == null) {
+        Map<String, Object> tbl = таблицаЦелей();
+        if (tbl == null) {
             return null;
         }
-        Map<String, Object> tbl = (Map<String, Object>) tblObj;
         Object row = tbl.get(unit.code);
         if (row == null) {
             return null;
