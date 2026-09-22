@@ -161,6 +161,19 @@ public final class Placement {
             }
         }
 
+        // ОПЫТ «БАЗА ИДЁТ ЗА АРМИЕЙ» (actions.build.zone_from_units, по умолчанию
+        // выключен): гекс, где стоит своё войско, входит в зону стройки. Вопрос
+        // дизайнера 22.09.2026 — почему игроки не переезжают по полю; замер
+        // kelium.ДинамикаПозиций показал, что зона стройки растёт только от
+        // стенок своих зданий, и база за партию уходит от старта на 0,8 гекса.
+        if (kelium.dataio.Ctx.rules(state).getBool("actions.build.zone_from_units", false)) {
+            for (kelium.core.UnitToken u : p.unitsOnField()) {
+                if (u.hexId != null && !u.inside()) {
+                    result.add(u.hexId);
+                }
+            }
+        }
+
         List<String> ok = new ArrayList<>();
         for (String hid : result) {
             Hex h = state.field.get(hid);
