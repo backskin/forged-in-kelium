@@ -36,6 +36,19 @@ public final class Intents {
     public final double[] grudge;
     /** Кого бью. −1 — пока никого. */
     public int targetSeat = -1;
+    /**
+     * КУДА БЬЮ — конкретный гекс, который бот выбрал целью удара и к которому
+     * подводит войска ЗАРАНЕЕ, ещё до объявления боя ({@code null} — нет).
+     *
+     * <p>Жалоба дизайнера 22.09.2026: «бот видит всё поле, он может прицениться
+     * за каждый жетон и тащить войска вокруг гекса, который хочет атаковать,
+     * задолго до боя». Прежде намерение знало только ИГРОКА-цель, но не МЕСТО:
+     * оценка платила за урон уже нанесённый и за жетоны, уже стоящие вплотную,
+     * — а за путь к будущему штурму не платила ничего, и войска брели куда
+     * придётся. Целевой гекс закрывает этот пробел: подведение нужного рода к
+     * нему оценивается как прогресс, а не как пустой ход.
+     */
+    public String targetHex = null;
     /** Карта задания, которую довожу до выполнения ({@code null} — нет). */
     public String focusObjective = null;
     /** Насколько крепко держусь за противника (0..1): выше — реже меняю цель. */
@@ -64,6 +77,88 @@ public final class Intents {
             grudge[i] *= 0.7;
         }
         retarget(s, seat, leaderBias, false);
+        retargetHex(s, seat, false);
+    }
+
+    /**
+     * ВЫБРАТЬ (или подтвердить) ЦЕЛЕВОЙ ГЕКС.
+     *
+     * <p>Ценность гекса — сумма ценности стоящих на нём чужих жетонов (ЦУ и
+     * здания дороже войск), с добавкой за жетон игрока-цели. Из этого вычитается
+     * дальность: гекс, до которого мои войска не дотянутся и за партию, целью
+     * быть не должен. Дальность — движковым BFS от ближайшего моего юнита, тем
+     * же, каким ходит Манёвр, поэтому маршрут сквозь стенку в цель не запишется.
+     *
+     * <p>Гистерезис, как у игрока-цели: новый гекс должен быть заметно ценнее
+     * прежнего, иначе бот метался бы между двумя соседними узлами и не доводил
+     * ни один штурм до конца.
+     *
+     * @param force сменить цель даже без запаса превосходства (гекс опустел)
+     */
+    public void retargetHex(GameState s, int seat, boolean force) {
+        PlayerState me = s.player(seat);
+        java.util.List<UnitToken> myUnits = me.unitsOnField();
+        // Собираем чужие жетоны по гексам.
+        Map<String, Double> ценность = new HashMap<>();
+        for (PlayerState p : s.players) {
+            if (p.seat == seat) {
+                continue;
+            }
+            double targetMult = p.seat == targetSeat ? 1.5 : 1.0;
+            for (BuildingToken b : p.buildingsOnField()) {
+                double v = b.type == BuildingType.COMMAND_CENTER ? 3.0
+                    : b.type == BuildingType.AIRBASE || b.type == BuildingType.FACTORY ? 1.4
+                    : 1.0;
+                ценность.merge(b.hexId, v * targetMult, Double::sum);
+            }
+            for (UnitToken u : p.unitsOnField()) {
+                ценность.merge(u.hexId, 0.6 * targetMult, Double::sum);
+            }
+        }
+        if (ценность.isEmpty() || myUnits.isEmpty()) {
+            targetHex = null;
+            return;
+        }
+        // Дальность до каждого кандидата — от ближайшего моего юнита.
+        String best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        double curScore = Double.NEGATIVE_INFINITY;
+        for (Map.Entry<String, Double> e : ценность.entrySet()) {
+            String hex = e.getKey();
+            int dist = Integer.MAX_VALUE;
+            for (UnitToken u : myUnits) {
+                Integer d = kelium.engine.Movement.distance(s, u.hexId,
+                    java.util.Set.of(hex));
+                if (d != null && d < dist) {
+                    dist = d;
+                }
+            }
+            if (dist == Integer.MAX_VALUE) {
+                continue;   // недостижим ни одним войском — не цель
+            }
+            // Дальность гасит ценность, но не обнуляет: дальний богатый узел
+            // может остаться целью, к которой бот идёт несколько ходов.
+            double score = e.getValue() - 0.4 * dist;
+            if (score > bestScore) {
+                bestScore = score;
+                best = hex;
+            }
+            if (hex.equals(targetHex)) {
+                curScore = score;
+            }
+        }
+        if (best == null) {
+            targetHex = null;
+            return;
+        }
+        if (targetHex == null || force || !ценность.containsKey(targetHex)) {
+            targetHex = best;
+            return;
+        }
+        // ГИСТЕРЕЗИС: держусь за прежний гекс, пока новый не станет заметно лучше.
+        if (bestScore > curScore + 0.5 + commitment) {
+            targetHex = best;
+        }
     }
 
     /**
@@ -197,6 +292,7 @@ public final class Intents {
     public String describe() {
         StringBuilder sb = new StringBuilder();
         sb.append("цель=").append(targetSeat < 0 ? "нет" : "игрок " + targetSeat);
+        sb.append(" гекс=").append(targetHex == null ? "нет" : targetHex);
         sb.append(" фокус=").append(focusObjective == null ? "нет" : focusObjective);
         sb.append(" обиды=[");
         for (int i = 0; i < grudge.length; i++) {

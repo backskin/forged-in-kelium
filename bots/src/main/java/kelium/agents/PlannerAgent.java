@@ -96,7 +96,7 @@ public class PlannerAgent extends Agent {
     public static final List<String> PL_KEYS = List.of(
         "pl.vp", "pl.margin", "pl.objective", "pl.economy", "pl.arsenal", "pl.army",
         "pl.war", "pl.ammo", "pl.trophy", "pl.tech", "pl.caution", "pl.target_bias",
-        "pl.leader_bias", "pl.commitment");
+        "pl.leader_bias", "pl.commitment", "pl.approach");
 
     private static final Map<String, Genome> SAVED = new java.util.concurrent.ConcurrentHashMap<>();
 

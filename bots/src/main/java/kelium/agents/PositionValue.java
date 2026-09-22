@@ -316,6 +316,41 @@ public final class PositionValue {
         warSum += denial;
         b.add("war", warSum * warW);
 
+        // ---- 6b. ПОДВЕДЕНИЕ ВОЙСК К ЦЕЛЕВОМУ ГЕКСУ --------------------------
+        // Претензия дизайнера 22.09.2026: бот должен тащить войска вокруг гекса,
+        // который хочет штурмовать, ЗАДОЛГО до боя. Оценка войны выше платит за
+        // урон уже нанесённый и за жетоны, уже стоящие вплотную; за путь к
+        // будущему штурму — ничего. Здесь путь оплачивается: чем ближе мой
+        // подвижный жетон к целевому гексу, тем лучше, и особенно если этот род
+        // сможет бить там ДЕШЁВОЙ спец-атакой (замер 22.09: выбор ячейки был
+        // лишь в 22% боёв — бот подводил к цели не тот род).
+        double approachW = w.get("pl.approach", 1.0);
+        if (in != null && in.targetHex != null && approachW != 0) {
+            String th = in.targetHex;
+            Set<kelium.core.Target> тамКатегории = new HashSet<>();
+            for (Token t : wv.enemyTokens) {
+                if (th.equals(t.hexId())) {
+                    тамКатегории.add(WorldView.targetCategory(t));
+                }
+            }
+            boolean естьЦель = !тамКатегории.isEmpty();
+            double approachSum = 0;
+            for (UnitToken u : me.unitsOnField()) {
+                if (kelium.engine.Speed.of(s, seat, u) <= 0) {
+                    continue;   // вышка не ходит — к цели её не подвести
+                }
+                Integer d = kelium.engine.Movement.distance(s, u.hexId, Set.of(th));
+                if (d == null) {
+                    continue;   // цель этому жетону недостижима (стенки, поле)
+                }
+                double close = 1.0 / (1.0 + d);
+                kelium.core.Target spec = me.board.troop.specializedTarget(u.type);
+                boolean дёшево = естьЦель && spec != null && тамКатегории.contains(spec);
+                approachSum += close * (дёшево ? 1.8 : 1.0);
+            }
+            b.add("approach", approachSum * 0.5 * approachW);
+        }
+
         // Угроза моему ЦУ и открытые фланги.
         double caution = w.get("pl.caution", 1.0);
         int threat = 0;
