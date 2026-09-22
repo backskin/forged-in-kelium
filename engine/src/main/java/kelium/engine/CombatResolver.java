@@ -284,6 +284,37 @@ public final class CombatResolver {
      * универсальную ячейку это не распространяется, вышка платит за неё как
      * все.
      */
+    /**
+     * БЫЛ ЛИ ВЫБОР МЕЖДУ ЯЧЕЙКАМИ — учёт для балансового стенда, в игре молчит.
+     *
+     * <p>Вопрос дизайнера 21.09.2026: печатная дилемма боя — «дёшево и по
+     * одному типу или дорого и по любому» — существует только тогда, когда
+     * напечатанная цель ФИЗИЧЕСКИ стоит на атакуемом гексе. Если её там нет,
+     * выбора нет вовсе, и дилемма только нарисована. Замер решает спор:
+     * на каждый жетон, которому есть куда стрелять, считается, какие ячейки
+     * ему были доступны.
+     *
+     * <p>Ключ — «род:что было доступно». {@code null} — учёт выключен, и ни
+     * одной лишней инструкции не исполняется.
+     */
+    public static java.util.Map<String, Long> УЧЁТ_ЯЧЕЕК = null;
+
+    private static void учестьЯчейки(GameState s, UnitToken u,
+                                       boolean спец, boolean унив) {
+        if (УЧЁТ_ЯЧЕЕК == null || (!спец && !унив)) {
+            return;
+        }
+        // Копии стола внутри планировщика считать нельзя: бот перебирает
+        // десятки сценариев на ход, и в учёт попали бы его мысли, а не игра.
+        if (kelium.engine.Storage.НАСТОЯЩАЯ_ПАРТИЯ != null
+                && s != kelium.engine.Storage.НАСТОЯЩАЯ_ПАРТИЯ) {
+            return;
+        }
+        String что = спец && унив ? "ВЫБОР есть"
+            : спец ? "только дешёвая" : "только универсальная";
+        УЧЁТ_ЯЧЕЕК.merge(u.type.code + " · " + что, 1L, Long::sum);
+    }
+
     private List<AttackRow> dualCellAttackRows(int seat, kelium.core.TroopSide side,
                                                 UnitToken unit) {
         List<AttackRow> rows = new ArrayList<>();
@@ -797,6 +828,11 @@ public final class CombatResolver {
                         continue;   // этому жетону цель закрыта стеной, а другому — нет
                     }
                     boolean closed = hexClosedAgainst(цель, attackerSeat);
+                    // УЧЁТ ЯЧЕЕК: был ли у этого жетона по этой цели ВЫБОР между
+                    // дешёвой печатной и дорогой универсальной атакой (см.
+                    // УЧЁТ_ЯЧЕЕК).
+                    boolean естьСпец = false;
+                    boolean естьУнив = false;
                     for (AttackRow ar : attackRows(attackerSeat, u)) {
                         String key = u.uid + ":" + ar.row();
                         if (usedRows.contains(key)) {
@@ -830,6 +866,11 @@ public final class CombatResolver {
                                 u.type.code + "." + ar.row() + "->" + ar.target().code
                                     + (ar.target2() == null ? "" : "+" + ar.target2().code)
                                     + "@" + цель));
+                            if ("specialized".equals(ar.row())) {
+                                естьСпец = true;
+                            } else {
+                                естьУнив = true;
+                            }
                         } else if (ar.target() == Target.BUILDINGS_TOWERS
                                 && s.field.get(цель).hasNeutral()
                                 && restrictTargetOwner == null) {
@@ -845,6 +886,7 @@ public final class CombatResolver {
                                 u.type.code + "." + ar.row() + "->raze neutral@" + цель));
                         }
                     }
+                    учестьЯчейки(s, u, естьСпец, естьУнив);
                 }
             }
             if (options.isEmpty()) {
