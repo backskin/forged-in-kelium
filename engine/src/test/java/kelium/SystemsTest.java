@@ -34,24 +34,26 @@ class SystemsTest {
         // без модуля оба выхода = печатная 1
         assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
         assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
-        // C3 лицом: 1 БП / 2 войска (стрелка на войсках)
+        // АССОРТИМЕНТ 20.09.2026: C1 2БПР/2в (зол.войска), C2 3БПР/1в (зол.войска),
+        // C3 2БПР/2в (зол.БПР), C4 3БПР/1в (зол.БПР).
+        // C3 лицом: 2 БПР / 2 войска.
         Map<String, Object> face = new HashMap<>(Modules.BLUE_MODULES.get("C3"));
         face.put("gold", false);
         p.bluePlacements.put(BuildingType.BARRACKS, face);
         assertEquals(2, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
-        assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
-        // C3 золотом: войска 2->3 (стрелка), БП без изменений
+        assertEquals(2, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
+        // C3 золотом (стрелка на БПР): БПР 2->3, войска остаются 2.
         Map<String, Object> gold = new HashMap<>(Modules.BLUE_MODULES.get("C3"));
         gold.put("gold", true);
         p.bluePlacements.put(BuildingType.FACTORY, gold);
-        assertEquals(3, Modules.assemblyOutput(p, BuildingType.FACTORY, "unit"));
-        assertEquals(1, Modules.assemblyOutput(p, BuildingType.FACTORY, "ammo"));
-        // C2 золотом: БП 2->3 (стрелка), войска остаются 1
+        assertEquals(3, Modules.assemblyOutput(p, BuildingType.FACTORY, "ammo"));
+        assertEquals(2, Modules.assemblyOutput(p, BuildingType.FACTORY, "unit"));
+        // C2 золотом (стрелка на войсках): войска 1->2, БПР остаются 3.
         Map<String, Object> c2g = new HashMap<>(Modules.BLUE_MODULES.get("C2"));
         c2g.put("gold", true);
         p.bluePlacements.put(BuildingType.AIRBASE, c2g);
+        assertEquals(2, Modules.assemblyOutput(p, BuildingType.AIRBASE, "unit"));
         assertEquals(3, Modules.assemblyOutput(p, BuildingType.AIRBASE, "ammo"));
-        assertEquals(1, Modules.assemblyOutput(p, BuildingType.AIRBASE, "unit"));
     }
 
     @Test
