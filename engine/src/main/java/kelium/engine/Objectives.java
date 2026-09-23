@@ -561,7 +561,15 @@ public final class Objectives {
                 // контекстом, своим журналом и своей телеметрией. Вторая правда
                 // о бесплатном действии здесь никому не нужна.
                 case "action" -> {
+                    // ВЫБОР ОДНОГО ИЗ ДВУХ ДЕЙСТВИЙ (решение дизайнера 22.09.2026).
+                    // Награда кодирует пару через «|» («combat|energy_swap»):
+                    // игрок выбирает, какое сыграть. Одиночное действие (без «|»)
+                    // играется как раньше.
                     String имя = String.valueOf(e.getValue());
+                    if (имя.contains("|")) {
+                        String[] пара = имя.split("\\|", 2);
+                        имя = выбратьДействиеНаграды(s, p.seat, пара[0], пара[1]);
+                    }
                     Map<String, Object> итог = Effects.freeAction(s, p.seat,
                         java.util.Map.of("action", имя));
                     into.put("action", имя);
@@ -601,6 +609,24 @@ public final class Objectives {
                 default -> { }
             }
         }
+    }
+
+    /**
+     * ВЫБОР ОДНОГО ИЗ ДВУХ ДЕЙСТВИЙ НАГРАДЫ. Спрашивает агента; если агента нет
+     * (тест, авторасстановка) — берёт первое. Возвращает код выбранного действия.
+     */
+    private static String выбратьДействиеНаграды(GameState s, int seat, String a, String b) {
+        Agent агент = s.agents == null || seat >= s.agents.size()
+            ? null : s.agents.get(seat);
+        if (агент == null) {
+            return a;
+        }
+        java.util.List<kelium.core.Choice> opts = java.util.List.of(
+            new kelium.core.Choice("reward_action", a, a),
+            new kelium.core.Choice("reward_action", b, b));
+        kelium.core.Choice ch = агент.choose(s, opts,
+            java.util.Map.of("kind", "objective_reward_action"));
+        return ch != null && ch.payload() instanceof String выбр ? выбр : a;
     }
 
     private static void grantSpecial(GameState s, PlayerState p, Map<String, Object> reward,
