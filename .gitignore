@@ -92,3 +92,7 @@ tools/книга/_look/
 tools/книга/_*
 tools/книга/last*.png
 tools/книга/sp.png
+
+# самоигра: данные и сети (большие, воспроизводимые)
+data/selfplay/*.bin
+data/selfplay/*.log

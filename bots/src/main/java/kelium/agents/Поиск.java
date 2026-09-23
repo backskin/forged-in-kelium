@@ -48,6 +48,11 @@ public final class Поиск extends Agent {
     public double исследование = 0.7;
     /** Сколько ядер тратить на розыгрыши одного решения. */
     public int потоков = 1;
+    /**
+     * Обученная оценка позиции. Есть — розыгрыш, оборванный на горизонте,
+     * судится сетью; нет — отрывом в очках на миг обрыва.
+     */
+    public kelium.agents.сеть.Сеть сеть;
 
     // ---- телеметрия (для прозрачности) ----
     public long решений;
@@ -243,7 +248,7 @@ public final class Поиск extends Agent {
                 концы[0]++;
             }
         }
-        double[] очки = итоги(итог, мест);
+        double[] очки = итог.finished || сеть == null ? итоги(итог, мест) : поСети(итог, мест);
         for (Ребро р : путь) {
             р.посещений++;
             for (int k = 0; k < мест; k++) {
@@ -252,8 +257,17 @@ public final class Поиск extends Agent {
         }
     }
 
+    /** Оборванный розыгрыш глазами сети: ожидаемый итог каждого места. */
+    private double[] поСети(GameState s, int мест) {
+        double[] out = new double[мест];
+        for (int i = 0; i < мест; i++) {
+            out[i] = сеть.оценить(kelium.agents.сеть.Кодировщик.закодировать(s, i));
+        }
+        return out;
+    }
+
     /** Итог розыгрыша по местам: отрыв своих очков от лучшего соперника, /10. */
-    private static double[] итоги(GameState s, int мест) {
+    public static double[] итоги(GameState s, int мест) {
         int[] очки = new int[мест];
         for (int i = 0; i < мест; i++) {
             очки[i] = Scoring.scorePlayer(s, i).getOrDefault("total", 0);
