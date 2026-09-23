@@ -56,11 +56,42 @@ public final class ЦиклAZ {
     private static double ДОЛЯ = 0.5;
 
     public static void main(String[] args) throws Exception {
-        PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8);
+        Files.createDirectories(ПАПКА);
+        // ВЫВОД И В ОКНО, И В ЖУРНАЛ train.log — окно запуска не пустое, а после
+        // закрытия всё видно в файле.
+        java.io.OutputStream журнал = Files.newOutputStream(ПАПКА.resolve("train.log"),
+            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        java.io.OutputStream консоль = new java.io.FileOutputStream(java.io.FileDescriptor.out);
+        PrintStream out = new PrintStream(new java.io.OutputStream() {
+            @Override
+            public void write(int b) throws java.io.IOException {
+                консоль.write(b);
+                журнал.write(b);
+            }
+
+            @Override
+            public void write(byte[] b, int off, int len) throws java.io.IOException {
+                консоль.write(b, off, len);
+                журнал.write(b, off, len);
+            }
+
+            @Override
+            public void flush() throws java.io.IOException {
+                консоль.flush();
+                журнал.flush();
+            }
+        }, true, StandardCharsets.UTF_8);
         int поколений = args.length > 0 ? Integer.parseInt(args[0]) : 1000;
         int партий = args.length > 1 ? Integer.parseInt(args[1]) : 200;
         int симуляций = args.length > 2 ? Integer.parseInt(args[2]) : 64;
         ДОЛЯ = args.length > 3 ? Double.parseDouble(args[3]) : 0.5;
+        out.println("============================================================");
+        out.println(" ОБУЧЕНИЕ БОТОВ — AlphaZero, самоигра поколениями");
+        out.printf(" партий в поколении %d, проб на решение %d, ядер %d%n", партий, симуляций,
+            Math.max(1, Runtime.getRuntime().availableProcessors() - 2));
+        out.println(" остановить — закрыть это окно; повторный запуск продолжит");
+        out.println(" отчёт по поколениям — data\\selfplay\\az\\отчёт.md");
+        out.println("============================================================");
         Files.createDirectories(ПАПКА);
         int старт = 1;
         while (Files.exists(ПАПКА.resolve("value_" + старт + ".bin"))) {
@@ -127,6 +158,26 @@ public final class ЦиклAZ {
         List<Future<?>> ff = new ArrayList<>();
         long t0 = System.currentTimeMillis();
         int[] сделано = {0};
+        РЕШЕНИЙ.set(0);
+        out.printf("  самоигра: %d партий идут параллельно по %d; раз в минуту — строка хода%n",
+            партий, ядер);
+        java.util.concurrent.ScheduledExecutorService пульс =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "пульс");
+                t.setDaemon(true);
+                return t;
+            });
+        пульс.scheduleAtFixedRate(() -> {
+            int n;
+            synchronized (ЦиклAZ.class) {
+                n = сделано[0];
+            }
+            double мин = (System.currentTimeMillis() - t0) / 60000.0;
+            String осталось = n == 0 ? "считаю…"
+                : String.format("~%.0f мин", мин / n * (партий - n));
+            out.printf("  %s %3d%%  партий %d/%d · решений %,d · %.0f мин · осталось %s%n",
+                полоска(n, партий), 100 * n / партий, n, партий, РЕШЕНИЙ.get(), мин, осталось);
+        }, 1, 1, java.util.concurrent.TimeUnit.MINUTES);
         for (int g = 0; g < партий; g++) {
             final long seed = 100_000_000L * пок + g;
             ff.add(пул.submit(() -> {
@@ -139,10 +190,7 @@ public final class ЦиклAZ {
                         throw new RuntimeException(e);
                     }
                     сделано[0]++;
-                    if (сделано[0] % 10 == 0) {
-                        out.printf("  самоигра %d/%d, %.0f с на партию%n", сделано[0], партий,
-                            (System.currentTimeMillis() - t0) / 1000.0 / сделано[0] * ядер);
-                    }
+
                 }
                 return null;
             }));
@@ -151,6 +199,20 @@ public final class ЦиклAZ {
             f.get();
         }
         пул.shutdown();
+        пульс.shutdownNow();
+        out.printf("  %s 100%%  самоигра готова за %.0f мин%n", полоска(партий, партий),
+            (System.currentTimeMillis() - t0) / 60000.0);
+    }
+
+    /** Сколько решений принято в самоигре текущего поколения (для строки хода). */
+    private static final java.util.concurrent.atomic.AtomicLong РЕШЕНИЙ =
+        new java.util.concurrent.atomic.AtomicLong();
+
+    /** Полоска прогресса из 30 клеток. */
+    private static String полоска(int сделано, int всего) {
+        int клеток = 30;
+        int полных = всего == 0 ? 0 : клеток * сделано / всего;
+        return "[" + "#".repeat(полных) + ".".repeat(клеток - полных) + "]";
     }
 
     /** Одно решение самоигры до того, как стал известен итог партии. */
@@ -228,6 +290,7 @@ public final class ЦиклAZ {
                         }
                     }
                     решения.add(new Решение(seat, стол, варианты, доли));
+                    РЕШЕНИЙ.incrementAndGet();
                     return c;
                 }
             });
