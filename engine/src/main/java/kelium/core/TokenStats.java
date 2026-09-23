@@ -1,5 +1,6 @@
 package kelium.core;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +24,16 @@ public final class TokenStats {
     public final int unitTokensPerColor;
     public final int buildingTokensPerColor;
 
+    /**
+     * ЖЕТОНЫ ПО ЦВЕТУ (планшеты фракций 22.09.2026): прочность войск, ячейки и
+     * прочность военных зданий напечатаны на жетонах, и у каждого цвета свои.
+     * Место за столом → поправка того же устройства, что общая запись
+     * ({@code units.<род>.hp}, {@code buildings.<здание>.hp/energy_slots}).
+     * Добытчики и энергостанции одинаковы у всех цветов (решение дизайнера
+     * 23.09.2026) и поправкой не накрываются.
+     */
+    private final Map<Integer, Map<String, Object>> seatPatch = new HashMap<>();
+
     @SuppressWarnings("unchecked")
     private TokenStats(Map<String, Object> raw, int hpBonus) {
         this.raw = raw;
@@ -40,6 +51,26 @@ public final class TokenStats {
     /** Собрать TokenStats из записи контента, задав общий бонус к HP. */
     public static TokenStats fromContent(Map<String, Object> tokensEntry, int hpBonus) {
         return new TokenStats(tokensEntry, hpBonus);
+    }
+
+    /** Задать жетоны цвета для места (null — общие жетоны). */
+    public void setSeatPatch(int seat, Map<String, Object> patch) {
+        if (patch == null) {
+            seatPatch.remove(seat);
+        } else {
+            seatPatch.put(seat, patch);
+        }
+    }
+
+    /** Поле жетона цвета: section units/buildings, code — род или здание. */
+    @SuppressWarnings("unchecked")
+    private Object patched(int owner, String section, String code, String key) {
+        Map<String, Object> p = seatPatch.get(owner);
+        if (p != null && p.get(section) instanceof Map<?, ?> sec
+                && sec.get(code) instanceof Map<?, ?> row && row.get(key) != null) {
+            return row.get(key);
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
@@ -68,18 +99,30 @@ public final class TokenStats {
 
     /** HP юнита указанного типа с учётом общего бонуса. */
     public int unitHp(UnitType t) {
-        return asInt(unitRaw(t).get("hp")) + hpBonus;
+        return unitHp(t, -1);
+    }
+
+    /** HP юнита по жетону цвета владельца. */
+    public int unitHp(UnitType t, int owner) {
+        Object v = patched(owner, "units", t.code, "hp");
+        return asInt(v != null ? v : unitRaw(t).get("hp")) + hpBonus;
     }
 
     /** HP здания указанного типа (для добытчика/энергостанции — по уровню) с бонусом. */
     public int buildingHp(BuildingType t, Integer level) {
+        return buildingHp(t, level, -1);
+    }
+
+    /** HP здания по жетону цвета владельца. */
+    public int buildingHp(BuildingType t, Integer level, int owner) {
         if (t == BuildingType.MINER) {
             return asInt(minerRaw(level).get("hp")) + hpBonus;
         }
         if (t == BuildingType.POWER_PLANT) {
             return asInt(plantRaw(level).get("hp")) + hpBonus;
         }
-        return asInt(buildingRaw(t).get("hp")) + hpBonus;
+        Object v = patched(owner, "buildings", t.code, "hp");
+        return asInt(v != null ? v : buildingRaw(t).get("hp")) + hpBonus;
     }
 
     /** Трофейная ценность по числу захваченных юнитов, напр. техника 1/1/2/2. */
@@ -172,7 +215,7 @@ public final class TokenStats {
      * @param indexInStock номер жетона в личном запасе рода (0..3)
      */
     public UnitToken makeUnit(UnitType t, int owner, int uid, int indexInStock) {
-        UnitToken u = new UnitToken(t, owner, unitHp(t), uid);
+        UnitToken u = new UnitToken(t, owner, unitHp(t, owner), uid);
         List<Integer> printed = unitTrophyList(t);
         int i = Math.max(0, Math.min(printed.size() - 1, indexInStock));
         u.trophyValue = printed.get(i);
@@ -190,11 +233,20 @@ public final class TokenStats {
      * при первой же правке дизайнера.
      */
     public int buildingEnergySlots(BuildingType t, Integer level) {
+        return buildingEnergySlots(t, level, -1);
+    }
+
+    /** Ячейки энергии здания по жетону цвета владельца. */
+    public int buildingEnergySlots(BuildingType t, Integer level, int owner) {
         if (t == BuildingType.MINER) {
             return minerEnergySlots(level);
         }
         if (t == BuildingType.POWER_PLANT) {
             return 0;                       // источники, а не потребители
+        }
+        Object own = patched(owner, "buildings", t.code, "energy_slots");
+        if (own != null) {
+            return asInt(own);
         }
         Map<String, Object> raw = buildingRaw(t);
         Object need = raw.get("energy_needed");
@@ -203,8 +255,8 @@ public final class TokenStats {
 
     /** Создать жетон здания указанного типа/уровня для владельца owner с id uid. */
     public BuildingToken makeBuilding(BuildingType t, int owner, int uid, Integer level) {
-        int slots = buildingEnergySlots(t, level);
-        BuildingToken b = new BuildingToken(t, owner, buildingHp(t, level), slots, level, uid);
+        int slots = buildingEnergySlots(t, level, owner);
+        BuildingToken b = new BuildingToken(t, owner, buildingHp(t, level, owner), slots, level, uid);
         b.trophyValue = buildingTrophy(t, level);
         return b;
     }

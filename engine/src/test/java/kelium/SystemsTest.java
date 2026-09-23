@@ -31,9 +31,12 @@ class SystemsTest {
     void blueModuleRaisesAssemblyOutput() {
         GameState s = build();
         PlayerState p = s.player(0);
-        // без модуля оба выхода = печатная 1
+        // без модуля — печать планшета красных: казарма 2 БПР / 1 войско,
+        // авиабаза 1 БПР / 2 войска (наём двух за раз).
         assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
-        assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
+        assertEquals(2, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
+        assertEquals(2, Modules.assemblyOutput(p, BuildingType.AIRBASE, "unit"));
+        assertEquals(1, Modules.assemblyOutput(p, BuildingType.AIRBASE, "ammo"));
         // АССОРТИМЕНТ 23.09.2026: C1 2БПР/2в (зол.войска), C2 2БПР/2в (зол.БПР),
         // C3 3БПР/1в (зол.войска), C4 1БПР/3в (зол.БПР).
         // C2 лицом: 2 БПР / 2 войска.
@@ -60,6 +63,34 @@ class SystemsTest {
         p.bluePlacements.put(BuildingType.BARRACKS, c4);
         assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
         assertEquals(3, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
+    }
+
+    /**
+     * ЖЕТОНЫ И ПЛАНШЕТЫ ЦВЕТОВ (22.09.2026): прочность и ячейки берутся с
+     * жетонов своего цвета, скорость и цена — с планшета своего цвета.
+     * Места по кругу: красный, зелёный, синий, жёлтый.
+     */
+    @Test
+    void жетоныИПланшетыПоЦвету() {
+        GameState s = Setup.buildGame(GameConfig.build(4, 5L));
+        var t = s.tokenStats;
+        // прочность войск
+        assertEquals(2, t.unitHp(kelium.core.UnitType.INFANTRY, 0));
+        assertEquals(2, t.unitHp(kelium.core.UnitType.AIRCRAFT, 2));
+        assertEquals(1, t.unitHp(kelium.core.UnitType.TOWER, 3));
+        // авиабаза: ячейки и прочность различаются по цвету
+        assertEquals(1, t.buildingEnergySlots(BuildingType.AIRBASE, null, 0));
+        assertEquals(2, t.buildingEnergySlots(BuildingType.AIRBASE, null, 1));
+        assertEquals(3, t.buildingHp(BuildingType.AIRBASE, null, 2));
+        assertEquals(1, t.buildingHp(BuildingType.AIRBASE, null, 3));
+        // добытчики общие
+        assertEquals(t.buildingHp(BuildingType.MINER, 3, 0), t.buildingHp(BuildingType.MINER, 3, 3));
+        // жетон на поле получает прочность своего цвета
+        assertEquals(1, t.makeUnit(kelium.core.UnitType.INFANTRY, 3, 9001).hp);
+        // планшет: скорость и цена
+        assertEquals(1, s.player(1).board.troop.speed(kelium.core.UnitType.INFANTRY));
+        assertEquals(3, s.player(0).board.troop.buildingPrice("barracks"));
+        assertEquals(1, s.player(2).board.troop.buildingPrice("factory"));
     }
 
     @Test

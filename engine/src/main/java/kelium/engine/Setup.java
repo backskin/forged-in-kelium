@@ -75,6 +75,11 @@ public final class Setup {
             return configOverride;
         }
         Object explicit = ruleset.get("asymmetry.board_sides", null);
+        // Строкой «green/blue/yellow/red» — из правки запуска
+        // (-Dkelium.rules=asymmetry.board_sides=...), где запятая уже занята.
+        if (explicit instanceof String str && !str.isBlank()) {
+            explicit = List.of(str.trim().split("\\s*/\\s*"));
+        }
         if (explicit instanceof List<?> list) {
             List<String> out = new ArrayList<>();
             for (Object o : list) {
@@ -454,6 +459,9 @@ public final class Setup {
             // какая сторона названа в наборе, та и берётся обоим планшетам.
             String side = sides.get(seat);
             PlayerBoard board = PlayerBoard.fromContent(boardsEntries, side, side);
+            // Жетоны этого цвета (прочность, ячейки) — до того, как на поле
+            // встанет первый жетон места.
+            stats.setSeatPatch(seat, board.troop.tokenPatch());
             // Стартовые монеты: из ruleset (setup.start_coins), иначе умолчание —
             // 5 всем (решение 2026-08-12).
             int startCoins = поМесту(ruleset, "setup.start_coins", seat,

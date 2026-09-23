@@ -1537,7 +1537,7 @@ public final class CombatResolver {
                     || b.type == BuildingType.POWER_PLANT;
                 // ПЕЧАТНАЯ прочность 1 — щит покрывает только их; здание с
                 // прочностью 2 и выше держит удар само и никуда не уходит.
-                if (!economy || b.damage <= 0 || state.tokenStats.buildingHp(b.type, b.level) > 1) {
+                if (!economy || b.damage <= 0 || state.tokenStats.buildingHp(b.type, b.level, b.owner) > 1) {
                     continue;
                 }
                 Actions.returnOwnBuildingToReserve(state, pl, b);

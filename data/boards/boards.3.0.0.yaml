@@ -122,10 +122,9 @@ boards:
     energy_invariant: {sources: 10, consumer_slots: 12, deficit: 2}
     modules:
       red_per_player: 4    # attack modules, overlay secondary row
-      # СИНИЕ ЖЕТОНЫ (ассортимент 20.09.2026): две печатные пары «боеприпасы /
-      # войска» — 2/2 и 3/1, — и у каждой две стороны позолоты, в войска или в
-      # боеприпас. Итого 2/2→2/3, 3/1→3/2, 2/2→3/2, 3/1→4/1. Числа живут в
-      # kelium.engine.Modules.BLUE_MODULES.
+      # СИНИЕ ЖЕТОНЫ (жетоны дизайнера, 23.09.2026): 2/2→2/3, 2/2→3/2,
+      # 3/1→3/2, 1/3→2/3 (боеприпасы / войска, лицо → позолота). Жетон
+      # накрывает печатное число здания. Мешок — modules.3.0.0, набор C30.
       blue_per_player: 4   # сборочные модули, накрывают печатное число здания
 
   # -- Планшет войск (dual_cell) ---------------------------------------------
@@ -157,6 +156,97 @@ boards:
     # не была стеной, поэтому скорости и просторные поля идут одним решением.
     speeds: {infantry: 2, vehicle: 2, aircraft: 3, tower: 0}
     building_prices: {barracks: 1, factory: 2, airbase: 2}   # 19.09.2026: авиабаза 3 -> 2, вровень с заводом
+
+  # -- Планшеты войск ФРАКЦИЙ (нарисованы дизайнером 22.09.2026) --------------
+  # Источник: «Компоненты игрока/экспорт-планшеты/планшет-войск-new-1..4» и
+  # жетоны войск и зданий; расшифровка — design-docs/ФРАКЦИИ — расшифровка
+  # нарисованных планшетов (22.09.2026).md. Цвета: 1 красный, 2 зелёный,
+  # 3 синий, 4 жёлтый. Какой цвет у какого места — asymmetry.board_sides свода.
+  #
+  # production — заголовок здания: ammo = боеприпасы за Снаряжение, units =
+  #   войска за наём (два автомата — два жетона за раз).
+  # tokens — то, что напечатано на ЖЕТОНАХ цвета: прочность войск, ячейки и
+  #   прочность военных зданий и ЦУ. Добытчики и энергостанции у всех цветов
+  #   одинаковые (решение дизайнера 23.09.2026) и берутся из общей записи.
+  - id: troop_red
+    kind: troop_side
+    side: red
+    name: "Красные"
+    dual_cell: true
+    attacks: {infantry: buildings_towers, vehicle: buildings_towers, aircraft: vehicle, tower: infantry}
+    speeds: {infantry: 2, vehicle: 2, aircraft: 2, tower: 0}
+    building_prices: {barracks: 3, factory: 2, airbase: 1}
+    production:
+      barracks: {ammo: 2, units: 1}
+      factory:  {ammo: 2, units: 1}
+      airbase:  {ammo: 1, units: 2}
+    tokens:
+      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 2}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 1}
+        factory:        {energy_slots: 2, hp: 2}
+        airbase:        {energy_slots: 1, hp: 2}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_green
+    kind: troop_side
+    side: green
+    name: "Зелёные"
+    dual_cell: true
+    attacks: {infantry: infantry, vehicle: buildings_towers, aircraft: vehicle, tower: aircraft}
+    speeds: {infantry: 1, vehicle: 2, aircraft: 3, tower: 0}
+    building_prices: {barracks: 1, factory: 3, airbase: 2}
+    production:
+      barracks: {ammo: 1, units: 2}
+      factory:  {ammo: 2, units: 1}
+      airbase:  {ammo: 2, units: 1}
+    tokens:
+      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 2}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 1}
+        factory:        {energy_slots: 2, hp: 2}
+        airbase:        {energy_slots: 2, hp: 2}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_blue
+    kind: troop_side
+    side: blue
+    name: "Синие"
+    dual_cell: true
+    attacks: {infantry: aircraft, vehicle: infantry, aircraft: vehicle, tower: buildings_towers}
+    speeds: {infantry: 2, vehicle: 2, aircraft: 1, tower: 0}
+    building_prices: {barracks: 2, factory: 1, airbase: 2}
+    production:
+      barracks: {ammo: 2, units: 1}
+      factory:  {ammo: 1, units: 2}
+      airbase:  {ammo: 2, units: 1}
+    tokens:
+      units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 2}, tower: {hp: 1}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 1}
+        factory:        {energy_slots: 2, hp: 2}
+        airbase:        {energy_slots: 2, hp: 3}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_yellow
+    kind: troop_side
+    side: yellow
+    name: "Жёлтые"
+    dual_cell: true
+    attacks: {infantry: vehicle, vehicle: aircraft, aircraft: buildings_towers, tower: infantry}
+    speeds: {infantry: 2, vehicle: 1, aircraft: 3, tower: 0}
+    building_prices: {barracks: 1, factory: 2, airbase: 2}
+    production:
+      barracks: {ammo: 2, units: 1}
+      factory:  {ammo: 1, units: 2}
+      airbase:  {ammo: 1, units: 1}
+    tokens:
+      units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 1}, tower: {hp: 1}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 1}
+        factory:        {energy_slots: 2, hp: 2}
+        airbase:        {energy_slots: 1, hp: 1}
+        command_center: {energy_slots: 1, hp: 3}
 
   # -- Планшет хранилища ----------------------------------------------------
   # cells: list per level 1..4; each is a string of cell types (У/К/Б) →

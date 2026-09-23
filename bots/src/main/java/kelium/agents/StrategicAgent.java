@@ -1340,7 +1340,7 @@ public class StrategicAgent extends HeuristicAgent {
             // зашитым числом: у авиабазы их два, а не три, с 13.08.2026.
             int need;
             try {
-                need = state.tokenStats.buildingEnergySlots(bt, null);
+                need = state.tokenStats.buildingEnergySlots(bt, null, seat);
             } catch (RuntimeException e) {
                 need = 2;
             }

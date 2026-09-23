@@ -1128,10 +1128,21 @@ public final class PlayerStrip extends JComponent {
      */
     private static String setupLineBoards(ReplayRecord.Player p) {
         java.util.List<String> bits = new java.util.ArrayList<>();
-        if (p.side != null && !p.side.isBlank()) {
+        // ФРАКЦИИ (22.09.2026): сторона планшета войск — это цвет; хранилище у
+        // всех одно, и повторять за ним тот же цвет незачем.
+        String фракция = p.side == null ? "" : switch (p.side) {
+            case "red" -> "красные";
+            case "green" -> "зелёные";
+            case "blue" -> "синие";
+            case "yellow" -> "жёлтые";
+            default -> "";
+        };
+        if (!фракция.isEmpty()) {
+            bits.add("войска: " + фракция);
+        } else if (p.side != null && !p.side.isBlank()) {
             bits.add("войска " + p.side);
         }
-        if (p.storageSide != null && !p.storageSide.isBlank()) {
+        if (фракция.isEmpty() && p.storageSide != null && !p.storageSide.isBlank()) {
             bits.add("склад " + p.storageSide);
         }
         return String.join(" · ", bits);

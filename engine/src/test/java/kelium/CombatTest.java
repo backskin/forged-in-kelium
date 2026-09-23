@@ -75,7 +75,8 @@ class CombatTest {
     }
 
     private GameState freshState() {
-        GameConfig cfg = GameConfig.build(2, 42L);
+        // Механика боя, не фракции: оба места на общем планшете «A».
+        GameConfig cfg = GameConfig.build(GameConfig.DEFAULT_RULESET, 2, 42L, null, List.of("A", "A"));
         GameState s = Setup.buildGame(cfg);
         s.journal = new TurnJournal(s.numPlayers());
         List<Agent> agents = new ArrayList<>();

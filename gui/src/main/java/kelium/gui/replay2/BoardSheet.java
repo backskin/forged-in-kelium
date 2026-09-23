@@ -1220,7 +1220,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         g.drawString(Names.building(maker), x + pad, ty);
         ty += px(11);
         // ЯЧЕЙКИ ЭНЕРГИИ — точками: столько кубиков здание просит, чтобы работать.
-        int slots = buildingSlots(maker);
+        int slots = buildingSlots(troop, maker);
         int dot = px(6);
         for (int i = 0; i < slots; i++) {
             g.setColor(Theme.energy());
@@ -1234,7 +1234,19 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             int price = buildingPrice(troop, maker);
             g.setFont(mono(9, Font.BOLD));
             g.setColor(Theme.ink2());
-            g.drawString(price < 0 ? "не строится" : price + " мон",
+            // ПРОИЗВОДСТВО с планшета цвета: боеприпасы / войска за одно Снаряжение.
+            String выход = "";
+            try {
+                var bt = kelium.core.BuildingType.fromCode(maker);
+                Integer бпр = troop == null ? null : troop.printedOutput(bt, "ammo");
+                Integer войск = troop == null ? null : troop.printedOutput(bt, "unit");
+                if (бпр != null && войск != null) {
+                    выход = " · " + бпр + " БПР / " + войск + " войск";
+                }
+            } catch (RuntimeException нет) {
+                выход = "";
+            }
+            g.drawString((price < 0 ? "не строится" : price + " мон") + выход,
                 x + pad + slots * (dot + px(2)) + px(4), ty);
         }
         ty += px(12);
@@ -1248,7 +1260,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         g.setColor(Theme.ink2());
         // ПРОЧНОСТЬ РЯДОМ СО СКОРОСТЬЮ: без неё по планшету нельзя понять, чем
         // кончится обстрел, а именно за этим в него и смотрят.
-        int hp = unitHp(type);
+        int hp = unitHp(troop, type);
         String stat = (hp < 0 ? "" : "прочность " + hp + " · ")
             + "скорость " + (troop == null ? "?"
             : String.valueOf(troop.speed(kelium.core.UnitType.fromCode(type))));
@@ -1370,8 +1382,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         };
     }
 
-    /** Сколько ячеек энергии просит здание — из правил, иначе 0. */
-    private int buildingSlots(String building) {
+    /** Сколько ячеек энергии просит здание — с жетона цвета, иначе из правил, иначе 0. */
+    private int buildingSlots(kelium.core.TroopSide troop, String building) {
+        if (troop != null && troop.tokenPatch() != null
+                && troop.tokenPatch().get("buildings") instanceof Map<?, ?> m
+                && m.get(building) instanceof Map<?, ?> b
+                && b.get("energy_slots") instanceof Number n) {
+            return n.intValue();
+        }
         try {
             var entries = session.content().get("boards").entries;
             for (var e : entries) {
@@ -1390,10 +1408,16 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     /**
      * Прочность жетона рода войск — из правил, или −1, если правил нет.
      *
-     * <p>Живёт не в стороне планшета, а в общей таблице жетонов: прочность у
-     * всех сторон одна и та же, меняется только то, что напечатано на планшете.
+     * <p>Прочность напечатана на жетоне, а жетоны у каждого цвета свои
+     * (фракции 22.09.2026): сперва жетоны цвета этого планшета, иначе общая
+     * таблица жетонов.
      */
-    private int unitHp(String type) {
+    private int unitHp(kelium.core.TroopSide troop, String type) {
+        if (troop != null && troop.tokenPatch() != null
+                && troop.tokenPatch().get("units") instanceof Map<?, ?> m
+                && m.get(type) instanceof Map<?, ?> u && u.get("hp") instanceof Number n) {
+            return n.intValue();
+        }
         try {
             for (var e : session.content().get("boards").entries) {
                 Object us = e.get("units");

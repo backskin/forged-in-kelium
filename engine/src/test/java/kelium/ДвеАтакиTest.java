@@ -51,24 +51,30 @@ class ДвеАтакиTest {
     }
 
     /**
-     * СПЕЦ-ЦЕЛИ СВЕРЕНЫ С ПЕЧАТЬЮ: в каждой специализированной ячейке планшета
-     * нарисована цель, и данные обязаны её повторять. У пехоты это ТАНК
-     * (проверено по картинке планшета 11.09.2026), поэтому перестановкой
-     * таблица не является: технику бьют двое, авиацию специализированной
-     * атакой не бьёт никто.
+     * СПЕЦ-ЦЕЛИ ФРАКЦИЙ СВЕРЕНЫ С ПЕЧАТЬЮ (планшеты 22.09.2026): в каждой
+     * специальной ячейке нарисована цель, и данные обязаны её повторять.
+     * Места за столом по кругу: красный, зелёный, синий, жёлтый.
      */
     @Test
-    void спецЦелиСтороныАПоДиктовке() {
-        GameState s = Fix.game();
-        var side = s.player(0).board.troop;
-        assertEquals(Target.VEHICLE, side.specializedTarget(UnitType.INFANTRY),
-            "пехота бьёт технику — на печати в её ячейке танк");
-        assertEquals(Target.BUILDINGS_TOWERS, side.specializedTarget(UnitType.VEHICLE),
-            "техника бьёт здания и вышки");
-        assertEquals(Target.VEHICLE, side.specializedTarget(UnitType.AIRCRAFT),
-            "авиация бьёт технику");
-        assertEquals(Target.INFANTRY, side.specializedTarget(UnitType.TOWER),
-            "вышка бьёт пехоту");
+    void спецЦелиФракцийПоПечати() {
+        GameState s = Setup.buildGame(
+            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 42L, null, null));
+        Target З = Target.BUILDINGS_TOWERS, П = Target.INFANTRY,
+            Т = Target.VEHICLE, А = Target.AIRCRAFT;
+        Target[][] печать = {
+            {З, З, Т, П},   // красный
+            {П, З, Т, А},   // зелёный
+            {А, П, Т, З},   // синий
+            {Т, А, З, П},   // жёлтый
+        };
+        UnitType[] рода = {UnitType.INFANTRY, UnitType.VEHICLE, UnitType.AIRCRAFT, UnitType.TOWER};
+        for (int seat = 0; seat < 4; seat++) {
+            var side = s.player(seat).board.troop;
+            for (int r = 0; r < 4; r++) {
+                assertEquals(печать[seat][r], side.specializedTarget(рода[r]),
+                    side.side + ": " + рода[r].code);
+            }
+        }
     }
 
     /** У любого рода войск ДОСТИЖИМЫ все четыре цели: универсальная бьёт всех. */
@@ -135,7 +141,7 @@ class ДвеАтакиTest {
     /** Партия с наблюдателем боевых событий (Fix.game привязывает бой без него). */
     private static GameState battleGame() {
         return Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 2, 42L, null, null));
+            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 2, 42L, null, List.of("A", "A")));
     }
 
     private static void bindWatching(GameState s, List<Map<String, Object>> hits) {

@@ -1457,7 +1457,7 @@ public class HeuristicAgent extends Agent {
             // высокий аппетит, пока их меньше, чем станций, дающих им энергию.
             base = (nMiners < nPlants + 1 ? 8.0 : 4.0) + lvlBonus;
         } else if (военное) {
-            int need = militarySlots(state, bt);
+            int need = militarySlots(state, bt, seat);
             if (spareEnergy < need) {
                 // Запитать нечем, и монетой ячейку НЕ закрыть (такого правила
                 // нет). Но здание можно построить впрок: недостающие кубики
@@ -1579,12 +1579,12 @@ public class HeuristicAgent extends Agent {
      * зашитым в бота числам: дизайнер меняет энергоёмкость в файлах, и бот
      * обязан считать так же, как движок.
      */
-    private static int militarySlots(GameState state, kelium.core.BuildingType bt) {
+    private static int militarySlots(GameState state, kelium.core.BuildingType bt, int seat) {
         if (bt == null) {
             return 1;
         }
         try {
-            return state.tokenStats.buildingEnergySlots(bt, null);
+            return state.tokenStats.buildingEnergySlots(bt, null, seat);
         } catch (RuntimeException e) {
             return 1;
         }

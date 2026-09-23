@@ -105,6 +105,37 @@ public final class TroopSide {
     }
 
     /**
+     * ПЕЧАТНОЕ ПРОИЗВОДСТВО ЗДАНИЯ за одно Снаряжение (планшеты фракций
+     * 22.09.2026): в заголовке здания две строки — боеприпасы и войска за наём.
+     * Ключ {@code production: {barracks: {ammo: 2, units: 1}, ...}}.
+     *
+     * @param kind "ammo" или "unit"
+     * @return число с планшета, или null, если планшет его не печатает
+     */
+    @SuppressWarnings("unchecked")
+    public Integer printedOutput(BuildingType building, String kind) {
+        if (!(raw.get("production") instanceof Map<?, ?> prod)) {
+            return null;
+        }
+        if (!(prod.get(building.code) instanceof Map<?, ?> row)) {
+            return null;
+        }
+        Object v = row.get("ammo".equals(kind) ? "ammo" : "units");
+        return v instanceof Number n ? n.intValue() : null;
+    }
+
+    /**
+     * ЖЕТОНЫ ЦВЕТА: прочность войск, ячейки и прочность зданий напечатаны на
+     * жетонах, а жетоны у каждого цвета свои. Ключ {@code tokens} повторяет
+     * устройство общей записи token_stats ({@code units.<род>.hp},
+     * {@code buildings.<здание>.hp/energy_slots}) и накрывает её поле за полем.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> tokenPatch() {
+        return raw.get("tokens") instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
+    }
+
+    /**
      * БОЙ 2.0 (заказ дизайнера 18.08.2026): у стороны вместо печатной пары
      * целей — универсальная ячейка (любая цель, задаётся ценой ruleset'а, не
      * этим файлом) плюс одна специализированная печатная цель на род войск.

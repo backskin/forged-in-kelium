@@ -111,9 +111,22 @@ public final class Modules {
                 база = Math.max(1, n.intValue());
             }
         }
+        // ПЕЧАТНОЕ ПРОИЗВОДСТВО ФРАКЦИИ (планшеты 22.09.2026): число в заголовке
+        // здания на планшете войск своего цвета. Оно и есть база — правило-
+        // вариант ammo_base действует только на планшет, который числа не печатает.
+        Integer печать = player.board == null ? null
+            : player.board.troop.printedOutput(btype, kind);
+        int войскБаза = 1;
+        if (печать != null) {
+            if ("ammo".equals(kind)) {
+                база = печать;
+            } else {
+                войскБаза = печать;
+            }
+        }
         Map<String, Object> place = player.bluePlacements.get(btype);
         if (place == null) {
-            return база;
+            return "ammo".equals(kind) ? база : войскБаза;
         }
         boolean gold = Boolean.TRUE.equals(place.get("gold"));
         String gild = String.valueOf(place.get("gild"));
@@ -124,7 +137,7 @@ public final class Modules {
             int v = place.get("ammo") instanceof Number n ? n.intValue() : база;
             return v + (gold && "ammo".equals(gild) ? 1 : 0);
         }
-        int v = place.get("units") instanceof Number n ? n.intValue() : 1;
+        int v = place.get("units") instanceof Number n ? n.intValue() : войскБаза;
         return v + (gold && "units".equals(gild) ? 1 : 0);
     }
 
