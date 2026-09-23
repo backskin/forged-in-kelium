@@ -165,7 +165,8 @@ boards:
   #
   # production — заголовок здания: ammo = боеприпасы за Снаряжение, units =
   #   войска за наём (два автомата — два жетона за раз).
-  # tokens — то, что напечатано на ЖЕТОНАХ цвета: прочность войск, ячейки и
+  # tokens — то, что напечатано на ЖЕТОНАХ цвета (жетоны зданий — экспорт
+  #   22.09.2026 11:36, сверено по картинкам 23.09): прочность войск, ячейки и
   #   прочность военных зданий и ЦУ. Добытчики и энергостанции у всех цветов
   #   одинаковые (решение дизайнера 23.09.2026) и берутся из общей записи.
   - id: troop_red
@@ -183,7 +184,7 @@ boards:
     tokens:
       units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 2}}
       buildings:
-        barracks:       {energy_slots: 1, hp: 1}
+        barracks:       {energy_slots: 1, hp: 2}
         factory:        {energy_slots: 2, hp: 2}
         airbase:        {energy_slots: 1, hp: 2}
         command_center: {energy_slots: 1, hp: 3}
@@ -204,7 +205,7 @@ boards:
       units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 2}}
       buildings:
         barracks:       {energy_slots: 1, hp: 1}
-        factory:        {energy_slots: 2, hp: 2}
+        factory:        {energy_slots: 1, hp: 2}
         airbase:        {energy_slots: 2, hp: 2}
         command_center: {energy_slots: 1, hp: 3}
 
@@ -223,7 +224,7 @@ boards:
     tokens:
       units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 2}, tower: {hp: 1}}
       buildings:
-        barracks:       {energy_slots: 1, hp: 1}
+        barracks:       {energy_slots: 1, hp: 2}
         factory:        {energy_slots: 2, hp: 2}
         airbase:        {energy_slots: 2, hp: 3}
         command_center: {energy_slots: 1, hp: 3}
@@ -243,8 +244,8 @@ boards:
     tokens:
       units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 1}, tower: {hp: 1}}
       buildings:
-        barracks:       {energy_slots: 1, hp: 1}
-        factory:        {energy_slots: 2, hp: 2}
+        barracks:       {energy_slots: 2, hp: 1}
+        factory:        {energy_slots: 1, hp: 1}
         airbase:        {energy_slots: 1, hp: 1}
         command_center: {energy_slots: 1, hp: 3}
 
