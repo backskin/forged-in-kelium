@@ -95,9 +95,26 @@ public final class Шаг {
     public static GameState прогнать(Позиция позиция,
                                      java.util.function.Consumer<GameState> наКорне,
                                      List<Agent> послеКорня) {
+        return прогнать(позиция, наКорне, послеКорня, -1);
+    }
+
+    /**
+     * То же, но БЕЗ ПОДГЛЯДЫВАНИЯ ЧУЖИХ ПРИКАЗОВ. Приказы вскрываются разом, а
+     * движок спрашивает игроков по очереди: к моменту, когда решает
+     * {@code искатель}, соседи до него уже выбрали — но их выбор никто не видел.
+     * Если позиция кончается таким хвостом выборов приказа, в повторе чужие
+     * выборы из хвоста НЕ берутся из записи: за соседей решают агенты
+     * {@code послеКорня} (то есть расчёт самого искателя, не знающий правды).
+     *
+     * @param искатель место того, кто считает; −1 — повторять всё как записано
+     */
+    public static GameState прогнать(Позиция позиция,
+                                     java.util.function.Consumer<GameState> наКорне,
+                                     List<Agent> послеКорня, int искатель) {
         GameState c = позиция.снимок.exactCopy();
         int[] курсор = {0};
         boolean[] корень = {false};
+        int скрытоС = искатель < 0 ? Integer.MAX_VALUE : позиция.началоСкрытогоВскрытия();
         List<Agent> agents = new ArrayList<>();
         for (int i = 0; i < c.numPlayers(); i++) {
             final int место = i;
@@ -105,6 +122,11 @@ public final class Шаг {
                 @Override
                 public Choice choose(GameState state, List<Choice> options,
                                      Map<String, Object> ctx) {
+                    if (курсор[0] < позиция.ходы.size() && курсор[0] >= скрытоС
+                            && место != искатель) {
+                        курсор[0]++;              // правду пропускаем — решает расчёт
+                        return послеКорня.get(место).choose(state, options, ctx);
+                    }
                     if (курсор[0] < позиция.ходы.size()) {
                         int k = позиция.ходы.get(курсор[0]++);
                         if (k < 0 || k >= options.size()) {

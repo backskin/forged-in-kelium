@@ -21,6 +21,7 @@ public final class Летопись {
 
     private GameState снимок;
     private final List<Integer> ходы = new ArrayList<>();
+    private final List<String> виды = new ArrayList<>();
 
     /**
      * Подключить к столу. Возвращает обёрнутых агентов — ими и надо играть.
@@ -29,6 +30,7 @@ public final class Летопись {
         стол.circleStartHook = s -> {
             снимок = s.exactCopy();
             ходы.clear();
+            виды.clear();
         };
         List<Agent> обёрнутые = new ArrayList<>();
         for (Agent a : агенты) {
@@ -42,12 +44,13 @@ public final class Летопись {
      * до первого круга (подготовка партии): там перезапуск невозможен.
      */
     public Позиция сейчас() {
-        return снимок == null ? null : new Позиция(снимок, ходы);
+        return снимок == null ? null : new Позиция(снимок, ходы, виды);
     }
 
-    private void записать(int вариант) {
+    private void записать(int вариант, String вид) {
         if (снимок != null) {
             ходы.add(вариант);
+            виды.add(вид);
         }
     }
 
@@ -80,7 +83,7 @@ public final class Летопись {
                     }
                 }
             }
-            летопись.записать(i);
+            летопись.записать(i, ctx == null ? "" : String.valueOf(ctx.getOrDefault("kind", "")));
             return c;
         }
 

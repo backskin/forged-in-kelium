@@ -24,17 +24,41 @@ public final class Позиция {
     final GameState снимок;
     /** Номера выбранных вариантов после снимка. */
     final List<Integer> ходы;
+    /** Вид каждого из этих решений ("reveal_order", "action", …). */
+    final List<String> виды;
 
-    Позиция(GameState снимок, List<Integer> ходы) {
+    Позиция(GameState снимок, List<Integer> ходы, List<String> виды) {
         this.снимок = снимок;
         this.ходы = Collections.unmodifiableList(new ArrayList<>(ходы));
+        this.виды = Collections.unmodifiableList(new ArrayList<>(виды));
     }
 
     /** Позиция после ещё одного решения: выбран вариант номер {@code вариант}. */
     public Позиция применить(int вариант) {
+        return применить(вариант, "");
+    }
+
+    /** То же, с видом решения. */
+    public Позиция применить(int вариант, String вид) {
         List<Integer> н = new ArrayList<>(ходы);
         н.add(вариант);
-        return new Позиция(снимок, н);
+        List<String> в = new ArrayList<>(виды);
+        в.add(вид);
+        return new Позиция(снимок, н, в);
+    }
+
+    /**
+     * С какого номера решения начинается ХВОСТ одновременного вскрытия
+     * приказов: подряд идущие выборы приказа в самом конце позиции. Эти выборы
+     * ещё никто не видел — карты лягут на стол разом, — и бот, который считает
+     * из такой позиции, не вправе их знать.
+     */
+    public int началоСкрытогоВскрытия() {
+        int i = виды.size();
+        while (i > 0 && "reveal_order".equals(виды.get(i - 1))) {
+            i--;
+        }
+        return i;
     }
 
     /** Сколько решений принято после начала круга. */

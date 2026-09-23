@@ -84,7 +84,15 @@ public final class ЦиклAZ {
             Files.deleteIfExists(данные);
             out.printf("%n=== ПОКОЛЕНИЕ %d: самоигра %d партий, %d симуляций на решение ===%n",
                 пок, партий, симуляций);
-            самоигра(партий, симуляций, оценка, ходы, данные, пок, out);
+            List<Сеть[]> прошлые = new ArrayList<>();
+            for (int g = Math.max(1, пок - 5); g < пок; g++) {
+                Path v = ПАПКА.resolve("value_" + g + ".bin");
+                Path h = ПАПКА.resolve("policy_" + g + ".bin");
+                if (Files.exists(v) && Files.exists(h)) {
+                    прошлые.add(new Сеть[]{Сеть.загрузить(v), Сеть.загрузить(h)});
+                }
+            }
+            самоигра(партий, симуляций, оценка, ходы, прошлые, данные, пок, out);
 
             List<Path> окно = new ArrayList<>();
             for (int g = Math.max(1, пок - ОКНО + 1); g <= пок; g++) {
@@ -111,7 +119,8 @@ public final class ЦиклAZ {
     //  Самоигра
     // ======================================================================
 
-    private static void самоигра(int партий, int симуляций, Сеть оценка, Сеть ходы, Path данные,
+    private static void самоигра(int партий, int симуляций, Сеть оценка, Сеть ходы,
+                                 List<Сеть[]> прошлые, Path данные,
                                  int пок, PrintStream out) throws Exception {
         int ядер = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
         ExecutorService пул = Executors.newFixedThreadPool(ядер);
@@ -121,7 +130,7 @@ public final class ЦиклAZ {
         for (int g = 0; g < партий; g++) {
             final long seed = 100_000_000L * пок + g;
             ff.add(пул.submit(() -> {
-                byte[] запись = партия(seed, симуляций, оценка, ходы);
+                byte[] запись = партия(seed, симуляций, оценка, ходы, прошлые);
                 synchronized (ЦиклAZ.class) {
                     try {
                         Files.write(данные, запись, StandardOpenOption.CREATE,
@@ -153,13 +162,36 @@ public final class ЦиклAZ {
      * вектор стола, число вариантов k (int; 0 — решение идёт только в сеть
      * оценки), затем k раз «вектор варианта + доля посещений».
      */
-    private static byte[] партия(long seed, int симуляций, Сеть оценка, Сеть ходы) {
+    private static byte[] партия(long seed, int симуляций, Сеть оценка, Сеть ходы,
+                                 List<Сеть[]> прошлые) {
         GameState s = Setup.buildGame(LayoutLibrary.configFor(4, seed));
         Летопись летопись = new Летопись();
         List<Решение> решения = new ArrayList<>();
         Random жребий = new Random(seed ^ 77);
+        // ЛИГА СОПЕРНИКОВ: двое — текущее поколение; третий — одно из прошлых
+        // поколений (если они есть); четвёртый через раз — прежний бот. Места
+        // крутятся от партии к партии. Записываются решения только текущего
+        // поколения: учится оно, остальные — разные соперники, чтобы не
+        // выучить стиль, который бьёт лишь собственные копии.
+        int сдвиг = (int) Math.floorMod(seed, 4);
         List<Agent> agents = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
+            int роль = Math.floorMod(i - сдвиг, 4);   // 0,1 — текущее; 2 — прошлое; 3 — прежний/текущее
+            if (роль == 3 && жребий.nextBoolean()) {
+                agents.add(Bots.create(Bots.ROSTER_4.get(i), Bots.Level.ГРОССМЕЙСТЕР, i,
+                    new Random(seed * 31 + i), 4));
+                continue;
+            }
+            if (роль == 2 && !прошлые.isEmpty()) {
+                Сеть[] п = прошлые.get(жребий.nextInt(прошлые.size()));
+                ПоискAZ старый = new ПоискAZ(i, летопись, seed * 31 + i);
+                старый.оценка = п[0];
+                старый.ходы = п[1];
+                старый.симуляций = симуляций;
+                старый.доляДоигрывания = ДОЛЯ;
+                agents.add(старый);
+                continue;
+            }
             ПоискAZ бот = new ПоискAZ(i, летопись, seed * 31 + i);
             бот.оценка = оценка;
             бот.ходы = ходы;

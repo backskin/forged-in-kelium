@@ -95,6 +95,58 @@ class ПошаговыйApiTest {
         return b.toString();
     }
 
+    /**
+     * ЧУЖИЕ ПРИКАЗЫ НЕ ПОДГЛЯДЫВАЮТСЯ: если позиция — выбор приказа, а соседи
+     * до меня уже выбрали (но карт ещё никто не видел), повтор с искателем не
+     * берёт их выбор из записи, а спрашивает агентов продолжения.
+     */
+    @Test
+    void чужиеВыборыПриказаСкрыты() {
+        GameState s = Setup.buildGame(GameConfig.build(4, 91L));
+        Летопись летопись = new Летопись();
+        List<Agent> простые = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            простые.add(new Случайный(i, 500 + i));
+        }
+        Позиция[] найдено = {null};
+        int[] чья = {-1};
+        List<Agent> agents = new ArrayList<>();
+        for (Agent a : летопись.подключить(s, простые)) {
+            agents.add(new Agent(a.seat, a.name) {
+                @Override
+                public Choice choose(GameState st, List<Choice> o, Map<String, Object> c) {
+                    Позиция п = летопись.сейчас();
+                    if (найдено[0] == null && п != null && "reveal_order".equals(c.get("kind"))
+                            && п.началоСкрытогоВскрытия() < п.глубина()) {
+                        найдено[0] = п;          // до меня уже выбирали приказ
+                        чья[0] = seat;
+                    }
+                    return a.choose(st, o, c);
+                }
+            });
+        }
+        GameEngine.playGame(s, agents, null);
+        assertTrue(найдено[0] != null, "в партии нашёлся выбор приказа не первым");
+        Позиция п = найдено[0];
+        List<Integer> спрошены = new ArrayList<>();
+        List<Agent> продолжение = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            final int место = i;
+            продолжение.add(new Agent(i, "проверка#" + i) {
+                @Override
+                public Choice choose(GameState st, List<Choice> o, Map<String, Object> c) {
+                    if ("reveal_order".equals(c.get("kind"))) {
+                        спрошены.add(место);
+                    }
+                    throw new Шаг.Обрыв();
+                }
+            });
+        }
+        Шаг.прогнать(п, null, продолжение, чья[0]);
+        assertFalse(спрошены.isEmpty(), "выбор соседа не был скрыт — взят из записи");
+        assertTrue(спрошены.get(0) != чья[0], "первым спрошен сосед, а не искатель");
+    }
+
     @Test
     void позицияВоспроизводитсяТочно() {
         for (long seed : new long[]{77L, 78L}) {
