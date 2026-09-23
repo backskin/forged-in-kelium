@@ -368,11 +368,19 @@ public final class GameEngine {
      * Берётся из настроек стола, а не из правил: это решение игроков, а не
      * редакции правил.
      */
-    private static String seatColorPick(int seat) {
+    private String seatColorPick(int seat) {
         java.util.List<kelium.dataio.GameConfig.SeatPick> all =
             kelium.dataio.GameConfig.seatPickAll();
         String выбрана = seat < all.size() && all.get(seat) != null
             ? all.get(seat).orderColor() : null;
+        // ФРАКЦИЯ ЗАДАЁТ ЦВЕТ (23.09.2026): колода приказов — того же цвета, что
+        // планшет войск места. Иначе красный планшет получал синюю колоду.
+        if (выбрана == null && seat < state.players.size()) {
+            String сторона = state.player(seat).board.troop.side;
+            if (java.util.List.of("red", "green", "blue", "yellow").contains(сторона)) {
+                return сторона;
+            }
+        }
         // НЕ ВЫБРАЛИ — БЕРЁМ КОЛОДУ СВОЕГО ЦВЕТА, а не то, что выпадет по сиду
         // (заказ дизайнера 11.09.2026). Иначе за красным планшетом мог оказаться
         // зелёный узор нижних приказов.
@@ -973,7 +981,8 @@ public final class GameEngine {
             String плашка = card.get("spec") instanceof String с ? с
                 : (Boolean.TRUE.equals(card.get("maneuver")) ? "movement" : null);
             if (плашка != null) {
-                разыгратьПлашку(p, ctx, плашка);
+                int цена = card.get("spec_cost_coin") instanceof Number н ? н.intValue() : 0;
+                разыгратьПлашку(p, ctx, плашка, цена);
             }
         }
         s.turnUndo = null;
@@ -1088,16 +1097,51 @@ public final class GameEngine {
      * <p>Плашка предлагается ПОСЛЕДНЕЙ в ходу: если игрок уже потратил спец на
      * задание, плашка просто не предлагается — это и есть конкуренция.
      */
-    private void разыгратьПлашку(PlayerState p, TurnContext ctx, String вид) {
+    private void разыгратьПлашку(PlayerState p, TurnContext ctx, String вид, int цена) {
         if (!ctx.canSpec()) {
             return;
         }
+        // ПЛАТНАЯ ПЛАШКА (набор orders 3.0.0): «−1 монета → …». Не хватает
+        // монет — плашки нет. Хватает — игрок решает, платить ли: это
+        // спец-действие, и оно же нужно для заданий и арсенала.
+        if (цена > 0) {
+            if (p.resources.coin() < цена) {
+                return;
+            }
+            if (!"movement".equals(вид)) {
+                Choice ч = agents.get(p.seat).choose(state, List.of(
+                    new Choice("order_spec", вид, "−" + цена + " мон: " + вид),
+                    new Choice("pass", null, "не брать плашку")),
+                    ev("kind", "order_spec", "spec", вид, "cost", цена));
+                if (ч.payload() == null) {
+                    return;
+                }
+            }
+        }
         switch (вид) {
-            case "movement" -> offerManeuver(p, ctx);
-            case "coin" -> {
-                p.resources.add(kelium.core.Resource.COIN, 1);
+            case "movement" -> {
+                // Манёвр сам спрашивает, какой жетон вести и вести ли вообще;
+                // платим, только если он состоялся (спец-действие потрачено).
+                boolean могБыл = ctx.canSpec();
+                offerManeuver(p, ctx);
+                if (цена > 0 && могБыл && !ctx.canSpec()) {
+                    p.resources.pay(kelium.core.Resource.COIN, цена);
+                }
+            }
+            case "ammo" -> {
+                p.resources.pay(kelium.core.Resource.COIN, цена);
+                int got = Storage.addAmmoCapped(state, p, 1);
                 ctx.useSpec();
-                emit(ev("type", "order_spec", "seat", p.seat, "spec", "coin", "got", 1));
+                emit(ev("type", "order_spec", "seat", p.seat, "spec", "ammo", "got", got,
+                    "cost", цена));
+            }
+            case "coin" -> {
+                // Сколько монет даёт плашка — из свода (orders.spec_coin); 2 с
+                // 23.09.2026 по решению дизайнера, прежде было напечатано 1.
+                int монет = Ctx.rules(state).getInt("orders.spec_coin", 1);
+                p.resources.add(kelium.core.Resource.COIN, монет);
+                ctx.useSpec();
+                emit(ev("type", "order_spec", "seat", p.seat, "spec", "coin", "got", монет));
             }
             case "objective" -> {
                 String карта = state.decks.get("objectives").draw(state.rng);
@@ -1109,10 +1153,13 @@ public final class GameEngine {
                         "empty", true));
                     return;
                 }
+                if (цена > 0) {
+                    p.resources.pay(kelium.core.Resource.COIN, цена);
+                }
                 p.objectiveHand.add(карта);
                 ctx.useSpec();
                 emit(ev("type", "order_spec", "seat", p.seat, "spec", "objective",
-                    "card", карта));
+                    "card", карта, "cost", цена));
             }
             default -> { }
         }

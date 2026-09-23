@@ -1,0 +1,40 @@
+# ============================================================================
+#  CONTENT: orders  version 3.0.0 — СИММЕТРИЧНЫЕ КАРТЫ ПРИКАЗОВ
+#
+#  По рисунку дизайнера «карты-приказов-симметрия-1..25» (экспорт 22.09.2026).
+#  У всех четырёх цветов ОДИН И ТОТ ЖЕ набор: верх → низ
+#    Инфраструктура → Разработка, Разработка → Наступление,
+#    Приобретения → Инфраструктура, Наступление → Приобретения.
+#  Различается только плашка спец-действия — латинский квадрат: у каждого
+#  цвета ровно одна плашка «+монета» (бесплатно), остальные три стоят
+#  1 монету: → 1 боеприпас, → 1 карта задания, → манёвр одним жетоном.
+#  spec_cost_coin — цена плашки в монетах. Сколько монет даёт плашка «coin» —
+#  ключ свода orders.spec_coin.
+#  Безопасность (4 шт.) — любые два разных действия + спец-действие.
+# ============================================================================
+
+meta:
+  id: 3.0.0
+  type: orders
+
+orders:
+  - {id: blue_infra, deck: blue, top: infrastructure, bottom: development, spec: coin, spec_cost_coin: 0, описание: "Приказ ИНФРАСТРУКТУРА; нижний — РАЗРАБОТКА. Спец-плашка: +1 МОНЕТА."}
+  - {id: blue_dev, deck: blue, top: development, bottom: operation, spec: ammo, spec_cost_coin: 1, описание: "Приказ РАЗРАБОТКА; нижний — НАСТУПЛЕНИЕ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: blue_acq, deck: blue, top: acquisitions, bottom: infrastructure, spec: objective, spec_cost_coin: 1, описание: "Приказ ПРИОБРЕТЕНИЯ; нижний — ИНФРАСТРУКТУРА. Спец-плашка: −1 монета → 1 карта задания."}
+  - {id: blue_oper, deck: blue, top: operation, bottom: acquisitions, spec: movement, spec_cost_coin: 1, описание: "Приказ НАСТУПЛЕНИЕ; нижний — ПРИОБРЕТЕНИЯ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
+  - {id: red_infra, deck: red, top: infrastructure, bottom: development, spec: movement, spec_cost_coin: 1, описание: "Приказ ИНФРАСТРУКТУРА; нижний — РАЗРАБОТКА. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
+  - {id: red_dev, deck: red, top: development, bottom: operation, spec: coin, spec_cost_coin: 0, описание: "Приказ РАЗРАБОТКА; нижний — НАСТУПЛЕНИЕ. Спец-плашка: +1 МОНЕТА."}
+  - {id: red_acq, deck: red, top: acquisitions, bottom: infrastructure, spec: ammo, spec_cost_coin: 1, описание: "Приказ ПРИОБРЕТЕНИЯ; нижний — ИНФРАСТРУКТУРА. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: red_oper, deck: red, top: operation, bottom: acquisitions, spec: objective, spec_cost_coin: 1, описание: "Приказ НАСТУПЛЕНИЕ; нижний — ПРИОБРЕТЕНИЯ. Спец-плашка: −1 монета → 1 карта задания."}
+  - {id: green_infra, deck: green, top: infrastructure, bottom: development, spec: objective, spec_cost_coin: 1, описание: "Приказ ИНФРАСТРУКТУРА; нижний — РАЗРАБОТКА. Спец-плашка: −1 монета → 1 карта задания."}
+  - {id: green_dev, deck: green, top: development, bottom: operation, spec: movement, spec_cost_coin: 1, описание: "Приказ РАЗРАБОТКА; нижний — НАСТУПЛЕНИЕ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
+  - {id: green_acq, deck: green, top: acquisitions, bottom: infrastructure, spec: coin, spec_cost_coin: 0, описание: "Приказ ПРИОБРЕТЕНИЯ; нижний — ИНФРАСТРУКТУРА. Спец-плашка: +1 МОНЕТА."}
+  - {id: green_oper, deck: green, top: operation, bottom: acquisitions, spec: ammo, spec_cost_coin: 1, описание: "Приказ НАСТУПЛЕНИЕ; нижний — ПРИОБРЕТЕНИЯ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: yellow_infra, deck: yellow, top: infrastructure, bottom: development, spec: ammo, spec_cost_coin: 1, описание: "Приказ ИНФРАСТРУКТУРА; нижний — РАЗРАБОТКА. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: yellow_dev, deck: yellow, top: development, bottom: operation, spec: objective, spec_cost_coin: 1, описание: "Приказ РАЗРАБОТКА; нижний — НАСТУПЛЕНИЕ. Спец-плашка: −1 монета → 1 карта задания."}
+  - {id: yellow_acq, deck: yellow, top: acquisitions, bottom: infrastructure, spec: movement, spec_cost_coin: 1, описание: "Приказ ПРИОБРЕТЕНИЯ; нижний — ИНФРАСТРУКТУРА. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
+  - {id: yellow_oper, deck: yellow, top: operation, bottom: acquisitions, spec: coin, spec_cost_coin: 0, описание: "Приказ НАСТУПЛЕНИЕ; нижний — ПРИОБРЕТЕНИЯ. Спец-плашка: +1 МОНЕТА."}
+  - {id: security_1, deck: security, joker: true, spec: null, описание: "БЕЗОПАСНОСТЬ: любые два разных действия из восьми и спец-действие. Нижнего приказа нет."}
+  - {id: security_2, deck: security, joker: true, spec: null, описание: "БЕЗОПАСНОСТЬ: любые два разных действия из восьми и спец-действие. Нижнего приказа нет."}
+  - {id: security_3, deck: security, joker: true, spec: null, описание: "БЕЗОПАСНОСТЬ: любые два разных действия из восьми и спец-действие. Нижнего приказа нет."}
+  - {id: security_4, deck: security, joker: true, spec: null, описание: "БЕЗОПАСНОСТЬ: любые два разных действия из восьми и спец-действие. Нижнего приказа нет."}

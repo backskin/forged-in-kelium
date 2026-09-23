@@ -58,7 +58,8 @@ class ДвеАтакиTest {
     @Test
     void спецЦелиФракцийПоПечати() {
         GameState s = Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 42L, null, null));
+            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 42L, null,
+                List.of("red", "green", "blue", "yellow")));
         Target З = Target.BUILDINGS_TOWERS, П = Target.INFANTRY,
             Т = Target.VEHICLE, А = Target.AIRCRAFT;
         Target[][] печать = {

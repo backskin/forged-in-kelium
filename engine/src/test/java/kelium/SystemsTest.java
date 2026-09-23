@@ -23,7 +23,9 @@ import kelium.engine.Storage;
 class SystemsTest {
 
     private GameState build() {
-        GameConfig cfg = GameConfig.build(4, 5L);
+        // Цвета по местам заданы явно: тесты сверяют данные цвета, а не рассадку.
+        GameConfig cfg = GameConfig.build(GameConfig.DEFAULT_RULESET, 4, 5L, null,
+            java.util.List.of("red", "green", "blue", "yellow"));
         return Setup.buildGame(cfg);
     }
 
@@ -72,7 +74,7 @@ class SystemsTest {
      */
     @Test
     void жетоныИПланшетыПоЦвету() {
-        GameState s = Setup.buildGame(GameConfig.build(4, 5L));
+        GameState s = build();
         var t = s.tokenStats;
         // прочность войск
         assertEquals(2, t.unitHp(kelium.core.UnitType.INFANTRY, 0));

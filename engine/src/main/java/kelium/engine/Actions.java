@@ -2641,7 +2641,19 @@ public final class Actions {
             GameState s = state;
             GameConfig cfg = Ctx.cfg(s);
             ctx.actionsPlayed.add(name());
+            // СТУПЕНЬ «−0 КЕЛЕМИЯ» НА ПЛАНШЕТЕ РЫНКА (решение дизайнера
+            // 23.09.2026): −0 / −1 / −2 келемия дают +1 / +3 / +7 монет. Монеты
+            // шли только из сданного келемия, келемий — из добытчиков, а
+            // добытчики строятся за монеты: игрок без келемия не мог войти в
+            // цикл вовсе. Нулевая ступень — вход в цикл: Рынок без сделки
+            // приносит её монеты. 0 — прежний рынок.
+            int нулевая = ((Number) rs.get("market.zero_kelium_coin", 0)).intValue();
             if (player.resources.kelium() < 1) {
+                if (нулевая > 0) {
+                    player.resources.add(Resource.COIN, нулевая);
+                    return ActionResult.ok("market: -0 kelium -> +" + нулевая + " coin",
+                        Map.of("coin", нулевая, "deals", 0));
+                }
                 return ActionResult.ok("market: no kelium");
             }
             TurnJournal.TurnFacts f = journal(s).of(player.seat);
@@ -2920,6 +2932,12 @@ public final class Actions {
             }
 
             if (deals == 0) {
+                // келемий был, но сдавать его не стали — та же нулевая ступень
+                if (нулевая > 0) {
+                    player.resources.add(Resource.COIN, нулевая);
+                    return ActionResult.ok("market: -0 kelium -> +" + нулевая + " coin",
+                        Map.of("coin", нулевая, "deals", 0));
+                }
                 return ActionResult.ok("market: no trade");
             }
             Map<String, Object> tel = new HashMap<>();
@@ -3187,6 +3205,23 @@ public final class Actions {
                 // Награда — ТОЛЬКО за ячейку, куда встал: бонусы перепрыгнутых
                 // ячеек не достаются никому.
                 techStepReward(player, track, target, agent);
+                // МОНЕТЫ ЗА СТУПЕНЬ ТРЕКА (решение дизайнера 23.09.2026): растущий
+                // доход — чем дальше ступень, тем больше, на каждом из трёх
+                // треков. Список по ступеням 1..4; нет ключа — монет нет.
+                Object шагМон = rs.get("tech.step_coin", null);
+                if (шагМон instanceof String стр && !стр.isBlank()) {
+                    // строкой «2/3/4/5» — из правки запуска, где запятая занята
+                    List<Integer> разбор = new ArrayList<>();
+                    for (String ч : стр.trim().split("\\s*/\\s*")) {
+                        разбор.add(Integer.parseInt(ч));
+                    }
+                    шагМон = разбор;
+                }
+                if (шагМон instanceof List<?> монетыЗаШаг
+                        && target >= 1 && target <= монетыЗаШаг.size()
+                        && монетыЗаШаг.get(target - 1) instanceof Number мон) {
+                    player.resources.add(Resource.COIN, мон.intValue());
+                }
                 steppedTracks.add(track);
                 stepsMade++;
                 spentTotal += cost;

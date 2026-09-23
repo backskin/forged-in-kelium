@@ -41,6 +41,7 @@ public final class RuleWords {
             case "symbols" -> "Символы супер-заданий";
             case "contested_cards" -> "Спорные карты";
             case "market" -> "Рынок";
+            case "orders" -> "Карты приказов";
             case "tech" -> "Наука";
             case "energy" -> "Энергия";
             case "return_step" -> "Конец раунда";
@@ -407,6 +408,8 @@ public final class RuleWords {
             case "market.cell_cost_kelium" -> "келемия за одну ячейку предложения";
             case "market.base_exchanges" -> "печатные обмены рынка";
             case "market.pair_bonus_coin" -> "монет за парный обмен";
+            case "market.zero_kelium_coin" -> "монет за рынок без сданного келемия";
+            case "orders.spec_coin" -> "монет с плашки «+монета» карты приказа";
 
             // ---------- Наука ----------
             case "tech.tracks" -> "треки науки";
