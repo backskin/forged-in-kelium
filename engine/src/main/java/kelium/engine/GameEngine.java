@@ -1056,7 +1056,9 @@ public final class GameEngine {
             }
             String actionName = (String) ch.payload();
             Action action = Actions.create(actionName, s);
+            java.util.Set<String> открытыДо = PrintedContainers.открытые(s);
             ActionResult res = action.perform(p, ctx, agents.get(p.seat));
+            PrintedContainers.накрытия(s, p, открытыДо);
             if (res.ok()) {
                 s.journal.onAction(p.seat, actionName, res.telemetry());
             }
@@ -1126,7 +1128,9 @@ public final class GameEngine {
                 // Манёвр сам спрашивает, какой жетон вести и вести ли вообще;
                 // платим, только если он состоялся (спец-действие потрачено).
                 boolean могБыл = ctx.canSpec();
+                java.util.Set<String> открытыДо = PrintedContainers.открытые(state);
                 offerManeuver(p, ctx);
+                PrintedContainers.накрытия(state, p, открытыДо);
                 if (цена > 0 && могБыл && !ctx.canSpec()) {
                     p.resources.pay(kelium.core.Resource.COIN, цена);
                 }
@@ -1469,8 +1473,10 @@ public final class GameEngine {
                 int цена = (Integer) ch.payload();
                 p.resources.pay(kelium.core.Resource.AMMO, цена);
                 TurnContext бойCtx = new TurnContext(p.seat, 0);
+                java.util.Set<String> открытыДо = PrintedContainers.открытые(s);
                 var res = kelium.engine.Actions.create("combat", s)
                     .perform(p, бойCtx, agents.get(p.seat));
+                PrintedContainers.накрытия(s, p, открытыДо);
                 if (res != null && res.ok()) {
                     j.onAction(p.seat, "combat", res.telemetry());
                 }

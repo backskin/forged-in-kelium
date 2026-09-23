@@ -480,7 +480,9 @@ public final class Effects {
         if (p.get("exchange_only") instanceof Number eo) {
             ctx.exchangeOnlyLimit = eo.intValue();
         }
+        java.util.Set<String> открытыДо = PrintedContainers.открытые(s);
         var res = Actions.create(name, s).perform(s.player(seat), ctx, agent);
+        PrintedContainers.накрытия(s, s.player(seat), открытыДо);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
             tj.onAction(seat, name, res.telemetry());
         }

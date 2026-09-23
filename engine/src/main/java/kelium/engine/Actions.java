@@ -482,8 +482,15 @@ public final class Actions {
                 // берёт контейнер, только если тот НАРИСОВАН И ОТКРЫТ на его
                 // гексе либо на примыкающем — так же, как он примыкает к тайлу
                 // зарождения. «Взять из запаса просто так» больше нельзя.
-                String contHex = PrintedContainers.miningBranchOn(s)
-                    ? PrintedContainers.minableContainerHex(s, b) : null;
+                // ДОБЫЧА ПО ВЫРАБОТКЕ (решение дизайнера 23.09.2026): контейнер
+                // берётся только со СВОЕГО гекса добытчика, и столько, сколько
+                // добытчик добывает келемия (1 или 2 по уровню).
+                boolean поВыработке = Boolean.TRUE.equals(
+                    kelium.dataio.Ctx.rules(s).get("containers.miner_by_yield", Boolean.FALSE));
+                String contHex = !PrintedContainers.miningBranchOn(s) ? null
+                    : поВыработке
+                        ? (PrintedContainers.visibleContainer(s, s.field.get(b.hexId)) ? b.hexId : null)
+                        : PrintedContainers.minableContainerHex(s, b);
                 if (contHex != null) {
                     opts.add(new Choice("mine", "container", "take container @" + contHex));
                 }
@@ -513,11 +520,14 @@ public final class Actions {
                     // РАЗМЕТКА ВЫБОРА (вопрос дизайнера 13.08.2026): контейнер и келемий —
                     // это ЛИБО-ЛИБО. Надо знать, берут ли контейнер ВМЕСТО келемия,
                     // или просто рядом нет живой грядки и выбора не было.
-                    gainedC += Storage.addContainersCapped(s, player, 1,
+                    int контейнеров = поВыработке && b.level != null
+                        ? Math.max(1, state.tokenStats.minerYield(b.level)) : 1;
+                    int взято = Storage.addContainersCapped(s, player, контейнеров,
                         grid != null ? "Добыча: контейнер ВМЕСТО келемия"
                                      : "Добыча: контейнер (келемия рядом не было)");
+                    gainedC += взято;
                     journal(s).of(player.seat).minerTookContainer = true;
-                    journal(s).of(player.seat).containersTaken += 1;
+                    journal(s).of(player.seat).containersTaken += взято;
                     if (b.level != null) {
                         journal(s).of(player.seat).minerContainerLevels.add(b.level);
                     }

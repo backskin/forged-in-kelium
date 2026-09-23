@@ -374,6 +374,8 @@ public final class RuleWords {
 
             // ---------- Контейнеры ----------
             case "containers.mode" -> "откуда берутся контейнеры";
+            case "containers.cover_by_action" -> "контейнер — за ячейку, открытую до действия и закрытую после";
+            case "containers.miner_by_yield" -> "добытчик берёт контейнеры со своего гекса по выработке";
             case "containers.printed_requires_empty_hex" ->
                 "печатный контейнер берут только с пустого гекса";
             case "containers.mining_needs_adjacent_sector" ->
