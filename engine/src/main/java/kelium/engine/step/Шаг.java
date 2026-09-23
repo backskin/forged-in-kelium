@@ -74,6 +74,64 @@ public final class Шаг {
     }
 
     /**
+     * ОБРЫВ РОЗЫГРЫША: агент продолжения бросает его, когда розыгрыш дальше вести
+     * незачем (достигнут горизонт). {@link #прогнать} ловит его и возвращает стол
+     * в этот миг.
+     */
+    public static final class Обрыв extends Error {
+        public Обрыв() {
+            super(null, null, false, false);
+        }
+    }
+
+    /**
+     * Проиграть позицию и ПРОДОЛЖИТЬ партию дальше. Записанные решения
+     * повторяются; в миг, когда они кончились (корень), один раз зовётся
+     * {@code наКорне} — например, перемешать скрытое, — а все решения после
+     * корня принимают агенты {@code послеКорня} (по одному на место).
+     *
+     * @return стол в конце партии или в миг {@link Обрыв}
+     */
+    public static GameState прогнать(Позиция позиция,
+                                     java.util.function.Consumer<GameState> наКорне,
+                                     List<Agent> послеКорня) {
+        GameState c = позиция.снимок.exactCopy();
+        int[] курсор = {0};
+        boolean[] корень = {false};
+        List<Agent> agents = new ArrayList<>();
+        for (int i = 0; i < c.numPlayers(); i++) {
+            final int место = i;
+            agents.add(new Agent(i, "продолжение#" + i) {
+                @Override
+                public Choice choose(GameState state, List<Choice> options,
+                                     Map<String, Object> ctx) {
+                    if (курсор[0] < позиция.ходы.size()) {
+                        int k = позиция.ходы.get(курсор[0]++);
+                        if (k < 0 || k >= options.size()) {
+                            throw new IllegalStateException("повтор разошёлся с партией");
+                        }
+                        return options.get(k);
+                    }
+                    if (!корень[0]) {
+                        корень[0] = true;
+                        if (наКорне != null) {
+                            наКорне.accept(state);
+                        }
+                    }
+                    return послеКорня.get(место).choose(state, options, ctx);
+                }
+            });
+        }
+        GameEngine engine = new GameEngine(c, agents, null);
+        try {
+            engine.resume();
+        } catch (Обрыв обрыв) {
+            return c;
+        }
+        return c;
+    }
+
+    /**
      * Проиграть позицию и остановиться на следующем решении.
      *
      * <p>Стол в ответе — живая копия в миг вопроса: из неё можно читать
