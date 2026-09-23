@@ -67,6 +67,136 @@ public final class Кодировщик {
         return v;
     }
 
+    // ======================================================================
+    //  ВАРИАНТ РЕШЕНИЯ — для сети ходов
+    // ======================================================================
+
+    private static final int КОРЗИН_ВИДА = 32;
+    private static final int КОРЗИН_ТИПА = 16;
+    private static final int КОРЗИН_СЛОВ = 128;
+    private static final int ПРО_ГЕКС = 9;
+    /** Длина описания варианта. */
+    public static final int ВАРИАНТ = КОРЗИН_ВИДА + КОРЗИН_ТИПА + КОРЗИН_СЛОВ + ПРО_ГЕКС;
+
+    private static final java.util.regex.Pattern ГЕКС =
+        java.util.regex.Pattern.compile("h-?\\d+_-?\\d+");
+
+    /** Вход сети ходов: стол глазами решающего + описание варианта. */
+    public static float[] вход(float[] стол, float[] вариант) {
+        float[] x = new float[стол.length + вариант.length];
+        System.arraycopy(стол, 0, x, 0, стол.length);
+        System.arraycopy(вариант, 0, x, стол.length, вариант.length);
+        return x;
+    }
+
+    /**
+     * Описание варианта решения: вид решения, тип варианта, слова подписи (по
+     * корзинам) и — если вариант называет гекс — что на этом гексе. Названия
+     * гексов в слова не идут: на другом поле те же имена значат другое, а
+     * смысл гекса передают числа «что там».
+     */
+    public static float[] вариант(GameState s, int seat, String видРешения, kelium.core.Choice c) {
+        float[] v = new float[ВАРИАНТ];
+        v[корзина(видРешения, КОРЗИН_ВИДА)] = 1;
+        v[КОРЗИН_ВИДА + корзина(c.kind(), КОРЗИН_ТИПА)] = 1;
+        String подпись = c.label() != null ? c.label() : String.valueOf(c.payload());
+        String гекс = null;
+        java.util.regex.Matcher m = ГЕКС.matcher(подпись);
+        if (m.find()) {
+            гекс = m.group();
+        }
+        String слова = ГЕКС.matcher(подпись).replaceAll(" ");
+        for (String слово : слова.toLowerCase().split("[^\\p{L}\\p{N}]+")) {
+            if (!слово.isEmpty()) {
+                v[КОРЗИН_ВИДА + КОРЗИН_ТИПА + корзина(слово, КОРЗИН_СЛОВ)] += 1;
+            }
+        }
+        if (гекс == null && c.payload() instanceof String p && s.field.get(p) != null) {
+            гекс = p;
+        }
+        if (гекс != null && s.field.get(гекс) != null) {
+            проГекс(s, seat, s.field.get(гекс), v, КОРЗИН_ВИДА + КОРЗИН_ТИПА + КОРЗИН_СЛОВ);
+        }
+        return v;
+    }
+
+    private static int корзина(String слово, int корзин) {
+        return Math.floorMod(слово.hashCode() * 0x9E3779B1, корзин);
+    }
+
+    /** Что на гексе глазами игрока: 9 чисел. */
+    private static void проГекс(GameState s, int seat, Hex h, float[] v, int i) {
+        int моиЗд = 0, чужиеЗд = 0, моиВойска = 0, чужиеВойска = 0;
+        for (PlayerState p : s.players) {
+            for (BuildingToken b : p.buildingsOnField()) {
+                if (h.id.equals(b.hexId)) {
+                    if (p.seat == seat) {
+                        моиЗд++;
+                    } else {
+                        чужиеЗд++;
+                    }
+                }
+            }
+            for (UnitToken u : p.unitsOnField()) {
+                if (h.id.equals(u.hexId)) {
+                    if (p.seat == seat) {
+                        моиВойска++;
+                    } else {
+                        чужиеВойска++;
+                    }
+                }
+            }
+        }
+        v[i++] = 1;   // вариант называет гекс
+        v[i++] = моиЗд;
+        v[i++] = чужиеЗд;
+        v[i++] = моиВойска / 2f;
+        v[i++] = чужиеВойска / 2f;
+        v[i++] = h.spawnTile == null ? 0 : h.spawnTile.kelium / 3f;
+        v[i++] = kelium.engine.PrintedContainers.visibleContainer(s, h) ? 1 : 0;
+        v[i++] = расстояние(s, h.id, seat, true) / 6f;
+        v[i++] = расстояние(s, h.id, seat, false) / 6f;
+    }
+
+    /** Шагов до моего ЦУ ({@code моё}) или до ближайшего чужого здания; 6 — далеко. */
+    private static int расстояние(GameState s, String от, int seat, boolean моё) {
+        java.util.Set<String> цели = new java.util.HashSet<>();
+        for (PlayerState p : s.players) {
+            if ((p.seat == seat) != моё) {
+                continue;
+            }
+            for (BuildingToken b : p.buildingsOnField()) {
+                if (!моё || b.type == BuildingType.COMMAND_CENTER) {
+                    цели.add(b.hexId);
+                }
+            }
+        }
+        if (цели.isEmpty()) {
+            return 6;
+        }
+        java.util.ArrayDeque<String> очередь = new java.util.ArrayDeque<>();
+        java.util.Map<String, Integer> шаг = new java.util.HashMap<>();
+        очередь.add(от);
+        шаг.put(от, 0);
+        while (!очередь.isEmpty()) {
+            String x = очередь.poll();
+            int d = шаг.get(x);
+            if (цели.contains(x)) {
+                return d;
+            }
+            if (d >= 6) {
+                continue;
+            }
+            for (String nb : s.field.neighbors(x)) {
+                if (!шаг.containsKey(nb)) {
+                    шаг.put(nb, d + 1);
+                    очередь.add(nb);
+                }
+            }
+        }
+        return 6;
+    }
+
     private static int игрок(GameState s, PlayerState p, float[] v, int i) {
         int начало = i;
         v[i++] = Scoring.scorePlayer(s, p.seat).getOrDefault("total", 0) / 10f;
