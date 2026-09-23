@@ -32,6 +32,7 @@ public final class АренаПоиска {
     }
 
     private static int ЯДЕР = 1;
+    private static kelium.agents.сеть.Сеть СЕТЬ;
 
     private record Итог(int очки, double соперники, boolean победа, double действий,
                         double действийСоп, long мс, long розыгрышей, long сорвалось,
@@ -43,6 +44,9 @@ public final class АренаПоиска {
         int партий = args.length > 0 ? Integer.parseInt(args[0]) : 8;
         int розыгрышей = args.length > 1 ? Integer.parseInt(args[1]) : 32;
         int горизонт = args.length > 2 ? Integer.parseInt(args[2]) : 4;
+        if (args.length > 3 && !"-".equals(args[3])) {
+            СЕТЬ = kelium.agents.сеть.Сеть.загрузить(java.nio.file.Path.of(args[3]));
+        }
         int ядер = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
         // Партии по очереди, а ядра — розыгрышам внутри решения поиска.
         ExecutorService пул = Executors.newFixedThreadPool(1);
@@ -90,6 +94,7 @@ public final class АренаПоиска {
         поиск.розыгрышей = розыгрышей;
         поиск.горизонтКругов = горизонт;
         поиск.потоков = ЯДЕР;
+        поиск.сеть = СЕТЬ;
         for (int i = 0; i < 4; i++) {
             agents.add(i == место ? поиск
                 : Bots.create(Bots.ROSTER_4.get(i), Bots.Level.ГРОССМЕЙСТЕР, i,

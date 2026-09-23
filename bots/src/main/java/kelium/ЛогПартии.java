@@ -41,19 +41,31 @@ public final class ЛогПартии {
     public static void main(String[] args) throws Exception {
         long seed = args.length > 0 ? Long.parseLong(args[0]) : 9_100_001L;
         int уровень = args.length > 1 ? Integer.parseInt(args[1]) : 4;
+        // уровень 0 — на первом месте бот поиска (розыгрышей: четвёртый аргумент)
+        int розыгрышей = args.length > 3 ? Integer.parseInt(args[3]) : 256;
         Path файл = Path.of(args.length > 2 ? args[2] : "reports/logs/partiya_" + seed + ".txt");
         Files.createDirectories(файл.toAbsolutePath().getParent());
         GameState s = Setup.buildGame(LayoutLibrary.configFor(4, seed));
         try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(файл, StandardCharsets.UTF_8))) {
             List<Agent> agents = new ArrayList<>();
+            kelium.engine.step.Летопись летопись = new kelium.engine.step.Летопись();
             for (int i = 0; i < 4; i++) {
-                Agent бот = Bots.create(Bots.ROSTER_4.get(i), Bots.Level.of(уровень), i,
-                    new Random(seed * 31 + i), 4);
+                Agent бот;
+                if (уровень == 0 && i == 0) {
+                    kelium.agents.Поиск п = new kelium.agents.Поиск(0, летопись, seed);
+                    п.розыгрышей = розыгрышей;
+                    п.горизонтКругов = 99;
+                    п.потоков = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
+                    бот = п;
+                } else {
+                    бот = Bots.create(Bots.ROSTER_4.get(i), Bots.Level.of(Math.max(1, уровень == 0 ? 4 : уровень)), i,
+                        new Random(seed * 31 + i), 4);
+                }
                 out.printf("место %d: %s, планшет %s%n", i, бот.name, s.player(i).board.troop.side);
                 agents.add(new Писарь(бот, s, out));
             }
             out.println();
-            GameEngine.playGame(s, agents, ev -> событие(s, ev, out));
+            GameEngine.playGame(s, летопись.подключить(s, agents), ev -> событие(s, ev, out));
             out.println("\nИТОГ");
             for (PlayerState p : s.players) {
                 out.printf("  место %d: %s%n", p.seat, Scoring.scorePlayer(s, p.seat));
@@ -84,10 +96,18 @@ public final class ЛогПартии {
                 for (Choice o : options) {
                     варианты.add(o.label() == null ? String.valueOf(o.payload()) : o.label());
                 }
-                out.printf("      [%d решает %s] выбрал «%s» из %s%n", seat, вид,
-                    c.label() == null ? c.payload() : c.label(),
-                    варианты.size() > 8 ? варианты.subList(0, 8) + "…(" + варианты.size() + ")"
-                        : варианты);
+                if (бот instanceof kelium.agents.Поиск п && !п.последнее.isEmpty()) {
+                    StringBuilder b = new StringBuilder();
+                    п.последнее.forEach((k, v) -> b.append(String.format(" %s=%.0f/%+.2f",
+                        k.substring(k.indexOf('|') + 1), v[0], v[1])));
+                    out.printf("      [%d ПОИСК %s] выбрал «%s»; розыгрышей/средний итог:%s%n", seat, вид,
+                        c.label() == null ? c.payload() : c.label(), b);
+                } else {
+                    out.printf("      [%d решает %s] выбрал «%s» из %s%n", seat, вид,
+                        c.label() == null ? c.payload() : c.label(),
+                        варианты.size() > 8 ? варианты.subList(0, 8) + "…(" + варианты.size() + ")"
+                            : варианты);
+                }
             }
             return c;
         }
