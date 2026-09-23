@@ -61,20 +61,16 @@ public final class Modules {
         RED_MODULES.put("M3", new Target[]{Target.AIRCRAFT, Target.BUILDINGS_TOWERS});
         RED_MODULES.put("M4", new Target[]{Target.BUILDINGS_TOWERS, Target.INFANTRY});
 
-        // АССОРТИМЕНТ СИНИХ ЖЕТОНОВ (диктовка дизайнера 20.09.2026):
+        // АССОРТИМЕНТ СИНИХ ЖЕТОНОВ (жетоны дизайнера, экспорт 23.09.2026):
         //   C1  2 БПР / 2 войска → позолота 2/3
-        //   C2  3 БПР / 1 войско → позолота 3/2
-        //   C3  2 БПР / 2 войска → позолота 3/2
-        //   C4  3 БПР / 1 войско → позолота 4/1
-        // Две печатные пары (2/2 и 3/1), у каждой две стороны позолоты —
-        // в войска или в боеприпас. Прежний набор был беднее: печатные числа
-        // 2/1 и 1/2 при базовой выдаче 1, то есть жетон всегда что-то да
-        // прибавлял. Теперь, когда здание и без модуля делает 2 боеприпаса,
-        // жетоны с двойкой по боеприпасу берут не им, а войсками.
+        //   C2  2 БПР / 2 войска → позолота 3/2
+        //   C3  3 БПР / 1 войско → позолота 3/2
+        //   C4  1 БПР / 3 войска → позолота 2/3
+        // Мешок партии (modules.3.0.0, набор C30) — те же четыре вида по три.
         BLUE_MODULES.put("C1", Map.of("ammo", 2, "units", 2, "gild", "units"));
-        BLUE_MODULES.put("C2", Map.of("ammo", 3, "units", 1, "gild", "units"));
-        BLUE_MODULES.put("C3", Map.of("ammo", 2, "units", 2, "gild", "ammo"));
-        BLUE_MODULES.put("C4", Map.of("ammo", 3, "units", 1, "gild", "ammo"));
+        BLUE_MODULES.put("C2", Map.of("ammo", 2, "units", 2, "gild", "ammo"));
+        BLUE_MODULES.put("C3", Map.of("ammo", 3, "units", 1, "gild", "units"));
+        BLUE_MODULES.put("C4", Map.of("ammo", 1, "units", 3, "gild", "ammo"));
     }
 
     private static final String[] RED_NAMES = {"M1", "M2", "M3", "M4"};
@@ -122,8 +118,11 @@ public final class Modules {
         boolean gold = Boolean.TRUE.equals(place.get("gold"));
         String gild = String.valueOf(place.get("gild"));
         if ("ammo".equals(kind)) {
+            // ЖЕТОН НАКРЫВАЕТ ПЕЧАТНОЕ ЧИСЛО ЗДАНИЯ, а не добавляется к нему и не
+            // берёт большее из двух. Жетон «1 БПР / 3 войска» — сознательный
+            // размен боеприпаса на войска; прежний max(жетон, база) его стирал.
             int v = place.get("ammo") instanceof Number n ? n.intValue() : база;
-            return Math.max(v, база) + (gold && "ammo".equals(gild) ? 1 : 0);
+            return v + (gold && "ammo".equals(gild) ? 1 : 0);
         }
         int v = place.get("units") instanceof Number n ? n.intValue() : 1;
         return v + (gold && "units".equals(gild) ? 1 : 0);

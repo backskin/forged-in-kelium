@@ -34,26 +34,32 @@ class SystemsTest {
         // без модуля оба выхода = печатная 1
         assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
         assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
-        // АССОРТИМЕНТ 20.09.2026: C1 2БПР/2в (зол.войска), C2 3БПР/1в (зол.войска),
-        // C3 2БПР/2в (зол.БПР), C4 3БПР/1в (зол.БПР).
-        // C3 лицом: 2 БПР / 2 войска.
-        Map<String, Object> face = new HashMap<>(Modules.BLUE_MODULES.get("C3"));
+        // АССОРТИМЕНТ 23.09.2026: C1 2БПР/2в (зол.войска), C2 2БПР/2в (зол.БПР),
+        // C3 3БПР/1в (зол.войска), C4 1БПР/3в (зол.БПР).
+        // C2 лицом: 2 БПР / 2 войска.
+        Map<String, Object> face = new HashMap<>(Modules.BLUE_MODULES.get("C2"));
         face.put("gold", false);
         p.bluePlacements.put(BuildingType.BARRACKS, face);
         assertEquals(2, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
         assertEquals(2, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
-        // C3 золотом (стрелка на БПР): БПР 2->3, войска остаются 2.
-        Map<String, Object> gold = new HashMap<>(Modules.BLUE_MODULES.get("C3"));
+        // C2 золотом (стрелка на БПР): БПР 2->3, войска остаются 2.
+        Map<String, Object> gold = new HashMap<>(Modules.BLUE_MODULES.get("C2"));
         gold.put("gold", true);
         p.bluePlacements.put(BuildingType.FACTORY, gold);
         assertEquals(3, Modules.assemblyOutput(p, BuildingType.FACTORY, "ammo"));
         assertEquals(2, Modules.assemblyOutput(p, BuildingType.FACTORY, "unit"));
-        // C2 золотом (стрелка на войсках): войска 1->2, БПР остаются 3.
-        Map<String, Object> c2g = new HashMap<>(Modules.BLUE_MODULES.get("C2"));
-        c2g.put("gold", true);
-        p.bluePlacements.put(BuildingType.AIRBASE, c2g);
+        // C3 золотом (стрелка на войсках): войска 1->2, БПР остаются 3.
+        Map<String, Object> c3g = new HashMap<>(Modules.BLUE_MODULES.get("C3"));
+        c3g.put("gold", true);
+        p.bluePlacements.put(BuildingType.AIRBASE, c3g);
         assertEquals(2, Modules.assemblyOutput(p, BuildingType.AIRBASE, "unit"));
         assertEquals(3, Modules.assemblyOutput(p, BuildingType.AIRBASE, "ammo"));
+        // C4 лицом: жетон накрывает печатное число — 1 БПР / 3 войска.
+        Map<String, Object> c4 = new HashMap<>(Modules.BLUE_MODULES.get("C4"));
+        c4.put("gold", false);
+        p.bluePlacements.put(BuildingType.BARRACKS, c4);
+        assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
+        assertEquals(3, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
     }
 
     @Test
