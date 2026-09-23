@@ -720,6 +720,9 @@ public final class GameEngine {
 
     private void playCircle(int circle) {
         GameState s = state;
+        if (s.circleStartHook != null) {
+            s.circleStartHook.accept(s);
+        }
         // I2: вскрытие ОДНОВРЕМЕННОЕ. Сначала все места ВЫБИРАЮТ карту (руки не
         // трогаем — каждый агент видит одинаковый до-вскрытный стейт, поздние места
         // не подглядывают выбор ранних), и только потом карты разом снимаются с рук.

@@ -58,5 +58,36 @@ public final class СкоростьСимуляции {
         }
         System.out.printf("партия быстрой политикой: %.1f мс, ход: %.2f мс, копия стола: %.3f мс%n",
             всего / 1e6 / партий, всего / 1e6 / ходов, наКопии / 1e6 / копий);
+
+        // ПОШАГОВЫЙ API: сколько стоит достать развилку (повтор от начала круга).
+        GameState s = Setup.buildGame(LayoutLibrary.configFor(4, 5_600_000L));
+        kelium.engine.step.Летопись летопись = new kelium.engine.step.Летопись();
+        List<Agent> простые = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            простые.add(new HeuristicAgent(i, new Random(i), "balanced"));
+        }
+        List<kelium.engine.step.Позиция> позиции = new ArrayList<>();
+        List<Agent> обёрнутые = new ArrayList<>();
+        for (Agent a : летопись.подключить(s, простые)) {
+            обёрнутые.add(new Agent(a.seat, a.name) {
+                @Override
+                public kelium.core.Choice choose(GameState st, List<kelium.core.Choice> o,
+                                                 java.util.Map<String, Object> c) {
+                    kelium.engine.step.Позиция п = летопись.сейчас();
+                    if (п != null) {
+                        позиции.add(п);
+                    }
+                    return a.choose(st, o, c);
+                }
+            });
+        }
+        GameEngine.playGame(s, обёрнутые, null);
+        long d0 = System.nanoTime();
+        for (kelium.engine.step.Позиция п : позиции) {
+            kelium.engine.step.Шаг.достать(п);
+        }
+        long d1 = System.nanoTime();
+        System.out.printf("развилка пошагового API: %.2f мс в среднем (%d развилок за партию)%n",
+            (d1 - d0) / 1e6 / позиции.size(), позиции.size());
     }
 }

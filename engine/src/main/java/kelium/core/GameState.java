@@ -131,6 +131,13 @@ public final class GameState {
      */
     public TurnUndo turnUndo = null;
 
+    /**
+     * КРЮЧОК НАЧАЛА КРУГА (пошаговый API, 23.09.2026): движок зовёт его в самом
+     * начале каждого круга, до вскрытия приказов. Летопись снимает здесь точную
+     * копию стола — от неё позиция и проигрывается заново. В копии НЕ переносится.
+     */
+    public java.util.function.Consumer<GameState> circleStartHook = null;
+
     public GameState(Object config, List<PlayerState> players, Field field,
                      TokenStats tokenStats, TechBoard tech,
                      Map<String, Deck> decks, Random rng, int firstPlayer) {
@@ -162,7 +169,38 @@ public final class GameState {
      * ссылки на прежнее состояние и агентов. Копию обязан привязать вызывающий
      * через {@code GameEngine.bind(copy, agents)}.
      */
+    /**
+     * ТОЧНАЯ КОПИЯ — с тем же состоянием ГСЧ, а не новым (23.09.2026). Нужна
+     * пошаговому API ({@code kelium.engine.step}): позиция там — снимок стола в
+     * начале круга плюс решения после него, и повтор решений обязан дать ровно
+     * ту же партию, включая доборы карт. Обычная {@link #deepCopy} для этого не
+     * годится — её ГСЧ новый нарочно.
+     */
+    public GameState exactCopy() {
+        return copyWith(cloneRandom(rng));
+    }
+
+    /** Копия ГСЧ в том же состоянии (Random сериализуем — это единственный публичный путь). */
+    private static Random cloneRandom(Random r) {
+        try {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(128);
+            try (java.io.ObjectOutputStream oo = new java.io.ObjectOutputStream(bo)) {
+                oo.writeObject(r);
+            }
+            try (java.io.ObjectInputStream oi = new java.io.ObjectInputStream(
+                    new java.io.ByteArrayInputStream(bo.toByteArray()))) {
+                return (Random) oi.readObject();
+            }
+        } catch (java.io.IOException | ClassNotFoundException e) {
+            throw new IllegalStateException("ГСЧ не копируется", e);
+        }
+    }
+
     public GameState deepCopy(long rngSeed) {
+        return copyWith(new Random(rngSeed));
+    }
+
+    private GameState copyWith(Random newRng) {
         Map<Integer, Token> registry = new HashMap<>();
         List<PlayerState> ps = new ArrayList<>();
         for (PlayerState p : players) {
@@ -181,7 +219,7 @@ public final class GameState {
             dk.put(e.getKey(), e.getValue().copy());
         }
         GameState s = new GameState(config, ps, field.copy(), tokenStats, tech.copy(),
-            dk, new Random(rngSeed), firstPlayer);
+            dk, newRng, firstPlayer);
         s.round = round;
         s.circle = circle;
         s.marketActive = marketActive;
