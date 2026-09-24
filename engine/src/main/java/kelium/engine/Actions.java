@@ -1177,6 +1177,11 @@ public final class Actions {
                 if (b.type == BuildingType.COMMAND_CENTER && !цуМожноСносить) {
                     continue;
                 }
+                // СНОС ЦУ — ТОЛЬКО ПРИ ОСТАВШЕМСЯ СПЕЦ-ДЕЙСТВИИ (решение дизайнера
+                // 23.09.2026): им ЦУ сразу ставят заново.
+                if (b.type == BuildingType.COMMAND_CENTER && !ctx.canSpec()) {
+                    continue;
+                }
                 if (одноНаЗдание && тронутые.contains(b.uid)) {
                     continue;
                 }
@@ -1231,9 +1236,21 @@ public final class Actions {
                 return performMove(player, ctx, agent, mv);
             }
             if ("demolish_pick".equals(pick.kind())) {
-                тронутые.add(((Number) pick.payload()).intValue());
-                return performDemolish(player, ctx, ((Number) pick.payload()).intValue(),
-                    refund, сносСтоит);
+                int uid = ((Number) pick.payload()).intValue();
+                тронутые.add(uid);
+                boolean этоЦу = false;
+                for (BuildingToken x : player.buildingsOnField()) {
+                    if (x.uid == uid && x.type == BuildingType.COMMAND_CENTER) {
+                        этоЦу = true;
+                    }
+                }
+                ActionResult итог = performDemolish(player, ctx, uid, refund, сносСтоит);
+                // Снесённый ЦУ сразу ставится заново оставшимся спец-действием.
+                if (этоЦу && итог.ok() && ctx.canSpec()
+                        && ЦуИзЗапаса.поставить(state, player, agent)) {
+                    ctx.useSpec();
+                }
+                return итог;
             }
             if ("repair_pick".equals(pick.kind())) {
                 Map<String, Object> rp = (Map<String, Object>) pick.payload();

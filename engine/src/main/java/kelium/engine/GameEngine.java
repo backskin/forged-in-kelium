@@ -1334,6 +1334,16 @@ public final class GameEngine {
         if (!ctx.canSpec()) {
             return;
         }
+        // ЦУ В ЗАПАСЕ ОБЯЗАН ВЕРНУТЬСЯ НА ПОЛЕ (command_center.must_replace_cu_with_spec):
+        // первое же спец-действие хода уходит на это — на свободные сектора любого гекса.
+        if (Ctx.rules(state).getBool("command_center.must_replace_cu_with_spec", false)
+                && ЦуИзЗапаса.вЗапасе(p) != null) {
+            if (ЦуИзЗапаса.поставить(state, p, agents.get(p.seat))) {
+                ctx.useSpec();
+                emit(ev("type", "cu_replaced", "seat", p.seat));
+                return;
+            }
+        }
         GameState s = state;
         TurnJournal j = s.journal;
         List<Choice> opts = new ArrayList<>();
