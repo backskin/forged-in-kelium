@@ -18,9 +18,9 @@ import kelium.core.PlayerState;
  * 23.09.2026).
  *
  * <p>ЦУ в запасе обязан вернуться на поле: в свой ход игрок тратит на это
- * спец-действие и ставит ЦУ на свободные сектора ЛЮБОГО гекса — правила
- * стройки (зона стройки, запрет из-за чужих войск) здесь не действуют, место
- * ограничивает только само поле. Цены у этой постановки нет.
+ * спец-действие и ставит ЦУ на свободные сектора любого гекса, где нет чужих
+ * войск (даже с чужими зданиями) — зона стройки здесь не действует. Цены у
+ * этой постановки нет.
  *
  * <p>Сюда же ведёт снос своего ЦУ Стройкой: снести его можно, только если в ходу
  * осталось спец-действие, и им ЦУ сразу ставится заново.
@@ -40,12 +40,17 @@ public final class ЦуИзЗапаса {
         return null;
     }
 
-    /** Гексы, где ЦУ помещается на свободные сектора (войска на гексе умещаются). */
-    public static List<String> места(GameState s) {
+    /**
+     * Гексы, где ЦУ помещается на свободные сектора: гекс без чужих войск
+     * (решение дизайнера 23.09.2026 — «на любом гексе, где нет чужих войск,
+     * даже на гексе с чужими зданиями»), свои войска на гексе умещаются.
+     */
+    public static List<String> места(GameState s, int seat) {
         int fp = Placement.footprint(BuildingType.COMMAND_CENTER);
         List<String> out = new ArrayList<>();
         for (Hex h : s.field.hexes.values()) {
-            if (h.kind == HexKind.FORBIDDEN || h.spawnTile != null) {
+            if (h.kind == HexKind.FORBIDDEN || h.spawnTile != null
+                    || Passability.enemyUnitsOn(s, h.id, seat)) {
                 continue;
             }
             int[] груз = Actions.groundLoad(s, h.id, -1);
@@ -68,7 +73,7 @@ public final class ЦуИзЗапаса {
         if (цу == null) {
             return false;
         }
-        List<String> места = места(s);
+        List<String> места = места(s, p.seat);
         if (места.isEmpty()) {
             return false;
         }

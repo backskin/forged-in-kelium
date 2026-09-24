@@ -414,6 +414,7 @@ public final class RuleWords {
             case "market.zero_kelium_coin" -> "монет за рынок без сданного келемия";
             case "market.exchange_once_per_action" -> "каждый обмен рынка — раз за действие";
             case "energy.lost_source_owner_chooses" -> "ушёл источник — владелец выбирает, какие кубики убрать";
+            case "actions.build.building_fires_on_build" -> "здание срабатывает при постройке";
             case "tech.exchange_once_per_action" -> "каждый обмен научного отдела — раз за действие";
             case "orders.spec_coin" -> "монет с плашки «+монета» карты приказа";
 

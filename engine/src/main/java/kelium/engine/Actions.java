@@ -454,6 +454,9 @@ public final class Actions {
                 if (b.type != BuildingType.MINER) {
                     continue;
                 }
+                if (ctx.толькоЗдание >= 0 && b.uid != ctx.толькоЗдание) {
+                    continue;              // срабатывание при постройке — только новый
+                }
                 // Разработка: незапитанный добытчик можно включить монетами
                 // на ЭТО действие (см. effectivelyPowered).
                 //
@@ -461,7 +464,7 @@ public final class Actions {
                 // добытчиков работают в эту Добычу БЕЗ энергии. Все запитанные
                 // работают и так — «ещё один» может значить только этот, иначе
                 // прибавка была бы пустой.
-                if (!effectivelyPowered(s, player, b, agent, paid)) {
+                if (!ctx.allPowered && !effectivelyPowered(s, player, b, agent, paid)) {
                     if (ctx.freeMinerMoves > 0) {
                         ctx.freeMinerMoves--;
                     } else {
@@ -580,7 +583,7 @@ public final class Actions {
             // число войск». Именно до, а не после: освободившийся жетон рода
             // тут же годится в производство, и в этом весь смысл — иначе
             // возврат был бы просто уборкой поля.
-            int returnedUnits = returnUnitsToReserve(player, agent);
+            int returnedUnits = ctx.толькоЗдание >= 0 ? 0 : returnUnitsToReserve(player, agent);
             // ПРЕДЕЛ С КАРТЫ: бесплатная Сборка бывает «не более чем N зданиями».
             int buildingLimit = ctx.objectLimit(name());
             int buildingsUsed = 0;
@@ -590,6 +593,9 @@ public final class Actions {
                 }
                 if (!ASSEMBLY_UNIT.containsKey(b.type)) {
                     continue;
+                }
+                if (ctx.толькоЗдание >= 0 && b.uid != ctx.толькоЗдание) {
+                    continue;              // срабатывание при постройке — только новое
                 }
                 // МОБИЛИЗАЦИЯ (карта рынка «Военный подряд»): в эту Сборку
                 // энергия не нужна вообще, все здания считаются запитанными.
@@ -1341,6 +1347,20 @@ public final class Actions {
             // ПЕЧАТНЫЙ КОНТЕЙНЕР: если след здания накрыл ячейку с
             // напечатанным контейнером — владелец берёт карту из запаса.
             PrintedContainers.onBuildingPlaced(state, player, b);
+            // ЗДАНИЕ СРАБАТЫВАЕТ ПРИ ПОСТРОЙКЕ (решение дизайнера 24.09.2026):
+            // один раз выполняет своё — военное здание и ЦУ дают выпуск, добытчик
+            // добывает; энергия для этого не нужна. Станция ничего сверх своих
+            // кубиков не делает, поэтому каскада «построил — запустил — …» нет.
+            if (rs.getBool("actions.build.building_fires_on_build", false)) {
+                String своё = btype == BuildingType.MINER ? "mining"
+                    : ASSEMBLY_UNIT.containsKey(btype) ? "assembly" : null;
+                if (своё != null) {
+                    TurnContext разово = new TurnContext(player.seat, 0);
+                    разово.толькоЗдание = b.uid;
+                    разово.allPowered = true;
+                    Actions.create(своё, state).perform(player, разово, agent);
+                }
+            }
             // СТАРЫЙ РЕЖИМ: стройка на гексе СЖИГАЕТ лежащий там жетон
             // контейнера (ruleset 1.6.0-c1).
             TokenContainers.onBuildingPlaced(state, b);

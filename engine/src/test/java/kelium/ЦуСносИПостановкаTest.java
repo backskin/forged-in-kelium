@@ -93,7 +93,7 @@ class ЦуСносИПостановкаTest {
         PlayerState p = s.player(0);
         Actions.returnOwnBuildingToReserve(s, p, цу(p), true);
         assertNotNull(ЦуИзЗапаса.вЗапасе(p), "ЦУ в запасе");
-        assertTrue(ЦуИзЗапаса.места(s).size() > 10, "мест под ЦУ много — любой гекс");
+        assertTrue(ЦуИзЗапаса.места(s, 0).size() > 10, "мест под ЦУ много — любой гекс");
         assertTrue(ЦуИзЗапаса.поставить(s, p, new Fix.FirstChoiceAgent(0)));
         assertTrue(цу(p).powered(), "ЦУ пришёл со своей энергией");
     }
