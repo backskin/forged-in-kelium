@@ -1896,11 +1896,51 @@ public final class Actions {
             int cardEnergy = kelium.engine.ability.RuleQuery
                 .of(state, player.seat, kelium.engine.ability.Hook.ENERGY_SOURCES)
                 .base(0).ask();
-            java.util.Set<Integer> used = new java.util.HashSet<>();
+            // ПИТАНИЕ БЕЗ ОГРАНИЧЕНИЯ (решение дизайнера 23.09.2026): любые свои
+            // кубики куда угодно — с источников на ячейки, с ячейки на ячейку,
+            // обратно на источники. Свод actions.energy_swap.activations_per_source:
+            // 0 — источник активируется сколько угодно раз; 1 — прежнее «один
+            // раз за действие».
+            int наИсточник = kelium.dataio.Ctx.rules(state)
+                .getInt("actions.energy_swap.activations_per_source", 1);
+            // Техническая страховка от вечной перекладки туда-обратно (случайная
+            // игра ботов): любую конечную раскладку можно получить за «забрать
+            // с каждого источника + раздать с каждого», поэтому предел 2n + 2
+            // не отнимает у игрока ни одной раскладки.
+            int источников = 1;
+            for (BuildingToken b : player.buildingsOnField()) {
+                if (isSource(b)) {
+                    источников++;
+                }
+            }
+            int пределАктиваций = наИсточник <= 0 ? 2 * источников + 2 : Integer.MAX_VALUE;
+            Map<Integer, Integer> активаций = new HashMap<>();
+            java.util.Set<Integer> used = new java.util.AbstractSet<>() {
+                @Override
+                public boolean contains(Object o) {
+                    return наИсточник > 0 && активаций.getOrDefault(o, 0) >= наИсточник;
+                }
+
+                @Override
+                public boolean add(Integer uid) {
+                    активаций.merge(uid, 1, Integer::sum);
+                    return true;
+                }
+
+                @Override
+                public java.util.Iterator<Integer> iterator() {
+                    return активаций.keySet().iterator();
+                }
+
+                @Override
+                public int size() {
+                    return активаций.size();
+                }
+            };
             int placedTotal = 0;
             int taken = 0;
             int activations = 0;
-            while (true) {
+            while (activations < пределАктиваций) {
                 int cardPlaced = 0;
                 for (BuildingToken c : player.buildingsOnField()) {
                     cardPlaced += c.energyBySource.getOrDefault(ARSENAL_CARD_SOURCE_UID, 0);
