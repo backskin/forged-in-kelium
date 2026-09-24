@@ -2486,8 +2486,8 @@ public final class Actions {
                 // одного игрока: рядом со своей — без счёта, к чужой — нельзя.
                 //
                 // ЧУЖИЕ НАЗЕМНЫЕ ВОЙСКА АВИАЦИИ НЕ МЕШАЮТ: она садится в небо
-                // над ними. Обратное неверно — чужая авиация запирает гекс для
-                // наземных (проверка enemyUnitsOn ниже считает и её).
+                // над ними. Чужая авиация наземным тоже не мешает (свод
+                // field.enemy_air_blocks_ground: false, решение 23.09.2026).
                 return Placement.skyOpen(state, hexId, seat, unit.uid);
             }
             if (h.hasSpawnTile()) {
@@ -2524,7 +2524,13 @@ public final class Actions {
             //
             // Карта «ракетные ранцы» снимает стенки ЗДАНИЙ, а не войск: её пассив
             // проверен выше и сюда не распространяется.
-            if (Passability.enemyUnitsOn(state, hexId, seat)) {
+            // С 23.09.2026 (решение дизайнера, ключ field.enemy_air_blocks_ground):
+            // гекс закрывают только чужие НАЗЕМНЫЕ войска, над чужой авиацией
+            // наземным ходить можно.
+            boolean авиацияЗапирает = kelium.dataio.Ctx.rules(state)
+                .getBool("field.enemy_air_blocks_ground", true);
+            if (авиацияЗапирает ? Passability.enemyUnitsOn(state, hexId, seat)
+                    : Passability.enemyGroundUnitsOn(state, hexId, seat)) {
                 return false;
             }
             // УМНАЯ проверка стоянки: войска НЕ приколочены к ячейкам — считаем,

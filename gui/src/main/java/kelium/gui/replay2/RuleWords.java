@@ -316,6 +316,7 @@ public final class RuleWords {
             // ---------- Поле ----------
             case "objectives.enhanced_reward_replaces_base" ->
                 "усиленная награда задания даётся ВМЕСТО базовой, на выбор";
+            case "field.enemy_air_blocks_ground" -> "чужая авиация запирает гекс для наземных";
             case "field.sky_single_owner" ->
                 "в небе гекса сколько угодно авиации, но одного игрока";
             case "field.enemy_units_block_build" ->
