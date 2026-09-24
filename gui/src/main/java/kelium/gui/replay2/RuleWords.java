@@ -411,6 +411,8 @@ public final class RuleWords {
             case "market.base_exchanges" -> "печатные обмены рынка";
             case "market.pair_bonus_coin" -> "монет за парный обмен";
             case "market.zero_kelium_coin" -> "монет за рынок без сданного келемия";
+            case "market.exchange_once_per_action" -> "каждый обмен рынка — раз за действие";
+            case "tech.exchange_once_per_action" -> "каждый обмен научного отдела — раз за действие";
             case "orders.spec_coin" -> "монет с плашки «+монета» карты приказа";
 
             // ---------- Наука ----------

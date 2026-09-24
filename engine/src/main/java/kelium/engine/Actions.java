@@ -2746,10 +2746,17 @@ public final class Actions {
                 "kelium_to_objective");
             boolean наЭнр = обменНаПланшете(rs, "market.base_exchanges",
                 "kelium_to_energy");
+            // КАЖДЫЙ ОБМЕН — ОДИН РАЗ ЗА ДЕЙСТВИЕ (решение дизайнера 23.09.2026):
+            // обмен на монеты — одна ступень из трёх (0→1, 1→3, 2→7), обмен на
+            // задания — один. Свод market.exchange_once_per_action; нет ключа —
+            // обмены повторяются сколько угодно (прежние своды).
+            boolean обменРаз = Boolean.TRUE.equals(
+                rs.get("market.exchange_once_per_action", Boolean.FALSE));
+            java.util.Set<String> взятыеОбмены = new java.util.HashSet<>();
             while (player.resources.kelium() >= 1) {
                 List<Choice> opts = new ArrayList<>();
-                // ---- постоянные обмены: доступны СКОЛЬКО УГОДНО раз ----
-                if (наКоин) {
+                // ---- печатные обмены планшета рынка ----
+                if (наКоин && !(обменРаз && взятыеОбмены.contains("coin"))) {
                     opts.add(new Choice("market_rate", rate("coin", coinRate),
                         "1 КЕЛ -> " + coinRate + " МОН"));
                     if (pairBonus > 0 && player.resources.kelium() >= 2) {
@@ -2759,18 +2766,20 @@ public final class Actions {
                             "2 КЕЛ разом -> " + (2 * coinRate + pairBonus) + " МОН"));
                     }
                 }
-                if (наБпр && Storage.ammoMax(state, player) > player.resources.ammo()) {
+                if (наБпр && !(обменРаз && взятыеОбмены.contains("ammo"))
+                        && Storage.ammoMax(state, player) > player.resources.ammo()) {
                     opts.add(new Choice("market_rate", rate("ammo", ammoRate),
                         "1 КЕЛ -> " + ammoRate + " БПР"));
                 }
-                if (наЗад) {
+                if (наЗад && !(обменРаз && взятыеОбмены.contains("objective_cards"))) {
                     opts.add(new Choice("market_rate", rate("objective_cards", cardRate),
                         keepCards > 0
                             ? "1 КЕЛ -> посмотреть " + cardRate + " карты задания, "
                                 + "оставить " + keepCards
                             : "1 КЕЛ -> " + cardRate + " карты задания"));
                 }
-                BuildingToken needsEnergy = наЭнр ? firstHungryBuilding(player) : null;
+                BuildingToken needsEnergy = наЭнр && !(обменРаз && взятыеОбмены.contains("energy"))
+                    ? firstHungryBuilding(player) : null;
                 if (needsEnergy != null) {
                     opts.add(new Choice("market_rate", rate("energy", 1),
                         "1 КЕЛ -> кубик НАВСЕГДА в ячейку " + needsEnergy.type.code));
@@ -2875,6 +2884,7 @@ public final class Actions {
                     Map<String, Object> pl = (Map<String, Object>) pick.payload();
                     String what = String.valueOf(pl.get("what"));
                     int amount = ((Number) pl.get("amount")).intValue();
+                    взятыеОбмены.add(what);
                     // СЧЁТЧИК ПО КАЖДОЙ ПЕЧАТНОЙ СДЕЛКЕ ОТДЕЛЬНО: сколько раз
                     // взяли именно этот обмен. Общее «сделок N» не отвечает на
                     // вопрос, какими из четырёх обменов боты вообще пользуются.
@@ -2981,6 +2991,12 @@ public final class Actions {
                 detail.append(offer.getOrDefault("label", "предложение карты")).append("; ");
             }
 
+            if (обменРаз && deals > 0 && нулевая > 0 && !взятыеОбмены.contains("coin")) {
+                // ступень «−0 келемия» — это выбор обмена на монеты: если за
+                // действие монет за келемий не брали, её +1 монета твоя
+                player.resources.add(Resource.COIN, нулевая);
+                coinGot += нулевая;
+            }
             if (deals == 0) {
                 // келемий был, но сдавать его не стали — та же нулевая ступень
                 if (нулевая > 0) {
@@ -3112,7 +3128,7 @@ public final class Actions {
                 if (ctx.exchangeOnlyLimit > 0 && usedExchanges.size() >= ctx.exchangeOnlyLimit) {
                     break;
                 }
-                String got = maybeExchange(player, agent);
+                String got = maybeExchange(player, agent, usedExchanges);
                 if (got == null) {
                     break;
                 }
@@ -3730,7 +3746,7 @@ public final class Actions {
 
         /** Предложить вечные обмены. Вернуть id взятого обмена или null. */
         @SuppressWarnings("unchecked")
-        private String maybeExchange(PlayerState player, Agent agent) {
+        private String maybeExchange(PlayerState player, Agent agent, List<String> уже) {
             int pool = сколькоМожемЗаплатить(player);
             List<Choice> opts = new ArrayList<>();
             // ЧТО НАПЕЧАТАНО НА ПЛАНШЕТЕ НАУКИ — из свода (см. обменНаПланшете).
@@ -3804,6 +3820,17 @@ public final class Actions {
             // тот заход оказался слишком строгим). Один жетон трофея по-прежнему
             // нельзя раздробить между РАЗНЫМИ обменами — payTrophy тратит его
             // целиком за один вызов, сдача сгорает.
+            // КАЖДЫЙ ОБМЕН НАУЧНОГО ОТДЕЛА — ОДИН РАЗ ЗА ДЕЙСТВИЕ (решение дизайнера
+            // 23.09.2026; свод tech.exchange_once_per_action). Взятые уже в этом
+            // действии обмены больше не предлагаются.
+            if (Boolean.TRUE.equals(rs.get("tech.exchange_once_per_action", Boolean.FALSE))) {
+                java.util.Set<String> взяты = new java.util.HashSet<>();
+                for (String u : уже) {
+                    взяты.add(u.contains(":") ? u.substring(0, u.indexOf(':')) : u);
+                }
+                opts.removeIf(c -> c.payload() instanceof Map<?, ?> m
+                    && взяты.contains(String.valueOf(m.get("id"))));
+            }
             if (opts.isEmpty()) {
                 return null;
             }
