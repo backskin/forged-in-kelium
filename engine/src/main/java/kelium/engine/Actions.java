@@ -228,11 +228,9 @@ public final class Actions {
     public static void returnOwnBuildingToReserve(GameState state, PlayerState player,
                                                    BuildingToken b, boolean ownTurnChoice) {
         String hex = b.hexId;
-        for (BuildingToken c : player.buildingsOnField()) {
-            if (c.uid != b.uid) {
-                c.stripEnergyOf(b.uid);
-            }
-        }
+        // ИСТОЧНИК СНЕСЁН: его кубики уходят в запас, какие именно — решает
+        // владелец (решение дизайнера 23.09.2026, см. УходИсточника).
+        УходИсточника.уйти(state, player, b.uid);
         for (Map.Entry<Integer, Integer> e : b.energyBySource.entrySet()) {
             for (BuildingToken src : player.buildingsOnField()) {
                 if (src.uid == e.getKey() && src.uid != b.uid) {

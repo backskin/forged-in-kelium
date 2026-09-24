@@ -1441,9 +1441,8 @@ public final class CombatResolver {
      * снимаются со всех потребителей владельца и исчезают вместе с источником.
      */
     private void removeSourceEnergy(int ownerSeat, int sourceUid) {
-        for (BuildingToken b : state.player(ownerSeat).buildingsOnField()) {
-            b.stripEnergyOf(sourceUid);
-        }
+        // Какие кубики уходят в запас — решает владелец (решение 23.09.2026).
+        УходИсточника.уйти(state, state.player(ownerSeat), sourceUid);
     }
 
     /**
