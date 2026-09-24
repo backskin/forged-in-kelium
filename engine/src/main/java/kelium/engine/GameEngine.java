@@ -1372,7 +1372,9 @@ public final class GameEngine {
         }
         for (String cid : new ArrayList<>(p.arsenalHand)) {
             opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
-            opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
+            if (!sameNameInstalled(p, cid)) {
+                opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
+            }
         }
         // «МАНДАТ СОВЕТА» (супер-арсенал sa8): перекладка между обычной полкой
         // и своим отдельным местом — свободная перестановка, не тратит ресурс,
@@ -1593,7 +1595,9 @@ public final class GameEngine {
             }
             for (String cid : new ArrayList<>(p.arsenalHand)) {
                 opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
-                opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
+                if (!sameNameInstalled(p, cid)) {
+                    opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
+                }
             }
             if (opts.isEmpty()) {
                 return;
@@ -1860,6 +1864,34 @@ public final class GameEngine {
     }
 
     /**
+     * ДВУХ ОДНОИМЁННЫХ АРСЕНАЛОВ У ИГРОКА НЕ БЫВАЕТ (правило дизайнера).
+     * Одинаковый низ у дизайнера всегда носит одно имя, поэтому сравнение
+     * по имени и есть запрет на двойной эффект. Считаются карты на полке
+     * и под Мандатом совета.
+     */
+    private boolean sameNameInstalled(PlayerState p, String cid) {
+        return sameNameInstalled(state, p, cid);
+    }
+
+    public static boolean sameNameInstalled(GameState s, PlayerState p, String cid) {
+        String name = arsenalName(s, cid);
+        if (name == null) {
+            return false;
+        }
+        for (String уже : p.arsenalInstalled) {
+            if (name.equals(arsenalName(s, уже))) {
+                return true;
+            }
+        }
+        return p.mandateArsenalCard != null && name.equals(arsenalName(s, p.mandateArsenalCard));
+    }
+
+    private static String arsenalName(GameState s, String cid) {
+        Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+        return card == null || card.get("name") == null ? null : String.valueOf(card.get("name"));
+    }
+
+    /**
      * Установить карту арсенала. Слотов ВСЕГДА три (мандат sa8 — не четвёртый
      * такой же, а отдельное место, см. {@link #mandateStoreCard}). Если три
      * слота заняты и игрок держит sa8 с ПУСТЫМ мандатом (ни карты, ни
@@ -1869,6 +1901,9 @@ public final class GameEngine {
      */
     private void arsenalInstall(PlayerState p, String cid, Agent agent) {
         GameState s = state;
+        if (sameNameInstalled(p, cid)) {
+            return;                // одноимённая уже установлена — карта остаётся в руке
+        }
         p.arsenalHand.remove(cid);
         boolean mandateFree = p.superArsenalCards.contains("sa8")
             && p.mandateArsenalCard == null && p.mandateContainers == 0;
