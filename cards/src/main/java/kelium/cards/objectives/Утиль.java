@@ -237,9 +237,9 @@ public enum Утиль {
             return ctx.deployUnits(1);
         }
     },
-    /** +1 боеприпас к приказу НАСТУПЛЕНИЕ. */
-    БОЕПРИПАС_В_НАСТУПЛЕНИЕ("+1 БОЕПРИПАС В ПРИКАЗ НАСТУПЛЕНИЕ", "gain",
-        Map.of("ammo", 1, "order", "operation")) {
+    /** +1 боеприпас к приказу КОНТРОЛИРОВАТЬ (в нём Бой). */
+    БОЕПРИПАС_В_НАСТУПЛЕНИЕ("+1 БОЕПРИПАС В ПРИКАЗ КОНТРОЛИРОВАТЬ", "gain",
+        Map.of("ammo", 1, "order", "control")) {
         @Override
         public boolean сыграть(CardContext ctx) {
             ctx.gain(Resource.AMMO, 1);

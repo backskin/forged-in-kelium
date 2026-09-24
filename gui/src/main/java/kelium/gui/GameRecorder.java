@@ -671,7 +671,11 @@ public final class GameRecorder {
             "development", "Разработка",
             "infrastructure", "Инфраструктура",
             "operation", "Наступление",
-            "acquisitions", "Приобретения");
+            "acquisitions", "Приобретения",
+            "place", "Разместить",
+            "acquire", "Приобрести",
+            "control", "Контролировать",
+            "explore", "Исследовать");
 
         private final GameConfig cfg;
         private final ReplayRecord rec;

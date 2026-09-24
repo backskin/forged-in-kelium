@@ -989,17 +989,17 @@ public class HeuristicAgent extends Agent {
                 nMil++;
             }
         }
-        if (top == Order.OPERATION && nUnits >= 1 && (threatened(state) || wget("aggression") >= 2.0)) {
+        if (top == Order.CONTROL && nUnits >= 1 && (threatened(state) || wget("aggression") >= 2.0)) {
             val += 6.0 * wget("aggression");
         }
-        if (top == Order.DEVELOPMENT && nMil >= 1) {
+        if (top == Order.ACQUIRE && nMil >= 1) {
             val += 3.0;
         }
-        if (top == Order.INFRASTRUCTURE && nMil == 0) {
+        if (top == Order.PLACE && nMil == 0) {
             val += 3.0;
         }
         // Есть трофеи для трат на треки науки -> охотнее берём Приобретения.
-        if (top == Order.ACQUISITIONS && trophyPool(me) >= 1) {
+        if (top == Order.EXPLORE && trophyPool(me) >= 1) {
             val += 4.0;
         }
         // ЦЕПОЧКА РАУНДА (порядок розыгрыша карт внутри раунда!):
@@ -1007,14 +1007,14 @@ public class HeuristicAgent extends Agent {
         // 2) захватил жетоны -> НЕМЕДЛЕННО Приобретения (наука), пока трофеи
         //    не вернулись владельцам в Возврат;
         // 3) армии нет, а бить хочется -> сперва Разработка (сборка).
-        if (top == Order.OPERATION && combatOpportunity(state)
+        if (top == Order.CONTROL && combatOpportunity(state)
                 && me.resources.ammo() >= 1) {
             val += 7.0;
         }
-        if (top == Order.ACQUISITIONS && me.destroyedValue() > 0) {
+        if (top == Order.EXPLORE && me.destroyedValue() > 0) {
             val += 8.0 + me.destroyedValue();
         }
-        if (top == Order.DEVELOPMENT && nMil >= 1 && nUnits < 3
+        if (top == Order.ACQUIRE && nMil >= 1 && nUnits < 3
                 && wget("aggression") >= 0.8) {
             val += 3.0;
         }

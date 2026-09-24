@@ -441,7 +441,7 @@ public final class Actions {
         }
 
         @Override public String name() { return "mining"; }
-        @Override public Order order() { return Order.DEVELOPMENT; }
+        @Override public Order order() { return Order.EXPLORE; }
         @Override public boolean implemented() { return true; }
 
         @Override
@@ -566,7 +566,7 @@ public final class Actions {
         }
 
         @Override public String name() { return "assembly"; }
-        @Override public Order order() { return Order.DEVELOPMENT; }
+        @Override public Order order() { return Order.ACQUIRE; }
         @Override public boolean implemented() { return true; }
 
         @Override
@@ -1002,7 +1002,7 @@ public final class Actions {
         }
 
         @Override public String name() { return "build"; }
-        @Override public Order order() { return Order.INFRASTRUCTURE; }
+        @Override public Order order() { return Order.PLACE; }
         @Override public boolean implemented() { return true; }
 
         @Override
@@ -1865,7 +1865,7 @@ public final class Actions {
         }
 
         @Override public String name() { return "energy_swap"; }
-        @Override public Order order() { return Order.INFRASTRUCTURE; }
+        @Override public Order order() { return Order.CONTROL; }
         @Override public boolean implemented() { return true; }
 
         @Override
@@ -2137,7 +2137,7 @@ public final class Actions {
         }
 
         @Override public String name() { return "movement"; }
-        @Override public Order order() { return Order.OPERATION; }
+        @Override public Order order() { return Order.PLACE; }
         @Override public boolean implemented() { return true; }
 
         @Override
@@ -2489,7 +2489,7 @@ public final class Actions {
         }
 
         @Override public String name() { return "combat"; }
-        @Override public Order order() { return Order.OPERATION; }
+        @Override public Order order() { return Order.CONTROL; }
         @Override public boolean implemented() { return true; }
 
         @Override
@@ -2642,7 +2642,7 @@ public final class Actions {
         }
 
         @Override public String name() { return "market"; }
-        @Override public Order order() { return Order.ACQUISITIONS; }
+        @Override public Order order() { return Order.ACQUIRE; }
         @Override public boolean implemented() { return true; }
 
         @Override
@@ -3054,7 +3054,7 @@ public final class Actions {
         }
 
         @Override public String name() { return "science"; }
-        @Override public Order order() { return Order.ACQUISITIONS; }
+        @Override public Order order() { return Order.EXPLORE; }
         @Override public boolean implemented() { return true; }
 
         @Override

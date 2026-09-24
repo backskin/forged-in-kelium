@@ -393,6 +393,10 @@ public final class NarrativeLog {
                 case "infrastructure" -> "Инфраструктура";
                 case "operation" -> "Наступление";
                 case "acquisitions" -> "Приобретения";
+                case "place" -> "Разместить";
+                case "acquire" -> "Приобрести";
+                case "control" -> "Контролировать";
+                case "explore" -> "Исследовать";
                 default -> top;
             };
             return cid + " (" + ru + ")";

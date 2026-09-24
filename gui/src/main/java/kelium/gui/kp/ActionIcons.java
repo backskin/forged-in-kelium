@@ -26,7 +26,11 @@ public final class ActionIcons {
         "infrastructure", List.of("build", "energy_swap"),
         "development", List.of("assembly", "mining"),
         "operation", List.of("movement", "combat"),
-        "acquisitions", List.of("market", "science"));
+        "acquisitions", List.of("market", "science"),
+        "place", List.of("movement", "build"),
+        "acquire", List.of("assembly", "market"),
+        "control", List.of("energy_swap", "combat"),
+        "explore", List.of("mining", "science"));
 
     /** Русское имя категории приказа. */
     public static String categoryRu(String cat) {
@@ -35,6 +39,10 @@ public final class ActionIcons {
             case "development" -> "РАЗРАБОТКА";
             case "operation" -> "НАСТУПЛЕНИЕ";
             case "acquisitions" -> "ПРИОБРЕТЕНИЯ";
+            case "place" -> "РАЗМЕСТИТЬ";
+            case "acquire" -> "ПРИОБРЕСТИ";
+            case "control" -> "КОНТРОЛИРОВАТЬ";
+            case "explore" -> "ИССЛЕДОВАТЬ";
             default -> cat == null ? "" : cat.toUpperCase(java.util.Locale.ROOT);
         };
     }

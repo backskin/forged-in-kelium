@@ -211,10 +211,10 @@ public class StrategicAgent extends HeuristicAgent {
         }
         Order top = Order.fromCode((String) card.get("top"));
         String what = switch (top) {
-            case DEVELOPMENT -> "разработка";
-            case INFRASTRUCTURE -> "инфраструктура";
-            case OPERATION -> "операция";
-            case ACQUISITIONS -> "приобретения";
+            case ACQUIRE -> "разработка";      // фразы прежних наборов: ближайший по смыслу
+            case PLACE -> "инфраструктура";
+            case CONTROL -> "операция";
+            case EXPLORE -> "приобретения";
         };
         return Phrasebook.pick("приказ." + what + "." + orderGrade(state, top), rng);
     }

@@ -1,0 +1,43 @@
+# ============================================================================
+#  CONTENT: orders  version 4.0.0 — СИММЕТРИЧНЫЕ КАРТЫ ПРИКАЗОВ, новые приказы
+#
+#  По рисунку дизайнера «карты-приказов-симметрия-1..25» (экспорт 24.09.2026).
+#  Приказы и их действия:
+#    РАЗМЕСТИТЬ     — манёвр, стройка
+#    ПРИОБРЕСТИ     — снабжение, рынок
+#    КОНТРОЛИРОВАТЬ — питание, бой
+#    ИССЛЕДОВАТЬ    — добыча, наука
+#  У всех четырёх цветов один набор: верх → низ
+#    Разместить → Приобрести, Приобрести → Контролировать,
+#    Контролировать → Исследовать, Исследовать → Разместить.
+#  Различается только плашка спец-действия — латинский квадрат: у каждого
+#  цвета одна «+2 монеты» (бесплатно), три стоят 1 монету: → 1 боеприпас,
+#  → 1 карта задания, → манёвр одним жетоном.
+#  ЗАТАИТЬСЯ (4 шт.) — любые два разных действия из восьми и спец-действие.
+# ============================================================================
+
+meta:
+  id: 4.0.0
+  type: orders
+
+orders:
+  - {id: blue_place, deck: blue, top: place, bottom: acquire, spec: coin, spec_cost_coin: 0, описание: "Приказ РАЗМЕСТИТЬ; нижний — ПРИОБРЕСТИ. Спец-плашка: +2 МОНЕТЫ."}
+  - {id: blue_acquire, deck: blue, top: acquire, bottom: control, spec: ammo, spec_cost_coin: 1, описание: "Приказ ПРИОБРЕСТИ; нижний — КОНТРОЛИРОВАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: blue_control, deck: blue, top: control, bottom: explore, spec: movement, spec_cost_coin: 1, описание: "Приказ КОНТРОЛИРОВАТЬ; нижний — ИССЛЕДОВАТЬ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
+  - {id: blue_explore, deck: blue, top: explore, bottom: place, spec: objective, spec_cost_coin: 1, описание: "Приказ ИССЛЕДОВАТЬ; нижний — РАЗМЕСТИТЬ. Спец-плашка: −1 монета → 1 карта задания."}
+  - {id: red_place, deck: red, top: place, bottom: acquire, spec: movement, spec_cost_coin: 1, описание: "Приказ РАЗМЕСТИТЬ; нижний — ПРИОБРЕСТИ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
+  - {id: red_acquire, deck: red, top: acquire, bottom: control, spec: coin, spec_cost_coin: 0, описание: "Приказ ПРИОБРЕСТИ; нижний — КОНТРОЛИРОВАТЬ. Спец-плашка: +2 МОНЕТЫ."}
+  - {id: red_control, deck: red, top: control, bottom: explore, spec: ammo, spec_cost_coin: 1, описание: "Приказ КОНТРОЛИРОВАТЬ; нижний — ИССЛЕДОВАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: red_explore, deck: red, top: explore, bottom: place, spec: objective, spec_cost_coin: 1, описание: "Приказ ИССЛЕДОВАТЬ; нижний — РАЗМЕСТИТЬ. Спец-плашка: −1 монета → 1 карта задания."}
+  - {id: green_place, deck: green, top: place, bottom: acquire, spec: objective, spec_cost_coin: 1, описание: "Приказ РАЗМЕСТИТЬ; нижний — ПРИОБРЕСТИ. Спец-плашка: −1 монета → 1 карта задания."}
+  - {id: green_acquire, deck: green, top: acquire, bottom: control, spec: movement, spec_cost_coin: 1, описание: "Приказ ПРИОБРЕСТИ; нижний — КОНТРОЛИРОВАТЬ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
+  - {id: green_control, deck: green, top: control, bottom: explore, spec: coin, spec_cost_coin: 0, описание: "Приказ КОНТРОЛИРОВАТЬ; нижний — ИССЛЕДОВАТЬ. Спец-плашка: +2 МОНЕТЫ."}
+  - {id: green_explore, deck: green, top: explore, bottom: place, spec: ammo, spec_cost_coin: 1, описание: "Приказ ИССЛЕДОВАТЬ; нижний — РАЗМЕСТИТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: yellow_place, deck: yellow, top: place, bottom: acquire, spec: ammo, spec_cost_coin: 1, описание: "Приказ РАЗМЕСТИТЬ; нижний — ПРИОБРЕСТИ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: yellow_acquire, deck: yellow, top: acquire, bottom: control, spec: objective, spec_cost_coin: 1, описание: "Приказ ПРИОБРЕСТИ; нижний — КОНТРОЛИРОВАТЬ. Спец-плашка: −1 монета → 1 карта задания."}
+  - {id: yellow_control, deck: yellow, top: control, bottom: explore, spec: movement, spec_cost_coin: 1, описание: "Приказ КОНТРОЛИРОВАТЬ; нижний — ИССЛЕДОВАТЬ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
+  - {id: yellow_explore, deck: yellow, top: explore, bottom: place, spec: coin, spec_cost_coin: 0, описание: "Приказ ИССЛЕДОВАТЬ; нижний — РАЗМЕСТИТЬ. Спец-плашка: +2 МОНЕТЫ."}
+  - {id: security_1, deck: security, joker: true, spec: null, name: "ЗАТАИТЬСЯ", описание: "ЗАТАИТЬСЯ: любые два разных действия из восьми и спец-действие. Нижнего приказа нет."}
+  - {id: security_2, deck: security, joker: true, spec: null, name: "ЗАТАИТЬСЯ", описание: "ЗАТАИТЬСЯ: любые два разных действия из восьми и спец-действие. Нижнего приказа нет."}
+  - {id: security_3, deck: security, joker: true, spec: null, name: "ЗАТАИТЬСЯ", описание: "ЗАТАИТЬСЯ: любые два разных действия из восьми и спец-действие. Нижнего приказа нет."}
+  - {id: security_4, deck: security, joker: true, spec: null, name: "ЗАТАИТЬСЯ", описание: "ЗАТАИТЬСЯ: любые два разных действия из восьми и спец-действие. Нижнего приказа нет."}

@@ -314,6 +314,10 @@ public final class OrdersTable extends JComponent {
             case "infrastructure" -> new Color(0x3B82D0);
             case "operation" -> new Color(0xD9534F);
             case "acquisitions" -> new Color(0xB08A2E);
+            case "place" -> new Color(0x3B82D0);
+            case "acquire" -> new Color(0x3F9E60);
+            case "control" -> new Color(0xD9534F);
+            case "explore" -> new Color(0xB08A2E);
             default -> new Color(0x7A5AA8);
         };
     }

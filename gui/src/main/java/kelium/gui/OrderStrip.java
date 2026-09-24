@@ -196,7 +196,11 @@ public final class OrderStrip extends JPanel {
         "development", "РАЗРАБОТКА",
         "infrastructure", "ИНФРАСТРУКТУРА",
         "operation", "НАСТУПЛЕНИЕ",
-        "acquisitions", "ПРИОБРЕТЕНИЯ");
+        "acquisitions", "ПРИОБРЕТЕНИЯ",
+        "place", "РАЗМЕСТИТЬ",
+        "acquire", "ПРИОБРЕСТИ",
+        "control", "КОНТРОЛИРОВАТЬ",
+        "explore", "ИССЛЕДОВАТЬ");
 
     private static Color orderColor(String code) {
         return switch (code) {
@@ -204,6 +208,10 @@ public final class OrderStrip extends JPanel {
             case "infrastructure" -> INF;
             case "operation" -> OPS;
             case "acquisitions" -> ACQ;
+            case "place" -> INF;
+            case "acquire" -> DEV;
+            case "control" -> OPS;
+            case "explore" -> ACQ;
             default -> JOKER;
         };
     }

@@ -186,6 +186,10 @@ public final class Names {
             case "infrastructure" -> "ИНФРАСТРУКТУРА";
             case "operation" -> "НАСТУПЛЕНИЕ";
             case "acquisitions" -> "ПРИОБРЕТЕНИЯ";
+            case "place" -> "РАЗМЕСТИТЬ";
+            case "acquire" -> "ПРИОБРЕСТИ";
+            case "control" -> "КОНТРОЛИРОВАТЬ";
+            case "explore" -> "ИССЛЕДОВАТЬ";
             // Джокер печатается как БЕЗОПАСНОСТЬ — у него нет верха и низа.
             case "security", "joker" -> "БЕЗОПАСНОСТЬ";
             // НЕИЗВЕСТНЫЙ КОД НЕ ВЫДАЁТ СЕБЯ ЗА КАРТУ. Прежде здесь стояла та же

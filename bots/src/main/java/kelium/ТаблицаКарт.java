@@ -57,7 +57,9 @@ public final class ТаблицаКарт {
 
     private static final Map<String, String> ПРИКАЗЫ = Map.of(
         "development", "Разработка", "infrastructure", "Инфраструктура",
-        "operation", "Наступление", "acquisitions", "Приобретения");
+        "operation", "Наступление", "acquisitions", "Приобретения",
+        "place", "Разместить", "acquire", "Приобрести", "control", "Контролировать",
+        "explore", "Исследовать");
 
     private static final Map<String, String> ПЛАШКИ = Map.of(
         "movement", "ДВИЖЕНИЕ", "coin", "МОНЕТА", "objective", "ЗАДАНИЕ");
