@@ -666,11 +666,34 @@ public final class Objectives {
                     }
                 }
                 case "arsenal" -> {
-                    String c = s.decks.get("arsenal").draw(s.rng);
-                    if (c != null) {
+                    // СКОЛЬКО НАПЕЧАТАНО, СТОЛЬКО И КАРТ (печатные задания
+                    // 1.19.0: «две карты арсенала»). Прежде бралась ровно одна
+                    // при любом числе.
+                    int взято = 0;
+                    for (int i = 0; i < Math.max(1, n); i++) {
+                        String c = s.decks.get("arsenal").draw(s.rng);
+                        if (c == null) {
+                            break;
+                        }
                         kelium.engine.Storage.takeArsenalCard(s, p, c);
+                        взято++;
                     }
-                    into.put("arsenal", 1);
+                    into.put("arsenal", взято);
+                }
+                // СПЕЦ-ДЕЙСТВИЕ И ПОЗОЛОТА В УСИЛЕННОЙ НАГРАДЕ. С 22.09.2026 почти
+                // каждая усиленная награда несёт «и спец-действие», но эта ветка
+                // ключа spec_actions не знала, и прибавка молча терялась —
+                // выдавалась только базовая ветка grantBase. Позолота на
+                // печатных картах 1.19.0 тоже стоит в усиленной награде.
+                case "spec_actions" -> {
+                    int сколько = Math.max(0, n);
+                    s.journal.of(p.seat).specBonus += сколько;
+                    into.put("spec_actions", сколько);
+                }
+                case "gild" -> {
+                    Agent агент = s.agents == null || p.seat >= s.agents.size()
+                        ? null : s.agents.get(p.seat);
+                    into.put("gild", Modules.gildOne(s, p, агент) ? 1 : 0);
                 }
                 case "arsenal_from_display" -> {
                     // КАРТА С ВИТРИНЫ — ВЫБОР ИЗ ДВУХ ОТКРЫТЫХ, а не слепая тяга

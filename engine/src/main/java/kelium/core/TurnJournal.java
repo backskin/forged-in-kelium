@@ -281,6 +281,24 @@ public final class TurnJournal {
          */
         public int freeAttacks = 0;
 
+        // === факты колоды 1.19.0 (печатные карты дизайнера 25.09.2026) ===
+        /**
+         * КАЖДЫЙ ЧУЖОЙ ЖЕТОН, УНИЧТОЖЕННЫЙ ЗА ХОД, — отдельной записью.
+         *
+         * <p>Печатные карты 1.19.0 спрашивают о СОВОКУПНОСТИ убитого у ОДНОГО
+         * игрока: «уничтожь жетон того, у кого келемия больше, чем у тебя;
+         * дополнительно — два жетона, один из них добытчик», «уничтожь у него хотя
+         * бы два жетона войск», «два жетона с прочностью 2 и выше». Отдельные
+         * счётчики хода (род, наибольшая прочность, число) на такой вопрос не
+         * отвечают: они не помнят, чей был жетон и каким было положение в момент
+         * удара. После боя его уже не восстановить.
+         */
+        public final List<Убитый> killLog = new ArrayList<>();
+        /** uid войск, нанятых за ход, — «размести оба войска в гарнизоне». */
+        public final Set<Integer> hiredUids = new HashSet<>();
+        /** Сколько своих зданий снесено Стройкой на каждом гексе за ход. */
+        public final Map<String, Integer> razedOwnOnHex = new HashMap<>();
+
         /**
          * Скопировать в себя все факты из {@code o} — нужно копии состояния для
          * просчёта вперёд: без журнала просчёт «забывает», что игрок уже успел
@@ -386,6 +404,12 @@ public final class TurnJournal {
             unlimitedSpec = o.unlimitedSpec;
             specBonus = o.specBonus;
             freeAttacks = o.freeAttacks;
+            killLog.clear();
+            killLog.addAll(o.killLog);
+            hiredUids.clear();
+            hiredUids.addAll(o.hiredUids);
+            razedOwnOnHex.clear();
+            razedOwnOnHex.putAll(o.razedOwnOnHex);
         }
 
         void reset() {
@@ -479,7 +503,28 @@ public final class TurnJournal {
             unlimitedSpec = false;
             specBonus = 0;
             freeAttacks = 0;
+            killLog.clear();
+            hiredUids.clear();
+            razedOwnOnHex.clear();
         }
+    }
+
+    /**
+     * ОДИН УНИЧТОЖЕННЫЙ ЧУЖОЙ ЖЕТОН И ПОЛОЖЕНИЕ В МИГ УДАРА.
+     *
+     * @param owner         чей был жетон
+     * @param kind          род: код войска ({@code infantry}…) или рода здания
+     * @param building      здание ли это
+     * @param hp            прочность жетона
+     * @param victimUnits   сколько войск было на поле у хозяина жетона
+     * @param myUnits       сколько войск было на поле у бьющего
+     * @param victimKelium  сколько келемия было у хозяина жетона
+     * @param myKelium      сколько келемия было у бьющего
+     * @param atStartSpawn  добытчик, примыкавший к СТАРТОВОМУ зарождению
+     */
+    public record Убитый(int owner, String kind, boolean building, int hp,
+                         int victimUnits, int myUnits, int victimKelium, int myKelium,
+                         boolean atStartSpawn) {
     }
 
     private final TurnFacts[] perSeat;

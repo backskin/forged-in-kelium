@@ -397,7 +397,7 @@ public class StrategicAgent extends HeuristicAgent {
         String what = switch (pick.kind()) {
             case "spec_objective" -> "задание";
             case "spec_objective_enh" -> "задание_усиленно";
-            case "spec_objective_burn" -> "сжечь_задание";
+            case "spec_objective_burn", "free_objective_burn" -> "сжечь_задание";
             case "spec_arsenal_burn" -> "сжечь_арсенал";
             case "spec_arsenal_install" -> "установить_арсенал";
             case "spec_super" -> "супер";

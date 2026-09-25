@@ -2173,7 +2173,11 @@ public final class HotSeatWindow {
         for (String id : p.objectiveHand) {
             Integer доВыполнения = indexOfSpec(opts, "spec_objective", id);
             Integer доУсиления = indexOfSpec(opts, "spec_objective_enh", id);
-            Integer доСожжения = indexOfSpec(opts, "spec_objective_burn", id);
+            // СВОБОДНЫЙ ВЕРХ (∞, задания 1.19.0) — отдельный вариант движка:
+            // он сжигается, не тратя спец-действие.
+            Integer заСпец = indexOfSpec(opts, "spec_objective_burn", id);
+            Integer доСожжения = заСпец != null ? заСпец
+                : indexOfSpec(opts, "free_objective_burn", id);
             List<kelium.gui.kp.CardMenu.Act> acts = new ArrayList<>();
             acts.add(new kelium.gui.kp.CardMenu.Act("Выполнить задание",
                 objectiveReward(id), доВыполнения != null,

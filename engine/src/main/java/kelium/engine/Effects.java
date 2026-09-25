@@ -476,6 +476,10 @@ public final class Effects {
         if (p.get("attack_tokens") instanceof Number at) {
             ctx.attackTokensLimit = at.intValue();
         }
+        // ДВИЖЕНИЕ ДВУМЯ ЛЮБЫМИ ЖЕТОНАМИ (верх заданий 1.19.0).
+        if (p.get("move_tokens") instanceof Number mt) {
+            ctx.moveTokensLimit = mt.intValue();
+        }
         // ТОЛЬКО ОБМЕНЫ: Наука без шага трека, Рынок без карты.
         if (p.get("exchange_only") instanceof Number eo) {
             ctx.exchangeOnlyLimit = eo.intValue();

@@ -192,6 +192,100 @@ class РеакцииTest {
         assertNull(жертва.hexId, "и ушёл с поля в запас");
     }
 
+    // === ПЕЧАТНЫЕ ЗАДАНИЯ 1.19.0 (25.09.2026) ===
+
+    @Test
+    void закромаДаютДваБоеприпасаПриАтаке() {
+        GameState s = стол();
+        PlayerState p0 = s.player(0);
+        PlayerState p1 = s.player(1);
+        s.journal.startTurn(0);
+        String откуда = p0.startHex;
+        String куда = соседний(s, откуда);
+        атакующий(s, p0, откуда);
+        UnitToken жертва = s.tokenStats.makeUnit(UnitType.INFANTRY, 1, 999);
+        жертва.hexId = куда;
+        p1.units.add(жертва);
+        p1.resources.setAmmo(0);
+        датьРеакцию(s, 1, "tst_am", Реакции.Вид.ЗАКРОМА);
+
+        ((Отвечающий) s.agents.get(0)).preferHex = куда;
+        ((CombatResolver) s.combat).runBattle(0, (Agent) s.agents.get(0));
+
+        assertTrue(p1.resources.ammo() >= 1, "атакованный получил боеприпасы");
+        assertFalse(p1.objectiveHand.contains("tst_am"), "карта сгорела");
+    }
+
+    @Test
+    void эвакуацияПриАтакеУводитЖетонДоУрона() {
+        GameState s = стол();
+        PlayerState p0 = s.player(0);
+        PlayerState p1 = s.player(1);
+        s.journal.startTurn(0);
+        String откуда = p0.startHex;
+        String куда = соседний(s, откуда);
+        атакующий(s, p0, откуда);
+        UnitToken жертва = s.tokenStats.makeUnit(UnitType.INFANTRY, 1, 999);
+        жертва.hexId = куда;
+        p1.units.add(жертва);
+        датьРеакцию(s, 1, "tst_ea", Реакции.Вид.ЭВАКУАЦИЯ);
+
+        ((Отвечающий) s.agents.get(0)).preferHex = куда;
+        ((CombatResolver) s.combat).runBattle(0, (Agent) s.agents.get(0));
+
+        assertFalse(p0.destroyedTokens.contains(жертва), "жетон НЕ достался атакующему");
+        assertNull(жертва.hexId, "жетон ушёл в запас");
+        assertEquals(0, жертва.damage, "урона на нём нет — ушёл до удара");
+    }
+
+    @Test
+    void контратакаБьётПервойИзАтакованногоГекса() {
+        GameState s = стол();
+        PlayerState p0 = s.player(0);
+        PlayerState p1 = s.player(1);
+        s.journal.startTurn(0);
+        String откуда = p0.startHex;
+        String куда = соседний(s, откуда);
+        UnitToken атакующий = атакующий(s, p0, откуда);
+        UnitToken защитник = s.tokenStats.makeUnit(UnitType.INFANTRY, 1, 999);
+        защитник.hexId = куда;
+        p1.units.add(защитник);
+        p1.resources.add(Resource.AMMO, 5);
+        датьРеакцию(s, 1, "tst_ca", Реакции.Вид.КОНТРАТАКА);
+        List<Map<String, Object>> события = new ArrayList<>();
+        s.combat = new CombatResolver(s, события::add).bindAgents(s.agents);
+
+        ((Отвечающий) s.agents.get(0)).preferHex = куда;
+        ((Отвечающий) s.agents.get(1)).preferHex = откуда;
+        ((CombatResolver) s.combat).runBattle(0, (Agent) s.agents.get(0));
+
+        assertFalse(p1.objectiveHand.contains("tst_ca"), "карта сгорела");
+        // Защитник выстрелил ПЕРВЫМ и С АТАКОВАННОГО ГЕКСА: его выстрел в
+        // журнале боя раньше выстрела атакующего. Во что он бил — выбор агента.
+        int егоВыстрел = -1;
+        int первыйЧужой = -1;
+        for (int i = 0; i < события.size(); i++) {
+            var e = события.get(i);
+            boolean выстрел = "combat_hit".equals(e.get("type"))
+                || "raze_neutral".equals(e.get("type"))
+                || "damage_neutral".equals(e.get("type"));
+            if (!выстрел) {
+                continue;
+            }
+            if (Integer.valueOf(1).equals(e.get("seat")) && егоВыстрел < 0) {
+                егоВыстрел = i;
+                if (e.get("from") != null) {
+                    assertEquals(куда, e.get("from"), "стреляли только с атакованного гекса");
+                }
+            }
+            if (Integer.valueOf(0).equals(e.get("seat")) && первыйЧужой < 0) {
+                первыйЧужой = i;
+            }
+        }
+        assertTrue(егоВыстрел >= 0 && (первыйЧужой < 0 || егоВыстрел < первыйЧужой),
+            "войско атакованного гекса выстрелило первым; события: " + события);
+    }
+
     @Test
     void реакцияОпознаётсяПоЗаписиКарты() {
         GameState s = стол();
