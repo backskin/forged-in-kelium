@@ -1618,6 +1618,11 @@ public final class Actions {
             boolean cuMovedThisTurn = cuAlreadyMoved(player);
             for (BuildingToken b : player.buildingsOnField()) {
                 boolean isCu = b.type == BuildingType.COMMAND_CENTER;
+                // ЦУ НЕ ПЕРЕНОСИТСЯ НИЧЕМ (решение дизайнера 25.09.2026): ни
+                // базовой Стройкой, ни картами переноса зданий.
+                if (isCu) {
+                    continue;
+                }
                 int cost = freeMove ? 0 : moveCost(player, b);
                 if (isCu && cuMovedThisTurn) {
                     continue;   // ЦУ уже переносили в этот ход
