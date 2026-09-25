@@ -122,6 +122,51 @@ public final class FieldView extends JComponent {
     private int facingSelected;
     java.util.function.IntConsumer onFacingPick;
 
+    /**
+     * ВЫБОР НА ПОЛЕ — пузыри вариантов у гексов и карточка вопроса (живая
+     * партия). Рисуются в экранных координатах поверх поля и едут вместе с ним.
+     */
+    public final kelium.gui.kp.FieldBubbles bubbles = new kelium.gui.kp.FieldBubbles();
+    /** Нажатие пришлось на пузырь — это не начало перетаскивания поля. */
+    private boolean pressOnBubble;
+
+    /**
+     * ЗАДАТЬ ВОПРОС НА ПОЛЕ: у каждого гекса-цели свои варианты (один — щелчок
+     * играет его, несколько — щелчок раскрывает пузырь), прочие варианты — в
+     * карточке вопроса у верхней кромки.
+     */
+    public void setChoices(Map<String, List<kelium.gui.kp.FieldBubbles.Opt>> byHex,
+                           String title, String hint,
+                           List<kelium.gui.kp.FieldBubbles.Opt> dock, Color seatColor) {
+        bubbles.set(byHex, title, hint, dock, seatColor);
+        this.selectableHexIds = byHex == null ? java.util.Set.of()
+            : new java.util.LinkedHashSet<>(byHex.keySet());
+        this.onHexPick = byHex == null || byHex.isEmpty() ? null : id -> {
+            bubbles.clickHex(id);
+            repaint();
+        };
+        repaint();
+    }
+
+    public void clearChoices() {
+        bubbles.clear();
+        clearSelectable();
+    }
+
+    /** Центр гекса на экране (null — нет такого гекса). */
+    private java.awt.geom.Point2D hexOnScreen(String hexId) {
+        if (record == null || hexId == null) {
+            return null;
+        }
+        for (ReplayRecord.HexInfo hi : record.hexes) {
+            if (hi.id.equals(hexId)) {
+                double[] c = FieldGeometry.hexCenter(hi.q, hi.r, BASE);
+                return new java.awt.geom.Point2D.Double(panX + zoom * c[0], panY + zoom * c[1]);
+            }
+        }
+        return null;
+    }
+
     public FieldView() {
         setOpaque(true);
         setBackground(new Color(0xFB, 0xFB, 0xFB));
@@ -140,6 +185,12 @@ public final class FieldView extends JComponent {
                     return;
                 }
                 requestFocusInWindow();
+                if (bubbles.covers(e.getPoint())) {
+                    pressOnBubble = true;
+                    drag = null;
+                    pressedAt = null;
+                    return;
+                }
                 drag = e.getPoint();
                 pressedAt = e.getPoint();
                 setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
@@ -148,6 +199,23 @@ public final class FieldView extends JComponent {
             @Override
             public void mouseReleased(java.awt.event.MouseEvent e) {
                 drag = null;
+                if (pressOnBubble) {
+                    pressOnBubble = false;
+                    kelium.gui.kp.FieldBubbles.Opt o = bubbles.optAt(e.getPoint());
+                    if (o != null && o.pick() != null) {
+                        o.pick().run();
+                    }
+                    repaint();
+                    return;
+                }
+                if (pressedAt != null && pressedAt.distance(e.getPoint()) < 4
+                        && facingVariants == null) {
+                    String under = hexIdAt(e.getPoint());
+                    if (under == null || !selectableHexIds.contains(under)) {
+                        bubbles.closeBubble();
+                        repaint();
+                    }
+                }
                 // КЛИК, А НЕ ПЕРЕТАСКИВАНИЕ — если указатель почти не сдвинулся с
                 // нажатия. Иначе конец панорамирования всегда засчитывался бы как
                 // клик по гексу под курсором в момент отпускания.
@@ -183,6 +251,19 @@ public final class FieldView extends JComponent {
             @Override
             public void mouseMoved(java.awt.event.MouseEvent e) {
                 lastMouse = e.getPoint();
+                boolean bubbleChanged = bubbles.hover(e.getPoint());
+                if (bubbles.covers(e.getPoint())) {
+                    setCursor(bubbles.hovering()
+                        ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                        : Cursor.getDefaultCursor());
+                    if (bubbleChanged) {
+                        repaint();
+                    }
+                    return;
+                }
+                if (bubbleChanged) {
+                    repaint();
+                }
                 String id = hexIdAt(e.getPoint());
                 boolean selectable = id != null && selectableHexIds.contains(id)
                     || facingVariants != null && id != null && id.equals(facingHexId);
@@ -575,6 +656,14 @@ public final class FieldView extends JComponent {
         g.scale(zoom, zoom);
         drawField(g, frame);
         g.dispose();
+
+        // ВЫБОР НА ПОЛЕ — поверх поля, в экранных координатах: пузырь привязан
+        // к гексу и едет вместе с ним, но кегль от масштаба не зависит.
+        if (bubbles.active()) {
+            Graphics2D gb = (Graphics2D) g0.create();
+            bubbles.paint(gb, getWidth(), getHeight(), this::hexOnScreen, BASE * zoom);
+            gb.dispose();
+        }
 
         if (showLegendHint) {
             Graphics2D gt = (Graphics2D) g0.create();
@@ -1160,6 +1249,9 @@ public final class FieldView extends JComponent {
     public String getToolTipText(java.awt.event.MouseEvent e) {
         if (record == null || frame == null || frame.snapshot == null) {
             return null;
+        }
+        if (bubbles.covers(e.getPoint())) {
+            return bubbles.tipAt(e.getPoint());
         }
         ReplayRecord.HexInfo hi = hexInfoAt(e.getPoint());
         return hi == null ? null : hexTip(hi);

@@ -353,6 +353,31 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         return (int) Math.round(сцепка.высота() * k);
     }
 
+    /**
+     * ПЛАНШЕТЫ НА СТОЛ ЖИВОЙ ПАРТИИ — та же сцепка, плюс зоны щелчка по
+     * деталям (жетоны зданий, ячейки модулей, запас войск; ключи — см.
+     * {@code PrintedBoards.hits}).
+     *
+     * @return высота сцепки (0 — печатных планшетов нет)
+     */
+    public int paintTableBoards(Graphics2D g, int x, int y, int width,
+                                Map<String, Rectangle> hits,
+                                Map<String, java.awt.Shape> outlines) {
+        PrintedBoards.hits = hits;
+        PrintedBoards.outlines = outlines;
+        try {
+            return печатнаяСцепка(g, x, y, width);
+        } finally {
+            PrintedBoards.hits = null;
+            PrintedBoards.outlines = null;
+        }
+    }
+
+    /** Пропорция сцепки для стола живой партии (0 — планшетов нет). */
+    public double tableAspect() {
+        return пропорцияСцепки();
+    }
+
     /** Каких пропорций сцепка печатных планшетов: ширина к высоте. */
     double пропорцияСцепки() {
         var с = PrintedBoards.сцепка(seat);

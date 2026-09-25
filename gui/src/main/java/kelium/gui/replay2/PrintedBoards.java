@@ -33,6 +33,35 @@ final class PrintedBoards {
     }
 
     /**
+     * ЗОНЫ ЩЕЛЧКА НА ПЛАНШЕТАХ — для живой партии (просьба дизайнера
+     * 25.09.2026: «выбрать жетончик на планшете во время стройки, выбрать гекс
+     * и нажать»). Пока поле не {@code null}, рисование записывает сюда, где
+     * лежит каждая деталь: {@code building:barracks}, {@code building:miner:2},
+     * {@code red:infantry}, {@code blue:factory}, {@code unit:vehicle},
+     * {@code store:0}, {@code storage}, {@code troop}. Рисуют только на потоке
+     * Swing, поэтому одного поля на программу хватает.
+     */
+    static Map<String, Rectangle> hits;
+    /** Настоящий контур детали для подсветки (повёрнутые жетоны крыльев). */
+    static Map<String, java.awt.Shape> outlines;
+
+    private static void hit(String key, Rectangle r) {
+        if (hits != null && r != null) {
+            hits.put(key, new Rectangle(r));
+        }
+    }
+
+    private static void hit(String key, java.awt.Shape s) {
+        if (s == null) {
+            return;
+        }
+        hit(key, s.getBounds());
+        if (outlines != null) {
+            outlines.put(key, s);
+        }
+    }
+
+    /**
      * ПЛАНШЕТ ВЫБИРАЕТСЯ ПО ЦВЕТУ ИГРОКА, А НЕ ПО СТОРОНЕ.
      *
      * <p>Сторон «А» и «Б» больше нет (решение дизайнера 09.09.2026): асимметрия
@@ -119,6 +148,7 @@ final class PrintedBoards {
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
         g.drawImage(art, x, y, width, h, null);
+        hit("troop", new Rectangle(x, y, width, h));
         for (BoardAnchors.Column c : troopCols(p.seat)) {
             paintTroopAttack(g, x, y, k, c, p, troop, spots);
             paintTroopAssembly(g, x, y, k, c, p, spots);
@@ -131,6 +161,7 @@ final class PrintedBoards {
                                          Map<Rectangle, Object[]> spots) {
         ReplayRecord.Module m = p.redPlaced.get(c.unit());
         Rectangle box = scale(x, y, k, c.ax(), c.ay(), c.aw(), c.ah());
+        hit("red:" + c.unit(), box);
         if (m != null) {
             // Жетон НАКРЫВАЕТ напечатанную ячейку ЦЕЛИКОМ — так он и лежит на
             // столе. Прежде он рисовался в 0,62 ячейки, и дизайнер это отбил
@@ -158,10 +189,11 @@ final class PrintedBoards {
                                            BoardAnchors.Column c, ReplayRecord.Player p,
                                            Map<Rectangle, Object[]> spots) {
         ReplayRecord.Module m = p.bluePlaced.get(c.building());
+        Rectangle box = scale(x, y, k, c.bx(), c.by(), c.bw(), c.bh());
+        hit("blue:" + c.building(), box);
         if (m == null) {
             return;
         }
-        Rectangle box = scale(x, y, k, c.bx(), c.by(), c.bw(), c.bh());
         // Рамка Сборки ВЫТЯНУТАЯ, и синий жетон нарисован таким же — кладём его
         // в рамку целиком, по её форме.
         ModuleSlot.paintOnPrint(g, m, ModuleSlot.blue(), box.x, box.y,
@@ -419,6 +451,7 @@ final class PrintedBoards {
             int вЗапасе = c[1];
             int всего = c[0] + c[1];
             int cx = x + i * colW + colW / 2;
+            hit("unit:" + роды[i], new Rectangle(x + i * colW, y, colW, height));
             java.awt.Font шрифт = Theme.font(Math.max(9, height / 7), Font.BOLD);
             g.setFont(шрифт);
             int строка = подписиЗапаса ? g.getFontMetrics().getHeight() : 0;
@@ -591,6 +624,8 @@ final class PrintedBoards {
                 kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
             at, d, d);
         g.drawImage(tex, at, null);
+        hit("building:" + code, new Rectangle((int) Math.round(cx - ш / 2),
+            (int) Math.round(низ - высота), (int) Math.round(ш), (int) Math.round(высота)));
         if (spots != null) {
             spots.put(new Rectangle((int) Math.round(cx - ш / 2),
                     (int) Math.round(низ - высота),
@@ -620,6 +655,7 @@ final class PrintedBoards {
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
         g.drawImage(art, x, y, width, h, null);
+        hit("storage", new Rectangle(x, y, width, h));
         // Рамки ячеек КАЖДОГО складского здания: по ним ляжет сам жетон, если он
         // ещё на планшете (см. ниже, жетонПоверхЯчеек).
         Map<String, java.util.List<Rectangle>> зоны = new java.util.LinkedHashMap<>();
@@ -687,11 +723,12 @@ final class PrintedBoards {
         }
         for (int i = 0; i < места.size(); i++) {
             String tok = i < p.storageTokens.size() ? p.storageTokens.get(i) : null;
+            int[] b = места.get(i);
+            Rectangle box = scale(x, y, k, b[0], b[1], b[2], b[3]);
+            hit("store:" + i, box);
             if (tok == null) {
                 continue;
             }
-            int[] b = места.get(i);
-            Rectangle box = scale(x, y, k, b[0], b[1], b[2], b[3]);
             int side = Math.min(box.width, box.height);
             int sx = box.x + (box.width - side) / 2;
             int sy = box.y + (box.height - side) / 2;
@@ -869,6 +906,8 @@ final class PrintedBoards {
                     kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
                 at, d, d);
             g.drawImage(tex, at, null);
+            hit("building:" + code + ":" + уровень, at.createTransformedShape(
+                new Rectangle(0, 0, tex.getWidth(), tex.getHeight())));
             return;
         }
         kelium.report.FieldGeometry.Shape sh;
@@ -885,6 +924,7 @@ final class PrintedBoards {
         at.scale(k, k);
         at.translate(-sh.vbW() / 2.0, -sh.vbH() / 2.0);
         java.awt.Shape path = at.createTransformedShape(sh.path());
+        hit("building:" + code + ":" + уровень, path);
         double торец = Math.max(1.5, k * 6);
         g.setColor(Theme.seatStroke(seat));
         kelium.report.ТеньЖетона.блок(g, path, торец, торец);
