@@ -1287,6 +1287,24 @@ public final class Arsenal3Abilities {
             return EnumSet.noneOf(Hook.class);
         }
 
+        private static List<BuildingToken> enemyBuildingsOn(GameState state, String hexId, int seat) {
+            List<BuildingToken> out = new ArrayList<>();
+            if (hexId == null) {
+                return out;
+            }
+            for (PlayerState pl : state.players) {
+                if (pl.seat == seat) {
+                    continue;
+                }
+                for (BuildingToken b : pl.buildingsOnField()) {
+                    if (hexId.equals(b.hexId)) {
+                        out.add(b);
+                    }
+                }
+            }
+            return out;
+        }
+
         private static BuildingToken enemyBuildingOn(GameState state, String hexId, int seat) {
             if (hexId == null) {
                 return null;
@@ -1315,9 +1333,11 @@ public final class Arsenal3Abilities {
                 if (!id().equals(Arsenal7Abilities.superPassive(state, u))) {
                     continue;
                 }
-                BuildingToken b = enemyBuildingOn(state, u.hexId, seat);
-                if (b != null) {
-                    out.add(new Choice("ability:" + id(), u.uid,
+                // ЦЕЛЬ ВЫБИРАЕТ ИГРОК среди ВСЕХ чужих зданий на гексе (25.09.2026).
+                // Прежде бралось первое попавшееся, и ЦУ рядом с чужой казармой
+                // выбрать было нельзя.
+                for (BuildingToken b : enemyBuildingsOn(state, u.hexId, seat)) {
+                    out.add(new Choice("ability:" + id(), java.util.Map.of("unit", u.uid, "b", b.uid),
                         "СПЕЦ (1 БПР): подрыв — снести " + b.type.code
                             + " игрока " + b.owner + " на " + u.hexId));
                 }
@@ -1326,7 +1346,18 @@ public final class Arsenal3Abilities {
         }
 
         @Override public boolean perform(GameState state, int seat, Choice chosen, Agent agent) {
-            if (!(chosen != null && chosen.payload() instanceof Integer uid)) {
+            if (chosen == null) {
+                return false;
+            }
+            Integer цельUid = null;
+            int uid;
+            if (chosen.payload() instanceof Integer одинUid) {
+                uid = одинUid;                       // старые записи партий
+            } else if (chosen.payload() instanceof java.util.Map<?, ?> m
+                    && m.get("unit") instanceof Number un && m.get("b") instanceof Number bn) {
+                uid = un.intValue();
+                цельUid = bn.intValue();
+            } else {
                 return false;
             }
             PlayerState me = state.player(seat);
@@ -1343,7 +1374,13 @@ public final class Arsenal3Abilities {
             if (u == null || !id().equals(Arsenal7Abilities.superPassive(state, u))) {
                 return false;
             }
-            BuildingToken b = enemyBuildingOn(state, u.hexId, seat);
+            BuildingToken b = null;
+            for (BuildingToken x : enemyBuildingsOn(state, u.hexId, seat)) {
+                if (цельUid == null || x.uid == цельUid) {
+                    b = x;
+                    break;
+                }
+            }
             if (b == null) {
                 return false;
             }
