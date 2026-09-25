@@ -450,9 +450,17 @@ public final class Actions {
             int gainedC = 0;
             int[] paid = {0, 0};
             boolean both = Passives.minerTakesKeliumAndContainer(s, player.seat);
+            // ПРЕДЕЛ ДОБЫТЧИКОВ С КАРТЫ: «добыча 1 добытчиком» (утиль арсенала
+            // 7.0.0). Та же настройка бесплатного действия, что «Сборка не более
+            // чем двумя зданиями»; в обычной Добыче предела нет.
+            int пределДобытчиков = ctx.objectLimit(name());
+            int отработали = 0;
             for (BuildingToken b : player.buildingsOnField()) {
                 if (b.type != BuildingType.MINER) {
                     continue;
+                }
+                if (отработали >= пределДобытчиков) {
+                    break;
                 }
                 if (ctx.толькоЗдание >= 0 && b.uid != ctx.толькоЗдание) {
                     continue;              // срабатывание при постройке — только новый
@@ -504,6 +512,7 @@ public final class Actions {
                     continue;   // добытчик пропущен
                 }
                 takeContainerOnly = "container".equals(pick.payload());
+                отработали++;
                 if (!takeContainerOnly) {
                     gainedK += mineFromMiner(s, player, b, grid);
                     if (both) {
@@ -2713,7 +2722,13 @@ public final class Actions {
             // стенками зданий и нейтралов. МЕСТО НА ГЕКСЕ по-прежнему нужно -
             // карта отменяет стенку, а не законы физики, поэтому проверка
             // упаковки ниже остаётся.
+            // «Реактивные ранцы» (арсенал 7.0.0, печать 13.09.2026) — то же
+            // правило, но только для ПЕХОТЫ: на карте «твоя пехота игнорирует
+            // здания как препятствие».
+            boolean пехотаСРанцем = unit.type == UnitType.INFANTRY
+                && Passives.hasPassive(state, seat, "infantry_ignores_buildings_in_maneuver");
             if (!Passives.hasPassive(state, seat, "ground_ignores_buildings_in_maneuver")
+                    && !пехотаСРанцем
                     && !Passability.groundEdgeOpen(state, unit.hexId, hexId, seat)) {
                 return false;
             }
@@ -3663,7 +3678,15 @@ public final class Actions {
                         UnitType ut = UnitType.fromCode(String.valueOf(card.get("unit")));
                         UnitToken su = state.tokenStats.makeUnit(ut, player.seat,
                             nextUid(state));
-                        su.hp += card.get("hp_bonus") instanceof Number n ? n.intValue() : 1;
+                        // ПЕЧАТНАЯ ПРОЧНОСТЬ ЧИСЛОМ СЕРДЕЦ (супер-арсенал 3.0.0:
+                        // на «Супер-технике» нарисованы три сердца) — это сама
+                        // прочность, а не прибавка к жетону рода. Без неё —
+                        // прибавка hp_bonus, как в прежних наборах.
+                        if (card.get("hp") instanceof Number абс) {
+                            su.hp = абс.intValue();
+                        } else {
+                            su.hp += card.get("hp_bonus") instanceof Number n ? n.intValue() : 1;
+                        }
                         su.superUnit = true;
                         su.superCardId = cid;
                         player.units.add(su);   // в резерв; выйдет через Сборку/эффекты
@@ -4009,6 +4032,30 @@ public final class Actions {
                 opts.add(new Choice("sci_exchange", ex,
                     "2 trophy разом -> " + (2 + pairBonus) + " coin"));
             }
+            // «КОНВЕРСИЯ СНАРЯДОВ» (арсенал 7.0.0, печать 13.09.2026): тот же
+            // обмен, что у «Скупки металла», но в БОЕПРИПАСЫ — «−1 / −2 трофея
+            // за +1 / +3 боеприпаса». Курс напечатан на карте, поэтому он здесь
+            // числами карты, а не ключом свода: скидки за пару у рынка тут нет,
+            // пара дороже на кубик прямо по печати. Боеприпас кладётся в ячейки
+            // хранилища — места нет, обмен не предлагается.
+            boolean вБоеприпасы = Passives.hasPassive(state, player.seat,
+                "science_trophy_to_ammo");
+            int местаПодБпр = вБоеприпасы
+                ? kelium.engine.Storage.roomFor(state, player, Resource.AMMO) : 0;
+            if (вБоеприпасы && pool >= 1 && местаПодБпр >= 1) {
+                Map<String, Object> ex = new HashMap<>();
+                ex.put("id", "trophy_to_ammo");
+                ex.put("give", 1);
+                ex.put("ammo", 1);
+                opts.add(new Choice("sci_exchange", ex, "1 трофей -> 1 боеприпас"));
+            }
+            if (вБоеприпасы && pool >= 2 && местаПодБпр >= 1) {
+                Map<String, Object> ex = new HashMap<>();
+                ex.put("id", "trophy_to_ammo");
+                ex.put("give", 2);
+                ex.put("ammo", 3);
+                opts.add(new Choice("sci_exchange", ex, "2 трофея разом -> 3 боеприпаса"));
+            }
             // ЗА КАРТУ НЕ ПЛАТЯТ, ЕСЛИ ЕЁ НЕКУДА ПОЛОЖИТЬ: ячейки под планшетом
             // заняты — обмен не предлагается вовсе. Иначе трофеи уходят, а карта
             // не приходит.
@@ -4069,6 +4116,9 @@ public final class Actions {
             String id = (String) ex.get("id");
             if ("trophy_to_coin".equals(id)) {
                 player.resources.add(Resource.COIN, ((Number) ex.get("coin")).intValue());
+            } else if ("trophy_to_ammo".equals(id)) {
+                kelium.engine.Storage.addAmmoCapped(state, player,
+                    ((Number) ex.get("ammo")).intValue());
             } else if ("draw_arsenal".equals(id)) {
                 // ВЫБОР ИЗ ВИТРИНЫ (правило дизайнера 15.08.2026). Раньше игрок
                 // тянул две карты вслепую и одну выбрасывал — то есть половина

@@ -2080,6 +2080,29 @@ public final class GameEngine {
     private void returnStep(boolean gameEnding) {
         GameState s = state;
         Ruleset rs = rs();
+        // «ШТУРМОВЫЕ ЩИТЫ» (арсенал 7.0.0, печать 13.09.2026): «в фазу
+        // Возвращение верни с поля в запас всю свою пехоту, на которой есть
+        // урон». Прежняя редакция («Ударная пехота» 5.0/6.0) уводила раненых
+        // сразу после боя; на новой карте срок — фаза Возвращение, то есть
+        // раненая пехота доживает до конца раунда и ещё может ходить и бить.
+        // В последний Возврат партии возврата нет, как и у уничтоженных жетонов.
+        if (!gameEnding) {
+            for (PlayerState p : s.players) {
+                if (!Passives.hasPassive(s, p.seat, "infantry_hp2_returns_at_return")) {
+                    continue;
+                }
+                for (kelium.core.UnitToken u : new ArrayList<>(p.unitsOnField())) {
+                    if (u.type != kelium.core.UnitType.INFANTRY || u.damage <= 0) {
+                        continue;
+                    }
+                    u.hexId = null;
+                    u.resetDamage();
+                    emit(ev("type", "ability_reaction", "seat", p.seat,
+                        "ability", "infantry_hp2_returns_at_return",
+                        "returned_unit", u.type.code, "round", s.round));
+                }
+            }
+        }
         // ЭКСПЕРИМЕНТ «военный трек» (economy.leftover_destroyed_vp_per = N, 0=выкл,
         // и таким и остаётся во всех живых рулсетах) — устарел с правилом 2026-08-15
         // «в Возврат ВСЕ уничтоженные жетоны конвертируются в трофеи» ниже: раньше это был

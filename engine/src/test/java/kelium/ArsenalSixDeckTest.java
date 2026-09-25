@@ -38,9 +38,17 @@ import kelium.engine.ability.Abilities;
  */
 class ArsenalSixDeckTest {
 
+    /**
+     * НАБОР 6.0.0 ЯВНО, а не «действующий»: с 25.09.2026 свод играет арсенал
+     * 7.0.0 (печать дизайнера), а 6.0.0 остаётся в данных ради прежних замеров
+     * и записей партий. Сторож проверяет, что старый набор цел.
+     */
     private static ContentSet arsenal() {
-        GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 6L, null, null);
-        return cfg.content.get("arsenal");
+        java.nio.file.Path root = GameConfig.resolveDataRoot(null);
+        kelium.rules.Ruleset rs = kelium.rules.Ruleset.loadById(GameConfig.DEFAULT_RULESET,
+            root.resolve("rulesets"));
+        rs.override("content_versions.arsenal", "6.0.0");
+        return kelium.dataio.ContentLibrary.forRuleset(rs, root).get("arsenal");
     }
 
     private static List<Map<String, Object>> обычные() {
@@ -64,7 +72,7 @@ class ArsenalSixDeckTest {
     }
 
     @Test
-    void действующийСводБерётШестойНабор() {
+    void шестойНаборЧитаетсяСвоейВерсией() {
         assertEquals("6.0.0", arsenal().version);
     }
 

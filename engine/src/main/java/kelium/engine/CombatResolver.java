@@ -197,6 +197,19 @@ public final class CombatResolver {
         if (unit.superUnit) {
             List<AttackRow> sup = new ArrayList<>();
             int slots = unit.type == UnitType.TOWER ? 1 : 2;
+            // СУПЕР-АРСЕНАЛ 3.0.0: на карте нарисована ОДНА рамка атаки
+            // («боеприпас → урон») — число атак берётся из записи карты.
+            if (unit.superCardId != null) {
+                try {
+                    var card = kelium.dataio.Ctx.cards(state, "super_arsenal")
+                        .find(unit.superCardId);
+                    if (card != null && card.get("attacks") instanceof Number n) {
+                        slots = n.intValue();
+                    }
+                } catch (RuntimeException нетНабора) {
+                    // набора нет — остаётся число атак прежних редакций
+                }
+            }
             for (int slot = 1; slot <= slots; slot++) {
                 String key = "super" + slot;
                 sup.add(new AttackRow(key, 1, Target.INFANTRY));

@@ -54,9 +54,18 @@ class ArsenalSixAbilitiesTest {
         }
     }
 
+    /**
+     * Стол с набором 6.0.0 ЯВНО: с 25.09.2026 действующий арсенал — 7.0.0 по
+     * печати дизайнера, и половины этих низов в нём нет. Способности живы и
+     * сторожатся на своём наборе.
+     */
     private static GameState стол(long seed) {
-        return Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, seed, null, null));
+        java.nio.file.Path root = GameConfig.resolveDataRoot(null);
+        kelium.rules.Ruleset rs = kelium.rules.Ruleset.loadById(GameConfig.DEFAULT_RULESET,
+            root.resolve("rulesets"));
+        rs.override("content_versions.arsenal", "6.0.0");
+        return Setup.buildGame(new GameConfig(rs,
+            kelium.dataio.ContentLibrary.forRuleset(rs, root), 4, seed, root, null));
     }
 
     /** Номер карты действующей колоды, несущей эту установку. */
