@@ -74,6 +74,22 @@ public final class ChoiceWords {
                         : c.kind().endsWith("replace") ? " (заменить)" : "");
                 }
             }
+            case "energy_give" -> {
+                Matcher m = ENERGY_GIVE.matcher(raw);
+                if (m.find()) {
+                    int n = Integer.parseInt(m.group(1));
+                    return "Раздать " + n + (n == 1 ? " кубик" : n < 5 ? " кубика" : " кубиков")
+                        + " с " + sourceGen(m.group(2));
+                }
+            }
+            case "energy_take" -> {
+                Matcher m = ENERGY_TAKE.matcher(raw);
+                return "Забрать все кубики обратно на "
+                    + (m.find() ? sourceAcc(m.group(1)) : "источник");
+            }
+            case "energy_done" -> {
+                return "Закончить смену энергии";
+            }
             case "pay_power" -> {
                 if (Boolean.TRUE.equals(p)) {
                     Matcher m = PAY_POWER.matcher(raw);
@@ -229,6 +245,29 @@ public final class ChoiceWords {
         return tidy(raw);
     }
 
+    /** «отдать 3 с POWER_PLANT», «отдать 1 с карты арсенала». */
+    private static final Pattern ENERGY_GIVE = Pattern.compile("отдать (\\d+) с (.+)$");
+    /** «забрать всё обратно на COMMAND_CENTER». */
+    private static final Pattern ENERGY_TAKE = Pattern.compile("обратно на (\\S+)");
+
+    /** Источник энергии в родительном: «с энергостанции», «с ЦУ». */
+    private static String sourceGen(String code) {
+        return switch (code.trim().toLowerCase(Locale.ROOT)) {
+            case "power_plant" -> "энергостанции";
+            case "command_center" -> "ЦУ";
+            default -> code.trim();
+        };
+    }
+
+    /** Источник энергии в винительном: «на энергостанцию», «на ЦУ». */
+    private static String sourceAcc(String code) {
+        return switch (code.trim().toLowerCase(Locale.ROOT)) {
+            case "power_plant" -> "энергостанцию";
+            case "command_center" -> "ЦУ";
+            default -> code.trim();
+        };
+    }
+
     /** «запитать barracks монетами (2 МОН …» — здание и цена. */
     private static final Pattern PAY_POWER = Pattern.compile("запитать (\\S+) монетами \\((\\d+)");
 
@@ -279,7 +318,7 @@ public final class ChoiceWords {
             case "reaction" -> "Не отвечать";
             case "maneuver_unit" -> "Без манёвра";
             case "return_unit" -> "Никого не возвращать";
-            case "energy_place" -> "Оставить простаивать";
+            case "energy_place" -> "Хватит — остаток оставить на источнике";
             case "mine" -> "Пропустить добытчик";
             case "assemble" -> "Пропустить здание";
             case "build_pick" -> "Закончить стройку";

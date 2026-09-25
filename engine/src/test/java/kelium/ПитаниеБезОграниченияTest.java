@@ -41,6 +41,12 @@ class ПитаниеБезОграниченияTest {
         public Choice choose(GameState s, List<Choice> options, Map<String, Object> ctx) {
             if ("energy_activation".equals(ctx.get("kind"))) {
                 String хочу = шаги.isEmpty() ? "energy_done" : шаги.poll();
+                // работаем с САМОЙ станцией: забрать у ЦУ — другое действие
+                for (Choice c : options) {
+                    if (хочу.equals(c.kind()) && String.valueOf(c.label()).contains("POWER_PLANT")) {
+                        return c;
+                    }
+                }
                 for (Choice c : options) {
                     if (хочу.equals(c.kind())) {
                         return c;

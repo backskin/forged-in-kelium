@@ -234,6 +234,12 @@ public final class PlayerTable extends JComponent {
                     bubbles.clickHex(key);
                 } else {
                     bubbles.closeBubble();
+                    // стопка контейнеров под планшетом — раскладывается сама по себе
+                    if ("containers".equals(key) && state != null) {
+                        onHoverOff.run();
+                        onOpen.accept("containers");
+                        return;
+                    }
                     String board = boardAt(p);
                     if (board != null && state != null) {
                         onHoverOff.run();
@@ -456,7 +462,8 @@ public final class PlayerTable extends JComponent {
         if (g != null) {
             return switch (g) {
                 case "arsenal" -> "Закрытые карты арсенала — щелчок раскрывает";
-                case "dump" -> "Свалка: уничтоженные жетоны врагов на отложенном приказе";
+                case "dump" -> "Свалка: отложенный приказ и уничтоженные жетоны врагов на нём — "
+                    + "щелчок раскрывает";
                 case "orders" -> "Приказы в руке — щелчок раскрывает";
                 default -> "Щелчок раскрывает карты";
             };

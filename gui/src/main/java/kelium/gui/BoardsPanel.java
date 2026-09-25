@@ -207,6 +207,24 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         }
         // Оба планшета одной высоты и целиком в отведённом месте: доска, у
         // которой обрезан край, читается как другая доска.
+        if (only != null) {
+            // ОДНА ДОСКА НА ВКЛАДКУ (26.09.2026): научный отдел и рынок —
+            // отдельными ящиками, каждая доска крупно на всё место
+            boolean science = "science".equals(only);
+            double asp = science ? aspS : aspM;
+            int room1H = science ? roomH : h - 2 * pad;
+            int oh = Math.min(room1H, (int) ((w - 2 * pad) / asp));
+            int ow = (int) Math.round(oh * asp);
+            int ox = pad + (w - 2 * pad - ow) / 2;
+            int oy = pad + (room1H - oh) / 2;
+            if (science) {
+                paintScienceArt(g, sci, ox, oy, ow, oh);
+                paintPrintedStrip(g, pad, h - pad - strip, w - 2 * pad, strip);
+            } else {
+                paintMarketArt(g, mkt, ox, oy, ow, oh);
+            }
+            return;
+        }
         int hh = Math.min(roomH, (int) (roomW / (aspS + aspM)));
         int sw = (int) Math.round(hh * aspS);
         int mw = (int) Math.round(hh * aspM);
@@ -215,6 +233,14 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         paintScienceArt(g, sci, x0, y0, sw, hh);
         paintMarketArt(g, mkt, x0 + sw + gap, y0, mw, hh);
         paintPrintedStrip(g, pad, h - pad - strip, w - 2 * pad, strip);
+    }
+
+    /** Только одна доска: {@code science}, {@code market}; null — обе. */
+    private String only;
+
+    public void setOnly(String which) {
+        this.only = which;
+        repaint();
     }
 
     /** Планшет науки: картинка плюс кубики в напечатанных ячейках. */

@@ -51,6 +51,10 @@ import kelium.report.ReplayRecord;
 public final class StartMenuWindow {
 
     public static void main(String[] args) {
+        // МАСШТАБ ИГРЫ — ПО ЭКРАНУ (жалоба дизайнера 26.09.2026: «на Full HD всё
+        // мелко, ничего не прочитать»). До первого окна: размеры запекаются в
+        // компоненты при создании.
+        kelium.gui.replay2.Theme.useGameScale();
         SwingUtilities.invokeLater(() -> new StartMenuWindow().start());
     }
 

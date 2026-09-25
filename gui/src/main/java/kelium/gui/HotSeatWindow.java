@@ -162,6 +162,8 @@ public final class HotSeatWindow {
     private JPanel chipsPanel;
     FieldView field;
     private BoardsPanel boards;
+    private BoardsPanel scienceBoard;
+    private BoardsPanel marketBoard;
     private BoardSheet sheet;
 
     /** Планшет смотрящего места — для прогонщиков и тестов. */
@@ -583,6 +585,10 @@ public final class HotSeatWindow {
                 openDumpSpread(p);
                 return;
             }
+            case "containers" -> {
+                openContainersSpread(p);
+                return;
+            }
             default -> {
                 return;
             }
@@ -623,9 +629,40 @@ public final class HotSeatWindow {
         boardZoom.open(tableSheet, seat, which, seatName(seat));
     }
 
+    /**
+     * КОНТЕЙНЕРЫ ПОД ПЛАНШЕТОМ — раскладкой рубашкой вверх. По правилам их
+     * берут не глядя, и что внутри, не знает и сам владелец: раскладка
+     * показывает, сколько их, и говорит, как вскрыть (жалоба дизайнера
+     * 26.09.2026: «нажимаю на контейнер — ничего не происходит»).
+     */
+    private void openContainersSpread(ReplayRecord.Player p) {
+        java.awt.image.BufferedImage back = kelium.report.Textures.card("deck_containers", "deck");
+        List<kelium.gui.kp.CardSpread.Card> cards = new ArrayList<>();
+        for (int i = 0; i < p.containers; i++) {
+            cards.add(new kelium.gui.kp.CardSpread.Card("container" + i, back, "Контейнер",
+                "рубашкой вверх", List.of()));
+        }
+        if (cards.isEmpty()) {
+            return;
+        }
+        zoom.setVisible(false);
+        spread.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        spread.open("Контейнеры под планшетом: " + p.containers,
+            "Лежат рубашкой вверх — что внутри, узнаете при вскрытии спец-действием. "
+                + "Щёлкните мимо карт, чтобы сложить их", cards, Theme.seat(shownSeat()), null);
+    }
+
     /** Свалка раскрытием: жетоны врагов трофейной стороной. */
     private void openDumpSpread(ReplayRecord.Player p) {
         List<kelium.gui.kp.CardSpread.Card> cards = new ArrayList<>();
+        // САМ ОТЛОЖЕННЫЙ ПРИКАЗ — первой картой: свалка лежит на нём, и
+        // посмотреть его надо и пустым (жалоба дизайнера 26.09.2026)
+        if (p.orderSetAside != null) {
+            cards.add(new kelium.gui.kp.CardSpread.Card(p.orderSetAside,
+                orderArt(p.orderSetAside, p.orderColor), cardName(p.orderSetAside),
+                "отложенный приказ — свалка", List.of()));
+        }
         for (ReplayRecord.DestroyedToken t : p.destroyedCard) {
             String nm = t.building ? kelium.report.Labels.buildingName(t.type, t.level)
                 : kelium.report.Labels.unitName(t.type);
@@ -992,10 +1029,11 @@ public final class HotSeatWindow {
             BorderFactory.createEmptyBorder(Theme.px(10), Theme.px(4), Theme.px(10), Theme.px(4))));
         // ЯЩИКИ — ВКЛАДКАМИ СБОКУ (25.09.2026): внизу теперь стол игрока из
         // компонентов, и кнопкам ящиков там больше не место.
-        addDrawerTab(strip, "Наука и рынок");
-        addDrawerTab(strip, "Планшет");
-        addDrawerTab(strip, "Сброс приказов");
-        addDrawerTab(strip, "Журнал");
+        // ДВЕ ВКЛАДКИ — ДВЕ ДОСКИ (просьба дизайнера 26.09.2026): планшет игрока
+        // и сброс приказов и так лежат на столе и раскрываются щелчком, журнал —
+        // кнопкой справа; здесь только общие доски, каждая отдельно.
+        addDrawerTab(strip, "Научный отдел");
+        addDrawerTab(strip, "Рынок");
         strip.add(javax.swing.Box.createVerticalGlue());
         return strip;
     }
@@ -1003,6 +1041,8 @@ public final class HotSeatWindow {
     private void addDrawerTab(JPanel strip, String name) {
         KpTab tab = new KpTab(name, () -> toggleDrawer(name));
         tab.setToolTipText(switch (name) {
+            case "Научный отдел" -> "Планшет научного отдела: треки, кубики игроков, вершины";
+            case "Рынок" -> "Планшет рынка и открытая карта рынка";
             case "Наука и рынок" -> "Доска науки и активная карта рынка — открываются поверх поля в любой момент";
             case "Планшет" -> "Планшеты игроков: склад, войска, трофеи, арсенал — свой и соперников";
             case "Сброс приказов" -> "Ваш личный сброс приказов: карты, разыгранные в этом раунде";
@@ -1043,6 +1083,13 @@ public final class HotSeatWindow {
         JScrollPane boardsScroll = new JScrollPane(boards);
         boardsScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
         drawers.put("Наука и рынок", wrapDrawer(boardsScroll));
+        // отдельные доски для двух вкладок
+        scienceBoard = new BoardsPanel();
+        scienceBoard.setOnly("science");
+        drawers.put("Научный отдел", wrapDrawer(new JScrollPane(scienceBoard)));
+        marketBoard = new BoardsPanel();
+        marketBoard.setOnly("market");
+        drawers.put("Рынок", wrapDrawer(new JScrollPane(marketBoard)));
 
         JPanel sheetWrap = new JPanel(new BorderLayout());
         sheetWrap.setBackground(Theme.panel());
@@ -1248,8 +1295,53 @@ public final class HotSeatWindow {
         feedScroll.setBorder(BorderFactory.createMatteBorder(Theme.px(1), 0, 0, 0, Theme.border()));
         feedScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(20));
         feedWrap.add(feedScroll, BorderLayout.CENTER);
-        rail.add(feedWrap, BorderLayout.CENTER);
+        // ЛЕНТА — НЕ В ПАНЕЛИ, А КНОПКОЙ (просьба дизайнера 26.09.2026: «мелко,
+        // ничего не читается»): журнал партии открывается отдельным окном
+        // крупным шрифтом. Сама лента собирается как прежде — для журнала и тестов.
+        JPanel journalWrap = new JPanel(new net.miginfocom.swing.MigLayout(
+            "insets " + Theme.px(8) + ", fillx", "[grow,fill]", "[]push"));
+        journalWrap.setBackground(Theme.panel());
+        KpButton journalBtn = new KpButton("Журнал партии", "всё, что случилось, крупно", null);
+        journalBtn.setToolTipText("Открыть журнал партии отдельным окном");
+        journalBtn.onClick(this::openJournalWindow);
+        journalBtn.setState(KpButton.State.AVAILABLE);
+        journalWrap.add(journalBtn, "h " + Theme.px(48) + "!");
+        rail.add(journalWrap, BorderLayout.CENTER);
         return rail;
+    }
+
+    /** Окно журнала партии (одно на окно игры; открыто — дописывается). */
+    private javax.swing.JDialog journalWindow;
+    private javax.swing.JTextArea journalText;
+
+    private void openJournalWindow() {
+        if (journalWindow == null) {
+            journalWindow = new javax.swing.JDialog(frame, "Журнал партии", false);
+            journalText = new javax.swing.JTextArea();
+            journalText.setEditable(false);
+            journalText.setLineWrap(true);
+            journalText.setWrapStyleWord(true);
+            journalText.setFont(Theme.font(15, Font.PLAIN));
+            journalText.setBackground(Theme.panel());
+            journalText.setForeground(Theme.ink());
+            journalText.setBorder(BorderFactory.createEmptyBorder(
+                Theme.px(12), Theme.px(16), Theme.px(12), Theme.px(16)));
+            JScrollPane sp = new JScrollPane(journalText);
+            sp.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
+            journalWindow.add(sp);
+            journalWindow.setSize(Theme.px(760), Math.max(Theme.px(420), frame.getHeight() - Theme.px(80)));
+            journalWindow.setLocationRelativeTo(frame);
+        }
+        StringBuilder sb = new StringBuilder();
+        synchronized (feedLog) {
+            for (String l : feedLog) {
+                sb.append(l).append("\n\n");
+            }
+        }
+        journalText.setText(sb.toString());
+        journalText.setCaretPosition(journalText.getDocument().getLength());
+        journalWindow.setVisible(true);
+        journalWindow.toFront();
     }
 
     private JLabel caption(String text) {
@@ -1650,6 +1742,8 @@ public final class HotSeatWindow {
             GameConfig c = cfg;
             SwingUtilities.invokeLater(() -> {
                 boards.setRules(c.ruleset, c.content);
+                scienceBoard.setRules(c.ruleset, c.content);
+                marketBoard.setRules(c.ruleset, c.content);
                 session.setContent(c.content);
             });
         }
@@ -2136,6 +2230,8 @@ public final class HotSeatWindow {
         session.seek(last);
         if (f.snapshot != null) {
             boards.show(r, f.snapshot);
+            scienceBoard.show(r, f.snapshot);
+            marketBoard.show(r, f.snapshot);
         }
         if (boardZoom != null) {
             boardZoom.refresh();
@@ -2479,6 +2575,9 @@ public final class HotSeatWindow {
         }
         lastFeedText = text;
         feedLog.add(text);
+        if (journalText != null && journalWindow.isVisible()) {
+            journalText.append(text + "\n\n");
+        }
         feedBox.add(feedRow(seat, text));
         journalBox.add(feedRow(seat, text));
         while (feedBox.getComponentCount() > 250) {
@@ -3234,11 +3333,10 @@ public final class HotSeatWindow {
             actionBar.idle("не сейчас");
             endBtn.setTexts("Сначала решение", kindLabel(kind));
             endBtn.setState(KpButton.State.DISABLED);
-            // Призрак здания за курсором — для стройки и переноса (§4).
-            if (("build_hex".equals(kind) || "move_hex".equals(kind))
-                    && d.context().get("btype") instanceof String bt) {
-                field.setGhost(bt, seat);
-            }
+            // ПРИЗРАКА ЗДАНИЯ НА ВЫБОРЕ ГЕКСА НЕТ (просьба дизайнера 26.09.2026):
+            // казалось, что щелчок сразу ставит здание. Гекс — заливкой, здание
+            // призраком — только на следующем шаге, повороте.
+            field.clearGhost();
             routeOnField(seat, kind, agent, options, d);
             // КУДА СТАВИТЬ — ЗАЛИВКОЙ (заказ дизайнера 25.09.2026): в миг Стройки
             // и найма вышки допустимые гексы залиты цветом игрока
@@ -3427,6 +3525,22 @@ public final class HotSeatWindow {
         } else {
             hint = null;
         }
+        // СМЕНА ЭНЕРГИИ — СЛОВАМИ ПО ШАГАМ (26.09.2026): сначала источник, потом
+        // по одному кубику — потребитель; без этого оба шага выглядели одинаково,
+        // «выберите гекс», и казалось, что игра ходит по кругу
+        if ("energy_activation".equals(kind)) {
+            title = "Смена энергии: выберите источник";
+            hint = "Щёлкните энергостанцию или ЦУ на поле: раздать с неё кубики "
+                + "или забрать все обратно — или «Закончить смену энергии»";
+        } else if ("energy_place".equals(kind)) {
+            Object left = d.context().get("remaining");
+            Object from = d.context().get("source_type");
+            title = "Куда поставить кубик"
+                + ("power_plant".equals(from) ? " с энергостанции"
+                    : "command_center".equals(from) ? " с ЦУ" : "")
+                + (left instanceof Number n ? " — осталось " + n : "");
+            hint = "Щёлкните здание, которое запитать, — или «Хватит»";
+        }
         setTableChoices(onTable, Theme.seat(seat));
         field.setChoices(byHex, title, hint, dock, Theme.seat(seat));
         field.setOptSides(optSides);
@@ -3437,8 +3551,9 @@ public final class HotSeatWindow {
         // пока идёт решение, и уезжает, когда решение принято.
         if (SCIENCE_MARKET.contains(kind)) {
             drawerCloser.stop();
-            if (openDrawer != drawers.get("Наука и рынок")) {
-                toggleDrawer("Наука и рынок");
+            String нужный = autoDrawer(kind);
+            if (openDrawer != drawers.get(нужный)) {
+                toggleDrawer(нужный);
                 drawerAutoOpened = true;
             }
         } else if (drawerAutoOpened) {
@@ -3457,10 +3572,18 @@ public final class HotSeatWindow {
         if (drawerAutoOpened && (awaitingSeat == null
                 || !SCIENCE_MARKET.contains(String.valueOf(pendingKind)))) {
             drawerAutoOpened = false;
-            if (openDrawer == drawers.get("Наука и рынок")) {
-                toggleDrawer("Наука и рынок");
+            for (String имя : List.of("Научный отдел", "Рынок", "Наука и рынок")) {
+                if (openDrawer != null && openDrawer == drawers.get(имя)) {
+                    toggleDrawer(имя);
+                    break;
+                }
             }
         }
+    }
+
+    /** Какую доску показать на решении: рынок — «Рынок», прочее — «Научный отдел». */
+    private static String autoDrawer(String kind) {
+        return "market".equals(kind) ? "Рынок" : "Научный отдел";
     }
 
     {

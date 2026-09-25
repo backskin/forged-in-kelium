@@ -519,7 +519,7 @@ public final class GameRecorder {
             ReplayRecord.Snapshot snap = snapshot(state,
                 event.get("seat") instanceof Number n ? n.intValue() : null);
             ReplayRecord.Highlight h = diff(prev, snap);
-            if (h.isEmpty() && !resourcesChanged(prev, snap)) {
+            if (h.isEmpty() && !resourcesChanged(prev, snap) && !tokensChanged(prev, snap)) {
                 return;
             }
             ReplayRecord.Frame f = new ReplayRecord.Frame();
@@ -532,6 +532,31 @@ public final class GameRecorder {
             f.snapshot = snap;
             prev = snap;
             rec.frames.add(f);
+        }
+
+        /**
+         * Жетоны: место, энергия, урон, жив ли. Кубик энергии, переложенный со
+         * станции на добытчик, — изменение, которое игрок обязан увидеть сразу
+         * (жалоба дизайнера 26.09.2026: «энергию увидел только после
+         * „закончить“»).
+         */
+        private static boolean tokensChanged(ReplayRecord.Snapshot a, ReplayRecord.Snapshot b) {
+            if (a == null || b == null || a.tokens.size() != b.tokens.size()) {
+                return true;
+            }
+            Map<Integer, ReplayRecord.Tok> was = new java.util.HashMap<>();
+            for (ReplayRecord.Tok t : a.tokens) {
+                was.put(t.uid, t);
+            }
+            for (ReplayRecord.Tok t : b.tokens) {
+                ReplayRecord.Tok o = was.get(t.uid);
+                if (o == null || !java.util.Objects.equals(o.hexId, t.hexId)
+                        || o.energyPlaced != t.energyPlaced || o.energyIdle != t.energyIdle
+                        || o.damage != t.damage || o.alive != t.alive) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static boolean resourcesChanged(ReplayRecord.Snapshot a, ReplayRecord.Snapshot b) {

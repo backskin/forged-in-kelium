@@ -2100,7 +2100,11 @@ public final class Actions {
                     if (!isSource(src) || used.contains(src.uid)) {
                         continue;
                     }
-                    if (src.energyIdle > 0) {
+                    // РАЗДАТЬ — ТОЛЬКО ЕСЛИ ЕСТЬ КУДА (26.09.2026): иначе вопрос
+                    // «куда поставить» состоял из одного «хватит», проходил сам,
+                    // кубик возвращался, и игроку снова предлагали то же самое —
+                    // по кругу.
+                    if (src.energyIdle > 0 && естьКудаПоставить(player, src)) {
                         opts.add(new Choice("energy_give", String.valueOf(src.uid),
                             "отдать " + src.energyIdle + " с " + src.type));
                     }
@@ -2263,9 +2267,16 @@ public final class Actions {
                     }
                 }
                 opts.add(new Choice("pass", null, "оставить простаивать"));
+                // откуда кубик — окно рисует от источника стрелку к потребителю
+                Map<String, Object> вопрос = new HashMap<>();
+                вопрос.put("kind", "energy_place");
+                вопрос.put("remaining", pool - i);
+                if (src != null && src.hexId != null) {
+                    вопрос.put("source", src.hexId);
+                    вопрос.put("source_type", src.type.code);
+                }
                 Choice pick = opts.size() == 1 ? opts.get(0)
-                    : agent.choose(state, opts, Map.of("kind", "energy_place",
-                        "remaining", pool - i));
+                    : agent.choose(state, opts, вопрос);
                 if (pick.payload() == null) {
                     if (src != null) {
                         src.energyIdle += pool - i;
@@ -2288,6 +2299,19 @@ public final class Actions {
                 }
             }
             return placed;
+        }
+
+        /** Есть ли здание со свободной ячейкой, куда кубик источника может лечь. */
+        private static boolean естьКудаПоставить(PlayerState player, BuildingToken src) {
+            for (BuildingToken c : player.buildingsOnField()) {
+                if (c.uid == src.uid && c.type == BuildingType.COMMAND_CENTER) {
+                    continue;          // ЦУ само себе кубик не перекладывает
+                }
+                if (c.energySlots > c.energyPlaced) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /** Источник энергии: энергостанция или ЦУ. */

@@ -476,7 +476,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 return "УСТАНОВЛЕННЫЙ АРСЕНАЛ\n«" + Names.card(session.record(),
                     key.substring("installed:".length())) + "»";
             case "containers":
-                return "КОНТЕЙНЕРЫ в пазах планшета: " + p.containers;
+                return "КОНТЕЙНЕРЫ под планшетом: " + p.containers
+                    + "\nКарты лежат рубашкой вверх: их берут не глядя, и что внутри,"
+                    + " не знает и сам владелец."
+                    + "\nВскрыть — спец-действием: карта переворачивается, вы получаете"
+                    + " написанное, карта уходит в сброс.";
             case "store":
                 return "Место под жетон модуля хранилища — пусто";
             case "cell": {
