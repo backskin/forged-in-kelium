@@ -1857,6 +1857,16 @@ public final class HotSeatWindow {
     }
 
     /** Вид ожидаемого решения — для прогонщиков и тестов. */
+    /**
+     * ПОКАЗАТЬ РЕШЕНИЕ, КОТОРОГО В ЭТОЙ ПАРТИИ НЕ БЫЛО — для съёмки редких
+     * видов (найм на заводе, позолота, оплата жетоном со свалки…): окно
+     * рисует его тем же кодом, что и настоящее. Ответ на него не уходит в
+     * движок, это только картинка.
+     */
+    void previewDecisionForTest(int seat, InteractiveAgent.PendingDecision d) {
+        showDecisionNow(seat, d);
+    }
+
     String pendingKindForTest() {
         return pendingKind;
     }
@@ -2937,6 +2947,9 @@ public final class HotSeatWindow {
 
         String kind = String.valueOf(d.context().get("kind"));
         pendingKind = kind;
+        // жетоны модулей в подписях — словами по библиотеке этой партии
+        GameState st = d.state();
+        kelium.gui.kp.ChoiceWords.moduleWords = id -> moduleRu(st, id);
         kelium.core.UndoableAgent agent = humansBySeat.get(seat);
         List<Choice> options = d.options();
         specMenuOptions = "spec".equals(kind) ? options : null;
@@ -3244,6 +3257,45 @@ public final class HotSeatWindow {
     private static final java.util.Set<String> PLACE_KINDS = java.util.Set.of(
         "build_hex", "tower_hex", "cu_hex", "move_hex", "build_neutral");
 
+    /** Жетон модуля словами: что он делает, без номера из данных. */
+    static String moduleRu(GameState s, String id) {
+        try {
+            var t = kelium.engine.ModuleSets.token(kelium.engine.ModuleSets.of(s), id);
+            if (t == null) {
+                return null;
+            }
+            if (t.blue()) {
+                return "модуль сборки: " + t.ammo() + " БПР или " + t.units()
+                    + (t.units() == 1 ? " войско" : " войска");
+            }
+            if (!t.targets().isEmpty()) {
+                List<String> цели = new ArrayList<>();
+                for (String c : t.targets()) {
+                    цели.add(switch (c) {
+                        case "infantry" -> "пехота";
+                        case "vehicle" -> "техника";
+                        case "aircraft" -> "авиация";
+                        case "buildings_towers" -> "здания и вышки";
+                        default -> c;
+                    });
+                }
+                return "модуль боя: " + String.join(" или ", цели);
+            }
+            if (t.stat() != null) {
+                String what = switch (t.stat()) {
+                    case "speed" -> "скорость";
+                    case "hp" -> "прочность";
+                    case "range" -> "дальность";
+                    default -> "свойство";
+                };
+                return "модуль боя: +" + t.plus() + " " + what;
+            }
+            return "модуль";
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     /** Варианты, где выбирают игрока (число — номер места). */
     private static final java.util.Set<String> SEAT_CHOICES = java.util.Set.of(
         "cu_token_to", "steal_objectives", "steal_from", "steal_arsenal");
@@ -3262,6 +3314,7 @@ public final class HotSeatWindow {
         }
         String ctxHex = contextHex(d.context(), hexIds);
         Map<String, List<kelium.gui.kp.FieldBubbles.Opt>> onTable = new LinkedHashMap<>();
+        Map<kelium.gui.kp.FieldBubbles.Opt, List<Integer>> optSides = new java.util.HashMap<>();
         refreshTable();
         for (int i = 0; i < options.size(); i++) {
             Choice c = options.get(i);
@@ -3275,6 +3328,15 @@ public final class HotSeatWindow {
                 kelium.gui.kp.ChoiceWords.sub(kind, c), pass ? 2 : 0, () -> {
                     submit(agent, d, idx);
                 });
+            if (c.payload() instanceof Map<?, ?> pm && pm.get("sectors") instanceof List<?> ss) {
+                List<Integer> sides = new ArrayList<>();
+                for (Object o : ss) {
+                    if (o instanceof Number n) {
+                        sides.add(n.intValue());
+                    }
+                }
+                optSides.put(opt, sides);
+            }
             // КАРТА ПЕРЕД ИГРОКОМ — выбирается на самой карте, на столе.
             if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)) {
                 onTable.computeIfAbsent("card:" + id, k -> new ArrayList<>()).add(opt);
@@ -3314,6 +3376,7 @@ public final class HotSeatWindow {
         }
         setTableChoices(onTable, Theme.seat(seat));
         field.setChoices(byHex, title, hint, dock, Theme.seat(seat));
+        field.setOptSides(optSides);
         if (d.context().get("source") instanceof String src && hexIds.contains(src)) {
             field.setSource(src, Theme.seat(seat));
         }

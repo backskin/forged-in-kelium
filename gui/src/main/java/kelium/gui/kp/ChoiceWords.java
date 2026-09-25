@@ -1,5 +1,6 @@
 package kelium.gui.kp;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
@@ -20,6 +21,18 @@ import kelium.core.Choice;
 public final class ChoiceWords {
 
     private ChoiceWords() {
+    }
+
+    /**
+     * ЖЕТОН МОДУЛЯ СЛОВАМИ по его номеру («R30-1» → «модуль боя: пехота или
+     * техника»). Номер — ярлык из данных, игроку он ничего не говорит.
+     * Окно партии подставляет описатель по библиотеке модулей своей партии.
+     */
+    public static Function<String, String> moduleWords = id -> null;
+
+    private static String module(String id) {
+        String w = id == null ? null : moduleWords.apply(id);
+        return w != null ? w : "модуль";
     }
 
     private static final Pattern AT_HEX = Pattern.compile("\\s*@h-?\\d+_-?\\d+(/\\d+)?");
@@ -59,6 +72,43 @@ public final class ChoiceWords {
                     String what = c.kind().startsWith("red") ? "Модуль боя" : "Модуль сборки";
                     return what + " → " + place + (raw.contains("обмен") ? " (поменять местами)"
                         : c.kind().endsWith("replace") ? " (заменить)" : "");
+                }
+            }
+            case "pay_power" -> {
+                if (Boolean.TRUE.equals(p)) {
+                    Matcher m = PAY_POWER.matcher(raw);
+                    if (m.find()) {
+                        int n = Integer.parseInt(m.group(2));
+                        return "Заплатить " + n + (n == 1 ? " монету" : n < 5 ? " монеты" : " монет");
+                    }
+                    return "Заплатить монетами";
+                }
+                return "Не платить";
+            }
+            case "module_keep" -> {
+                if (p instanceof String id) {
+                    return "Оставить: " + module(id);
+                }
+            }
+            case "gild_red", "gild_blue" -> {
+                String code = p instanceof Enum<?> e ? e.name().toLowerCase(Locale.ROOT)
+                    : String.valueOf(p);
+                return "Позолотить модуль на ячейке «" + ("gild_red".equals(c.kind())
+                    ? unitRu(code) : buildingRu(code)) + "»";
+            }
+            case "neutral" -> {
+                if (p instanceof Map<?, ?> m && m.get("sectors") instanceof List<?> s) {
+                    return "Нейтральная постройка на " + s.size()
+                        + (s.size() == 1 ? " сектор" : " сектора") + " · сторона "
+                        + sidesRu(s);
+                }
+            }
+            case "combat_victim" -> {
+                if (p instanceof kelium.core.Token t) {
+                    return cap(tokenRu(t)) + " игрока " + (t.owner() + 1)
+                        + (raw.contains("(урон ") ? " — урон " + raw.substring(
+                            raw.indexOf("(урон ") + 6).replace(")", "").replace("/", " из ")
+                            : "");
                 }
             }
             case "move_red", "move_blue" -> {
@@ -179,9 +229,18 @@ public final class ChoiceWords {
         return tidy(raw);
     }
 
+    /** «запитать barracks монетами (2 МОН …» — здание и цена. */
+    private static final Pattern PAY_POWER = Pattern.compile("запитать (\\S+) монетами \\((\\d+)");
+
     /** Пояснение мелко: цена, расход, последствие; null — нечего сказать. */
     public static String sub(String kind, Choice c) {
         Object p = c.payload();
+        if ("pay_power".equals(c.kind()) && Boolean.TRUE.equals(p) && c.label() != null) {
+            Matcher m = PAY_POWER.matcher(c.label());
+            if (m.find()) {
+                return "и запитать «" + buildingRu(m.group(1)) + "» на это действие";
+            }
+        }
         if ("attack".equals(kind) && p instanceof Map<?, ?> m) {
             StringBuilder s = new StringBuilder();
             if (m.get("ammo") instanceof Number n) {
@@ -370,6 +429,18 @@ public final class ChoiceWords {
             case "tower" -> "вышка";
             default -> code.trim();
         };
+    }
+
+    /** Стороны гекса по часовой с севера, номерами с единицы: «2», «2–3». */
+    private static String sidesRu(List<?> sides) {
+        StringBuilder sb = new StringBuilder();
+        for (Object o : sides) {
+            if (sb.length() > 0) {
+                sb.append('–');
+            }
+            sb.append(o instanceof Number n ? n.intValue() + 1 : o);
+        }
+        return sb.toString();
     }
 
     /** Жетон словами: «добытчик 3», «пехота». */

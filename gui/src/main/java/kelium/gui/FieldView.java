@@ -186,6 +186,7 @@ public final class FieldView extends JComponent {
         sourceHexId = null;
         selectFill = null;
         unitGhosts = Map.of();
+        optSides = Map.of();
         hoverUnitGhost = null;
         unitGhostTimer.stop();
         clearSelectable();
@@ -559,6 +560,14 @@ public final class FieldView extends JComponent {
             ((javax.swing.Timer) e.getSource()).stop();
         }
     });
+
+    /** Стороны гекса, которые займёт вариант, — подсветка при наведении. */
+    private Map<kelium.gui.kp.FieldBubbles.Opt, List<Integer>> optSides = Map.of();
+
+    public void setOptSides(Map<kelium.gui.kp.FieldBubbles.Opt, List<Integer>> sides) {
+        this.optSides = sides == null ? Map.of() : sides;
+        repaint();
+    }
 
     /**
      * ПРИЗРАК ЖЕТОНА ПОД КУРСОРОМ — для найма вышки, где место выбирают из
@@ -1237,6 +1246,21 @@ public final class FieldView extends JComponent {
         }
         if (!unitGhosts.isEmpty()) {
             drawUnitGhosts(g);
+        }
+        // СТОРОНЫ ВАРИАНТА ПОД МЫШЬЮ (нейтральная постройка на 1–2 сектора):
+        // наведение на строку пузыря показывает на гексе, какие сектора займёт
+        kelium.gui.kp.FieldBubbles.Opt над = bubbles.hovered();
+        if (над != null && optSides.containsKey(над) && bubbles.openHex() != null) {
+            Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+            for (ReplayRecord.HexInfo h : record.hexes) {
+                info.put(h.id, h);
+            }
+            double[] c = center(info, bubbles.openHex());
+            if (c != null) {
+                for (int side : optSides.get(над)) {
+                    drawEdge(g, c[0], c[1], side, kelium.gui.replay2.Theme.kelium(), 7.0, false);
+                }
+            }
         }
         if (hoverUnitGhost != null && hoverHexId != null && selectableHexIds.contains(hoverHexId)) {
             drawUnitGhosts(g, Map.of(hoverHexId, new Object[]{hoverUnitGhost, 1}));

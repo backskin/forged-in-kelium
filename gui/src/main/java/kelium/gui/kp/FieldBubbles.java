@@ -180,6 +180,16 @@ public final class FieldBubbles {
         return false;
     }
 
+    /** Вариант под мышью (или null). */
+    public Opt hovered() {
+        return hover;
+    }
+
+    /** Гекс раскрытого пузыря (или null). */
+    public String openHex() {
+        return openHex;
+    }
+
     public boolean hovering() {
         return hover != null;
     }

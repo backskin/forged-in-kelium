@@ -75,6 +75,21 @@ public final class HotSeatShot {
             SwingUtilities.invokeAndWait(() -> win.lookAtSeatForTest(Integer.parseInt(seatProp)));
             Thread.sleep(300);
         }
+        // -Dshot.fake=<вид> — показать редкое решение, собранное из этой партии
+        String fake = System.getProperty("shot.fake");
+        if (fake != null) {
+            var agent0 = win.humansBySeat.get(0);
+            var now = agent0 == null ? null : agent0.pending();
+            if (now != null) {
+                var d = РедкиеРешения.собрать(fake, now.state(), 0);
+                if (d == null) {
+                    System.out.println("не из чего собрать решение " + fake);
+                } else {
+                    SwingUtilities.invokeAndWait(() -> win.previewDecisionForTest(0, d));
+                    Thread.sleep(400);
+                }
+            }
+        }
         // -Dshot.spread=objectives|arsenal|dump… — снять раскрытую группу карт
         String spreadGroup = System.getProperty("shot.spread");
         if (spreadGroup != null) {
