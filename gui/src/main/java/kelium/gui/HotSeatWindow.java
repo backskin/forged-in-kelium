@@ -1587,6 +1587,11 @@ public final class HotSeatWindow {
         }
 
         @Override
+        public boolean specInActionMenu() {
+            return inner.specInActionMenu();
+        }
+
+        @Override
         public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
             // перед вопросом — живой кадр: поставленное здание, списанные монеты
             // видны сразу, а не в конце действия
@@ -2368,6 +2373,19 @@ public final class HotSeatWindow {
 
     /** События хода → источники ленты шагов (концепт §5). */
     private void trackSteps(ReplayRecord.Frame f) {
+        // ВСКРЫТИЕ — ВСЕ КАРТЫ НА СТОЛ СРАЗУ (26.09.2026): приказ «ЗАТАИТЬСЯ» сообщает
+        // о ходе только после обоих действий, и до того стол показывал «приказ
+        // ещё не вскрыт», хотя карта уже открыта.
+        if ("reveal".equals(f.type) && rec != null) {
+            java.util.Set<Integer> seen = new java.util.HashSet<>();
+            for (int i = rec.orderPlays.size() - 1; i >= 0; i--) {
+                var play = rec.orderPlays.get(i);
+                if (seen.add(play.seat)) {
+                    revealed.put(play.seat, play.card);
+                }
+            }
+            refreshTable();
+        }
         if ("turn_orders".equals(f.type) && f.seat != null) {
             turnSeat = f.seat;
             lockedSteps.clear();
