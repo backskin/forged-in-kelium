@@ -318,6 +318,25 @@ public final class Theme {
         return table;
     }
 
+    /**
+     * ПОСЧИТАТЬ ЧТО-ТО В ПАЛИТРЕ «СТОЛ», не меняя действующую тему. Нужно окну,
+     * которое всегда в цветах стола, даже когда его открыли из светлого «Штаба»
+     * (справочник правил): оно снимает краски отсюда один раз и дальше красит
+     * себя само. Оформление Swing (UIManager) при этом не трогается.
+     */
+    public static <T> T asTable(java.util.function.Supplier<T> what) {
+        boolean d = dark;
+        boolean t = table;
+        dark = true;
+        table = true;
+        try {
+            return what.get();
+        } finally {
+            dark = d;
+            table = t;
+        }
+    }
+
     private static Color base(int i) {
         return (table ? TABLE : dark ? DARK : LIGHT)[i];
     }

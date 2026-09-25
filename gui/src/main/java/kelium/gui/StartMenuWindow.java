@@ -296,6 +296,20 @@ public final class StartMenuWindow {
         sub.setForeground(Theme.ink2());
         sub.setBorder(BorderFactory.createEmptyBorder(0, Theme.px(16), 0, 0));
         bar.add(sub, BorderLayout.CENTER);
+        // СПРАВОЧНИК ПРАВИЛ — главы книги с поиском (заказ 25.09.2026), и на F1.
+        KpButton rules = new KpButton("Правила", "справочник · F1", null);
+        rules.setPreferredSize(new Dimension(Theme.px(150), Theme.px(38)));
+        rules.setToolTipText("Книга правил по главам, с поиском по словам");
+        rules.onClick(() -> kelium.gui.replay2.HelpWindow.showRules(frame));
+        bar.add(rules, BorderLayout.EAST);
+        bar.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+            .put(javax.swing.KeyStroke.getKeyStroke("F1"), "rulesBook");
+        bar.getActionMap().put("rulesBook", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                kelium.gui.replay2.HelpWindow.showRules(frame);
+            }
+        });
         return bar;
     }
 
