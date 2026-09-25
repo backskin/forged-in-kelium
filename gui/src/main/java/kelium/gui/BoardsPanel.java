@@ -310,6 +310,12 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
     private void картаВЯчейку(Graphics2D g, int x, int y, int w, int h,
                               int cellCost, int players) {
         Map<String, Object> card = snap.market == null ? null : find("market", snap.market);
+        java.awt.image.BufferedImage face = snap.market == null ? null
+            : kelium.report.Textures.cardFace("market", snap.market);
+        if (face != null) {
+            печатнаяКартаРынка(g, face, x, y, w, h, players);
+            return;
+        }
         Color accent = new Color(0x2F, 0x85, 0x5A);      // зелень планшета рынка
         int r = Math.max(6, h / 12);
         int pad = Math.max(5, w / 32);
@@ -357,6 +363,57 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             card.get("left"), 0, cellCost, players, du, accent);
         предложениеВЯчейку(g, x + pad, oy + rowH, w - 2 * pad, rowH - Math.max(2, h / 60),
             card.get("right"), 1, cellCost, players, du, accent);
+    }
+
+    /**
+     * ПЕЧАТНАЯ КАРТА РЫНКА (набор 4.0.0, печать 24.09.2026): лицо карты как
+     * есть, в своей пропорции, по центру ячейки планшета. Кубики келемия
+     * встают прямо в напечатанные квадраты под предложениями; закрытая при
+     * этом числе игроков ячейка притушена.
+     */
+    private void печатнаяКартаРынка(Graphics2D g, java.awt.image.BufferedImage face,
+                                    int x, int y, int w, int h, int players) {
+        double k = Math.min(w / (double) face.getWidth(), h / (double) face.getHeight());
+        int fw = (int) Math.round(face.getWidth() * k);
+        int fh = (int) Math.round(face.getHeight() * k);
+        int fx = x + (w - fw) / 2;
+        int fy = y + (h - fh) / 2;
+        Object aa = g.getRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+            java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.drawImage(face, fx, fy, fw, fh, null);
+        if (aa != null) {
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, aa);
+        }
+        // Квадраты на печати (доли лица 1028×661): центры по x — 157, 336 слева
+        // и 690, 868 справа; по y — 535; сторона внутреннего окна ~100.
+        double[][] cxs = {{157 / 1028.0, 336 / 1028.0}, {690 / 1028.0, 868 / 1028.0}};
+        double cy = 535 / 661.0;
+        int d = (int) Math.round(fw * 96 / 1028.0);
+        int open = kelium.engine.Actions.marketCellsOpen(players);
+        for (int side = 0; side < 2; side++) {
+            int[] taken = snap.marketCells == null || snap.marketCells.length <= side
+                ? new int[]{-1, -1} : snap.marketCells[side];
+            for (int i = 0; i < 2; i++) {
+                int px = fx + (int) Math.round(cxs[side][i] * fw) - d / 2;
+                int py = fy + (int) Math.round(cy * fh) - d / 2;
+                if (i >= open) {
+                    g.setColor(new Color(0, 0, 0, 120));
+                    g.fillRoundRect(px, py, d, d, d / 5, d / 5);
+                    continue;
+                }
+                int seat = i < taken.length ? taken[i] : -1;
+                if (seat >= 0) {
+                    cube(g, px + d / 8, py + d / 8, d - d / 4, KELIUM_CUBE);
+                    int m = Math.max(6, d / 3);
+                    g.setColor(FieldView.seatColor(seat));
+                    g.fillOval(px + d - m / 2, py - m / 2, m, m);
+                    g.setColor(FieldView.seatStroke(seat));
+                    g.setStroke(new BasicStroke(1.2f));
+                    g.drawOval(px + d - m / 2, py - m / 2, m, m);
+                }
+            }
+        }
     }
 
     /** Одно предложение карты рынка: что дают и ячейки, кто его уже занял. */

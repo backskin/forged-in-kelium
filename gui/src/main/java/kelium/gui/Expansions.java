@@ -99,6 +99,29 @@ public final class Expansions {
         for (String name : ALL) {
             ruleset.override("expansions." + name, on(settings, name));
         }
+        // РАУНДЫ ПАРТИИ (заказ дизайнера 25.09.2026): подготовительный раунд
+        // без карты рынка и число карт рынка на планшете (= раундов с рынком).
+        // Не задано — как в своде.
+        if (settings != null) {
+            String prep = settings.get(PREP_ROUND, null);
+            if (prep != null) {
+                ruleset.override("market.preparatory_round", Boolean.parseBoolean(prep));
+            }
+            int cards = settings.getInt(MARKET_CARDS_COUNT, 0);
+            if (cards > 0) {
+                ruleset.override("market.deck_size", cards);
+            }
+        }
+    }
+
+    /** Ключ настроек: подготовительный раунд (true/false; нет ключа — как в своде). */
+    public static final String PREP_ROUND = "rounds.preparatory";
+    /** Ключ настроек: сколько карт рынка на планшете (0 — как в своде). */
+    public static final String MARKET_CARDS_COUNT = "rounds.market_cards";
+
+    /** Подготовительный раунд по настройкам (по умолчанию — выключен). */
+    public static boolean prepRound(AppSettings settings) {
+        return settings != null && Boolean.parseBoolean(settings.get(PREP_ROUND, "false"));
     }
 
     /** Короткая строка «что включено» — для журнала подготовки. */

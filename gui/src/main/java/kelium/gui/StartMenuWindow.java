@@ -82,6 +82,8 @@ public final class StartMenuWindow {
         restoreCoins = o.startCoins();
         restoreKelium = o.startKelium();
         restoreAmmo = o.startAmmo();
+        restorePrep = o.prepRound();
+        restoreMarketCards = o.marketCards();
         // Место игрока и поворот ЦУ — из состава мест прошлой партии, по тому
         // же правилу, что и пометка «вы» в окне партии: живой был один — его
         // место и есть ваше; живых было несколько — своего места нет ни у кого.
@@ -108,6 +110,8 @@ public final class StartMenuWindow {
     private Integer restoreCoins;
     private Integer restoreKelium;
     private Integer restoreAmmo;
+    private Boolean restorePrep;
+    private Integer restoreMarketCards;
 
     private static final int RAIL_W = 320;
 
@@ -134,6 +138,12 @@ public final class StartMenuWindow {
     private Stepper coinStep;
     private Stepper keliumStep;
     private Stepper ammoStep;
+    /** Сколько карт рынка кладут на планшет — столько раундов с рынком. */
+    private Stepper marketStep;
+    /** Первый раунд подготовительный — без карты рынка. */
+    private kelium.gui.replay2.Toggle prepToggle;
+    private boolean prepRound;
+    private JLabel roundsLine;
 
     private Mode mode = Mode.OFFLINE;
     /**
@@ -251,6 +261,12 @@ public final class StartMenuWindow {
         if (restoreAmmo != null) {
             ammoStep.step(restoreAmmo - ammoStep.value());
         }
+        if (restoreMarketCards != null) {
+            marketStep.step(restoreMarketCards - marketStep.value());
+        }
+        if (restorePrep != null) {
+            setPrep(restorePrep);
+        }
     }
 
     private JComponent buildHead() {
@@ -289,6 +305,8 @@ public final class StartMenuWindow {
         rail.add(section("РЕЖИМ", buildModes()));
         rail.add(javax.swing.Box.createVerticalStrut(Theme.px(14)));
         rail.add(section("СТОЛ", buildTable()));
+        rail.add(javax.swing.Box.createVerticalStrut(Theme.px(14)));
+        rail.add(section("РАУНДЫ", buildRounds()));
         rail.add(javax.swing.Box.createVerticalStrut(Theme.px(14)));
         rail.add(section("СТАРТОВЫЕ ЗНАЧЕНИЯ", buildTraining()));
         rail.add(javax.swing.Box.createVerticalGlue());
@@ -569,6 +587,81 @@ public final class StartMenuWindow {
                 bots.set(i, HUMAN);
             }
         }
+    }
+
+    /**
+     * РАУНДЫ ПАРТИИ (заказ дизайнера 25.09.2026): сколько карт рынка лежит на
+     * планшете — столько раундов с рынком, и переключатель «подготовительный
+     * раунд»: первый раунд без карты рынка, партия на раунд длиннее.
+     */
+    private JComponent buildRounds() {
+        JPanel col = new JPanel();
+        col.setOpaque(false);
+        col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
+        int[] m = printedMarket();
+        marketStep = new Stepper("карт рынка", null, m[0], 1, Math.max(1, m[1]),
+            v -> refreshRounds());
+        marketStep.setAlignmentX(Component.LEFT_ALIGNMENT);
+        col.add(marketStep);
+        col.add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
+        prepRound = m[2] == 1;
+        prepToggle = new kelium.gui.replay2.Toggle("Подготовительный раунд", prepRound,
+            "Первый раунд без карты рынка: на планшете рынка работает только обмен, "
+                + "первая карта открывается в Обновлении второго раунда.")
+            .onChange(this::setPrep);
+        prepToggle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        col.add(prepToggle);
+        col.add(javax.swing.Box.createVerticalStrut(Theme.px(4)));
+        roundsLine = new JLabel();
+        roundsLine.setFont(Theme.font(11, Font.PLAIN));
+        roundsLine.setForeground(Theme.ink3());
+        roundsLine.setAlignmentX(Component.LEFT_ALIGNMENT);
+        col.add(roundsLine);
+        setPrep(prepRound);
+        return col;
+    }
+
+    private void setPrep(boolean on) {
+        prepRound = on;
+        if (prepToggle != null && prepToggle.isSelected() != on) {
+            prepToggle.setSelected(on);
+        }
+        refreshRounds();
+    }
+
+    private void refreshRounds() {
+        if (roundsLine == null || marketStep == null) {
+            return;
+        }
+        int n = marketStep.value() + (prepRound ? 1 : 0);
+        roundsLine.setText("раундов в партии не больше " + n
+            + (prepRound ? " (подготовительный + " + marketStep.value() + ")" : ""));
+    }
+
+    /** Из свода: {карт рынка на планшет, карт в колоде, подготовительный 0/1}. */
+    private int[] printedMarket() {
+        try {
+            var cfg = GameConfig.buildCached(rulesetId, players, seed, null, null);
+            int printed = cfg.content.get("market").entries.size();
+            int deck = ((Number) cfg.ruleset.get("market.deck_size", 0)).intValue();
+            if (deck <= 0 || deck > printed) {
+                deck = printed;
+            }
+            boolean prep = Boolean.TRUE.equals(cfg.ruleset.get("market.preparatory_round", false));
+            return new int[]{deck, printed, prep ? 1 : 0};
+        } catch (RuntimeException e) {
+            return new int[]{8, 10, 0};
+        }
+    }
+
+    /** Число карт рынка, если оно отличается от свода; иначе null. */
+    private Integer marketCardsChoice() {
+        return marketStep == null || !marketStep.changed() ? null : marketStep.value();
+    }
+
+    /** Подготовительный раунд, если он отличается от свода; иначе null. */
+    private Boolean prepChoice() {
+        return prepToggle == null || (printedMarket()[2] == 1) == prepRound ? null : prepRound;
     }
 
     private JComponent buildTraining() {
@@ -1228,7 +1321,8 @@ public final class StartMenuWindow {
             List.copyOf(colors.subList(0, players)),
             training && coinStep.changed() ? coinStep.value() : null,
             training && keliumStep.changed() ? keliumStep.value() : null,
-            training && ammoStep.changed() ? ammoStep.value() : null);
+            training && ammoStep.changed() ? ammoStep.value() : null,
+            prepChoice(), marketCardsChoice());
     }
 
     /** Взять месту краску — для прогонщиков и тестов, то же что клик по кружку. */

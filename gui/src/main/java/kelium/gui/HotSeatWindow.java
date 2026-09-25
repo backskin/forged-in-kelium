@@ -91,7 +91,20 @@ public final class HotSeatWindow {
     public record Options(String rulesetId, int players, long seed, List<String> seatSpecs,
                            String scenarioId, java.nio.file.Path scenarioFile,
                            List<Integer> cuFacing, List<Integer> seatColors,
-                           Integer startCoins, Integer startKelium, Integer startAmmo) {
+                           Integer startCoins, Integer startKelium, Integer startAmmo,
+                           Boolean prepRound, Integer marketCards) {
+
+        /**
+         * Без настройки раундов: подготовительный раунд и число карт рынка —
+         * как в своде ({@code prepRound}/{@code marketCards} = null).
+         */
+        public Options(String rulesetId, int players, long seed, List<String> seatSpecs,
+                       String scenarioId, java.nio.file.Path scenarioFile,
+                       List<Integer> cuFacing, List<Integer> seatColors,
+                       Integer startCoins, Integer startKelium, Integer startAmmo) {
+            this(rulesetId, players, seed, seatSpecs, scenarioId, scenarioFile, cuFacing,
+                seatColors, startCoins, startKelium, startAmmo, null, null);
+        }
 
         /** Партия с правкой значений подготовки — не обычная. */
         public boolean training() {
@@ -1871,6 +1884,15 @@ public final class HotSeatWindow {
         }
         if (options.startAmmo() != null) {
             cfg.ruleset.override("setup.start_ammo", options.startAmmo());
+        }
+        // РАУНДЫ ПАРТИИ (заказ дизайнера 25.09.2026) — не тренировка, а
+        // законная настройка стола: подготовительный раунд без карты рынка и
+        // сколько карт рынка положить (= сколько раундов с рынком).
+        if (options.prepRound() != null) {
+            cfg.ruleset.override("market.preparatory_round", options.prepRound());
+        }
+        if (options.marketCards() != null) {
+            cfg.ruleset.override("market.deck_size", options.marketCards());
         }
     }
 

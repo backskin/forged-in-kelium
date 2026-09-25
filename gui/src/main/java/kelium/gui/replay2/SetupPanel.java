@@ -279,6 +279,8 @@ public final class SetupPanel extends JPanel {
         row1.add(group("Состав", tableButton, randomAll));
         row1.add(divider());
         row1.add(expansionsGroup());
+        row1.add(divider());
+        row1.add(roundsGroup());
 
         // ГЛАВНАЯ КНОПКА: текст в две строки, значок крупный. Одной строкой она
         // раздувалась в ширину и прилипала к «другой сборке» — отсюда и отступ слева.
@@ -685,6 +687,42 @@ public final class SetupPanel extends JPanel {
             rows.add(row);
         }
         return group("Дополнения", rows.toArray(new Component[0]));
+    }
+
+    /**
+     * РАУНДЫ ПАРТИИ (заказ дизайнера 25.09.2026): подготовительный раунд —
+     * первый раунд без карты рынка — и сколько карт рынка положить на планшет
+     * (столько раундов с рынком). Те же ключи, что читает
+     * {@link kelium.gui.Expansions#applyTo} при сборке партии.
+     */
+    private JPanel roundsGroup() {
+        kelium.dataio.AppSettings settings = kelium.dataio.AppSettings.of("replay2");
+        Toggle prep = new Toggle("Подготовительный раунд",
+            kelium.gui.Expansions.prepRound(settings),
+            "Первый раунд без карты рынка: на планшете рынка работает только обмен, "
+                + "первая карта открывается в Обновлении второго раунда. Партия длиннее "
+                + "на один раунд.");
+        prep.onChange(value -> {
+            settings.put(kelium.gui.Expansions.PREP_ROUND, String.valueOf(value));
+            onPreview.run();
+            say.accept(value ? "Первый раунд — подготовительный, без карты рынка."
+                : "Подготовительного раунда нет: карта рынка с первого раунда.");
+        });
+        JComboBox<String> cards = new JComboBox<>();
+        cards.addItem(AS_IN_RULES);
+        for (int i = 1; i <= 10; i++) {
+            cards.addItem(String.valueOf(i));
+        }
+        int now = settings.getInt(kelium.gui.Expansions.MARKET_CARDS_COUNT, 0);
+        cards.setSelectedIndex(Math.max(0, Math.min(10, now)));
+        cards.setToolTipText(Ui2.tip("Сколько карт рынка положить на планшет. Кончились "
+            + "карты — кончилась партия, поэтому это и есть предел числа раундов "
+            + "(плюс подготовительный, если он включён)."));
+        cards.addActionListener(e -> {
+            settings.putInt(kelium.gui.Expansions.MARKET_CARDS_COUNT, cards.getSelectedIndex());
+            onPreview.run();
+        });
+        return group("Раунды", prep, cell(Ui2.label("карт рынка:"), cards));
     }
 
     private static JPanel group(String captionText, Component... parts) {

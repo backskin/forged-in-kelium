@@ -105,16 +105,29 @@ public final class GameEngine {
             // считается по тому, сколько карт ЛЕЖИТ НА ПЛАНШЕТЕ, иначе партия
             // тянулась бы до числа печатных карт, а карты кончились бы раньше.
             int вКолоду = ((Number) rs().get("market.deck_size", 0)).intValue();
+            // ПОДГОТОВИТЕЛЬНЫЙ РАУНД (решение дизайнера 25.09.2026) идёт без
+            // карты рынка и потому добавляет к партии один раунд сверху колоды.
+            int подготовка = подготовительныйРаунд() ? 1 : 0;
             if (вКолоду > 0 && (printed <= 0 || вКолоду < printed)) {
-                return вКолоду;
+                return вКолоду + подготовка;
             }
             if (printed > 0) {
-                return printed;
+                return printed + подготовка;
             }
         } catch (RuntimeException ignored) {
             // содержимое недоступно (сцена в тесте) — падаем на запасное число
         }
         return RESERVE_ROUND_CAP_FALLBACK;
+    }
+
+    /**
+     * ПОДГОТОВИТЕЛЬНЫЙ РАУНД (решение дизайнера 25.09.2026): первый раунд
+     * играется БЕЗ КАРТЫ РЫНКА — на планшете рынка работает только печатный
+     * обмен, а первая карта открывается в Обновлении второго раунда. Галочка
+     * в настройках партии, ключ свода {@code market.preparatory_round}.
+     */
+    private boolean подготовительныйРаунд() {
+        return Boolean.TRUE.equals(rs().get("market.preparatory_round", false));
     }
 
     public GameEngine(GameState state, List<Agent> agents, Consumer<Map<String, Object>> onEvent) {
@@ -548,8 +561,12 @@ public final class GameEngine {
     private void refresh(int rnd) {
         GameState s = state;
         if (rnd == 1) {
-            s.marketActive = s.decks.get("market").draw(s.rng);
-            emit(ev("type", "refresh", "round", rnd, "skipped", true));
+            // В подготовительном раунде карты рынка нет: первая откроется в
+            // Обновлении второго раунда обычным шагом «Рынок».
+            s.marketActive = подготовительныйРаунд() ? null
+                : s.decks.get("market").draw(s.rng);
+            emit(ev("type", "refresh", "round", rnd, "skipped", true,
+                "preparatory", подготовительныйРаунд()));
             return;
         }
         // ПОРЯДОК ШАГОВ ОБНОВЛЕНИЯ (решение дизайнера 16.09.2026): рынок, потом

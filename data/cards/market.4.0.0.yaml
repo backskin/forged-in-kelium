@@ -1,0 +1,168 @@
+# CONTENT: market  version 4.0.0
+# ============================================================================
+#  ВЫГРУЖЕНО ИЗ КОДА — файл является ЗЕРКАЛОМ классов карт.
+#  рынок 4.0: печать дизайнера 24.09.2026 — 10 карт, «получи» и «выполни» ровно по лицам
+#
+#  Править этот файл руками бессмысленно: движок накрывает запись каталога
+#  выгрузкой класса. Менять надо класс kelium.cards.market.СделкиНаРынке4,
+#  а затем выгружать заново (kelium.ВыгрузкаРынка).
+# ============================================================================
+meta:
+  id: 4.0.0
+  type: market
+  выгружено: 'рынок 4.0: печать дизайнера 24.09.2026 — 10 карт, «получи» и «выполни» ровно по лицам'
+market:
+- id: m4_01
+  name: Рынок 01
+  left:
+    label: Выполни наём 2 разных войск на 1 гекс
+    params:
+      same_hex: true
+      count: 2
+    effect: landing
+    name: Наём 2 войск
+  right:
+    label: Получи 5 монет
+    params:
+      coin: 5
+    effect: gain
+    name: 5 монет
+  описание: Выполни наём 2 разных войск на 1 гекс · Получи 5 монет
+- id: m4_02
+  name: Рынок 02
+  left:
+    label: Получи 5 монет
+    params:
+      coin: 5
+    effect: gain
+    name: 5 монет
+  right:
+    label: Получи 2 арсенала
+    params:
+      arsenal: 2
+    effect: gain
+    name: 2 арсенала
+  описание: Получи 5 монет · Получи 2 арсенала
+- id: m4_03
+  name: Рынок 03
+  left:
+    label: Получи 2 арсенала
+    params:
+      arsenal: 2
+    effect: gain
+    name: 2 арсенала
+  right:
+    label: Выполни «Манёвр»
+    params:
+      action: movement
+    effect: free_action
+    name: Манёвр
+  описание: Получи 2 арсенала · Выполни «Манёвр»
+- id: m4_04
+  name: Рынок 04
+  left:
+    label: Выполни «Манёвр»
+    params:
+      action: movement
+    effect: free_action
+    name: Манёвр
+  right:
+    label: Выполни «Питание»
+    params:
+      action: energy_swap
+    effect: free_action
+    name: Питание
+  описание: Выполни «Манёвр» · Выполни «Питание»
+- id: m4_05
+  name: Рынок 05
+  left:
+    label: Выполни «Питание»
+    params:
+      action: energy_swap
+    effect: free_action
+    name: Питание
+  right:
+    label: Получи 3 боеприпаса
+    params:
+      ammo: 3
+    effect: gain
+    name: 3 боеприпаса
+  описание: Выполни «Питание» · Получи 3 боеприпаса
+- id: m4_06
+  name: Рынок 06
+  left:
+    label: Получи 3 боеприпаса
+    params:
+      ammo: 3
+    effect: gain
+    name: 3 боеприпаса
+  right:
+    label: Посмотри 4 задания — 2 оставь себе
+    params:
+      objective_cards_keep: 2
+      objective_cards: 4
+    effect: gain
+    name: 4 задания, 2 себе
+  описание: Получи 3 боеприпаса · Посмотри 4 задания — 2 оставь себе
+- id: m4_07
+  name: Рынок 07
+  left:
+    label: Посмотри 4 задания — 2 оставь себе
+    params:
+      objective_cards_keep: 2
+      objective_cards: 4
+    effect: gain
+    name: 4 задания, 2 себе
+  right:
+    label: Выполни «Бой»
+    params:
+      action: combat
+    effect: free_action
+    name: Бой
+  описание: Посмотри 4 задания — 2 оставь себе · Выполни «Бой»
+- id: m4_08
+  name: Рынок 08
+  left:
+    label: Выполни «Бой»
+    params:
+      action: combat
+    effect: free_action
+    name: Бой
+  right:
+    label: Выполни наём 2 разных войск на 1 гекс
+    params:
+      same_hex: true
+      count: 2
+    effect: landing
+    name: Наём 2 войск
+  описание: Выполни «Бой» · Выполни наём 2 разных войск на 1 гекс
+- id: m4_09
+  name: Рынок 09
+  left:
+    label: Получи 5 монет
+    params:
+      coin: 5
+    effect: gain
+    name: 5 монет
+  right:
+    label: Выполни «Питание»
+    params:
+      action: energy_swap
+    effect: free_action
+    name: Питание
+  описание: Получи 5 монет · Выполни «Питание»
+- id: m4_10
+  name: Рынок 10
+  left:
+    label: Получи 3 боеприпаса
+    params:
+      ammo: 3
+    effect: gain
+    name: 3 боеприпаса
+  right:
+    label: Получи 2 арсенала
+    params:
+      arsenal: 2
+    effect: gain
+    name: 2 арсенала
+  описание: Получи 3 боеприпаса · Получи 2 арсенала

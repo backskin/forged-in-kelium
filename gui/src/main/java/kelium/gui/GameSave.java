@@ -114,6 +114,8 @@ public final class GameSave {
         m.put("startCoins", options.startCoins());
         m.put("startKelium", options.startKelium());
         m.put("startAmmo", options.startAmmo());
+        m.put("prepRound", options.prepRound());
+        m.put("marketCards", options.marketCards());
         m.put("moves", moves);
         Path parent = file.getParent();
         if (parent != null) {
@@ -152,7 +154,8 @@ public final class GameSave {
             m.get("scenarioId") == null ? null : String.valueOf(m.get("scenarioId")),
             scenarioFile == null ? null : Path.of(scenarioFile),
             nums(m, "cuFacing"), nums(m, "seatColors"),
-            num(m, "startCoins"), num(m, "startKelium"), num(m, "startAmmo"));
+            num(m, "startCoins"), num(m, "startKelium"), num(m, "startAmmo"),
+            m.get("prepRound") instanceof Boolean pb ? pb : null, num(m, "marketCards"));
         return new GameSave(String.valueOf(m.get("name")), opts, moves,
             String.valueOf(m.get("ruleset")), versions,
             String.valueOf(m.get("saved")), Json.i(m, "round"), Json.i(m, "circle"));
