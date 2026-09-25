@@ -546,10 +546,8 @@ final class PrintedBoards {
             if (паз >= вставлено.size()) {
                 break;
             }
-            BufferedImage лицо = Textures.cardFace("arsenal", id);
-            if (лицо == null) {
-                лицо = Textures.cardFace("arsenal_start", id);
-            }
+            // обычный, начальный и супер-арсенал — каждый из своей папки лиц
+            BufferedImage лицо = kelium.gui.CardArt.arsenal(id);
             картаВПаз(g, войX, войY, k, вставлено.get(паз), лицо != null ? лицо : лицоНет);
             hit("installed:" + id, scale(войX, войY, k, вставлено.get(паз)[0],
                 вставлено.get(паз)[1], вставлено.get(паз)[2], вставлено.get(паз)[3]));

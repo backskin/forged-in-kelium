@@ -583,6 +583,93 @@ public final class Drawer extends JPanel {
 
     // ==================== планшет игрока ====================
     private JPanel playerCard;
+    private final CardRow sheetCards = new CardRow();
+
+    /** Панель во всю ширину прокрутки: ряды карт переносятся по ней. */
+    private static final class WidthPanel extends JPanel implements javax.swing.Scrollable {
+        private static final long serialVersionUID = 1L;
+
+        WidthPanel() {
+            super(new BorderLayout(0, Theme.px(Theme.GAP_BLOCK)));
+        }
+
+        @Override
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        @Override
+        public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) {
+            return Theme.px(18);
+        }
+
+        @Override
+        public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) {
+            return r.height - Theme.px(18);
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            // По ширине окна — пока текст листа в неё влезает; уже — прежняя
+            // горизонтальная прокрутка, а не обрезанные строки.
+            return getParent() instanceof javax.swing.JViewport v
+                && v.getWidth() >= getPreferredSize().width;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
+    }
+
+    /** Карты игрока группами — печатными лицами. */
+    private void refreshCards(ReplayRecord.Player p) {
+        ReplayRecord rec = session.record();
+        List<CardRow.Group> gs = new ArrayList<>();
+        gs.add(new CardRow.Group("ЗАДАНИЯ НА РУКЕ",
+            items(p.objectiveHand, "objectives", "objective:", rec), "рука пуста"));
+        if (!p.superObjectives.isEmpty()) {
+            gs.add(new CardRow.Group("СУПЕР-ЗАДАНИЯ",
+                items(p.superObjectives, "super_objectives", "super", rec), null));
+        }
+        gs.add(new CardRow.Group("АРСЕНАЛ В РУКЕ",
+            items(p.arsenalHand, "arsenal", "arsenal:", rec), "закрытых карт нет"));
+        gs.add(new CardRow.Group("АРСЕНАЛ УСТАНОВЛЕН",
+            items(p.arsenalInstalled, "arsenal", "arsenal:", rec), "ничего не установлено"));
+        List<CardRow.Item> ords = new ArrayList<>();
+        java.awt.image.BufferedImage ob = kelium.gui.CardArt.orderBack(p.orderColor);
+        for (String id : p.orderHand) {
+            ords.add(new CardRow.Item(kelium.gui.CardArt.order(id, p.orderColor),
+                Names.card(rec, id), kelium.gui.CardArt.aspect(ob)));
+        }
+        gs.add(new CardRow.Group("ПРИКАЗЫ В РУКЕ", ords, "рука пуста"));
+        if (p.orderSetAside != null) {
+            gs.add(new CardRow.Group("ОТЛОЖЕННЫЙ ПРИКАЗ", List.of(new CardRow.Item(
+                kelium.gui.CardArt.order(p.orderSetAside, p.orderColor),
+                Names.card(rec, p.orderSetAside), kelium.gui.CardArt.aspect(ob))), null));
+        }
+        List<CardRow.Item> tr = new ArrayList<>();
+        for (ReplayRecord.DestroyedToken t : p.destroyedCard) {
+            String nm = t.building ? kelium.report.Labels.buildingName(t.type, t.level)
+                : kelium.report.Labels.unitName(t.type);
+            tr.add(new CardRow.Item(kelium.gui.CardArt.trophy(t.type, t.level, t.value),
+                nm + " · трофеев " + t.value, 1.0));
+        }
+        gs.add(new CardRow.Group("ТРОФЕИ НА КАРТЕ ПРИКАЗОВ", tr, "пока никого не снесли"));
+        sheetCards.setGroups(gs);
+    }
+
+    private static List<CardRow.Item> items(List<String> ids, String set, String backKind,
+                                            ReplayRecord rec) {
+        List<CardRow.Item> out = new ArrayList<>();
+        for (String id : ids) {
+            java.awt.image.BufferedImage back = kelium.gui.CardArt.back(
+                backKind.endsWith(":") ? backKind + id : backKind);
+            out.add(new CardRow.Item(kelium.gui.CardArt.face(set, id), Names.card(rec, id),
+                back == null ? 0 : kelium.gui.CardArt.aspect(back)));
+        }
+        return out;
+    }
 
     /** Открыть подробный планшет места. */
     public void showPlayer(int seat) {
@@ -600,7 +687,14 @@ public final class Drawer extends JPanel {
                 Theme.px(4), Theme.px(10), Theme.px(8), Theme.px(10)));
             sheetText.setVerticalAlignment(JLabel.TOP);
             sheetText.setFont(Theme.body());
-            JScrollPane sc = new JScrollPane(sheetText);
+            // КАРТЫ ИГРОКА ПЕЧАТНЫМИ ЛИЦАМИ под текстом: названия списком не
+            // говорят, что на карте напечатано, а лицо — говорит (наведи —
+            // увеличится).
+            JPanel body = new WidthPanel();
+            body.setOpaque(false);
+            body.add(sheetText, BorderLayout.NORTH);
+            body.add(sheetCards, BorderLayout.CENTER);
+            JScrollPane sc = new JScrollPane(body);
             sc.setBorder(null);
             sc.getVerticalScrollBar().setUnitIncrement(Theme.px(18));
             playerCard.add(sc, BorderLayout.CENTER);
@@ -608,7 +702,7 @@ public final class Drawer extends JPanel {
             bottom.setOpaque(false);
             bottom.add(Ui2.caption("приказы этого раунда"), BorderLayout.NORTH);
             bottom.add(orders, BorderLayout.CENTER);
-            bottom.setPreferredSize(new Dimension(Theme.px(300), Theme.px(220)));
+            bottom.setPreferredSize(new Dimension(Theme.px(300), Theme.px(250)));
             playerCard.add(bottom, BorderLayout.SOUTH);
         }
         refreshSheet();
@@ -641,6 +735,7 @@ public final class Drawer extends JPanel {
         }
         ReplayRecord.Player p = f.snapshot.players.get(sheetSeat);
         ReplayRecord rec = session.record();
+        refreshCards(p);
         StringBuilder sb = new StringBuilder("<html><body style='width:")
             .append(Theme.px(330)).append("px'>");
         sb.append("<div style='font-size:12pt'><b>").append(esc(rec.playerName(sheetSeat)))

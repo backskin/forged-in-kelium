@@ -1542,7 +1542,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         for (Object[] btn : deckButtons(p)) {
             String label = (String) btn[0];
             int count = (Integer) btn[1];
-            int need = deckButtonWidth(g, label, count);
+            int need = deckButtonWidth(g, label, count, (String) btn[2]);
             if (bx > x && bx + need > x + w) {
                 bx = x;
                 by += rowH;
@@ -1587,9 +1587,13 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     }
 
     /** Ширина кнопки-стопки вместе с отступом до следующей. */
-    private int deckButtonWidth(Graphics2D g, String label, int count) {
+    private int deckButtonWidth(Graphics2D g, String label, int count, String kind) {
         g.setFont(font(9, Font.PLAIN));
-        int стопка = (int) Math.round(px(48) / КАРТА)
+        // ШИРИНА СТОПКИ — ПО САМОЙ РУБАШКЕ, как и в стопкаКарт: пропорция с
+        // картинки, а не общим числом.
+        java.awt.image.BufferedImage рубашка = kelium.gui.CardArt.back(kind);
+        int стопка = (рубашка == null ? px(48)
+            : (int) Math.round(px(76) * kelium.gui.CardArt.aspect(рубашка)))
             + (Math.min(Math.max(count, 1), 5) - 1) * px(4);
         return Math.max(стопка, g.getFontMetrics().stringWidth(
             label + (count > 0 ? " " + count : ""))) + px(10);
@@ -1601,9 +1605,6 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
 
     /** Кнопки стопок и что за ними стоит — заполняется при отрисовке. */
     private final Map<Rectangle, Deck> deckSpots = new LinkedHashMap<>();
-
-    /** Отношение высоты печатной карты к ширине (256×358 точек). */
-    private static final double КАРТА = 358 / 256.0;
 
     /**
      * СТОПКА КАРТ — НАСТОЯЩИМИ КАРТАМИ, А НЕ КНОПКОЙ С ЧИСЛОМ.
@@ -1619,8 +1620,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      */
     private int стопкаКарт(Graphics2D g, int x, int y, String label, int count,
                            String kind, java.util.List<String> ids) {
-        java.awt.image.BufferedImage рубашка = kelium.report.Textures.card(
-            "deck_" + kind, "deck");
+        java.awt.image.BufferedImage рубашка = kelium.gui.CardArt.back(kind);
         if (рубашка == null) {
             return deckButton(g, x, y, label, count, kind, ids);
         }
@@ -1713,8 +1713,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     }
 
     /** Отложенный приказ — рубашкой вверх, как он и лежит на столе. */
-    /** Отношение высоты печатной карты к её ширине (661×1028 точек). */
-    private static final double КАРТА_ПРИКАЗА = 1028 / 661.0;
+    /** Отношение высоты карты приказа к ширине — с самой картинки. */
+    private static double высотаКШирине(java.awt.image.BufferedImage img) {
+        return 1.0 / kelium.gui.CardArt.aspect(img);
+    }
 
     /**
      * РУБАШКА КОЛОДЫ ПРИКАЗОВ этого игрока — печатная картинка со стола.
@@ -1724,24 +1726,12 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * рубашку.
      */
     private static java.awt.image.BufferedImage рубашкаПриказов(String colour) {
-        String c = colour == null || colour.isBlank() ? "" : colour;
-        String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
-        return kelium.report.Textures.orderCard(c.isEmpty() ? null : "back_" + c,
-            alt.isEmpty() ? null : "back_" + alt, "back");
+        return kelium.gui.CardArt.orderBack(colour);
     }
 
     /** Печатное лицо карты приказа; {@code null} — художник его не рисовал. */
     private java.awt.image.BufferedImage лицоПриказа(String cardId, String colour) {
-        if (cardId == null || cardId.isBlank()) {
-            return null;
-        }
-        if (cardId.startsWith("security")) {
-            String c = colour == null || colour.isBlank() ? "" : colour;
-            String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
-            return kelium.report.Textures.orderCard(c.isEmpty() ? null : "security_" + c,
-                alt.isEmpty() ? null : "security_" + alt, "security");
-        }
-        return kelium.report.Textures.orderCard(cardId);
+        return kelium.gui.CardArt.order(cardId, colour);
     }
 
     private void paintSetAside(Graphics2D g, ReplayRecord.Player p, int x, int y,
@@ -1756,8 +1746,9 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         java.awt.image.BufferedImage печать = p.orderSetAside == null
             ? рубашкаПриказов(p.orderColor) : лицоПриказа(p.orderSetAside, p.orderColor);
         if (печать != null) {
-            int кв = (int) Math.min(w, h / КАРТА_ПРИКАЗА);
-            int кh = (int) (кв * КАРТА_ПРИКАЗА);
+            double отн = высотаКШирине(печать);
+            int кв = (int) Math.min(w, h / отн);
+            int кh = (int) (кв * отн);
             java.awt.Composite было = g.getComposite();
             if (p.orderSetAside == null) {
                 // Ничего не отложено — на месте лежит рубашка, приглушённая:
@@ -1943,8 +1934,9 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // Своей нарисованной плашки здесь больше нет.
         java.awt.image.BufferedImage рубашка = рубашкаПриказов(p.orderColor);
         if (рубашка != null) {
-            int кh = (int) Math.min(h, w / КАРТА_ПРИКАЗА);
-            int кв = (int) (кh * КАРТА_ПРИКАЗА);
+            double отн = высотаКШирине(рубашка);
+            int кh = (int) Math.min(h, w / отн);
+            int кв = (int) (кh * отн);
             java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform();
             at.translate(x, top + кh);
             at.rotate(-Math.PI / 2);
