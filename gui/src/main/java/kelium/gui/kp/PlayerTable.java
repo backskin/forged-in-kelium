@@ -195,6 +195,11 @@ public final class PlayerTable extends JComponent {
         setChoices(null, null);
     }
 
+    public void closeBubble() {
+        bubbles.closeBubble();
+        repaint();
+    }
+
     /** Раскрыть пузырь вариантов у детали (например, у карты по наведению). */
     public void openBubble(String key) {
         if (choices.containsKey(key)) {

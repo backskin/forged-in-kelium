@@ -378,6 +378,20 @@ public final class HotSeatWindow {
                 undoLast();
             }
         });
+        // Esc — закрыть раскрытый пузырь вариантов (на поле и на столе).
+        frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+            javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+            "close-bubble");
+        frame.getRootPane().getActionMap().put("close-bubble", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                field.bubbles.closeBubble();
+                field.repaint();
+                if (table != null) {
+                    table.closeBubble();
+                }
+            }
+        });
 
         frame.setSize(Theme.px(1500), Theme.px(950));
         frame.setMinimumSize(new Dimension(Theme.px(1150), Theme.px(760)));
@@ -1364,6 +1378,9 @@ public final class HotSeatWindow {
             return;
         }
         ReplayRecord finalRec = result;
+        // ЖУРНАЛ — ДО объявления «партия окончена»: иначе читатель журнала
+        // (робот-тест, дизайнер сразу после партии) застаёт файл недописанным.
+        saveJournal(finalRec, "");
         SwingUtilities.invokeLater(() -> {
             turnLabel.setText("Партия окончена: "
                 + (finalRec.winner == null ? "без победителя (" + finalRec.condition + ")"
@@ -1376,7 +1393,6 @@ public final class HotSeatWindow {
             finished = true;
             clearDecision();
         });
-        saveJournal(finalRec, "");
     }
 
     /** Записать журнал партии на диск. {@code suffix} — пометка в имени файла. */
