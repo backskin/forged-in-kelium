@@ -30,6 +30,10 @@ public final class HotSeatShot {
 
     public static void main(String[] args) throws Exception {
         System.setProperty("kelium.gui.offscreen", "true");
+        // -Dshot.gamescale — масштаб, как у запуска игры (по экрану этой машины)
+        if (System.getProperty("shot.gamescale") != null) {
+            kelium.gui.replay2.Theme.useGameScale();
+        }
         String out = args[0];
         String kind = args.length > 1 && !"-".equals(args[1]) ? args[1] : null;
         int skip = args.length > 2 ? Integer.parseInt(args[2]) : 0;
