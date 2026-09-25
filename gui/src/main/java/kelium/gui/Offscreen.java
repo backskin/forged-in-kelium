@@ -34,6 +34,15 @@ public final class Offscreen {
             // рисовать будет нечего, — но ДАЛЕКО ЗА ПРЕДЕЛАМИ любого монитора
             // и без права брать фокус: ни закрыть собой чужое окно, ни
             // перехватить клавиатуру оно не может.
+            // Служебное окно — без кнопки на панели задач: иначе каждый
+            // проверочный прогон виден игроку как «лишнее открытое окно».
+            if (!w.isDisplayable()) {
+                try {
+                    w.setType(Window.Type.UTILITY);
+                } catch (RuntimeException ignored) {
+                    // окно уже показано — тип не сменить, не беда
+                }
+            }
             w.setFocusableWindowState(false);
             w.setAutoRequestFocus(false);
             w.setLocation(-32000, -32000);

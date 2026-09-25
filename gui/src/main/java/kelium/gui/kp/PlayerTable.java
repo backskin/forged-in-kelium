@@ -452,6 +452,23 @@ public final class PlayerTable extends JComponent {
         top += paintSeatTabs(g, w);
         int innerH = h - top - pad;
         int x = pad + Theme.px(8);
+        // ВЕСЬ РЯД ВПИСЫВАЕТСЯ ПО ШИРИНЕ (сдача под ключ 25.09.2026): все
+        // детали зоны растут от её высоты, и на узком окне сумма ширин
+        // оказывалась больше экрана — руки уезжали за правый край. Не
+        // влезает — ряд уменьшается целиком и встаёт по центру высоты.
+        {
+            double hang = boards != null && boards.aspect() > 0 ? Math.max(0, boards.hang()) : 0;
+            double perH = (boards != null && boards.aspect() > 0
+                ? boards.aspect() / (1 + hang) : 0)
+                + 0.66 + 0.643 + 2.4 * 0.643;
+            int fixed = x + pad + Theme.px(18) * 2 + Theme.px(6) + Theme.px(104)
+                + Theme.px(22);
+            int fitH = (int) ((w - fixed) / perH);
+            if (fitH < innerH) {
+                top += (innerH - Math.max(Theme.px(80), fitH)) / 2;
+                innerH = Math.max(Theme.px(80), fitH);
+            }
+        }
 
         // ---- планшеты и стопка арсенала под хранилищем
         if (boards != null && boards.aspect() > 0) {
@@ -459,7 +476,7 @@ public final class PlayerTable extends JComponent {
             // торчит из-под планшета войск вниз, и стопка арсенала под
             // хранилищем торчит ровно так же — полосу под них считаем честно.
             double hang = Math.max(0, boards.hang());
-            int bw = (int) Math.min(w * 0.52, innerH / (1 + hang) * boards.aspect());
+            int bw = (int) Math.min(w * 0.60, innerH / (1 + hang) * boards.aspect());
             int bh = (int) Math.round(bw / boards.aspect());
             int by = top;
             int cardsBottom = by + (int) Math.round(bh * (1 + hang));
@@ -966,7 +983,7 @@ public final class PlayerTable extends JComponent {
         if (!played.isEmpty()) {
             int ch = Math.min(eh, h - eh - Theme.px(26));
             int cw = (int) Math.round(ch * aspect(faceOf.apply(played.get(0)), 0.643));
-            if (ch > Theme.px(40)) {
+            if (ch > Theme.px(70)) {
                 int cx = x + (w - cw) / 2;
                 int cy = y + Theme.px(16);
                 g.setFont(Theme.caption());
@@ -978,6 +995,22 @@ public final class PlayerTable extends JComponent {
                         Theme.tile());
                 }
                 groups.put("played", new Rectangle(cx, cy, cw + Theme.px(16), ch + Theme.px(12)));
+            } else {
+                // Места под стопку нет (низкое окно) — плашка со счётом,
+                // щелчок раскрывает сыгранные карты так же, как стопка.
+                int ph = Theme.px(26);
+                int py = Math.max(y, ey - ph - Theme.px(8));
+                boolean hotP = "played".equals(hoverGroup);
+                RoundRectangle2D pill = new RoundRectangle2D.Double(x, py, w, ph, ph, ph);
+                g.setColor(hotP ? Theme.alpha(Color.WHITE, 0.16) : Theme.alpha(Color.BLACK, 0.25));
+                g.fill(pill);
+                g.setColor(Theme.alpha(MAT_INK2, 0.8));
+                g.setStroke(new BasicStroke(1f));
+                g.draw(pill);
+                g.setFont(Theme.font(10.5, Font.BOLD));
+                g.setColor(MAT_INK);
+                centred(g, "сыграно · " + played.size(), x + w / 2, py + ph / 2 + Theme.px(4));
+                groups.put("played", pill.getBounds());
             }
         }
     }

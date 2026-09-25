@@ -804,6 +804,12 @@ public final class GameRecorder {
                 : kelium.gui.replay2.Names.card(rec, String.valueOf(cid));
         }
 
+        /** Что дал сожжённый верх: имя вида реакции «ОТВЕТНЫЙ_ОГОНЬ» — словами. */
+        private static String burnLabel(Object label) {
+            String s = label == null ? "" : String.valueOf(label);
+            return s.matches("[А-ЯЁ_]+") ? s.replace('_', ' ').toLowerCase() : s;
+        }
+
         /** Строка лога для одного события. */
         @SuppressWarnings("unchecked")
         String describe(Map<String, Object> ev, GameState s) {
@@ -906,7 +912,7 @@ public final class GameRecorder {
                         + "»" + (Boolean.TRUE.equals(ev.get("enhanced")) ? " с усилением" : "");
                 case "objective_burn":
                     return who(ev.get("seat")) + " сжёг верх задания «" + card(ev.get("card"))
-                        + "» (" + ev.getOrDefault("label", "") + ")";
+                        + "» (" + burnLabel(ev.get("label")) + ")";
                 case "objective_drawn":
                     return who(ev.get("seat")) + " получил задание «" + card(ev.get("card"))
                         + "» (в руке " + ev.get("hand") + ")";

@@ -37,8 +37,10 @@ public final class HotSeatShot {
         int w = args.length > 4 ? Integer.parseInt(args[4]) : 1600;
         int h = args.length > 5 ? Integer.parseInt(args[5]) : 1000;
 
+        // -Dshot.specs=human,builder:1,punisher:1 — состав мест (по умолчанию двое)
+        List<String> specs = List.of(System.getProperty("shot.specs", "human,builder:1").split(","));
         HotSeatWindow win = new HotSeatWindow(
-            HotSeatWindow.Options.simple(2, seed, List.of("human", "builder:1")));
+            HotSeatWindow.Options.simple(specs.size(), seed, specs));
         SwingUtilities.invokeAndWait(win::start);
         SwingUtilities.invokeAndWait(() -> win.frame.setSize(w, h));
 

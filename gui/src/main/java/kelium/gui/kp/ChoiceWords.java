@@ -42,6 +42,50 @@ public final class ChoiceWords {
         if ("pass".equals(c.kind()) && p == null) {
             return passWords(kind, raw);
         }
+        // ПО ВИДУ ВАРИАНТА — то, что встречается в разных решениях.
+        switch (c.kind()) {
+            case "free_objective_burn" -> {
+                return "Сжечь «" + cardName.apply(String.valueOf(p)) + "» — верх даром";
+            }
+            case "spec_arsenal_use" -> {
+                return "СПЕЦ: «" + cardName.apply(String.valueOf(p)) + "»";
+            }
+            case "red_slot", "blue_slot", "red_replace", "blue_replace" -> {
+                if (p instanceof Map<?, ?> m) {
+                    Object where = m.get(c.kind().startsWith("red") ? "unit" : "building");
+                    String code = where instanceof Enum<?> e ? e.name().toLowerCase(Locale.ROOT)
+                        : String.valueOf(where);
+                    String place = c.kind().startsWith("red") ? unitRu(code) : buildingRu(code);
+                    String what = c.kind().startsWith("red") ? "Модуль боя" : "Модуль сборки";
+                    return what + " → " + place + (raw.contains("обмен") ? " (поменять местами)"
+                        : c.kind().endsWith("replace") ? " (заменить)" : "");
+                }
+            }
+            case "move_red", "move_blue" -> {
+                String code = p instanceof Enum<?> e ? e.name().toLowerCase(Locale.ROOT)
+                    : String.valueOf(p);
+                return "Снять модуль с ячейки «" + ("move_red".equals(c.kind())
+                    ? unitRu(code) : buildingRu(code)) + "»";
+            }
+            case "order_spec" -> {
+                return "Взять плашку: " + switch (String.valueOf(p)) {
+                    case "ammo" -> "1 боеприпас";
+                    case "objective" -> "1 карта задания";
+                    case "coin" -> "1 монета";
+                    case "kelium" -> "1 келемий";
+                    case "trophy" -> "1 трофей";
+                    case "movement" -> "движение";
+                    default -> tidy(String.valueOf(p));
+                };
+            }
+            case "attack" -> {
+                if (p instanceof Map<?, ?> m) {
+                    return attack(raw, m);
+                }
+            }
+            default -> {
+            }
+        }
         switch (kind) {
             case "action", "objective_reward_action", "energy_or_modules" -> {
                 if (p instanceof String a) {
@@ -50,6 +94,11 @@ public final class ChoiceWords {
                 }
             }
             case "move" -> {
+                // вариант «гарнизон» в том же выборе: «infantry в BARRACKS»
+                if (!raw.contains("->") && raw.contains(" в ")) {
+                    return cap(unitRu(before(raw, " в "))) + " — в здание: "
+                        + buildingRu(after(raw, " в "));
+                }
                 String unit = before(raw, "->");
                 return cap(unitRu(unit)) + " — сюда";
             }
@@ -169,6 +218,8 @@ public final class ChoiceWords {
             case "market_offer", "market_rate" -> "Хватит торговать";
             case "storage_discard" -> "Ничего не выбрасывать";
             case "module_move_pick", "module_gild_pick" -> "Отмена";
+            case "module_place_red", "module_place_blue" -> "Оставить в запасе";
+            case "move_source", "maneuver_hex" -> "Больше не двигаться";
             case "order_spec" -> "Не брать плашку";
             default -> {
                 String t = tidy(raw);
@@ -204,6 +255,48 @@ public final class ChoiceWords {
         };
     }
 
+    /** «infantry.universal->units@h1_2» → «Пехота · обычная атака → по войскам». */
+    public static String attack(String raw, Map<?, ?> payload) {
+        int dot = raw.indexOf('.');
+        int arrow = raw.indexOf("->");
+        String unit = dot > 0 ? unitRu(raw.substring(0, dot)) : "";
+        String rowCode = dot > 0 && arrow > dot ? raw.substring(dot + 1, arrow)
+            : String.valueOf(payload.get("row"));
+        String row = switch (rowCode) {
+            case "universal" -> "обычная атака";
+            case "special", "specialized" -> "спец-атака";
+            default -> "атака";
+        };
+        String tcat = Boolean.TRUE.equals(payload.get("neutral")) ? "снести нейтральную постройку"
+            : switch (String.valueOf(payload.get("tcat"))) {
+                case "infantry" -> "по пехоте";
+                case "vehicle" -> "по технике";
+                case "aircraft" -> "по авиации";
+                case "units" -> "по войскам";
+                case "buildings_towers" -> "по зданиям и вышкам";
+                case "any" -> "по любой цели";
+                default -> "";
+            };
+        String head = unit.isEmpty() ? "Атака" : cap(unit);
+        return head + " · " + row + (tcat.isEmpty() ? "" : " → " + tcat);
+    }
+
+    /** Английские фразы движка, которые доходят до игрока, — по-русски. */
+    private static final String[][] ENGLISH = {
+        {"stop moving", "Больше не двигаться"},
+        {"stop building", "Не строить"},
+        {"stop science", "Закончить с наукой"},
+        {"stop attacking", "Прекратить бой"},
+        {"stop opening", "Больше не вскрывать"},
+        {"leave in reserve", "Оставить в запасе"},
+        {"cancel", "Отмена"},
+        {"extract kelium", "Добыть келемий"},
+        {"take container", "Взять контейнер"},
+        {"1 trophy -> 1 coin", "1 трофей → 1 монета"},
+        {"1 trophy -> move a module", "1 трофей → переставить модуль"},
+        {"hit", "Нанести урон"},
+    };
+
     private static final Pattern OPEN_ONE =
         Pattern.compile("open one \\((\\d+) cont, (\\d+) ars\\)");
 
@@ -212,7 +305,21 @@ public final class ChoiceWords {
         if (raw == null) {
             return "";
         }
+        for (String[] e : ENGLISH) {
+            if (raw.trim().equalsIgnoreCase(e[0])
+                    || raw.trim().toLowerCase(Locale.ROOT).startsWith(e[0] + " @")) {
+                return e[1];
+            }
+        }
+        if (raw.startsWith("skip ")) {
+            return "Пропустить";
+        }
+        if (raw.startsWith("tower @")) {
+            return "Вышка сюда";
+        }
         String s = AT_HEX.matcher(raw).replaceAll("");
+        // жетоны модулей «R30-1», «C30-12» — служебные номера
+        s = s.replaceAll("\\b[RC]\\d+-\\d+\\b", "модуль");
         s = s.replace("->", "→").replace("КЕЛ", "келемий").replace("МОН", "монет");
         // «miner L1», «power_plantL3» — здание с уровнем
         Matcher lv = LEVELED.matcher(s);

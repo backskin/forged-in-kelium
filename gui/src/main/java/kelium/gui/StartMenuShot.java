@@ -18,6 +18,7 @@ public final class StartMenuShot {
     }
 
     public static void main(String[] args) throws Exception {
+        System.setProperty("kelium.gui.offscreen", "true");
         String out = args[0];
         int w = args.length > 1 ? Integer.parseInt(args[1]) : 1500;
         int h = args.length > 2 ? Integer.parseInt(args[2]) : 950;

@@ -648,6 +648,21 @@ public final class FieldView extends JComponent {
         repaint();
     }
 
+    /**
+     * ПОЛОСА СВЕРХУ, КУДА ПОЛЕ НЕ ВПИСЫВАЕТСЯ: в окне партии там висят
+     * подсказка хода и панель вариантов, и они закрывали верхний ряд гексов
+     * (сдача под ключ 25.09.2026). Постоянная, чтобы поле не прыгало от
+     * решения к решению.
+     */
+    private int topReserve;
+
+    public void setTopReserve(int px) {
+        this.topReserve = Math.max(0, px);
+        if (autoFit) {
+            fitToWindow();
+        }
+    }
+
     /** Вписать поле в окно (и снова разрешить авто-вписывание при растягивании). */
     public void fitToWindow() {
         autoFit = true;
@@ -668,10 +683,10 @@ public final class FieldView extends JComponent {
         }
         double margin = 24;
         double kx = (getWidth() - 2 * margin) / (maxx - minx);
-        double ky = (getHeight() - 2 * margin) / (maxy - miny);
+        double ky = (getHeight() - topReserve - 2 * margin) / (maxy - miny);
         zoom = Math.max(0.25, Math.min(4.0, Math.min(kx, ky)));
         panX = getWidth() / 2.0 - zoom * (minx + maxx) / 2;
-        panY = getHeight() / 2.0 - zoom * (miny + maxy) / 2;
+        panY = topReserve + (getHeight() - topReserve) / 2.0 - zoom * (miny + maxy) / 2;
         fitPending = false;
         repaint();
     }
