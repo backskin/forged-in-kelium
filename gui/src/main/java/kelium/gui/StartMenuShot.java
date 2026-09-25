@@ -28,6 +28,14 @@ public final class StartMenuShot {
             win[0].frame.setSize(w, h);
         });
         Thread.sleep(2500);
+        // -Dshot.gallery=1 — снять открытую галерею полей, дождавшись картинок
+        if (System.getProperty("shot.gallery") != null) {
+            SwingUtilities.invokeAndWait(() -> win[0].openGallery());
+            for (int i = 0; i < 600 && win[0].gallery.readyCount() < win[0].gallery.tileCount(); i++) {
+                Thread.sleep(100);
+            }
+            Thread.sleep(300);
+        }
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         SwingUtilities.invokeAndWait(() -> {
             win[0].frame.getRootPane().validate();

@@ -206,8 +206,18 @@ public final class StartMenuWindow {
 
         frame.setSize(Theme.px(1280), Theme.px(860));
         frame.setLocationRelativeTo(null);
+        gallery = new FieldGallery();
+        frame.getLayeredPane().add(gallery, javax.swing.JLayeredPane.POPUP_LAYER);
+        frame.getLayeredPane().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                gallery.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+                    frame.getLayeredPane().getHeight());
+            }
+        });
         Offscreen.show(frame);
         applyRestored();
+        refreshFieldButton();
         rebuildPreview();
     }
 
@@ -240,6 +250,7 @@ public final class StartMenuWindow {
                     || restoreMapId == null && restoreMapFile == null && f.id() == null) {
                 map = f;
                 mapBox.select(f.label());
+                refreshFieldButton();
                 break;
             }
         }
@@ -727,7 +738,16 @@ public final class StartMenuWindow {
             rebuildPreview();
         });
         mapBox.setPreferredSize(new Dimension(Theme.px(320), Theme.px(40)));
-        top.add(mapBox, BorderLayout.WEST);
+        // ВЫБОР ПОЛЯ ПО КАРТИНКЕ (просьба дизайнера 25.09.2026): кнопка открывает
+        // галерею с отрисованными полями; список-выпадашка остаётся для тех,
+        // кто знает имя раскладки.
+        fieldBtn = new KpButton("Выбрать поле", "по картинке", null).onClick(this::openGallery);
+        fieldBtn.setPreferredSize(new Dimension(Theme.px(200), Theme.px(40)));
+        JPanel pick = new JPanel(new BorderLayout(Theme.px(8), 0));
+        pick.setOpaque(false);
+        pick.add(fieldBtn, BorderLayout.WEST);
+        pick.add(mapBox, BorderLayout.CENTER);
+        top.add(pick, BorderLayout.WEST);
 
         hint = new JLabel("Кликните стартовый гекс — это будет ваше место");
         hint.setFont(Theme.font(13, Font.BOLD));
@@ -1168,6 +1188,110 @@ public final class StartMenuWindow {
         return maps.isEmpty() ? new FieldOption(null, "любая — по сиду", null) : maps.get(0);
     }
 
+    /** Галерея полей поверх окна. */
+    FieldGallery gallery;
+    private KpButton fieldBtn;
+    /** Картинки полей: ключ раскладки и числа мест → картинка. */
+    private final Map<String, java.awt.image.BufferedImage> thumbs =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void refreshFieldButton() {
+        if (fieldBtn != null && map != null) {
+            fieldBtn.setTexts("Выбрать поле", "по картинке");
+        }
+    }
+
+    /** Открыть галерею полей для текущего числа мест. */
+    void openGallery() {
+        List<FieldOption> opts = new ArrayList<>(maps);
+        List<FieldGallery.Tile> tiles = new ArrayList<>();
+        int current = -1;
+        for (int i = 0; i < opts.size(); i++) {
+            FieldOption f = opts.get(i);
+            String label = f.label();
+            int dot = label.indexOf(" · ");
+            String title = f.id() == null ? "Любое поле" : dot > 0 ? label.substring(dot + 3) : label;
+            String note = f.id() == null ? "собирается по сиду партии"
+                : dot > 0 ? label.substring(0, dot) + " раскладка" : null;
+            FieldGallery.Tile t = new FieldGallery.Tile(title, note);
+            t.thumb = thumbs.get(thumbKey(f));
+            tiles.add(t);
+            if (map != null && f.label().equals(map.label())) {
+                current = i;
+            }
+        }
+        gallery.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        int ps = players;
+        long sd = seed;
+        String rs = rulesetId;
+        gallery.open(tiles, current, i -> renderThumb(opts.get(i), rs, ps, sd), i -> {
+            map = opts.get(i);
+            mapBox.select(map.label());
+            mySeat = null;
+            myFacing = null;
+            refreshFieldButton();
+            rebuildPreview();
+        });
+    }
+
+    private String thumbKey(FieldOption f) {
+        return players + "|" + seed + "|" + rulesetId + "|" + f.label();
+    }
+
+    /**
+     * КАРТИНКА ПОЛЯ ДЛЯ ГАЛЕРЕИ: стол собирается тем же {@link Setup#buildGame}
+     * и рисуется тем же {@link FieldView}, что и в партии, — только в память
+     * и без подписей. Вызывается в фоновом потоке.
+     */
+    private java.awt.image.BufferedImage renderThumb(FieldOption f, String rs, int ps, long sd) {
+        String key = ps + "|" + sd + "|" + rs + "|" + f.label();
+        java.awt.image.BufferedImage have = thumbs.get(key);
+        if (have != null) {
+            return have;
+        }
+        GameConfig cfg = GameConfig.buildCached(rs, ps, sd, null, null, f.id(), null, f.file());
+        GameState state = Setup.buildGame(cfg);
+        ReplayRecord rec = new ReplayRecord();
+        rec.players = ps;
+        rec.seed = sd;
+        rec.ruleset = rs;
+        for (int i = 0; i < ps; i++) {
+            rec.seatLabels.add("место " + (i + 1));
+            rec.sides.add(state.player(i).board.troop.side);
+        }
+        rec.seatColors.addAll(colors.subList(0, ps));
+        GameRecorder.fillTableAndField(rec, cfg, state);
+        ReplayRecord.Frame fr = new ReplayRecord.Frame();
+        fr.type = "setup";
+        fr.snapshot = ReplayRecord.snapshotOf(state, 0);
+        rec.frames.add(fr);
+        int w = Theme.px(560);
+        int h = Theme.px(380);
+        FieldView fv = new FieldView();
+        fv.setShowIds(false);
+        fv.setShowTurnCaption(false);
+        fv.setSize(w, h);
+        fv.setRecord(rec);
+        fv.setFrame(fr);
+        fv.fitToWindow();
+        java.awt.image.BufferedImage img =
+            new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2DPaint.paint(fv, img);
+        thumbs.put(key, img);
+        return img;
+    }
+
+    /** Нарисовать компонент в картинку, без окна. */
+    private static final class Graphics2DPaint {
+        static void paint(JComponent c, java.awt.image.BufferedImage img) {
+            java.awt.Graphics2D g = img.createGraphics();
+            c.setOpaque(false);
+            c.paint(g);
+            g.dispose();
+        }
+    }
+
     private void refreshMaps() {
         String keep = map == null ? null : map.label();
         mapBox.setItems(mapList(), keep);
@@ -1231,6 +1355,7 @@ public final class StartMenuWindow {
     private void applyFieldPicking() {
         field.clearSelectable();
         field.clearFacingChoice();
+        field.clearGhost();
         if (!soloHuman()) {
             hint.setText("Живых игроков " + humans()
                 + " — места заняты все, выбирать нечего; ходят по очереди");
@@ -1262,6 +1387,14 @@ public final class StartMenuWindow {
             myFacing = i;
             rebuildPreview();
         });
+        // ПРИЗРАК ЦУ под курсором (просьба дизайнера 25.09.2026): пока поворот
+        // не выбран, полупрозрачный ЦУ цвета места стоит на наведённой паре
+        // стенок — видно, как именно встанет центр управления.
+        if (myFacing == null) {
+            field.setGhost("command_center", mySeat);
+        } else {
+            field.clearGhost();
+        }
         hint.setText(myFacing == null
             ? "Наведите на сектор своего гекса — так встанет центр управления"
             : "Место выбрано, ЦУ повёрнут — можно начинать");
