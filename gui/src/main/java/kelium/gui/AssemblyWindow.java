@@ -372,6 +372,42 @@ public final class AssemblyWindow extends JPanel {
      *
      * @return нашлась ли сборка
      */
+    /**
+     * СБОРКА ОБЯЗАНА БЫТЬ ОТ ТЕКУЩЕГО ПОЛЯ. Вкладка пересчитывает её, только
+     * когда на неё переходят, — а экспорт слиянием зовут с вкладки
+     * «Конструктор». Поправил поле и сразу выгрузил — блоки брались от прежнего
+     * поля, и все слои съезжали друг с друга (баг дизайнера 25.09.2026).
+     * Здесь сборка сверяется с полем и при расхождении подбирается заново,
+     * синхронно, с теми же числами блоков, что стоят во вкладке.
+     *
+     * @return есть ли сборка текущего поля
+     */
+    boolean ensureCurrent() {
+        Set<Cell> playable = new HashSet<>();
+        for (LHex h : model.hexes.values()) {
+            if (!"forbidden".equals(h.content)) {
+                playable.add(new Cell(h.q, h.r));
+            }
+        }
+        if (hasResult() && playable.equals(view.playable)) {
+            return true;
+        }
+        if (worker != null && !worker.isDone()) {
+            worker.cancel(true);
+        }
+        boolean ok = подобратьБезОкна((Integer) bigCount.getValue(),
+            (Integer) smallCount.getValue(), (Integer) blackCount.getValue());
+        if (ok) {
+            variants.clear();
+            variants.add(view.result);
+            order.clear();
+            order.add(0);
+            orderPos = 0;
+            showVariant(view.result);
+        }
+        return ok;
+    }
+
     boolean подобратьБезОкна(int big, int small, int black) {
         Set<Cell> playable = new HashSet<>();
         for (LHex h : model.hexes.values()) {
