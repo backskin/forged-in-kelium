@@ -378,6 +378,22 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         return пропорцияСцепки();
     }
 
+    /**
+     * Где в сцепке лежит планшет хранилища — доли её ширины и высоты:
+     * {@code [левый край, ширина, низ]}. Под ним на столе лежит стопка
+     * закрытых карт арсенала.
+     */
+    public double[] tableStorageBox() {
+        var с = PrintedBoards.сцепка(seat);
+        if (с == null) {
+            return new double[]{0, 0.33, 1};
+        }
+        double хрШ = PrintedBoards.storageHeight(seat, 1000) > 0
+            ? PrintedBoards.хранилищеШирина(seat, с) : с.ширина() * 0.33;
+        double низ = (с.хрY() + PrintedBoards.хранилищеВысота(seat, с)) / с.высота();
+        return new double[]{с.хрX() / с.ширина(), хрШ / с.ширина(), Math.min(1, низ)};
+    }
+
     /** Каких пропорций сцепка печатных планшетов: ширина к высоте. */
     double пропорцияСцепки() {
         var с = PrintedBoards.сцепка(seat);

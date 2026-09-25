@@ -106,6 +106,18 @@ final class PrintedBoards {
         return height(troopArt(seat), width);
     }
 
+    /** Ширина планшета хранилища в пикселях печати сцепки. */
+    static double хранилищеШирина(int seat, Сцепка с) {
+        BufferedImage хр = storageArt(seat);
+        return хр == null ? 0 : хр.getWidth() * с.хрМасштаб();
+    }
+
+    /** Высота планшета хранилища в пикселях печати сцепки. */
+    static double хранилищеВысота(int seat, Сцепка с) {
+        BufferedImage хр = storageArt(seat);
+        return хр == null ? 0 : хр.getHeight() * с.хрМасштаб();
+    }
+
     /** Высота планшета хранилища при такой ширине (0 — картинки нет). */
     static int storageHeight(int seat, int width) {
         return height(storageArt(seat), width);
@@ -499,34 +511,37 @@ final class PrintedBoards {
      * размещая их там визуально» — и убрать текст «арсенал в руке / установлен /
      * контейнеров».
      *
-     * <p>Паз занимают тремя способами, и у каждого своя рамка в маске:
-     * УСТАНОВЛЕННАЯ карта арсенала вставлена в паз и видна лицом
-     * ({@code arsenal_open}); карта В РУКЕ лежит рубашкой и торчит из паза
-     * дальше ({@code arsenal_back}); КОНТЕЙНЕРЫ кладутся по два в паз
-     * ({@code container}).
+     * <p>Паз занимают двумя способами: УСТАНОВЛЕННАЯ карта арсенала вставлена
+     * в паз и видна лицом ({@code arsenal_open}), КОНТЕЙНЕРЫ кладутся по два в
+     * паз ({@code container}). Карты В РУКЕ в пазы не кладутся (правило
+     * 25.09.2026): они лежат стопкой под планшетом хранилища.
      *
-     * <p>Порядок раскладки — как на столе: сперва установленные, потом то, что в
-     * руке, потом контейнеры; каждая занятая ячейка выбывает.
+     * <p>Порядок раскладки — как на столе: сперва установленные, потом
+     * контейнеры; каждая занятая ячейка выбывает.
      */
     private static void картыВПазах(Graphics2D g, int войX, int войY, double k,
                                     ReplayRecord.Player p) {
         var вставлено = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_open");
-        var рубашкой = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_back");
         var подКонтейнер = BoardAnchors.cardSlots(цвет(p.seat), "container");
         if (вставлено.isEmpty()) {
             return;
         }
         int паз = 0;
         BufferedImage лицоНет = Textures.card("deck_arsenal", "deck");
+        // В ПАЗАХ — ТОЛЬКО УСТАНОВЛЕННЫЕ КАРТЫ, И СВОИМ ЛИЦОМ. Закрытые карты
+        // арсенала в пазы больше не кладутся (правило дизайнера 25.09.2026):
+        // они лежат стопкой под планшетом хранилища, и их число не ограничено.
         for (String id : p.arsenalInstalled) {
             if (паз >= вставлено.size()) {
                 break;
             }
-            картаВПаз(g, войX, войY, k, вставлено.get(паз), лицоНет);
-            паз++;
-        }
-        for (int i = 0; i < p.arsenalHand.size() && паз < рубашкой.size(); i++) {
-            картаВПаз(g, войX, войY, k, рубашкой.get(паз), лицоНет);
+            BufferedImage лицо = Textures.cardFace("arsenal", id);
+            if (лицо == null) {
+                лицо = Textures.cardFace("arsenal_start", id);
+            }
+            картаВПаз(g, войX, войY, k, вставлено.get(паз), лицо != null ? лицо : лицоНет);
+            hit("installed:" + id, scale(войX, войY, k, вставлено.get(паз)[0],
+                вставлено.get(паз)[1], вставлено.get(паз)[2], вставлено.get(паз)[3]));
             паз++;
         }
         // КОНТЕЙНЕРЫ: по два в паз, поэтому рамок шесть — берём те, что

@@ -104,6 +104,16 @@ public final class FieldBubbles {
         return byHex.keySet();
     }
 
+    /** Все варианты, что сейчас есть на поле и в карточке, — для робота-теста. */
+    public List<Opt> allOptsForTest() {
+        List<Opt> out = new ArrayList<>();
+        for (List<Opt> l : byHex.values()) {
+            out.addAll(l);
+        }
+        out.addAll(dock);
+        return out;
+    }
+
     /**
      * ЩЕЛЧОК ПО ГЕКСУ-ЦЕЛИ: один вариант — выбрать, несколько — раскрыть пузырь.
      *

@@ -344,6 +344,9 @@ public final class HotSeatWindow {
         cardMenu = new kelium.gui.kp.CardMenu();
         frame.getLayeredPane().add(cardMenu, JLayeredPane.MODAL_LAYER);
 
+        spread = new kelium.gui.kp.CardSpread();
+        frame.getLayeredPane().add(spread, JLayeredPane.MODAL_LAYER);
+
         curtain = new kelium.gui.kp.HandoverCurtain();
         frame.getLayeredPane().add(curtain, JLayeredPane.DRAG_LAYER);
         frame.getLayeredPane().addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -390,6 +393,9 @@ public final class HotSeatWindow {
                 if (table != null) {
                     table.closeBubble();
                 }
+                if (spread != null) {
+                    spread.close();
+                }
             }
         });
 
@@ -415,7 +421,7 @@ public final class HotSeatWindow {
     private void placeTableDivider() {
         if (tableSplit != null && tableSplit.getHeight() > 0) {
             tableSplit.setDividerLocation(Math.max(Theme.px(300),
-                tableSplit.getHeight() - Theme.px(290)));
+                tableSplit.getHeight() - Theme.px(340)));
         }
     }
 
@@ -435,15 +441,127 @@ public final class HotSeatWindow {
             }
 
             @Override
+            public double[] storageBox() {
+                return tableSheet.tableStorageBox();
+            }
+
+            @Override
             public int paint(java.awt.Graphics2D g, int x, int y, int width,
                              Map<String, java.awt.Rectangle> hits,
                              Map<String, java.awt.Shape> outlines) {
                 return tableSheet.paintTableBoards(g, x, y, width, hits, outlines);
             }
         });
-        t.setCards(this::cardFace, this::cardName, this::objectiveTag);
+        t.setCards(this::anyFace, kind -> switch (kind) {
+            case "arsenal" -> kelium.report.Textures.card("deck_arsenal", "deck");
+            case "objective" -> kelium.report.Textures.card("deck_objectives", "deck");
+            default -> null;
+        }, this::cardName, this::objectiveTag);
         t.onCardHover((id, r) -> showTableZoom(id, r), () -> zoom.setVisible(false));
+        t.onOpen(this::openSpread);
         return t;
+    }
+
+    /** Лицо любой карты игрока: задания, арсенал, приказы. */
+    private java.awt.image.BufferedImage anyFace(String id) {
+        java.awt.image.BufferedImage f = cardFace(id);
+        if (f != null) {
+            return f;
+        }
+        ReplayRecord.Player p = viewedPlayer();
+        return orderArt(id, p == null ? null : p.orderColor);
+    }
+
+    /** Раскрытые карты игрока — поверх всего окна. */
+    kelium.gui.kp.CardSpread spread;
+
+    /**
+     * РАСКРЫТЬ ГРУППУ КАРТ СТОЛА (просьба дизайнера 25.09.2026: «зона с
+     * картами, которая раскрывается, которую можно посмотреть»). Под каждой
+     * картой — то, что с ней можно сделать прямо сейчас: варианты берутся из
+     * текущего решения движка, из того же списка, что обводит карты на столе.
+     */
+    void openSpread(String group) {
+        ReplayRecord.Player p = viewedPlayer();
+        if (p == null) {
+            return;
+        }
+        List<String> ids;
+        String title;
+        switch (group) {
+            case "objectives" -> {
+                ids = p.objectiveHand;
+                title = "Задания на руке";
+            }
+            case "super" -> {
+                ids = p.superObjectives;
+                title = "Супер-задания";
+            }
+            case "arsenal" -> {
+                ids = p.arsenalHand;
+                title = "Арсенал: закрытые карты";
+            }
+            case "installed" -> {
+                ids = p.arsenalInstalled;
+                title = "Арсенал: установленные карты";
+            }
+            case "orders" -> {
+                ids = p.orderHand;
+                title = "Приказы в руке";
+            }
+            case "played" -> {
+                ids = p.orderPlayed;
+                title = "Сыграно в этом раунде";
+            }
+            case "dump" -> {
+                openDumpSpread(p);
+                return;
+            }
+            default -> {
+                return;
+            }
+        }
+        List<kelium.gui.kp.CardSpread.Card> cards = new ArrayList<>();
+        boolean any = false;
+        for (String id : ids) {
+            List<kelium.gui.kp.FieldBubbles.Opt> acts = table.choicesFor("card:" + id);
+            any |= !acts.isEmpty();
+            String note = objectiveTag(id);
+            if ("installed".equals(group)) {
+                note = "установлена";
+            }
+            cards.add(new kelium.gui.kp.CardSpread.Card(id, anyFace(id), cardName(id),
+                note == null ? null : ("installed".equals(group) ? note : "выполнено " + note),
+                acts));
+        }
+        if (cards.isEmpty()) {
+            return;
+        }
+        zoom.setVisible(false);
+        spread.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        spread.open(title, any ? "Выберите, что сыграть, — или щёлкните мимо карт"
+                : "Щёлкните мимо карт, чтобы сложить их", cards,
+            Theme.seat(viewedSeat), null);
+    }
+
+    /** Свалка раскрытием: жетоны врагов трофейной стороной. */
+    private void openDumpSpread(ReplayRecord.Player p) {
+        List<kelium.gui.kp.CardSpread.Card> cards = new ArrayList<>();
+        for (ReplayRecord.DestroyedToken t : p.destroyedCard) {
+            String nm = t.building ? kelium.report.Labels.buildingName(t.type, t.level)
+                : kelium.report.Labels.unitName(t.type);
+            cards.add(new kelium.gui.kp.CardSpread.Card("t" + t.uid,
+                kelium.report.Textures.trophySide(t.type, t.level, t.value),
+                nm, nm + " · трофеев " + t.value, List.of()));
+        }
+        if (cards.isEmpty()) {
+            return;
+        }
+        spread.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        spread.open("Свалка", "Уничтоженные жетоны врагов на отложенном приказе", cards,
+            Theme.seat(viewedSeat), null);
     }
 
     /** Печатное лицо карты по id — задания, арсенал любых наборов. */
@@ -533,11 +651,33 @@ public final class HotSeatWindow {
         }
         tableSheet.setSeat(viewedSeat);
         String order = revealed.get(viewedSeat);
+        java.awt.image.BufferedImage dumpBack = null;
+        if (p.orderSetAside != null) {
+            String c = p.orderColor == null ? "" : p.orderColor;
+            String alt = "red".equals(c) ? "scarlet" : "scarlet".equals(c) ? "red" : "";
+            dumpBack = kelium.report.Textures.orderCard("back_" + c,
+                alt.isEmpty() ? null : "back_" + alt, "back");
+            if (dumpBack == null) {
+                dumpBack = kelium.report.Textures.card("deck_orders", "deck");
+            }
+        }
+        List<kelium.gui.kp.PlayerTable.Trophy> dump = new ArrayList<>();
+        int dumpValue = 0;
+        for (ReplayRecord.DestroyedToken t : p.destroyedCard) {
+            dump.add(new kelium.gui.kp.PlayerTable.Trophy(
+                kelium.report.Textures.trophySide(t.type, t.level, t.value), t.value));
+            dumpValue += t.value;
+        }
         table.setState(new kelium.gui.kp.PlayerTable.State(viewedSeat, seatName(viewedSeat),
             order, order == null ? null : orderFace(order),
             order == null ? null : orderArt(order, p.orderColor),
-            List.copyOf(p.objectiveHand), List.copyOf(p.arsenalHand),
-            List.copyOf(p.arsenalInstalled), p.orderHand.size(),
+            List.copyOf(p.objectiveHand), List.copyOf(p.superObjectives),
+            List.copyOf(p.arsenalHand), List.copyOf(p.arsenalInstalled),
+            List.copyOf(p.orderHand), List.copyOf(p.orderPlayed),
+            dumpBack == null && p.orderSetAside != null
+                ? new java.awt.image.BufferedImage(10, 16, java.awt.image.BufferedImage.TYPE_INT_RGB)
+                : dumpBack,
+            dump, dumpValue,
             awaitingSeat == null ? "ход соперника" : "сначала решение"));
     }
 
@@ -2286,6 +2426,21 @@ public final class HotSeatWindow {
         clearDecision();
     }
 
+    /**
+     * ОТВЕТ НА ТО САМОЕ РЕШЕНИЕ, ради которого нарисован орган управления.
+     * Если движок уже спрашивает другое (двойной щелчок, щелчок по гаснущей
+     * карте вскрытия, пузырь, не успевший исчезнуть), ответ не уходит: номер
+     * варианта прежнего вопроса в новом значил бы совсем другой ход.
+     */
+    private void submit(kelium.core.UndoableAgent agent, InteractiveAgent.PendingDecision d,
+                        int index) {
+        if (agent == null || agent.pending() != d) {
+            return;
+        }
+        agent.submitIndex(index);
+        clearDecision();
+    }
+
     /** Дописать кусок текста карты — пустые молча пропускаются. */
     /** Виды решений «выбери карту» и набор, откуда брать её текст. */
     private static final Map<String, String> CARD_PICKS = Map.of(
@@ -2474,8 +2629,7 @@ public final class HotSeatWindow {
                     cards.add(new kelium.gui.kp.CardChoiceOverlay.Card(id,
                         orderFace(id), cardName(id), orderDesc(id), () -> {
                             ceremony.close();
-                            agent.submitIndex(idx);
-                            clearDecision();
+                            submit(agent, d, idx);
                         }));
                 }
                 boolean reveal = "reveal_order".equals(kind);
@@ -2511,8 +2665,7 @@ public final class HotSeatWindow {
                 cards.add(new kelium.gui.kp.CardChoiceOverlay.Card(id, null,
                     cardName(id), cardFullText(набор, id), () -> {
                         ceremony.close();
-                        agent.submitIndex(idx);
-                        clearDecision();
+                        submit(agent, d, idx);
                     }));
             }
             boolean супер = "super_pick".equals(kind);
@@ -2552,8 +2705,7 @@ public final class HotSeatWindow {
                     field.setGhost(bt, seat);
                 }
                 field.setFacingChoice(fhex, variants, idx -> {
-                    agent.submitIndex(idx);
-                    clearDecision();
+                    submit(agent, d, idx);
                 });
                 field.setChoices(null, KIND_LABELS.get(kind),
                     "Наведите курсор на сторону гекса или крутите колесо — "
@@ -2589,8 +2741,7 @@ public final class HotSeatWindow {
                 if (name != null && !kelium.core.UndoableAgent.SAFE_ACTIONS.contains(name)) {
                     pendingBakeName = ActionBar.ACTIONS.getOrDefault(name, name);
                 }
-                agent.submitIndex(idx);
-                clearDecision();
+                submit(agent, d, idx);
             });
             if (passIdx >= 0) {
                 int pi = passIdx;
@@ -2599,8 +2750,7 @@ public final class HotSeatWindow {
                         ? "доступно действий: " + n : "");
                 endBtn.setState(KpButton.State.AVAILABLE);
                 endBtn.onClick(() -> {
-                    agent.submitIndex(pi);
-                    clearDecision();
+                    submit(agent, d, pi);
                 });
             }
             // ДЕЙСТВИЕ ВЫБИРАЕТСЯ НА САМОЙ КАРТЕ ПРИКАЗА (просьба дизайнера
@@ -2617,8 +2767,7 @@ public final class HotSeatWindow {
                 String nm = e.getKey();
                 var opt = new kelium.gui.kp.FieldBubbles.Opt(
                     ActionBar.ACTIONS.getOrDefault(nm, nm), null, 1, () -> {
-                        agent.submitIndex(idx);
-                        clearDecision();
+                        submit(agent, d, idx);
                     });
                 if (printed.contains(nm)) {
                     onCard.put("action:" + nm, List.of(opt));
@@ -2631,8 +2780,7 @@ public final class HotSeatWindow {
                 onCard.put("end", List.of(new kelium.gui.kp.FieldBubbles.Opt("Завершить ход",
                     d.context().get("remaining") instanceof Number n
                         ? "осталось действий: " + n : null, 1, () -> {
-                            agent.submitIndex(pi);
-                            clearDecision();
+                            submit(agent, d, pi);
                         })));
             }
             refreshTable();
@@ -2688,8 +2836,7 @@ public final class HotSeatWindow {
             var opt = new kelium.gui.kp.FieldBubbles.Opt(
                 kelium.gui.kp.ChoiceWords.label(kind, c, this::cardName),
                 kelium.gui.kp.ChoiceWords.sub(kind, c), pass ? 2 : 0, () -> {
-                    agent.submitIndex(idx);
-                    clearDecision();
+                    submit(agent, d, idx);
                 });
             // КАРТА ПЕРЕД ИГРОКОМ — выбирается на самой карте, на столе.
             if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)) {
@@ -2764,11 +2911,9 @@ public final class HotSeatWindow {
     /** Ящик науки открыт окном для решения — окно его и закроет. */
     private boolean drawerAutoOpened;
 
-    /** Лежит ли карта на столе смотрящего места (руки заданий и арсенала). */
+    /** Лежит ли карта на столе смотрящего места (руки, стопка, пазы). */
     private boolean onTableCard(String id) {
-        ReplayRecord.Player p = viewedPlayer();
-        return p != null && (p.objectiveHand.contains(id) || p.arsenalHand.contains(id)
-            || p.arsenalInstalled.contains(id));
+        return table != null && table.hasCard(id);
     }
 
     /**
@@ -2954,8 +3099,7 @@ public final class HotSeatWindow {
             int idx = i;
             Runnable pick = () -> {
                 confirm.close();
-                agent.submitIndex(idx);
-                clearDecision();
+                submit(agent, d, idx);
             };
             if ("pass".equals(c.kind()) && c.payload() == null) {
                 cancel = new kelium.gui.kp.ConfirmDialog.Option(
@@ -3061,6 +3205,9 @@ public final class HotSeatWindow {
         hands.clearPickable();
         if (table != null) {
             table.clearChoices();
+        }
+        if (spread != null && spread.isOpen()) {
+            spread.close();
         }
         if (drawerAutoOpened) {
             // Закрываем не сразу: сделки рынка и шаги науки идут чередой, и
