@@ -1028,11 +1028,31 @@ public final class StartMenuWindow {
         } catch (RuntimeException ignore) {
             // авторских нет — остаются свои и «любая»
         }
+        // НОВЫЕ РАСКЛАДКИ ИЗ КОНСТРУКТОРА — первыми, самые свежие сверху
+        // (просьба дизайнера 25.09.2026: «чтобы поле собиралось согласно
+        // текущим раскладкам»). Конструктор сохраняет их в scenarios/new, а
+        // библиотека замеров по решению 20.09 смотрит в scenarios/old — в
+        // игре должны быть видны обе.
+        Set<java.nio.file.Path> seen = new java.util.HashSet<>();
+        try {
+            java.nio.file.Path fresh = GameConfig.resolveDataRoot(null)
+                .resolve("scenarios").resolve("new");
+            List<kelium.engine.LayoutLibrary.Entry> news =
+                new ArrayList<>(kelium.engine.LayoutLibrary.scanFolder(fresh, players, null));
+            java.util.Collections.reverse(news);
+            for (kelium.engine.LayoutLibrary.Entry e : news) {
+                if (!authors.contains(e.id()) && seen.add(e.file())) {
+                    maps.add(new FieldOption(e.id(), "новая · " + e.id(), e.file()));
+                }
+            }
+        } catch (RuntimeException ignore) {
+            // папки новых раскладок нет — не беда
+        }
         try {
             List<String> problems = new ArrayList<>();
             for (kelium.engine.LayoutLibrary.Entry e
                     : kelium.engine.LayoutLibrary.scan(players, problems)) {
-                if (!authors.contains(e.id())) {
+                if (!authors.contains(e.id()) && seen.add(e.file())) {
                     maps.add(new FieldOption(e.id(), "своя · " + e.id(), e.file()));
                 }
             }

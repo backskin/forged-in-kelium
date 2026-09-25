@@ -1107,6 +1107,32 @@ public final class HotSeatWindow {
     }
 
     /**
+     * ХОД БОТА — НЕ ТЕЛЕПОРТОМ (концепт §1.5). Движок играет бота мгновенно,
+     * и живой игрок видел только итог: поле перескакивало. Здесь поток движка
+     * чуть придерживается на каждом ВИДИМОМ событии бота — стройка, шаг, удар,
+     * — чтобы поле успело показать его подсветкой. При переигровке ленты
+     * (откат, загрузка) пауз нет, и если за столом нет живых — тоже.
+     */
+    private void paceBot(ReplayRecord r) {
+        if (catchingUp || humansBySeat.isEmpty() || r.frames.isEmpty()
+                || Offscreen.on()) {
+            return;
+        }
+        ReplayRecord.Frame f = r.frames.get(r.frames.size() - 1);
+        if (f.seat == null || humansBySeat.containsKey(f.seat)) {
+            return;
+        }
+        long ms = !f.highlight.isEmpty() ? 420 : "action".equals(f.type) ? 260 : 0;
+        if (ms > 0) {
+            try {
+                Thread.sleep(ms);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /**
      * РЕШЕНИЕ СЛОВАМИ — строка в списке шагов хода. Зовётся из потока движка,
      * поэтому берёт только неизменяемое (подписи, свод партии).
      */
@@ -1279,6 +1305,7 @@ public final class HotSeatWindow {
                             onFrame(r);
                         }
                     });
+                    paceBot(r);
                 });
         } catch (kelium.core.GameAborted e) {
             if (gen != generation) {
