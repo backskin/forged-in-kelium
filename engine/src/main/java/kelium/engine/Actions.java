@@ -2218,6 +2218,9 @@ public final class Actions {
         @Override
         @SuppressWarnings("unchecked")
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
+            if ("hex_swap".equals(rs.getStr("actions.movement.surcharge_model", "per_move"))) {
+                return выгнатьИЗагнать(player, ctx, agent);
+            }
             GameState s = state;
             var side = player.board.troop;
             int freeExtra = 0;
@@ -2391,6 +2394,187 @@ public final class Actions {
             Map<String, Object> tel = new HashMap<>();
             tel.put("moves", movesDone);
             return ActionResult.ok("moved " + movesDone + " steps", tel);
+        }
+
+        /**
+         * МАНЁВР «ВЫГНАТЬ И ЗАГНАТЬ» (правило дизайнера 25.09.2026, возврат
+         * старого правила): выбери ЛЮБОЙ гекс. Сначала выведи с него любое
+         * число своих войск на любые гексы, каждое на свою скорость; затем
+         * введи в него любое число своих войск, которые до него дойдут. Всё —
+         * за одно действие, без доплаты боеприпасами. Каждый жетон движется
+         * один раз: выведенный обратно не возвращается.
+         *
+         * <p>Проходимость, прыжок через тайл, печатные контейнеры и журнал —
+         * те же, что у обычного шага: маршрут проигрывается по одному гексу.
+         */
+        @SuppressWarnings("unchecked")
+        private ActionResult выгнатьИЗагнать(PlayerState player, TurnContext ctx, Agent agent) {
+            GameState s = state;
+            int ходов = 0;
+            // ГЕКСЫ, НА КОТОРЫХ МАНЁВРУ ЕСТЬ ЧТО ДЕЛАТЬ: откуда кто-то может уйти
+            // или куда кто-то может прийти.
+            java.util.LinkedHashSet<String> кандидаты = new java.util.LinkedHashSet<>();
+            for (UnitToken u : player.unitsOnField()) {
+                Map<String, List<String>> r = маршруты(s, player, u);
+                if (!r.isEmpty()) {
+                    кандидаты.add(u.hexId);
+                    кандидаты.addAll(r.keySet());
+                }
+            }
+            String цель = null;
+            if (!кандидаты.isEmpty()) {
+                List<Choice> opts = new ArrayList<>();
+                for (String h : кандидаты) {
+                    opts.add(new Choice("maneuver_hex", h, h));
+                }
+                opts.add(new Choice("pass", null, "stop moving"));
+                цель = (String) agent.choose(s, opts, Map.of("kind", "maneuver_hex")).payload();
+            }
+            if (цель != null) {
+                Set<Integer> сходили = new HashSet<>();
+                // 1. ВЫГНАТЬ: войска выбранного гекса уходят куда угодно в пределах
+                // своей скорости (или встают гарнизоном в здание на месте).
+                while (true) {
+                    List<Choice> opts = new ArrayList<>();
+                    for (UnitToken u : player.unitsOnField()) {
+                        if (!цель.equals(u.hexId) || сходили.contains(u.uid)) {
+                            continue;
+                        }
+                        for (var e : маршруты(s, player, u).entrySet()) {
+                            if (!e.getKey().equals(цель)) {
+                                opts.add(new Choice("move", Map.of("uid", u.uid,
+                                    "to", e.getKey(), "path", e.getValue()),
+                                    u.type.code + "->" + e.getKey()));
+                            }
+                        }
+                        for (BuildingToken b : garrisonTargets(s, player, u)) {
+                            opts.add(new Choice("garrison",
+                                Map.of("uid", u.uid, "b", b.uid, "to", u.hexId),
+                                u.type.code + " в " + b.type));
+                        }
+                    }
+                    if (opts.isEmpty()) {
+                        break;
+                    }
+                    opts.add(new Choice("pass", null, "stop moving"));
+                    Choice pick = agent.choose(s, opts, Map.of("kind", "move", "source", цель));
+                    if (pick.payload() == null) {
+                        break;
+                    }
+                    сходили.add(провестиМаршрут(s, player, pick));
+                    ходов++;
+                }
+                // 2. ЗАГНАТЬ: любые другие свои войска, которые дойдут до гекса.
+                while (true) {
+                    List<Choice> opts = new ArrayList<>();
+                    for (UnitToken u : player.unitsOnField()) {
+                        if (цель.equals(u.hexId) || сходили.contains(u.uid)) {
+                            continue;
+                        }
+                        List<String> путь = маршруты(s, player, u).get(цель);
+                        if (путь != null) {
+                            opts.add(new Choice("move", Map.of("uid", u.uid,
+                                "to", цель, "path", путь), u.type.code + "->" + цель));
+                        }
+                    }
+                    if (opts.isEmpty()) {
+                        break;
+                    }
+                    opts.add(new Choice("pass", null, "stop moving"));
+                    Choice pick = agent.choose(s, opts, Map.of("kind", "move", "source", цель));
+                    if (pick.payload() == null) {
+                        break;
+                    }
+                    сходили.add(провестиМаршрут(s, player, pick));
+                    ходов++;
+                }
+            }
+            ctx.recordOp("movement");
+            ctx.actionsPlayed.add(name());
+            Map<String, Object> tel = new HashMap<>();
+            tel.put("moves", ходов);
+            return ActionResult.ok("moved " + ходов + " tokens", tel);
+        }
+
+        /**
+         * ВЕДЁТ ЖЕТОН ПО ВЫБРАННОМУ МАРШРУТУ шаг за шагом (контейнеры, журнал)
+         * или заводит его в гарнизон. Возвращает uid жетона.
+         */
+        @SuppressWarnings("unchecked")
+        private int провестиМаршрут(GameState s, PlayerState player, Choice pick) {
+            Map<String, Object> mp = (Map<String, Object>) pick.payload();
+            int uid = ((Number) mp.get("uid")).intValue();
+            UnitToken unit = null;
+            for (UnitToken u : player.units) {
+                if (u.uid == uid) {
+                    unit = u;
+                    break;
+                }
+            }
+            if ("garrison".equals(pick.kind())) {
+                unit.insideBuildingUid = ((Number) mp.get("b")).intValue();
+                return uid;
+            }
+            TurnJournal.TurnFacts f = journal(s).of(player.seat);
+            f.movedFromHexes.add(unit.hexId);
+            for (String шаг : (List<String>) mp.get("path")) {
+                String fromHex = unit.hexId;
+                boolean wasInside = unit.inside();
+                unit.setHexId(шаг);
+                PrintedContainers.onUnitMoved(s, player, fromHex, шаг, unit.type, wasInside);
+                TokenContainers.onUnitEntered(s, player, шаг);
+            }
+            f.movedUids.add(uid);
+            f.unitsMoved = f.movedUids.size();
+            return uid;
+        }
+
+        /**
+         * КУДА ЭТОТ ЖЕТОН ДОЙДЁТ ЗА СВОЮ СКОРОСТЬ — гекс остановки и кратчайший
+         * маршрут к нему (без начального гекса). Шаги те же, что у обычного
+         * Манёвра ({@link #moveOptions}); чтобы их спросить, жетон на время
+         * поиска «ставится» на промежуточный гекс и потом возвращается.
+         */
+        @SuppressWarnings("unchecked")
+        private Map<String, List<String>> маршруты(GameState s, PlayerState player, UnitToken u) {
+            Map<String, List<String>> out = new java.util.LinkedHashMap<>();
+            int скорость = Speed.of(s, player.seat, u);
+            if (скорость <= 0 || u.hexId == null) {
+                return out;
+            }
+            String дом = u.hexId;
+            Integer внутри = u.insideBuildingUid;
+            Map<String, List<String>> пути = new HashMap<>();
+            пути.put(дом, List.of());
+            List<String> фронт = List.of(дом);
+            try {
+                for (int шаг = 0; шаг < скорость && !фронт.isEmpty(); шаг++) {
+                    List<String> следующий = new ArrayList<>();
+                    for (String откуда : фронт) {
+                        u.hexId = откуда;
+                        u.insideBuildingUid = откуда.equals(дом) ? внутри : null;
+                        for (Choice c : moveOptions(s, player, u)) {
+                            if (!"move".equals(c.kind())) {
+                                continue;
+                            }
+                            String куда = (String) ((Map<String, Object>) c.payload()).get("to");
+                            if (!пути.containsKey(куда)) {
+                                List<String> п = new ArrayList<>(пути.get(откуда));
+                                п.add(куда);
+                                пути.put(куда, п);
+                                следующий.add(куда);
+                                out.put(куда, п);
+                            }
+                        }
+                    }
+                    фронт = следующий;
+                }
+            } finally {
+                u.hexId = дом;
+                u.insideBuildingUid = внутри;
+            }
+            out.remove(дом);
+            return out;
         }
 
         /**

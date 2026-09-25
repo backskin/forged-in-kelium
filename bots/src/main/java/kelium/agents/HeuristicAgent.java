@@ -423,6 +423,7 @@ public class HeuristicAgent extends Agent {
             // ДВИЖЕНИЕ ПО РУЛБУКУ: сперва бесплатный гекс — тот, чьим войскам
             // есть куда и зачем идти. Без оценки бот брал гекс наугад.
             case "move_source" -> (s, o) -> scoreMoveSource(s, o);
+            case "maneuver_hex" -> (s, o) -> scoreMoveSource(s, o);
             case "combat_source" -> (s, o) -> scoreCombatSource(s, o);
             case "combat_target" -> (s, o) -> scoreCombatTarget(s, o);
             case "attack" -> (s, o) -> scoreAttack(s, o);
