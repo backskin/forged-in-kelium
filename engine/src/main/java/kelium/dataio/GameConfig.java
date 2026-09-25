@@ -166,6 +166,20 @@ public final class GameConfig {
     }
 
     /** Определить каталог данных: свойство kelium.data или первый существующий кандидат. */
+    /**
+     * ГДЕ ЛЕЖАТ КАРТИНКИ. В раздаче они приходят отдельным паком
+     * ({@code textures.pak}) и распаковываются не туда, где правила и карты:
+     * запускатель передаёт их папку свойством {@code kelium.textures}. Нет
+     * свойства — картинки в {@code <data>/textures}, как в проекте.
+     */
+    public static Path texturesRoot() {
+        String prop = System.getProperty("kelium.textures");
+        if (prop != null && !prop.isEmpty() && Files.isDirectory(Paths.get(prop))) {
+            return Paths.get(prop);
+        }
+        return resolveDataRoot(null).resolve("textures");
+    }
+
     public static Path resolveDataRoot(Path override) {
         if (override != null) {
             return override;

@@ -1017,7 +1017,7 @@ public final class HelpBook {
 
     /** Что из текстур реально лежит на месте — это факт, а не обещание. */
     private String texturesFound() {
-        Path dir = dataRoot.resolve("textures");
+        Path dir = GameConfig.texturesRoot();
         if (!Files.isDirectory(dir)) {
             return "<p style='color:" + Html.DIM + "'>Каталог текстур не найден.</p>";
         }
