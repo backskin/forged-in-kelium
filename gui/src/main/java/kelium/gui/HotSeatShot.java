@@ -67,6 +67,12 @@ public final class HotSeatShot {
             answered++;
         }
         Thread.sleep(400);
+        // -Dshot.spread=objectives|arsenal|dump… — снять раскрытую группу карт
+        String spreadGroup = System.getProperty("shot.spread");
+        if (spreadGroup != null) {
+            SwingUtilities.invokeAndWait(() -> win.openSpread(spreadGroup));
+            Thread.sleep(400);
+        }
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         SwingUtilities.invokeAndWait(() -> {
             win.frame.getRootPane().validate();
