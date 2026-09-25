@@ -104,6 +104,32 @@ public final class HotSeatWindow {
         }
     }
 
+    /**
+     * СТОЛ ДО ПЕРВОГО ХОДА — точка, от которой партию можно проиграть заново.
+     *
+     * <p>На ней стоит ОТКАТ (просьба дизайнера 25.09.2026: «откатывать свои
+     * действия назад в рамках хода до самого начала, в любое действие»). Движок
+     * воспроизводим: та же копия стола и та же лента решений дают ту же партию.
+     * Поэтому отменить можно ЛЮБОЕ решение — и бой, и рынок, и науку, и выбор
+     * гекса посреди действия: партия переигрывается с этой копии по ленте до
+     * нужного места за доли секунды, и игрока снова спрашивают там же.
+     *
+     * <p>Зерно ГСЧ закреплено: {@link GameState#deepCopy} даёт копии НОВЫЙ ГСЧ с
+     * этим зерном, и каждая переигровка идёт по тому же потоку случайностей.
+     */
+    record StartTable(GameState table, long seed) {
+
+        static StartTable of(GameState built) {
+            long s = built.rng.nextLong();
+            return new StartTable(built.deepCopy(s), s);
+        }
+
+        /** Свежая копия стола — живая партия всегда играется на копии. */
+        GameState fresh() {
+            return table.deepCopy(seed);
+        }
+    }
+
     private final Options options;
     private final int players;
     private final long seed;
@@ -206,7 +232,7 @@ public final class HotSeatWindow {
      * ЛЕНТА ПРИНЯТЫХ РЕШЕНИЙ — из неё складывается сохранение партии. Пишется
      * на каждом решении любого места; см. {@link MoveLog}.
      */
-    private final List<Integer> moves = java.util.Collections.synchronizedList(
+    final List<Integer> moves = java.util.Collections.synchronizedList(
         new ArrayList<>());
     /** Лента загруженного сохранения: её надо доиграть, прежде чем спрашивать игрока. */
     private final List<Integer> replay = new ArrayList<>();
@@ -316,6 +342,17 @@ public final class HotSeatWindow {
             frame.getLayeredPane().getHeight());
         ceremony.setBounds(0, 0, frame.getLayeredPane().getWidth(),
             frame.getLayeredPane().getHeight());
+
+        // Ctrl+Z — шаг назад из любого места окна.
+        frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+            javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Z,
+                java.awt.event.InputEvent.CTRL_DOWN_MASK), "undo-step");
+        frame.getRootPane().getActionMap().put("undo-step", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                undoLast();
+            }
+        });
 
         frame.setSize(Theme.px(1500), Theme.px(950));
         frame.setMinimumSize(new Dimension(Theme.px(1150), Theme.px(760)));
@@ -591,8 +628,27 @@ public final class HotSeatWindow {
         JPanel top = new JPanel();
         top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
         top.setBackground(Theme.panel());
-        stepsCaption = caption("ШАГИ ХОДА");
+        stepsCaption = caption("ШАГИ ХОДА — щелчок отменяет шаг");
         top.add(stepsCaption);
+        // ОТКАТ ВСЕГДА ПОД РУКОЙ: шаг назад и к началу хода. Отменяется
+        // любое решение круга — это переигровка партии, а не заплатка.
+        JPanel undoRow = new JPanel(new net.miginfocom.swing.MigLayout(
+            "insets 0 " + Theme.px(8) + " " + Theme.px(6) + " " + Theme.px(8)
+                + ", gapx " + Theme.px(6), "[grow,fill][grow,fill]"));
+        undoRow.setOpaque(false);
+        undoBtn = new KpButton("Шаг назад", "Ctrl+Z", null);
+        undoBtn.setToolTipText("Отменить последнее своё решение в этом круге");
+        undoBtn.onClick(this::undoLast);
+        undoBtn.setState(KpButton.State.DISABLED);
+        undoAllBtn = new KpButton("К началу хода", "", null);
+        undoAllBtn.setToolTipText("Отменить всё, что вы решили в этом круге, "
+            + "включая вскрытие приказа");
+        undoAllBtn.onClick(this::undoAll);
+        undoAllBtn.setState(KpButton.State.DISABLED);
+        undoRow.add(undoBtn, "h " + Theme.px(40) + "!");
+        undoRow.add(undoAllBtn, "h " + Theme.px(40) + "!");
+        undoRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        top.add(undoRow);
         steps = new kelium.gui.kp.TurnStepsPanel();
         steps.setAlignmentX(Component.LEFT_ALIGNMENT);
         top.add(steps);
@@ -813,20 +869,137 @@ public final class HotSeatWindow {
 
     // ==================== партия ====================
 
+    /**
+     * ПОКОЛЕНИЕ ПАРТИИ. Откат перезапускает движок, и у старого потока ещё могут
+     * быть в пути кадры и точки решения: всё, что пришло не от текущего
+     * поколения, окно молча выбрасывает.
+     */
+    private volatile int generation;
+    /** Стол до первого хода — от него переигрывается партия при откате. */
+    private volatile StartTable startTable;
+
+    /**
+     * ЗАПИСЬ О ПРИНЯТОМ РЕШЕНИИ — рядом с номером варианта в ленте. По ней
+     * окно знает, чьё это решение, какого вида, в каком круге и как его назвать
+     * человеку в списке шагов хода.
+     */
+    record Decision(int seat, String kind, String label, int round, int circle) {
+    }
+
+    /** Решения партии — параллельно ленте {@link #moves}, под её же замком. */
+    final List<Decision> decisions = new ArrayList<>();
+
+    /** Пишущая обёртка: номер варианта в ленту и запись о решении рядом. */
+    private final class Journaled extends Agent {
+
+        private final Agent inner;
+
+        Journaled(Agent inner) {
+            super(inner.seat, inner.name);
+            this.inner = inner;
+        }
+
+        @Override
+        public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
+            Choice picked = inner.choose(state, options, context);
+            int idx = options.indexOf(picked);
+            synchronized (moves) {
+                moves.add(idx);
+                decisions.add(new Decision(seat, String.valueOf(context.get("kind")),
+                    decisionWords(String.valueOf(context.get("kind")), picked),
+                    state.round, state.circle));
+            }
+            return picked;
+        }
+
+        @Override
+        public void observeEvent(Map<String, Object> event) {
+            inner.observeEvent(event);
+        }
+
+        @Override
+        public void observePublicEvent(Map<String, Object> event) {
+            inner.observePublicEvent(event);
+        }
+    }
+
     private void runGame() {
-        // КРАСКИ МЕСТ ставятся ДО сборки партии: по ним рисуется и поле, и
-        // фишки, и картинки жетонов.
-        kelium.report.FieldGeometry.useSeatColors(options.seatColors());
-        GameConfig cfg = GameConfig.buildCached(options.rulesetId(), players, seed, null, null,
-            options.scenarioId(), options.cuFacing(), options.scenarioFile());
-        applyTrainingSetup(cfg);
-        this.cfg = cfg;
-        GameState state = Setup.buildGame(cfg);
+        playSession(generation, List.copyOf(replay));
+    }
+
+    /**
+     * РЕШЕНИЕ СЛОВАМИ — строка в списке шагов хода. Зовётся из потока движка,
+     * поэтому берёт только неизменяемое (подписи, свод партии).
+     */
+    String decisionWords(String kind, Choice c) {
+        Object p = c.payload();
+        String raw = humanLabel(c.label() == null ? String.valueOf(p) : c.label());
+        if ("pass".equals(c.kind()) && p == null) {
+            return "action".equals(kind) ? "Завершил ход"
+                : KIND_LABELS.getOrDefault(kind, "Решение") + ": отказ";
+        }
+        return switch (kind) {
+            case "action" -> p instanceof String a ? ActionBar.ACTIONS.getOrDefault(a, a) : raw;
+            case "reveal_order" -> "Вскрыт приказ «" + cardNameSafe(String.valueOf(p)) + "»";
+            case "blind_discard" -> "Отложен приказ «" + cardNameSafe(String.valueOf(p)) + "»";
+            case "build_pick" -> p instanceof Map<?, ?> m && m.get("btype") != null
+                ? "Строю: " + kelium.report.Labels.buildingLabel(
+                    String.valueOf(m.get("btype")).toLowerCase(java.util.Locale.ROOT),
+                    m.get("level") instanceof Number n ? n.intValue() : null)
+                : "Строю: " + raw;
+            case "build_hex", "tower_hex", "cu_hex" -> "Гекс стройки " + hexWords(String.valueOf(p));
+            case "build_facing", "cu_sides" -> "Поворот здания";
+            case "move" -> p instanceof Map<?, ?> m && m.get("to") != null
+                ? "Шаг на " + hexWords(String.valueOf(m.get("to"))) : "Шаг: " + raw;
+            case "maneuver_hex" -> "Манёвр через " + hexWords(String.valueOf(p));
+            case "combat_source" -> "Бой из " + hexWords(String.valueOf(p));
+            case "attack" -> p instanceof Map<?, ?> m ? "Атака " + attackLabelRu(
+                c.label() == null ? "" : c.label(), m) : "Атака";
+            case "spec" -> "СПЕЦ: " + raw;
+            default -> KIND_LABELS.containsKey(kind)
+                ? KIND_LABELS.get(kind) + ": " + raw : raw;
+        };
+    }
+
+    /** Гекс словами: координаты, как их пишет правило, а не внутренний id. */
+    private static String hexWords(String hexId) {
+        if (hexId != null && hexId.startsWith("h")) {
+            return "(" + hexId.substring(1).replace('_', ',') + ")";
+        }
+        return String.valueOf(hexId);
+    }
+
+    /** Имя карты без обращения к живой записи (её пишет поток Swing). */
+    private String cardNameSafe(String id) {
+        ReplayRecord r = rec;
+        String n = r == null ? null : r.cardNames.get(id);
+        return n == null ? id : n;
+    }
+
+    /**
+     * ОДИН ПРОГОН ДВИЖКА. Первый прогон строит стол; каждый откат запускает
+     * новый прогон того же стола, и лента {@code prefix} проигрывается до
+     * места отката без вопросов игроку.
+     */
+    private void playSession(int gen, List<Integer> prefix) {
+        GameConfig cfg = this.cfg;
+        if (cfg == null) {
+            // КРАСКИ МЕСТ ставятся ДО сборки партии: по ним рисуется и поле, и
+            // фишки, и картинки жетонов.
+            kelium.report.FieldGeometry.useSeatColors(options.seatColors());
+            cfg = GameConfig.buildCached(options.rulesetId(), players, seed, null, null,
+                options.scenarioId(), options.cuFacing(), options.scenarioFile());
+            applyTrainingSetup(cfg);
+            this.cfg = cfg;
+            startTable = StartTable.of(Setup.buildGame(cfg));
+            GameConfig c = cfg;
+            SwingUtilities.invokeLater(() -> {
+                boards.setRules(c.ruleset, c.content);
+                session.setContent(c.content);
+            });
+        }
+        GameState state = startTable.fresh();
         this.liveState = state;
-        SwingUtilities.invokeLater(() -> {
-            boards.setRules(cfg.ruleset, cfg.content);
-            session.setContent(cfg.content);
-        });
 
         List<Agent> agents = new ArrayList<>();
         List<String> labels = new ArrayList<>();
@@ -836,8 +1009,12 @@ public final class HotSeatWindow {
                 int seatFinal = seat;
                 kelium.core.UndoableAgent ia = new kelium.core.UndoableAgent(
                     seat, "Игрок " + (seat + 1), state,
-                    d -> SwingUtilities.invokeLater(() -> showDecision(seatFinal, d)),
-                    ev -> { });
+                    d -> SwingUtilities.invokeLater(() -> {
+                        if (gen == generation) {
+                            showDecision(seatFinal, d);
+                        }
+                    }),
+                    ev -> { }, false);
                 humansBySeat.put(seat, ia);
                 if (humansBySeat.size() == 1) {
                     viewedSeat = seat;
@@ -856,40 +1033,80 @@ public final class HotSeatWindow {
         }
         mySeat = meSeat(seatSpecs);
 
-        if (options.training()) {
+        if (options.training() && gen == 0) {
             SwingUtilities.invokeLater(() -> feedLine(null,
                 "ТРЕНИРОВОЧНАЯ ПАРТИЯ: значения подготовки заданы вручную — "
                     + trainingNote() + ". В замеры баланса такая партия не годится."));
         }
 
-        // ЛЕНТА РЕШЕНИЙ пишется всегда: без неё партию не сохранить. Если
-        // партию продолжают, поверх ложится проигрывающая обёртка — она доводит
-        // стол до места сохранения и передаёт игру живым.
+        // ЛЕНТА РЕШЕНИЙ пишется всегда: без неё партию не сохранить и не
+        // откатить. Если партию продолжают (сохранение) или откатывают, поверх
+        // ложится проигрывающая обёртка — она доводит стол до нужного места и
+        // передаёт игру живым.
         List<Agent> playing = agents;
-        if (!replay.isEmpty()) {
-            catchingUp = true;
-            SwingUtilities.invokeLater(() -> turnLabel.setText(
-                "Доигрываем сохранённое — " + replay.size() + " решений…"));
-            playing = MoveLog.playback(playing, replay,
-                () -> SwingUtilities.invokeLater(this::onCaughtUp));
+        catchingUp = !prefix.isEmpty();
+        if (prefix.isEmpty() && gen > 0) {
+            // Откат к самому первому решению партии: доигрывать нечего.
+            SwingUtilities.invokeLater(() -> {
+                if (gen == generation) {
+                    onCaughtUp();
+                }
+            });
+        }
+        if (!prefix.isEmpty()) {
+            if (gen == 0) {
+                SwingUtilities.invokeLater(() -> turnLabel.setText(
+                    "Доигрываем сохранённое — " + prefix.size() + " решений…"));
+            }
+            playing = MoveLog.playback(playing, prefix,
+                () -> SwingUtilities.invokeLater(() -> {
+                    if (gen == generation) {
+                        onCaughtUp();
+                    }
+                }));
         }
         // ПИШУЩАЯ ОБЁРТКА — САМАЯ ВЕРХНЯЯ, поверх проигрывающей: иначе
-        // доигранные по сохранению ходы мимо ленты пройдут, и сохранить
+        // доигранные по ленте ходы мимо неё пройдут, и сохранить или откатить
         // продолженную партию будет нечем.
-        playing = MoveLog.recording(playing, moves);
+        List<Agent> journaled = new ArrayList<>(playing.size());
+        for (Agent a : playing) {
+            journaled.add(new Journaled(a));
+        }
+        playing = journaled;
 
         ReplayRecord result;
         try {
             result = GameRecorder.playWithAgents(cfg, state, playing, labels, seed,
                 options.seatColors(),
-                msg -> SwingUtilities.invokeLater(() -> feedLine(null, msg)),
-                r -> SwingUtilities.invokeLater(() -> onFrame(r)));
+                msg -> SwingUtilities.invokeLater(() -> {
+                    if (gen == generation) {
+                        feedLine(null, msg);
+                    }
+                }),
+                r -> {
+                    if (gen != generation) {
+                        // Прогон отменён откатом: новых кадров от него не
+                        // надо, и дальше он доигрывать не должен.
+                        throw new kelium.core.GameAborted("прогон отменён откатом");
+                    }
+                    SwingUtilities.invokeLater(() -> {
+                        if (gen == generation) {
+                            onFrame(r);
+                        }
+                    });
+                });
         } catch (kelium.core.GameAborted e) {
+            if (gen != generation) {
+                return;      // это откат, а не закрытие: новый прогон уже идёт
+            }
             // Игрок закрыл партию — это не поломка. Записываем то, что успело
             // случиться: журнал партии нужен дизайнеру и от недоигранной.
             saveJournal(rec, "-прервана");
             return;
         } catch (Throwable t) {
+            if (gen != generation) {
+                return;
+            }
             failure = t;
             if (stopped) {
                 return;      // окно уже закрыто, жаловаться некому
@@ -929,6 +1146,9 @@ public final class HotSeatWindow {
                     new kelium.gui.kp.ConfirmDialog.Option("Остаться в окне",
                         "посмотреть доску и ленту", () -> confirm.close()));
             });
+            return;
+        }
+        if (gen != generation) {
             return;
         }
         ReplayRecord finalRec = result;
@@ -982,6 +1202,11 @@ public final class HotSeatWindow {
     /** Место с пометкой «вы» (−1 — ни у кого) — для прогонщиков и тестов. */
     int mySeatForTest() {
         return mySeat;
+    }
+
+    /** Идёт ли переигровка ленты (сохранение или откат) — для тестов. */
+    boolean catchingUpForTest() {
+        return catchingUp;
     }
 
     /** Партия доиграна или оборвана — для прогонщиков и тестов. */
@@ -1052,7 +1277,12 @@ public final class HotSeatWindow {
         if (rec != null && !rec.frames.isEmpty()) {
             onFrame(rec);
         }
-        feedLine(null, "Сохранённая партия восстановлена — играем дальше");
+        if (undoNote != null) {
+            feedLine(null, undoNote);
+            undoNote = null;
+        } else {
+            feedLine(null, "Сохранённая партия восстановлена — играем дальше");
+        }
     }
 
     /**
@@ -1166,8 +1396,10 @@ public final class HotSeatWindow {
         // перерисовка, а связь окна с партией. Пропускать её было ошибкой —
         // восстановленная партия открывалась «пустой», хотя уже шла.
         if (this.rec != r) {
+            // Новая запись — это новый прогон (откат переигрывает партию).
             this.rec = r;
             field.setRecord(r);
+            sessionBound = false;
         }
         if (r.frames.isEmpty()) {
             return;
@@ -1347,91 +1579,146 @@ public final class HotSeatWindow {
         refreshSteps();
     }
 
-    /** Собрать ленту: запёкшееся → точки отката агента → текущая точка. */
+    /**
+     * ШАГИ ХОДА: все решения живого игрока в этом круге — каждое можно
+     * отменить щелчком, и партия вернётся к моменту ПЕРЕД ним. Бой, рынок и
+     * наука здесь такие же, как стройка: откат переигрывает партию, а не
+     * латает состояние, поэтому ничего необратимого для него нет (просьба
+     * дизайнера 25.09.2026: «забей на честность — дай отменять всё»).
+     */
     private void refreshSteps() {
-        // ЗАПЕКАНИЕ ПО ФАКТУ: точки исчезли из агента (первый залп/рынок/наука
-        // очистили стек) — их подписи переезжают в замки вместе с именем
-        // необратимого действия, запомненным при клике по плитке.
-        kelium.core.UndoableAgent bakeAgent =
-            turnSeat == null ? null : humansBySeat.get(turnSeat);
-        if (bakeAgent != null) {
-            List<String> now = new ArrayList<>();
-            for (String l : bakeAgent.checkpointLabels()) {
-                now.add(ActionBar.ACTIONS.getOrDefault(l, l));
-            }
-            if (now.isEmpty() && !lastAgentLabels.isEmpty() && pendingBakeName != null) {
-                lockedSteps.addAll(lastAgentLabels);
-            }
-            if (now.isEmpty() && pendingBakeName != null) {
-                lockedSteps.add(pendingBakeName);
-                pendingBakeName = null;
-            }
-            lastAgentLabels = now;
-        }
-
         List<kelium.gui.kp.TurnStepsPanel.Row> rows = new ArrayList<>();
-        int seat = turnSeat == null ? viewedSeat : turnSeat;
-        for (String s : lockedSteps) {
-            rows.add(new kelium.gui.kp.TurnStepsPanel.Row(s,
-                kelium.gui.kp.TurnStepsPanel.Kind.LOCKED, null));
-        }
-        kelium.core.UndoableAgent agent =
-            turnSeat == null ? null : humansBySeat.get(turnSeat);
-        if (agent != null) {
-            // Откат безопасен только на границе действий: пока движок стоит на
-            // точке вида action этого же хода (см. javadoc UndoableAgent).
-            boolean undoNow = awaitingSeat != null && awaitingSeat.equals(turnSeat)
-                && "action".equals(pendingKind);
-            List<String> labels = agent.checkpointLabels();
-            for (int i = 0; i < labels.size(); i++) {
-                String ru = ActionBar.ACTIONS.getOrDefault(labels.get(i), labels.get(i));
+        int seat = awaitingSeat != null ? awaitingSeat
+            : turnSeat == null ? viewedSeat : turnSeat;
+        if (awaitingSeat != null) {
+            for (int i : undoTargets(awaitingSeat)) {
+                Decision d;
+                synchronized (moves) {
+                    d = i < decisions.size() ? decisions.get(i) : null;
+                }
+                if (d == null) {
+                    continue;
+                }
                 int idx = i;
-                rows.add(new kelium.gui.kp.TurnStepsPanel.Row(ru,
-                    undoNow ? kelium.gui.kp.TurnStepsPanel.Kind.UNDOABLE
-                        : kelium.gui.kp.TurnStepsPanel.Kind.INFO,
-                    undoNow ? () -> doUndoTo(agent, idx) : null));
+                rows.add(new kelium.gui.kp.TurnStepsPanel.Row(d.label(),
+                    kelium.gui.kp.TurnStepsPanel.Kind.UNDOABLE, () -> undoTo(idx)));
             }
-        } else {
+            if (pendingKind != null) {
+                rows.add(new kelium.gui.kp.TurnStepsPanel.Row(
+                    KIND_LABELS.getOrDefault(pendingKind, "решение"),
+                    kelium.gui.kp.TurnStepsPanel.Kind.CURRENT, null));
+            }
+        } else if (turnSeat != null && !humansBySeat.containsKey(turnSeat)) {
             for (String s : botSteps) {
                 rows.add(new kelium.gui.kp.TurnStepsPanel.Row(s,
                     kelium.gui.kp.TurnStepsPanel.Kind.INFO, null));
             }
         }
-        if (awaitingSeat != null && awaitingSeat.equals(turnSeat) && pendingKind != null) {
-            rows.add(new kelium.gui.kp.TurnStepsPanel.Row(
-                KIND_LABELS.getOrDefault(pendingKind, pendingKind),
-                kelium.gui.kp.TurnStepsPanel.Kind.CURRENT, null));
-        }
         steps.setRows(seat, rows);
+        refreshUndoControls();
     }
 
     /**
-     * ОТКАТ «ДО ТОЧКИ»: партия возвращается к моменту перед шагом, экран
-     * перерисовывается сразу (движок молчит — он всё ещё ждёт наш ответ),
-     * след отката остаётся и в ленте, и в журнале партии.
+     * КУДА МОЖНО ОТКАТИТЬСЯ: номера решений этого места в ленте, принятых в
+     * ТЕКУЩЕМ круге (от вскрытия приказа до этой минуты), по порядку.
      */
-    private void doUndoTo(kelium.core.UndoableAgent agent, int idx) {
-        String ru = ActionBar.ACTIONS.getOrDefault(
-            agent.checkpointLabels().get(idx), agent.checkpointLabels().get(idx));
-        agent.undoTo(idx);
-        List<String> left = agent.checkpointLabels();
-        actionBar.setPlayed(left);
-        GameState s = liveState;
-        if (rec != null && s != null) {
-            ReplayRecord.Frame f = new ReplayRecord.Frame();
-            f.type = "undo";
-            f.round = s.round;
-            f.circle = s.circle;
-            f.seat = agent.seat;
-            f.log = "Игрок " + (agent.seat + 1) + " вернулся к моменту перед шагом «"
-                + ru + "»";
-            f.snapshot = ReplayRecord.snapshotOf(s, agent.seat);
-            rec.frames.add(f);
-            onFrame(rec);
-        } else {
-            refreshSteps();
+    List<Integer> undoTargets(int seat) {
+        List<Integer> out = new ArrayList<>();
+        kelium.core.UndoableAgent agent = humansBySeat.get(seat);
+        InteractiveAgent.PendingDecision now = agent == null ? null : agent.pending();
+        if (now == null || catchingUp) {
+            return out;
+        }
+        int round = now.state().round;
+        int circle = now.state().circle;
+        synchronized (moves) {
+            for (int i = decisions.size() - 1; i >= 0; i--) {
+                Decision d = decisions.get(i);
+                if (d.round() != round || d.circle() != circle) {
+                    break;
+                }
+                if (d.seat() == seat) {
+                    out.add(0, i);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Шаг назад: отменить последнее решение живого игрока в этом круге. */
+    void undoLast() {
+        if (awaitingSeat == null) {
+            return;
+        }
+        List<Integer> t = undoTargets(awaitingSeat);
+        if (!t.isEmpty()) {
+            undoTo(t.get(t.size() - 1));
         }
     }
+
+    /** К началу хода: отменить всё, что живой игрок решил в этом круге. */
+    void undoAll() {
+        if (awaitingSeat == null) {
+            return;
+        }
+        List<Integer> t = undoTargets(awaitingSeat);
+        if (!t.isEmpty()) {
+            undoTo(t.get(0));
+        }
+    }
+
+    /** Кнопки отката в полосе хода — живы, только когда есть что отменять. */
+    private void refreshUndoControls() {
+        if (undoBtn == null) {
+            return;
+        }
+        int n = awaitingSeat == null ? 0 : undoTargets(awaitingSeat).size();
+        undoBtn.setState(n > 0 ? KpButton.State.AVAILABLE : KpButton.State.DISABLED);
+        undoAllBtn.setState(n > 1 ? KpButton.State.AVAILABLE : KpButton.State.DISABLED);
+        undoBtn.setTexts("Шаг назад", n > 0 ? "Ctrl+Z" : "нечего отменять");
+        undoAllBtn.setTexts("К началу хода", n > 1 ? "отменить шагов: " + n : "");
+    }
+
+    KpButton undoBtn;
+    KpButton undoAllBtn;
+
+    /**
+     * ОТКАТ «ДО ТОЧКИ»: партия переигрывается с начального стола по ленте до
+     * решения {@code index} (его самого — уже нет), и игрока спрашивают там же
+     * заново. Старый прогон движка снимается: его агенты размыкаются, а всё,
+     * что он ещё успеет прислать, отбрасывается по номеру поколения.
+     */
+    void undoTo(int index) {
+        List<Integer> prefix;
+        String what;
+        synchronized (moves) {
+            if (index < 0 || index >= moves.size()) {
+                return;
+            }
+            what = decisions.get(index).label();
+            prefix = new ArrayList<>(moves.subList(0, index));
+            moves.clear();
+            decisions.clear();
+        }
+        int gen = ++generation;
+        for (kelium.core.UndoableAgent a : humansBySeat.values()) {
+            a.abort();
+        }
+        clearDecision();
+        catchingUp = true;
+        undoNote = "Отменено: «" + what + "» и всё после него";
+        feedBox.removeAll();
+        journalBox.removeAll();
+        lastFeedText = null;
+        botSteps.clear();
+        turnLabel.setText("Откат…");
+        Thread engine = new Thread(() -> playSession(gen, prefix), "hotseat-engine-" + gen);
+        engine.setDaemon(true);
+        engine.start();
+    }
+
+    /** Что сказать в ленте, когда откат доиграет до места. */
+    private String undoNote;
 
     /**
      * ПОДПИСЬ ДЛЯ ЧЕЛОВЕКА: без внутренних кодов в скобках — «Колосс (koloss)»
@@ -1515,6 +1802,7 @@ public final class HotSeatWindow {
         Map.entry("energy_hex", "гекс для энергии"),
         Map.entry("move_source", "гекс, войска которого двигаются бесплатно"),
         Map.entry("maneuver_hex", "гекс манёвра: сначала выведите войска, потом введите"),
+        Map.entry("sci_pay_kelium", "сколько заплатить келемием, остальное трофеями"),
         Map.entry("move", "куда шагнуть"),
         Map.entry("maneuver_unit", "какой отряд поведёте"),
         Map.entry("combat_source", "откуда атаковать"),

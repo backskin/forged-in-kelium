@@ -3820,9 +3820,19 @@ public final class Actions {
         }
 
         private int сколькоМожемЗаплатить(PlayerState player) {
-            return rs.getBool("tech.pay_with_trophy_only", false)
+            int трофеи = rs.getBool("tech.pay_with_trophy_only", false)
                 ? player.resources.trophy()
                 : player.destroyedValue() + player.resources.trophy();
+            return трофеи + (наукаЗаКелемий() ? player.resources.kelium() : 0);
+        }
+
+        /**
+         * НАУКА ЗА КЕЛЕМИЙ ИЛИ ТРОФЕИ (решение дизайнера 25.09.2026): шаги всех
+         * трёх треков и обмены планшета науки оплачиваются келемием, трофеями
+         * или тем и другим вперемешку — сколько чего, выбирает игрок.
+         */
+        private boolean наукаЗаКелемий() {
+            return rs.getBool("tech.pay_with_kelium", false);
         }
 
         private void payTrophy(PlayerState player, int cost) {
@@ -3858,6 +3868,33 @@ public final class Actions {
          */
         private int payTrophy(PlayerState player, int cost, Agent agent) {
             int remaining = cost;
+            // СКОЛЬКО ЗАПЛАТИТЬ КЕЛЕМИЕМ — решает игрок, остальное идёт
+            // трофеями; не хватило трофеев — добирается келемием ниже.
+            if (наукаЗаКелемий() && player.resources.kelium() > 0 && cost > 0) {
+                int трофеев = rs.getBool("tech.pay_with_trophy_only", false)
+                    ? player.resources.trophy()
+                    : player.destroyedValue() + player.resources.trophy();
+                int макс = Math.min(cost, player.resources.kelium());
+                int мин = Math.max(0, cost - трофеев);
+                int келемием = макс;
+                if (agent != null && мин < макс) {
+                    List<Choice> opts = new ArrayList<>();
+                    for (int k = мин; k <= макс; k++) {
+                        opts.add(new Choice("sci_pay_kelium", k,
+                            k + " келемия, " + (cost - k) + " трофеев"));
+                    }
+                    Object выбор = agent.choose(state, opts,
+                        Map.of("kind", "sci_pay_kelium", "cost", cost)).payload();
+                    келемием = выбор instanceof Integer k ? k : макс;
+                }
+                if (келемием > 0) {
+                    player.resources.pay(Resource.KELIUM, келемием);
+                    remaining -= келемием;
+                }
+                if (remaining == 0) {
+                    return cost;
+                }
+            }
             // ПЛАТЯТ ТРОФЕЯМИ, А НЕ ЦЕЛЫМИ ЖЕТОНАМИ (уточнение дизайнера
             // 21.08.2026, ключ tech.pay_with_trophy_only).
             //
@@ -3880,7 +3917,8 @@ public final class Actions {
                 boolean keliumOkHere = келемийДжокер(state)
                     || kelium.engine.ability.RuleQuery
                     .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
-                    .base(0).ask() >= 1.0;
+                    .base(0).ask() >= 1.0
+                    || наукаЗаКелемий();
                 int pay = Math.min(remaining, player.resources.trophy());
                 if (pay > 0) {
                     player.resources.pay(Resource.TROPHY, pay);
@@ -3902,7 +3940,8 @@ public final class Actions {
             boolean keliumOk = келемийДжокер(state)
                 || kelium.engine.ability.RuleQuery
                 .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
-                .base(0).ask() >= 1.0;
+                .base(0).ask() >= 1.0
+                    || наукаЗаКелемий();
             // ЧЕМ ПЛАТИТЬ — РЕШАЕТ ИГРОК (решение дизайнера 13.09.2026): кубиками
             // трофеев из хранилища или жетоном со своей свалки целиком, без
             // сдачи. Жетоны предлагаются рядом с кубиками, а не тратятся первыми.
