@@ -53,18 +53,36 @@ public final class UndoableAgent extends Agent {
     private final GameState state;
     private final InteractiveAgent delegate;
     private final List<Mark> stack = new ArrayList<>();
+    /**
+     * Снимать ли точки отката. Окно партии откатывает ПЕРЕИГРОВКОЙ ленты
+     * решений (любое решение, не только безопасные действия), и снимки ему не
+     * нужны — больше того, вредны: снимок сдвигает ГСЧ партии
+     * ({@code rng.nextLong}), а при переигровке ленты этот агент не
+     * спрашивается, и поток случайностей разошёлся бы с исходной партией.
+     */
+    private final boolean snapshots;
 
     public UndoableAgent(int seat, String name, GameState state,
                           Consumer<InteractiveAgent.PendingDecision> onDecision,
                           Consumer<Map<String, Object>> onPublicEvent) {
+        this(seat, name, state, onDecision, onPublicEvent, true);
+    }
+
+    public UndoableAgent(int seat, String name, GameState state,
+                          Consumer<InteractiveAgent.PendingDecision> onDecision,
+                          Consumer<Map<String, Object>> onPublicEvent, boolean snapshots) {
         super(seat, name);
         this.state = state;
+        this.snapshots = snapshots;
         this.delegate = new InteractiveAgent(seat, name, onDecision, onPublicEvent);
     }
 
     @Override
     public Choice choose(GameState s, List<Choice> options, Map<String, Object> context) {
         Choice pick = delegate.choose(s, options, context);
+        if (!snapshots) {
+            return pick;
+        }
         String kind = String.valueOf(context.get("kind"));
         if ("action".equals(kind) && pick.payload() instanceof String actionName
                 && SAFE_ACTIONS.contains(actionName)) {
