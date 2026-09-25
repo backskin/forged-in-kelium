@@ -1008,29 +1008,62 @@ public final class PlayerTable extends JComponent {
         spots.put("back", new Rectangle(x, ey, w, eh));
     }
 
+    /** Строка, обрезанная многоточием по ширине. */
+    private static String clipText(Graphics2D g, String s, int w) {
+        FontMetrics fm = g.getFontMetrics();
+        if (fm.stringWidth(s) <= w) {
+            return s;
+        }
+        int n = s.length();
+        while (n > 1 && fm.stringWidth(s.substring(0, n) + "…") > w) {
+            n--;
+        }
+        return s.substring(0, n) + "…";
+    }
+
     // ---------- руки веером ----------
 
     private void paintHands(Graphics2D g, int x, int y, int w, int h) {
         if (w < Theme.px(80)) {
             return;
         }
-        List<String> obj = state.objectives();
-        List<String> sup = state.superObjectives();
-        List<String> ord = state.ordersInHand();
-        // Задания — главный веер, крупно; ниже узкой полосой — приказы в руке
-        // и супер-задания.
-        int subH = ord.isEmpty() && sup.isEmpty() ? 0 : (int) (h * 0.30);
-        int mainH = h - subH - (subH > 0 ? Theme.px(8) : 0);
-        fan(g, "objectives", "ЗАДАНИЯ", obj, x, y, w, mainH, false);
-        if (subH > 0) {
-            int sy = y + mainH + Theme.px(8);
-            int half = sup.isEmpty() ? w : ord.isEmpty() ? 0 : w / 2;
-            if (!ord.isEmpty()) {
-                fan(g, "orders", "ПРИКАЗЫ В РУКЕ", ord, x, sy, half - Theme.px(8), subH, true);
-            }
-            if (!sup.isEmpty()) {
-                fan(g, "super", "СУПЕР-ЗАДАНИЯ", sup, x + half, sy, w - half, subH, true);
-            }
+        // ТРИ РУКИ В ОДИН РЯД НА ПОЛНУЮ ВЫСОТУ (замечание дизайнера 25.09.2026:
+        // супер-задание и приказы в руке ютились полосой-марками под заданиями).
+        // Карты всех рук одного роста, ширина ряда делится по числу карт.
+        List<Object[]> hands = new ArrayList<>();
+        hands.add(new Object[]{"objectives", "ЗАДАНИЯ", state.objectives()});
+        if (!state.superObjectives().isEmpty()) {
+            hands.add(new Object[]{"super", "СУПЕР", state.superObjectives()});
+        }
+        if (!state.ordersInHand().isEmpty()) {
+            hands.add(new Object[]{"orders", "ПРИКАЗЫ", state.ordersInHand()});
+        }
+        int gap = Theme.px(16);
+        int ch = h - Theme.px(22);
+        double cw = ch * 0.643;
+        double[] need = new double[hands.size()];
+        double total = gap * (hands.size() - 1);
+        for (int k = 0; k < hands.size(); k++) {
+            int n = Math.max(1, ((List<?>) hands.get(k)[2]).size());
+            need[k] = cw * (1 + 0.3 * (n - 1)) + Theme.px(4);
+            total += need[k];
+        }
+        // Не влезает в ширину — весь ряд уменьшается целиком, карты не
+        // наезжают друг на друга и не уходят за край зоны.
+        double scale = total > w
+            ? Math.max(0.35, (w - gap * (hands.size() - 1)) / (total - gap * (hands.size() - 1)))
+            : 1;
+        int cap = Theme.px(22);
+        int hh = (int) (cap + (h - cap) * scale);
+        int hy = y + (h - hh) / 2;
+        int hx = x;
+        for (int k = 0; k < hands.size(); k++) {
+            Object[] hd = hands.get(k);
+            @SuppressWarnings("unchecked")
+            List<String> ids = (List<String>) hd[2];
+            int hw = (int) Math.round(need[k] * scale);
+            fan(g, (String) hd[0], (String) hd[1], ids, hx, hy, hw, hh, false);
+            hx += hw + gap;
         }
     }
 
@@ -1044,7 +1077,8 @@ public final class PlayerTable extends JComponent {
         g.setFont(Theme.caption());
         boolean chosen = ids.stream().anyMatch(id -> choices.containsKey("card:" + id));
         g.setColor(chosen ? seatColor : MAT_INK2);
-        g.drawString(caption + " · " + ids.size() + (chosen ? " — щёлкните, чтобы сыграть" : ""),
+        g.drawString(clipText(g, caption + " · " + ids.size()
+                + (chosen ? " — щёлкните, чтобы сыграть" : ""), Math.max(w, Theme.px(40))),
             x, y + capH - Theme.px(4));
         int ch = h - capH - Theme.px(6);
         // ПРОПОРЦИЯ — С ПЕЧАТНОГО ЛИЦА (не «кукожить» карты, 25.09.2026)
@@ -1060,6 +1094,7 @@ public final class PlayerTable extends JComponent {
             return;
         }
         double step = n <= 1 ? 0 : Math.min(cw * 0.78, (w - cw) / (double) (n - 1));
+        step = Math.min(step, cw * 0.78);
         step = Math.max(cw * 0.22, step);
         double spreadDeg = small ? 0 : Math.min(18, n * 4.0);
         int baseY = y + capH + Theme.px(4);
