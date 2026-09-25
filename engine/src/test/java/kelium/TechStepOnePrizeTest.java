@@ -27,13 +27,14 @@ class TechStepOnePrizeTest {
     @Test
     void stepCellsOpenUpWithTheTableSize() {
         Ruleset rs = Ctx.rules(Fix.game());
-        assertEquals(List.of(3, 3, 2, 1), rs.stepCapacity(4),
-            "вчетвером открыты все ячейки всех шагов");
+        // Вершина — без предела (решение 25.09.2026): null.
+        assertEquals(java.util.Arrays.asList(3, 3, 2, null), rs.stepCapacity(4),
+            "вчетвером открыты все ячейки всех шагов, вершина без предела");
         // Последняя ячейка шагов 1, 2 и 3 открыта ТОЛЬКО вчетвером, поэтому
-        // вдвоём и втроём состав ячеек одинаковый: 2/2/1/1.
-        assertEquals(List.of(2, 2, 1, 1), rs.stepCapacity(3),
+        // вдвоём и втроём состав ячеек одинаковый: 2/2/1.
+        assertEquals(java.util.Arrays.asList(2, 2, 1, null), rs.stepCapacity(3),
             "втроём закрыты последние ячейки шагов 1, 2 и 3");
-        assertEquals(List.of(2, 2, 1, 1), rs.stepCapacity(2),
+        assertEquals(java.util.Arrays.asList(2, 2, 1, null), rs.stepCapacity(2),
             "вдвоём открыты те же ячейки, что и втроём");
     }
 

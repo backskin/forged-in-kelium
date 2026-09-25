@@ -182,8 +182,19 @@ public final class Ruleset {
      * Вместимость шагов науки для заданного числа игроков (null-элемент = без
      * лимита на этом шаге).
      */
-    @SuppressWarnings("unchecked")
     public List<Integer> stepCapacity(int numPlayers) {
+        List<Integer> out = stepCapacityPrinted(numPlayers);
+        // ВЕРШИНУ ЗАНИМАЕТ СКОЛЬКО УГОДНО ИГРОКОВ (решение дизайнера 25.09.2026):
+        // на планшете одна ячейка, кубики на ней ставятся стопкой.
+        if (getBool("tech.peak_unlimited", false) && out != null && !out.isEmpty()) {
+            out = new ArrayList<>(out);
+            out.set(out.size() - 1, null);
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Integer> stepCapacityPrinted(int numPlayers) {
         // ТРЕКИ 2.1 (12.08.2026): ячейки шага описаны поимённо — для каждой задан
         // МИНИМАЛЬНЫЙ состав, при котором она открыта («4И», «3+И» на планшете).
         // Ёмкость шага для этого стола = сколько ячеек открыто.

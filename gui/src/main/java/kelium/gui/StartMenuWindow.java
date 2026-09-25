@@ -627,12 +627,18 @@ public final class StartMenuWindow {
      * планшете — столько раундов с рынком, и переключатель «подготовительный
      * раунд»: первый раунд без карты рынка, партия на раунд длиннее.
      */
+    /** Меньше карт рынка на партию класть нельзя. */
+    public static final int MIN_MARKET_CARDS = 4;
+
     private JComponent buildRounds() {
         JPanel col = new JPanel();
         col.setOpaque(false);
         col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
         int[] m = printedMarket();
-        marketStep = new Stepper("карт рынка", null, m[0], 1, Math.max(1, m[1]),
+        // от 4 до 10 карт (решение дизайнера 25.09.2026): меньше четырёх —
+        // партия не успевает развернуться
+        marketStep = new Stepper("карт рынка", null, Math.max(MIN_MARKET_CARDS, m[0]),
+            MIN_MARKET_CARDS, Math.max(MIN_MARKET_CARDS, m[1]),
             v -> refreshRounds());
         marketStep.setAlignmentX(Component.LEFT_ALIGNMENT);
         col.add(marketStep);

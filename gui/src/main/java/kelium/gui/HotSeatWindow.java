@@ -2476,6 +2476,7 @@ public final class HotSeatWindow {
         Map.entry("mass_open", "вскрытие находок"),
         Map.entry("cu_hex", "где поставить центр управления"),
         Map.entry("cu_sides", "поворот центра управления"),
+        Map.entry("cu_token_to", "кому отдать жетон уничтожения ЦУ"),
         Map.entry("storage_burn_choice", "ячейка хранилища закрылась: что сжечь"),
         Map.entry("arsenal_replace", "какую установленную карту заменить"),
         Map.entry("barrage", "заградительный огонь"),

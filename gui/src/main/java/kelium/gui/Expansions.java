@@ -109,7 +109,9 @@ public final class Expansions {
             }
             int cards = settings.getInt(MARKET_CARDS_COUNT, 0);
             if (cards > 0) {
-                ruleset.override("market.deck_size", cards);
+                // от 4 до 10 (решение 25.09.2026); старые настройки могли хранить меньше
+                ruleset.override("market.deck_size",
+                    Math.max(StartMenuWindow.MIN_MARKET_CARDS, Math.min(10, cards)));
             }
         }
     }

@@ -41,7 +41,7 @@ public final class GameLogger {
     private static final Map<String, String> COND_RU = Map.of(
         "victory_points", "по победным очкам", "military", "военная победа",
         "super_objective", "супер-задание", "all_peaks_occupied", "заняты все вершины",
-        "last_spawn_tile", "остался последний тайл зарождения");
+        "last_spawn_tile", "истощены тайлы зарождения", "all_peaks", "победа наукой");
 
     private final GameState state;
     private final Path path;

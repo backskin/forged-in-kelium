@@ -140,6 +140,9 @@ class BoardsAndPodiumTest {
             for (var e : f.snapshot.techOccupancy.entrySet()) {
                 List<List<Integer>> steps = e.getValue();
                 for (int i = 0; i < steps.size() && i < caps.size(); i++) {
+                    if (caps.get(i) == null) {
+                        continue;                   // вершина без предела
+                    }
                     assertTrue(steps.get(i).size() <= caps.get(i),
                         "на шаге " + (i + 1) + " трека " + e.getKey() + " больше игроков ("
                             + steps.get(i).size() + "), чем ячеек (" + caps.get(i) + ")");
@@ -155,10 +158,12 @@ class BoardsAndPodiumTest {
     @Test
     void cellCountsFollowThePlayerCount() {
         var rules = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 0L, null, null).ruleset;
-        assertEquals(List.of(3, 3, 2, 1), rules.stepCapacity(4), "вчетвером открыто всё");
-        assertEquals(List.of(2, 2, 1, 1), rules.stepCapacity(3),
+        // вершина без предела (решение 25.09.2026) — null
+        assertEquals(java.util.Arrays.asList(3, 3, 2, null), rules.stepCapacity(4),
+            "вчетвером открыто всё");
+        assertEquals(java.util.Arrays.asList(2, 2, 1, null), rules.stepCapacity(3),
             "втроём закрыты последние ячейки шагов 1, 2 и 3");
-        assertEquals(List.of(2, 2, 1, 1), rules.stepCapacity(2),
+        assertEquals(java.util.Arrays.asList(2, 2, 1, null), rules.stepCapacity(2),
             "вдвоём открыты те же ячейки, что и втроём");
     }
 

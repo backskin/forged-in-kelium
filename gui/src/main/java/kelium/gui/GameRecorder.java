@@ -990,7 +990,8 @@ public final class GameRecorder {
                         case "last_spawn_tile" -> kelium.gui.replay2.Names.condition(code,
                             ev.get("spawn_left") instanceof Number sl ? sl.intValue() : -1,
                             ev.get("spawn_threshold") instanceof Number st ? st.intValue() : -1);
-                        case "military" -> "военная победа (второе ЦУ)";
+                        case "military" -> "военная победа (второй уничтоженный ЦУ)";
+                        case "all_peaks" -> "победа наукой (вершины всех трёх треков)";
                         default -> code;
                     };
                     return "КОНЕЦ ПАРТИИ — победил " + (w == null ? "никто" : rec.playerName(w))

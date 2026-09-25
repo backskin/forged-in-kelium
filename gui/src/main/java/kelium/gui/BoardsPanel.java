@@ -246,6 +246,15 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                     кубикВЯчейку(g, x + c[0] * k, y + c[1] * k, cube, sc.angle(),
                         FieldView.seatColor(here.get(used++)));
                 }
+                // ВЕРШИНА БЕЗ ПРЕДЕЛА (решение 25.09.2026): кубики на её
+                // единственной ячейке стоят стопкой — каждый следующий выше.
+                if (step == steps && used > 0 && used < here.size()) {
+                    double[] c = sc.cell(TRACKS[t], step, 0, steps);
+                    for (int extra = 1; c != null && used < here.size(); extra++) {
+                        кубикВЯчейку(g, x + c[0] * k, y + c[1] * k - extra * cube * 0.45,
+                            cube, sc.angle(), FieldView.seatColor(here.get(used++)));
+                    }
+                }
             }
             // ВЕРШИНА ЗАНЯТА — карту супер-арсенала с неё уже забрали. На печати
             // в этой рамке нарисована карта, и без пометки кажется, что она ещё
@@ -800,6 +809,12 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                     } else if (cell < here.size()) {
                         cube(g, sx + 2, sy + 2, cube - 4, FieldView.seatColor(here.get(cell)));
                     }
+                }
+                // вершина без предела: лишние кубики — левее ячейки, рядом
+                for (int extra = mins.size(); i == steps - 1 && extra < here.size(); extra++) {
+                    int sx = px - (extra - mins.size() + 1) * slot;
+                    int sy = ry + (rowH - 6 - cube) / 2;
+                    cube(g, sx + 2, sy + 2, cube - 4, FieldView.seatColor(here.get(extra)));
                 }
             }
 

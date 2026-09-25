@@ -136,7 +136,9 @@ public final class СуперЗадания {
         // набор 9.0.0: трудные разделы «по ★★»
         "buildings_at_enemy", "full_unit_sets", "gold_modules", "top_steps",
         "resource_sets", "super_arsenal_cards", "kelium", "powered_two_cell",
-        "spawn_double", "track_leader", "dump_tokens");
+        "spawn_double", "track_leader", "dump_tokens",
+        // 25.09.2026, вечер: карта №10 — сектора с контейнером
+        "military_on_container");
 
     /**
      * Знает ли движок эту категорию. Нужно сторожу каталога: неизвестная
@@ -193,6 +195,7 @@ public final class СуперЗадания {
             case "track_leader" -> трековВпереди(s, p);
             case "dump_tokens" -> p.destroyedTokens.size();
             case "spawn_double" -> тайловСДвумяДобытчиками(s, p);
+            case "military_on_container" -> военныеНаКонтейнере(s, p);
             default -> 0;
         };
     }
@@ -472,9 +475,22 @@ public final class СуперЗадания {
 
     /** Свои добытчики, занявшие ячейку печатного контейнера своего гекса. */
     private static int добытчикиНаКонтейнере(GameState s, PlayerState p) {
+        return наКонтейнере(s, p, Set.of(BuildingType.MINER));
+    }
+
+    /**
+     * Свои военные здания и ЦУ, закрывшие ячейку печатного контейнера
+     * (супер-задание, решение дизайнера 25.09.2026).
+     */
+    private static int военныеНаКонтейнере(GameState s, PlayerState p) {
+        return наКонтейнере(s, p, Set.of(BuildingType.BARRACKS, BuildingType.FACTORY,
+            BuildingType.AIRBASE, BuildingType.COMMAND_CENTER));
+    }
+
+    private static int наКонтейнере(GameState s, PlayerState p, Set<BuildingType> типы) {
         int n = 0;
         for (BuildingToken b : p.buildingsOnField()) {
-            if (b.type != BuildingType.MINER || b.hexId == null) {
+            if (!типы.contains(b.type) || b.hexId == null) {
                 continue;
             }
             Hex h = s.field.get(b.hexId);
