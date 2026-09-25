@@ -173,6 +173,27 @@ public final class Textures {
     }
 
     /**
+     * ПЕЧАТНОЕ ЛИЦО КАРТЫ ПО ИДЕНТИФИКАТОРУ — задания, начальные задания, супер
+     * задания, арсенал, начальный и супер арсенал, рынок, контейнеры. Лежат в
+     * {@code card/<колода>/<id>.png}: {@code card/objective/o04},
+     * {@code card/arsenal/a12}. Имя файла — ровно идентификатор карты в
+     * каталоге, поэтому картинка находит свою карту без таблицы соответствия.
+     * Разложены утилитой {@code tools/gen_card_art.py} по экспорту дизайнера.
+     *
+     * @param deck папка колоды: {@code objective} | {@code objective_start} |
+     *             {@code objective_super} | {@code arsenal} |
+     *             {@code arsenal_start} | {@code arsenal_super} |
+     *             {@code market} | {@code container}
+     * @return картинка или {@code null} — тогда карта рисуется прежним видом
+     */
+    public static BufferedImage cardFace(String deck, String id) {
+        if (deck == null || id == null || id.isBlank()) {
+            return null;
+        }
+        return find(List.of("card/" + deck + "/" + id));
+    }
+
+    /**
      * КАРТА ПРИКАЗА — печатное лицо или рубашка. Лежат в {@code card/orders/}.
      *
      * <p>Имя лица — идентификатор карты из набора ({@code blue_infra},
