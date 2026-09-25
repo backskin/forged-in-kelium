@@ -30,6 +30,7 @@ import java.util.function.Function;
 
 import javax.swing.JComponent;
 
+import kelium.gui.replay2.MarkIcons;
 import kelium.gui.replay2.Theme;
 
 /**
@@ -504,7 +505,9 @@ public final class PlayerTable extends JComponent {
         }
         int pad = Theme.px(12);
         int top = pad + Theme.px(4);
-        top += paintSeatTabs(g, w);
+        int tabsH = paintSeatTabs(g, w);
+        int resH = paintResources(g, pad + Theme.px(8), Theme.px(8));
+        top += Math.max(tabsH, resH);
         int innerH = h - top - pad;
         int x = pad + Theme.px(8);
         // ВЕСЬ РЯД ВПИСЫВАЕТСЯ ПО ШИРИНЕ (сдача под ключ 25.09.2026): все
@@ -515,9 +518,9 @@ public final class PlayerTable extends JComponent {
             double hang = boards != null && boards.aspect() > 0 ? Math.max(0, boards.hang()) : 0;
             double perH = (boards != null && boards.aspect() > 0
                 ? boards.aspect() / (1 + hang) : 0)
-                + 0.66 + 0.643 + 2.4 * 0.643;
+                + 0.66 + 0.643 + handsPerHeight();
             int fixed = x + pad + Theme.px(18) * 2 + Theme.px(6) + Theme.px(104)
-                + Theme.px(22);
+                + Theme.px(22) + Theme.px(16) * 2;
             int fitH = (int) ((w - fixed) / perH);
             if (fitH < innerH) {
                 top += (innerH - Math.max(Theme.px(80), fitH)) / 2;
@@ -595,6 +598,49 @@ public final class PlayerTable extends JComponent {
             return r == null ? null : new Point2D.Double(r.getCenterX(), r.getCenterY());
         }, Theme.px(30));
         g.dispose();
+    }
+
+    /** Ресурс игрока в строке над столом: значок, цвет, значение, предел (или null). */
+    public record Res(String icon, Color color, String value, String cap, String label) {
+    }
+
+    private List<Res> resources = List.of();
+
+    /**
+     * РЕСУРСЫ — НА СВОЁМ СТОЛЕ, А НЕ В ВЕРХНЕЙ ПОЛОСЕ (просьба дизайнера
+     * 26.09.2026: «почему деньги и очки сверху, а не там же, где моя зона?»).
+     */
+    public void setResources(List<Res> res) {
+        this.resources = res == null ? List.of() : res;
+        repaint();
+    }
+
+    /** Строка ресурсов крупно; возвращает её высоту. */
+    private int paintResources(Graphics2D g, int x, int y) {
+        if (resources.isEmpty()) {
+            return 0;
+        }
+        int h = Theme.px(28);
+        double s = Theme.px(16);
+        Font num = Theme.mono(15, Font.BOLD);
+        Font cap = Theme.font(11, Font.PLAIN);
+        int cy = y + h / 2;
+        for (Res r : resources) {
+            MarkIcons.paint(g, r.icon(), x + s / 2, cy, s, r.color());
+            x += (int) s + Theme.px(6);
+            g.setFont(num);
+            g.setColor(Color.WHITE);
+            FontMetrics fm = g.getFontMetrics();
+            String v = r.value() + (r.cap() == null ? "" : "/" + r.cap());
+            g.drawString(v, x, cy + (fm.getAscent() - fm.getDescent()) / 2);
+            x += fm.stringWidth(v) + Theme.px(5);
+            g.setFont(cap);
+            g.setColor(MAT_INK2);
+            fm = g.getFontMetrics();
+            g.drawString(r.label(), x, cy + (fm.getAscent() - fm.getDescent()) / 2);
+            x += fm.stringWidth(r.label()) + Theme.px(18);
+        }
+        return h + Theme.px(6);
     }
 
     /** Где лежат вкладки мест после отрисовки. */
@@ -765,7 +811,7 @@ public final class PlayerTable extends JComponent {
         at.translate(x, y + h);
         at.rotate(-Math.PI / 2);
         at.scale(h / (double) back.getWidth(), w / (double) back.getHeight());
-        g.drawImage(back, at, null);
+        kelium.report.Mips.draw(g, back, at);
         g.setClip(clip);
         g.setColor(Theme.alpha(Color.BLACK, 0.3));
         g.setStroke(new BasicStroke(1f));
@@ -790,7 +836,7 @@ public final class PlayerTable extends JComponent {
                     tt.rotate(Math.toRadians((i * 37) % 30 - 15));
                     tt.scale(k, k);
                     tt.translate(-t.face().getWidth() / 2.0, -t.face().getHeight() / 2.0);
-                    g.drawImage(t.face(), tt, null);
+                    kelium.report.Mips.draw(g, t.face(), tt);
                 } else {
                     g.setColor(Theme.trophy());
                     g.fill(new Ellipse2D.Double(cx - cell * 0.3, cy - cell * 0.3,
@@ -845,7 +891,7 @@ public final class PlayerTable extends JComponent {
         if (state.orderArt() != null) {
             java.awt.Shape clip = g.getClip();
             g.clip(shape);
-            g.drawImage(state.orderArt(), x, y, w, h, null);
+            kelium.report.Mips.draw(g, state.orderArt(), x, y, w, h);
             g.setClip(clip);
         } else if (state.orderInfo() != null) {
             paintOrderBack(g, state.orderInfo(), shape, x, y, w, h);
@@ -1111,6 +1157,26 @@ public final class PlayerTable extends JComponent {
 
     // ---------- руки веером ----------
 
+    /**
+     * СКОЛЬКО ШИРИНЫ ЗАНИМАЮТ РУКИ НА ЕДИНИЦУ ВЫСОТЫ — по настоящему числу карт
+     * (вёрстка стола, 26.09.2026). Прежде бралась оценка «2,4 карты», руки же
+     * бывают шире, и их дожимал собственный множитель: зону уменьшали — приказ
+     * и планшеты сужались, рукам доставалось больше места, и карты заданий
+     * РОСЛИ. Теперь высота ряда подбирается по честной ширине, и уменьшается
+     * всё вместе.
+     */
+    private double handsPerHeight() {
+        if (state == null) {
+            return 2.4 * 0.643;
+        }
+        double sum = 0;
+        for (int n : new int[]{state.objectives().size(), state.superObjectives().size(),
+                state.ordersInHand().size()}) {
+            sum += 1 + 0.3 * (Math.max(1, n) - 1);
+        }
+        return sum * 0.643;
+    }
+
     private void paintHands(Graphics2D g, int x, int y, int w, int h) {
         if (w < Theme.px(80)) {
             return;
@@ -1218,7 +1284,7 @@ public final class PlayerTable extends JComponent {
             RoundRectangle2D local = new RoundRectangle2D.Double(0, 0, cw, ch, cw * 0.08, cw * 0.08);
             if (face != null) {
                 gc.clip(local);
-                gc.drawImage(face, 0, 0, cw, ch, null);
+                kelium.report.Mips.draw(gc, face, 0, 0, cw, ch);
                 gc.setClip(null);
             } else {
                 // ПЕЧАТИ НЕТ — рисуем карту, а не белый прямоугольник: цвет
@@ -1277,7 +1343,7 @@ public final class PlayerTable extends JComponent {
         if (img != null) {
             java.awt.Shape clip = g.getClip();
             g.clip(shape);
-            g.drawImage(img, x, y, w, h, null);
+            kelium.report.Mips.draw(g, img, x, y, w, h);
             g.setClip(clip);
         } else {
             g.setColor(fallback);

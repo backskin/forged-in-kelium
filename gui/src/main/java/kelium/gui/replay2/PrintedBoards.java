@@ -180,7 +180,7 @@ final class PrintedBoards {
         }
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
-        g.drawImage(art, x, y, width, h, null);
+        kelium.report.Mips.draw(g, art, x, y, width, h);
         hit("troop", new Rectangle(x, y, width, h));
         for (BoardAnchors.Column c : troopCols(p.seat)) {
             paintTroopAttack(g, x, y, k, c, p, troop, spots);
@@ -484,8 +484,8 @@ final class PrintedBoards {
         int сдвиг = Math.max(1, th / 9);
         int всего = (сколько - 1) * сдвиг;
         for (int i = сколько - 1; i >= 0; i--) {
-            g.drawImage(tex, cx - tw / 2 - всего / 2 + i * сдвиг,
-                y + (высота - th) / 2 - i * сдвиг / 2, tw, th, null);
+            kelium.report.Mips.draw(g, tex, cx - tw / 2 - всего / 2 + i * сдвиг,
+                y + (высота - th) / 2 - i * сдвиг / 2, tw, th);
         }
     }
 
@@ -526,7 +526,7 @@ final class PrintedBoards {
                     tw = colW - 4;
                     th = (int) Math.round(tw / доля);
                 }
-                g.drawImage(tex, cx - tw / 2, y + (картинкаH - th) / 2, tw, th, null);
+                kelium.report.Mips.draw(g, tex, cx - tw / 2, y + (картинкаH - th) / 2, tw, th);
             }
             g.setComposite(было);
             g.setColor(вЗапасе == 0 ? Theme.ink3() : Theme.ink2());
@@ -645,7 +645,7 @@ final class PrintedBoards {
             // планшет, нарисованный следом. Ничего не сжимается.
             int h = (int) Math.round(box.width
                 * картинка.getHeight() / (double) картинка.getWidth());
-            g.drawImage(картинка, box.x, box.y + box.height - h, box.width, h, null);
+            kelium.report.Mips.draw(g, картинка, box.x, box.y + box.height - h, box.width, h);
             return;
         }
         // Печати нет — рисуем саму карту: паз не должен выглядеть пустым, когда
@@ -712,7 +712,7 @@ final class PrintedBoards {
             kelium.report.ТеньЖетона.силуэт(tex,
                 kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
             at, d, d);
-        g.drawImage(tex, at, null);
+        kelium.report.Mips.draw(g, tex, at);
         hit("building:" + code, new Rectangle((int) Math.round(cx - ш / 2),
             (int) Math.round(низ - высота), (int) Math.round(ш), (int) Math.round(высота)));
         if (spots != null) {
@@ -743,7 +743,7 @@ final class PrintedBoards {
         }
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
-        g.drawImage(art, x, y, width, h, null);
+        kelium.report.Mips.draw(g, art, x, y, width, h);
         hit("storage", new Rectangle(x, y, width, h));
         // Рамки ячеек КАЖДОГО складского здания: по ним ляжет сам жетон, если он
         // ещё на планшете (см. ниже, жетонПоверхЯчеек).
@@ -998,7 +998,7 @@ final class PrintedBoards {
                 kelium.report.ТеньЖетона.силуэт(tex,
                     kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
                 at, d, d);
-            g.drawImage(tex, at, null);
+            kelium.report.Mips.draw(g, tex, at);
             hit("building:" + code + ":" + уровень, at.createTransformedShape(
                 new Rectangle(0, 0, tex.getWidth(), tex.getHeight())));
             return;

@@ -852,6 +852,16 @@ public final class HotSeatWindow {
         }
         int seat = shownSeat();
         boolean hidden = seat != viewedSeat;
+        // ресурсы того, чей стол перед глазами — на самом столе
+        table.setResources(List.of(
+            new kelium.gui.kp.PlayerTable.Res("SUPER", Theme.points(), String.valueOf(vpTotal(p)), null, "очков"),
+            new kelium.gui.kp.PlayerTable.Res("COIN", Theme.points(), String.valueOf(p.coin), null, "монет"),
+            new kelium.gui.kp.PlayerTable.Res("KELIUM", Theme.kelium(), String.valueOf(p.kelium),
+                String.valueOf(p.keliumCap), "келемий"),
+            new kelium.gui.kp.PlayerTable.Res("AMMO", Theme.energy(), String.valueOf(p.ammo),
+                String.valueOf(p.ammoCap), "боеприпасы"),
+            new kelium.gui.kp.PlayerTable.Res("TROPHY", Theme.neutral(), String.valueOf(p.trophy),
+                String.valueOf(p.trophyCap), "трофеи")));
         List<kelium.gui.kp.PlayerTable.SeatTab> tabs = new ArrayList<>();
         for (int s = 0; s < seatSpecs.size(); s++) {
             tabs.add(new kelium.gui.kp.PlayerTable.SeatTab(s, shortName(s), s == viewedSeat));
@@ -967,9 +977,8 @@ public final class HotSeatWindow {
         turnLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, Theme.px(8)));
         // длинный заголовок сжимается многоточием, а не наезжает на плашки
         bar.add(turnLabel, "width 80:pref:pref, shrinkprio 200");
-        if (chipsPanel != null) {
-            bar.add(chipsPanel);
-        }
+        // РЕСУРСЫ — НЕ ЗДЕСЬ, А НА СТОЛЕ ИГРОКА (26.09.2026): верхняя полоса —
+        // чей ход и кнопки; счёт своего стола — рядом со своими компонентами.
 
         // СПРАВОЧНИК ПРАВИЛ — главы книги с поиском (заказ 25.09.2026), и на F1.
         KpButton rulesBtn = new KpButton("Правила", "справочник · F1", null);
@@ -2280,7 +2289,7 @@ public final class HotSeatWindow {
                 rows.add(new kelium.gui.kp.OpponentStrip.Row(p.seat, seatName(p.seat),
                     p.seat == mySeat, vpTotal(p), p.coin, p.kelium, p.ammo,
                     p.orderHand.size(), p.objectiveHand.size(), p.arsenalHand.size(),
-                    p.destroyedValue));
+                    p.destroyedValue, p.seat == f.snapshot.firstPlayer));
             }
             opponents.update(rows);
         }
