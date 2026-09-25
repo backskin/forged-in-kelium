@@ -309,6 +309,9 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
      */
     private void картаВЯчейку(Graphics2D g, int x, int y, int w, int h,
                               int cellCost, int players) {
+        if (печатьРынка(g, x, y, w, h, players)) {
+            return;
+        }
         Map<String, Object> card = snap.market == null ? null : find("market", snap.market);
         Color accent = new Color(0x2F, 0x85, 0x5A);      // зелень планшета рынка
         int r = Math.max(6, h / 12);
@@ -357,6 +360,63 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             card.get("left"), 0, cellCost, players, du, accent);
         предложениеВЯчейку(g, x + pad, oy + rowH, w - 2 * pad, rowH - Math.max(2, h / 60),
             card.get("right"), 1, cellCost, players, du, accent);
+    }
+
+    /**
+     * ЦЕНТРЫ ЯЧЕЕК НА ПЕЧАТНОЙ КАРТЕ РЫНКА — доли её ширины и высоты, сняты
+     * по шаблону {@code card/market_face.png} (1028×661): у левого предложения
+     * две ячейки внизу слева, у правого — две внизу справа; вторая в паре
+     * помечена «4 игрока». Сторона ячейки — доля ширины карты.
+     */
+    private static final double[][][] ЯЧЕЙКИ_РЫНКА = {
+        {{0.154, 0.809}, {0.327, 0.809}},
+        {{0.671, 0.809}, {0.845, 0.809}},
+    };
+    private static final double ЯЧЕЙКА_РЫНКА = 0.124;
+
+    /**
+     * АКТИВНАЯ КАРТА РЫНКА ПЕЧАТНЫМ ЛИЦОМ — если лицо этой карты разложено
+     * ({@code card/market/<id>.png}; id любой: {@code m3_03}, {@code m4_07}).
+     * Карта вписывается в место в своей пропорции, не сплющиваясь; поверх
+     * напечатанных ячеек ложатся кубики келемия тех, кто их занял, с меткой
+     * места. Закрытая по числу игроков ячейка затеняется.
+     *
+     * @return {@code false} — лица нет, рисуй прежним видом
+     */
+    private boolean печатьРынка(Graphics2D g, int x, int y, int w, int h, int players) {
+        java.awt.image.BufferedImage face = CardArt.market(snap.market);
+        if (face == null) {
+            return false;
+        }
+        java.awt.Rectangle r = CardArt.drawFit(g, face, x, y, w, h, Math.max(4, h / 24.0));
+        int open = kelium.engine.Actions.marketCellsOpen(players);
+        int d = (int) Math.round(r.width * ЯЧЕЙКА_РЫНКА);
+        for (int side = 0; side < ЯЧЕЙКИ_РЫНКА.length; side++) {
+            int[] taken = snap.marketCells == null || snap.marketCells.length <= side
+                ? new int[]{-1, -1} : snap.marketCells[side];
+            for (int i = 0; i < ЯЧЕЙКИ_РЫНКА[side].length; i++) {
+                int cx = r.x + (int) Math.round(ЯЧЕЙКИ_РЫНКА[side][i][0] * r.width);
+                int cy = r.y + (int) Math.round(ЯЧЕЙКИ_РЫНКА[side][i][1] * r.height);
+                if (i >= open) {
+                    g.setColor(kelium.gui.replay2.Theme.alpha(Color.BLACK, 0.38));
+                    g.fillRoundRect(cx - d / 2, cy - d / 2, d, d, d / 5, d / 5);
+                    continue;
+                }
+                int seat = i < taken.length ? taken[i] : -1;
+                if (seat < 0) {
+                    continue;
+                }
+                int c = (int) Math.round(d * 0.62);
+                cube(g, cx - c / 2, cy - c / 2, c, KELIUM_CUBE);
+                int m = Math.max(6, d / 3);
+                g.setColor(FieldView.seatColor(seat));
+                g.fillOval(cx + d / 2 - m, cy - d / 2, m, m);
+                g.setColor(FieldView.seatStroke(seat));
+                g.setStroke(new BasicStroke(1.2f));
+                g.drawOval(cx + d / 2 - m, cy - d / 2, m, m);
+            }
+        }
+        return true;
     }
 
     /** Одно предложение карты рынка: что дают и ячейки, кто его уже занял. */
@@ -1588,6 +1648,14 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
 
     private void paintMarketCard(Graphics2D g, int x, int y, int w, int h,
                                  int cellCost, int players) {
+        if (CardArt.market(snap.market) != null) {
+            // Лицо карты есть — оно и лежит на месте карты, в своей пропорции.
+            g.setFont(bold(10));
+            g.setColor(new Color(0x2C, 0x62, 0xA8));
+            g.drawString("АКТИВНАЯ КАРТА РЫНКА · раунд " + snap.round, x + 12, y + 16);
+            печатьРынка(g, x, y + 24, w, h - 24, players);
+            return;
+        }
         Map<String, Object> card = snap.market == null ? null : find("market", snap.market);
         g.setColor(wash(new Color(0x2C, 0x62, 0xA8)));
         g.fillRoundRect(x, y, w, h, 12, 12);

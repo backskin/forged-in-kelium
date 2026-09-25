@@ -55,6 +55,27 @@ public final class OrdersTable extends JComponent {
         setOpaque(true);
         setFont(Theme.body());
         ToolTipManager.sharedInstance().registerComponent(this);
+        // НАВЁЛ НА КАРТУ — ОНА КРУПНО РЯДОМ: в стопке печать мелкая.
+        java.awt.event.MouseAdapter zoom = new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseMoved(java.awt.event.MouseEvent e) {
+                int i = playAt(e.getPoint());
+                java.awt.image.BufferedImage art = i < 0 ? null
+                    : kelium.gui.CardArt.order(plays.get(i).card, colour());
+                if (art == null) {
+                    CardZoom.hide();
+                } else {
+                    CardZoom.show(OrdersTable.this, art, bounds.get(i));
+                }
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                CardZoom.hide();
+            }
+        };
+        addMouseListener(zoom);
+        addMouseMotionListener(zoom);
         session.whenFrameChanged(s -> refresh());
         session.whenRecordChanged(s -> refresh());
     }
@@ -66,7 +87,25 @@ public final class OrdersTable extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(Theme.px(CARD_W * 2 + GAP * 3), Theme.px(CARD_H + 12));
+        return new Dimension(Theme.px(CARD_W * 2 + GAP * 3),
+            Theme.px(CARD_H + 12) + (orderBack() != null ? Theme.px(STATUS_H) : 0));
+    }
+
+    /** Под печатной картой — две строки состояния: печать не закрываем. */
+    private static final int STATUS_H = 30;
+
+    /** Цвет колоды приказов этого места в текущем кадре. */
+    private String colour() {
+        ReplayRecord.Frame f = session.frame();
+        if (f == null || f.snapshot == null || seat >= f.snapshot.players.size()) {
+            return null;
+        }
+        return f.snapshot.players.get(seat).orderColor;
+    }
+
+    /** Печатная рубашка колоды этого места — от неё пропорция карт. */
+    private java.awt.image.BufferedImage orderBack() {
+        return session.record() == null ? null : kelium.gui.CardArt.orderBack(colour());
     }
 
     /** Пересобрать состояние карт под текущий кадр. */
@@ -98,6 +137,17 @@ public final class OrdersTable extends JComponent {
             ready.add(op.turnFrame >= 0 && idx >= op.turnFrame);
         }
         repaint();
+    }
+
+    /** Верхняя сыгранная карта под точкой, или −1. */
+    private int playAt(java.awt.Point p) {
+        int found = -1;
+        for (Map.Entry<Integer, Rectangle> en : bounds.entrySet()) {
+            if (en.getKey() < plays.size() && en.getValue().contains(p)) {
+                found = en.getKey();
+            }
+        }
+        return found;
     }
 
     /** Сколько кругов в раунде — столько мест под карты приказов. */
@@ -166,19 +216,29 @@ public final class OrdersTable extends JComponent {
 
         int n = CIRCLES;
         int avail = getWidth() - GAP;
-        int cardW = Theme.px(CARD_W);
-        int cardH = Math.min(Theme.px(CARD_H), getHeight() - Theme.px(8));
+        // ПЕЧАТНАЯ КАРТА — В СВОЕЙ ПРОПОРЦИИ, с картинки: ширина от высоты.
+        // Под ней остаётся полоса на состояние хода.
+        java.awt.image.BufferedImage back = orderBack();
+        int statusH = back != null ? Theme.px(STATUS_H) : 0;
+        int cardH = Math.min(Theme.px(CARD_H), getHeight() - Theme.px(8) - statusH);
+        int cardW = back != null ? (int) Math.round(cardH * kelium.gui.CardArt.aspect(back))
+            : Theme.px(CARD_W);
+        int y = Math.max(Theme.px(2), (getHeight() - statusH - cardH) / 2);
+        if (back != null) {
+            paintStack(g, n, avail, cardW, cardH, y);
+            g.dispose();
+            return;
+        }
         boolean spines = n * (cardW + GAP) > avail;
         // Корешки: все карты видны как узкие полоски, последняя — целиком
         int spineW = Theme.px(SPINE_W);
-        int y = Math.max(Theme.px(2), (getHeight() - cardH) / 2);
         int x = GAP;
         for (int i = 0; i < n; i++) {
             boolean last = i == n - 1;
             int w = spines && !last ? spineW : cardW;
             Rectangle r = new Rectangle(x, y, w, cardH);
-            bounds.put(i, r);
             if (i < plays.size()) {
+                bounds.put(i, r);
                 drawCard(g, plays.get(i), used.get(i), ready.get(i), r, last,
                     spines && !last);
             } else {
@@ -187,6 +247,39 @@ public final class OrdersTable extends JComponent {
             x += w + GAP;
         }
         g.dispose();
+    }
+
+    /**
+     * ПЕЧАТНЫЕ КАРТЫ — СТОПКОЙ СО СДВИГОМ, как их кладут на стол (просьба
+     * дизайнера 25.09.2026: «лежать стопкой красиво одна за другой со
+     * сдвигом», а не «колбасками»). Каждая карта целиком и в своей пропорции;
+     * следующий круг ложится поверх предыдущего, от нижней видна полоса слева,
+     * самая свежая — сверху и целиком. Влезают все рядом — лежат рядом, без
+     * наложения. Места под ещё не вскрытые круги стоят пунктиром там же, где
+     * ляжет их карта.
+     */
+    private void paintStack(Graphics2D g, int n, int avail, int cardW, int cardH, int y) {
+        int step = n <= 1 ? 0 : Math.min(cardW + GAP, (avail - GAP - cardW) / (n - 1));
+        step = Math.max(Theme.px(12), step);
+        boolean overlap = step < cardW + GAP;
+        // сперва пустые места, потом карты: карта ложится поверх пустого места
+        for (int i = plays.size(); i < n; i++) {
+            drawEmptySlot(g, i + 1, new Rectangle(GAP + i * step, y, cardW, cardH));
+        }
+        for (int i = 0; i < plays.size() && i < n; i++) {
+            Rectangle r = new Rectangle(GAP + i * step, y, cardW, cardH);
+            boolean top = i == plays.size() - 1;
+            if (overlap && i > 0) {
+                // тень по левой кромке: видно, что карта лежит на соседней
+                g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.35));
+                g.fill(new RoundRectangle2D.Double(r.x - Theme.px(3), r.y + Theme.px(2),
+                    r.width, r.height, Theme.R_OVERLAY * 2, Theme.R_OVERLAY * 2));
+            }
+            bounds.put(i, r);
+            // Под нижней картой видна только её полоса — там и подпись узкая.
+            int textW = top || !overlap ? cardW : step - Theme.px(2);
+            drawCard(g, plays.get(i), used.get(i), ready.get(i), r, top, false, textW);
+        }
     }
 
     /**
@@ -213,6 +306,17 @@ public final class OrdersTable extends JComponent {
 
     private void drawCard(Graphics2D g, ReplayRecord.OrderPlay op, List<String> done,
                           boolean isReady, Rectangle r, boolean fresh, boolean spine) {
+        drawCard(g, op, done, isReady, r, fresh, spine, r.width);
+    }
+
+    private void drawCard(Graphics2D g, ReplayRecord.OrderPlay op, List<String> done,
+                          boolean isReady, Rectangle r, boolean fresh, boolean spine,
+                          int textW) {
+        java.awt.image.BufferedImage art = kelium.gui.CardArt.order(op.card, colour());
+        if (art != null) {
+            drawPrinted(g, art, op, done, isReady, r, fresh, spine, textW);
+            return;
+        }
         Color accent = orderColour(op.top);
         RoundRectangle2D card = new RoundRectangle2D.Double(r.x, r.y, r.width, r.height,
             Theme.R_OVERLAY * 2, Theme.R_OVERLAY * 2);
@@ -295,6 +399,72 @@ public final class OrdersTable extends JComponent {
         g.setClip(clip);
     }
 
+    /**
+     * КАРТА ПЕЧАТЬЮ: лицо художника без подписей поверх, состояние хода — под
+     * картой двумя строками. Ещё не её ход — карта приглушена; свежая —
+     * обведена акцентом. Корешок — левая полоса той же печати.
+     */
+    private void drawPrinted(Graphics2D g, java.awt.image.BufferedImage art,
+                             ReplayRecord.OrderPlay op, List<String> done, boolean isReady,
+                             Rectangle r, boolean fresh, boolean spine, int textW) {
+        double rad = Theme.R_OVERLAY;
+        java.awt.Composite was = g.getComposite();
+        if (!isReady) {
+            g.setComposite(java.awt.AlphaComposite.getInstance(
+                java.awt.AlphaComposite.SRC_OVER, 0.55f));
+        }
+        java.awt.Shape clip = g.getClip();
+        g.clip(new RoundRectangle2D.Double(r.x, r.y, r.width, r.height, rad * 2, rad * 2));
+        int fullW = (int) Math.round(r.height * kelium.gui.CardArt.aspect(art));
+        kelium.gui.CardArt.draw(g, art, new Rectangle(r.x, r.y, fullW, r.height), 0);
+        g.setClip(clip);
+        g.setComposite(was);
+        if (fresh && isReady) {
+            g.setColor(Theme.accent());
+            g.setStroke(new BasicStroke(Theme.pxf(2)));
+            g.draw(new RoundRectangle2D.Double(r.x + 1, r.y + 1, r.width - 2, r.height - 2,
+                rad * 2, rad * 2));
+        }
+        int ty = r.y + r.height + Theme.px(12);
+        g.setFont(Theme.font(9, Font.PLAIN));
+        if (spine) {
+            g.setColor(Theme.ink3());
+            g.drawString("к" + op.circle, r.x, ty);
+            return;
+        }
+        String first;
+        Color c1;
+        if (!isReady) {
+            first = "ждёт своего хода";
+            c1 = Theme.ink3();
+        } else if (op.coincided || op.topAllowed < op.topActions.size()) {
+            first = "совпадение: одно из двух";
+            c1 = Theme.bad();
+        } else {
+            List<String> names = new ArrayList<>();
+            for (String a : done) {
+                names.add(Names.action(a));
+            }
+            first = names.isEmpty() ? "ещё ничего не сыграно"
+                : "сыграно: " + String.join(", ", names);
+            c1 = names.isEmpty() ? Theme.ink3() : Theme.ink2();
+        }
+        if (textW < r.width) {
+            // нижняя карта стопки: видна полоса — под ней только номер круга
+            g.setColor(Theme.ink3());
+            g.drawString(clip(g, "к" + op.circle, textW), r.x, ty);
+            return;
+        }
+        g.setColor(c1);
+        g.drawString(clip(g, first, r.width), r.x, ty);
+        String second = "круг " + op.circle
+            + (op.maneuver ? " · манёвр" : "")
+            + (isReady && op.bottom != null ? (op.bottomOpen ? " · низ открыт" : " · низ закрыт")
+                : "");
+        g.setColor(Theme.ink3());
+        g.drawString(clip(g, second, r.width), r.x, ty + Theme.px(12));
+    }
+
     /** Строка действия: сыгранное зачёркнуто и бледное, доступное — в полную силу. */
     private void drawAction(Graphics2D g, String text, int x, int y, boolean played,
                             Color live, boolean isReady) {
@@ -335,8 +505,11 @@ public final class OrdersTable extends JComponent {
 
     @Override
     public String getToolTipText(java.awt.event.MouseEvent e) {
-        for (Map.Entry<Integer, Rectangle> en : bounds.entrySet()) {
-            if (!en.getValue().contains(e.getPoint())) {
+        // С конца: в стопке верхняя карта нарисована последней.
+        List<Map.Entry<Integer, Rectangle>> order = new ArrayList<>(bounds.entrySet());
+        java.util.Collections.reverse(order);
+        for (Map.Entry<Integer, Rectangle> en : order) {
+            if (en.getKey() >= plays.size() || !en.getValue().contains(e.getPoint())) {
                 continue;
             }
             ReplayRecord.OrderPlay op = plays.get(en.getKey());

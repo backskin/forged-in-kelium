@@ -57,6 +57,7 @@ public final class DecksPanel extends JPanel {
         {"objectives", "ЗАДАНИЯ"},
         {"arsenal", "АРСЕНАЛ"},
         {"containers", "КОНТЕЙНЕРЫ"},
+        {"market", "РЫНОК"},
     };
 
     private ReplayRecord record;
@@ -298,6 +299,23 @@ public final class DecksPanel extends JPanel {
         return i >= 0 && i < ids.size() ? ids.get(i) : null;
     }
 
+    /**
+     * Открытые карты набора рядом с колодой: у арсенала — витрина обмена в
+     * Науке, у рынка — активная карта раунда.
+     */
+    private List<String> открытые(String набор) {
+        if (snap == null) {
+            return List.of();
+        }
+        if ("arsenal".equals(набор)) {
+            return snap.arsenalDisplay;
+        }
+        if ("market".equals(набор) && snap.market != null) {
+            return List.of(snap.market);
+        }
+        return List.of();
+    }
+
     // ==================================================================
     //  РЯД СТОПОК
     // ==================================================================
@@ -315,7 +333,15 @@ public final class DecksPanel extends JPanel {
      * то, чем карты за столом и различают, «спутать их нельзя физически».
      */
     private static double форма(String набор) {
+        // ПРОПОРЦИЯ — С ПЕЧАТНОЙ РУБАШКИ НАБОРА, если она есть: у задания
+        // 661×1028, у арсенала 803×520, у рынка 1028×661. Числа ниже — только
+        // запас на случай, когда картинки нет.
+        java.awt.image.BufferedImage рубашка = kelium.gui.CardArt.back(набор);
+        if (рубашка != null) {
+            return kelium.gui.CardArt.aspect(рубашка);
+        }
         return switch (набор) {
+            case "market" -> 68.0 / 44.0;
             case "arsenal" -> 68.0 / 44.0;
             case "containers" -> 1.0;
             default -> 63.0 / 88.0;
@@ -442,8 +468,7 @@ public final class DecksPanel extends JPanel {
         private int ширинаГруппы(String набор) {
             int выс = высотаКарты();
             int шир = (int) Math.round(выс * форма(набор));
-            int стопок = 2 + ("arsenal".equals(набор) && snap != null
-                ? snap.arsenalDisplay.size() : 0);
+            int стопок = 2 + (snap == null ? 0 : открытые(набор).size());
             return стопок * шир + (стопок - 1) * зазор();
         }
 
@@ -562,13 +587,14 @@ public final class DecksPanel extends JPanel {
             ReplayRecord.DeckState d = snap.decks.get(набор);
             int вКолоде = d == null ? 0 : d.draw.size();
             int вСбросе = d == null ? 0 : d.discard.size();
-            List<String> витрина = "arsenal".equals(набор) ? snap.arsenalDisplay : List.of();
+            List<String> витрина = открытые(набор);
 
             int cx = x;
             рубашка(g, cx, cy, шир, выс, вКолоде, "колода", набор, false);
             cx += шир + зазор();
             for (String id : витрина) {
-                лицом(g, cx, cy, шир, выс, id, "витрина", набор);
+                лицом(g, cx, cy, шир, выс, id,
+                    "market".equals(набор) ? "открыта" : "витрина", набор);
                 cx += шир + зазор();
             }
             String верхСброса = вСбросе > 0 ? d.discard.get(0) : null;
@@ -651,6 +677,15 @@ public final class DecksPanel extends JPanel {
          */
         private void миниЛицо(Graphics2D g, int x, int y, int w, int h, String id,
                               String набор, boolean выбрана) {
+            // ПЕЧАТНОЕ ЛИЦО, если разложено: оно и есть «что эта карта делает».
+            java.awt.image.BufferedImage печать = kelium.gui.CardArt.face(набор, id);
+            if (печать != null) {
+                java.awt.Rectangle r = kelium.gui.CardArt.drawFit(g, печать, x, y, w, h, 5);
+                g.setStroke(new BasicStroke(выбрана ? 2.6f : 1f));
+                g.setColor(выбрана ? Theme.accent() : Theme.border());
+                g.drawRoundRect(r.x, r.y, r.width, r.height, 10, 10);
+                return;
+            }
             g.setColor(Theme.paper());
             g.fillRoundRect(x, y, w, h, 10, 10);
             g.setStroke(new BasicStroke(выбрана ? 2.6f : 1.4f));
@@ -740,14 +775,17 @@ public final class DecksPanel extends JPanel {
                 return;
             }
             // Форма карты — та же, что у стопки: одно место на всю панель.
-            double отн = форма(выбранныйНабор);
+            // Есть печатное лицо — пропорция и рисунок с него.
+            java.awt.image.BufferedImage печать = kelium.gui.CardArt.face(выбранныйНабор, id);
+            double отн = печать != null ? kelium.gui.CardArt.aspect(печать)
+                : форма(выбранныйНабор);
             int поле = 24;
             // ПОТОЛОК РАЗМЕРА. Растянутая на всю панель карта оставляла внизу ладонь
             // пустоты: разделов на ней немного, а форму держать обязана. Ограничиваем
             // и ставим по центру — так она выглядит картой, а не полосой.
             int дw = Math.max(60, Math.min(getWidth() - поле * 2,
                 (int) Math.round(760 * Theme.effectiveScale())));
-            int дh = Math.max(60, Math.min(getHeight() - поле * 2,
+            int дh = Math.max(60, Math.min(getHeight() - поле * 2 - (печать != null ? 20 : 0),
                 (int) Math.round(820 * Theme.effectiveScale())));
             int w = дw;
             int h = (int) Math.round(w / отн);
@@ -757,6 +795,16 @@ public final class DecksPanel extends JPanel {
             }
             int x = (getWidth() - w) / 2;
             int y = поле + Math.max(0, (getHeight() - поле * 2 - h) / 2);
+            if (печать != null) {
+                kelium.gui.CardArt.draw(g, печать, new java.awt.Rectangle(x, y, w, h),
+                    Math.max(6, Math.min(w, h) / 28.0));
+                g.setFont(Theme.font(10, Font.PLAIN));
+                g.setColor(Theme.ink3());
+                String имя = имяКарты(выбранныйНабор, id) + "  ·  " + id;
+                g.drawString(обрезать(g, имя, getWidth() - поле * 2), x, y + h + 16);
+                g.dispose();
+                return;
+            }
             карта(g, x, y, w, h, id);
             g.dispose();
         }
@@ -959,6 +1007,7 @@ public final class DecksPanel extends JPanel {
             case "objectives" -> "задание";
             case "arsenal" -> "карта арсенала";
             case "containers" -> "контейнер";
+            case "market" -> "карта рынка";
             default -> выбранныйНабор;
         };
         String вид = c == null ? "" : switch (String.valueOf(c.get("kind"))) {
