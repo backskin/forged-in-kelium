@@ -390,9 +390,9 @@ public final class FieldBubbles {
         int maxRow = Theme.px(340);
         int bw = Theme.px(160);
         for (Opt o : opts) {
-            bw = Math.max(bw, Math.min(maxRow, lm.stringWidth(o.label()) + Theme.px(28)));
+            bw = Math.max(bw, Math.min(maxRow, lm.stringWidth(o.label()) + Theme.px(40)));
             if (o.sub() != null) {
-                bw = Math.max(bw, Math.min(maxRow, sm.stringWidth(o.sub()) + Theme.px(28)));
+                bw = Math.max(bw, Math.min(maxRow, sm.stringWidth(o.sub()) + Theme.px(40)));
             }
         }
         int bh = pad * 2 + opts.size() * rowH + (opts.size() - 1) * Theme.px(4);

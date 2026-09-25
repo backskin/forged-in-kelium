@@ -158,6 +158,16 @@ public final class ChoiceWords {
                         + "» у игрока " + (((Number) m.get("seat")).intValue() + 1);
                 }
             }
+            case "destroyed_pay" -> {
+                if (p instanceof kelium.core.Token t) {
+                    return "Жетон со свалки: " + tokenRu(t) + " — стоит " + t.trophyValue();
+                }
+            }
+            case "ricochet_target" -> {
+                if (p instanceof kelium.core.Token t) {
+                    return cap(tokenRu(t)) + " игрока " + (t.owner() + 1);
+                }
+            }
             case "keep_objective", "objective_keep", "arsenal_draw2", "module_keep" -> {
                 if (p instanceof String id) {
                     return "Оставить «" + cardName.apply(id) + "»";
@@ -360,6 +370,14 @@ public final class ChoiceWords {
             case "tower" -> "вышка";
             default -> code.trim();
         };
+    }
+
+    /** Жетон словами: «добытчик 3», «пехота». */
+    public static String tokenRu(kelium.core.Token t) {
+        if (t instanceof kelium.core.BuildingToken b) {
+            return buildingRu(b.type.code) + (b.level == null ? "" : " " + b.level);
+        }
+        return unitRu(((kelium.core.UnitToken) t).type.code);
     }
 
     public static String buildingRu(String code) {

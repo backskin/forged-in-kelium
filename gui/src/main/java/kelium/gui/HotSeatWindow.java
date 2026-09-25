@@ -844,7 +844,7 @@ public final class HotSeatWindow {
     private JComponent buildTopBar() {
         JPanel bar = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets " + Theme.px(8) + " " + Theme.px(12) + " " + Theme.px(8) + " " + Theme.px(12)
-                + ", gapx " + Theme.px(12), "[][shrink 200]push[][][][][]"));
+                + ", gapx " + Theme.px(12), "[][shrinkprio 200, shrink 200]push[][][][][]"));
         // ВЕРХНЯЯ ПОЛОСА — ГЛУБОКИМ ЦВЕТОМ СТОЛА (25.09.2026: «не серо-белое»).
         bar.setBackground(BAR_BG);
         bar.setBorder(BorderFactory.createMatteBorder(0, 0, Theme.px(2), 0, new Color(0x3C6A7C)));
@@ -854,10 +854,56 @@ public final class HotSeatWindow {
         roundLabel.setForeground(new Color(0xA9C6D2));
         bar.add(roundLabel);
 
-        turnLabel = new JLabel("Партия начинается…");
+        // ЗАГОЛОВОК ХОДА НЕ ШИРЕ СВОБОДНОГО МЕСТА: длинное «какую карту
+        // арсенала оставить» на 1366 наезжало на плашку очков — сжатие
+        // раскладки его не трогало. Лишнее JLabel сам срезает многоточием.
+        turnLabel = new JLabel("Партия начинается…") {
+            @Override
+            public Dimension getPreferredSize() {
+                Dimension d = super.getPreferredSize();
+                java.awt.Container p = getParent();
+                if (p != null && p.getWidth() > 0) {
+                    int others = 0;
+                    for (Component c : p.getComponents()) {
+                        if (c != this && c.isVisible()) {
+                            others += c.getPreferredSize().width;
+                        }
+                    }
+                    int gaps = Theme.px(12) * (p.getComponentCount() + 1);
+                    d.width = Math.max(Theme.px(80), Math.min(d.width, p.getWidth() - others - gaps));
+                }
+                return d;
+            }
+
+            // FlatLaf здесь не ставит многоточие, а просто срезает последние
+            // буквы — не влезло, сокращаем сами
+            @Override
+            protected void paintComponent(java.awt.Graphics g) {
+                String full = getText() == null ? "" : getText();
+                java.awt.Insets in = getInsets();
+                int avail = getWidth() - in.left - in.right;
+                java.awt.FontMetrics fm = getFontMetrics(getFont());
+                if (fm.stringWidth(full) <= avail) {
+                    super.paintComponent(g);
+                    return;
+                }
+                String s = full;
+                while (s.length() > 1 && fm.stringWidth(s.trim() + "…") > avail) {
+                    s = s.substring(0, s.length() - 1);
+                }
+                g.setFont(getFont());
+                g.setColor(getForeground());
+                int y = in.top + (getHeight() - in.top - in.bottom - fm.getHeight()) / 2 + fm.getAscent();
+                com.formdev.flatlaf.ui.FlatUIUtils.drawString(this, g, s.trim() + "…", in.left, y);
+            }
+        };
         turnLabel.setFont(Theme.font(16, Font.BOLD));
         turnLabel.setForeground(Color.WHITE);
-        bar.add(turnLabel, "wmin 80, shrinkprio 200");
+        // запас справа: текст рисуется на пару пикселей шире замера, и без
+        // запаса последняя буква срезалась, а многоточие не ставилось
+        turnLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, Theme.px(8)));
+        // длинный заголовок сжимается многоточием, а не наезжает на плашки
+        bar.add(turnLabel, "width 80:pref:pref, shrinkprio 200");
         if (chipsPanel != null) {
             bar.add(chipsPanel);
         }
@@ -2998,7 +3044,7 @@ public final class HotSeatWindow {
                 field.setFacingChoice(fhex, variants, idx -> {
                     submit(agent, d, idx);
                 });
-                field.setChoices(null, kindLabel(kind),
+                field.setChoices(null, cap(kindLabel(kind)),
                     "Наведите курсор на сторону гекса или крутите колесо — "
                         + "здание встаёт призраком; щелчок по гексу ставит", null,
                     Theme.seat(seat));
