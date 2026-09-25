@@ -28,6 +28,14 @@ public final class StartMenuShot {
             win[0].frame.setSize(w, h);
         });
         Thread.sleep(2500);
+        // -Dshot.seat=N — сесть на место N (поворот ЦУ ещё не выбран)
+        if (System.getProperty("shot.seat") != null) {
+            SwingUtilities.invokeAndWait(() -> {
+                win[0].mySeat = Integer.parseInt(System.getProperty("shot.seat"));
+                win[0].rebuildPreview();
+            });
+            Thread.sleep(500);
+        }
         // -Dshot.gallery=1 — снять открытую галерею полей, дождавшись картинок
         if (System.getProperty("shot.gallery") != null) {
             SwingUtilities.invokeAndWait(() -> win[0].openGallery());
