@@ -103,6 +103,12 @@ public final class ChoiceWords {
                     return cap(b) + (lvl == null ? "" : " " + lvl);
                 }
             }
+            case "discard_enemy_arsenal" -> {
+                if (p instanceof Map<?, ?> m && m.get("card") != null) {
+                    return "Удалить «" + cardName.apply(String.valueOf(m.get("card")))
+                        + "» у игрока " + (((Number) m.get("seat")).intValue() + 1);
+                }
+            }
             case "keep_objective", "objective_keep", "arsenal_draw2", "module_keep" -> {
                 if (p instanceof String id) {
                     return "Оставить «" + cardName.apply(id) + "»";

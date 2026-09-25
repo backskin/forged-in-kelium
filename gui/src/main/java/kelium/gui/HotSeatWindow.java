@@ -2079,7 +2079,10 @@ public final class HotSeatWindow {
         Map.entry("cu_hex", "где поставить центр управления"),
         Map.entry("cu_sides", "поворот центра управления"),
         Map.entry("build_neutral", "где поставить нейтральное здание"),
-        Map.entry("ricochet_target", "куда уходит рикошет"));
+        Map.entry("ricochet_target", "куда уходит рикошет"),
+        Map.entry("discard_enemy_arsenal", "какой установленный арсенал врага удалить"),
+        Map.entry("steal_arsenal", "у кого забрать карту арсенала"),
+        Map.entry("steal_objectives", "у кого забрать задания"));
 
     /**
      * ТОЧКА РЕШЕНИЯ ЖИВОГО ИГРОКА. Если за столом несколько людей и ход

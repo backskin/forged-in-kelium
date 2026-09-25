@@ -963,21 +963,41 @@ public final class Effects {
         return out;
     }
 
-    /** СБРОСИТЬ 1 КАРТУ АРСЕНАЛА у другого игрока (у кого их больше всех). */
+    /**
+     * УДАЛИТЬ У ВРАГА УСТАНОВЛЕННЫЙ АРСЕНАЛ — как напечатано на картах
+     * («Удали у врага установленный арсенал»). Прежде снималась ЗАКРЫТАЯ карта
+     * из руки — это другое свойство («забрать карту арсенала у противника» —
+     * случайная из руки, см. {@link #stealArsenalCard}); дизайнер поправил
+     * 25.09.2026. Какую карту и у кого снять, выбирает игрок: установленные
+     * карты лежат открыто.
+     */
     static Map<String, Object> discardEnemyArsenal(GameState s, int seat, Map<String, Object> p) {
-        PlayerState victim = null;
+        List<Choice> opts = new ArrayList<>();
         for (PlayerState o : s.players) {
-            if (o.seat == seat || o.arsenalHand.isEmpty()) {
+            if (o.seat == seat) {
                 continue;
             }
-            if (victim == null || o.arsenalHand.size() > victim.arsenalHand.size()) {
-                victim = o;
+            for (String cid : o.arsenalInstalled) {
+                Map<String, Object> pl = new HashMap<>();
+                pl.put("seat", o.seat);
+                pl.put("card", cid);
+                opts.add(new Choice("discard_enemy_arsenal", pl,
+                    "удалить установленную карту " + cid + " у места " + (o.seat + 1)));
             }
         }
-        if (victim == null) {
+        if (opts.isEmpty()) {
+            return Map.of("discarded", 0, "reason", "у врагов нет установленного арсенала");
+        }
+        Agent ag = agentFor(s, seat);
+        Choice pick = ag == null || opts.size() == 1 ? opts.get(0)
+            : ag.choose(s, opts, Map.of("kind", "discard_enemy_arsenal"));
+        Map<?, ?> m = pick != null && pick.payload() instanceof Map<?, ?> mm
+            ? mm : (Map<?, ?>) opts.get(0).payload();
+        PlayerState victim = s.player(((Number) m.get("seat")).intValue());
+        String card = String.valueOf(m.get("card"));
+        if (!victim.arsenalInstalled.remove(card)) {
             return Map.of("discarded", 0);
         }
-        String card = victim.arsenalHand.remove(victim.arsenalHand.size() - 1);
         s.decks.get("arsenal").discard(card);
         return Map.of("discarded", 1, "from_seat", victim.seat, "card", card);
     }

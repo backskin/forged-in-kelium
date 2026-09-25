@@ -89,8 +89,25 @@ public final class Storage {
         if (!Boolean.TRUE.equals(rs.get("containers_storage.open_is_spec", Boolean.FALSE))) {
             return true;                    // правило ячеек выключено
         }
+        if (!closedArsenalInCells(s)) {
+            return true;                    // закрытые карты лежат стопкой, без предела
+        }
         int cells = ((Number) rs.get("containers_storage.arsenal_cells", 3)).intValue();
         return cellsUsed(s, p) + 1 <= cells;
+    }
+
+    /**
+     * ЗАНИМАЕТ ЛИ ЗАКРЫТАЯ КАРТА АРСЕНАЛА ЯЧЕЙКУ ПОД ПЛАНШЕТОМ.
+     *
+     * <p>Правило дизайнера 25.09.2026: «карты арсенала, ещё не вставленные,
+     * лежат стопкой под планшетом хранилища, и их количество не ограничено».
+     * Ячейки под планшетом войск занимают только УСТАНОВЛЕННЫЕ карты и
+     * контейнеры. Ключ {@code containers_storage.closed_arsenal_in_cells};
+     * своды без ключа играют по-старому (закрытая карта занимает ячейку).
+     */
+    public static boolean closedArsenalInCells(kelium.core.GameState s) {
+        return !Boolean.FALSE.equals(Ctx.rules(s).get(
+            "containers_storage.closed_arsenal_in_cells", Boolean.TRUE));
     }
 
     /**
@@ -102,7 +119,8 @@ public final class Storage {
         int perFree = ((Number) rs.get("containers_storage.slots_per_free_cell", 2)).intValue();
         int onCard = ((Number) rs.get("containers_storage.slots_on_open_card_with_slot", 1))
             .intValue();
-        int арсенал = p.arsenalHand.size() + p.arsenalInstalled.size();
+        int арсенал = (closedArsenalInCells(s) ? p.arsenalHand.size() : 0)
+            + p.arsenalInstalled.size();
         // ЛЕЖАЩИЕ НЕ В ЯЧЕЙКАХ НЕ СЧИТАЮТСЯ: контейнеры под «мандатом» лежат на
         // своём отдельном месте, а у установленной карты с container_slot есть
         // место НА САМОЙ КАРТЕ. Без этой поправки счёт завышал занятость и
@@ -151,7 +169,8 @@ public final class Storage {
         int cells = ((Number) rs.get("containers_storage.arsenal_cells", 3)).intValue();
         int perFree = ((Number) rs.get("containers_storage.slots_per_free_cell", 2)).intValue();
         int onCard = ((Number) rs.get("containers_storage.slots_on_open_card_with_slot", 1)).intValue();
-        int occupied = Math.min(cells, p.arsenalHand.size() + p.arsenalInstalled.size());
+        int occupied = Math.min(cells, (closedArsenalInCells(s) ? p.arsenalHand.size() : 0)
+            + p.arsenalInstalled.size());
         int freeCells = cells - occupied;
         int slotCards = 0;
         var lib = Ctx.cards(s, "arsenal");

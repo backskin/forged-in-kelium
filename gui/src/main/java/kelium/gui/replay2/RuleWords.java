@@ -385,6 +385,8 @@ public final class RuleWords {
                 "Добыча берёт и воздушную ячейку";
             case "containers_storage.arsenal_cells" ->
                 "ячеек под контейнеры на картах арсенала";
+            case "containers_storage.closed_arsenal_in_cells" ->
+                "закрытая карта арсенала занимает ячейку (нет — лежит стопкой без предела)";
             case "symbols.tuck_is_free" ->
                 "подсунуть карту под планшет — свободное решение, не действие";
             case "symbols.reveal_is_spec" ->
