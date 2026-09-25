@@ -277,6 +277,9 @@ public final class GameRecorder {
             rc.accept(event);
             onFrame.accept(rec);
         };
+        synchronized (SINKS) {
+            SINKS.put(state, sink);
+        }
         Map<String, Object> result = GameEngine.playGame(state, agents, sink);
 
         rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
@@ -472,6 +475,27 @@ public final class GameRecorder {
         }
     }
 
+    /** Служебное событие «живой кадр» (не из движка). */
+    static final String LIVE = "live";
+
+    /** Приёмник событий каждой идущей партии — по её состоянию. */
+    private static final Map<GameState, Consumer<Map<String, Object>>> SINKS =
+        new java.util.WeakHashMap<>();
+
+    /**
+     * Положить живой кадр этой партии, если состояние изменилось с прошлого
+     * кадра. Зовётся на потоке движка перед вопросом живому игроку.
+     */
+    static void live(GameState state, int seat) {
+        Consumer<Map<String, Object>> sink;
+        synchronized (SINKS) {
+            sink = SINKS.get(state);
+        }
+        if (sink != null) {
+            sink.accept(Map.of("type", LIVE, "seat", seat));
+        }
+    }
+
     // ==================== приёмник событий ====================
 
     /** Приёмник событий движка: на каждое событие кладёт кадр в запись. */
@@ -483,6 +507,48 @@ public final class GameRecorder {
         private final List<ReplayRecord.Thought> pending;
         private ReplayRecord.Snapshot prev;
 
+        /**
+         * ЖИВОЙ КАДР перед вопросом игроку (окно партии, 26.09.2026). Движок
+         * пишет событие на действие целиком, а внутри Стройки игрок ставит
+         * здания одно за другим — без этого кадра поставленное здание и
+         * списанные монеты не видны до конца действия, и кажется, что щелчок
+         * ничего не сделал. Кадр кладётся, только если что-то изменилось, и
+         * строки в ленту не даёт.
+         */
+        private void live(Map<String, Object> event) {
+            ReplayRecord.Snapshot snap = snapshot(state,
+                event.get("seat") instanceof Number n ? n.intValue() : null);
+            ReplayRecord.Highlight h = diff(prev, snap);
+            if (h.isEmpty() && !resourcesChanged(prev, snap)) {
+                return;
+            }
+            ReplayRecord.Frame f = new ReplayRecord.Frame();
+            f.type = LIVE;
+            f.round = state.round;
+            f.circle = state.circle;
+            f.seat = event.get("seat") instanceof Number n ? n.intValue() : null;
+            f.log = "";
+            f.highlight = h;
+            f.snapshot = snap;
+            prev = snap;
+            rec.frames.add(f);
+        }
+
+        private static boolean resourcesChanged(ReplayRecord.Snapshot a, ReplayRecord.Snapshot b) {
+            if (a == null || b == null || a.players.size() != b.players.size()) {
+                return true;
+            }
+            for (int i = 0; i < a.players.size(); i++) {
+                ReplayRecord.Player x = a.players.get(i);
+                ReplayRecord.Player y = b.players.get(i);
+                if (x.coin != y.coin || x.kelium != y.kelium || x.ammo != y.ammo
+                        || x.trophy != y.trophy) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         Recorder(GameState state, ReplayRecord rec, ReplayText text,
                  List<ReplayRecord.Thought> pending) {
             this.state = state;
@@ -493,6 +559,10 @@ public final class GameRecorder {
 
         @Override
         public void accept(Map<String, Object> event) {
+            if (LIVE.equals(event.get("type"))) {
+                live(event);
+                return;
+            }
             ReplayRecord.Frame f = new ReplayRecord.Frame();
             f.type = String.valueOf(event.get("type"));
             f.round = state.round;

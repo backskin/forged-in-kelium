@@ -361,7 +361,8 @@ public final class HotSeatWindow {
         frame.getLayeredPane().add(spread, JLayeredPane.MODAL_LAYER);
 
         boardZoom = new kelium.gui.kp.BoardZoom();
-        frame.getLayeredPane().add(boardZoom, JLayeredPane.MODAL_LAYER);
+        // выше прочих модальных окон (выбор приказа, раскрытые карты), ниже шторки
+        frame.getLayeredPane().add(boardZoom, Integer.valueOf(JLayeredPane.MODAL_LAYER + 10));
 
         curtain = new kelium.gui.kp.HandoverCurtain();
         frame.getLayeredPane().add(curtain, JLayeredPane.DRAG_LAYER);
@@ -1486,6 +1487,11 @@ public final class HotSeatWindow {
 
         @Override
         public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
+            // перед вопросом — живой кадр: поставленное здание, списанные монеты
+            // видны сразу, а не в конце действия
+            if (humansBySeat.containsKey(seat) && !catchingUp) {
+                GameRecorder.live(state, seat);
+            }
             Choice picked = inner.choose(state, options, context);
             int idx = options.indexOf(picked);
             synchronized (moves) {
@@ -1738,11 +1744,18 @@ public final class HotSeatWindow {
                         // надо, и дальше он доигрывать не должен.
                         throw new kelium.core.GameAborted("прогон отменён откатом");
                     }
-                    SwingUtilities.invokeLater(() -> {
-                        if (gen == generation) {
-                            onFrame(r);
-                        }
-                    });
+                    // ОДНО ОБНОВЛЕНИЕ В ОЧЕРЕДИ, А НЕ ПО ОДНОМУ НА СОБЫТИЕ
+                    // (тормоза, 26.09.2026): каждое стоит десятки миллисекунд,
+                    // а боты дают сотни событий за ход. Стоящее в очереди
+                    // обновление само заберёт все новые кадры.
+                    if (framePending.compareAndSet(false, true)) {
+                        SwingUtilities.invokeLater(() -> {
+                            framePending.set(false);
+                            if (gen == generation) {
+                                onFrame(r);
+                            }
+                        });
+                    }
                     paceBot(r);
                 });
         } catch (kelium.core.GameAborted e) {
@@ -1949,6 +1962,8 @@ public final class HotSeatWindow {
         // скорости, и последний из них мог оказаться пропущенным — окно тогда
         // встречает игрока пустым полем, хотя партия уже идёт.
         if (rec != null && !rec.frames.isEmpty()) {
+            // строки доигрывания в ленту не сыплем — только последний кадр
+            shownFrames = Math.max(shownFrames, rec.frames.size() - 1);
             onFrame(rec);
         }
         if (undoNote != null) {
@@ -2071,6 +2086,13 @@ public final class HotSeatWindow {
         return String.join(", ", parts);
     }
 
+    /** Обновление окна уже стоит в очереди — новое не ставим. */
+    private final java.util.concurrent.atomic.AtomicBoolean framePending =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    /** Сколько кадров записи уже разобрано в ленту и шаги. */
+    private int shownFrames;
+    private long lastCatchUpPaint;
+
     private void onFrame(ReplayRecord r) {
         if (stopped) {
             return;          // окно закрыто — движку уже некуда рисовать
@@ -2083,18 +2105,29 @@ public final class HotSeatWindow {
             this.rec = r;
             field.setRecord(r);
             sessionBound = false;
+            shownFrames = 0;
         }
         if (r.frames.isEmpty()) {
             return;
         }
-        if (catchingUp && r.frames.size() % 40 != 0) {
+        if (catchingUp && System.nanoTime() - lastCatchUpPaint < 200_000_000L) {
             // Доигрывание сохранения идёт сотнями кадров в секунду: перерисовывать
-            // каждый — только тормозить. Показываем каждый сороковой, чтобы было
+            // каждый — только тормозить. Раз в пятую долю секунды, чтобы было
             // видно, что дело движется.
             return;
         }
+        lastCatchUpPaint = System.nanoTime();
         int last = r.frames.size() - 1;
         ReplayRecord.Frame f = r.frames.get(last);
+        // ЛЕНТА И ШАГИ — ПО КАЖДОМУ НОВОМУ КАДРУ, перерисовка — один раз
+        for (int i = Math.max(0, shownFrames); i <= last; i++) {
+            ReplayRecord.Frame fi = r.frames.get(i);
+            if (!catchingUp && fi.log != null && !fi.log.isBlank()) {
+                feedLine(fi.seat, fi.log);
+            }
+            trackSteps(fi);
+        }
+        shownFrames = last + 1;
         field.setFrame(f);
         if (!sessionBound) {
             sessionBound = true;
@@ -2104,10 +2137,9 @@ public final class HotSeatWindow {
         if (f.snapshot != null) {
             boards.show(r, f.snapshot);
         }
-        if (f.log != null && !f.log.isBlank()) {
-            feedLine(f.seat, f.log);
+        if (boardZoom != null) {
+            boardZoom.refresh();
         }
-        trackSteps(f);
         refreshHands(f);
         refreshTopBar(f);
         refreshTable();
@@ -3253,6 +3285,22 @@ public final class HotSeatWindow {
         return out;
     }
 
+    /** Ставил ли игрок здание в этой Стройке (после неё снова «что строим»). */
+    private boolean builtThisAction(int seat) {
+        synchronized (moves) {
+            for (int i = decisions.size() - 1; i >= 0; i--) {
+                Decision d = decisions.get(i);
+                if (d.seat() != seat || "action".equals(d.kind())) {
+                    return false;
+                }
+                if ("build_facing".equals(d.kind()) || "build_hex".equals(d.kind())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** Решения «на какой гекс поставить» — Стройка, найм вышки, ЦУ из запаса. */
     private static final java.util.Set<String> PLACE_KINDS = java.util.Set.of(
         "build_hex", "tower_hex", "cu_hex", "move_hex", "build_neutral");
@@ -3369,6 +3417,11 @@ public final class HotSeatWindow {
                 + (multi ? " — где стоит цифра, откроется список вариантов" : "");
         } else if (onTable.keySet().stream().anyMatch(k -> k.startsWith("card:"))) {
             hint = "Щёлкните подсвеченную карту на столе внизу";
+        } else if ("build_pick".equals(kind) && builtThisAction(seat)) {
+            // СТРОЙКА ИДЁТ ДАЛЬШЕ: здание поставлено, и снова «что строим» —
+            // без этой строки казалось, что щелчок ничего не сделал
+            title = "Здание поставлено";
+            hint = "Постройте ещё — щёлкните здание на планшете внизу — или «Закончить стройку»";
         } else if (!onTable.isEmpty()) {
             hint = "Щёлкните подсвеченную деталь на планшете внизу";
         } else {

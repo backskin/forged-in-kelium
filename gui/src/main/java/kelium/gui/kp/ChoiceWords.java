@@ -282,7 +282,8 @@ public final class ChoiceWords {
             case "energy_place" -> "Оставить простаивать";
             case "mine" -> "Пропустить добытчик";
             case "assemble" -> "Пропустить здание";
-            case "build_pick", "build_hex", "build_facing" -> "Не строить";
+            case "build_pick" -> "Закончить стройку";
+            case "build_hex", "build_facing" -> "Не строить";
             case "combat_victim", "neutral_victim" -> "Не выбирать";
             case "market_offer", "market_rate" -> "Хватит торговать";
             case "storage_discard" -> "Ничего не выбрасывать";

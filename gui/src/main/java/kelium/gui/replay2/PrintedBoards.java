@@ -428,6 +428,27 @@ final class PrintedBoards {
     }
 
     /**
+     * ТОЛЬКО ПЛАНШЕТ ВОЙСК со своим — картами в пазах, жетонами военных зданий
+     * и контейнерами, без хранилища сбоку (увеличение планшета, заказ
+     * дизайнера 26.09.2026: «чтобы хранилище к войскам не прилипало»).
+     * {@code x, y} — начало сцепки, как у {@link #paintPair}.
+     */
+    static void paintTroopOnly(Graphics2D g, int x, int y, double k, Сцепка с,
+                               ReplayRecord.Player p, kelium.core.TroopSide troop,
+                               Set<String> вЗапасе, Map<Rectangle, Object[]> spots) {
+        BufferedImage вой = troopArt(p.seat);
+        if (с == null || вой == null) {
+            return;
+        }
+        int войX = (int) Math.round(x + с.войX() * k);
+        int войY = (int) Math.round(y + с.войY() * k);
+        картыВПазах(g, войX, войY, k, p);
+        paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
+        военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
+        подписьКонтейнеров(g);
+    }
+
+    /**
      * ПОДПИСИ ПОД СТОПКАМИ ЗАПАСА («пехота», «3 из 4»). На столе таких цифр нет:
      * там просто лежат оставшиеся жетоны. Прибору они нужны, картинке стола для
      * книги правил — нет, поэтому выключаются на время снимка.

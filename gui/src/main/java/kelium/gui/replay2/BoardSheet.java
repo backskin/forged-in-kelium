@@ -394,9 +394,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 PrintedBoards.paintStorage(g, board.x, board.y, board.width, p,
                     cellFill, startFill, coveredCells(all), всеЖетоны);
             } else {
-                PrintedBoards.paintPair(g, (int) Math.round(bx - rx * k),
-                    (int) Math.round(by - ry * k), k, с, p, troopSide(p), cellFill, startFill,
-                    coveredCells(all), вЗапасе(f, seat), запасВойск(f, seat), всеМодули, всеЖетоны);
+                // войска — одни, без угла хранилища сбоку
+                PrintedBoards.paintTroopOnly(g, (int) Math.round(bx - rx * k),
+                    (int) Math.round(by - ry * k), k, с, p, troopSide(p),
+                    вЗапасе(f, seat), всеМодули);
             }
         } finally {
             PrintedBoards.hits = null;
