@@ -55,6 +55,7 @@ public final class VpSources {
             case "war_track" -> "военный трек";
             case "objective_card_vp" -> "очки, напечатанные на заданиях";
             case "arsenal_vp" -> "очки от карт арсенала";
+            case "arsenal_stars" -> "звёзды на картах арсенала";
             case "super_arsenal" -> "супер-арсенал";
             case "super_first_part" -> "первая часть супер-задания";
             case "level4_stars" -> "звёзды зданий 4-го уровня";

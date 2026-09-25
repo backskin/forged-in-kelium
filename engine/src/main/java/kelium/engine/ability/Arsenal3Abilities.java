@@ -1310,7 +1310,9 @@ public final class Arsenal3Abilities {
             }
             List<Choice> out = new ArrayList<>();
             for (UnitToken u : state.player(seat).unitsOnField()) {
-                if (!u.superUnit || !"sa1".equals(u.superCardId)) {
+                // Карта узнаётся по способности, а не по номеру: ту же
+                // способность несёт «Супер-пехота» супер-арсенала 3.0.0.
+                if (!id().equals(Arsenal7Abilities.superPassive(state, u))) {
                     continue;
                 }
                 BuildingToken b = enemyBuildingOn(state, u.hexId, seat);
@@ -1338,7 +1340,7 @@ public final class Arsenal3Abilities {
                     break;
                 }
             }
-            if (u == null || !u.superUnit || !"sa1".equals(u.superCardId)) {
+            if (u == null || !id().equals(Arsenal7Abilities.superPassive(state, u))) {
                 return false;
             }
             BuildingToken b = enemyBuildingOn(state, u.hexId, seat);
@@ -1395,7 +1397,8 @@ public final class Arsenal3Abilities {
             }
             List<Choice> out = new ArrayList<>();
             for (UnitToken u : state.player(seat).unitsOnField()) {
-                if (!u.superUnit || !"sa2".equals(u.superCardId)) {
+                // Карта узнаётся по способности: её несёт и «Супер-техника» 3.0.0.
+                if (!id().equals(Arsenal7Abilities.superPassive(state, u))) {
                     continue;
                 }
                 String tile = adjacentTileWithKelium(state, u.hexId);
@@ -1419,7 +1422,7 @@ public final class Arsenal3Abilities {
                     break;
                 }
             }
-            if (u == null || !u.superUnit || !"sa2".equals(u.superCardId)) {
+            if (u == null || !id().equals(Arsenal7Abilities.superPassive(state, u))) {
                 return false;
             }
             String tile = adjacentTileWithKelium(state, u.hexId);

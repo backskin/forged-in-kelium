@@ -61,6 +61,7 @@ public final class Names {
             case "super_objectives" -> "супер-задания";
             // Установленная (не сожжённая) карта арсенала со своим scoring-условием.
             case "arsenal_vp" -> "очки арсенала";
+            case "arsenal_stars" -> "звёзды на картах арсенала";
             case "total" -> "всего";
             default -> unknown(key);
         };

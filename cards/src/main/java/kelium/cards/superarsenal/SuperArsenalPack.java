@@ -21,6 +21,8 @@ public final class SuperArsenalPack implements CardRegistry.CardPack {
         out.add(new СуперАрсенал.ВоеннаяМашина());
         out.add(new СуперАрсенал.МандатСовета());
         out.add(new СуперАрсенал.ПараллельныеШтабы());
+        // Супер-арсенал 3.0.0 (печать 17.09.2026): четыре супер-войска.
+        out.addAll(СуперАрсенал3.карты());
         return out;
     }
 }

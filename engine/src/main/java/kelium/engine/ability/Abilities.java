@@ -48,6 +48,8 @@ public final class Abilities {
         Arsenal3Abilities.install();
         Arsenal5Abilities.install();
         Arsenal6Abilities.install();
+        // Арсенал 7.0.0 и супер-арсенал 3.0.0 (печать дизайнера 13–17.09.2026).
+        Arsenal7Abilities.install();
     }
 
     /** Зарегистрировать способность (обычно из статического блока набора). */

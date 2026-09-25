@@ -54,6 +54,20 @@ public final class Speed {
         if (unit.superUnit && "sa1".equals(unit.superCardId)) {
             base = Math.max(base, 2);
         }
+        // СУПЕР-АРСЕНАЛ 3.0.0: скорость напечатана на самой карте (у
+        // «Супер-пехоты» — знак манёвра и два гекса), и запись несёт её полем
+        // speed. Тот же смысл, что у sa1 выше: абсолютное значение жетона.
+        if (unit.superUnit && unit.superCardId != null) {
+            try {
+                var card = kelium.dataio.Ctx.cards(state, "super_arsenal")
+                    .find(unit.superCardId);
+                if (card != null && card.get("speed") instanceof Number sp) {
+                    base = sp.intValue();
+                }
+            } catch (RuntimeException нетНабора) {
+                // набора супер-арсенала нет — печатной скорости тоже
+            }
+        }
         return Math.max(0, RuleQuery.of(state, seat, Hook.UNIT_SPEED)
             .about(unit)
             .base(base)

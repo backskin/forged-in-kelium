@@ -247,6 +247,7 @@ public final class Commentator implements Consumer<Map<String, Object>> {
             case "kills" -> "уничтожения";
             case "objective_card_vp" -> "прямые очки от заданий";
             case "arsenal_vp" -> "очки от карт арсенала";
+            case "arsenal_stars" -> "звёзды на картах арсенала";
             default -> s;
         };
     }

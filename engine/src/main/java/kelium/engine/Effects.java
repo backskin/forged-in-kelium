@@ -701,6 +701,21 @@ public final class Effects {
                 }
             }
         }
+        // ДЕСАНТ НА ПУСТОЙ ГЕКС (арсенал 7.0.0, печать 13.09.2026: «пехота и
+        // техника из запаса на пустой гекс»): гекс, на котором нет НИЧЬИХ
+        // жетонов — ни войск, ни зданий, ни нейтральных построек.
+        if ("empty_hex".equals(String.valueOf(p.get("where")))) {
+            zone = new java.util.LinkedHashSet<>();
+            for (Hex h : s.field.hexes.values()) {
+                if (Movement.passable(s, h.id) && пустойГекс(s, h)) {
+                    zone.add(h.id);
+                }
+            }
+        }
+        // ВСЕ НА ОДИН ГЕКС (печать: «2 разных войска из запаса на любой гекс»,
+        // «… на пустой гекс» — гекс назван в единственном числе): первый жетон
+        // выбирает гекс, остальные садятся туда же.
+        boolean одинГекс = Boolean.TRUE.equals(p.get("same_hex"));
         while (placed < count) {
             List<Choice> opts = new ArrayList<>();
             for (UnitType ut : UnitType.values()) {
@@ -741,8 +756,31 @@ public final class Effects {
             PrintedContainers.onUnitPlaced(s, pl, hex, ut);
             used.add(ut);
             placed++;
+            if (одинГекс) {
+                zone = new java.util.LinkedHashSet<>(List.of(hex));
+            }
         }
         return Map.of("landed", placed);
+    }
+
+    /** На гексе нет ничьих жетонов: ни войск, ни зданий, ни нейтралов. */
+    private static boolean пустойГекс(GameState s, Hex h) {
+        if (h.hasNeutral() || h.hasSpawnTile()) {
+            return false;
+        }
+        for (PlayerState o : s.players) {
+            for (UnitToken u : o.unitsOnField()) {
+                if (h.id.equals(u.hexId)) {
+                    return false;
+                }
+            }
+            for (kelium.core.BuildingToken b : o.buildingsOnField()) {
+                if (h.id.equals(b.hexId)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
