@@ -163,6 +163,11 @@ public final class TestCardContext implements CardContext {
         return true;
     }
 
+    @Override public boolean moduleSwap() {
+        log.add(Map.of("module_swap", true));
+        return true;
+    }
+
     @Override public boolean convert(Resource from, Resource to, int amount) {
         log.add(Map.of("convert", from.code + "->" + to.code, "amount", amount));
         return true;

@@ -669,6 +669,9 @@ public final class CombatResolver {
                              Integer restrictTargetOwner, int предельноЖетонов) {
         GameState s = state;
         PlayerState p = s.player(attackerSeat);
+        // КОНТРАТАКА: бьют только войска атакованного гекса (см. контратака).
+        String толькоСГекса = принудительныйИсточник;
+        принудительныйИсточник = null;
 
         // Шаг 0: ЧУЖИЕ РЕАКЦИИ ПЕРЕД БОЕМ. Карта «разыграй бой перед чужим боем»
         // играется именно здесь — до того, как атакующий выбрал гекс: успевший
@@ -681,7 +684,8 @@ public final class CombatResolver {
         // Шаг 1: выбрать свой гекс, где есть хотя бы один живой юнит.
         Set<String> srcSet = new java.util.TreeSet<>();
         for (UnitToken u : p.units) {
-            if (u.hexId != null && u.alive()) {
+            if (u.hexId != null && u.alive()
+                    && (толькоСГекса == null || толькоСГекса.equals(u.hexId))) {
                 srcSet.add(u.hexId);
             }
         }
@@ -803,7 +807,7 @@ public final class CombatResolver {
         // КТО МОЖЕТ БИТЬ. В старой грамматике — только войска выбранного гекса.
         // В «Близнеце» — все свои войска на поле; те, что не в выбранном гексе,
         // доплачивают за право стрелять.
-        List<UnitToken> attackers = близнецДвижения
+        List<UnitToken> attackers = близнецДвижения && толькоСГекса == null
             ? aliveUnitsOnField(attackerSeat) : unitsOf(attackerSeat, source);
         Set<String> usedRows = new HashSet<>();   // "uid:row"
         boolean[] firstAttackUsed = {false};
@@ -959,6 +963,13 @@ public final class CombatResolver {
             // до залпа, а не между попаданиями.
             if (отходСпрошен.add(target)) {
                 отход(target, attackerSeat);
+                // КОНТРАТАКА (печатные задания 1.19.0) — в то же окно: «если
+                // атакуют гекс с твоими жетонами, сначала все войска оттуда
+                // выполняют атаку». Ответный бой окна не открывает — иначе
+                // контратака на контратаку шла бы без конца.
+                if (!isRetaliation) {
+                    контратака(target, attackerSeat);
+                }
             }
             boolean closed = hexClosedAgainst(target, attackerSeat);
             // Доплата за жетон засчитывается в момент, когда жетон реально
@@ -972,6 +983,12 @@ public final class CombatResolver {
                     unit = u;
                     break;
                 }
+            }
+            // СТРЕЛОК МОГ ПОГИБНУТЬ В ОКНЕ ПЕРЕД АТАКОЙ: контратака бьёт раньше,
+            // чем выстрел состоится, и выбранного жетона может уже не быть.
+            if (unit == null || !unit.alive() || unit.hexId == null) {
+                usedRows.add(key);
+                continue;
             }
 
             // Снос нейтральной постройки: на гексе их может быть несколько —
@@ -1064,6 +1081,13 @@ public final class CombatResolver {
             // состоялся, спор идёт лишь о том, кому он достался. Потому карта и
             // не отменяет атаку — она её ПЕРЕВОДИТ.
             victim = рикошет(victim, target, attackerSeat);
+            // ЗАКРОМА и ЭВАКУАЦИЯ (печатные задания 1.19.0) — окна в миг атаки:
+            // «если атакуют твой жетон». Спрашиваются ПОСЛЕ рикошета: атакован
+            // тот, кому удар в итоге достался.
+            закрома(victim, attackerSeat);
+            if (эвакуацияПриАтаке(victim, attackerSeat)) {
+                continue;               // жетона на поле нет — бить некого
+            }
             // ЖЕТОН ЩИТА (эффект «щит», 17.08.2026) снимает ПЕРВОЕ попадание по
             // жетону защищённого рода и уходит. Проверяется ДО начисления урона:
             // у пехоты прочность 1, и «снять урон потом» её уже не спасает.
@@ -1139,6 +1163,27 @@ public final class CombatResolver {
                 af.killerUnitTypes.put(unit.uid, unit.type.code);
                 // o21 «Первая кровь» 10.0: усиление платит за толстую цель.
                 af.maxDestroyedHp = Math.max(af.maxDestroyedHp, Passives.effectiveHp(s, victim));
+                // ЗАПИСЬ ОБ УБИТОМ ЦЕЛИКОМ (печатные задания 1.19.0): чей, какой,
+                // какой прочности и каким было положение в миг удара.
+                boolean уСтартового = false;
+                if (victim instanceof BuildingToken sb && sb.type == BuildingType.MINER
+                        && sb.hexId != null) {
+                    for (String рядом : s.field.neighbors(sb.hexId)) {
+                        Hex hh = s.field.get(рядом);
+                        if (hh != null && hh.spawnTile != null && hh.spawnTile.isStart) {
+                            уСтартового = true;
+                            break;
+                        }
+                    }
+                }
+                af.killLog.add(new TurnJournal.Убитый(owner,
+                    victim instanceof UnitToken vu ? vu.type.code
+                        : ((BuildingToken) victim).type.code,
+                    victim instanceof BuildingToken,
+                    Passives.effectiveHp(s, victim),
+                    s.player(owner).unitsOnField().size(), p.unitsOnField().size(),
+                    s.player(owner).resources.kelium(), p.resources.kelium(),
+                    уСтартового));
             }
             // ТРОФЕИ убитого — в событие: без этого поля трофейную
             // экономику нечем мерить, а она половина смысла боя. Ценность
@@ -2006,6 +2051,103 @@ public final class CombatResolver {
             "attacker", attackerSeat);
         return true;
     }
+
+    /**
+     * «ЭВАКУАЦИЯ!» (печатные задания 1.19.0): атакуют твой жетон — ты можешь
+     * вернуть его в свой запас, не отдавая в трофеи. Окно в миг АТАКИ: жетон
+     * уходит до урона, и атака пропадает. Прежний вид
+     * ({@link Реакции.Вид#ЭВАКУАЦИЯ_ТРОФЕЕВ}) спрашивался в миг уничтожения и
+     * остался для старых наборов.
+     *
+     * @return true — жетон ушёл в запас, бить некого
+     */
+    private boolean эвакуацияПриАтаке(Token жертва, int attackerSeat) {
+        int хозяин = жертва.owner();
+        if (хозяин == attackerSeat || хозяин < 0) {
+            return false;
+        }
+        String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЭВАКУАЦИЯ,
+            agentFor(хозяин), "атакуют твой жетон — вернуть его в свой запас",
+            Map.of("attacker", attackerSeat), emit);
+        if (карта == null) {
+            return false;
+        }
+        увестиВЗапас(жертва, хозяин);
+        emit("type", "reaction_evacuate", "seat", хозяин, "card", карта,
+            "attacker", attackerSeat, "on_attack", true);
+        return true;
+    }
+
+    /** Увести свой жетон с поля в свой запас (общий путь обеих эвакуаций). */
+    private void увестиВЗапас(Token жертва, int хозяин) {
+        if (жертва instanceof UnitToken u) {
+            u.setHexId(null);
+            u.damage = 0;
+        } else {
+            Actions.returnOwnBuildingToReserve(state, state.player(хозяин),
+                (BuildingToken) жертва, false);
+        }
+        state.journal.of(хозяин).lostOwnThisTurn += 1;
+    }
+
+    /** «ЗАКРОМА» (печатные задания 1.19.0): атакуют твой жетон — получи 2 боеприпаса. */
+    private void закрома(Token жертва, int attackerSeat) {
+        int хозяин = жертва.owner();
+        if (хозяин == attackerSeat || хозяин < 0) {
+            return;
+        }
+        String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЗАКРОМА,
+            agentFor(хозяин), "атакуют твой жетон — получить 2 боеприпаса",
+            Map.of("attacker", attackerSeat), emit);
+        if (карта == null) {
+            return;
+        }
+        // Склад ограничивает, как всякую выдачу: нет ячейки — боеприпас не лёг.
+        int легло = Storage.addAmmoCapped(state, state.player(хозяин), 2);
+        emit("type", "reaction_ammo", "seat", хозяин, "card", карта,
+            "ammo", легло, "attacker", attackerSeat);
+    }
+
+    /**
+     * «КОНТРАТАКА!» (печатные задания 1.19.0): атакуют гекс с твоими жетонами —
+     * сначала все твои войска ОТТУДА выполняют атаку. Бой обычный, за свои
+     * боеприпасы, но стреляют только войска атакованного гекса (гарнизон не
+     * стреляет вовсе — это правило укрытия, и карта его не снимает).
+     */
+    private void контратака(String hexId, int attackerSeat) {
+        for (PlayerState pl : state.players) {
+            if (pl.seat == attackerSeat) {
+                continue;
+            }
+            boolean естьКому = false;
+            for (UnitToken u : pl.units) {
+                if (hexId.equals(u.hexId) && u.alive() && !вЗдании(u)) {
+                    естьКому = true;
+                    break;
+                }
+            }
+            if (!естьКому) {
+                continue;
+            }
+            String карта = Реакции.предложить(state, pl.seat, Реакции.Вид.КОНТРАТАКА,
+                agentFor(pl.seat), "атакуют гекс с твоими жетонами — войска оттуда бьют первыми",
+                Map.of("attacker", attackerSeat, "hex", hexId), emit);
+            if (карта == null) {
+                continue;
+            }
+            emit("type", "reaction_counterattack", "seat", pl.seat, "card", карта,
+                "hex", hexId, "attacker", attackerSeat);
+            принудительныйИсточник = hexId;
+            runBattle(pl.seat, agentFor(pl.seat), true, null, 0);
+        }
+    }
+
+    /**
+     * ГЕКС, С КОТОРОГО ОБЯЗАН БИТЬ СЛЕДУЮЩИЙ БОЙ, — только его войска. Ставит
+     * контратака перед вызовом {@link #runBattle}; бой забирает его в первой же
+     * строке и обнуляет, поэтому вложенные бои его не наследуют.
+     */
+    private String принудительныйИсточник = null;
 
     /**
      * РИКОШЕТ: назначенная атака переходит на ДРУГОЙ жетон того же гекса —

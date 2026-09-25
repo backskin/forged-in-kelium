@@ -1332,6 +1332,9 @@ public final class GameEngine {
         // складывалась бы с собой на каждом предложении СПЕЦ.
         ctx.specLimit = ctx.specLimitBase + state.journal.of(p.seat).specBonus;
         if (!ctx.canSpec()) {
+            // СВОБОДНЫЙ ВЕРХ (знак ∞) спец-действия не просит — его можно сжечь
+            // и тогда, когда спец-действие хода уже истрачено.
+            offerFreeBurns(p);
             return;
         }
         // ЦУ В ЗАПАСЕ ОБЯЗАН ВЕРНУТЬСЯ НА ПОЛЕ (command_center.must_replace_cu_with_spec):
@@ -1367,7 +1370,11 @@ public final class GameEngine {
                 // ВЕРХ «В МОМЕНТЕ» В СВОЙ ХОД НЕ ПРЕДЛАГАЕТСЯ. Реакция ждёт
                 // чужого удара, и сжечь её просто так значило бы отдать карту
                 // даром: окно ей открывает бой (kelium.engine.Реакции).
-                opts.add(new Choice("spec_objective_burn", cid, "burn top " + cid));
+                // СВОБОДНЫЙ ВЕРХ (∞) предлагается отдельным вариантом: он
+                // спец-действия не тратит (см. offerFreeBurns).
+                opts.add(верхСвободный(s, cid)
+                    ? new Choice("free_objective_burn", cid, "burn free top " + cid)
+                    : new Choice("spec_objective_burn", cid, "burn top " + cid));
             }
         }
         for (String cid : new ArrayList<>(p.arsenalHand)) {
@@ -1471,7 +1478,8 @@ public final class GameEngine {
             case "spec_objective" -> Objectives.playObjective(s, p.seat, j, (String) ch.payload(), this::emit);
             case "spec_objective_enh" -> Objectives.playObjective(
                 s, p.seat, j, (String) ch.payload(), this::emit, true);
-            case "spec_objective_burn" -> objectiveBurnTop(p, (String) ch.payload());
+            case "spec_objective_burn", "free_objective_burn" ->
+                objectiveBurnTop(p, (String) ch.payload());
             case "spec_arsenal_burn" -> arsenalBurn(p, (String) ch.payload());
             case "spec_arsenal_install" -> arsenalInstall(p, (String) ch.payload(), agents.get(p.seat));
             case "spec_mandate_store" -> mandateStoreCard(p, (String) ch.payload());
@@ -1521,8 +1529,46 @@ public final class GameEngine {
         boolean заданиеСвободно = Boolean.TRUE.equals(Ctx.rules(state)
                 .get("objectives.play_is_free_action", Boolean.FALSE))
             && ("spec_objective".equals(ch.kind()) || "spec_objective_enh".equals(ch.kind()));
-        if (!заданиеСвободно) {
+        if (!заданиеСвободно && !"free_objective_burn".equals(ch.kind())) {
             ctx.useSpec();
+        }
+    }
+
+    /**
+     * ВЕРХ КАРТЫ ЗАДАНИЯ СО ЗНАКОМ ∞ — СВОБОДНОЕ ДЕЙСТВИЕ (печатные карты
+     * 25.09.2026; памятка планшета войск: «∞ свободное · ▶ СПЕЦ»). Такой верх
+     * сжигается в свой ход в любой момент и спец-действия не тратит. Реакции
+     * тоже помечены ∞, но их окно открывает бой, и сюда они не попадают.
+     */
+    public static boolean верхСвободный(GameState s, String cid) {
+        Map<String, Object> oc = Ctx.cards(s, "objectives").find(cid);
+        return oc != null && oc.get("top") instanceof Map<?, ?> t
+            && t.get("params") instanceof Map<?, ?> пар
+            && Boolean.TRUE.equals(пар.get("free"))
+            && kelium.engine.Реакции.видКарты(s, cid) == null;
+    }
+
+    /**
+     * СВОБОДНЫЕ ВЕРХИ, КОГДА СПЕЦ-ДЕЙСТВИЕ УЖЕ ИСТРАЧЕНО. Предлагаются по одному,
+     * пока игрок не откажется: каждая карта сгорает, так что круг конечен.
+     */
+    private void offerFreeBurns(PlayerState p) {
+        for (int guard = 0; guard < 16; guard++) {
+            List<Choice> opts = new ArrayList<>();
+            for (String cid : new ArrayList<>(p.objectiveHand)) {
+                if (верхСвободный(state, cid)) {
+                    opts.add(new Choice("free_objective_burn", cid, "burn free top " + cid));
+                }
+            }
+            if (opts.isEmpty()) {
+                return;
+            }
+            opts.add(new Choice("pass", null, "не сжигать"));
+            Choice ch = agents.get(p.seat).choose(state, opts, ev("kind", "spec"));
+            if (ch == null || ch.payload() == null) {
+                return;
+            }
+            objectiveBurnTop(p, (String) ch.payload());
         }
     }
 

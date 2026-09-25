@@ -742,6 +742,9 @@ public final class Actions {
                             // (задание «Конвейер» усиление «3 разных здания»).
                             jf.unitsProducedBuildings.add(b.uid);
                             jf.producedByType.merge(unitType.code, 1, Integer::sum);
+                            // «Размести оба войска в гарнизоне» (1.19.0): карта
+                            // спрашивает про ЭТИ жетоны, поэтому помним их uid.
+                            jf.hiredUids.add(u.uid);
                             if (unitType != UnitType.TOWER) {
                                 jf.producedUnitBuildingTypes.add(b.type.code);
                             }
@@ -1519,6 +1522,9 @@ public final class Actions {
             TurnJournal.TurnFacts f = journal(state).of(player.seat);
             f.buildOps += 1;
             f.razedOwnHexes.add(hex);
+            // «Снеси 2 своих здания на одном гексе» (1.19.0): множество гексов
+            // этого не различает, нужен счёт по гексу.
+            f.razedOwnOnHex.merge(hex, 1, Integer::sum);
             f.buildOpHexes.add(hex);        // o15: снос — тоже операция стройки
             if (b.type != BuildingType.COMMAND_CENTER) {
                 f.demolishedNonCu = true;
@@ -2227,6 +2233,9 @@ public final class Actions {
         @Override
         @SuppressWarnings("unchecked")
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
+            if (ctx.moveTokensLimit > 0) {
+                return движениеЖетонами(player, ctx, agent, ctx.moveTokensLimit);
+            }
             if ("hex_swap".equals(rs.getStr("actions.movement.surcharge_model", "per_move"))) {
                 return выгнатьИЗагнать(player, ctx, agent);
             }
@@ -2503,6 +2512,54 @@ public final class Actions {
             Map<String, Object> tel = new HashMap<>();
             tel.put("moves", ходов);
             return ActionResult.ok("moved " + ходов + " tokens", tel);
+        }
+
+        /**
+         * ДВИЖЕНИЕ НЕ БОЛЬШЕ ЧЕМ {@code предел} ЛЮБЫМИ ЖЕТОНАМИ — верх карты
+         * задания «Выполни движение двумя любыми жетонами войск» (печатные карты
+         * 25.09.2026).
+         *
+         * <p>Жетоны берутся с любых гексов, каждый идёт на всю свою скорость и
+         * один раз, доплаты нет: на карте нет ни выбора гекса, ни цены. Маршрут,
+         * гарнизон, печатные контейнеры и журнал — общие с обычным Манёвром
+         * ({@link #маршруты}, {@link #провестиМаршрут}).
+         */
+        private ActionResult движениеЖетонами(PlayerState player, TurnContext ctx, Agent agent,
+                                              int предел) {
+            GameState s = state;
+            Set<Integer> сходили = new HashSet<>();
+            while (сходили.size() < предел) {
+                List<Choice> opts = new ArrayList<>();
+                for (UnitToken u : player.unitsOnField()) {
+                    if (сходили.contains(u.uid)) {
+                        continue;
+                    }
+                    for (var e : маршруты(s, player, u).entrySet()) {
+                        opts.add(new Choice("move", Map.of("uid", u.uid,
+                            "to", e.getKey(), "path", e.getValue()),
+                            u.type.code + "->" + e.getKey()));
+                    }
+                    for (BuildingToken b : garrisonTargets(s, player, u)) {
+                        opts.add(new Choice("garrison",
+                            Map.of("uid", u.uid, "b", b.uid, "to", u.hexId),
+                            u.type.code + " в " + b.type));
+                    }
+                }
+                if (opts.isEmpty()) {
+                    break;
+                }
+                opts.add(new Choice("pass", null, "stop moving"));
+                Choice pick = agent.choose(s, opts, Map.of("kind", "move", "source", ""));
+                if (pick == null || pick.payload() == null) {
+                    break;
+                }
+                сходили.add(провестиМаршрут(s, player, pick));
+            }
+            ctx.recordOp("movement");
+            ctx.actionsPlayed.add(name());
+            Map<String, Object> tel = new HashMap<>();
+            tel.put("moves", сходили.size());
+            return ActionResult.ok("moved " + сходили.size() + " tokens", tel);
         }
 
         /**

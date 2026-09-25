@@ -2632,6 +2632,9 @@ public class HeuristicAgent extends Agent {
             case "spec_objective_enh" -> scoreObjectiveComplete(state, (String) o.payload())
                 * wget("objective.enhanced");
             case "spec_objective_burn" -> scoreObjectiveBurn(state, (String) o.payload());
+            // СВОБОДНЫЙ ВЕРХ (∞, задания 1.19.0) ценится той же меркой, что
+            // сжигание спец-действием: вещь та же, только спец не тратится.
+            case "free_objective_burn" -> scoreObjectiveBurn(state, (String) o.payload());
             case "spec_super" -> 3.0;
             case "spec_arsenal_install" -> scoreArsenalInstall(state, (String) o.payload());
             // ПРИМЕНИТЬ УЖЕ УСТАНОВЛЕННУЮ КАРТУ. Этой ветки не было вовсе, и
