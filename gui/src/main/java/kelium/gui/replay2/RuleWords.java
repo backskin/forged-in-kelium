@@ -410,6 +410,7 @@ public final class RuleWords {
 
             // ---------- Рынок ----------
             case "market.deck_size" -> "карт рынка кладут на планшет";
+            case "market.preparatory_round" -> "первый раунд подготовительный — без карты рынка";
             case "market.cell_cost_kelium" -> "келемия за одну ячейку предложения";
             case "market.base_exchanges" -> "печатные обмены рынка";
             case "market.pair_bonus_coin" -> "монет за парный обмен";
