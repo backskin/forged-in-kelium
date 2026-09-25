@@ -328,6 +328,11 @@ public final class HotSeatWindow {
 
         // Церемония выбора карты круга/отложенного приказа — крупными лицами.
         ceremony = new kelium.gui.kp.CardChoiceOverlay();
+        ceremony.setArt(id -> {
+            ReplayRecord.Player p = viewedPlayer();
+            java.awt.image.BufferedImage o = orderArt(id, p == null ? null : p.orderColor);
+            return o != null ? o : cardFace(id);
+        });
         frame.getLayeredPane().add(ceremony, JLayeredPane.MODAL_LAYER);
 
         // Модальное окно необратимого — во весь слой окна, поверх всего.
@@ -710,6 +715,9 @@ public final class HotSeatWindow {
         for (JComponent d : drawers.values()) {
             d.setBounds(x, 0, w, layered.getHeight());
         }
+        // Карточка вопроса не прячется под выехавший ящик.
+        field.bubbles.setDockInset(openDrawerSpan());
+        field.repaint();
         layoutPrompt();
     }
 
@@ -1989,14 +1997,46 @@ public final class HotSeatWindow {
         Map.entry("combat_victim", "кого поразить"),
         Map.entry("neutral_victim", "какой нейтрал атаковать"),
         Map.entry("attack", "атака"),
-        Map.entry("mine", "добыча"),
-        Map.entry("assemble", "сборка"),
+        Map.entry("mine", "добыча: что взять"),
+        Map.entry("assemble", "сборка: что нанять"),
         Map.entry("tuck", "подложить карту-символ"),
         Map.entry("open_container", "вскрытие контейнера"),
         Map.entry("market_rate", "курс рынка"),
         Map.entry("sci_track", "трек науки"),
         Map.entry("super_pick", "выберите супер-задание"),
-        Map.entry("start_objective_pick", "стартовое задание"));
+        Map.entry("start_objective_pick", "стартовое задание"),
+        // все прочие точки решения движка — чтобы в шапке и в карточке вопроса
+        // не всплывали внутренние коды (замер 25.09.2026: 46 видов за 6 партий)
+        Map.entry("market", "рынок: сделка"),
+        Map.entry("sci_exchange", "обмен науки"),
+        Map.entry("energy_activation", "смена энергии: откуда и куда"),
+        Map.entry("energy_place", "куда поставить энергию"),
+        Map.entry("energy_loss_shift", "куда перенести кубик энергии"),
+        Map.entry("energy_or_modules", "смена энергии или смена модулей"),
+        Map.entry("return_unit", "кого вернуть в запас"),
+        Map.entry("storage_side", "сторона жетона хранилища"),
+        Map.entry("storage_discard", "что выбросить со склада"),
+        Map.entry("module_keep", "какой модуль оставить"),
+        Map.entry("module_place_red", "куда положить красный модуль"),
+        Map.entry("module_place_blue", "куда положить синий модуль"),
+        Map.entry("module_move_pick", "какой модуль переставить"),
+        Map.entry("module_gild_pick", "какой модуль позолотить"),
+        Map.entry("seal_move", "куда положить глухой жетон"),
+        Map.entry("landing", "высадка: где и кого"),
+        Map.entry("reaction", "ответ картой"),
+        Map.entry("pay_power", "запитать монетами?"),
+        Map.entry("order_spec", "плашка приказа"),
+        Map.entry("objective_reward_action", "награда: какое действие"),
+        Map.entry("destroyed_pay", "чем заплатить"),
+        Map.entry("exchange_where", "где меняться"),
+        Map.entry("keep_objective", "какое задание оставить"),
+        Map.entry("objective_keep", "какое задание оставить"),
+        Map.entry("arsenal_draw2", "какую карту арсенала оставить"),
+        Map.entry("mass_open", "вскрытие находок"),
+        Map.entry("cu_hex", "где поставить центр управления"),
+        Map.entry("cu_sides", "поворот центра управления"),
+        Map.entry("build_neutral", "где поставить нейтральное здание"),
+        Map.entry("ricochet_target", "куда уходит рикошет"));
 
     /**
      * ТОЧКА РЕШЕНИЯ ЖИВОГО ИГРОКА. Если за столом несколько людей и ход
@@ -2365,6 +2405,11 @@ public final class HotSeatWindow {
         // ЦЕРЕМОНИЯ КАРТ КРУГА (просьба дизайнера 24.08): выбор карты круга и
         // отложенного приказа — крупными лицами по центру, с печатным
         // описанием под наведённой картой.
+        if ("reveal_order".equals(kind)) {
+            // новый круг — прошлый приказ со стола убирается
+            revealed.remove(seat);
+            refreshTable();
+        }
         if ("reveal_order".equals(kind) || "blind_discard".equals(kind)) {
             boolean allCards = options.stream().allMatch(c -> c.payload() instanceof String);
             if (allCards && !options.isEmpty()) {
@@ -2632,7 +2677,42 @@ public final class HotSeatWindow {
         }
         table.setChoices(onTable, Theme.seat(seat));
         field.setChoices(byHex, title, hint, dock, Theme.seat(seat));
+        if (d.context().get("source") instanceof String src && hexIds.contains(src)) {
+            field.setSource(src, Theme.seat(seat));
+        }
+        // РЫНОК И НАУКА — С ДОСКАМИ ПЕРЕД ГЛАЗАМИ: ящик с ними выезжает сам,
+        // пока идёт решение, и уезжает, когда решение принято.
+        if (SCIENCE_MARKET.contains(kind)) {
+            drawerCloser.stop();
+            if (openDrawer != drawers.get("Наука и рынок")) {
+                toggleDrawer("Наука и рынок");
+                drawerAutoOpened = true;
+            }
+        }
     }
+
+    /** Отложенное закрытие ящика науки, открытого окном для решения. */
+    private final javax.swing.Timer drawerCloser =
+        new javax.swing.Timer(450, e -> closeAutoDrawer());
+
+    private void closeAutoDrawer() {
+        if (drawerAutoOpened && (awaitingSeat == null
+                || !SCIENCE_MARKET.contains(String.valueOf(pendingKind)))) {
+            drawerAutoOpened = false;
+            if (openDrawer == drawers.get("Наука и рынок")) {
+                toggleDrawer("Наука и рынок");
+            }
+        }
+    }
+
+    {
+        drawerCloser.setRepeats(false);
+    }
+
+    private static final java.util.Set<String> SCIENCE_MARKET = java.util.Set.of(
+        "market", "sci_track", "sci_exchange", "exchange_where", "sci_pay_kelium");
+    /** Ящик науки открыт окном для решения — окно его и закроет. */
+    private boolean drawerAutoOpened;
 
     /** Лежит ли карта на столе смотрящего места (руки заданий и арсенала). */
     private boolean onTableCard(String id) {
@@ -2931,6 +3011,11 @@ public final class HotSeatWindow {
         hands.clearPickable();
         if (table != null) {
             table.clearChoices();
+        }
+        if (drawerAutoOpened) {
+            // Закрываем не сразу: сделки рынка и шаги науки идут чередой, и
+            // ящик не должен хлопать между ними.
+            drawerCloser.restart();
         }
         actionBar.idle("ход соперника");
         awaitingSeat = null;

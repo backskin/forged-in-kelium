@@ -150,7 +150,72 @@ public final class FieldView extends JComponent {
 
     public void clearChoices() {
         bubbles.clear();
+        sourceHexId = null;
         clearSelectable();
+    }
+
+    /**
+     * ОТКУДА ИДЁТ ДЕЙСТВИЕ (бой, шаг): гекс обводится сплошной линией цвета
+     * места, и от него к гексу-цели под курсором тянется стрелка — видно, кто
+     * по кому бьёт и кто куда идёт, до щелчка.
+     */
+    public void setSource(String hexId, Color color) {
+        this.sourceHexId = hexId;
+        this.sourceColor = color;
+        repaint();
+    }
+
+    private String sourceHexId;
+    private Color sourceColor = new Color(0x3b82d0);
+
+    private void drawSource(Graphics2D g) {
+        if (sourceHexId == null || record == null) {
+            return;
+        }
+        Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo h : record.hexes) {
+            info.put(h.id, h);
+        }
+        double[] s = center(info, sourceHexId);
+        if (s == null) {
+            return;
+        }
+        g.setColor(sourceColor);
+        g.setStroke(pen(3.4));
+        g.draw(hexPath(s[0], s[1], BASE * 0.93));
+        if (hoverHexId == null || hoverHexId.equals(sourceHexId)
+                || !selectableHexIds.contains(hoverHexId)) {
+            return;
+        }
+        double[] t = center(info, hoverHexId);
+        if (t == null) {
+            return;
+        }
+        double dx = t[0] - s[0];
+        double dy = t[1] - s[1];
+        double len = Math.hypot(dx, dy);
+        if (len < 1) {
+            return;
+        }
+        double ux = dx / len;
+        double uy = dy / len;
+        double x0 = s[0] + ux * BASE * 0.45;
+        double y0 = s[1] + uy * BASE * 0.45;
+        double x1 = t[0] - ux * BASE * 0.45;
+        double y1 = t[1] - uy * BASE * 0.45;
+        g.setColor(withAlpha(Color.WHITE, 220));
+        g.setStroke(pen(7));
+        g.draw(new Line2D.Double(x0, y0, x1, y1));
+        g.setColor(sourceColor);
+        g.setStroke(pen(4));
+        g.draw(new Line2D.Double(x0, y0, x1, y1));
+        double head = BASE * 0.28;
+        Path2D arrow = new Path2D.Double();
+        arrow.moveTo(x1 + ux * head * 0.4, y1 + uy * head * 0.4);
+        arrow.lineTo(x1 - ux * head - uy * head * 0.6, y1 - uy * head + ux * head * 0.6);
+        arrow.lineTo(x1 - ux * head + uy * head * 0.6, y1 - uy * head - ux * head * 0.6);
+        arrow.closePath();
+        g.fill(arrow);
     }
 
     /** Центр гекса на экране (null — нет такого гекса). */
@@ -949,6 +1014,7 @@ public final class FieldView extends JComponent {
         if (!selectableHexIds.isEmpty()) {
             drawSelectable(g);
         }
+        drawSource(g);
         if (facingVariants != null && facingHexId != null) {
             drawFacing(g);
         }

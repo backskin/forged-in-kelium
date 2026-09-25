@@ -100,11 +100,22 @@ public final class CardChoiceOverlay extends JComponent {
     private int cardW() {
         int n = Math.max(1, cards.size());
         int fit = (getWidth() - Theme.px(80)) / n + Theme.px(30);
-        return Math.max(Theme.px(120), Math.min(Theme.px(170), fit));
+        // печатные лица крупнее: на них мелкий текст, его надо прочесть
+        boolean printed = !cards.isEmpty() && art.apply(cards.get(0).id()) != null;
+        int max = printed ? Theme.px(230) : Theme.px(170);
+        int byHeight = (int) ((getHeight() - Theme.px(260)) / 1.52);
+        return Math.max(Theme.px(120), Math.min(Math.min(max, byHeight), fit));
     }
 
     private int cardH() {
-        return (int) (cardW() * 1.42);
+        return (int) (cardW() * 1.52);
+    }
+
+    /** Печатное лицо карты по id (null — рисуем сами). */
+    private java.util.function.Function<String, java.awt.image.BufferedImage> art = id -> null;
+
+    public void setArt(java.util.function.Function<String, java.awt.image.BufferedImage> art) {
+        this.art = art == null ? id -> null : art;
     }
 
     private Rectangle cardRect(int i) {
@@ -182,7 +193,17 @@ public final class CardChoiceOverlay extends JComponent {
         Card c = cards.get(i);
         g.setColor(new Color(0, 0, 0, 100));
         g.fillRoundRect(r.x + 3, r.y + 5, r.width, r.height, Theme.px(10), Theme.px(10));
-        if (c.face() != null) {
+        java.awt.image.BufferedImage img = art.apply(c.id());
+        if (img != null) {
+            // ПЕЧАТНОЕ ЛИЦО КАРТЫ — есть картинка, рисуем её (25.09.2026)
+            java.awt.Shape clip = g.getClip();
+            g.clip(new java.awt.geom.RoundRectangle2D.Double(r.x, r.y, r.width, r.height,
+                Theme.px(10), Theme.px(10)));
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.drawImage(img, r.x, r.y, r.width, r.height, null);
+            g.setClip(clip);
+        } else if (c.face() != null) {
             OrderCardFace.paint(g, c.face(), r.x, r.y, r.width, r.height, false);
         } else {
             g.setColor(Theme.paper());

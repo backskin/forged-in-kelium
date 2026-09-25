@@ -89,6 +89,13 @@ public final class FieldBubbles {
         set(null, null, null, null, null);
     }
 
+    /** Слева поле закрыто ящиком на столько точек — карточка вопроса правее. */
+    private int dockInset;
+
+    public void setDockInset(int left) {
+        this.dockInset = Math.max(0, left);
+    }
+
     public boolean active() {
         return !byHex.isEmpty() || !dock.isEmpty() || title != null;
     }
@@ -193,7 +200,24 @@ public final class FieldBubbles {
             }
         }
         if (title != null || !dock.isEmpty()) {
-            paintDock(g, w);
+            java.awt.geom.AffineTransform was = g.getTransform();
+            g.translate(dockInset, 0);
+            paintDock(g, w - dockInset);
+            g.setTransform(was);
+            // зоны щелчка карточки сдвинуты вместе с ней
+            if (dockInset > 0) {
+                Map<Rectangle, Opt> moved = new LinkedHashMap<>();
+                for (Map.Entry<Rectangle, Opt> e : hits.entrySet()) {
+                    Rectangle r = new Rectangle(e.getKey());
+                    r.translate(dockInset, 0);
+                    moved.put(r, e.getValue());
+                }
+                hits.clear();
+                hits.putAll(moved);
+                for (Rectangle r : panels) {
+                    r.translate(dockInset, 0);
+                }
+            }
         }
         if (openHex != null) {
             Point2D c = hexScreen.apply(openHex);
@@ -234,10 +258,11 @@ public final class FieldBubbles {
         int chipH = Theme.px(40);
         int gap = Theme.px(8);
         List<int[]> chips = new ArrayList<>();       // {w}
+        int chipMax = Math.max(Theme.px(80), maxW - pad * 2 - Theme.px(8));
         for (Opt o : dock) {
-            int lw = cm.stringWidth(clip(cm, o.label(), Theme.px(300)));
-            int sw = o.sub() == null ? 0 : sm.stringWidth(clip(sm, o.sub(), Theme.px(300)));
-            chips.add(new int[]{Math.max(lw, sw) + Theme.px(28)});
+            int lw = cm.stringWidth(clip(cm, o.label(), Theme.px(420)));
+            int sw = o.sub() == null ? 0 : sm.stringWidth(clip(sm, o.sub(), Theme.px(420)));
+            chips.add(new int[]{Math.min(chipMax, Math.max(lw, sw) + Theme.px(28))});
         }
         List<List<Integer>> rows = new ArrayList<>();
         int rowW = 0;

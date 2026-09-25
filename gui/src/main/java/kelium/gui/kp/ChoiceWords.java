@@ -24,6 +24,8 @@ public final class ChoiceWords {
 
     private static final Pattern AT_HEX = Pattern.compile("\\s*@h-?\\d+_-?\\d+(/\\d+)?");
     private static final Pattern HEX = Pattern.compile("h(-?\\d+)_(-?\\d+)");
+    private static final Pattern LEVELED = Pattern.compile(
+        "\\b(miner|power_plant|plant|MINER|POWER_PLANT)\\s?L(\\d)\\b");
     private static final Pattern CODE = Pattern.compile(
         "\\b(command_center|power_plant|barracks|factory|airbase|miner|plant|"
             + "infantry|vehicle|aircraft|tower|COMMAND_CENTER|POWER_PLANT|BARRACKS|"
@@ -56,7 +58,7 @@ public final class ChoiceWords {
                 return cap(unitRu(unit)) + ("return_unit".equals(kind) ? " — в запас" : "");
             }
             case "energy_place" -> {
-                return "Энергию на " + buildingRu(before(raw, "@").trim());
+                return "Энергию на " + tidy(before(raw, "@").trim());
             }
             case "mine" -> {
                 return "container".equals(p) ? "Взять контейнер" : "Добыть келемий";
@@ -206,6 +208,15 @@ public final class ChoiceWords {
         }
         String s = AT_HEX.matcher(raw).replaceAll("");
         s = s.replace("->", "→").replace("КЕЛ", "келемий").replace("МОН", "монет");
+        // «miner L1», «power_plantL3» — здание с уровнем
+        Matcher lv = LEVELED.matcher(s);
+        StringBuilder lb = new StringBuilder();
+        while (lv.find()) {
+            lv.appendReplacement(lb, Matcher.quoteReplacement(
+                buildingRu(lv.group(1)) + " " + lv.group(2)));
+        }
+        lv.appendTail(lb);
+        s = lb.toString();
         Matcher m = CODE.matcher(s);
         StringBuilder out = new StringBuilder();
         while (m.find()) {
