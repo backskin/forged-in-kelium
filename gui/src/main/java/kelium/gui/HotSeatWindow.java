@@ -452,10 +452,22 @@ public final class HotSeatWindow {
                 return tableSheet.paintTableBoards(g, x, y, width, hits, outlines);
             }
         });
-        t.setCards(this::anyFace, kind -> switch (kind) {
-            case "arsenal" -> kelium.report.Textures.card("deck_arsenal", "deck");
-            case "objective" -> kelium.report.Textures.card("deck_objectives", "deck");
-            default -> null;
+        // РУБАШКИ — готовые из «Общие компоненты/экспорт-рубашки» (deck_*):
+        // у каждой колоды своя, у начального и супер-арсенала тоже.
+        t.setCards(this::anyFace, kind -> {
+            if (kind.startsWith("arsenal:")) {
+                String id = kind.substring("arsenal:".length());
+                String deck = kelium.report.Textures.cardFace("arsenal_start", id) != null
+                    ? "deck_arsenal_start"
+                    : kelium.report.Textures.cardFace("arsenal_super", id) != null
+                        ? "deck_super_arsenal" : "deck_arsenal";
+                return kelium.report.Textures.card(deck, "deck_arsenal");
+            }
+            return switch (kind) {
+                case "arsenal" -> kelium.report.Textures.card("deck_arsenal", "deck");
+                case "objective" -> kelium.report.Textures.card("deck_objectives", "deck");
+                default -> null;
+            };
         }, this::cardName, this::objectiveTag);
         t.onCardHover((id, r) -> showTableZoom(id, r), () -> zoom.setVisible(false));
         t.onOpen(this::openSpread);
@@ -681,21 +693,30 @@ public final class HotSeatWindow {
             awaitingSeat == null ? "ход соперника" : "сначала решение"));
     }
 
+    /** Фон верхней полосы — глубокий цвет стола. */
+    private static final Color BAR_BG = new Color(0x15303C);
+
+    /** Цвет места, читаемый на тёмной полосе: светлее самого цвета. */
+    private static Color barInk(int seat) {
+        return Theme.lighten(Theme.seat(seat), 0.45);
+    }
+
     private JComponent buildTopBar() {
         JPanel bar = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets " + Theme.px(8) + " " + Theme.px(12) + " " + Theme.px(8) + " " + Theme.px(12)
                 + ", gapx " + Theme.px(12), "[][]push[][][][][]"));
-        bar.setBackground(Theme.panel());
-        bar.setBorder(BorderFactory.createMatteBorder(0, 0, Theme.px(2), 0, Theme.border()));
+        // ВЕРХНЯЯ ПОЛОСА — ГЛУБОКИМ ЦВЕТОМ СТОЛА (25.09.2026: «не серо-белое»).
+        bar.setBackground(BAR_BG);
+        bar.setBorder(BorderFactory.createMatteBorder(0, 0, Theme.px(2), 0, new Color(0x3C6A7C)));
 
         roundLabel = new JLabel("Подготовка…");
         roundLabel.setFont(Theme.font(13, Font.PLAIN));
-        roundLabel.setForeground(Theme.ink2());
+        roundLabel.setForeground(new Color(0xA9C6D2));
         bar.add(roundLabel);
 
         turnLabel = new JLabel("Партия начинается…");
         turnLabel.setFont(Theme.font(16, Font.BOLD));
-        turnLabel.setForeground(Theme.ink());
+        turnLabel.setForeground(Color.WHITE);
         bar.add(turnLabel);
         if (chipsPanel != null) {
             bar.add(chipsPanel);
@@ -720,13 +741,13 @@ public final class HotSeatWindow {
         // Полоса всех мест — открытый счёт стола (блокер приёмки №1).
         JPanel north = new JPanel();
         north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
-        north.setBackground(Theme.panel());
+        north.setBackground(BAR_BG);
         bar.setAlignmentX(Component.LEFT_ALIGNMENT);
         north.add(bar);
         opponents = new kelium.gui.kp.OpponentStrip();
         opponents.setAlignmentX(Component.LEFT_ALIGNMENT);
         JPanel oppWrap = new JPanel(new BorderLayout());
-        oppWrap.setBackground(Theme.panel());
+        oppWrap.setBackground(new Color(0x1B3845));
         oppWrap.setBorder(BorderFactory.createMatteBorder(Theme.px(1), 0, Theme.px(2), 0,
             Theme.border()));
         oppWrap.add(opponents, BorderLayout.CENTER);
@@ -777,6 +798,7 @@ public final class HotSeatWindow {
 
     private JComponent buildCenter() {
         field = new FieldView();
+        field.setTableBackdrop(true);
         field.setShowTurnCaption(false);
         // Отладочные подписи гексов игроку не показываются; для наведения
         // работает подсказка гекса, для решений — подсветка целей.
@@ -1527,7 +1549,7 @@ public final class HotSeatWindow {
                     : "победил Игрок " + (finalRec.winner + 1))
                 + " · раундов " + finalRec.rounds);
             turnLabel.setForeground(finalRec.winner == null
-                ? Theme.ink() : Theme.seatInk(finalRec.winner));
+                ? Color.WHITE : barInk(finalRec.winner));
             endBtn.setTexts("Партия окончена", "");
             endBtn.setState(KpButton.State.DISABLED);
             finished = true;
@@ -1814,11 +1836,11 @@ public final class HotSeatWindow {
         if (awaitingSeat == null) {
             if (active == null) {
                 turnLabel.setText("Общая фаза раунда");
-                turnLabel.setForeground(Theme.ink2());
+                turnLabel.setForeground(new Color(0xA9C6D2));
             } else {
                 boolean bot = !"human".equals(seatSpecs.get(active));
                 turnLabel.setText("Ходит: " + seatName(active) + (bot ? " (бот)" : ""));
-                turnLabel.setForeground(Theme.seatInk(active));
+                turnLabel.setForeground(barInk(active));
             }
         }
         int seat = awaitingSeat != null ? awaitingSeat
@@ -2590,7 +2612,7 @@ public final class HotSeatWindow {
 
         turnLabel.setText("ВАШ ХОД — Игрок " + (seat + 1) + ": "
             + KIND_LABELS.getOrDefault(kind, kind));
-        turnLabel.setForeground(Theme.seatInk(seat));
+        turnLabel.setForeground(barInk(seat));
 
         // «Завершить ход» = вариант "пас" точки вида action.
         int passIdx = -1;

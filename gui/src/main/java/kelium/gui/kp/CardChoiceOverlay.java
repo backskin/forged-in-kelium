@@ -103,12 +103,26 @@ public final class CardChoiceOverlay extends JComponent {
         // печатные лица крупнее: на них мелкий текст, его надо прочесть
         boolean printed = !cards.isEmpty() && art.apply(cards.get(0).id()) != null;
         int max = printed ? Theme.px(230) : Theme.px(170);
-        int byHeight = (int) ((getHeight() - Theme.px(260)) / 1.52);
+        int byHeight = (int) ((getHeight() - Theme.px(260)) * ratio());
         return Math.max(Theme.px(120), Math.min(Math.min(max, byHeight), fit));
     }
 
     private int cardH() {
-        return (int) (cardW() * 1.52);
+        return (int) Math.round(cardW() / ratio());
+    }
+
+    /**
+     * Ширина к высоте — С ПЕЧАТНОГО ЛИЦА первой карты (карты одной колоды
+     * одного формата); печати нет — пропорция карты приказа 661×1028.
+     */
+    private double ratio() {
+        if (!cards.isEmpty()) {
+            java.awt.image.BufferedImage img = art.apply(cards.get(0).id());
+            if (img != null && img.getHeight() > 0) {
+                return img.getWidth() / (double) img.getHeight();
+            }
+        }
+        return 661 / 1028.0;
     }
 
     /** Печатное лицо карты по id (null — рисуем сами). */

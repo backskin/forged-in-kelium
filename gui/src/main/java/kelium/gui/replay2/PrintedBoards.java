@@ -548,9 +548,29 @@ final class PrintedBoards {
         // относятся к ещё свободным пазам.
         BufferedImage конт = Textures.card("deck_containers", "deck");
         int положено = 0;
+        Rectangle первый = null;
         for (int i = паз * 2; i < подКонтейнер.size() && положено < p.containers; i++) {
             картаВПаз(g, войX, войY, k, подКонтейнер.get(i), конт);
+            int[] r = подКонтейнер.get(i);
+            Rectangle box = scale(войX, войY, k, r[0], r[1], r[2], r[3]);
+            первый = первый == null ? box : первый.union(box);
             положено++;
+        }
+        // ПОДПИСЬ К КОНТЕЙНЕРАМ: квадратная рубашка в пазу без подписи
+        // читалась как непонятный квадратик (замечание дизайнера 25.09.2026).
+        if (первый != null && p.containers > 0) {
+            hit("containers", первый);
+            String s = "контейнеры · " + p.containers;
+            g.setFont(Theme.font(Math.max(9, первый.height / 5), Font.BOLD));
+            var fm = g.getFontMetrics();
+            int tw = fm.stringWidth(s) + 10;
+            int th = fm.getHeight() + 2;
+            int tx = первый.x + (первый.width - tw) / 2;
+            int ty = первый.y + первый.height + 2;
+            g.setColor(Theme.alpha(new Color(0x6B, 0x45, 0x1F), 0.92));
+            g.fill(new RoundRectangle2D.Double(tx, ty, tw, th, th, th));
+            g.setColor(Color.WHITE);
+            g.drawString(s, tx + 5, ty + fm.getAscent() + 1);
         }
     }
 

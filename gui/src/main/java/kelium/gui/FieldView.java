@@ -148,6 +148,39 @@ public final class FieldView extends JComponent {
         repaint();
     }
 
+    /**
+     * СТОЛ ПОД ПОЛЕМ (живая партия): глубокое бирюзовое сукно со светом по
+     * центру вместо плоского белого листа — поле и его светлые картонки на нём
+     * горят (просьба дизайнера 25.09.2026: «цветасто, чётко, круто»).
+     */
+    private boolean tableBackdrop;
+
+    public void setTableBackdrop(boolean on) {
+        this.tableBackdrop = on;
+        repaint();
+    }
+
+    private void paintBackdrop(Graphics2D g) {
+        int w = getWidth();
+        int h = getHeight();
+        java.awt.RadialGradientPaint p = new java.awt.RadialGradientPaint(
+            new java.awt.geom.Point2D.Double(w / 2.0, h * 0.48),
+            (float) Math.max(w, h) * 0.75f, new float[]{0f, 0.55f, 1f},
+            new Color[]{new Color(0x3C6A7C), new Color(0x1F3F4E), new Color(0x0C1A22)});
+        g.setPaint(p);
+        g.fillRect(0, 0, w, h);
+        // сетка стола: редкие гексы-водяные знаки
+        g.setColor(new Color(255, 255, 255, 10));
+        g.setStroke(new BasicStroke(1f));
+        double r = 46;
+        double dx = r * Math.sqrt(3);
+        for (double y = -r, row = 0; y < h + r; y += r * 1.5, row++) {
+            for (double x = (row % 2 == 0 ? 0 : dx / 2) - dx; x < w + dx; x += dx) {
+                g.draw(hexPath(x, y, r * 0.96));
+            }
+        }
+    }
+
     public void clearChoices() {
         bubbles.clear();
         sourceHexId = null;
@@ -702,8 +735,12 @@ public final class FieldView extends JComponent {
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setColor(getBackground());
-        g.fillRect(0, 0, getWidth(), getHeight());
+        if (tableBackdrop) {
+            paintBackdrop(g);
+        } else {
+            g.setColor(getBackground());
+            g.fillRect(0, 0, getWidth(), getHeight());
+        }
 
         if (record == null || frame == null || frame.snapshot == null) {
             g.setColor(new Color(0x88, 0x88, 0x88));

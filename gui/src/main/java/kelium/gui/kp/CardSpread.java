@@ -176,23 +176,37 @@ public final class CardSpread extends JComponent {
         int chipH = Theme.px(34);
         int actsH = maxActs == 0 ? Theme.px(24) : maxActs * (chipH + Theme.px(6)) + Theme.px(8);
         int headH = Theme.px(70);
-        // РАЗМЕР КАРТЫ — ПО МЕСТУ: одна строка, если влезает, иначе две
+        // ПРОПОРЦИЯ КАЖДОЙ КАРТЫ — С ЕЁ ЛИЦА: задания и приказы стоят,
+        // арсенал лежит (замечание дизайнера 25.09.2026: «ты кукожишь карты»).
+        double[] ratio = new double[n];
+        for (int i = 0; i < n; i++) {
+            BufferedImage f = cards.get(i).face();
+            ratio[i] = f == null || f.getHeight() == 0 ? 0.643
+                : f.getWidth() / (double) f.getHeight();
+        }
+        // РАЗМЕР — ПО МЕСТУ: одна строка, если влезает, иначе две-три
         int gap = Theme.px(18);
         int rows = 1;
-        int cardW;
         int cardH;
+        int perRow;
         while (true) {
-            int perRow = (n + rows - 1) / rows;
-            int byW = (w - Theme.px(80) - gap * (perRow - 1)) / perRow;
-            int byH = (int) (((h - headH - Theme.px(30)) / (double) rows - actsH) / 1.45);
-            cardW = Math.min(Theme.px(280), Math.min(byW, byH));
-            cardH = (int) (cardW * 1.45);
-            if (cardW >= Theme.px(150) || rows >= 3) {
+            perRow = (n + rows - 1) / rows;
+            double widest = 0;
+            for (int r = 0; r < rows; r++) {
+                double s = 0;
+                for (int i = r * perRow; i < Math.min(n, (r + 1) * perRow); i++) {
+                    s += ratio[i];
+                }
+                widest = Math.max(widest, s);
+            }
+            int byW = (int) ((w - Theme.px(80) - gap * (perRow - 1)) / Math.max(0.1, widest));
+            int byH = (int) ((h - headH - Theme.px(30)) / (double) rows - actsH);
+            cardH = Math.min(Theme.px(430), Math.min(byW, byH));
+            if (cardH >= Theme.px(220) || rows >= 3) {
                 break;
             }
             rows++;
         }
-        int perRow = (n + rows - 1) / rows;
         int blockH = rows * (cardH + actsH) + (rows - 1) * gap;
         int top = Math.max(headH, (h - blockH) / 2 + Theme.px(20));
         int slide = (int) Math.round((1 - a) * Theme.px(30));
@@ -208,14 +222,20 @@ public final class CardSpread extends JComponent {
             g.drawString(subtitle, (w - sf.stringWidth(subtitle)) / 2, top - Theme.px(14));
         }
 
-        for (int i = 0; i < n; i++) {
-            int row = i / perRow;
-            int col = i % perRow;
-            int inRow = Math.min(perRow, n - row * perRow);
-            int rowW = inRow * cardW + (inRow - 1) * gap;
-            int x = (w - rowW) / 2 + col * (cardW + gap);
+        for (int row = 0; row * perRow < n; row++) {
+            int from = row * perRow;
+            int to = Math.min(n, from + perRow);
+            int rowW = (to - from - 1) * gap;
+            for (int i = from; i < to; i++) {
+                rowW += (int) Math.round(cardH * ratio[i]);
+            }
+            int x = (w - rowW) / 2;
             int y = top + row * (cardH + actsH + gap) + slide;
-            paintCard(g, cards.get(i), x, y, cardW, cardH, chipH);
+            for (int i = from; i < to; i++) {
+                int cw = (int) Math.round(cardH * ratio[i]);
+                paintCard(g, cards.get(i), x, y, cw, cardH, chipH);
+                x += cw + gap;
+            }
         }
         g.dispose();
     }

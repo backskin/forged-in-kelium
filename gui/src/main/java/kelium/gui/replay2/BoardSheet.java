@@ -365,11 +365,16 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                                 Map<String, java.awt.Shape> outlines) {
         PrintedBoards.hits = hits;
         PrintedBoards.outlines = outlines;
+        // На столе запас войск лежит САМИМИ ЖЕТОНАМИ стопкой, без подписей:
+        // сколько осталось, столько и видно (подписи — прибору разбора).
+        boolean былиПодписи = PrintedBoards.подписиЗапаса;
+        PrintedBoards.подписиЗапаса = false;
         try {
             return печатнаяСцепка(g, x, y, width);
         } finally {
             PrintedBoards.hits = null;
             PrintedBoards.outlines = null;
+            PrintedBoards.подписиЗапаса = былиПодписи;
         }
     }
 

@@ -405,7 +405,7 @@ public final class PlayerTable extends JComponent {
         paintMat(g, w, h);
         if (state == null) {
             g.setFont(Theme.italic());
-            g.setColor(Theme.ink3());
+            g.setColor(MAT_INK2);
             g.drawString("зона игрока появится, когда партия начнётся", Theme.px(24), Theme.px(34));
             g.dispose();
             return;
@@ -483,21 +483,38 @@ public final class PlayerTable extends JComponent {
         g.dispose();
     }
 
-    /** Коврик зоны игрока: тёплая подложка стола и полоса цвета места. */
+    /** Подписи на коврике: светлые, коврик тёмный. */
+    private static final Color MAT_INK = new Color(0xDCEAF0);
+    private static final Color MAT_INK2 = new Color(0x9FBCC9);
+
+    /**
+     * КОВРИК ЗОНЫ ИГРОКА — тёмно-бирюзовое сукно стола (просьба дизайнера
+     * 25.09.2026: «всё серо-белое, как поделка; должно быть цветасто, чётко,
+     * круто»). Печатные планшеты и карты светлые, и на глубоком фоне они
+     * горят; подложка подкрашена цветом места, сверху — его светящаяся кромка.
+     */
     private void paintMat(Graphics2D g, int w, int h) {
-        Color base = Theme.isDark() ? new Color(0x1A1E24) : new Color(0xE9E4DA);
-        Color deep = Theme.isDark() ? new Color(0x12151A) : new Color(0xD9D2C4);
-        g.setPaint(new GradientPaint(0, 0, base, 0, h, deep));
+        Color seat = state == null ? new Color(0x3B82D0) : Theme.seat(state.seat());
+        g.setPaint(new GradientPaint(0, 0, new Color(0x21414F), 0, h, new Color(0x0D1B23)));
         g.fillRect(0, 0, w, h);
-        g.setColor(Theme.alpha(Color.BLACK, Theme.isDark() ? 0.5 : 0.18));
-        g.fillRect(0, 0, w, Theme.px(2));
-        if (state != null) {
-            Color seat = Theme.seat(state.seat());
-            g.setColor(seat);
-            g.fillRect(0, 0, Theme.px(6), h);
-            g.setColor(Theme.alpha(seat, 0.08));
-            g.fillRect(Theme.px(6), 0, w, h);
+        // лёгкий отсвет цвета места из левого верхнего угла
+        java.awt.RadialGradientPaint glow = new java.awt.RadialGradientPaint(
+            new Point2D.Double(w * 0.18, 0), (float) Math.max(w, h) * 0.7f,
+            new float[]{0f, 1f},
+            new Color[]{Theme.alpha(seat, 0.22), Theme.alpha(seat, 0.0)});
+        g.setPaint(glow);
+        g.fillRect(0, 0, w, h);
+        // ткань: редкие диагонали
+        g.setColor(new Color(255, 255, 255, 7));
+        g.setStroke(new BasicStroke(1f));
+        for (int x = -h; x < w; x += Theme.px(9)) {
+            g.drawLine(x, h, x + h, 0);
         }
+        // светящаяся кромка цвета места
+        g.setPaint(new GradientPaint(0, 0, seat, w, 0, Theme.alpha(seat, 0.15)));
+        g.fillRect(0, 0, w, Theme.px(3));
+        g.setColor(seat);
+        g.fillRect(0, 0, Theme.px(5), h);
     }
 
     // ---------- стопка закрытого арсенала ----------
@@ -509,9 +526,17 @@ public final class PlayerTable extends JComponent {
      */
     private void paintArsenalStack(Graphics2D g, int sx, int sw, int boardBottom, int bottom) {
         List<String> hand = state.arsenalHand();
+        BufferedImage back = backOf.apply("arsenal");
+        // КАРТА АРСЕНАЛА ГОРИЗОНТАЛЬНАЯ — пропорция берётся с самой картинки
+        // (замечание дизайнера 25.09.2026: «ты кукожишь карты»).
+        double ratio = aspect(back, 1.544);
         int visible = Math.max(Theme.px(30), bottom - boardBottom);
-        int ch = (int) Math.round(visible / 0.52);
-        int cw = (int) Math.round(ch * 0.69);
+        int ch = (int) Math.round(visible / 0.55);
+        int cw = (int) Math.round(ch * ratio);
+        if (cw > sw * 0.8) {
+            cw = (int) (sw * 0.8);
+            ch = (int) Math.round(cw / ratio);
+        }
         int cx = sx + sw / 2;
         int y0 = bottom - ch;
         int n = Math.min(6, hand.size());
@@ -523,17 +548,18 @@ public final class PlayerTable extends JComponent {
         if (hand.isEmpty()) {
             // Пусто — тихой подписью под кромкой: место не должно кричать.
             g.setFont(Theme.font(10, Font.PLAIN));
-            g.setColor(Theme.ink3());
+            g.setColor(MAT_INK2);
             centred(g, "закрытого арсенала нет", cx, bottom - Theme.px(6));
             return;
         }
-        BufferedImage back = backOf.apply("arsenal");
         boolean chosen = hand.stream().anyMatch(id -> choices.containsKey("card:" + id));
         boolean hot = "arsenal".equals(hoverGroup);
         for (int i = 0; i < n; i++) {
             int x = x0 + i * spread;
             int y = y0 - (hot ? Theme.px(10) : 0) + (i % 2) * Theme.px(2);
-            paintBack(g, back, x, y, cw, ch, Theme.container());
+            // рубашка СВОЕЙ колоды: начальный, обычный, супер-арсенал
+            BufferedImage own = backOf.apply("arsenal:" + hand.get(hand.size() - n + i));
+            paintBack(g, own != null ? own : back, x, y, cw, ch, Theme.container());
         }
         if (chosen) {
             g.setColor(seatColor);
@@ -555,11 +581,11 @@ public final class PlayerTable extends JComponent {
      */
     private void paintDump(Graphics2D g, int x, int y, int w, int h) {
         g.setFont(Theme.caption());
-        g.setColor(Theme.ink3());
+        g.setColor(MAT_INK2);
         g.drawString("СВАЛКА", x, y - Theme.px(6));
         RoundRectangle2D shape = new RoundRectangle2D.Double(x, y, w, h, h * 0.08, h * 0.08);
         if (state.dumpBack() == null) {
-            g.setColor(Theme.alpha(Theme.ink3(), 0.6));
+            g.setColor(Theme.alpha(MAT_INK2, 0.6));
             g.setStroke(new BasicStroke(Theme.pxf(1.3), BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND, 10f, new float[]{Theme.pxf(5), Theme.pxf(4)}, 0f));
             g.draw(shape);
@@ -613,7 +639,7 @@ public final class PlayerTable extends JComponent {
         String cap = tokens.isEmpty() ? "пусто"
             : tokens.size() + " жет. · трофеев " + state.dumpValue();
         g.setFont(Theme.font(10, Font.BOLD));
-        g.setColor(Theme.ink2());
+        g.setColor(MAT_INK);
         centred(g, cap, x + w / 2, y + h + Theme.px(14));
         groups.put("dump", shape);
         if ("dump".equals(hoverGroup)) {
@@ -642,12 +668,12 @@ public final class PlayerTable extends JComponent {
     private void paintOrder(Graphics2D g, int x, int y, int w, int h) {
         RoundRectangle2D shape = new RoundRectangle2D.Double(x, y, w, h, w * 0.08, w * 0.08);
         if (state.orderId() == null) {
-            g.setColor(Theme.alpha(Theme.ink3(), 0.7));
+            g.setColor(Theme.alpha(MAT_INK2, 0.7));
             g.setStroke(new BasicStroke(Theme.pxf(1.5), BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND, 10f, new float[]{Theme.pxf(6), Theme.pxf(5)}, 0f));
             g.draw(shape);
             g.setFont(Theme.font(11, Font.PLAIN));
-            g.setColor(Theme.ink3());
+            g.setColor(MAT_INK2);
             centred(g, "приказ круга", x + w / 2, y + h / 2 - Theme.px(6));
             centred(g, "ещё не вскрыт", x + w / 2, y + h / 2 + Theme.px(10));
             return;
@@ -815,7 +841,7 @@ public final class PlayerTable extends JComponent {
         g.setColor(can ? Theme.darken(seatColor, 0.2) : Theme.border());
         g.setStroke(new BasicStroke(1f));
         g.draw(r);
-        g.setColor(can ? Color.WHITE : Theme.ink3());
+        g.setColor(can ? Color.WHITE : MAT_INK2);
         g.setFont(Theme.font(14, Font.BOLD));
         String a = can ? "Завершить" : "Ход";
         String b = can ? "ход" : "соперника";
@@ -839,12 +865,12 @@ public final class PlayerTable extends JComponent {
         List<String> played = state.ordersPlayed();
         if (!played.isEmpty()) {
             int ch = Math.min(eh, h - eh - Theme.px(26));
-            int cw = (int) (ch * 0.64);
+            int cw = (int) Math.round(ch * aspect(faceOf.apply(played.get(0)), 0.643));
             if (ch > Theme.px(40)) {
                 int cx = x + (w - cw) / 2;
                 int cy = y + Theme.px(16);
                 g.setFont(Theme.caption());
-                g.setColor(Theme.ink3());
+                g.setColor(MAT_INK2);
                 g.drawString("СЫГРАНО · " + played.size(), x, y + Theme.px(10));
                 for (int i = 0; i < Math.min(4, played.size()); i++) {
                     BufferedImage img = faceOf.apply(played.get(played.size() - 1 - i));
@@ -891,14 +917,16 @@ public final class PlayerTable extends JComponent {
         int capH = Theme.px(16);
         g.setFont(Theme.caption());
         boolean chosen = ids.stream().anyMatch(id -> choices.containsKey("card:" + id));
-        g.setColor(chosen ? seatColor : Theme.ink3());
+        g.setColor(chosen ? seatColor : MAT_INK2);
         g.drawString(caption + " · " + ids.size() + (chosen ? " — щёлкните, чтобы сыграть" : ""),
             x, y + capH - Theme.px(4));
         int ch = h - capH - Theme.px(6);
-        int cw = (int) Math.round(ch * 0.69);
+        // ПРОПОРЦИЯ — С ПЕЧАТНОГО ЛИЦА (не «кукожить» карты, 25.09.2026)
+        double ratio = ids.isEmpty() ? 0.643 : aspect(faceOf.apply(ids.get(0)), 0.643);
+        int cw = (int) Math.round(ch * ratio);
         int n = ids.size();
         if (n == 0) {
-            g.setColor(Theme.alpha(Theme.ink3(), 0.6));
+            g.setColor(Theme.alpha(MAT_INK2, 0.6));
             g.setStroke(new BasicStroke(Theme.pxf(1.3), BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND, 10f, new float[]{Theme.pxf(5), Theme.pxf(4)}, 0f));
             g.draw(new RoundRectangle2D.Double(x, y + capH + Theme.px(2), cw, ch,
@@ -937,13 +965,28 @@ public final class PlayerTable extends JComponent {
                 gc.drawImage(face, 0, 0, cw, ch, null);
                 gc.setClip(null);
             } else {
-                gc.setColor(Theme.panel());
+                // ПЕЧАТИ НЕТ — рисуем карту, а не белый прямоугольник: цвет
+                // колоды, название колоды и имя карты (супер-задания пока без
+                // печатного лица).
+                boolean sup = "super".equals(group);
+                Color top = sup ? new Color(0xE0B04A) : new Color(0x3F7FB8);
+                Color bot = sup ? new Color(0x7A5212) : new Color(0x1E3F5E);
+                gc.setPaint(new GradientPaint(0, 0, top, 0, ch, bot));
                 gc.fill(local);
-                gc.setColor(Theme.points());
-                gc.fillRect(0, 0, cw, Math.max(4, ch / 14));
-                gc.setColor(Theme.ink());
-                gc.setFont(Theme.font(small ? 9 : 11, Font.BOLD));
-                wrap(gc, nameOf.apply(id), Theme.px(5), Theme.px(small ? 18 : 26),
+                gc.setColor(new Color(255, 255, 255, 60));
+                gc.setStroke(new BasicStroke(Theme.pxf(1.2)));
+                gc.draw(new RoundRectangle2D.Double(Theme.px(3), Theme.px(3), cw - Theme.px(6),
+                    ch - Theme.px(6), cw * 0.07, cw * 0.07));
+                gc.setColor(new Color(255, 255, 255, 220));
+                gc.setFont(Theme.font(small ? 7 : 9, Font.BOLD));
+                String head = sup ? "СУПЕР-ЗАДАНИЕ" : "ЗАДАНИЕ";
+                FontMetrics hm = gc.getFontMetrics();
+                gc.drawString(FieldBubbles.clip(hm, head, cw - Theme.px(8)),
+                    (cw - Math.min(cw - Theme.px(8), hm.stringWidth(head))) / 2,
+                    Theme.px(small ? 11 : 15));
+                gc.setColor(Color.WHITE);
+                gc.setFont(Theme.font(small ? 9 : 12, Font.BOLD));
+                wrap(gc, nameOf.apply(id), Theme.px(5), ch / 2 - Theme.px(4),
                     cw - Theme.px(10), 3);
             }
             boolean can = choices.containsKey("card:" + id);
@@ -1019,6 +1062,12 @@ public final class PlayerTable extends JComponent {
         if (line.length() > 0 && lines < maxLines) {
             g.drawString(FieldBubbles.clip(fm, line.toString(), w), x, y + lines * fm.getHeight());
         }
+    }
+
+    /** Ширина к высоте у картинки; нет картинки — запасная пропорция. */
+    static double aspect(BufferedImage img, double fallback) {
+        return img == null || img.getHeight() == 0 ? fallback
+            : img.getWidth() / (double) img.getHeight();
     }
 
     private static void centred(Graphics2D g, String s, int cx, int baseline) {
