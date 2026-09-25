@@ -238,6 +238,12 @@ class HotSeatUiClickTest {
         for (String line : w.feedLog) {
             checkText("лента", line);
         }
+        // шаги хода — тоже строки на экране (панель «Шаги хода»)
+        synchronized (w.moves) {
+            for (HotSeatWindow.Decision d : w.decisions) {
+                checkText("шаг хода", d.label());
+            }
+        }
         SwingUtilities.invokeAndWait(() -> w.frame.dispose());
         assertTrue(RAW.isEmpty(), "служебный текст на экране:\n" + String.join("\n", RAW));
     }

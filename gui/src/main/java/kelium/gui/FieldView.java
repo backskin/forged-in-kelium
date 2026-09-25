@@ -184,6 +184,10 @@ public final class FieldView extends JComponent {
     public void clearChoices() {
         bubbles.clear();
         sourceHexId = null;
+        selectFill = null;
+        unitGhosts = Map.of();
+        hoverUnitGhost = null;
+        unitGhostTimer.stop();
         clearSelectable();
     }
 
@@ -522,6 +526,99 @@ public final class FieldView extends JComponent {
         repaint();
     }
 
+    /**
+     * ПРИЗРАКИ НАЙМА (заказ дизайнера 25.09.2026): найм войск — это выставление
+     * жетонов, и до щелчка видно, что и куда встанет. Жетоны появляются по
+     * очереди, по одному; сколько их — столько, сколько встанет на сам гекс
+     * (севшие внутрь здания призрака не получают).
+     *
+     * @param ghosts гекс → {код рода, сколько жетонов}
+     */
+    public void setUnitGhosts(Map<String, Object[]> ghosts, int seat) {
+        this.unitGhosts = ghosts == null ? Map.of() : new LinkedHashMap<>(ghosts);
+        this.unitGhostSeat = seat;
+        this.unitGhostsStart = System.currentTimeMillis();
+        if (!unitGhosts.isEmpty()) {
+            unitGhostTimer.restart();
+        }
+        repaint();
+    }
+
+    private Map<String, Object[]> unitGhosts = Map.of();
+    private int unitGhostSeat;
+    private long unitGhostsStart;
+    /** Шаг появления очередного призрака. */
+    private static final int UNIT_GHOST_STEP_MS = 320;
+    private final javax.swing.Timer unitGhostTimer = new javax.swing.Timer(60, e -> {
+        repaint();
+        int most = 0;
+        for (Object[] v : unitGhosts.values()) {
+            most = Math.max(most, ((Number) v[1]).intValue());
+        }
+        if (System.currentTimeMillis() - unitGhostsStart > (long) most * UNIT_GHOST_STEP_MS + 100) {
+            ((javax.swing.Timer) e.getSource()).stop();
+        }
+    });
+
+    /**
+     * ПРИЗРАК ЖЕТОНА ПОД КУРСОРОМ — для найма вышки, где место выбирают из
+     * нескольких гексов: встаёт только на допустимый гекс.
+     */
+    private String hoverUnitGhost;
+
+    public void setHoverUnitGhost(String unitCode, int seat) {
+        this.hoverUnitGhost = unitCode;
+        this.unitGhostSeat = seat;
+        repaint();
+    }
+
+    private void drawUnitGhosts(Graphics2D g) {
+        drawUnitGhosts(g, unitGhosts);
+    }
+
+    private void drawUnitGhosts(Graphics2D g, Map<String, Object[]> ghosts) {
+        Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo h : record.hexes) {
+            info.put(h.id, h);
+        }
+        long elapsed = System.currentTimeMillis() - unitGhostsStart;
+        int shown = Offscreen.on() || ghosts != unitGhosts ? Integer.MAX_VALUE
+            : 1 + (int) (elapsed / UNIT_GHOST_STEP_MS);
+        for (Map.Entry<String, Object[]> e : ghosts.entrySet()) {
+            double[] c = center(info, e.getKey());
+            if (c == null) {
+                continue;
+            }
+            String code = String.valueOf(e.getValue()[0]);
+            int n = Math.min(shown, ((Number) e.getValue()[1]).intValue());
+            int total = ((Number) e.getValue()[1]).intValue();
+            // крупнее стоящего жетона — призрак не должен сливаться с ними
+            double w = FieldGeometry.unitWidth(code, 1, BASE) * 1.25;
+            java.awt.image.BufferedImage tex = kelium.report.Textures.unit(code, unitGhostSeat);
+            for (int i = 0; i < n; i++) {
+                double x = c[0] + (i - (total - 1) / 2.0) * w * 1.08;
+                double y = c[1] + BASE * 0.30;
+                java.awt.Composite was = g.getComposite();
+                // белая подложка отделяет призрак от стоящих жетонов
+                g.setColor(withAlpha(Color.WHITE, 170));
+                g.fill(new java.awt.geom.Ellipse2D.Double(x - w * 0.56, y - w * 0.56, w * 1.12, w * 1.12));
+                g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.72f));
+                if (tex != null) {
+                    double h = w * tex.getHeight() / (double) tex.getWidth();
+                    g.drawImage(tex, (int) Math.round(x - w / 2), (int) Math.round(y - h / 2),
+                        (int) Math.round(w), (int) Math.round(h), null);
+                } else {
+                    g.setColor(seatColor(unitGhostSeat));
+                    g.fill(new java.awt.geom.Ellipse2D.Double(x - w / 2, y - w / 2, w, w));
+                }
+                g.setComposite(was);
+                g.setColor(withAlpha(seatColor(unitGhostSeat), 230));
+                g.setStroke(penDashed(2.0, 4, 3));
+                g.draw(new java.awt.geom.Ellipse2D.Double(x - w * 0.56, y - w * 0.56, w * 1.12, w * 1.12));
+            }
+        }
+    }
+
     /** Мировая точка (координаты поля) под экранной, либо null. */
     private java.awt.geom.Point2D worldPoint(Point screen) {
         try {
@@ -655,6 +752,8 @@ public final class FieldView extends JComponent {
      * решения к решению.
      */
     private int topReserve;
+    /** Левая кромка карты в мировых координатах — для полосы под карточку вопроса. */
+    private double worldMinX = Double.NaN;
 
     public void setTopReserve(int px) {
         this.topReserve = Math.max(0, px);
@@ -682,11 +781,23 @@ public final class FieldView extends JComponent {
             maxy = Math.max(maxy, c[1] + BASE);
         }
         double margin = 24;
+        worldMinX = minx;
         double kx = (getWidth() - 2 * margin) / (maxx - minx);
-        double ky = (getHeight() - topReserve - 2 * margin) / (maxy - miny);
+        // ПОЛОСА СВЕРХУ НУЖНА, ТОЛЬКО ЕСЛИ КАРТОЧКЕ ВОПРОСА НЕКУДА ВСТАТЬ СБОКУ
+        // (полировка 25.09.2026): на широком окне поле упиралось в высоту, а
+        // по бокам от карты пустовало по трети ширины.
+        int reserve = topReserve;
+        if (reserve > 0) {
+            double full = Math.min(kx, (getHeight() - 2 * margin) / (maxy - miny));
+            double side = (getWidth() - full * (maxx - minx)) / 2.0;
+            if (side >= kelium.gui.kp.FieldBubbles.dockSideMin()) {
+                reserve = 0;
+            }
+        }
+        double ky = (getHeight() - reserve - 2 * margin) / (maxy - miny);
         zoom = Math.max(0.25, Math.min(4.0, Math.min(kx, ky)));
         panX = getWidth() / 2.0 - zoom * (minx + maxx) / 2;
-        panY = topReserve + (getHeight() - topReserve) / 2.0 - zoom * (miny + maxy) / 2;
+        panY = reserve + (getHeight() - reserve) / 2.0 - zoom * (miny + maxy) / 2;
         fitPending = false;
         repaint();
     }
@@ -736,6 +847,31 @@ public final class FieldView extends JComponent {
         repaint();
     }
 
+    /**
+     * ПОДКРАСКА ЗОН — ТОЛЬКО У ЭТОГО ПОЛЯ, а не у всех (флаг художника общий).
+     * В живой партии её нет вовсе (заказ дизайнера 25.09.2026: «гексы слегка
+     * подкрашиваются — так делать больше не надо»); зона стройки видна только
+     * в миг Стройки — заливкой гексов-вариантов, см. {@link #setSelectFill}.
+     */
+    private Boolean ownershipHere;
+
+    public void setOwnershipTint(boolean on) {
+        this.ownershipHere = on;
+        repaint();
+    }
+
+    /**
+     * ЗАЛИВКА ГЕКСОВ-ВАРИАНТОВ цветом игрока — в миг Стройки и найма вышки,
+     * когда вопрос именно «куда ставить». {@code null} — обычная пунктирная
+     * обводка.
+     */
+    private Color selectFill;
+
+    public void setSelectFill(Color seatColor) {
+        this.selectFill = seatColor;
+        repaint();
+    }
+
     @Override
     public Dimension getPreferredSize() {
         return new Dimension(700, 480);
@@ -771,13 +907,24 @@ public final class FieldView extends JComponent {
 
         g.translate(panX, panY);
         g.scale(zoom, zoom);
-        drawField(g, frame);
+        boolean былаПодкраска = kelium.report.FieldPainter.showOwnership;
+        if (ownershipHere != null) {
+            kelium.report.FieldPainter.showOwnership = ownershipHere;
+        }
+        try {
+            drawField(g, frame);
+        } finally {
+            kelium.report.FieldPainter.showOwnership = былаПодкраска;
+        }
         g.dispose();
 
         // ВЫБОР НА ПОЛЕ — поверх поля, в экранных координатах: пузырь привязан
         // к гексу и едет вместе с ним, но кегль от масштаба не зависит.
         if (bubbles.active()) {
             Graphics2D gb = (Graphics2D) g0.create();
+            // свободно слева от карты — туда встанет карточка вопроса
+            bubbles.setDockSide(Double.isNaN(worldMinX) ? 0
+                : (int) Math.round(panX + zoom * worldMinX) - kelium.gui.replay2.Theme.px(8));
             bubbles.paint(gb, getWidth(), getHeight(), this::hexOnScreen, BASE * zoom);
             gb.dispose();
         }
@@ -1088,6 +1235,12 @@ public final class FieldView extends JComponent {
         if (ghostType != null) {
             drawGhost(g);
         }
+        if (!unitGhosts.isEmpty()) {
+            drawUnitGhosts(g);
+        }
+        if (hoverUnitGhost != null && hoverHexId != null && selectableHexIds.contains(hoverHexId)) {
+            drawUnitGhosts(g, Map.of(hoverHexId, new Object[]{hoverUnitGhost, 1}));
+        }
     }
 
     /**
@@ -1229,6 +1382,15 @@ public final class FieldView extends JComponent {
             }
             boolean hovered = id.equals(hoverHexId);
             Path2D path = hexPath(c[0], c[1], BASE * 0.94);
+            if (selectFill != null) {
+                // куда можно ставить — гекс залит цветом игрока, заметно
+                g.setColor(withAlpha(selectFill, hovered ? 150 : 105));
+                g.fill(path);
+                g.setColor(withAlpha(selectFill.darker(), 255));
+                g.setStroke(pen(hovered ? 3.4 : 2.4));
+                g.draw(path);
+                continue;
+            }
             if (hovered) {
                 g.setColor(withAlpha(accent, 90));
                 g.fill(path);

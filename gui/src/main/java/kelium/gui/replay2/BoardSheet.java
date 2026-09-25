@@ -333,6 +333,204 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * @param width ширина всей сцепки в точках холста
      * @return высота сцепки (0 — печатных планшетов у этого места нет)
      */
+    /**
+     * ОДИН ПЛАНШЕТ КРУПНО — для окна увеличения на столе живой партии (заказ
+     * дизайнера 25.09.2026: «при нажатии на планшет увеличить на весь экран,
+     * с подсказкой по каждому элементу»). Рисуется ВСЯ сцепка тем же кодом, что
+     * на столе, но в таком масштабе и со сдвигом, чтобы выбранный планшет занял
+     * {@code view}; остальное срезается. Зоны деталей пишутся в {@code hits},
+     * жетоны модулей и хранилища — в {@code modules} и {@code stores}.
+     *
+     * @param which {@code troop} или {@code storage}
+     * @return где планшет лёг на экране ({@code null} — печатных планшетов нет)
+     */
+    public Rectangle paintBoardZoom(Graphics2D g, Rectangle view, String which,
+                                    Map<String, Rectangle> hits,
+                                    Map<Rectangle, Object[]> modules,
+                                    Map<Rectangle, String> stores) {
+        ReplayRecord.Frame f = session.frame();
+        if (f == null || f.snapshot == null || seat >= f.snapshot.players.size()
+            || !PrintedBoards.available(seat)) {
+            return null;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(seat);
+        var с = PrintedBoards.сцепка(seat);
+        if (с == null) {
+            return null;
+        }
+        double rx;
+        double ry;
+        double rw;
+        double rh;
+        if ("storage".equals(which)) {
+            rx = с.хрX();
+            ry = с.хрY();
+            rw = PrintedBoards.хранилищеШирина(seat, с);
+            rh = PrintedBoards.хранилищеВысота(seat, с);
+        } else {
+            // войска — вместе с жетонами военных зданий над ними и картами,
+            // свисающими из пазов
+            rx = с.войX();
+            ry = 0;
+            rw = с.ширина() - с.войX();
+            rh = с.войY() + Math.max(PrintedBoards.войскаВысота(seat), PrintedBoards.низПаза(seat));
+        }
+        double k = Math.min(view.width / rw, view.height / rh);
+        int bx = (int) Math.round(view.x + (view.width - rw * k) / 2);
+        int by = (int) Math.round(view.y + (view.height - rh * k) / 2);
+        Rectangle board = new Rectangle(bx, by, (int) Math.round(rw * k), (int) Math.round(rh * k));
+        List<ReplayRecord.Tok> all = buildingsOf(f, seat);
+        planCells(p, all);
+        Map<String, Rectangle> всеЗоны = new LinkedHashMap<>();
+        Map<Rectangle, Object[]> всеМодули = new LinkedHashMap<>();
+        Map<Rectangle, String> всеЖетоны = new LinkedHashMap<>();
+        java.awt.Shape clip = g.getClip();
+        g.clip(board);
+        PrintedBoards.hits = всеЗоны;
+        PrintedBoards.outlines = new LinkedHashMap<>();
+        try {
+            if ("storage".equals(which)) {
+                // хранилище — одно, без угла планшета войск, лежащего поверх
+                PrintedBoards.paintStorage(g, board.x, board.y, board.width, p,
+                    cellFill, startFill, coveredCells(all), всеЖетоны);
+            } else {
+                PrintedBoards.paintPair(g, (int) Math.round(bx - rx * k),
+                    (int) Math.round(by - ry * k), k, с, p, troopSide(p), cellFill, startFill,
+                    coveredCells(all), вЗапасе(f, seat), запасВойск(f, seat), всеМодули, всеЖетоны);
+            }
+        } finally {
+            PrintedBoards.hits = null;
+            PrintedBoards.outlines = null;
+            g.setClip(clip);
+        }
+        // в подсказки — только то, что попало на показанный планшет
+        всеЗоны.forEach((key, r) -> {
+            if (board.intersects(r)) {
+                hits.put(key, r);
+            }
+        });
+        всеМодули.forEach((r, v) -> {
+            if (board.intersects(r)) {
+                modules.put(r, v);
+            }
+        });
+        всеЖетоны.forEach((r, v) -> {
+            if (board.intersects(r)) {
+                stores.put(r, v);
+            }
+        });
+        return board;
+    }
+
+    /** Подсказка к жетону модуля с увеличенного планшета. */
+    public static String moduleTip(Object[] spot) {
+        return ModuleSlot.describe((ReplayRecord.Module) spot[0], (Boolean) spot[1],
+            String.valueOf(spot[2]));
+    }
+
+    /** Подсказка к жетону хранилища с увеличенного планшета. */
+    public static String storeTip(String token) {
+        return ModuleSlot.storageTokenName(token);
+    }
+
+    /**
+     * ЧТО ЭТО ЗА ДЕТАЛЬ — по ключу зоны планшета ({@code building:miner:2},
+     * {@code red:infantry}, {@code cell:miner:3:0:1:K}…). {@code null} —
+     * сказать нечего.
+     */
+    public String describeHit(String key) {
+        ReplayRecord.Frame f = session.frame();
+        if (key == null || f == null || f.snapshot == null || seat >= f.snapshot.players.size()) {
+            return null;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(seat);
+        String[] a = key.split(":");
+        switch (a[0]) {
+            case "troop":
+                return "ПЛАНШЕТ ВОЙСК\nСверху — жетоны военных зданий над своими подписями."
+                    + "\nСтолбцы — рода войск: прочность, скорость, атаки."
+                    + "\nКрасные ячейки — модули боя, синие — модули сборки, пазы — арсенал.";
+            case "storage":
+                return "ПЛАНШЕТ ХРАНИЛИЩА\nЯчейки склада под кубики: центральные открыты всегда,"
+                    + "\nостальные открывает построенный добытчик или энергостанция.";
+            case "building": {
+                String type = a.length > 1 ? a[1] : "";
+                Integer level = a.length > 2 ? Integer.valueOf(a[2]) : null;
+                return buildingTip(f, type, level);
+            }
+            case "red":
+                return ModuleSlot.describe(null, true, Names.unit(a.length > 1 ? a[1] : ""))
+                    .replaceFirst("^Красный модуль \\(атака\\)", "Ячейка модуля боя");
+            case "blue":
+                return ModuleSlot.describe(null, false,
+                    kelium.gui.GameRecorder.buildingName(a.length > 1 ? a[1] : "", null))
+                    .replaceFirst("^Синий модуль \\(сборка\\)", "Ячейка модуля сборки");
+            case "unit": {
+                String t = a.length > 1 ? a[1] : "";
+                int[] z = запасВойск(f, seat).getOrDefault(t, new int[2]);
+                return Names.unit(t).toUpperCase(java.util.Locale.ROOT)
+                    + "\nна поле " + z[0] + " · в запасе " + z[1];
+            }
+            case "installed":
+                return "УСТАНОВЛЕННЫЙ АРСЕНАЛ\n«" + Names.card(session.record(),
+                    key.substring("installed:".length())) + "»";
+            case "containers":
+                return "КОНТЕЙНЕРЫ в пазах планшета: " + p.containers;
+            case "store":
+                return "Место под жетон модуля хранилища — пусто";
+            case "cell": {
+                String grp = a.length > 1 ? a[1] : "";
+                String lvl = a.length > 2 ? a[2] : "";
+                boolean open = a.length > 4 && "1".equals(a[4]);
+                char has = a.length > 5 && !a[5].isEmpty() ? a[5].charAt(0) : '-';
+                String чья = "base".equals(grp) ? "Центральная ячейка склада — открыта всегда"
+                    : "Ячейка склада " + ("miner".equals(grp) ? "добытчика" : "энергостанции")
+                        + " №" + lvl + (open ? " — открыта (здание построено)"
+                            : " — закрыта: на ней лежит жетон здания");
+                String что = switch (has) {
+                    case 'K' -> "лежит келемий";
+                    case 'D' -> "лежит трофей";
+                    case 'A' -> "лежит боеприпас";
+                    default -> open ? "пусто" : null;
+                };
+                return что == null ? чья : чья + "\n" + что;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /** Подсказка к жетону здания: главное — где оно сейчас. */
+    private String buildingTip(ReplayRecord.Frame f, String type, Integer level) {
+        ReplayRecord.Tok t = null;
+        for (ReplayRecord.Tok x : buildingsOf(f, seat)) {
+            if (type.equals(x.type) && (level == null || level.equals(x.level))) {
+                t = x;
+                break;
+            }
+        }
+        StringBuilder sb = new StringBuilder(
+            kelium.gui.GameRecorder.buildingName(type, level).toUpperCase(java.util.Locale.ROOT));
+        if (t == null || t.hexId == null && t.alive && t.capturedBy == null) {
+            sb.append("\nлежит на планшете — можно построить");
+        } else if (t.hexId != null && t.alive) {
+            sb.append("\nпостроено, стоит на поле");
+            sb.append("\nпрочность ").append(Math.max(0, t.hp - t.damage)).append(" из ").append(t.hp);
+            if (t.energySlots > 0) {
+                sb.append("\nэнергия ").append(t.energyPlaced).append(" из ").append(t.energySlots);
+            }
+        } else if (t.capturedBy != null) {
+            sb.append("\nуничтожено — лежит на свалке у игрока ").append(t.capturedBy + 1);
+        } else {
+            sb.append("\nснесено — вернётся в запас в Возвращении");
+        }
+        if ("miner".equals(type) || "power_plant".equals(type)) {
+            sb.append(t != null && t.hexId != null && t.alive
+                ? "\nего ячейки склада открыты" : "\nего ячейки склада закрыты самим жетоном");
+        }
+        return sb.toString();
+    }
+
     int печатнаяСцепка(Graphics2D g, int x, int y, int width) {
         ReplayRecord.Frame f = session.frame();
         if (f == null || f.snapshot == null || seat >= f.snapshot.players.size()

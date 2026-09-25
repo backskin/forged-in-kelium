@@ -96,6 +96,23 @@ public final class FieldBubbles {
         this.dockInset = Math.max(0, left);
     }
 
+    /**
+     * СВОБОДНАЯ ПОЛОСА СЛЕВА ОТ КАРТЫ (полировка 25.09.2026). Поле почти
+     * квадратное, а окно широкое: по бокам от карты пусто. Хватает ширины —
+     * карточка вопроса встаёт в левый верхний угол и не заставляет поле
+     * уступать ей полосу сверху. 0 — карточка по центру, как прежде.
+     */
+    private int dockSide;
+
+    public void setDockSide(int widthPx) {
+        this.dockSide = Math.max(0, widthPx);
+    }
+
+    /** Ширина полосы, начиная с которой карточке хватает места сбоку. */
+    public static int dockSideMin() {
+        return Theme.px(250);
+    }
+
     public boolean active() {
         return !byHex.isEmpty() || !dock.isEmpty() || title != null;
     }
@@ -258,7 +275,9 @@ public final class FieldBubbles {
         Font hf = Theme.font(12, Font.PLAIN);
         Font cf = Theme.font(13, Font.BOLD);
         Font sf = Theme.font(10, Font.PLAIN);
-        int maxW = Math.min(w - Theme.px(40), Theme.px(900));
+        boolean сбоку = dockSide - dockInset >= dockSideMin();
+        int maxW = сбоку ? dockSide - dockInset - Theme.px(20)
+            : Math.min(w - Theme.px(40), Theme.px(900));
 
         // ряды фишек-вариантов с переносом
         g.setFont(cf);
@@ -302,14 +321,25 @@ public final class FieldBubbles {
         FontMetrics tm = g.getFontMetrics();
         g.setFont(hf);
         FontMetrics hm = g.getFontMetrics();
-        String t = title == null ? "" : clip(tm, title, maxW - pad * 2 - Theme.px(8));
-        String hn = hint == null ? null : clip(hm, hint, maxW - pad * 2 - Theme.px(8));
-        int textW = Math.max(tm.stringWidth(t), hn == null ? 0 : hm.stringWidth(hn));
+        int textMax = maxW - pad * 2 - Theme.px(8);
+        // заголовок и подсказка переносятся по словам, а не срезаются: сбоку
+        // карточка узкая
+        List<String> titleLines = title == null ? List.of("") : wrap(tm, title, textMax, 2);
+        List<String> hintLines = hint == null ? List.of() : wrap(hm, hint, textMax, 3);
+        int textW = 0;
+        for (String l : titleLines) {
+            textW = Math.max(textW, tm.stringWidth(l));
+        }
+        int titleH = titleLines.size() * tm.getHeight();
+        for (String l : hintLines) {
+            textW = Math.max(textW, hm.stringWidth(l));
+        }
+        int hintH = hintLines.size() * hm.getHeight();
         int cardW = Math.min(maxW, Math.max(textW, widest) + pad * 2 + Theme.px(8));
-        int cardH = pad + tm.getHeight() + (hn == null ? 0 : hm.getHeight())
+        int cardH = pad + titleH + hintH
             + (rows.isEmpty() ? 0 : Theme.px(8) + rows.size() * chipH + (rows.size() - 1) * gap)
             + pad;
-        int x = (w - cardW) / 2;
+        int x = сбоку ? Theme.px(10) : (w - cardW) / 2;
         int y = Theme.px(10);
         panel(g, x, y, cardW, cardH);
         // полоса цвета места слева — чей вопрос
@@ -318,13 +348,16 @@ public final class FieldBubbles {
         int ty = y + pad + tm.getAscent();
         g.setFont(tf);
         g.setColor(Theme.ink());
-        g.drawString(t, x + pad + Theme.px(6), ty);
-        if (hn != null) {
-            g.setFont(hf);
-            g.setColor(Theme.ink2());
-            g.drawString(hn, x + pad + Theme.px(6), ty + hm.getHeight());
+        for (int i = 0; i < titleLines.size(); i++) {
+            g.drawString(titleLines.get(i), x + pad + Theme.px(6), ty + tm.getHeight() * i);
         }
-        int cy = y + pad + tm.getHeight() + (hn == null ? 0 : hm.getHeight()) + Theme.px(8);
+        g.setFont(hf);
+        g.setColor(Theme.ink2());
+        int hy = ty + titleH - tm.getHeight();
+        for (int i = 0; i < hintLines.size(); i++) {
+            g.drawString(hintLines.get(i), x + pad + Theme.px(6), hy + hm.getHeight() * (i + 1));
+        }
+        int cy = y + pad + titleH + hintH + Theme.px(8);
         for (List<Integer> r : rows) {
             int rw = 0;
             for (int i : r) {
@@ -473,6 +506,35 @@ public final class FieldBubbles {
     }
 
     /** Обрезать строку по ширине с многоточием. */
+    /** Перенос по словам в строки не шире {@code width}; последняя — с многоточием. */
+    static List<String> wrap(FontMetrics fm, String s, int width, int maxLines) {
+        List<String> out = new ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        String[] words = s.split(" ");
+        for (int i = 0; i < words.length; i++) {
+            String w = words[i];
+            String next = line.length() == 0 ? w : line + " " + w;
+            if (line.length() > 0 && fm.stringWidth(next) > width) {
+                if (out.size() == maxLines - 1) {
+                    StringBuilder rest = new StringBuilder(line);
+                    for (int j = i; j < words.length; j++) {
+                        rest.append(' ').append(words[j]);
+                    }
+                    out.add(clip(fm, rest.toString(), width));
+                    return out;
+                }
+                out.add(line.toString());
+                line = new StringBuilder(w);
+            } else {
+                line = new StringBuilder(next);
+            }
+        }
+        if (line.length() > 0) {
+            out.add(clip(fm, line.toString(), width));
+        }
+        return out;
+    }
+
     static String clip(FontMetrics fm, String s, int width) {
         if (s == null) {
             return "";

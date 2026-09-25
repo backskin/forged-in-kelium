@@ -133,6 +133,12 @@ final class PrintedBoards {
         return хр == null ? 0 : хр.getHeight() * с.хрМасштаб();
     }
 
+    /** Высота планшета войск в пикселях печати сцепки (0 — картинки нет). */
+    static double войскаВысота(int seat) {
+        BufferedImage вой = troopArt(seat);
+        return вой == null ? 0 : вой.getHeight();
+    }
+
     /** Высота планшета хранилища при такой ширине (0 — картинки нет). */
     static int storageHeight(int seat, int width) {
         return height(storageArt(seat), width);
@@ -742,6 +748,10 @@ final class PrintedBoards {
                 char[] arr = fill.get(key);
                 has = open && arr != null && seen < arr.length ? arr[seen] : 0;
             }
+            // ЗОНА ЯЧЕЙКИ — для подсказки по каждой детали планшета (увеличение
+            // планшета, 25.09.2026): чья ячейка, открыта ли и что в ней лежит.
+            hit("cell:" + c.group() + ":" + c.level() + ":" + seen + ":" + (open ? 1 : 0)
+                + ":" + (has == 0 ? '-' : has), box);
             seen++;
             if (!open) {
                 // ЯЧЕЙКА НАКРЫТА СВОИМ ЖЕТОНОМ — и жетон мы сейчас на неё и

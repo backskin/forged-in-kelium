@@ -656,8 +656,14 @@ public final class Actions {
                     roomForUnit = false;
                 }
                 List<Choice> opts = new ArrayList<>();
+                // ПРИЗРАКИ НАЙМА (окно партии, 25.09.2026): сколько жетонов выйдет
+                // и сколько из них встанет на сам гекс — остальные сядут внутрь
+                // здания, и призрака на поле для них нет.
+                int встанут = unitType == UnitType.TOWER ? 0
+                    : Placement.hireFits(state, player, b.hexId, unitType, unitsOut);
                 if (roomForUnit) {
-                    opts.add(new Choice("assemble", Map.of("kind", "unit", "building", b.uid),
+                    opts.add(new Choice("assemble", Map.of("kind", "unit", "building", b.uid, "unit", unitType.code,
+                        "units", unitsOut, "fits", встанут),
                         b.type.code + "->" + unitType.code));
                 }
                 if (!ctx.сборкаТолькоВойска) {
@@ -671,7 +677,8 @@ public final class Actions {
                 boolean dualLeft = ctx.assemblyDualOutput > 0;
                 if (dualLeft && roomForUnit) {
                     opts.add(new Choice("assemble",
-                        Map.of("kind", "both", "building", b.uid),
+                        Map.of("kind", "both", "building", b.uid, "unit", unitType.code, "units", unitsOut,
+                            "fits", встанут),
                         b.type.code + "->" + unitType.code + " И ammo"));
                 }
                 opts.add(new Choice("pass", null, "skip " + b.type.code));

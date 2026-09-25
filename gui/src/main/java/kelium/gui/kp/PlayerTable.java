@@ -179,7 +179,8 @@ public final class PlayerTable extends JComponent {
                 boolean onTab = tabRects.keySet().stream().anyMatch(r -> r.contains(p));
                 boolean hand = bubbles.hovering() || group != null || onTab
                     || "back".equals(key)
-                    || key != null && choices.containsKey(key);
+                    || key != null && choices.containsKey(key)
+                    || !overBubble && boardAt(p) != null;
                 setCursor(hand ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
                 if (repaint) {
@@ -233,6 +234,12 @@ public final class PlayerTable extends JComponent {
                     bubbles.clickHex(key);
                 } else {
                     bubbles.closeBubble();
+                    String board = boardAt(p);
+                    if (board != null && state != null) {
+                        onHoverOff.run();
+                        onOpen.accept("board:" + board);
+                        return;
+                    }
                 }
                 repaint();
             }
@@ -360,6 +367,8 @@ public final class PlayerTable extends JComponent {
                 long a = (long) r.width * r.height;
                 if (choices.containsKey(e.getKey())) {
                     a /= 4;
+                } else if (e.getKey().startsWith("cell:")) {
+                    a *= 8;     // ячейка склада — только для подсказки, жетон важнее
                 }
                 if (a < bestArea) {
                     bestArea = a;
@@ -368,6 +377,40 @@ public final class PlayerTable extends JComponent {
             }
         }
         return best;
+    }
+
+    /**
+     * КАКОЙ ПЛАНШЕТ ПОД ТОЧКОЙ: {@code troop} или {@code storage}, иначе null.
+     * Щелчок по планшету, когда на нём ничего не выбирают, открывает его крупно
+     * (заказ дизайнера 25.09.2026).
+     */
+    private String boardAt(Point p) {
+        String hit = null;
+        for (String b : List.of("storage", "troop")) {
+            Rectangle r = spots.get(b);
+            if (r != null && r.contains(p)) {
+                hit = b;
+            }
+        }
+        if (hit != null) {
+            return hit;
+        }
+        // жетоны военных зданий лежат над планшетом войск, добытчики и
+        // энергостанции — на хранилище
+        String key = keyAt(p);
+        if (key == null) {
+            return null;
+        }
+        if (key.startsWith("building:miner") || key.startsWith("building:power_plant")
+                || key.startsWith("store:") || key.startsWith("cell:")) {
+            return "storage";
+        }
+        if (key.startsWith("building:") || key.startsWith("red:") || key.startsWith("blue:")
+                || key.startsWith("unit:") || key.startsWith("installed:")
+                || "containers".equals(key)) {
+            return "troop";
+        }
+        return null;
     }
 
     private String groupAt(Point p) {
@@ -417,6 +460,11 @@ public final class PlayerTable extends JComponent {
                 case "orders" -> "Приказы в руке — щелчок раскрывает";
                 default -> "Щелчок раскрывает карты";
             };
+        }
+        String board = boardAt(e.getPoint());
+        if (board != null) {
+            return ("storage".equals(board) ? "Планшет хранилища" : "Планшет войск")
+                + " — щелчок открывает его крупно, с подсказкой по каждой детали";
         }
         return null;
     }
@@ -1068,9 +1116,9 @@ public final class PlayerTable extends JComponent {
         if (!state.superObjectives().isEmpty()) {
             hands.add(new Object[]{"super", "СУПЕР", state.superObjectives()});
         }
-        if (!state.ordersInHand().isEmpty()) {
-            hands.add(new Object[]{"orders", "ПРИКАЗЫ", state.ordersInHand()});
-        }
+        // Рука приказов видна и пустой — пунктирным местом с «· 0»: пропавшая
+        // группа читается как баг рисования, а не как «всё сыграно».
+        hands.add(new Object[]{"orders", "ПРИКАЗЫ", state.ordersInHand()});
         int gap = Theme.px(16);
         int ch = h - Theme.px(22);
         double cw = ch * 0.643;
