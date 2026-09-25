@@ -46,7 +46,7 @@ public final class ExportShot {
                 PngExport.Item.hex(new java.awt.Color(0xEFEDE4), "обычный гекс — можно строить и ходить, ставить любые здания и передвигать войска без ограничений в любую сторону"),
                 PngExport.Item.hex(LayoutEditor.Canvas.SPAWN_START, "малое зарождение: лицо 3 келемия, оборот 2"),
                 PngExport.Item.hex(LayoutEditor.Canvas.SPAWN_NORMAL, "большое зарождение: лицо 4 келемия, оборот 3"),
-                PngExport.Item.hex(new java.awt.Color(0x3A3A3A), "запретный гекс (✕) — дыра в поле, совершенно непроходимая ни для кого и никогда, ни при каких условиях"),
+                PngExport.Item.hex(new java.awt.Color(0x3A3A3A), "запретный гекс — дыра в поле, совершенно непроходимая ни для кого и никогда, ни при каких условиях"),
                 PngExport.Item.square(LayoutEditor.Canvas.NEUTRAL_FILL, "нейтральное здание на стенке гекса"),
                 PngExport.Item.square(LayoutEditor.Canvas.CONTAINER_FILL, "контейнер, напечатанный на гексе")),
             LayoutEditor.playerBlocks(m), LayoutEditor.mapStats(m));

@@ -485,7 +485,7 @@ public final class LayoutEditor {
         Theme.restyleTree(frame.getJMenuBar());
         // Подложка поля — явно: в светлой палитре она белая, как и панель, и по
         // одной краске их не различить (см. Theme.counterpart).
-        canvas.setBackground(Theme.paper());
+        canvas.setBackground(Canvas.canvasBg());
         // Полотно сборки из блоков — та же беда с фоном, что у canvas выше.
         if (assemblyTab != null) {
             assemblyTab.перекрасить();
@@ -964,7 +964,7 @@ public final class LayoutEditor {
             "«×2» на тайле зарождения — два тайла стопкой: исчерпав верхний, "
                 + "открываешь нижний. «+1» / «−1» — правка келемия на лице"));
         out.add(PngExport.Item.hex(new Color(0x3A3A3A),
-            "запретный гекс (✕) — непроходим ни для кого и никогда, строить нельзя"));
+            "запретный гекс (тёмный) — непроходим ни для кого и никогда, строить нельзя"));
         out.add(PngExport.Item.square(Canvas.NEUTRAL_FILL,
             "нейтральное здание: закрывает стенку гекса с обеих сторон — через неё "
                 + "не пройти наземкой и не расширить зону стройки. Малое занимает "
@@ -1723,7 +1723,7 @@ public final class LayoutEditor {
             // ПОДЛОЖКА ПОЛЯ берётся из темы: на светлой это бумага, на тёмной —
             // тёмный стол, но всё равно светлее фона окна, чтобы поле читалось
             // отдельным предметом (тот же приём, что в разборе партии).
-            setBackground(Theme.paper());
+            setBackground(canvasBg());
             MouseAdapter ma = new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e) {
                     lastMx = e.getX();
@@ -2631,6 +2631,12 @@ public final class LayoutEditor {
 
         private void drawHex(Graphics2D g, LHex h, double cx, double cy) {
             drawHexBody(g, h, cx, cy);
+            // КООРДИНАТЫ — ТОЛЬКО НА ЭКРАНЕ (просьба дизайнера 25.09.2026): это
+            // подсказка для рисования, на печатном поле их нет, и в выгрузке
+            // они лишь засоряли картинку.
+            if (ExportPaint.active()) {
+                return;
+            }
             // Кегль подписей на поле считается от РАЗМЕРА ГЕКСА, а не от масштаба
             // интерфейса: Theme.font() домножил бы его на масштаб второй раз.
             g.setFont(getFont().deriveFont((float) (size * 0.17)));
@@ -2684,9 +2690,9 @@ public final class LayoutEditor {
                     g.setColor(new Color(0x5A6068));
                     g.setStroke(new BasicStroke(1.6f));
                     g.draw(tile);
-                    g.setColor(new Color(0xE0E0E0));
-                    g.setFont(getFont().deriveFont(Font.BOLD, (float) (size * 0.46)));
-                    drawCentered(g, "✕", cx, cy);
+                    // БЕЗ БУКВЫ «✕» (просьба дизайнера 25.09.2026): запретный
+                    // гекс и так читается тёмной картонкой, а знак поверх —
+                    // лишняя надпись, которой на печатной детали нет.
                 }
                 default -> { }
             }
@@ -2807,10 +2813,21 @@ public final class LayoutEditor {
             }
             boolean dark = Theme.isDark();
             return switch (h.content) {
-                case "forbidden" -> dark ? new Color(0x0E1116) : new Color(0x4a4844);
+                case "forbidden" -> dark ? new Color(0x1C2027) : new Color(0x4a4844);
                 case "player_start" -> dark ? new Color(0x333A44) : new Color(0xFFFDF5);
-                default -> dark ? new Color(0x2A313B) : Color.WHITE;
+                default -> dark ? new Color(0x353D49) : Color.WHITE;
             };
+        }
+
+        /**
+         * ПОДЛОЖКА ПОЛОТНА — ЗАМЕТНО ТЕМНЕЕ ГЕКСА в обеих темах (просьба
+         * дизайнера 25.09.2026). Раньше подложкой была {@code Theme.paper()}: на
+         * светлой теме — тот же белый, что и гекс, на тёмной — почти тот же тон.
+         * Дырка внутри кольца гексов не читалась вовсе. Теперь положенный гекс
+         * всегда светлее фона, и пустое место видно сразу.
+         */
+        static Color canvasBg() {
+            return Theme.isDark() ? new Color(0x0C0E12) : new Color(0xB9B5AB);
         }
 
         /** Обводка гекса — по теме, иначе на тёмном фоне её не видно. */
