@@ -77,7 +77,9 @@ boards:
       infantry: {hp: 1, trophy: [1, 1, 1, 2], count: 4}
       vehicle:  {hp: 2, trophy: [1, 1, 2, 2], count: 4}
       aircraft: {hp: 1, trophy: [1, 1, 2, 2], count: 4}
-      tower:    {hp: 2, trophy: [1, 1, 1, 1], count: 4}
+      # ВЫШКА — 1 ПРОЧНОСТЬ (решение дизайнера 25.09.2026): две были наследием
+      # старой редакции. Какой фракции дать 2 — вопрос асимметрии, на потом.
+      tower:    {hp: 1, trophy: [1, 1, 1, 1], count: 4}
     # Сумма личных запасов по родам: 4 рода × 4 жетона.
     unit_tokens_per_color: 16
     building_tokens_per_color: 12
@@ -186,8 +188,11 @@ boards:
       barracks: {ammo: 2, units: 1}
       factory:  {ammo: 2, units: 1}
       airbase:  {ammo: 1, units: 2}
+      # ЦУ НЕ НАНИМАЕТ ВЫШКИ, ПОКА НА НЁМ НЕТ СИНЕГО ЖЕТОНА (решение дизайнера
+      # 25.09.2026): печатное число вышек — 0, жетон сборки накрывает его своим.
+      command_center: {ammo: 1, units: 0}
     tokens:
-      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 2}}
+      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 1}}
       buildings:
         barracks:       {energy_slots: 1, hp: 2}
         factory:        {energy_slots: 2, hp: 2}
@@ -206,8 +211,11 @@ boards:
       barracks: {ammo: 1, units: 2}
       factory:  {ammo: 2, units: 1}
       airbase:  {ammo: 2, units: 1}
+      # ЦУ НЕ НАНИМАЕТ ВЫШКИ, ПОКА НА НЁМ НЕТ СИНЕГО ЖЕТОНА (решение дизайнера
+      # 25.09.2026): печатное число вышек — 0, жетон сборки накрывает его своим.
+      command_center: {ammo: 1, units: 0}
     tokens:
-      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 2}}
+      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 1}}
       buildings:
         barracks:       {energy_slots: 1, hp: 1}
         factory:        {energy_slots: 1, hp: 2}
@@ -226,6 +234,9 @@ boards:
       barracks: {ammo: 2, units: 1}
       factory:  {ammo: 1, units: 2}
       airbase:  {ammo: 2, units: 1}
+      # ЦУ НЕ НАНИМАЕТ ВЫШКИ, ПОКА НА НЁМ НЕТ СИНЕГО ЖЕТОНА (решение дизайнера
+      # 25.09.2026): печатное число вышек — 0, жетон сборки накрывает его своим.
+      command_center: {ammo: 1, units: 0}
     tokens:
       units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 2}, tower: {hp: 1}}
       buildings:
@@ -246,6 +257,9 @@ boards:
       barracks: {ammo: 2, units: 1}
       factory:  {ammo: 1, units: 2}
       airbase:  {ammo: 1, units: 1}
+      # ЦУ НЕ НАНИМАЕТ ВЫШКИ, ПОКА НА НЁМ НЕТ СИНЕГО ЖЕТОНА (решение дизайнера
+      # 25.09.2026): печатное число вышек — 0, жетон сборки накрывает его своим.
+      command_center: {ammo: 1, units: 0}
     tokens:
       units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 1}, tower: {hp: 1}}
       buildings:

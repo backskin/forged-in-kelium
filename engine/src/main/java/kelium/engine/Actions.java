@@ -650,13 +650,20 @@ public final class Actions {
                 int ammoOut = kelium.engine.ability.RuleQuery
                     .of(state, player.seat, kelium.engine.ability.Hook.ASSEMBLY_AMMO_OUT)
                     .about(b).base(Modules.assemblyOutput(state, player, b.type, "ammo")).ask();
+                // НОЛЬ ВОЙСК — НАНИМАТЬ НЕЧЕГО (печатный выпуск ЦУ 25.09.2026: вышек 0,
+                // пока синий жетон не накрыл число).
+                if (unitsOut <= 0) {
+                    roomForUnit = false;
+                }
                 List<Choice> opts = new ArrayList<>();
                 if (roomForUnit) {
                     opts.add(new Choice("assemble", Map.of("kind", "unit", "building", b.uid),
                         b.type.code + "->" + unitType.code));
                 }
-                opts.add(new Choice("assemble", Map.of("kind", "ammo", "building", b.uid),
-                    b.type.code + "->ammo"));
+                if (!ctx.сборкаТолькоВойска) {
+                    opts.add(new Choice("assemble", Map.of("kind", "ammo", "building", b.uid),
+                        b.type.code + "->ammo"));
+                }
                 // «И НАНИМАЕТ, И ГОТОВИТ» (утиль «Двойная смена», 21.08.2026):
                 // столько зданий за эту Сборку выдают ОБА выхода сразу, а не один
                 // из двух. Отдельный вариант выбора, а не молчаливая прибавка:
@@ -1349,6 +1356,11 @@ public final class Actions {
                 b.energyIdle = gives - self;
             }
             Hex bh = state.field.get(targetHex);
+            // ОТКРЫТ ЛИ ПЕЧАТНЫЙ КОНТЕЙНЕР ДО ПОСТРОЙКИ — после неё ячейка уже
+            // накрыта, и спросить будет не у кого.
+            boolean контейнерБылОткрыт = bh.containerCell >= 0
+                && bh.containerCell != BlockStamp.AIR
+                && PrintedContainers.visibleContainer(state, bh);
             bh.occupySides(b.uid, sides);
             if (btype == BuildingType.POWER_PLANT) {
                 // ПОСЛЕ occupySides: выработка станции зависит от того, накрыл
@@ -1366,10 +1378,22 @@ public final class Actions {
             if (rs.getBool("actions.build.building_fires_on_build", false)) {
                 String своё = btype == BuildingType.MINER ? "mining"
                     : ASSEMBLY_UNIT.containsKey(btype) ? "assembly" : null;
-                if (своё != null) {
+                // ВОЕННОЕ ЗДАНИЕ НА ЯЧЕЙКЕ КОНТЕЙНЕРА (решение дизайнера 25.09.2026,
+                // вместо «военное здание всегда срабатывает при постройке»):
+                // выпуск войск идёт, только если след здания накрыл открытую
+                // наземную ячейку печатного контейнера, и только войсками.
+                // ЦУ и добытчик срабатывают как прежде.
+                boolean военное = своё != null && !"mining".equals(своё)
+                    && btype != BuildingType.COMMAND_CENTER;
+                boolean толькоНаКонтейнере = военное
+                    && rs.getBool("actions.build.military_fires_only_on_container", false);
+                boolean накрылКонтейнер = контейнерБылОткрыт
+                    && Integer.valueOf(b.uid).equals(bh.sideOwner[bh.containerCell]);
+                if (своё != null && (!толькоНаКонтейнере || накрылКонтейнер)) {
                     TurnContext разово = new TurnContext(player.seat, 0);
                     разово.толькоЗдание = b.uid;
                     разово.allPowered = true;
+                    разово.сборкаТолькоВойска = толькоНаКонтейнере;
                     Actions.create(своё, state).perform(player, разово, agent);
                 }
             }
