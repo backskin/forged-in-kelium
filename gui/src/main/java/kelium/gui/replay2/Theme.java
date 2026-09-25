@@ -275,8 +275,51 @@ public final class Theme {
         new Color(0x1F6FC4),
     };
 
+    /**
+     * ПАЛИТРА «СТОЛ» — для окна живой партии (просьба дизайнера 25.09.2026:
+     * «белые элементы как плашки из ворда не сочетаются с цветом стола»). Та же
+     * тёмная тема по устройству, но в тонах бирюзового сукна: поверхности —
+     * глубокая бирюза, текст — светлый, акцент — яркая бирюза. Печатные
+     * компоненты светлые и на ней горят.
+     */
+    private static final Color[] TABLE = {
+        new Color(0x0E2029),   // 0 фон приложения
+        new Color(0x14303C),   // 1 панели
+        new Color(0x1B3C4A),   // 2 плитки
+        new Color(0x245062),   // 3 наведение
+        new Color(0x2C5667),   // 4 границы
+        new Color(0x3B6A7C),   // 5 сильные разделители
+        new Color(0xEEF7FA),   // 6 текст главный
+        new Color(0xB8D3DD),   // 7 текст второй
+        new Color(0x7FA3B2),   // 8 текст тихий
+        new Color(0x1F3F4E),   // 9 подложка поля
+        new Color(0x3FC1DE),   // 10 акцент
+    };
+
+    private static boolean table;
+
+    /** Включить палитру «Стол» (тёмная тема в тонах сукна). */
+    public static void applyTable() {
+        apply(true);
+        table = true;
+        UIManager.put("Panel.background", panel());
+        UIManager.put("ScrollPane.background", panel());
+        UIManager.put("Viewport.background", panel());
+        UIManager.put("Label.foreground", ink());
+        UIManager.put("SplitPane.background", bg());
+        UIManager.put("SplitPaneDivider.background", bg());
+        UIManager.put("ToolTip.background", tile());
+        UIManager.put("ToolTip.foreground", ink());
+        UIManager.put("Component.focusColor", accent());
+        UIManager.put("Component.borderColor", border());
+    }
+
+    public static boolean isTable() {
+        return table;
+    }
+
     private static Color base(int i) {
-        return (dark ? DARK : LIGHT)[i];
+        return (table ? TABLE : dark ? DARK : LIGHT)[i];
     }
 
     public static Color bg() {
@@ -638,6 +681,7 @@ public final class Theme {
      */
     public static void apply(boolean darkTheme) {
         dark = darkTheme;
+        table = false;          // палитра «Стол» — только через applyTable()
         // СТРОКУ ЗАГОЛОВКА рисует сама FlatLaf, а не Windows: иначе при тёмной теме
         // в светлом режиме системы (и наоборот) заголовок оставался цветов системы
         // и окно выглядело склеенным из двух программ. Свойства читаются при

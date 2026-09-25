@@ -173,7 +173,9 @@ public final class CardSpread extends JComponent {
         for (Card c : cards) {
             maxActs = Math.max(maxActs, c.actions().size());
         }
-        int chipH = Theme.px(34);
+        // КНОПКИ ПОД КАРТОЙ — КРУПНЫЕ: карта большая, и мелкий текст под ней
+        // не читался (замечание дизайнера 25.09.2026).
+        int chipH = Theme.px(52);
         int actsH = maxActs == 0 ? Theme.px(24) : maxActs * (chipH + Theme.px(6)) + Theme.px(8);
         int headH = Theme.px(70);
         // ПРОПОРЦИЯ КАЖДОЙ КАРТЫ — С ЕЁ ЛИЦА: задания и приказы стоят,
@@ -271,7 +273,7 @@ public final class CardSpread extends JComponent {
         g.draw(shape);
         int cy = r.y + h + Theme.px(8) + lift;
         if (c.note() != null) {
-            g.setFont(Theme.font(11, Font.BOLD));
+            g.setFont(Theme.font(13, Font.BOLD));
             g.setColor(new Color(255, 255, 255, 220));
             FontMetrics nf = g.getFontMetrics();
             String s = FieldBubbles.clip(nf, c.note(), w);
@@ -282,12 +284,12 @@ public final class CardSpread extends JComponent {
             Rectangle cr = new Rectangle(x, cy, w, chipH);
             boolean hc = mouse != null && cr.contains(mouse);
             RoundRectangle2D rr = new RoundRectangle2D.Double(cr.x, cr.y, cr.width, cr.height,
-                Theme.px(10), Theme.px(10));
+                Theme.px(14), Theme.px(14));
             Color fill = o.tone() == 2 ? new Color(255, 255, 255, hc ? 70 : 40)
                 : hc ? Theme.lighten(accent, 0.15) : accent;
             g.setColor(fill);
             g.fill(rr);
-            g.setFont(Theme.font(12, Font.BOLD));
+            g.setFont(Theme.font(16, Font.BOLD));
             FontMetrics fm = g.getFontMetrics();
             g.setColor(Color.WHITE);
             String l = FieldBubbles.clip(fm, o.label(), w - Theme.px(16));
@@ -296,7 +298,7 @@ public final class CardSpread extends JComponent {
                     cr.y + (chipH + fm.getAscent()) / 2 - Theme.px(2));
             } else {
                 g.drawString(l, cr.x + (w - fm.stringWidth(l)) / 2, cr.y + Theme.px(3) + fm.getAscent());
-                g.setFont(Theme.font(9.5, Font.PLAIN));
+                g.setFont(Theme.font(12, Font.PLAIN));
                 FontMetrics sm = g.getFontMetrics();
                 String s = FieldBubbles.clip(sm, o.sub(), w - Theme.px(16));
                 g.setColor(new Color(255, 255, 255, 210));

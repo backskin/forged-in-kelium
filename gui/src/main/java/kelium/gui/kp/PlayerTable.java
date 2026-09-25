@@ -73,6 +73,12 @@ public final class PlayerTable extends JComponent {
         /** Где в сцепке планшет хранилища: {@code [левый край, ширина, низ]} долями. */
         double[] storageBox();
 
+        /** Ширина карты арсенала — доля ширины сцепки (натуральный размер). */
+        double cardWidth();
+
+        /** Насколько вставленные карты свисают под сцепкой — доля её высоты. */
+        double hang();
+
         /** Нарисовать и записать зоны щелчка и контуры деталей; вернуть высоту. */
         int paint(Graphics2D g, int x, int y, int width, Map<String, Rectangle> hits,
                   Map<String, Shape> outlines);
@@ -94,7 +100,24 @@ public final class PlayerTable extends JComponent {
                         List<String> superObjectives, List<String> arsenalHand,
                         List<String> arsenalInstalled, List<String> ordersInHand,
                         List<String> ordersPlayed, BufferedImage dumpBack,
-                        List<Trophy> dump, int dumpValue, String status) {
+                        List<Trophy> dump, int dumpValue, String status,
+                        boolean hidden, BufferedImage orderBack) {
+    }
+
+    /**
+     * ВКЛАДКИ МЕСТ над зоной: на чей стол смотрим. Щелчок — посмотреть стол
+     * другого игрока, в том числе бота (просьба дизайнера 25.09.2026).
+     */
+    public record SeatTab(int seat, String name, boolean own) {
+    }
+
+    private List<SeatTab> seatTabs = List.of();
+    private Consumer<Integer> onSeat = s -> { };
+
+    public void setSeatTabs(List<SeatTab> tabs, Consumer<Integer> onSeat) {
+        this.seatTabs = tabs == null ? List.of() : List.copyOf(tabs);
+        this.onSeat = onSeat == null ? s -> { } : onSeat;
+        repaint();
     }
 
     private BoardsArt boards;
@@ -153,7 +176,9 @@ public final class PlayerTable extends JComponent {
                         onHoverCard.accept(card, fanRect(card));
                     }
                 }
-                boolean hand = bubbles.hovering() || group != null
+                boolean onTab = tabRects.keySet().stream().anyMatch(r -> r.contains(p));
+                boolean hand = bubbles.hovering() || group != null || onTab
+                    || "back".equals(key)
                     || key != null && choices.containsKey(key);
                 setCursor(hand ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
@@ -177,6 +202,18 @@ public final class PlayerTable extends JComponent {
             @Override
             public void mouseClicked(MouseEvent e) {
                 Point p = e.getPoint();
+                for (Map.Entry<Rectangle, Integer> t : tabRects.entrySet()) {
+                    if (t.getKey().contains(p)) {
+                        onSeat.accept(t.getValue());
+                        return;
+                    }
+                }
+                Rectangle back = spots.get("back");
+                if (state != null && state.hidden() && back != null && back.contains(p)) {
+                    seatTabs.stream().filter(SeatTab::own).findFirst()
+                        .ifPresent(t -> onSeat.accept(t.seat()));
+                    return;
+                }
                 if (bubbles.covers(p)) {
                     FieldBubbles.Opt o = bubbles.optAt(p);
                     if (o != null && o.pick() != null) {
@@ -412,21 +449,26 @@ public final class PlayerTable extends JComponent {
         }
         int pad = Theme.px(12);
         int top = pad + Theme.px(4);
+        top += paintSeatTabs(g, w);
         int innerH = h - top - pad;
         int x = pad + Theme.px(8);
 
         // ---- планшеты и стопка арсенала под хранилищем
         if (boards != null && boards.aspect() > 0) {
-            int bandH = (int) (innerH * 0.17);      // полоса под стопку арсенала
-            int bh = innerH - bandH;
-            int bw = (int) Math.min(w * 0.50, bh * boards.aspect());
-            bh = (int) Math.round(bw / boards.aspect());
+            // ВЫСОТА СЦЕПКИ ВМЕСТЕ СО СВИСАЮЩИМИ КАРТАМИ: вставленная карта
+            // торчит из-под планшета войск вниз, и стопка арсенала под
+            // хранилищем торчит ровно так же — полосу под них считаем честно.
+            double hang = Math.max(0, boards.hang());
+            int bw = (int) Math.min(w * 0.52, innerH / (1 + hang) * boards.aspect());
+            int bh = (int) Math.round(bw / boards.aspect());
             int by = top;
+            int cardsBottom = by + (int) Math.round(bh * (1 + hang));
             double[] sb = boards.storageBox();
             int sx = x + (int) (sb[0] * bw);
             int sw = (int) (sb[1] * bw);
             int sBottom = by + (int) (sb[2] * bh);
-            paintArsenalStack(g, sx, sw, sBottom, top + innerH);
+            int cardW = (int) Math.round(boards.cardWidth() * bw);
+            paintArsenalStack(g, sx, sw, sBottom, cardsBottom, cardW);
             Map<String, Rectangle> hits = new LinkedHashMap<>();
             boards.paint(g, x, by, bw, hits, outlines);
             spots.putAll(hits);
@@ -483,6 +525,54 @@ public final class PlayerTable extends JComponent {
         g.dispose();
     }
 
+    /** Где лежат вкладки мест после отрисовки. */
+    private final Map<Rectangle, Integer> tabRects = new LinkedHashMap<>();
+
+    /**
+     * ВКЛАДКИ МЕСТ — узкой полосой у верхнего края зоны: чей стол сейчас
+     * перед глазами. Своя вкладка подписана «вы», чужая — «смотрим».
+     *
+     * @return сколько высоты заняла полоса
+     */
+    private int paintSeatTabs(Graphics2D g, int w) {
+        tabRects.clear();
+        if (seatTabs.size() < 2 || state == null) {
+            return 0;
+        }
+        int th = Theme.px(24);
+        int x = w - Theme.px(12);
+        int y = Theme.px(8);
+        g.setFont(Theme.font(11, Font.BOLD));
+        FontMetrics fm = g.getFontMetrics();
+        for (int i = seatTabs.size() - 1; i >= 0; i--) {
+            SeatTab t = seatTabs.get(i);
+            String label = t.name() + (t.own() ? " · вы" : "");
+            int tw = fm.stringWidth(label) + Theme.px(26);
+            x -= tw;
+            boolean on = t.seat() == state.seat();
+            Color c = Theme.seat(t.seat());
+            RoundRectangle2D r = new RoundRectangle2D.Double(x, y, tw, th, th, th);
+            g.setColor(on ? c : Theme.alpha(Color.BLACK, 0.25));
+            g.fill(r);
+            g.setColor(on ? Theme.lighten(c, 0.3) : Theme.alpha(c, 0.8));
+            g.setStroke(new BasicStroke(Theme.pxf(1.4)));
+            g.draw(r);
+            g.setColor(on ? Color.WHITE : MAT_INK);
+            g.fillOval(x + Theme.px(8), y + th / 2 - Theme.px(3), Theme.px(6), Theme.px(6));
+            g.drawString(label, x + Theme.px(18), y + (th + fm.getAscent()) / 2 - Theme.px(2));
+            tabRects.put(new Rectangle(x, y, tw, th), t.seat());
+            x -= Theme.px(6);
+        }
+        if (state.hidden()) {
+            g.setFont(Theme.font(11, Font.PLAIN));
+            g.setColor(MAT_INK2);
+            String s = "стол " + state.seatName() + " — видно только открытое";
+            g.drawString(s, x - g.getFontMetrics().stringWidth(s) - Theme.px(8),
+                y + (th + g.getFontMetrics().getAscent()) / 2 - Theme.px(2));
+        }
+        return th + Theme.px(2);
+    }
+
     /** Подписи на коврике: светлые, коврик тёмный. */
     private static final Color MAT_INK = new Color(0xDCEAF0);
     private static final Color MAT_INK2 = new Color(0x9FBCC9);
@@ -524,23 +614,21 @@ public final class PlayerTable extends JComponent {
      * хранилища, рисуется РАНЬШЕ планшетов: планшет лежит поверх неё. Сколько
      * карт — столько и видно (до шести, дальше цифрой).
      */
-    private void paintArsenalStack(Graphics2D g, int sx, int sw, int boardBottom, int bottom) {
+    private void paintArsenalStack(Graphics2D g, int sx, int sw, int boardBottom, int bottom,
+                                   int cardW) {
         List<String> hand = state.arsenalHand();
         BufferedImage back = backOf.apply("arsenal");
-        // КАРТА АРСЕНАЛА ГОРИЗОНТАЛЬНАЯ — пропорция берётся с самой картинки
-        // (замечание дизайнера 25.09.2026: «ты кукожишь карты»).
+        // КАРТА НАТУРАЛЬНОГО РАЗМЕРА — та же ширина, что у вставленной в паз
+        // (ширина паза в печати), и своя пропорция с картинки: карта
+        // горизонтальная (замечание дизайнера 25.09.2026: «стопка гигантская и
+        // не соответствует размеру карты»).
         double ratio = aspect(back, 1.544);
-        int visible = Math.max(Theme.px(30), bottom - boardBottom);
-        int ch = (int) Math.round(visible / 0.55);
-        int cw = (int) Math.round(ch * ratio);
-        if (cw > sw * 0.8) {
-            cw = (int) (sw * 0.8);
-            ch = (int) Math.round(cw / ratio);
-        }
+        int cw = Math.max(Theme.px(40), cardW);
+        int ch = (int) Math.round(cw / ratio);
         int cx = sx + sw / 2;
         int y0 = bottom - ch;
         int n = Math.min(6, hand.size());
-        int spread = Theme.px(14);
+        int spread = Math.max(Theme.px(4), cw / 16);
         int total = cw + Math.max(0, n - 1) * spread;
         int x0 = cx - total / 2;
         Rectangle area = new Rectangle(x0 - Theme.px(4), boardBottom - Theme.px(6),
@@ -569,7 +657,9 @@ public final class PlayerTable extends JComponent {
         }
         badge(g, x0 + total + Theme.px(4), bottom - Theme.px(18),
             "арсенал · " + hand.size(), chosen ? seatColor : Theme.container());
-        groups.put("arsenal", area);
+        if (!state.hidden()) {
+            groups.put("arsenal", area);
+        }
     }
 
     // ---------- свалка ----------
@@ -826,6 +916,10 @@ public final class PlayerTable extends JComponent {
     }
 
     private void paintEnd(Graphics2D g, int x, int y, int w, int h) {
+        if (state.hidden()) {
+            paintBackToOwn(g, x, y, w, h);
+            return;
+        }
         boolean can = choices.containsKey("end");
         boolean hot = can && "end".equals(hoverKey);
         int eh = Math.min(h, Theme.px(118));
@@ -842,13 +936,19 @@ public final class PlayerTable extends JComponent {
         g.setStroke(new BasicStroke(1f));
         g.draw(r);
         g.setColor(can ? Color.WHITE : MAT_INK2);
-        g.setFont(Theme.font(14, Font.BOLD));
-        String a = can ? "Завершить" : "Ход";
-        String b = can ? "ход" : "соперника";
+        g.setFont(Theme.font(15, Font.BOLD));
+        // ВСЕГДА «Завершить ход»: гаснет, когда нажать нельзя, а под ним — почему,
+        // обычными словами (вместо «Сначала решение», которое никто не понял).
+        String a = "Завершить";
+        String b = "ход";
         if (!can && state.status() != null) {
-            String[] w2 = state.status().split(" ", 2);
-            a = Character.toUpperCase(w2[0].charAt(0)) + w2[0].substring(1);
-            b = w2.length > 1 ? w2[1] : "";
+            List<String> why = List.of(state.status());
+            g.setFont(Theme.font(10, Font.PLAIN));
+            int ly = ey + eh - Theme.px(12);
+            for (String line : why) {
+                centred(g, line, x + w / 2, ly);
+            }
+            g.setFont(Theme.font(15, Font.BOLD));
         }
         centred(g, a, x + w / 2, ey + eh / 2 - Theme.px(4));
         if (!b.isEmpty()) {
@@ -880,6 +980,32 @@ public final class PlayerTable extends JComponent {
                 groups.put("played", new Rectangle(cx, cy, cw + Theme.px(16), ch + Theme.px(12)));
             }
         }
+    }
+
+    /**
+     * На ЧУЖОМ СТОЛЕ вместо «Завершить ход» — возврат к своему: управлять
+     * чужим столом нельзя, а дорогу назад видно сразу.
+     */
+    private void paintBackToOwn(Graphics2D g, int x, int y, int w, int h) {
+        int eh = Math.min(h, Theme.px(118));
+        int ey = y + h - eh;
+        boolean hot = "back".equals(hoverKey);
+        Color own = seatTabs.stream().filter(SeatTab::own).findFirst()
+            .map(t -> Theme.seat(t.seat())).orElse(Theme.accent());
+        RoundRectangle2D r = new RoundRectangle2D.Double(x, ey, w, eh, Theme.px(14), Theme.px(14));
+        g.setColor(hot ? Theme.alpha(own, 0.35) : Theme.alpha(Color.BLACK, 0.22));
+        g.fill(r);
+        g.setColor(own);
+        g.setStroke(new BasicStroke(Theme.pxf(1.6)));
+        g.draw(r);
+        g.setColor(MAT_INK);
+        g.setFont(Theme.font(13, Font.BOLD));
+        centred(g, "К своему", x + w / 2, ey + eh / 2 - Theme.px(4));
+        centred(g, "столу", x + w / 2, ey + eh / 2 + Theme.px(13));
+        g.setFont(Theme.font(10, Font.PLAIN));
+        g.setColor(MAT_INK2);
+        centred(g, "только смотреть", x + w / 2, ey + eh - Theme.px(10));
+        spots.put("back", new Rectangle(x, ey, w, eh));
     }
 
     // ---------- руки веером ----------
@@ -938,7 +1064,9 @@ public final class PlayerTable extends JComponent {
         double spreadDeg = small ? 0 : Math.min(18, n * 4.0);
         int baseY = y + capH + Theme.px(4);
         Rectangle area = new Rectangle(x, y, (int) (cw + step * (n - 1)) + Theme.px(8), h);
-        groups.put(group, area);
+        if (!state.hidden()) {
+            groups.put(group, area);
+        }
         String hot = hoverCard;
         for (int i = 0; i < n; i++) {
             String id = ids.get(i);
@@ -958,7 +1086,12 @@ public final class PlayerTable extends JComponent {
             gc.transform(at);
             gc.setColor(Theme.alpha(Color.BLACK, 0.22));
             gc.fill(new RoundRectangle2D.Double(2, 4, cw, ch, cw * 0.08, cw * 0.08));
-            BufferedImage face = faceOf.apply(id);
+            // ЧУЖАЯ РУКА — рубашками: смотреть можно только открытое
+            boolean closed = state.hidden();
+            BufferedImage face = closed
+                ? ("orders".equals(group) ? state.orderBack()
+                    : backOf.apply("super".equals(group) ? "super" : "objective"))
+                : faceOf.apply(id);
             RoundRectangle2D local = new RoundRectangle2D.Double(0, 0, cw, ch, cw * 0.08, cw * 0.08);
             if (face != null) {
                 gc.clip(local);
@@ -1006,7 +1139,9 @@ public final class PlayerTable extends JComponent {
                 gc.drawString(tag, cw - tw + Theme.px(1), ch - Theme.px(8));
             }
             gc.dispose();
-            fanCards.add(new Object[]{id, card});
+            if (!closed) {
+                fanCards.add(new Object[]{id, card});
+            }
             spots.put("card:" + id, card.getBounds());
         }
     }

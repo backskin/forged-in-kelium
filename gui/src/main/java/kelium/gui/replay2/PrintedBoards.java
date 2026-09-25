@@ -106,6 +106,21 @@ final class PrintedBoards {
         return height(troopArt(seat), width);
     }
 
+    /**
+     * Ширина КАРТЫ АРСЕНАЛА в пикселях печати сцепки — по пазу планшета войск:
+     * паз нарисован в натуральную величину карты.
+     */
+    static double картаШирина(int seat) {
+        var пазы = BoardAnchors.cardSlots(цвет(seat), "arsenal_back");
+        return пазы.isEmpty() ? 804 : пазы.get(0)[2];
+    }
+
+    /** Нижний край окна паза в пикселях печати планшета войск. */
+    static double низПаза(int seat) {
+        var пазы = BoardAnchors.cardSlots(цвет(seat), "arsenal_open");
+        return пазы.isEmpty() ? 1217 : пазы.get(0)[1] + пазы.get(0)[3];
+    }
+
     /** Ширина планшета хранилища в пикселях печати сцепки. */
     static double хранилищеШирина(int seat, Сцепка с) {
         BufferedImage хр = storageArt(seat);
@@ -183,18 +198,10 @@ final class PrintedBoards {
                 box.width, box.height, c.unit());
             spots.put(new Rectangle(box),
                 new Object[]{m, Boolean.TRUE, Names.unit(c.unit())});
-            return;
         }
-        if (troop == null || !troop.dualCell()) {
-            return;
-        }
-        kelium.core.Target t = troop.specializedTarget(kelium.core.UnitType.fromCode(c.unit()));
-        if (t == null) {
-            return;
-        }
-        // Настоящая цель — узкой плашкой у нижней кромки рамки: не закрывает
-        // печатный рисунок, но говорит, по кому род бьёт на самом деле.
-        chip(g, box, "→ " + targetName(t), Theme.accent());
+        // ПЛАШКИ «→ пехота / → техника» В ЯЧЕЙКАХ МОДУЛЯ БОЯ УБРАНЫ (приказ
+        // дизайнера 25.09.2026: «убери эти надписи вообще»). Цель напечатана на
+        // самом планшете.
     }
 
     private static void paintTroopAssembly(Graphics2D g, int x, int y, double k,
@@ -399,9 +406,13 @@ final class PrintedBoards {
             fill, base, covered, storeSpots);
         int войX = (int) Math.round(x + с.войX() * k);
         int войY = (int) Math.round(y + с.войY() * k);
+        // КАРТЫ В ПАЗАХ — ДО ПЛАНШЕТА: вставленная карта заезжает под него
+        // верхом (утилем), и планшет, нарисованный поверх, этот верх и прячет;
+        // видна только способность (замечание дизайнера 25.09.2026).
+        картыВПазах(g, войX, войY, k, p);
         paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
         военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
-        картыВПазах(g, войX, войY, k, p);
+        подписьКонтейнеров(g);
         // Блок запаса стоит В ТОЙ ЖЕ ПОЛОСЕ, что и жетоны военных зданий над
         // планшетом войск: она начинается у самого верха сцепки и кончается там,
         // где начинаются планшеты. Отсюда и «вровень по высоте».
@@ -556,22 +567,40 @@ final class PrintedBoards {
             первый = первый == null ? box : первый.union(box);
             положено++;
         }
-        // ПОДПИСЬ К КОНТЕЙНЕРАМ: квадратная рубашка в пазу без подписи
-        // читалась как непонятный квадратик (замечание дизайнера 25.09.2026).
-        if (первый != null && p.containers > 0) {
+        // ПОДПИСЬ К КОНТЕЙНЕРАМ рисуется ПОСЛЕ планшета (подписьКонтейнеров):
+        // карты лежат под ним, подпись — поверх.
+        контейнерыПодпись = первый != null && p.containers > 0 ? первый : null;
+        контейнерыЧисло = p.containers;
+        if (контейнерыПодпись != null) {
             hit("containers", первый);
-            String s = "контейнеры · " + p.containers;
-            g.setFont(Theme.font(Math.max(9, первый.height / 5), Font.BOLD));
-            var fm = g.getFontMetrics();
-            int tw = fm.stringWidth(s) + 10;
-            int th = fm.getHeight() + 2;
-            int tx = первый.x + (первый.width - tw) / 2;
-            int ty = первый.y + первый.height + 2;
-            g.setColor(Theme.alpha(new Color(0x6B, 0x45, 0x1F), 0.92));
-            g.fill(new RoundRectangle2D.Double(tx, ty, tw, th, th, th));
-            g.setColor(Color.WHITE);
-            g.drawString(s, tx + 5, ty + fm.getAscent() + 1);
         }
+    }
+
+    /** Где подписать контейнеры в пазах (после планшета), и сколько их. */
+    private static Rectangle контейнерыПодпись;
+    private static int контейнерыЧисло;
+
+    /**
+     * ПОДПИСЬ К КОНТЕЙНЕРАМ: квадратная рубашка в пазу без подписи читалась
+     * как непонятный квадратик (замечание дизайнера 25.09.2026).
+     */
+    private static void подписьКонтейнеров(Graphics2D g) {
+        Rectangle первый = контейнерыПодпись;
+        контейнерыПодпись = null;
+        if (первый == null) {
+            return;
+        }
+        String s = "контейнеры · " + контейнерыЧисло;
+        g.setFont(Theme.font(Math.max(9, первый.height / 6), Font.BOLD));
+        var fm = g.getFontMetrics();
+        int tw = fm.stringWidth(s) + 12;
+        int th = fm.getHeight() + 2;
+        int tx = первый.x + (первый.width - tw) / 2;
+        int ty = первый.y + первый.height - th - 2;
+        g.setColor(Theme.alpha(new Color(0x6B, 0x45, 0x1F), 0.92));
+        g.fill(new RoundRectangle2D.Double(tx, ty, tw, th, th, th));
+        g.setColor(Color.WHITE);
+        g.drawString(s, tx + 6, ty + fm.getAscent() + 1);
     }
 
     /**
@@ -586,12 +615,12 @@ final class PrintedBoards {
                                   int[] рамка, BufferedImage картинка) {
         Rectangle box = scale(войX, войY, k, рамка[0], рамка[1], рамка[2], рамка[3]);
         if (картинка != null) {
+            // ВО ВСЮ ШИРИНУ ОКНА, СВОЕЙ ПРОПОРЦИЕЙ, НИЖНИМ КРАЕМ ПО НИЖНЕМУ КРАЮ
+            // ОКНА: верх карты уходит вверх, под планшет, и его накроет сам
+            // планшет, нарисованный следом. Ничего не сжимается.
             int h = (int) Math.round(box.width
                 * картинка.getHeight() / (double) картинка.getWidth());
-            java.awt.Shape было = g.getClip();
-            g.clip(box);
-            g.drawImage(картинка, box.x, box.y, box.width, Math.max(h, box.height), null);
-            g.setClip(было);
+            g.drawImage(картинка, box.x, box.y + box.height - h, box.width, h, null);
             return;
         }
         // Печати нет — рисуем саму карту: паз не должен выглядеть пустым, когда

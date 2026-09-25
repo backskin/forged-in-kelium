@@ -378,6 +378,25 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         }
     }
 
+    /**
+     * НАСКОЛЬКО ВСТАВЛЕННЫЕ КАРТЫ СВИСАЮТ ПОД СЦЕПКОЙ — доля её высоты: карта
+     * в пазу торчит из-под планшета войск вниз (окно паза — в разметке).
+     */
+    public double tableHang() {
+        var с = PrintedBoards.сцепка(seat);
+        if (с == null) {
+            return 0;
+        }
+        double низКарты = с.войY() + PrintedBoards.низПаза(seat);
+        return Math.max(0, (низКарты - с.высота()) / с.высота());
+    }
+
+    /** Ширина карты арсенала — доля ширины сцепки (по пазу планшета войск). */
+    public double tableCardWidth() {
+        var с = PrintedBoards.сцепка(seat);
+        return с == null ? 0.17 : PrintedBoards.картаШирина(seat) / с.ширина();
+    }
+
     /** Пропорция сцепки для стола живой партии (0 — планшетов нет). */
     public double tableAspect() {
         return пропорцияСцепки();

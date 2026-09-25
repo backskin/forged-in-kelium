@@ -67,6 +67,12 @@ public final class HotSeatShot {
             answered++;
         }
         Thread.sleep(400);
+        // -Dshot.seat=N — посмотреть стол другого места
+        String seatProp = System.getProperty("shot.seat");
+        if (seatProp != null) {
+            SwingUtilities.invokeAndWait(() -> win.lookAtSeatForTest(Integer.parseInt(seatProp)));
+            Thread.sleep(300);
+        }
         // -Dshot.spread=objectives|arsenal|dump… — снять раскрытую группу карт
         String spreadGroup = System.getProperty("shot.spread");
         if (spreadGroup != null) {
