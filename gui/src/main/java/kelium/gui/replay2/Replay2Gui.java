@@ -698,6 +698,8 @@ public final class Replay2Gui {
         // СПРАВОЧНИК — на F1: это главный вход в справку. «Как пользоваться»
         // остаётся коротким листком про клавиши и никуда не девается.
         help.add(item("Справочник", "F1", this::showBook));
+        // Книга правил отдельным окном в палитре стола — та же, что в игре.
+        help.add(item("Книга правил", "shift F1", () -> HelpWindow.showRules(frame)));
         help.add(item("Как пользоваться", null, this::showHelp));
         help.add(item("О приложении", null, this::showAbout));
         bar.add(help);

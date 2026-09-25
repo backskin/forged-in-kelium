@@ -833,6 +833,21 @@ public final class HotSeatWindow {
             bar.add(chipsPanel);
         }
 
+        // СПРАВОЧНИК ПРАВИЛ — главы книги с поиском (заказ 25.09.2026), и на F1.
+        KpButton rulesBtn = new KpButton("Правила", "справочник · F1", null);
+        rulesBtn.setPreferredSize(new Dimension(Theme.px(130), Theme.px(38)));
+        rulesBtn.setToolTipText("Книга правил по главам, с поиском по словам");
+        rulesBtn.onClick(() -> kelium.gui.replay2.HelpWindow.showRules(frame));
+        bar.add(rulesBtn);
+        bar.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+            .put(javax.swing.KeyStroke.getKeyStroke("F1"), "rulesBook");
+        bar.getActionMap().put("rulesBook", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                kelium.gui.replay2.HelpWindow.showRules(frame);
+            }
+        });
+
         // ВЫЙТИ ИЗ ПАРТИИ МОЖНО ВСЕГДА (просьба дизайнера 26.08): закрыли —
         // вернулись в «Штаб» и собрали стол заново.
         KpButton saveBtn = new KpButton("Сохранить", "продолжить потом", null);

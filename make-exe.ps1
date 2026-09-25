@@ -298,6 +298,24 @@ Get-ChildItem -Path (Join-Path $dataDst "textures") -Filter "_образцы" `
     -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 "   данные: {0:N1} МБ" -f ((Get-ChildItem -Recurse $dataDst | Measure-Object Length -Sum).Sum / 1MB) | Write-Output
 
+# КНИГА ПРАВИЛ — РЯДОМ С ДАННЫМИ (справочник правил, 25.09.2026). Справочник ищет
+# главы в <data>\..\rules\Книга правил… (RulesMarkdown.bookDir): на машине
+# разработчика это рабочая папка проекта, в раздаче — эта копия. Берутся только
+# главы и значки; рисунки вёрстки (tools\книга\_*.svg) в раздачу не идут — там
+# справочник пишет «смотрите в печатной книге».
+$rulesDst = "dist\app\Kelium\app\rules"
+$bookSrc = Get-ChildItem -Path "rules" -Directory -Filter "Книга правил*" | Select-Object -First 1
+if ($bookSrc) {
+    $bookDst = Join-Path $rulesDst $bookSrc.Name
+    New-Item -ItemType Directory -Force $bookDst | Out-Null
+    Get-ChildItem -Path $bookSrc.FullName -Filter "*.md" | Copy-Item -Destination $bookDst -Force
+    foreach ($icons in @("иконки-экспорт", "иконки")) {
+        if (Test-Path (Join-Path "rules" $icons)) {
+            Copy-Item -Recurse -Force (Join-Path "rules" $icons) (Join-Path $rulesDst $icons)
+        }
+    }
+}
+
 Write-Output "4/6 упаковка образа в архив…"
 $zip = "target\payload.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
