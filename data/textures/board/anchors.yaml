@@ -74,11 +74,11 @@ boards:
       - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
       - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
       - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
-      - {group: base, level: 0, type: U, box: [717, 414, 113, 112]}
-      - {group: base, level: 0, type: U, box: [717, 540, 113, 112]}
+      - {group: base, level: 0, type: U, box: [717, 606, 113, 112]}
     stores:
-      - [432, 337, 213, 213]
-      - [902, 337, 213, 213]
+      - [430, 337, 213, 212]
+      - [667, 337, 212, 212]
+      - [904, 337, 213, 212]
   - id: storage-p2
     kind: storage
     side: p2
@@ -96,11 +96,11 @@ boards:
       - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
       - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
       - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
-      - {group: base, level: 0, type: U, box: [718, 414, 112, 112]}
-      - {group: base, level: 0, type: U, box: [718, 540, 112, 112]}
+      - {group: base, level: 0, type: U, box: [718, 606, 112, 112]}
     stores:
-      - [432, 337, 213, 213]
-      - [902, 337, 213, 213]
+      - [430, 337, 212, 212]
+      - [666, 337, 213, 212]
+      - [902, 337, 213, 212]
   - id: storage-p3
     kind: storage
     side: p3
@@ -118,11 +118,11 @@ boards:
       - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
       - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
       - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
-      - {group: base, level: 0, type: U, box: [717, 414, 113, 112]}
-      - {group: base, level: 0, type: U, box: [718, 540, 112, 112]}
+      - {group: base, level: 0, type: U, box: [718, 606, 112, 112]}
     stores:
-      - [432, 337, 213, 213]
-      - [902, 338, 213, 212]
+      - [431, 337, 212, 213]
+      - [667, 337, 213, 212]
+      - [904, 338, 212, 212]
   - id: storage-p4
     kind: storage
     side: p4
@@ -140,11 +140,11 @@ boards:
       - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
       - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
       - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
-      - {group: base, level: 0, type: U, box: [717, 414, 113, 112]}
-      - {group: base, level: 0, type: U, box: [718, 540, 112, 112]}
+      - {group: base, level: 0, type: U, box: [718, 606, 112, 112]}
     stores:
-      - [432, 338, 213, 212]
-      - [902, 338, 213, 212]
+      - [431, 338, 212, 212]
+      - [667, 337, 213, 212]
+      - [904, 338, 212, 212]
   - id: troop-A
     kind: troop
     side: A
