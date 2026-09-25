@@ -1,0 +1,437 @@
+<title>Стратегии Кристаллов раздора</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#f3f5f2;
+  --paper:#fbfcfa;
+  --ink:#18211d;
+  --ink-soft:#4a5a52;
+  --rule:#d5ddd8;
+  --kelium:#12815a;
+  --kelium-wash:#e1f1e9;
+  --red:#b3432d;
+  --red-wash:#f7e6e1;
+  --blue:#2d5ea6;
+  --blue-wash:#e3ebf7;
+  --gold:#a8791c;
+  --gold-wash:#f5ecd8;
+  --grey-wash:#eceeed;
+  --display:"Russo One","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#101613;
+    --paper:#161e1a;
+    --ink:#e2eae6;
+    --ink-soft:#9fb2a8;
+    --rule:#2a3631;
+    --kelium:#46cf95;
+    --kelium-wash:#16362a;
+    --red:#e3765f;
+    --red-wash:#3a211b;
+    --blue:#7fa6e6;
+    --blue-wash:#1b2740;
+    --gold:#d9ad55;
+    --gold-wash:#352b16;
+    --grey-wash:#222b27;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#101613;
+  --paper:#161e1a;
+  --ink:#e2eae6;
+  --ink-soft:#9fb2a8;
+  --rule:#2a3631;
+  --kelium:#46cf95;
+  --kelium-wash:#16362a;
+  --red:#e3765f;
+  --red-wash:#3a211b;
+  --blue:#7fa6e6;
+  --blue-wash:#1b2740;
+  --gold:#d9ad55;
+  --gold-wash:#352b16;
+  --grey-wash:#222b27;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16.5px;line-height:1.62;padding-inline:16px;padding-block:0 64px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr);gap:0}.toc{display:none}}
+header.top{max-width:1120px;margin:0 auto;padding-block:48px 28px;border-bottom:1px solid var(--rule);margin-bottom:36px}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--kelium)}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5.4vw,56px);line-height:1.05;margin:10px 0 16px;text-wrap:balance;letter-spacing:.005em}
+.lede{font-size:19px;max-width:66ch;color:var(--ink-soft);margin:0}
+.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 20px);align-self:start;font-size:14px}
+.toc b{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;font-weight:500}
+.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.toc a{color:var(--ink);text-decoration:none;border-left:2px solid var(--rule);padding-left:10px;display:block}
+.toc a:hover,.toc a:focus-visible{border-left-color:var(--kelium);color:var(--kelium);outline:none}
+main{min-width:0}
+main > section{margin-bottom:56px}
+h2{font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4vw,34px);line-height:1.15;margin:0 0 14px;text-wrap:balance}
+h3{font-size:21px;font-weight:600;margin:34px 0 8px;line-height:1.3;text-wrap:balance}
+h4{font-size:15px;font-weight:600;margin:20px 0 6px;letter-spacing:.01em}
+p,li{max-width:68ch}
+p{margin:0 0 14px}
+ul,ol{margin:0 0 14px;padding-left:22px}
+li{margin-bottom:6px}
+strong{font-weight:600}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.94em}
+a{color:var(--kelium)}
+.note{background:var(--paper);border:1px solid var(--rule);border-left:3px solid var(--gold);padding:14px 18px;margin:18px 0;border-radius:3px;max-width:72ch}
+.note p:last-child{margin-bottom:0}
+.game{border-top:1px solid var(--rule);padding-top:22px;margin-top:30px}
+.game .meta{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);letter-spacing:.03em;margin:-2px 0 12px}
+.paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:14px 0 16px}
+.path{background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:12px 14px}
+.path b{display:block;font-weight:600;margin-bottom:4px}
+.path span{font-size:15px;color:var(--ink-soft);line-height:1.5;display:block}
+.lesson{font-size:15.5px;padding-left:14px;border-left:2px solid var(--kelium);color:var(--ink);max-width:68ch}
+.lesson em{font-style:normal;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--kelium);display:block;margin-bottom:2px}
+.dossier{background:var(--paper);border:1px solid var(--rule);border-radius:4px;margin:26px 0;overflow:hidden}
+.dossier .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px;padding:16px 20px 12px;border-bottom:1px solid var(--rule)}
+.dossier .head h3{margin:0;font-family:var(--display);font-weight:400;font-size:24px}
+.dossier .body{padding:14px 20px 18px}
+.dossier .body p{max-width:none}
+.rows{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px 18px;margin:8px 0 12px}
+.rows dt{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);padding-top:3px}
+.rows dd{margin:0}
+@media (max-width:560px){.rows{grid-template-columns:minmax(0,1fr);gap:2px}.rows dd{margin-bottom:10px}}
+.pill{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--kelium-wash);color:var(--kelium)}
+.pill.half{background:var(--gold-wash);color:var(--gold)}
+.pill.weak{background:var(--red-wash);color:var(--red)}
+.tag{display:inline-block;font-size:13.5px;background:var(--grey-wash);border-radius:3px;padding:1px 7px;margin:2px 3px 2px 0;white-space:nowrap}
+.tbl{overflow-x:auto;margin:16px 0 20px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14.5px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--rule)}
+th{font-family:var(--mono);font-weight:500;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);background:var(--grey-wash)}
+tr:last-child td{border-bottom:none}
+td:first-child{font-weight:600;white-space:nowrap}
+.fix{counter-reset:f;list-style:none;padding:0}
+.fix li{counter-increment:f;position:relative;padding-left:40px;margin-bottom:14px;max-width:72ch}
+.fix li::before{content:counter(f);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--kelium-wash);color:var(--kelium);font-family:var(--mono);font-size:13px;display:grid;place-items:center}
+.flag{border-left:3px solid var(--red);background:var(--red-wash);padding:12px 16px;border-radius:3px;margin:12px 0;max-width:72ch}
+.flag b{color:var(--red)}
+footer{max-width:1120px;margin:40px auto 0;border-top:1px solid var(--rule);padding-top:16px;font-size:13.5px;color:var(--ink-soft)}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+html{scroll-behavior:smooth}
+</style>
+
+<header class="top">
+  <div class="eyebrow">Кристаллы раздора · разбор для дизайнера · 25.09.2026</div>
+  <h1>Сколько путей к победе в&nbsp;Кристаллах раздора</h1>
+  <p class="lede">Как устроены стратегии в семи играх, которые мы прочитали. Какие стратегии есть в нашей игре после сегодняшних правок: Манёвр, наука за келемий, призы-монеты. Каких пока нет и чем их можно открыть, не добавляя правил.</p>
+</header>
+
+<div class="wrap">
+<nav class="toc" aria-label="Оглавление">
+  <b>Содержание</b>
+  <ol>
+    <li><a href="#what">Что считать стратегией</a></li>
+    <li><a href="#others">Семь игр</a></li>
+    <li><a href="#patterns">Что у них общего</a></li>
+    <li><a href="#ours-now">Кристаллы сегодня</a></li>
+    <li><a href="#ours-paths">Пять путей</a></li>
+    <li><a href="#matrix">Сводная таблица</a></li>
+    <li><a href="#verdict">Честная оценка</a></li>
+    <li><a href="#next">Что открыть</a></li>
+    <li><a href="#flags">Нестыковки в картах</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="what">
+  <h2>Что считать стратегией</h2>
+  <p>Стратегия — это отдельный путь к победе, по которому идут всю партию. Тактика — лучший ход в данный момент. Во многих играх тактика богатая, а стратегия одна: все делают одно и то же, только с разной ловкостью.</p>
+  <p>Чтобы путь был настоящей стратегией, у него должно быть три свойства:</p>
+  <ul>
+    <li><strong>Свой вход.</strong> Путь питается ресурсом или действием, которые другим путям не так нужны.</li>
+    <li><strong>Цена отказа.</strong> Кто идёт этим путём, не успевает на другой: действия и ресурсы кончаются раньше. Отклоняешься в одну сторону — отходишь от другой.</li>
+    <li><strong>Своя уязвимость.</strong> Соперник видит, куда ты идёшь, и знает, чем тебя остановить.</li>
+  </ul>
+  <p>Отсюда различие, которое нам важно: <strong>разные условия победы</strong> и <strong>разные пути к победе</strong> — не одно и то же. У «Игры престолов» условие одно, а путей несколько. У Blood Rage условие тоже одно — Слава, — а путей пять. Новые условия победы нужны не всегда. Всегда нужно, чтобы одну валюту победы можно было набрать разными руками.</p>
+</section>
+
+<section id="others">
+  <h2>Как это устроено в семи играх</h2>
+  <p>Все книги прочитаны целиком, конспекты лежат в <span class="num">docs/настолки</span> (номера 11, 15, 24–29).</p>
+
+  <div class="game">
+    <h3>«Дюна. Империя» и «Восстание»</h3>
+    <div class="meta">Пол Деннен · выставление рабочих + построение колоды · до 10 ПО</div>
+    <p>Каждый раунд ты разыгрываешь карты двумя способами. Картой можно послать агента в ячейку поля, и тогда её нижний эффект пропадает. Или оставить карту на раскрытие, и тогда она даёт убеждение и мечи. Каждая карта — развилка. Занятая ячейка закрыта для всех, так что соперники мешают друг другу каждым ходом.</p>
+    <div class="paths">
+      <div class="path"><b>Военный</b><span>Выигрывать конфликты каждого раунда: ПО с карт конфликта, контроль Арракина и Котловины как доход с чужих ходов. В «Восстании» — пары боевых символов и черви, удваивающие награду.</span></div>
+      <div class="path"><b>Фракционный</b><span>Влияние в четырёх фракциях: 1 ПО на втором делении, союз и +1 ПО на четвёртом. Союз можно отнять, обогнав на треке.</span></div>
+      <div class="path"><b>Колода и Совет</b><span>Удалять слабые карты, покупать сильные, сесть в Высший Совет. Пряность и солярии конвертируются в ПО и карты с очками.</span></div>
+      <div class="path"><b>Интриги и шпионы</b><span>Карты интриг с ПО в конце, кража интриг, шпионы для входа в занятые ячейки. В «Восстании» — контракты КООАМ.</span></div>
+    </div>
+    <p class="lesson"><em>Почему работает</em>Карта нужна везде, и её нельзя сыграть дважды. Ячейку поля нельзя занять вдвоём. Лидерство в фракции не окончательно. Каждое вложение отнимает у другого.</p>
+  </div>
+
+  <div class="game">
+    <h3>«Кровь и ярость»</h3>
+    <div class="meta">Эрик Лэнг · контроль территорий с драфтом · три эпохи, валюта — Слава</div>
+    <p>Все области касаются центра, а Марш переносит армию из любой области в любую. Расстояния нет, угроза есть с первого хода. Прокачка — три параметра на планшете клана, растущие от грабежа и заданий.</p>
+    <div class="paths">
+      <div class="path"><b>Победы</b><span>Прокачать Топоры и брать Славу за каждую выигранную битву. Путь Тора.</span></div>
+      <div class="path"><b>Задания</b><span>Тайно принять задания («больше всех силы в регионе») и выполнить их в конце эпохи. Путь Одина.</span></div>
+      <div class="path"><b>Грабёж и рост</b><span>Грабить области без соперника и расти в Ярости, Топорах и Рогах. В конце партии параметры на верхних делениях дают до 20 Славы.</span></div>
+      <div class="path"><b>Смерть</b><span>Карты Локи и Рагнарёк: Слава за гибель своих фигур. Путь проигравшего, но не слабого.</span></div>
+      <div class="path"><b>Чудовища и улучшения</b><span>Сильные фигуры и способности кланов в восьми ячейках планшета.</span></div>
+    </div>
+    <p class="lesson"><em>Почему работает</em>Драфт заставляет выбрать направление и отнять его у соседа. Проигравший бой забирает карту в руку, а победитель свою сбрасывает. Даже смерть приносит очки, поэтому драться выгодно всем, а не только сильному.</p>
+  </div>
+
+  <div class="game">
+    <h3>«Анх. Боги Египта»</h3>
+    <div class="meta">Эрик Лэнг · контроль территорий на гексах · до верха шкалы поклонения</div>
+    <p>Каждая фигура ходит на 1–3 клетки сквозь всех. Общие шкалы действий двигают таймер событий: выбирая действие, ты приближаешь конфликт для всех.</p>
+    <div class="paths">
+      <div class="path"><b>Доминирование</b><span>Стоять в регионе одному: поклонение без боя каждый конфликт.</span></div>
+      <div class="path"><b>Памятники</b><span>Большинство обелисков, пирамид, храмов в регионе — очко за каждый тип.</span></div>
+      <div class="path"><b>Бой</b><span>Выигрывать сражения, выжигать чужих «Нашествием саранчи».</span></div>
+      <div class="path"><b>Свойства бога</b><span>Открывать анхи на планшете, призывать стражей, играть от асимметрии бога.</span></div>
+    </div>
+    <p class="lesson"><em>Почему работает</em>Нетронутый растёт сам, поэтому к нему обязаны идти. Отстающие боги сливаются в одного и играют против лидера вместе.</p>
+  </div>
+
+  <div class="game">
+    <h3>«Волки»</h3>
+    <div class="meta">Камат и Симпсон · гексы, тайлы местности как цена действий · три схватки по лунному календарю</div>
+    <p>Цена любого действия — перевернуть тайлы той местности, что у цели. Выставляя фигурку на поле, ты снимаешь её с планшета и открываешь цифру под ней. Выставил — значит стал сильнее.</p>
+    <div class="paths">
+      <div class="path"><b>Регионы</b><span>Большинство в регионах к схватке — жетоны доминирования.</span></div>
+      <div class="path"><b>Логова</b><span>Улучшать лёжки у водоёмов: ПО за каждое открытое логово.</span></div>
+      <div class="path"><b>Свойства стаи</b><span>Лёжками прокачать активность, скорость, дальность зова — очки за верхние значения.</span></div>
+      <div class="path"><b>Зов и охота</b><span>Звать одиноких волков, окружать добычу — две отдельные области очков.</span></div>
+    </div>
+    <p class="lesson"><em>Почему работает</em>В конце считается максимум каждой из шести областей планшета отдельно. Вложиться везде понемногу невыгодно, надо выбрать.</p>
+  </div>
+
+  <div class="game">
+    <h3>«Игра престолов» и «Мать драконов»</h3>
+    <div class="meta">Кристиан Петерсен · тайные приказы на карте · семь замков или 10 раундов</div>
+    <p>Условие победы одно — замки и крепости. Ты сам сыграл и не увидел там стратегий. Это честный вывод: без переговоров игра сводится к «копи армию и иди». Разнообразие держат три вещи:</p>
+    <div class="paths">
+      <div class="path"><b>Сила</b><span>Походы, осадные башни, флот, переброска морем.</span></div>
+      <div class="path"><b>Политика</b><span>Ставки власти на три трека: очерёдность, победа в ничьих, особые приказы.</span></div>
+      <div class="path"><b>Экономика</b><span>Усиление власти и знаки бочек: сколько армий можешь содержать.</span></div>
+      <div class="path"><b>Дипломатия</b><span>Подмога чужой армией, союзы без обязательств и предательства.</span></div>
+    </div>
+    <p class="lesson"><em>Почему работает</em>Власть нужна на всё сразу: на треки, против одичалых и на закрепление земель. Потратил на трон — нечем удержать земли. У Таргариенов другой путь к той же цели: жетоны верности вместо замков.</p>
+  </div>
+
+  <div class="game">
+    <h3>«Серп»</h3>
+    <div class="meta">Якоб Стегмайер · шесть звёзд из десяти достижений · итог в монетах</div>
+    <div class="paths">
+      <div class="path"><b>Экономика</b><span>Улучшения, рабочие, постройки: звёзды за полные наборы и монеты за ресурсы.</span></div>
+      <div class="path"><b>Экспансия</b><span>Территории — главный множитель в конце.</span></div>
+      <div class="path"><b>Война</b><span>До двух звёзд за победы; сила и карты боя.</span></div>
+      <div class="path"><b>Популярность</b><span>Уровень популярности умножает все остальные очки.</span></div>
+    </div>
+    <p class="lesson"><em>Почему работает</em>Звёзд всего шесть, а поводов для них десять, и первый выложивший шестую кончает партию. Каждый выбирает свой набор, и темп игры зависит от этого выбора.</p>
+  </div>
+
+  <div class="game">
+    <h3>«Эклипс»</h3>
+    <div class="meta">Туко Тахкокаллио · космос, 4X · очки из восьми источников</div>
+    <div class="paths">
+      <div class="path"><b>Война</b><span>Жетоны репутации за бои — от 1 до 4 ПО.</span></div>
+      <div class="path"><b>Территория</b><span>Сектора и монолиты: 1–4 и 3 ПО.</span></div>
+      <div class="path"><b>Наука</b><span>Длинные ряды технологий — бонусные ПО.</span></div>
+      <div class="path"><b>Дипломатия и открытия</b><span>Послы и жетоны открытий.</span></div>
+    </div>
+    <p class="lesson"><em>Почему работает</em>Каждая строка итогового подсчёта называет часть игры, где выросло очко. У видов не только силы, но и слабости, и они толкают вид к своему пути.</p>
+  </div>
+</section>
+
+<section id="patterns">
+  <h2>Что у них общего</h2>
+  <p>Если отбросить сеттинг, у всех семи игр одни и те же шесть приёмов.</p>
+  <ol>
+    <li><strong>Одна вещь — несколько назначений, и они мешают друг другу.</strong> Карта в «Дюне», власть в «Игре престолов», фигурка в «Волках». Это главный двигатель развилки.</li>
+    <li><strong>Очки лежат на поле, и их можно отнять.</strong> Союз в «Дюне», доминирование в Анхе, регион в «Волках». Кто вырвался вперёд, становится мишенью.</li>
+    <li><strong>Кого не трогают, тот растёт сам.</strong> Грабёж без боя, доминирование без соперника. Это делает конфликт неизбежным.</li>
+    <li><strong>Проиграть не смертельно.</strong> Награда за второе место, карта возвращается проигравшему, смерть приносит очки. Драться выгодно не только сильному.</li>
+    <li><strong>Асимметрия наклоняет, а не запирает.</strong> Бог, дом, клан или вид облегчают один путь, но не закрывают другие.</li>
+    <li><strong>Выбор виден соперникам.</strong> Кубики на треке, фигуры в регионе, выложенные карты. Путь соперника читается с компонентов, и ему можно помешать.</li>
+  </ol>
+</section>
+
+<section id="ours-now">
+  <h2>Кристаллы раздора сегодня</h2>
+  <p>Состояние после правок 25.09: свод 1.45.0, арсенал 7.0.0, задания 1.19.0, супер-арсенал 3.0.0, супер-задания 8.0.0, рынок 3.0.0.</p>
+
+  <h4>Откуда берутся победные очки</h4>
+  <ul>
+    <li><strong>Треки науки:</strong> <span class="num">1 / 1 / 2 / 3</span> ПО за ступень, до 7 ПО за трек. Ступени оплачиваются трофеями или келемием, вперемешку.</li>
+    <li><strong>Установленные карты арсенала</strong> с пометкой «пока установлена — 1 победное очко». Таких в колоде 7.0 — 14 из 36.</li>
+    <li><strong>Супер-задания:</strong> две категории на карте, 1 ПО за единицу. Приходят с третьей ступени любого трека.</li>
+    <li><strong>Супер-арсенал:</strong> четыре супер-войска, у каждой карты 1 ПО. Лежат на вершинах треков.</li>
+    <li><strong>Золотые модули.</strong></li>
+    <li><strong>Жетон уничтожения ЦУ:</strong> 3 ПО тому, кто снёс чужое ЦУ.</li>
+    <li><strong>Келемий в хранилище:</strong> решено 1/1/2/2 ПО по ячейкам, <em>но в движке этого пока нет</em>.</li>
+  </ul>
+
+  <h4>Чем за что платят</h4>
+  <ul>
+    <li><strong>Трофеи</strong> — это снесённые чужие жетоны. Идут на ступени треков и на три обмена Научного отдела: смена модуля, позолота, карта арсенала, каждый по 1 трофею.</li>
+    <li><strong>Келемий</strong> — добыча с тайлов зарождения. Идёт на рынок, где он единственная плата, и на ступени треков.</li>
+    <li><strong>Монеты</strong> — рынок и призы ячеек науки. Идут на стройку, найм и спец-действия.</li>
+  </ul>
+
+  <h4>Как кончается партия</h4>
+  <ul>
+    <li><strong>Военная победа:</strong> снёс чужое ЦУ, уже держа чужой жетон уничтожения. Это единственная мгновенная победа.</li>
+    <li><strong>Три вершины треков у одного игрока</strong> — конец партии, дальше решает счёт.</li>
+    <li><strong>Выработан последний тайл зарождения</strong> — конец партии.</li>
+    <li><strong>Кончилась колода рынка</strong> (8 раундов) — страховка.</li>
+  </ul>
+
+  <h4>Поле</h4>
+  <p>Требование — три пути от каждого игрока к соперникам. Замер <span class="num">kelium.ГеометрияПолей</span> на восьми раскладках вчетвером: <strong>три пути есть только в раскладках 4 и 7</strong>, в остальных шести по два. Со стартового гекса до клетки рядом с чужим ЦУ — 2–3 шага, из соседнего гекса — 1–2. Военное здание рядом со своим ЦУ дотягивается до чужого за один Манёвр. Новый Манёвр «выгнать и загнать» делает удар резче: одним действием можно освободить гекс и набить его войсками с разных сторон.</p>
+</section>
+
+<section id="ours-paths">
+  <h2>Пять путей к победе</h2>
+  <p>Ниже пять путей, которые подсказывают сами компоненты. Для каждого указано, что его кормит, что даёт очки, какие карты его поддерживают, как его бьют и готов ли он уже сейчас.</p>
+
+  <article class="dossier" id="p-rush">
+    <div class="head"><h3>Натиск</h3><span class="pill ok">работает</span></div>
+    <div class="body">
+      <p>Раш в духе Command &amp; Conquer: снести два ЦУ и выиграть сразу. Путь есть с самого начала, и геометрия поля его поддерживает.</p>
+      <dl class="rows">
+        <dt>Вход</dt><dd>Монеты в военные здания и найм, боеприпасы, энергия на военных зданиях.</dd>
+        <dt>Очки</dt><dd>Мгновенная военная победа. Иначе жетон ЦУ (3 ПО), трофеи на треки, установленные боевые карты.</dd>
+        <dt>Карты</dt><dd><span class="tag">Воздушная наводка</span><span class="tag">Реактивные ранцы</span><span class="tag">Штурмовые щиты</span><span class="tag">Воздушный щит</span><span class="tag">Ядерный удар</span><span class="tag">Облегченная броня</span> · задания <span class="tag">Штаб на передовой</span><span class="tag">На чужом дворе</span><span class="tag">Против сильнейшего</span><span class="tag">Зачистка гекса</span> · супер <span class="tag">Супер-пехота</span> (сносит здание) <span class="tag">Супер-вышка</span></dd>
+        <dt>Цена отказа</dt><dd>Всё уходит в армию: ни копилки келемия, ни мест на треках.</dd>
+        <dt>Как бьют</dt><dd>Гарнизоны, стенки зданий, реакции заданий («Контратака», «Эвакуация», «Рикошет», «Ответный заряд»), встречный удар по оголённому ЦУ.</dd>
+      </dl>
+      <p>Три пути на поле превращают натиск из прямой линии в выбор, кого бить. Это и есть интерес пути. Сейчас такой выбор есть только в двух раскладках из восьми.</p>
+    </div>
+  </article>
+
+  <article class="dossier" id="p-kelium">
+    <div class="head"><h3>Промысел</h3><span class="pill half">половина есть</span></div>
+    <div class="body">
+      <p>Экономический «бум»: держать тайлы зарождения, копить келемий и превращать его в очки и науку. После сегодняшней правки келемий платит за ступени треков, и путь впервые может дойти до победы без войны.</p>
+      <dl class="rows">
+        <dt>Вход</dt><dd>Добытчики на тайлах зарождения, энергия на них, ячейки хранилища (зелёный трек, «Склад в тылу»).</dd>
+        <dt>Очки</dt><dd>Келемий в хранилище (1/1/2/2 — ждёт движка). Ступени треков за келемий. Супер-задания «келемий в хранилище» и «пара боеприпас + келемий».</dd>
+        <dt>Карты</dt><dd><span class="tag">Геологоразведка</span><span class="tag">Келемиевый дождь</span><span class="tag">Склад в тылу</span><span class="tag">Кристальный реактор</span><span class="tag">Резерв командования</span> · задания <span class="tag">Жила</span><span class="tag">Рудный двор</span><span class="tag">Биржа</span><span class="tag">Выработка</span> · супер <span class="tag">Супер-техника</span> (собирает келемий)</dd>
+        <dt>Цена отказа</dt><dd>Каждый кубик келемия — выбор: лежать и приносить очки, уйти на рынок за монеты, уйти в науку. На армию остаётся меньше.</dd>
+        <dt>Как бьют</dt><dd>Снос добытчика и здания, сжигающего келемий под жетоном. Задания <span class="tag">Разорение</span><span class="tag">Охота на сильного</span> (прямо «у кого больше келемия»), карта <span class="tag">Мародёрка</span>.</dd>
+      </dl>
+      <p>Чего не хватает: хранилище не даёт очков в движке. Пока его нет, копить келемий бессмысленно, и путь сводится к «продал на рынке». Вторая половина — конкуренция за тайлы: если их не меньше, чем игроков, каждый добывает в своём углу, и конфликта нет.</p>
+    </div>
+  </article>
+
+  <article class="dossier" id="p-tech">
+    <div class="head"><h3>Технократ</h3><span class="pill half">половина есть</span></div>
+    <div class="body">
+      <p>Гонка по трекам науки. Раньше это был не отдельный путь, а корзина для трофеев натиска. Теперь ступени берут и келемий, так что учёный может быть и воином, и шахтёром.</p>
+      <dl class="rows">
+        <dt>Вход</dt><dd>Трофеи или келемий на ступени, трофеи на обмены, кубики технологий (8 / 7 / 6 по составу).</dd>
+        <dt>Очки</dt><dd>До 7 ПО за трек, супер-задания с третьих ступеней, супер-арсенал на вершинах, монеты ячеек как разгон.</dd>
+        <dt>Карты</dt><dd><span class="tag">Альтернативный протокол</span> и <span class="tag">Кристальные лаборатории</span> (утиль: место на треке за монеты) · задания <span class="tag">Научный рывок</span><span class="tag">Научный отдел</span> · все супер-задания.</dd>
+        <dt>Цена отказа</dt><dd>Кубиков технологий меньше, чем ступеней: все три трека до верха не пройти. Выбрал треки — отказался от остальных.</dd>
+        <dt>Как бьют</dt><dd>Занять ячейку раньше: на вершине одна ячейка, на третьей ступени — одна или две. Лишить входа: не отдавать трофеи, сжечь келемий.</dd>
+      </dl>
+      <p>Чего не хватает: три вершины у одного — только конец партии, а не победа. Технократ может «закрыть» партию, но выиграет её по очкам. Отдельной угрозы, которую все обязаны гасить, у него нет.</p>
+    </div>
+  </article>
+
+  <article class="dossier" id="p-industry">
+    <div class="head"><h3>Промышленник</h3><span class="pill weak">слабый</span></div>
+    <div class="body">
+      <p>Плотная застройка, полная энергосеть, модули и позолота, установленные карты арсенала с очками. Путь есть на бумаге, но он почти целиком совпадает с подготовкой к натиску.</p>
+      <dl class="rows">
+        <dt>Вход</dt><dd>Монеты на стройку, энергия, модули с треков, обмены позолоты.</dd>
+        <dt>Очки</dt><dd>Установленные карты арсенала по 1 ПО, золотые модули, супер-задания «здания», «модули», «станции не на круге».</dd>
+        <dt>Карты</dt><dd><span class="tag">Оперативный отдел</span><span class="tag">Аварийный фонд</span><span class="tag">Склад в тылу</span><span class="tag">Полевой генератор</span> · задания <span class="tag">Стройбум</span><span class="tag">Развёртывание</span><span class="tag">Энергосеть</span><span class="tag">Полная нагрузка</span><span class="tag">Перестройка</span></dd>
+        <dt>Цена отказа</dt><dd>Слабая: здания нужны всем путям, поэтому строиться — не отказ, а общий фундамент.</dd>
+        <dt>Как бьют</dt><dd>Снос зданий. Каждое снесённое уходит сопернику в трофеи.</dd>
+      </dl>
+      <p>Честно: как самостоятельный путь не работает. Хорошо живёт как <strong>наклон фракции</strong>, у которой здания дешевле или прочнее. Тогда он приправа к промыслу или технократии.</p>
+    </div>
+  </article>
+
+  <article class="dossier" id="p-raid">
+    <div class="head"><h3>Налётчик</h3><span class="pill half">стиль, не путь</span></div>
+    <div class="body">
+      <p>Подлянки вместо тумана войны: воровать, выбивать, мешать, не вступая в большой бой. В колоде для этого уже очень много всего.</p>
+      <dl class="rows">
+        <dt>Вход</dt><dd>Мелкие быстрые войска, спец-действия, утиль карт.</dd>
+        <dt>Очки</dt><dd>Напрямую — почти никаких. Награды заданий — бесплатные действия, а не ПО. Очки приходят косвенно, трофеями.</dd>
+        <dt>Карты</dt><dd>утиль <span class="tag">Забери закрытый арсенал у врага</span><span class="tag">Удали у врага установленный арсенал</span><span class="tag">Забери до 2 карт заданий</span><span class="tag">Забери у 1-го игрока жетон и монету</span> · <span class="tag">Мародёрка</span><span class="tag">Воздушная наводка</span> · задания <span class="tag">Диверсия</span><span class="tag">Бронебой</span><span class="tag">Разорение</span><span class="tag">Растяжка</span></dd>
+        <dt>Цена отказа</dt><dd>Армия мелкая: против настоящего натиска не устоит.</dd>
+        <dt>Как бьют</dt><dd>Реакции заданий в руке, гарнизоны, прикрытие авиацией.</dd>
+      </dl>
+      <p>Налётчик — слой поверх любого пути, а не отдельная дорога к победе. Это нормально: в Blood Rage грабёж тоже приправа. Скрытая информация, заменяющая туман войны, у нас уже есть: закрытые приказы, закрытый арсенал в резерве, задания в руке с реакциями.</p>
+    </div>
+  </article>
+</section>
+
+<section id="matrix">
+  <h2>Сводная таблица</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Путь</th><th>Кормит</th><th>Очки</th><th>Мгновенная угроза</th><th>Уязвимость</th><th>Сейчас</th></tr></thead>
+      <tbody>
+        <tr><td>Натиск</td><td>монеты, боеприпасы, энергия</td><td>жетон ЦУ, трофеи</td><td>да — второе ЦУ</td><td>открытое своё ЦУ</td><td><span class="pill ok">работает</span></td></tr>
+        <tr><td>Промысел</td><td>тайлы, добытчики, хранилище</td><td>келемий в ячейках, наука за келемий</td><td>нет</td><td>снос сжигает келемий</td><td><span class="pill half">нужны ячейки 1/1/2/2</span></td></tr>
+        <tr><td>Технократ</td><td>трофеи или келемий, кубики</td><td>ступени, супер-задания, супер-арсенал</td><td>нет — только конец партии</td><td>гонка за ячейки</td><td><span class="pill half">путь есть, угрозы нет</span></td></tr>
+        <tr><td>Промышленник</td><td>монеты, энергия, модули</td><td>карты с ПО, позолота</td><td>нет</td><td>снос зданий</td><td><span class="pill weak">совпадает с натиском</span></td></tr>
+        <tr><td>Налётчик</td><td>утиль, спец-действия</td><td>косвенно — трофеи</td><td>нет</td><td>реакции заданий</td><td><span class="pill half">слой поверх</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="verdict">
+  <h2>Честная оценка</h2>
+  <p><strong>Сегодня настоящих путей к победе два с половиной</strong>: натиск, технократ, которого сегодняшняя правка отвязала от войны, и половина промысла. Промышленник и налётчик — стили, а не пути.</p>
+  <p>Что изменилось за день. До правок все очки кормились трофеями, и любой путь упирался в «иди и убей». Теперь у науки два входа — трофеи и келемий, — а келемий стал спорной вещью с тремя назначениями: рынок, наука и (после движка) очки в хранилище. Это приём номер один из списка выше — тот самый, что держит «Дюну» и «Игру престолов».</p>
+  <p>Чего по-прежнему не хватает по сравнению с семью играми:</p>
+  <ul>
+    <li><strong>Очков, которые можно отнять, кроме жетона ЦУ.</strong> Хранилище решит это для келемия.</li>
+    <li><strong>Роста того, кого не трогают.</strong> Спокойный добытчик пока не уходит в отрыв сам по себе.</li>
+    <li><strong>Второй мгновенной угрозы.</strong> Натиск — единственный путь, который заставляет всех реагировать.</li>
+    <li><strong>Трёх путей на поле во всех раскладках.</strong></li>
+  </ul>
+  <div class="note"><p>Однообразие скелета партии — стройка, питание, найм — останется при любой правке. Это черта игры в духе C&amp;C, а не дефект. Все три пути проходят через этот цикл, но в конце его поворачивают в разные стороны.</p></div>
+</section>
+
+<section id="next">
+  <h2>Что открыть, не добавляя правил</h2>
+  <p>Всё ниже — замены или внесение уже решённого. Порядок — по силе эффекта.</p>
+  <ol class="fix">
+    <li><strong>Ячейки хранилища 1/1/2/2 ПО в движке</strong> (решено 24.09). Промысел получает свои очки и свою уязвимость: снос сжигает то, что под жетоном. Это главный шаг.</li>
+    <li><strong>Тайлов зарождения меньше, чем игроков</strong> (вопрос 7). Промысел перестаёт быть игрой в своём углу: за тайлы придётся драться.</li>
+    <li><strong>Три пути во всех раскладках.</strong> Шесть из восьми раскладок вчетвером переложить так, чтобы у каждого было три независимых пути. Замер уже есть.</li>
+    <li><strong>Угроза технократа.</strong> Если захочешь — «три вершины у одного» как победа при удержании до следующего хода. Если нет — оставить как есть: технократ закрывает партию, а побеждает по очкам. Решать тебе, раньше ты такую внезапную победу отклонял.</li>
+    <li><strong>Рост того, кого не трогают.</strong> Возможно, само хранилище с ячейками это и даст: у спокойного добытчика копятся очки, и его приходится идти бить. Проверить за столом после пункта 1.</li>
+    <li><strong>Нейтральная фракция вдвоём.</strong> Жетоны неиграющей фракции на поле, у тайлов зарождения: болванка, которую выгодно бить. Или вассал, как в «Матери драконов», которым по очереди командуют сами игроки.</li>
+  </ol>
+</section>
+
+<section id="flags">
+  <h2>Нестыковки в картах, найденные по дороге</h2>
+  <div class="flag"><p><b>«Кристальные лаборатории».</b> Установка «Можешь тратить келемий вместо трофеев в действии Наука» теперь совпадает с общим правилом для ступеней треков. Разница осталась только в обменах Научного отдела: общее правило их не открывает. Нужно решить: либо установка — это «келемий и в обменах», либо ей нужен новый низ.</p></div>
+  <div class="flag"><p><b>Старые имена приказов на картах арсенала.</b> «Оперативный отдел» говорит о приказе БЕЗОПАСНОСТЬ, «Аварийное питание» — о приказе РАЗРАБОТКА. Приказы 4.0 называются Разместить, Приобрести, Контролировать, Исследовать. Карты надо переписать под новые имена.</p></div>
+  <div class="flag"><p><b>Начальное задание «Жила».</b> Пояснение «Келемий равен победному очку» пока неправда: в хранилище келемий очков не даёт. Станет правдой после пункта 1 выше, и то по ячейкам (1/1/2/2), а не каждый кубик.</p></div>
+</section>
+
+</main>
+</div>
+
+<footer>Разбор по своду 1.45.0 и данным карт на 25.09.2026. Конспекты игр — docs/настолки, номера 11, 15, 24–29. Замер поля — kelium.ГеометрияПолей.</footer>
