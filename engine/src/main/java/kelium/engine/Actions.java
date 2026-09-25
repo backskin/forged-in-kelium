@@ -3578,6 +3578,21 @@ public final class Actions {
             if (rewards != null && reached - 1 >= 0 && reached - 1 < rewards.size()) {
                 reward = String.valueOf(rewards.get(reached - 1));
             }
+            // МОНЕТЫ ЗА ЯЧЕЙКУ СТУПЕНИ (планшет научного отдела, финальный
+            // вариант дизайнера 25.09.2026): на всех трёх треках призы — только
+            // монеты, и они есть не только на первой ступени. Ступень 1: 1
+            // монета первому; ступень 2: 2 и 1; ступень 3: 3; вершина — без
+            // монет. Кубики стоят навсегда, поэтому номер ячейки = сколько
+            // кубиков уже стоит на ступени вместе с новым.
+            if (cfg.ruleset.get("tech.step_coin_prize", null) instanceof List<?> поСтупеням
+                    && reached - 1 < поСтупеням.size()
+                    && поСтупеням.get(reached - 1) instanceof List<?> поЯчейкам) {
+                int ячейка = state.tech.occupancy.get(track).get(reached - 1).size();
+                if (ячейка >= 1 && ячейка <= поЯчейкам.size()
+                        && поЯчейкам.get(ячейка - 1) instanceof Number мон && мон.intValue() > 0) {
+                    player.resources.add(Resource.COIN, мон.intValue());
+                }
+            }
             if ("prize_cube".equals(reward)) {
                 // Приз шага 1 убывает по мере занятия ячеек: чем позже пришёл,
                 // тем меньше досталось. Каким по счёту игрок ПРИШЁЛ на шаг 1:
@@ -3867,10 +3882,16 @@ public final class Actions {
          * (правило §5.2), а не уничтожаются.
          */
         private int payTrophy(PlayerState player, int cost, Agent agent) {
+            return payTrophy(player, cost, agent, true);
+        }
+
+        /** {@code келемийМожно} — false для обменов: они только за трофеи. */
+        private int payTrophy(PlayerState player, int cost, Agent agent, boolean келемийМожно) {
             int remaining = cost;
             // СКОЛЬКО ЗАПЛАТИТЬ КЕЛЕМИЕМ — решает игрок, остальное идёт
             // трофеями; не хватило трофеев — добирается келемием ниже.
-            if (наукаЗаКелемий() && player.resources.kelium() > 0 && cost > 0) {
+            boolean келемийТреков = келемийМожно && наукаЗаКелемий();
+            if (келемийТреков && player.resources.kelium() > 0 && cost > 0) {
                 int трофеев = rs.getBool("tech.pay_with_trophy_only", false)
                     ? player.resources.trophy()
                     : player.destroyedValue() + player.resources.trophy();
@@ -3918,7 +3939,7 @@ public final class Actions {
                     || kelium.engine.ability.RuleQuery
                     .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                     .base(0).ask() >= 1.0
-                    || наукаЗаКелемий();
+                    || келемийТреков;
                 int pay = Math.min(remaining, player.resources.trophy());
                 if (pay > 0) {
                     player.resources.pay(Resource.TROPHY, pay);
@@ -3941,7 +3962,7 @@ public final class Actions {
                 || kelium.engine.ability.RuleQuery
                 .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                 .base(0).ask() >= 1.0
-                    || наукаЗаКелемий();
+                    || келемийТреков;
             // ЧЕМ ПЛАТИТЬ — РЕШАЕТ ИГРОК (решение дизайнера 13.09.2026): кубиками
             // трофеев из хранилища или жетоном со своей свалки целиком, без
             // сдачи. Жетоны предлагаются рядом с кубиками, а не тратятся первыми.
@@ -4008,10 +4029,26 @@ public final class Actions {
             return cost - Math.max(0, remaining);
         }
 
+        /** Цена обмена планшета науки в трофеях по его id из tech.science_exchanges. */
+        private static int ценаОбмена(kelium.rules.Ruleset rs, String id, int def) {
+            if (rs.get("tech.science_exchanges", null) instanceof List<?> list) {
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m && id.equals(m.get("id"))
+                            && m.get("give_trophy") instanceof Number n) {
+                        return n.intValue();
+                    }
+                }
+            }
+            return def;
+        }
+
         /** Предложить вечные обмены. Вернуть id взятого обмена или null. */
         @SuppressWarnings("unchecked")
         private String maybeExchange(PlayerState player, Agent agent, List<String> уже) {
-            int pool = сколькоМожемЗаплатить(player);
+            // ОБМЕНЫ — ТОЛЬКО ЗА ТРОФЕИ: на планшете у них знак трофея без
+            // келемия (финальный планшет 25.09.2026); келемий берут лишь треки.
+            int pool = сколькоМожемЗаплатить(player)
+                - (наукаЗаКелемий() ? player.resources.kelium() : 0);
             List<Choice> opts = new ArrayList<>();
             // ЧТО НАПЕЧАТАНО НА ПЛАНШЕТЕ НАУКИ — из свода (см. обменНаПланшете).
             // Обмен трофеев на монеты снят с планшета 02.09.2026 и переехал на
@@ -4051,12 +4088,17 @@ public final class Actions {
             // ЗА КАРТУ НЕ ПЛАТЯТ, ЕСЛИ ЕЁ НЕКУДА ПОЛОЖИТЬ: ячейки под планшетом
             // заняты — обмен не предлагается вовсе. Иначе трофеи уходят, а карта
             // не приходит.
-            if (арсенал && pool >= 2
+            // ЦЕНА — ИЗ СВОДА (tech.science_exchanges, draw_arsenal.give_trophy).
+            // До 25.09.2026 здесь стояла зашитая двойка, хотя свод с 18.09
+            // говорил «1 трофей».
+            int ценаКарты = ценаОбмена(rs, "draw_arsenal", 2);
+            if (арсенал && pool >= ценаКарты
                     && kelium.engine.Storage.arsenalCellFree(state, player)) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "draw_arsenal");
-                ex.put("give", 2);
-                opts.add(new Choice("sci_exchange", ex, "2 trophy -> draw 2 arsenal, keep 1"));
+                ex.put("give", ценаКарты);
+                opts.add(new Choice("sci_exchange", ex,
+                    ценаКарты + " trophy -> draw 2 arsenal, keep 1"));
             }
             // ЦЕНА ПОЗОЛОТЫ — из свода, а не из кода (решение дизайнера
             // 28.08.2026: два трофея вместо трёх). Старым сводам, где ключа
@@ -4104,7 +4146,7 @@ public final class Actions {
                 return null;
             }
             Map<String, Object> ex = (Map<String, Object>) ch.payload();
-            payTrophy(player, ((Number) ex.get("give")).intValue(), agent);
+            payTrophy(player, ((Number) ex.get("give")).intValue(), agent, false);
             String id = (String) ex.get("id");
             if ("trophy_to_coin".equals(id)) {
                 player.resources.add(Resource.COIN, ((Number) ex.get("coin")).intValue());
