@@ -827,8 +827,23 @@ public final class FieldView extends JComponent {
             });
         }
 
+        // ТЁМНЫЙ СТОЛ ЖИВОЙ ПАРТИИ (25.09.2026): табличка в палитре стола, а не
+        // белая бумажная — иначе в конце партии посреди тёмного окна
+        // вспыхивал светлый прямоугольник.
+        boolean dark = tableBackdrop;
+        Color veil = dark ? new Color(0x0E, 0x20, 0x29, 200) : new Color(0xF2, 0xF1, 0xEC, 205);
+        Color cardBg = dark ? new Color(0x14, 0x30, 0x3C, 245) : new Color(0xFF, 0xFF, 0xFF, 245);
+        Color cardLine = dark ? new Color(0x3B, 0x6A, 0x7C) : new Color(0x33, 0x33, 0x33);
+        Color ink = dark ? new Color(0xEE, 0xF7, 0xFA) : new Color(0x22, 0x22, 0x22);
+        Color ink3 = dark ? new Color(0x9F, 0xBC, 0xC9) : new Color(0x77, 0x77, 0x77);
+        Color rowBg = dark ? new Color(0x1B, 0x3C, 0x4A) : new Color(0xF7, 0xF7, 0xF5);
+        Color rowLine = dark ? new Color(0x2C, 0x56, 0x67) : new Color(0xDD, 0xDD, 0xD8);
+        Color champBg = dark ? new Color(0x4A, 0x3C, 0x12) : new Color(0xFD, 0xF3, 0xD2);
+        Color champInk = dark ? new Color(0xF2, 0xC9, 0x4C) : new Color(0x8A, 0x63, 0x00);
+        Color vpInk = dark ? new Color(0xDC, 0xEA, 0xF0) : new Color(0x44, 0x44, 0x44);
+
         // 1) поле уходит в тень — итоги читаются, партия видна фоном
-        g.setColor(new Color(0xF2, 0xF1, 0xEC, 205));
+        g.setColor(veil);
         g.fillRect(0, 0, getWidth(), getHeight());
 
         int rowH = 46;
@@ -843,19 +858,19 @@ public final class FieldView extends JComponent {
         int y = Math.max(12, (getHeight() - cardH) / 2);
 
         // 2) сама табличка
-        g.setColor(new Color(0xFF, 0xFF, 0xFF, 245));
+        g.setColor(cardBg);
         g.fillRoundRect(x, y, cardW, cardH, 18, 18);
-        g.setColor(new Color(0x33, 0x33, 0x33));
+        g.setColor(cardLine);
         g.setStroke(new BasicStroke(2.2f));
         g.drawRoundRect(x, y, cardW, cardH, 18, 18);
 
         g.setFont(getFont().deriveFont(Font.BOLD, 20f));
-        g.setColor(new Color(0x22, 0x22, 0x22));
+        g.setColor(ink);
         String head = "ПАРТИЯ ОКОНЧЕНА";
         g.drawString(head, x + (cardW - g.getFontMetrics().stringWidth(head)) / 2, y + 32);
 
         g.setFont(getFont().deriveFont(Font.PLAIN, 12f));
-        g.setColor(new Color(0x77, 0x77, 0x77));
+        g.setColor(ink3);
         int hy = y + 50;
         for (String line : howLines) {
             g.drawString(line, x + (cardW - g.getFontMetrics().stringWidth(line)) / 2, hy);
@@ -868,15 +883,15 @@ public final class FieldView extends JComponent {
             ReplayRecord.Player p = ps.get(i);
             boolean champ = i == 0;
             int h = rowH - 6;
-            g.setColor(champ ? new Color(0xFD, 0xF3, 0xD2) : new Color(0xF7, 0xF7, 0xF5));
+            g.setColor(champ ? champBg : rowBg);
             g.fillRoundRect(x + 14, ry, cardW - 28, h, 10, 10);
-            g.setColor(champ ? new Color(0xD9, 0xA9, 0x18) : new Color(0xDD, 0xDD, 0xD8));
+            g.setColor(champ ? new Color(0xD9, 0xA9, 0x18) : rowLine);
             g.setStroke(new BasicStroke(champ ? 2.0f : 1.0f));
             g.drawRoundRect(x + 14, ry, cardW - 28, h, 10, 10);
 
             // место в списке
             g.setFont(getFont().deriveFont(Font.BOLD, champ ? 20f : 15f));
-            g.setColor(champ ? new Color(0x8A, 0x63, 0x00) : new Color(0x99, 0x99, 0x99));
+            g.setColor(champ ? champInk : ink3);
             g.drawString(String.valueOf(i + 1), x + 26, ry + h / 2 + (champ ? 7 : 5));
 
             // цветной жетон игрока
@@ -905,11 +920,11 @@ public final class FieldView extends JComponent {
             int nameX = cxp + chip + 10;
             int nameRoom = (x + cardW - 26 - tw - 12) - nameX;
             g.setFont(getFont().deriveFont(champ ? Font.BOLD : Font.PLAIN, champ ? 15f : 13f));
-            g.setColor(new Color(0x22, 0x22, 0x22));
+            g.setColor(ink);
             g.drawString(clip(g, record.playerName(p.seat), nameRoom), nameX, ry + h / 2 + 5);
 
             g.setFont(getFont().deriveFont(Font.BOLD, champ ? 19f : 15f));
-            g.setColor(champ ? new Color(0x8A, 0x63, 0x00) : new Color(0x44, 0x44, 0x44));
+            g.setColor(champ ? champInk : vpInk);
             g.drawString(vpText, x + cardW - 26 - tw, ry + h / 2 + (champ ? 7 : 5));
 
             ry += rowH;

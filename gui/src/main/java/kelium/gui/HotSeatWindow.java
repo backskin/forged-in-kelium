@@ -732,6 +732,9 @@ public final class HotSeatWindow {
      * ход идёт, или что сначала выбрать.
      */
     private String endWhy() {
+        if (finished) {
+            return "партия окончена";
+        }
         if (awaitingSeat == null) {
             Integer active = null;
             if (rec != null && !rec.frames.isEmpty()) {
@@ -1678,6 +1681,16 @@ public final class HotSeatWindow {
             endBtn.setState(KpButton.State.DISABLED);
             finished = true;
             clearDecision();
+            refreshTable();
+            // Итоги рисует поле — открытый ящик их закрывал бы.
+            if (openDrawer != null) {
+                for (var e : drawers.entrySet()) {
+                    if (e.getValue() == openDrawer) {
+                        toggleDrawer(e.getKey());
+                        break;
+                    }
+                }
+            }
         });
     }
 
