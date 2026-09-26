@@ -141,7 +141,8 @@ public final class AssemblyWindow extends JPanel {
         top.add(Box.createHorizontalStrut(4));
         top.add(spinner(blackCount, "Сколько накладок «недоступный гекс» есть (1–16)"));
         top.add(Box.createHorizontalStrut(16));
-        JButton again = new JButton("↻ Другая сборка");
+        // стрелка — рисованный значок: символа «↻» в шрифте Tektur нет
+        JButton again = new JButton("Другая сборка", new ЗначокПоворота(true));
         again.setToolTipText("<html><div style='width:320px'>Показать <b>следующий вариант</b> "
             + "сборки того же поля. Варианты перебираются по кругу в случайном порядке, "
             + "каждый показывается один раз — потом порядок тасуется заново.<br>"

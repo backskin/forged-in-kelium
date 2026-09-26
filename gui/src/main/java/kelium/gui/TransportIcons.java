@@ -102,12 +102,19 @@ public final class TransportIcons {
             case "REPLAY" -> {
                 g.setColor(PLAY);
                 g.setStroke(new BasicStroke(11f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
-                g.draw(new java.awt.geom.Arc2D.Double(24, 24, 52, 52, 60, 250,
+                // наконечник ставится по касательной к концу дуги (прежний стоял
+                // по прикидке и уезжал от дуги — дизайнер 27.09.2026)
+                double нач = 70, размах = 280;
+                g.draw(new java.awt.geom.Arc2D.Double(24, 24, 52, 52, нач, размах,
                     java.awt.geom.Arc2D.OPEN));
+                double к = Math.toRadians(нач + размах);
+                double hx = 50 + 26 * Math.cos(к), hy = 50 - 26 * Math.sin(к);
+                double tx = -Math.sin(к), ty = -Math.cos(к);
+                double nx = -ty, ny = tx;
                 Path2D tip = new Path2D.Double();
-                tip.moveTo(72, 14);
-                tip.lineTo(86, 40);
-                tip.lineTo(56, 40);
+                tip.moveTo(hx + tx * 14, hy + ty * 14);
+                tip.lineTo(hx - tx * 6 + nx * 15, hy - ty * 6 + ny * 15);
+                tip.lineTo(hx - tx * 6 - nx * 15, hy - ty * 6 - ny * 15);
                 tip.closePath();
                 g.fill(tip);
             }

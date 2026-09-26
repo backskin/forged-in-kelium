@@ -181,18 +181,14 @@ public final class SeedBox extends JComponent {
         g.setColor(Theme.border());
         g.setStroke(new BasicStroke(1f));
         g.drawRoundRect(bx, by, Theme.px(20), Theme.px(20), Theme.px(5), Theme.px(5));
-        g.setColor(Theme.ink2());
-        double cx = bx + Theme.px(10);
-        double cy = by + Theme.px(10);
-        double r = Theme.px(6);
-        g.setStroke(new BasicStroke(Theme.pxf(1.5), BasicStroke.CAP_ROUND,
-            BasicStroke.JOIN_ROUND));
-        g.draw(new java.awt.geom.Arc2D.Double(cx - r, cy - r, r * 2, r * 2, 40, 280,
-            java.awt.geom.Arc2D.OPEN));
-        int ah = Theme.px(3);
-        g.drawPolyline(new int[]{(int) (cx + r * 0.55) - ah, (int) (cx + r * 0.9),
-            (int) (cx + r * 0.9) + ah},
-            new int[]{(int) (cy - r * 0.75), (int) (cy - r * 0.95), (int) (cy - r * 0.35)}, 3);
+        // круговая стрелка — тот же значок, что у кнопок поворота: дуга и
+        // наконечник по касательной (прежняя самодельная загогулина читалась
+        // как непонятный символ — замечание дизайнера 27.09.2026)
+        int сторона = Theme.px(16);
+        JComponent краска = new JComponent() { };
+        краска.setForeground(Theme.ink2());
+        new kelium.gui.ЗначокПоворота(true, сторона).paintIcon(краска, g,
+            bx + (Theme.px(20) - сторона) / 2, by + (Theme.px(20) - сторона) / 2);
         g.dispose();
     }
 }
