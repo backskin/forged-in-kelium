@@ -594,7 +594,12 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         int top = pad + band;
         int innerH = h - top - pad;
         Layout L = layout(w, h, top, innerH);
-        paintResources(g, Math.max(pad, L.leftX()), pad);
+        blocks.clear();
+        int resX = Math.max(pad, L.leftX());
+        int resH = paintResources(g, resX, pad);
+        if (resH > 0) {
+            blocks.put("ресурсы", new Rectangle(resX, pad, resourcesWidth(), resH - Theme.px(6)));
+        }
         paintSeatTabs(g, w);
 
         // ---- СЛЕВА: руки стопками и свалка
@@ -605,10 +610,14 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             int hw = stackWidth(ids.size(), L.stackH());
             fan(g, (String) hd[0], (String) hd[1], ids, sx0,
                 top + (innerH - L.stackH()) / 2, hw, L.stackH(), true);
+            blocks.put("рука " + hd[0], new Rectangle(sx0, top + (innerH - L.stackH()) / 2, hw,
+                L.stackH()));
             sx0 += hw + L.gap();
         }
         paintDump(g, L.dumpX(), top + (innerH - L.dumpH()) / 2 - Theme.px(6), L.dumpW(),
             L.dumpH());
+        blocks.put("свалка", new Rectangle(L.dumpX(), top + (innerH - L.dumpH()) / 2
+            - Theme.px(6), L.dumpW(), L.dumpH() + Theme.px(22)));
 
         // ---- ПО ЦЕНТРУ: планшеты хранилища и войск, под хранилищем — стопка арсенала
         if (L.bw() > 0) {
@@ -626,6 +635,16 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             Map<String, Rectangle> hits = new LinkedHashMap<>();
             boards.paint(g, x, by, bw, hits, outlines);
             spots.putAll(hits);
+            Rectangle доски = null;
+            for (Rectangle hr : hits.values()) {
+                доски = доски == null ? new Rectangle(hr) : доски.union(hr);
+            }
+            if (доски != null) {
+                blocks.put("планшеты", доски);
+            }
+            if (groups.get("arsenal") != null) {
+                blocks.put("арсенал", groups.get("arsenal").getBounds());
+            }
             for (String k : hits.keySet()) {
                 if (k.startsWith("installed:")) {
                     groups.put("installed", hits.get(k));
@@ -639,6 +658,9 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         int oy = top + Math.max(0, (innerH - orderH) / 2);
         paintOrder(g, L.orderX(), oy, L.orderW(), orderH);
         paintEnd(g, L.orderX() + L.orderW() + Theme.px(10), oy, L.endW(), orderH);
+        blocks.put("приказ", new Rectangle(L.orderX(), oy, L.orderW(), orderH));
+        blocks.put("конец хода", new Rectangle(L.orderX() + L.orderW() + Theme.px(10), oy,
+            L.endW(), orderH));
 
         // ---- обводка всего, что можно выбрать
         for (String key : choices.keySet()) {
@@ -753,6 +775,10 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         int dumpW = cardH;
         int dumpH = cardW;
         left += dumpW;
+        // СТРОКА РЕСУРСОВ НАД РУКАМИ НЕ ЗАХОДИТ НА ПЛАНШЕТЫ (жалоба дизайнера
+        // 27.09.2026: «0/1 трофеи» лезли под запас войск над хранилищем):
+        // левый блок не уже самой строки, и планшеты встают правее неё.
+        left = Math.max(left, resourcesWidth());
         int bw = 0;
         if (boards != null && boards.aspect() > 0) {
             bw = boards.printWidth() > 0 ? (int) Math.round(boards.printWidth() * sc)
@@ -793,6 +819,33 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
     public void setResources(List<Res> res) {
         this.resources = res == null ? List.of() : res;
         repaint();
+    }
+
+    /** Ширина строки ресурсов — столько, сколько она займёт на экране. */
+    private int resourcesWidth() {
+        if (resources.isEmpty()) {
+            return 0;
+        }
+        FontMetrics num = getFontMetrics(Theme.mono(19, Font.BOLD));
+        FontMetrics cap = getFontMetrics(Theme.font(13, Font.PLAIN));
+        int x = 0;
+        for (Res r : resources) {
+            x += Theme.px(24) + Theme.px(6);
+            String v = r.value() + (r.cap() == null ? "" : "/" + r.cap());
+            x += num.stringWidth(v) + Theme.px(5);
+            x += cap.stringWidth(r.label()) + Theme.px(18);
+        }
+        return x - Theme.px(18);
+    }
+
+    /**
+     * ГДЕ ЧТО ЛЕГЛО НА СТОЛЕ при последней отрисовке: имя блока → его место.
+     * Для проверки, что блоки зоны не налезают друг на друга.
+     */
+    private final Map<String, Rectangle> blocks = new LinkedHashMap<>();
+
+    public Map<String, Rectangle> blocksForTest() {
+        return new LinkedHashMap<>(blocks);
     }
 
     /** Строка ресурсов крупно; возвращает её высоту. */
