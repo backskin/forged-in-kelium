@@ -43,8 +43,18 @@ public final class HotSeatShot {
 
         // -Dshot.specs=human,builder:1,punisher:1 — состав мест (по умолчанию двое)
         List<String> specs = List.of(System.getProperty("shot.specs", "human,builder:1").split(","));
-        HotSeatWindow win = new HotSeatWindow(
-            HotSeatWindow.Options.simple(specs.size(), seed, specs));
+        // -Dshot.colors=2,0,1,3 — краска (фракция) каждого места
+        List<Integer> colors = null;
+        if (System.getProperty("shot.colors") != null) {
+            colors = new java.util.ArrayList<>();
+            for (String c : System.getProperty("shot.colors").split(",")) {
+                colors.add(Integer.parseInt(c.trim()));
+            }
+        }
+        HotSeatWindow win = new HotSeatWindow(colors == null
+            ? HotSeatWindow.Options.simple(specs.size(), seed, specs)
+            : new HotSeatWindow.Options(kelium.dataio.GameConfig.DEFAULT_RULESET, specs.size(),
+                seed, specs, null, null, null, colors, null, null, null));
         SwingUtilities.invokeAndWait(win::start);
         SwingUtilities.invokeAndWait(() -> win.frame.setSize(w, h));
 
@@ -77,6 +87,18 @@ public final class HotSeatShot {
         if (System.getProperty("shot.specmenu") != null) {
             SwingUtilities.invokeAndWait(() -> win.actionStrip.openSpecMenu());
             Thread.sleep(200);
+        }
+        // -Dshot.drawer=Памятка — открыть ящик; -Dshot.memo=N — страница памятки
+        String drawerProp = System.getProperty("shot.drawer");
+        if (drawerProp != null) {
+            SwingUtilities.invokeAndWait(() -> win.openDrawerForTest(drawerProp,
+                Integer.getInteger("shot.memo", 1)));
+            Thread.sleep(500);
+        }
+        // -Dshot.zone=0 — убрать зону игрока вниз
+        if ("0".equals(System.getProperty("shot.zone"))) {
+            SwingUtilities.invokeAndWait(() -> win.setZoneShown(false));
+            Thread.sleep(300);
         }
         // -Dshot.seat=N — посмотреть стол другого места
         String seatProp = System.getProperty("shot.seat");

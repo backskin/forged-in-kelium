@@ -379,14 +379,23 @@ public final class HotSeatWindow {
         tableScroll.setBorder(null);
         tableScroll.getHorizontalScrollBar().setUnitIncrement(Theme.px(40));
         tableScroll.getViewport().setBackground(Theme.bg());
-        javax.swing.JSplitPane split = new javax.swing.JSplitPane(
-            javax.swing.JSplitPane.VERTICAL_SPLIT, upper, tableScroll);
-        split.setResizeWeight(1.0);
-        split.setBorder(null);
-        split.setDividerSize(Theme.px(6));
-        split.setContinuousLayout(true);
-        tableSplit = split;
-        frame.add(split, BorderLayout.CENTER);
+        // ЗОНА ИГРОКА ВЫДВИГАЕТСЯ ПОВЕРХ ПОЛЯ (26.09.2026: «не меняя масштаба
+        // поля, выдвигать и удвигать планшет игрока; кнопки действий никуда не
+        // теряются»). Поле занимает всю высоту окна и масштаб не меняет; зона
+        // въезжает снизу поверх него, полоса действий едет вместе с её кромкой.
+        tableScrollPane = tableScroll;
+        tableStage = new JLayeredPane() {
+            @Override
+            public void doLayout() {
+                layoutStage();
+            }
+        };
+        tableStage.add(upper, JLayeredPane.DEFAULT_LAYER);
+        tableStage.add(tableScroll, JLayeredPane.PALETTE_LAYER);
+        zoneHandle = new ZoneHandle();
+        tableStage.add(zoneHandle, JLayeredPane.PALETTE_LAYER);
+        stageUpper = upper;
+        frame.add(tableStage, BorderLayout.CENTER);
 
         zoom = new ZoomCard();
         // Выше прежнего: под лицом карты теперь помещается весь печатный текст
@@ -480,16 +489,8 @@ public final class HotSeatWindow {
         frame.setLocationByPlatform(true);
         Offscreen.show(frame);
         placeTableDivider();
-        // Разделитель поля и зоны ставится по размеру окна при каждом его
-        // изменении — пока игрок не передвинул его сам.
-        if (tableSplit.getUI() instanceof javax.swing.plaf.basic.BasicSplitPaneUI ui) {
-            ui.getDivider().addMouseListener(new java.awt.event.MouseAdapter() {
-                @Override
-                public void mousePressed(java.awt.event.MouseEvent e) {
-                    dividerByHand = true;
-                }
-            });
-        }
+        // Высота зоны ставится по размеру окна при каждом его изменении — пока
+        // игрок не потянул её за язычок сам.
         frame.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
@@ -501,9 +502,205 @@ public final class HotSeatWindow {
     }
 
     private boolean dividerByHand;
+    private JLayeredPane tableStage;
+    private JComponent stageUpper;
+    private javax.swing.JScrollPane tableScrollPane;
+    private ZoneHandle zoneHandle;
+    /** Высота зоны игрока, когда она выдвинута. */
+    private int zoneHeight;
+    /** Доля выдвижения зоны: 1 — выдвинута, 0 — убрана вниз. */
+    private double zoneShown = 1;
+    private boolean zoneWanted = true;
+    private boolean zoneBeforeMemo = true;
+    private javax.swing.Timer zoneTimer;
 
-    /** Стол игрока занимает свою высоту снизу, остальное — поле. */
+    /** Высота зоны, не больше того, что оставляет полю место под полосу действий. */
+    private int zoneFullHeight() {
+        return Math.min(zoneHeight, Math.max(0, tableStage.getHeight() - Theme.px(200)));
+    }
+
+    /** Поле — на всю высоту, зона — поверх него снизу, язычок — над её кромкой. */
+    private void layoutStage() {
+        if (tableStage == null) {
+            return;
+        }
+        int w = tableStage.getWidth();
+        int h = tableStage.getHeight();
+        stageUpper.setBounds(0, 0, w, h);
+        stageUpper.validate();
+        int zh = zoneFullHeight();
+        int shown = (int) Math.round(zh * zoneShown);
+        tableScrollPane.setBounds(0, h - shown, w, zh);
+        tableScrollPane.setVisible(shown > 0);
+        tableScrollPane.validate();
+        Dimension hd = zoneHandle.getPreferredSize();
+        // язычок — у правого края окна, под колонкой шагов: слева выезжают
+        // ящики, над полем стоят кружки действий
+        zoneHandle.setBounds(w - hd.width - Theme.px(16), h - shown - hd.height,
+            hd.width, hd.height);
+        if (layered != null) {
+            layoutLayers();
+        }
+    }
+
+    /** Сколько точек снизу поля сейчас закрывает зона игрока с язычком. */
+    int zoneCover() {
+        if (tableStage == null || layered == null || !layered.isShowing()
+                || !tableStage.isShowing()) {
+            return 0;
+        }
+        int shown = (int) Math.round(zoneFullHeight() * zoneShown);
+        java.awt.Point p = SwingUtilities.convertPoint(layered, 0, layered.getHeight(), tableStage);
+        return Math.max(0, shown - (tableStage.getHeight() - p.y));
+    }
+
+    /** Выдвинуть или убрать зону игрока — плавно, с того места, где она сейчас. */
+    void setZoneShown(boolean show) {
+        zoneWanted = show;
+        if (zoneTimer != null) {
+            zoneTimer.stop();
+        }
+        if (Offscreen.on() || tableStage == null) {
+            zoneShown = show ? 1 : 0;
+            layoutStage();
+            if (zoneHandle != null) {
+                zoneHandle.repaint();
+            }
+            return;
+        }
+        zoneTimer = new javax.swing.Timer(16, e -> {
+            double target = zoneWanted ? 1 : 0;
+            zoneShown += (target - zoneShown) * 0.28;
+            if (Math.abs(target - zoneShown) < 0.02) {
+                zoneShown = target;
+                ((javax.swing.Timer) e.getSource()).stop();
+            }
+            layoutStage();
+            tableStage.repaint();
+        });
+        zoneTimer.start();
+        zoneHandle.repaint();
+    }
+
+    /**
+     * ЯЗЫЧОК ЗОНЫ ИГРОКА: щелчок убирает зону вниз или выдвигает обратно;
+     * потянуть вверх-вниз — поменять её высоту.
+     */
+    private final class ZoneHandle extends JComponent {
+        private boolean hover;
+        private java.awt.Point pressed;
+        private int pressedHeight;
+        private boolean dragged;
+
+        ZoneHandle() {
+            setOpaque(false);
+            setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+            setToolTipText("Щелчок — убрать или выдвинуть стол игрока; потянуть — выше или ниже");
+            java.awt.event.MouseAdapter m = new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseEntered(java.awt.event.MouseEvent e) {
+                    hover = true;
+                    repaint();
+                }
+
+                @Override
+                public void mouseExited(java.awt.event.MouseEvent e) {
+                    hover = false;
+                    repaint();
+                }
+
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    pressed = e.getLocationOnScreen();
+                    pressedHeight = zoneHeight;
+                    dragged = false;
+                }
+
+                @Override
+                public void mouseDragged(java.awt.event.MouseEvent e) {
+                    if (pressed == null || !zoneWanted) {
+                        return;
+                    }
+                    int dy = e.getLocationOnScreen().y - pressed.y;
+                    if (Math.abs(dy) > 4) {
+                        dragged = true;
+                    }
+                    if (dragged) {
+                        dividerByHand = true;
+                        zoneHeight = Math.max(Theme.px(200), pressedHeight - dy);
+                        layoutStage();
+                    }
+                }
+
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    if (!dragged && contains(e.getPoint())) {
+                        setZoneShown(!zoneWanted);
+                    }
+                    pressed = null;
+                }
+            };
+            addMouseListener(m);
+            addMouseMotionListener(m);
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            return new Dimension(Theme.px(190), Theme.px(30));
+        }
+
+        @Override
+        protected void paintComponent(java.awt.Graphics g0) {
+            java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+            g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING,
+                java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            int w = getWidth() - 1;
+            int h = getHeight();
+            int r = Theme.px(12);
+            java.awt.geom.Path2D tab = new java.awt.geom.Path2D.Double();
+            tab.moveTo(0, h);
+            tab.lineTo(0, r);
+            tab.quadTo(0, 0, r, 0);
+            tab.lineTo(w - r, 0);
+            tab.quadTo(w, 0, w, r);
+            tab.lineTo(w, h);
+            tab.closePath();
+            g.setColor(hover ? Theme.hover() : Theme.panel());
+            g.fill(tab);
+            g.setColor(Theme.accent());
+            g.setStroke(new java.awt.BasicStroke((float) Theme.pxf(1.4)));
+            g.draw(tab);
+            // стрелка: вниз — убрать, вверх — выдвинуть
+            double ax = Theme.px(20);
+            double ay = h / 2.0;
+            double as = Theme.px(6);
+            java.awt.geom.Path2D arrow = new java.awt.geom.Path2D.Double();
+            if (zoneWanted) {
+                arrow.moveTo(ax - as, ay - as / 2);
+                arrow.lineTo(ax + as, ay - as / 2);
+                arrow.lineTo(ax, ay + as / 2 + 2);
+            } else {
+                arrow.moveTo(ax - as, ay + as / 2);
+                arrow.lineTo(ax + as, ay + as / 2);
+                arrow.lineTo(ax, ay - as / 2 - 2);
+            }
+            arrow.closePath();
+            g.fill(arrow);
+            g.setFont(Theme.font(13, Font.BOLD));
+            g.setColor(Theme.ink());
+            java.awt.FontMetrics fm = g.getFontMetrics();
+            String t = zoneWanted ? "Убрать стол" : "Мой стол";
+            g.drawString(t, (float) (ax + as + Theme.px(10)),
+                (float) ((h + fm.getAscent() - fm.getDescent()) / 2.0));
+            g.dispose();
+        }
+    }
+
+    /** Высота выдвинутой зоны — по окну, пока игрок не потянул язычок сам. */
     private void placeTableDivider() {
+        JComponent tableSplit = tableStage;
         if (tableSplit != null && tableSplit.getHeight() > 0) {
             // ВЫСОТА ЗОНЫ — ДОЛЯ ОКНА (сдача под ключ 25.09.2026): на экране
             // ноутбука 1366×768 постоянные 340 точек съедали половину высоты,
@@ -519,12 +716,21 @@ public final class HotSeatWindow {
                     zone -= Theme.px(6);
                 }
             }
-            tableSplit.setDividerLocation(Math.max(Theme.px(200), h - zone));
+            zoneHeight = zone;
+            layoutStage();
         }
     }
 
     kelium.gui.kp.PlayerTable table;
-    private javax.swing.JSplitPane tableSplit;
+    private kelium.gui.kp.MemoPanel memo;
+
+    /** Для снимков: открыть ящик и, если это памятка, листнуть на страницу. */
+    void openDrawerForTest(String name, int memoPage) {
+        toggleDrawer(name);
+        if (memo != null && "Памятка".equals(name)) {
+            memo.flip(memoPage - 1);
+        }
+    }
     /** Лист планшетов для стола: свой, чтобы ящик «Планшет» листал места независимо. */
     private BoardSheet tableSheet;
 
@@ -847,6 +1053,10 @@ public final class HotSeatWindow {
     private void setTableChoices(Map<String, List<kelium.gui.kp.FieldBubbles.Opt>> ch, Color c) {
         ownTableChoices = ch == null ? Map.of() : ch;
         ownTableColor = c;
+        // решение на своём столе — зона выдвигается сама, прятать его нельзя
+        if (!ownTableChoices.isEmpty() && !zoneWanted) {
+            setZoneShown(true);
+        }
         if (shownSeat() == viewedSeat) {
             table.setChoices(ownTableChoices, ownTableColor);
         }
@@ -1111,6 +1321,7 @@ public final class HotSeatWindow {
         // кнопкой справа; здесь только общие доски, каждая отдельно.
         addDrawerTab(strip, "Научный отдел");
         addDrawerTab(strip, "Рынок");
+        addDrawerTab(strip, "Памятка");
         strip.add(javax.swing.Box.createVerticalGlue());
         return strip;
     }
@@ -1120,6 +1331,7 @@ public final class HotSeatWindow {
         tab.setToolTipText(switch (name) {
             case "Научный отдел" -> "Планшет научного отдела: треки, кубики игроков, вершины";
             case "Рынок" -> "Планшет рынка и открытая карта рынка";
+            case "Памятка" -> "Памятка игрока: раунд, действия, конец игры — листайте стрелками";
             case "Наука и рынок" -> "Доска науки и активная карта рынка — открываются поверх поля в любой момент";
             case "Планшет" -> "Планшеты игроков: склад, войска, трофеи, арсенал — свой и соперников";
             case "Сброс приказов" -> "Ваш личный сброс приказов: карты, разыгранные в этом раунде";
@@ -1219,6 +1431,10 @@ public final class HotSeatWindow {
         journalScroll.setBorder(null);
         drawers.put("Журнал", wrapDrawer(journalScroll));
 
+        // ПАМЯТКА ИГРОКА — печатные страницы, листаются (26.09.2026)
+        memo = new kelium.gui.kp.MemoPanel(this::zoneCover);
+        drawers.put("Памятка", wrapDrawer(memo));
+
         prompt = new PromptOverlay();
         layered.add(prompt, JLayeredPane.MODAL_LAYER);
         // ПОЛОСА ДЕЙСТВИЙ — над зоной игрока, поверх поля (26.09.2026)
@@ -1256,8 +1472,12 @@ public final class HotSeatWindow {
         // Карточка вопроса не прячется под выехавший ящик.
         field.bubbles.setDockInset(openDrawerSpan());
         if (actionStrip != null) {
-            int sh = Math.min(layered.getHeight(), kelium.gui.kp.ActionStrip.boundsHeight());
-            actionStrip.setBounds(0, layered.getHeight() - sh, layered.getWidth(), sh);
+            // полоса стоит над кромкой зоны игрока и едет вместе с ней
+            int bottom = layered.getHeight() - zoneCover();
+            int sh = Math.min(bottom, kelium.gui.kp.ActionStrip.boundsHeight());
+            // выехавший ящик не закрывает кружки: полоса встаёт правее него
+            int left = openDrawerSpan();
+            actionStrip.setBounds(left, bottom - sh, layered.getWidth() - left, sh);
         }
         field.repaint();
         layoutPrompt();
@@ -1323,6 +1543,10 @@ public final class HotSeatWindow {
      * резались карты, замечание приёмки). Журналу хватает узкой ленты.
      */
     private int drawerWidth() {
+        if (memo != null && openDrawer == drawers.get("Памятка")) {
+            return Math.min(memo.widthFor(layered.getHeight() - zoneCover()),
+                (int) (layered.getWidth() * 0.72));
+        }
         int want = openDrawer == drawers.get("Журнал")
             ? Theme.px(DRAWER_W) : Theme.px(WIDE_DRAWER_W);
         return Math.min(want, Math.max(Theme.px(320), (int) (layered.getWidth() * 0.72)));
@@ -1356,6 +1580,18 @@ public final class HotSeatWindow {
     private void toggleDrawer(String name) {
         JComponent target = drawers.get(name);
         boolean closing = openDrawer == target;
+        // ПАМЯТКУ ЧИТАЮТ ВО ВСЮ ВЫСОТУ: стол игрока на это время уезжает вниз и
+        // возвращается, когда памятку закрыли (если его не убрали раньше сами)
+        boolean memoNow = memo != null && target == drawers.get("Памятка") && !closing;
+        boolean memoWas = memo != null && openDrawer == drawers.get("Памятка");
+        if (memoNow && !memoWas) {
+            zoneBeforeMemo = zoneWanted;
+            if (zoneWanted) {
+                setZoneShown(false);
+            }
+        } else if (memoWas && !memoNow && zoneBeforeMemo && !zoneWanted) {
+            setZoneShown(true);
+        }
         for (Map.Entry<String, JComponent> e : drawers.entrySet()) {
             boolean on = e.getValue() == target && !closing;
             if (e.getValue() != target) {
@@ -1882,13 +2118,33 @@ public final class HotSeatWindow {
      * новый прогон того же стола, и лента {@code prefix} проигрывается до
      * места отката без вопросов игроку.
      */
+    /**
+     * ФРАКЦИЯ МЕСТА — ЭТО ЕЁ ПЛАНШЕТЫ И КОЛОДА, а не только краска (26.09.2026:
+     * «выбрал зелёную фракцию, а карты приказов красные»). Краска места красила
+     * экран, а движок раздавал планшеты и колоды по номеру места. Стороны
+     * планшетов идут в том же порядке, что гнёзда краски: 0 синий, 1 красный,
+     * 2 зелёный, 3 жёлтый; колода приказов берётся по планшету войск.
+     */
+    static List<String> factionSides(List<Integer> seatColors, int players) {
+        if (seatColors == null || seatColors.isEmpty()) {
+            return null;
+        }
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < players; i++) {
+            Integer slot = i < seatColors.size() ? seatColors.get(i) : null;
+            out.add(GameConfig.orderDeckOfColour(slot == null ? i : slot));
+        }
+        return out;
+    }
+
     private void playSession(int gen, List<Integer> prefix) {
         GameConfig cfg = this.cfg;
         if (cfg == null) {
             // КРАСКИ МЕСТ ставятся ДО сборки партии: по ним рисуется и поле, и
             // фишки, и картинки жетонов.
             kelium.report.FieldGeometry.useSeatColors(options.seatColors());
-            cfg = GameConfig.buildCached(options.rulesetId(), players, seed, null, null,
+            cfg = GameConfig.buildCached(options.rulesetId(), players, seed, null,
+                factionSides(options.seatColors(), players),
                 options.scenarioId(), options.cuFacing(), options.scenarioFile());
             applyTrainingSetup(cfg);
             this.cfg = cfg;

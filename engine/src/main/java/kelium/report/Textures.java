@@ -183,6 +183,15 @@ public final class Textures {
     }
 
     /**
+     * СТРАНИЦА ПАМЯТКИ ИГРОКА ({@code memo/memo_<n>.png}, n с единицы) —
+     * печатная двусторонняя памятка из экспорта дизайнера. {@code null} — такой
+     * страницы нет.
+     */
+    public static BufferedImage memoPage(int n) {
+        return find(List.of("memo/memo_" + n));
+    }
+
+    /**
      * ПЕЧАТНОЕ ЛИЦО КАРТЫ ПО ИДЕНТИФИКАТОРУ — задания, начальные задания, супер
      * задания, арсенал, начальный и супер арсенал, рынок, контейнеры. Лежат в
      * {@code card/<колода>/<id>.png}: {@code card/objective/o04},
