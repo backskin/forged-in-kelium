@@ -195,7 +195,7 @@ public final class GameRecorder {
 
         ReplayText text = new ReplayText(cfg, rec);
         Recorder rc = new Recorder(state, rec, text, pending);
-        Map<String, Object> result = GameEngine.playGame(state, agents, rc);
+        Map<String, Object> result = GameEngine.playGame(state, noted(agents, rc), rc);
 
         rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
         rec.condition = String.valueOf(result.get("condition"));
@@ -280,7 +280,7 @@ public final class GameRecorder {
         synchronized (SINKS) {
             SINKS.put(state, sink);
         }
-        Map<String, Object> result = GameEngine.playGame(state, agents, sink);
+        Map<String, Object> result = GameEngine.playGame(state, noted(agents, rc), sink);
 
         rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
         rec.condition = String.valueOf(result.get("condition"));
@@ -496,10 +496,233 @@ public final class GameRecorder {
         }
     }
 
+    // ==================== решения игроков ====================
+
+    /**
+     * КАЖДОЕ МЕСТО — ЗА ПИШУЩЕЙ ОБЁРТКОЙ: что предложили и что выбрали, идёт в
+     * запись (разбор партии показывает решения так же, как окно партии).
+     * Обёртка прозрачна: решает по-прежнему сам агент.
+     */
+    private static List<Agent> noted(List<Agent> agents, Recorder rc) {
+        List<Agent> out = new ArrayList<>(agents.size());
+        for (Agent a : agents) {
+            out.add(new Noted(a, rc));
+        }
+        return out;
+    }
+
+    private static final class Noted extends Agent {
+        private final Agent inner;
+        private final Recorder rc;
+
+        Noted(Agent inner, Recorder rc) {
+            super(inner.seat, inner.name);
+            this.inner = inner;
+            this.rc = rc;
+        }
+
+        @Override
+        public kelium.core.Choice choose(GameState state, List<kelium.core.Choice> options,
+                                         Map<String, Object> context) {
+            kelium.core.Choice picked = inner.choose(state, options, context);
+            try {
+                rc.noteDecision(seat, options, context, picked);
+            } catch (RuntimeException e) {
+                // запись решения — пояснение, партия важнее
+            }
+            return picked;
+        }
+
+        @Override
+        public boolean specInActionMenu() {
+            return inner.specInActionMenu();
+        }
+
+        @Override
+        public boolean choosesSectors() {
+            return inner.choosesSectors();
+        }
+
+        @Override
+        public void observeEvent(Map<String, Object> event) {
+            inner.observeEvent(event);
+        }
+
+        @Override
+        public void observePublicEvent(Map<String, Object> event) {
+            inner.observePublicEvent(event);
+        }
+    }
+
+    /** Варианты, где выбирают игрока (число — номер места). */
+    private static final java.util.Set<String> SEAT_CHOICES = java.util.Set.of(
+        "cu_token_to", "steal_objectives", "steal_from", "steal_arsenal");
+
+    private static final java.util.regex.Pattern AT_HEX =
+        java.util.regex.Pattern.compile("@(h-?\\d+_-?\\d+)");
+
+    /** Стороны гекса по номеру — как в выборе поворота ЦУ. */
+    private static final String[] СТОРОНЫ =
+        {"северо-восток", "восток", "юго-восток", "юго-запад", "запад", "северо-запад"};
+
     // ==================== приёмник событий ====================
 
     /** Приёмник событий движка: на каждое событие кладёт кадр в запись. */
     private static final class Recorder implements Consumer<Map<String, Object>> {
+
+        /** Решения, принятые после последнего кадра, — лягут в следующий. */
+        private final List<ReplayRecord.Decision> decided = new ArrayList<>();
+
+        /** Записать решение словами: вопрос, варианты, выбранный. */
+        synchronized void noteDecision(int seat, List<kelium.core.Choice> options,
+                                       Map<String, Object> context, kelium.core.Choice picked) {
+            String kind = context == null ? "" : String.valueOf(context.get("kind"));
+            ReplayRecord.Decision d = new ReplayRecord.Decision();
+            d.seat = seat;
+            d.kind = kind;
+            String l = HotSeatWindow.kindLabel(kind);
+            d.title = "ваш выбор".equals(l) ? "решение" : l;
+            d.total = options.size();
+            d.picked = options.indexOf(picked);
+            java.util.Set<String> hexIds = new java.util.HashSet<>();
+            for (ReplayRecord.HexInfo h : rec.hexes) {
+                hexIds.add(h.id);
+            }
+            Map<Integer, String> uidHex = new HashMap<>();
+            if (prev != null) {
+                for (ReplayRecord.Tok t : prev.tokens) {
+                    if (t.hexId != null) {
+                        uidHex.put(t.uid, t.hexId);
+                    }
+                }
+            }
+            String ctxHex = null;
+            if (context != null) {
+                for (String k : List.of("target", "hex", "killer_hex", "source")) {
+                    if (context.get(k) instanceof String s && hexIds.contains(s)) {
+                        ctxHex = s;
+                        break;
+                    }
+                }
+            }
+            // выбранный вариант храним всегда, даже если он дальше предела
+            List<Integer> keep = new ArrayList<>();
+            for (int i = 0; i < options.size() && keep.size() < ReplayRecord.Decision.KEEP; i++) {
+                keep.add(i);
+            }
+            if (d.picked >= ReplayRecord.Decision.KEEP) {
+                keep.set(keep.size() - 1, d.picked);
+                d.picked = keep.size() - 1;
+            }
+            for (int i : keep) {
+                kelium.core.Choice c = options.get(i);
+                ReplayRecord.DecisionOption o = new ReplayRecord.DecisionOption();
+                Object p = c.payload();
+                boolean pass = "pass".equals(c.kind()) && p == null;
+                // спец-действие в меню хода — словами спец-действия, как в окне партии
+                String words = "action".equals(kind) && c.kind() != null
+                    && !"action".equals(c.kind()) && !"pass".equals(c.kind()) ? "spec" : kind;
+                try {
+                    o.text = SEAT_CHOICES.contains(c.kind()) && p instanceof Number who
+                        ? "Игрок " + (who.intValue() + 1)
+                        : kelium.gui.kp.ChoiceWords.label(words, c,
+                            id -> kelium.gui.replay2.Names.card(rec, id));
+                    o.sub = kelium.gui.kp.ChoiceWords.sub(words, c);
+                } catch (RuntimeException e) {
+                    o.text = kelium.gui.kp.ChoiceWords.tidy(
+                        c.label() == null ? String.valueOf(p) : c.label());
+                }
+                // стороны гекса — сторонами света, а не номерами стенок
+                if (p instanceof List<?> sides && !sides.isEmpty()
+                        && sides.stream().allMatch(x -> x instanceof Number)) {
+                    List<String> names = new ArrayList<>();
+                    for (Object x : sides) {
+                        names.add(СТОРОНЫ[Math.floorMod(((Number) x).intValue(), 6)]);
+                    }
+                    o.text = (sides.size() == 1 ? "Сектор: " : "Секторы: ")
+                        + String.join(", ", names);
+                }
+                if (p instanceof String id && rec.cardNames.containsKey(id)) {
+                    o.card = id;
+                }
+                if ("cu_facing".equals(kind)) {
+                    // число в варианте — сторона гекса, а не номер жетона:
+                    // вариант лежит на гексе своего ЦУ
+                    o.hex = cuHex(seat);
+                } else if (!pass && !SEAT_CHOICES.contains(c.kind())) {
+                    o.hex = anchor(c, uidHex, hexIds);
+                    if (o.hex == null && o.card == null) {
+                        o.hex = ctxHex;
+                    }
+                }
+                d.options.add(o);
+            }
+            decided.add(d);
+        }
+
+        /** Гекс ЦУ места по последнему снимку, либо null. */
+        private String cuHex(int seat) {
+            if (prev == null) {
+                return null;
+            }
+            for (ReplayRecord.Tok t : prev.tokens) {
+                if (t.owner == seat && t.building && t.alive && t.hexId != null
+                        && "command_center".equalsIgnoreCase(t.type)) {
+                    return t.hexId;
+                }
+            }
+            return null;
+        }
+
+        /** Гекс, к которому относится вариант, либо null (как в окне партии). */
+        private static String anchor(kelium.core.Choice c, Map<Integer, String> uidHex,
+                                     java.util.Set<String> hexIds) {
+            Object p = c.payload();
+            if (p instanceof String s) {
+                if (hexIds.contains(s)) {
+                    return s;
+                }
+                if (s.matches("\\d+")) {
+                    String h = uidHex.get(Integer.parseInt(s));
+                    if (h != null) {
+                        return h;
+                    }
+                }
+            }
+            if (p instanceof Integer n && uidHex.containsKey(n)) {
+                return uidHex.get(n);
+            }
+            if (p instanceof Token t && t.hexId() != null) {
+                return t.hexId();
+            }
+            if (p instanceof Map<?, ?> m) {
+                for (String k : List.of("target", "to", "hex")) {
+                    if (m.get(k) instanceof String s && hexIds.contains(s)) {
+                        return s;
+                    }
+                }
+                for (String k : List.of("building", "to", "from", "uid")) {
+                    if (m.get(k) instanceof Number n && uidHex.containsKey(n.intValue())) {
+                        return uidHex.get(n.intValue());
+                    }
+                }
+            }
+            if (c.label() != null) {
+                java.util.regex.Matcher mm = AT_HEX.matcher(c.label());
+                if (mm.find() && hexIds.contains(mm.group(1))) {
+                    return mm.group(1);
+                }
+            }
+            return null;
+        }
+
+        /** Отдать накопленные решения кадру. */
+        private synchronized void attachDecisions(ReplayRecord.Frame f) {
+            if (!decided.isEmpty()) {
+                f.decisions.addAll(decided);
+                decided.clear();
+            }
+        }
 
         private final GameState state;
         private final ReplayRecord rec;
@@ -530,6 +753,7 @@ public final class GameRecorder {
             f.log = "";
             f.highlight = h;
             f.snapshot = snap;
+            attachDecisions(f);
             prev = snap;
             rec.frames.add(f);
         }
@@ -616,6 +840,7 @@ public final class GameRecorder {
                 }
             }
             f.snapshot = snap;
+            attachDecisions(f);
             prev = snap;
             rec.frames.add(f);
             int idx = rec.frames.size() - 1;

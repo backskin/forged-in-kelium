@@ -133,6 +133,9 @@ public final class Session {
     }
 
     public void setRecord(ReplayRecord rec) {
+        // КРАСКИ МЕСТ — ИЗ ЗАПИСИ: за столом сидели в выбранных цветах (фракции),
+        // и разбор обязан показать партию в них же — поле, жетоны, планшеты.
+        kelium.report.FieldGeometry.useSeatColors(rec == null ? null : rec.seatColors);
         this.record = rec;
         this.cursor = 0;
         this.selectedHex = null;
@@ -683,7 +686,7 @@ public final class Session {
             sb.append(" · круг ").append(f.snapshot.circle);
         }
         sb.append(f.snapshot.active != null
-            ? " · ходит " + record.playerName(f.snapshot.active)
+            ? " · ходит " + ReplayTable.seatName(record, f.snapshot.active)
             : " · общая фаза раунда");
         return sb.toString();
     }

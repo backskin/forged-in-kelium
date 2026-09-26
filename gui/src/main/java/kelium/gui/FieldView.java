@@ -161,8 +161,11 @@ public final class FieldView extends JComponent {
     }
 
     private void paintBackdrop(Graphics2D g) {
-        int w = getWidth();
-        int h = getHeight();
+        paintTableBackdrop(g, getWidth(), getHeight());
+    }
+
+    /** Сукно стола под полем — то же рисует поле разбора партии. */
+    public static void paintTableBackdrop(Graphics2D g, int w, int h) {
         java.awt.RadialGradientPaint p = new java.awt.RadialGradientPaint(
             new java.awt.geom.Point2D.Double(w / 2.0, h * 0.48),
             (float) Math.max(w, h) * 0.75f, new float[]{0f, 0.55f, 1f},
@@ -991,6 +994,12 @@ public final class FieldView extends JComponent {
      * военная (второе ЦУ) или по супер заданию.
      */
     private void drawPodium(Graphics2D g) {
+        paintPodium(g, getWidth(), getHeight(), getFont(), record, frame, tableBackdrop);
+    }
+
+    /** Итоги партии поверх поля — то же рисует поле разбора партии на последнем шаге. */
+    public static void paintPodium(Graphics2D g, int width, int height, Font font,
+                                   ReplayRecord record, ReplayRecord.Frame frame, boolean dark) {
         List<ReplayRecord.Player> ps = new ArrayList<>(frame.snapshot.players);
         ps.sort((a, b) -> Integer.compare(b.vp.getOrDefault("total", 0),
             a.vp.getOrDefault("total", 0)));
@@ -1012,7 +1021,6 @@ public final class FieldView extends JComponent {
         // ТЁМНЫЙ СТОЛ ЖИВОЙ ПАРТИИ (25.09.2026): табличка в палитре стола, а не
         // белая бумажная — иначе в конце партии посреди тёмного окна
         // вспыхивал светлый прямоугольник.
-        boolean dark = tableBackdrop;
         Color veil = dark ? new Color(0x0E, 0x20, 0x29, 200) : new Color(0xF2, 0xF1, 0xEC, 205);
         Color cardBg = dark ? new Color(0x14, 0x30, 0x3C, 245) : new Color(0xFF, 0xFF, 0xFF, 245);
         Color cardLine = dark ? new Color(0x3B, 0x6A, 0x7C) : new Color(0x33, 0x33, 0x33);
@@ -1026,18 +1034,19 @@ public final class FieldView extends JComponent {
 
         // 1) поле уходит в тень — итоги читаются, партия видна фоном
         g.setColor(veil);
-        g.fillRect(0, 0, getWidth(), getHeight());
+        g.fillRect(0, 0, width, height);
 
         int rowH = 46;
-        int cardW = Math.min(520, Math.max(340, getWidth() - 80));
+        int cardW = Math.min(520, Math.max(340, width - 80));
         // Подпись способа победы бывает длинной — заранее считаем, во сколько
         // строк она ляжет, и на столько же растягиваем табличку. Раньше текст
         // просто вылезал за рамку (замечание дизайнера 12.08.2026).
-        g.setFont(getFont().deriveFont(Font.PLAIN, 12f));
-        List<String> howLines = wrapText(g, winCondition(), cardW - 44);
+        g.setFont(font.deriveFont(Font.PLAIN, 12f));
+        List<String> howLines = wrapText(g, kelium.gui.replay2.Names.conditionLong(
+            record.condition, record.spawnLeft, record.spawnThreshold), cardW - 44);
         int cardH = 78 + howLines.size() * 15 + ps.size() * rowH;
-        int x = (getWidth() - cardW) / 2;
-        int y = Math.max(12, (getHeight() - cardH) / 2);
+        int x = (width - cardW) / 2;
+        int y = Math.max(12, (height - cardH) / 2);
 
         // 2) сама табличка
         g.setColor(cardBg);
@@ -1046,12 +1055,12 @@ public final class FieldView extends JComponent {
         g.setStroke(new BasicStroke(2.2f));
         g.drawRoundRect(x, y, cardW, cardH, 18, 18);
 
-        g.setFont(getFont().deriveFont(Font.BOLD, 20f));
+        g.setFont(font.deriveFont(Font.BOLD, 20f));
         g.setColor(ink);
         String head = "ПАРТИЯ ОКОНЧЕНА";
         g.drawString(head, x + (cardW - g.getFontMetrics().stringWidth(head)) / 2, y + 32);
 
-        g.setFont(getFont().deriveFont(Font.PLAIN, 12f));
+        g.setFont(font.deriveFont(Font.PLAIN, 12f));
         g.setColor(ink3);
         int hy = y + 50;
         for (String line : howLines) {
@@ -1072,7 +1081,7 @@ public final class FieldView extends JComponent {
             g.drawRoundRect(x + 14, ry, cardW - 28, h, 10, 10);
 
             // место в списке
-            g.setFont(getFont().deriveFont(Font.BOLD, champ ? 20f : 15f));
+            g.setFont(font.deriveFont(Font.BOLD, champ ? 20f : 15f));
             g.setColor(champ ? champInk : ink3);
             g.drawString(String.valueOf(i + 1), x + 26, ry + h / 2 + (champ ? 7 : 5));
 
@@ -1086,7 +1095,7 @@ public final class FieldView extends JComponent {
             g.setStroke(new BasicStroke(1.6f));
             g.drawOval(cxp, cyp, chip, chip);
             g.setColor(Color.WHITE);
-            g.setFont(getFont().deriveFont(Font.BOLD, chip * 0.6f));
+            g.setFont(font.deriveFont(Font.BOLD, chip * 0.6f));
             String num = String.valueOf(p.seat + 1);
             g.drawString(num, cxp + (chip - g.getFontMetrics().stringWidth(num)) / 2,
                 cyp + chip - chip / 4);
@@ -1094,18 +1103,19 @@ public final class FieldView extends JComponent {
             // победные очки справа считаем ПЕРВЫМИ: от их ширины зависит, сколько
             // места остаётся имени бота, чтобы оно не наползало на очки
             int total = p.vp.getOrDefault("total", 0);
-            g.setFont(getFont().deriveFont(Font.BOLD, champ ? 19f : 15f));
+            g.setFont(font.deriveFont(Font.BOLD, champ ? 19f : 15f));
             String vpText = total + " ПО";
             int tw = g.getFontMetrics().stringWidth(vpText);
 
-            // имя бота
+            // имя бота; живое место — просто «Игрок N», без повтора «Игрок 1 · Игрок 1»
             int nameX = cxp + chip + 10;
             int nameRoom = (x + cardW - 26 - tw - 12) - nameX;
-            g.setFont(getFont().deriveFont(champ ? Font.BOLD : Font.PLAIN, champ ? 15f : 13f));
+            g.setFont(font.deriveFont(champ ? Font.BOLD : Font.PLAIN, champ ? 15f : 13f));
             g.setColor(ink);
-            g.drawString(clip(g, record.playerName(p.seat), nameRoom), nameX, ry + h / 2 + 5);
+            String name = record.playerName(p.seat).replaceAll("(Игрок \\d+) · \\1", "$1");
+            g.drawString(clip(g, name, nameRoom), nameX, ry + h / 2 + 5);
 
-            g.setFont(getFont().deriveFont(Font.BOLD, champ ? 19f : 15f));
+            g.setFont(font.deriveFont(Font.BOLD, champ ? 19f : 15f));
             g.setColor(champ ? champInk : vpInk);
             g.drawString(vpText, x + cardW - 26 - tw, ry + h / 2 + (champ ? 7 : 5));
 
@@ -1771,19 +1781,22 @@ public final class FieldView extends JComponent {
         return out;
     }
 
-    /** Цвет силуэта жетона игрока. */
+    /**
+     * Цвет силуэта жетона игрока — по краске места (фракции), как и сами
+     * жетоны на поле: при выбранных в меню цветах место 1 может быть красным.
+     */
     public static Color seatColor(int seat) {
-        return TOKEN_COLORS[seat % 4];
+        return TOKEN_COLORS[kelium.report.FieldGeometry.seatColor(seat) % 4];
     }
 
     /** Обводка жетонов и рамок игрока. */
     public static Color seatStroke(int seat) {
-        return STROKE_COLORS[seat % 4];
+        return STROKE_COLORS[kelium.report.FieldGeometry.seatColor(seat) % 4];
     }
 
     /** Бледная заливка игрока (подложки, панели). */
     public static Color seatFill(int seat) {
-        return FILL_COLORS[seat % 4];
+        return FILL_COLORS[kelium.report.FieldGeometry.seatColor(seat) % 4];
     }
 
     static Color withAlpha(Color c, int alpha) {

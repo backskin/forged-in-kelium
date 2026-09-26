@@ -317,6 +317,11 @@ public final class Names {
             case "tokens_returned" -> "жетоны вернулись";
             case "return" -> "конец раунда";
             case "game_end" -> "конец партии";
+            case "seal_unit" -> "подготовка: глухой жетон";
+            case "starter_kit" -> "стартовый набор";
+            case "blind_discard" -> "отложенные приказы";
+            case "super_pick", "start_objective_pick" -> "подготовка: выбор карты";
+            case "cu_facing" -> "подготовка: поворот ЦУ";
             // Неизвестный тип — нейтральное слово, а не «не описано»: это заголовок
             // титра на поле, и «не описано» там читается как ошибка.
             default -> "шаг партии";
@@ -439,28 +444,87 @@ public final class Names {
      * вместо них пустые квадраты. Один раз это уже испортило пульт, поэтому весь
      * чужой текст проходит через этот фильтр: непечатаемое молча выбрасывается.
      */
+    private static final java.util.regex.Pattern SEAL = java.util.regex.Pattern.compile(
+        "^seal_unit \\{seat=(\\d+), unit=([a-z_]+)\\}");
+    private static final java.util.regex.Pattern KIT = java.util.regex.Pattern.compile(
+        "^starter_kit \\{seat=(\\d+), got=\\{([^}]*)\\}");
+
+    /**
+     * События подготовки, которые движок пишет служебной строкой, — словами:
+     * глухой жетон, вытянутый при раздаче, стартовый набор арсенала. Прочая
+     * телеметрия (подсказки ботов, пустой бой) человеку не нужна.
+     */
+    private static String telemetryWords(String s) {
+        java.util.regex.Matcher m = SEAL.matcher(s);
+        if (m.find()) {
+            return "Игрок " + (Integer.parseInt(m.group(1)) + 1)
+                + " вытянул глухой жетон — он закрывает ячейку «" + unit(m.group(2)) + "»";
+        }
+        m = KIT.matcher(s);
+        if (m.find()) {
+            java.util.List<String> got = new java.util.ArrayList<>();
+            for (String part : m.group(2).split(",\\s*")) {
+                String[] kv = part.split("=");
+                if (kv.length == 2) {
+                    got.add("+" + kv[1].trim() + " " + switch (kv[0].trim()) {
+                        case "coin" -> "монета";
+                        case "ammo" -> "боеприпас";
+                        case "kelium" -> "келемий";
+                        case "trophy" -> "трофей";
+                        default -> "";
+                    });
+                }
+            }
+            return "Игрок " + (Integer.parseInt(m.group(1)) + 1) + " получил стартовый набор: "
+                + String.join(", ", got);
+        }
+        return "";
+    }
+
     public static String printable(String s) {
         if (s == null || s.isEmpty()) {
             return "";
         }
+        // СЫРАЯ ТЕЛЕМЕТРИЯ БОТОВ («objective_hints {…}») человеку не нужна —
+        // окно партии её тоже не показывает; в полном журнале она остаётся.
+        if (s.matches("(?s)^[a-z_]+ \\{.*")) {
+            return telemetryWords(s);
+        }
         java.awt.Font f = kelium.gui.replay2.Theme.body();
-        if (f.canDisplayUpTo(s) < 0) {
-            return s;
-        }
-        StringBuilder sb = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '\n' || c == '\t' || f.canDisplay(c)) {
-                sb.append(c);
+        String out = s;
+        if (f.canDisplayUpTo(s) >= 0) {
+            StringBuilder sb = new StringBuilder(s.length());
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                if (c == '\n' || c == '\t' || f.canDisplay(c)) {
+                    sb.append(c);
+                }
             }
+            out = sb.toString();
         }
-        // ВНУТРЕННИЕ КОДЫ В СКОБКАХ убираем: движок иногда дописывает в лог
+        // ВНУТРЕННИЕ КОДЫ В СКОБКАХ убираем: движок дописывает в лог
         // идентификатор карты вроде «(yellow_dev)» — человеку он ничего не говорит,
         // а правило у нас одно: внутренних ключей на экране быть не должно.
-        return sb.toString()
-            .replaceAll("\\s*\\([a-z][a-z0-9_]*\\)", "")
+        // Прежде чистка стояла только на ветке с непечатаемыми символами, и
+        // обычная строка приходила на экран с «(blue_explore)» (26.09.2026).
+        out = out.replaceAll("\\s*\\([a-z][a-z0-9_:>.\\-]*\\)", "")
+            .replaceAll("(Игрок \\d+) · \\1", "$1")
+            // карта-джокер напечатана как «ЗАТАИТЬСЯ» — так же и в строке лога
+            .replace("БЕЗОПАСНОСТЬ", "ЗАТАИТЬСЯ")
             .replaceAll("^[\\s·•]+", "")
             .trim();
+        // отчёты движка — словами, как в ленте окна партии; построчно, чтобы
+        // многострочная запись хода не слиплась в одну строку
+        String[] rows = out.split("\n", -1);
+        StringBuilder res = new StringBuilder(out.length());
+        for (int i = 0; i < rows.length; i++) {
+            if (i > 0) {
+                res.append('\n');
+            }
+            String lead = rows[i].substring(0, rows[i].length() - rows[i].stripLeading().length());
+            res.append(lead).append(kelium.gui.kp.FeedWords.ru(rows[i]));
+        }
+        return res.toString();
     }
 
     /**

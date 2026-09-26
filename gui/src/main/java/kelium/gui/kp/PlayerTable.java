@@ -280,6 +280,18 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         addMouseMotionListener(m);
     }
 
+    /**
+     * ТОЛЬКО СМОТРЕТЬ — стол в разборе партии: на месте «Завершить ход» чей
+     * ход идёт на этом шаге (нажимать там нечего).
+     */
+    private boolean viewOnly;
+
+    public void setViewOnly(boolean on) {
+        viewOnly = on;
+        dirty = true;
+        repaint();
+    }
+
     public void setBoards(BoardsArt art) {
         this.boards = art;
         repaint();
@@ -1259,7 +1271,16 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         // обычными словами (вместо «Сначала решение», которое никто не понял).
         String a = "Завершить";
         String b = "ход";
-        if (!can && state.status() != null) {
+        if (viewOnly) {
+            // РАЗБОР ПАРТИИ: нажимать нечего — на месте кнопки чей ход на этом шаге
+            String st = state.status() == null ? "" : state.status();
+            int sp = st.indexOf(' ');
+            a = sp > 0 ? st.substring(0, sp) : st;
+            b = sp > 0 ? st.substring(sp + 1) : "";
+            g.setFont(Theme.font(12.5, Font.PLAIN));
+            centred(g, "разбор партии", x + w / 2, ey + eh - Theme.px(10));
+            g.setFont(Theme.font(17, Font.BOLD));
+        } else if (!can && state.status() != null) {
             List<String> why = List.of(state.status());
             g.setFont(Theme.font(12.5, Font.PLAIN));
             int ly = ey + eh - Theme.px(12);

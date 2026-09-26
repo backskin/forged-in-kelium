@@ -562,6 +562,41 @@ public final class ReplayRecord {
     /** Все карты приказов, разыгранные к этому шагу (в порядке розыгрыша). */
     public final List<OrderPlay> orderPlays = new ArrayList<>();
 
+    /**
+     * РЕШЕНИЕ ИГРОКА — ЧТО ЕМУ ПРЕДЛОЖИЛИ И ЧТО ОН ВЫБРАЛ (разбор партии,
+     * 26.09.2026: «всё, что игрок решает, должно быть видно в реплее так же,
+     * как в игре»). Движок пишет событие уже после решения, и по одному
+     * событию не узнать, из чего выбирали: какие карты лежали на выбор, какие
+     * гексы подсвечивались. Решение кладётся в кадр, который оно породило.
+     *
+     * <p>Всё уже словами: запись читает человек, а не движок.
+     */
+    public static final class Decision {
+        public int seat;
+        /** Вид точки решения движка ({@code reveal_order}, {@code build_hex}…). */
+        public String kind = "";
+        /** Вопрос словами — тот же, что в карточке вопроса окна партии. */
+        public String title = "";
+        /** Номер выбранного варианта; −1 — неизвестно. */
+        public int picked = -1;
+        /** Сколько вариантов было всего (в записи может лежать не больше {@link #KEEP}). */
+        public int total;
+        public final List<DecisionOption> options = new ArrayList<>();
+
+        /** Больше вариантов не храним: хватит, чтобы показать выбор, и файл не пухнет. */
+        public static final int KEEP = 24;
+    }
+
+    /** Вариант решения: слова, пояснение, карта или гекс, если вариант о них. */
+    public static final class DecisionOption {
+        public String text = "";
+        public String sub;
+        /** Id карты, если вариант — карта (лицо показывается печатью). */
+        public String card;
+        /** Гекс, если вариант — гекс поля. */
+        public String hex;
+    }
+
     public static final class Frame {
         public String type = "";
         public int round;
@@ -576,6 +611,8 @@ public final class ReplayRecord {
         public Snapshot snapshot;
         /** Шаг относится к бою (для перехода «к следующему бою»). */
         public boolean combat;
+        /** Решения игроков, принятые перед этим шагом (в порядке принятия). */
+        public final List<Decision> decisions = new ArrayList<>();
     }
 
     // ==================== удобные выборки ====================
@@ -1020,6 +1057,13 @@ public final class ReplayRecord {
                 th.add(to);
             }
             o.put("thoughts", th);
+            if (!f.decisions.isEmpty()) {
+                List<Object> ds = new ArrayList<>();
+                for (Decision d : f.decisions) {
+                    ds.add(decisionToMap(d));
+                }
+                o.put("decisions", ds);
+            }
             o.put("hl", highlightToMap(f.highlight));
             // Снимок повторяется дословно — не дублируем: null значит «как в
             // предыдущем кадре». На длинной партии это заметно уменьшает файл.
@@ -1044,6 +1088,53 @@ public final class ReplayRecord {
         }
         m.put("frames", fs);
         return m;
+    }
+
+    private static Map<String, Object> decisionToMap(Decision d) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("seat", d.seat);
+        m.put("kind", d.kind);
+        m.put("title", d.title);
+        m.put("picked", d.picked);
+        m.put("total", d.total);
+        List<Object> os = new ArrayList<>();
+        for (DecisionOption o : d.options) {
+            Map<String, Object> om = new LinkedHashMap<>();
+            om.put("text", o.text);
+            if (o.sub != null) {
+                om.put("sub", o.sub);
+            }
+            if (o.card != null) {
+                om.put("card", o.card);
+            }
+            if (o.hex != null) {
+                om.put("hex", o.hex);
+            }
+            os.add(om);
+        }
+        m.put("options", os);
+        return m;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Decision decisionFromMap(Map<String, Object> m) {
+        Decision d = new Decision();
+        d.seat = Json.i(m, "seat");
+        d.kind = orEmpty(Json.s(m, "kind"));
+        d.title = orEmpty(Json.s(m, "title"));
+        Integer p = Json.io(m, "picked");
+        d.picked = p == null ? -1 : p;
+        d.total = Json.i(m, "total");
+        for (Object o : Json.list(m, "options")) {
+            Map<String, Object> om = (Map<String, Object>) o;
+            DecisionOption opt = new DecisionOption();
+            opt.text = orEmpty(Json.s(om, "text"));
+            opt.sub = Json.s(om, "sub");
+            opt.card = Json.s(om, "card");
+            opt.hex = Json.s(om, "hex");
+            d.options.add(opt);
+        }
+        return d;
     }
 
     private static Map<String, Object> highlightToMap(Highlight h) {
@@ -1364,6 +1455,9 @@ public final class ReplayRecord {
             for (Object t : Json.list(fo, "thoughts")) {
                 Map<String, Object> to = (Map<String, Object>) t;
                 f.thoughts.add(new Thought(Json.i(to, "seat"), orEmpty(Json.s(to, "text"))));
+            }
+            for (Object d : Json.list(fo, "decisions")) {
+                f.decisions.add(decisionFromMap((Map<String, Object>) d));
             }
             f.highlight = highlightFromMap(Json.map(fo, "hl"));
             Map<String, Object> so = Json.map(fo, "snap");

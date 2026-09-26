@@ -70,27 +70,25 @@ public final class Replay2Gui {
     private JSplitPane drawerSplit;
     private JPanel stage;
     private CardLayout stageCards;
-    private JPanel stripsRow;
-    private JScrollPane stripsScroll;
-    private final PlayerStrip[] strips = new PlayerStrip[4];
-
-    // ==================== панели карт приказов ====================
     /**
-     * ВЫЕЗЖАЮЩИЕ ПАНЕЛИ КАРТ ПРИКАЗОВ (заказ дизайнера 19.08.2026): у каждого
-     * игрока своя, открытых может быть сколько угодно разом.
-     *
-     * <p>ЖИВУТ В СЛОЁНОЙ ПАНЕЛИ ОКНА, а не в раскладке. Панель обязана
-     * ПЕРЕКРЫВАТЬ поле, а поле лежит выше полос в обычной раскладке — вставь
-     * панель туда, и она либо подвинет поле, либо окажется под ним. Слоёная
-     * панель — единственное место, откуда можно лечь поверх, ничего не сдвинув.
-     *
-     * <p>Раз панель вне раскладки, её место приходится держать вручную: полосы
-     * ездят в горизонтальной прокрутке, и панель должна ездить вместе со своей.
+     * СТОЛ ИГРОКА ВМЕСТО ПОЛОС (26.09.2026: «подтяни графику реплея до
+     * цифровой версии»). Прежние полосы с плитками показателей и выезжающие
+     * панели приказов заменены тем же столом, что в окне партии: печатные
+     * планшеты, карты, свалка, вскрытый приказ, ресурсы иконками.
      */
-    private final OrderCardsPanel[] orderPanels = new OrderCardsPanel[4];
-    private final double[] orderOpen = new double[4];
-    private final double[] orderTarget = new double[4];
-    private javax.swing.Timer orderAnim;
+    private ReplayTable replayTable;
+    /** Зона стола: высота — по окну. */
+    private JPanel tableZone;
+    private int tableZoneHeight = Theme.px(300);
+    /** Места за столом — строкой иконками, как соперники в окне партии. */
+    private kelium.gui.kp.OpponentStrip opponents;
+    /** Решение шага — карточкой в углу поля. */
+    private DecisionCard decisionCard;
+    /** Выбор карты (приказ круга, отложенный приказ, задание) — крупными лицами. */
+    private final kelium.gui.kp.CardChoiceOverlay ceremony = new kelium.gui.kp.CardChoiceOverlay();
+    /** Для какого шага и места показана церемония; убранная щелчком не всплывает снова. */
+    private String ceremonyKey;
+    private String ceremonyDismissed;
     private final JLabel context = new JLabel();
     private final JLabel thought = new JLabel();
     private final JLabel status = new JLabel();
@@ -121,7 +119,8 @@ public final class Replay2Gui {
         // Тему можно задать запуском: -Dkelium.theme=light|dark. Нужно, чтобы
         // проверять оба вида, не трогая запомненную настройку.
         String forced = System.getProperty("kelium.theme", "");
-        Theme.apply(forced.isBlank() ? p.getBoolean("dark", true) : !"light".equals(forced));
+        // Тёмная тема — палитра «Стол», как окно партии (26.09.2026).
+        applyPalette(forced.isBlank() ? p.getBoolean("dark", true) : !"light".equals(forced));
         SwingUtilities.invokeLater(() -> {
             Replay2Gui gui = new Replay2Gui();
             gui.show();
@@ -152,17 +151,27 @@ public final class Replay2Gui {
         setup = new SetupPanel(session, this::say);
         setup.setOnPlay(this::startGame);
         setup.setOnPreview(this::preview);
+        // СТОЛ ИГРОКА, СОПЕРНИКИ, РЕШЕНИЯ — детали окна партии (26.09.2026)
+        replayTable = new ReplayTable(session);
+        decisionCard = new DecisionCard(session);
+        opponents = new kelium.gui.kp.OpponentStrip();
+        opponents.onSeat(s -> replayTable.setSeat(s));
+        replayTable.onSeat(s -> {
+            opponents.setShown(s);
+            refreshCeremony();
+        });
 
         frame.add(topBar(), BorderLayout.NORTH);
         frame.add(centre(), BorderLayout.CENTER);
         frame.add(bottom(), BorderLayout.SOUTH);
         frame.setJMenuBar(menuBar());
+        replayTable.install(frame.getLayeredPane());
 
-        // ПАНЕЛИ ПРИКАЗОВ ЛЕЖАТ ВНЕ РАСКЛАДКИ, поэтому про изменение размера
-        // окна им надо сообщать самим: раскладка Swing их не пересчитает.
+        // ЗОНА СТОЛА — ПО ВЫСОТЕ ОКНА, как в окне партии: наибольшая, при
+        // которой стол влезает в ширину без ползунка.
         frame.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override public void componentResized(java.awt.event.ComponentEvent e) {
-                layoutOrderPanels();
+                placeTableZone();
             }
         });
 
@@ -172,12 +181,18 @@ public final class Replay2Gui {
                 setDrawer(true);
             }
         });
-        session.whenFrameChanged(s -> refreshContext());
+        session.whenFrameChanged(s -> {
+            refreshContext();
+            refreshSeats();
+            refreshCeremony();
+        });
         session.whenRecordChanged(s -> {
-            rebuildStrips();
             drawer.refreshAll();
             refreshContext();
             refreshTitle();
+            refreshSeats();
+            SwingUtilities.invokeLater(this::placeTableZone);
+            SwingUtilities.invokeLater(this::matchPaletteToRecord);
         });
 
         bindKeys();
@@ -297,7 +312,7 @@ public final class Replay2Gui {
         // или итоги, «только поле» прямо врало (замечание дизайнера 14.08.2026).
         // Осталась «сцена» — то, что сейчас открыто, чем бы оно ни было.
         right.add(Ui2.textButton("только сцена",
-            "Убрать полосы игроков и ленту времени — останется только то, что "
+            "Убрать стол игрока и ленту времени — останется только то, что "
             + "открыто сейчас: поле, планшеты или итоги (F11).",
             () -> setFieldOnly(!fieldOnly)));
         bar.add(right);
@@ -322,7 +337,29 @@ public final class Replay2Gui {
         stageCards = new CardLayout();
         stage = new JPanel(stageCards);
         bgSurface(stage);
-        stage.add(field, "field");
+        // ПОЛЕ СО СЛОЯМИ: поверх — карточка решения и выбор карты крупными
+        // лицами, оба только над полем: лента времени и пульт остаются под рукой.
+        javax.swing.JLayeredPane fieldLayer = new javax.swing.JLayeredPane() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void doLayout() {
+                for (java.awt.Component c : getComponents()) {
+                    c.setBounds(0, 0, getWidth(), getHeight());
+                }
+            }
+        };
+        fieldLayer.add(field, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        fieldLayer.add(decisionCard, javax.swing.JLayeredPane.PALETTE_LAYER);
+        fieldLayer.add(ceremony, javax.swing.JLayeredPane.MODAL_LAYER);
+        // церемония разбора — уже решённая: щелчок куда угодно убирает её
+        ceremony.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                dismissCeremony();
+            }
+        });
+        stage.add(fieldLayer, "field");
         stage.add(scrolled(boards), "boards");
         stage.add(scrolled(decks), "decks");
         stage.add(scrolled(results), "results");
@@ -378,6 +415,9 @@ public final class Replay2Gui {
             stageButtons.put(s[0], b);
             p.add(b);
         }
+        // МЕСТА ЗА СТОЛОМ — строкой иконками (как соперники в окне партии):
+        // очки, монеты, келемий, боеприпасы, руки. Щелчок — стол этого места.
+        p.add(opponents, "gapx " + Theme.px(16) + ", pushx, growx, wmin 120");
         return p;
     }
 
@@ -426,47 +466,25 @@ public final class Replay2Gui {
         JPanel p = new JPanel(new BorderLayout());
         bgSurface(p);
 
-        stripsRow = new JPanel(new java.awt.GridLayout(1, 4, Theme.px(6), 0));
-        stripsRow.setOpaque(false);
-        stripsRow.setBorder(BorderFactory.createEmptyBorder(Theme.px(4), Theme.px(6),
-            Theme.px(4), Theme.px(6)));
-        for (int i = 0; i < 4; i++) {
-            strips[i] = new PlayerStrip(session, i);
-            strips[i].setOnTile(this::onTile);
-            strips[i].setOnOrders(this::toggleOrders);
-            stripsRow.add(strips[i]);
-        }
-        // ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА ВМЕСТО ОБРЕЗАНИЯ. У полосы игрока есть свой
-        // минимум ширины (PlayerStrip.getMinimumSize) — с ним текст не мельчает
-        // до нечитаемого. На узком окне ПРИ КРУПНОМ масштабе интерфейса (130 %
-        // и уже на обычном ноутбучном 1366×768) четыре полосы в GridLayout не
-        // помещались, и последняя просто обрывалась за краем окна без единого
-        // способа её увидеть — ни прокрутки, ни сжатия (найдено ревью читаемости
-        // 14.08.2026). GridLayout сам никогда не сжимается ниже суммы минимумов,
-        // поэтому лишнее теперь уезжает в прокрутку, а не пропадает.
-        stripsScroll = new JScrollPane(stripsRow,
-            JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        stripsScroll.setBorder(null);
-        stripsScroll.setOpaque(false);
-        stripsScroll.getViewport().setOpaque(false);
-        // ТОНКАЯ ПОЛОСА, КАК У ЛЕНТЫ НАСТРОЕК: конвейер полос — не орган
-        // управления, а способ дотянуться до полосы, которая не влезла.
-        Ui2.thinHorizontalBar(stripsScroll, 6);
-        // ОКНО ДОЛЖНО СЖИМАТЬСЯ УЖЕ ОДНОЙ ПОЛОСЫ (просьба дизайнера 15.08.2026).
-        // JScrollPane по умолчанию берёт минимум у своего содержимого, а у ряда
-        // из GridLayout минимум — это сумма минимумов всех полос. Из-за этого
-        // конвейер держал всё окно широким: прокрутка была, но воспользоваться
-        // ею было нельзя, окно просто не давало себя сузить до её появления.
-        // Свой минимум разрывает эту связь: ряд внутри остаётся какой есть и
-        // уезжает в прокрутку, а окно сжимается дальше.
-        // ПАНЕЛИ ЕЗДЯТ ЗА СВОЕЙ ПОЛОСОЙ. Полосы уезжают в горизонтальную
-        // прокрутку, а панели лежат в слоёной панели окна и о прокрутке сами
-        // не узнают — без этой подписки открытая панель осталась бы висеть на
-        // прежнем месте, над чужой полосой.
-        stripsScroll.getViewport().addChangeListener(e -> layoutOrderPanels());
-        stripsScroll.setMinimumSize(new Dimension(Theme.px(120),
-            Theme.px(Theme.H_STRIP_TIGHT) + Theme.px(14)));
-        p.add(stripsScroll, BorderLayout.NORTH);
+        // СТОЛ ИГРОКА — ВО ВСЮ ШИРИНУ ОКНА, как в окне партии; не влез в
+        // ширину — листается вбок. Высота — по окну (placeTableZone).
+        tableZone = new JPanel(new BorderLayout()) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(Theme.px(400), tableZoneHeight);
+            }
+
+            @Override
+            public Dimension getMinimumSize() {
+                return new Dimension(Theme.px(120), Theme.px(180));
+            }
+        };
+        tableZone.setOpaque(false);
+        tableZone.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.border()));
+        tableZone.add(replayTable.component(), BorderLayout.CENTER);
+        p.add(tableZone, BorderLayout.NORTH);
 
         JPanel deck = panelSurface(new JPanel(new BorderLayout()));
         deck.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.border()));
@@ -483,134 +501,145 @@ public final class Replay2Gui {
         return p;
     }
 
-    /** Щелчок по плитке показателя или по полосе игрока. */
     // ==================================================================
-    //  ПАНЕЛИ КАРТ ПРИКАЗОВ
+    //  СТОЛ ИГРОКА, МЕСТА, РЕШЕНИЯ
     // ==================================================================
 
-    /**
-     * Высота выезжающей панели.
-     *
-     * <p>ВЫШЕ, ЧЕМ ПОДЛОЖКА: карты законно выступают за её верхнюю кромку
-     * (просьба дизайнера 20.08.2026), а Swing обрезает рисование по границам
-     * компонента — без этого запаса выступающая часть просто обрубалась бы.
-     */
-    private static int orderPanelHeight() {
-        return Theme.px(196);
+    /** Высота зоны стола — по окну, как в окне партии. */
+    private void placeTableZone() {
+        if (tableZone == null || frame == null || frame.getContentPane().getHeight() <= 0) {
+            return;
+        }
+        int h = replayTable.fitHeight(frame.getContentPane().getHeight(),
+            frame.getContentPane().getWidth());
+        if (h != tableZoneHeight) {
+            tableZoneHeight = h;
+            tableZone.revalidate();
+        }
+    }
+
+    /** Строка мест: очки, ресурсы и руки каждого на этом шаге. */
+    private void refreshSeats() {
+        ReplayRecord rec = session.record();
+        ReplayRecord.Frame f = session.frame();
+        if (rec == null || f == null || f.snapshot == null) {
+            opponents.update(List.of());
+            return;
+        }
+        List<kelium.gui.kp.OpponentStrip.Row> rows = new ArrayList<>();
+        for (ReplayRecord.Player p : f.snapshot.players) {
+            rows.add(new kelium.gui.kp.OpponentStrip.Row(p.seat, ReplayTable.seatName(rec, p.seat),
+                false, ReplayTable.vpTotal(p), p.coin, p.kelium, p.ammo,
+                p.orderHand.size(), p.objectiveHand.size(), p.arsenalHand.size(),
+                p.destroyedValue, p.seat == f.snapshot.firstPlayer));
+        }
+        opponents.update(rows);
+        opponents.setShown(replayTable.seat());
     }
 
     /**
-     * Открыть или закрыть панель приказов игрока.
-     *
-     * <p>Открытых панелей может быть сколько угодно одновременно — дизайнер
-     * просил именно так, чтобы можно было сравнить руки двух игроков.
+     * ВЫБОР КАРТЫ НА ЭТОМ ШАГЕ — ТАК ЖЕ, КАК В ИГРЕ: приказ круга, отложенный
+     * приказ, задание, карта арсенала — крупными лицами по центру поля, с
+     * отметкой выбранной. Решение того места, чей стол открыт; нет — первого.
      */
-    private void toggleOrders(int seat) {
-        if (seat < 0 || seat >= orderPanels.length) {
-            return;
-        }
-        boolean opening = orderTarget[seat] < 0.5;
-        orderTarget[seat] = opening ? 1 : 0;
-        if (opening && orderPanels[seat] == null) {
-            OrderCardsPanel panel = new OrderCardsPanel(session, seat);
-            panel.setOpen(0);
-            // Анимация переездов карт — только когда разбор ИДЁТ. При шаге по
-            // кадрам руками движение мешает: шаг должен показывать состояние
-            // сразу (решение дизайнера 20.08.2026).
-            panel.setPlayingSource(transport::isPlaying);
-            orderPanels[seat] = panel;
-            // PALETTE_LAYER — выше поля, но НИЖЕ всплывающих подсказок и меню:
-            // панель не должна перекрывать собственную подсказку.
-            frame.getLayeredPane().add(panel, javax.swing.JLayeredPane.PALETTE_LAYER);
-        }
-        strips[seat].setOrdersOpen(opening);
-        layoutOrderPanels();
-        startOrderAnimation();
-    }
-
-    /**
-     * ПЛАВНЫЙ ВЫЕЗД. Один таймер на все панели: их может быть четыре, и четыре
-     * независимых таймера дёргали бы перерисовку вразнобой.
-     */
-    private void startOrderAnimation() {
-        if (orderAnim != null && orderAnim.isRunning()) {
-            return;
-        }
-        orderAnim = new javax.swing.Timer(16, e -> {
-            boolean moving = false;
-            for (int i = 0; i < orderPanels.length; i++) {
-                if (orderPanels[i] == null) {
+    private void refreshCeremony() {
+        ReplayRecord.Frame f = session.frame();
+        ReplayRecord.Decision d = null;
+        if (f != null) {
+            for (ReplayRecord.Decision x : f.decisions) {
+                boolean cards = x.options.size() > 1
+                    && x.options.stream().allMatch(o -> o.card != null);
+                if (!cards) {
                     continue;
                 }
-                double d = orderTarget[i] - orderOpen[i];
-                if (Math.abs(d) < 0.02) {
-                    orderOpen[i] = orderTarget[i];
-                } else {
-                    // Шаг ПРОПОРЦИОНАЛЕН остатку: движение начинается быстро и
-                    // мягко тормозит у края, как выезжает ящик.
-                    orderOpen[i] += d * 0.22;
-                    moving = true;
-                }
-                orderPanels[i].setOpen(orderOpen[i]);
-                // ЗАКРЫТУЮ ПАНЕЛЬ УБИРАЕМ ИЗ СЛОЯ. Оставленная невидимая панель
-                // продолжала бы ловить курсор и мешать щелчкам по полю.
-                if (orderOpen[i] <= 0.001 && orderTarget[i] == 0) {
-                    frame.getLayeredPane().remove(orderPanels[i]);
-                    orderPanels[i] = null;
-                    frame.getLayeredPane().repaint();
+                if (d == null || x.seat == replayTable.seat() && d.seat != replayTable.seat()) {
+                    d = x;
                 }
             }
-            layoutOrderPanels();
-            if (!moving) {
-                ((javax.swing.Timer) e.getSource()).stop();
+        }
+        String key = d == null ? null : session.cursor() + ":" + d.seat + ":" + d.kind;
+        if (d == null || key.equals(ceremonyDismissed)) {
+            if (ceremony.isVisible()) {
+                ceremony.close();
             }
-        });
-        orderAnim.start();
+            ceremonyKey = null;
+            return;
+        }
+        if (key.equals(ceremonyKey) && ceremony.isVisible()) {
+            return;
+        }
+        ceremonyKey = key;
+        ReplayRecord rec = session.record();
+        int seat = d.seat;
+        ceremony.setArt(id -> replayTable.faceFor(seat, id));
+        List<kelium.gui.kp.CardChoiceOverlay.Card> cards = new ArrayList<>();
+        for (ReplayRecord.DecisionOption o : d.options) {
+            cards.add(new kelium.gui.kp.CardChoiceOverlay.Card(o.card,
+                replayTable.orderFace(o.card), replayTable.cardName(o.card), null,
+                this::dismissCeremony));
+        }
+        String picked = d.picked >= 0 && d.picked < d.options.size()
+            ? replayTable.cardName(d.options.get(d.picked).card) : null;
+        ceremony.open(ReplayTable.seatName(rec, seat) + ": "
+                + DecisionCard.clean(d.title),
+            (picked == null ? "" : "Выбрано: «" + picked + "» · ")
+                + "щёлкните, чтобы убрать; стрелки — дальше по партии", cards);
+        ceremony.setPicked(d.picked);
+    }
+
+    private void dismissCeremony() {
+        ceremonyDismissed = ceremonyKey;
+        ceremony.close();
+    }
+
+    /** Место, в цвет которого окрашен стол: первый живой игрок, иначе первое. */
+    private static int ownSeat(ReplayRecord rec) {
+        int i = rec == null ? -1 : rec.seatIds.indexOf("human");
+        return Math.max(0, i);
     }
 
     /**
-     * Поставить каждую открытую панель НАД её полосой игрока.
-     *
-     * <p>Ширина берётся у полосы, а не задаётся своя: панель должна выглядеть
-     * продолжением полосы, а полосы сжимаются и разъезжаются вместе с окном.
-     * Место считается через {@code convertRectangle}, потому что полоса лежит
-     * внутри прокрутки, а панель — в слоёной панели окна: у них разные системы
-     * координат, и складывать их вручную значило бы повторять раскладку Swing.
+     * ОКНО ЦВЕТОМ ФРАКЦИИ, как окно партии: тёмная тема разбора — палитра
+     * «Стол» в цвете места живого игрока. Запись в других красках —
+     * окно пересобирается в её цвет (так же, как при смене масштаба).
      */
-    private void layoutOrderPanels() {
-        for (int i = 0; i < orderPanels.length; i++) {
-            OrderCardsPanel panel = orderPanels[i];
-            if (panel == null || strips[i] == null || !strips[i].isShowing()) {
-                continue;
-            }
-            java.awt.Rectangle r = javax.swing.SwingUtilities.convertRectangle(
-                strips[i].getParent(), strips[i].getBounds(), frame.getLayeredPane());
-            int h = orderPanelHeight();
-            panel.setBounds(r.x, r.y - h, r.width, h);
-        }
-        frame.getLayeredPane().repaint();
-    }
-
-    private void onTile(int seat, String metric) {
-        if (metric == null) {
-            drawer.showPlayer(seat);
-            setDrawer(true);
+    private void matchPaletteToRecord() {
+        ReplayRecord rec = session.record();
+        // расстановка до партии (один кадр) окно не перекрашивает — только сыгранная
+        if (rec == null || !session.playable() || !Theme.isDark() || frame == null
+                || !frame.isDisplayable()) {
             return;
         }
-        Chart.Metric m = switch (metric) {
-            case "kelium" -> Chart.Metric.KELIUM;
-            case "coin" -> Chart.Metric.COIN;
-            case "trophy" -> Chart.Metric.TROPHY;
-            case "vp" -> Chart.Metric.VP;
-            default -> null;
-        };
-        if (m == null) {
-            drawer.showPlayer(seat);
-        } else {
-            drawer.show(Drawer.View.CHART);
-            SwingUtilities.invokeLater(() -> drawer.repaint());
+        java.awt.Color want = Theme.seat(ownSeat(rec));
+        if (want.equals(tableColour)) {
+            return;
         }
-        setDrawer(true);
+        tableColour = want;
+        rebuildWindow(null);
+    }
+
+    /** Цвет фракции, в котором собрана палитра «Стол» (null — ещё не выбран). */
+    private static java.awt.Color tableColour;
+
+    /** Заранее выбрать палитру под запись — чтобы окно сразу собралось в её цвете. */
+    static void presetPalette(ReplayRecord rec) {
+        kelium.report.FieldGeometry.useSeatColors(rec == null ? null : rec.seatColors);
+        tableColour = Theme.seat(ownSeat(rec));
+    }
+
+    /** Тёмная тема — палитра «Стол» в цвете фракции; светлая — для картинок в правила. */
+    static void applyPalette(boolean dark) {
+        if (dark) {
+            Theme.applyTable(tableColour == null ? Theme.seat(0) : tableColour);
+        } else {
+            Theme.apply(false);
+        }
+    }
+
+    /** Открыть раскрытие группы карт стола места (для прогонщиков снимков). */
+    void openTableSpread(int seat, String group) {
+        replayTable.setSeat(seat);
+        replayTable.openSpread(group);
     }
 
     // ==================== меню ====================
@@ -797,7 +826,18 @@ public final class Replay2Gui {
         prefs.putInt("winW", (int) Math.round(frame.getWidth() * k));
         prefs.putInt("winH", (int) Math.round(frame.getHeight() * k));
 
-        Theme.apply(Theme.isDark());       // defaultFont и прочие токены считаны через px()
+        rebuildWindow("Масштаб интерфейса — " + Math.round(Theme.effectiveScale() * 100) + " %"
+            + (Theme.userScale() == 0 ? " (подобран под экран)." : "."));
+    }
+
+    /**
+     * СОБРАТЬ ОКНО ЗАНОВО с той же записью и на том же шаге — под новый
+     * масштаб или новую палитру (краска запечена в компоненты при сборке).
+     */
+    private void rebuildWindow(String note) {
+        ReplayRecord rec = session.record();
+        int cursor = session.cursor();
+        applyPalette(Theme.isDark());      // defaultFont и прочие токены считаны через px()
         HelpWindow.closeIfOpen();          // справочник собран в старом масштабе
         JFrame old = frame;
         Replay2Gui gui = new Replay2Gui();
@@ -807,10 +847,18 @@ public final class Replay2Gui {
             gui.loadRules(rec);
             gui.session.seek(cursor);
         }
+        if (note == null) {
+            gui.frame.setBounds(old.getBounds());     // новая палитра — окно на прежнем месте
+        }
         old.dispose();
-        gui.say("Масштаб интерфейса — " + Math.round(Theme.effectiveScale() * 100) + " %"
-            + (Theme.userScale() == 0 ? " (подобран под экран)." : "."));
+        if (note != null) {
+            gui.say(note);
+        }
+        rebuilt = gui;
     }
+
+    /** Последнее пересобранное окно — для прогонщиков снимков. */
+    static Replay2Gui rebuilt;
 
     /** Масштаб, при котором собрано ЭТО окно, — от него считается пересчёт размера. */
     private final double scaleOfWindow = Theme.effectiveScale();
@@ -938,7 +986,12 @@ public final class Replay2Gui {
         bind(root, "N", () -> session.jumpSameSeatTurn(+1));
         bind(root, "shift N", () -> session.jumpSameSeatTurn(-1));
         bind(root, "ESCAPE", () -> {
-            if (!"field".equals(currentCard)) {
+            if (ceremony.isVisible()) {
+                dismissCeremony();
+            } else if (replayTable.closePopups()) {
+                // сначала — всплывшее над окном: раскрытые карты, планшет крупно
+                return;
+            } else if (!"field".equals(currentCard)) {
                 showStage("field");
             } else {
                 setDrawer(false);
@@ -1013,7 +1066,7 @@ public final class Replay2Gui {
 
     private void setFieldOnly(boolean only) {
         fieldOnly = only;
-        stripsScroll.setVisible(!only);
+        tableZone.setVisible(!only);
         timeline.setVisible(!only);
         if (only) {
             setDrawer(false);
@@ -1025,8 +1078,8 @@ public final class Replay2Gui {
             setupButton.setText(setup.summary());
         }
         frame.getContentPane().revalidate();
-        say(only ? "Только сцена: полосы игроков и лента убраны. F11 — вернуть."
-                 : "Обычный вид: полосы игроков и лента на месте.");
+        say(only ? "Только сцена: стол игрока и лента убраны. F11 — вернуть."
+                 : "Обычный вид: стол игрока и лента на месте.");
     }
 
     /**
@@ -1048,11 +1101,12 @@ public final class Replay2Gui {
 
     private void setDarkTheme(boolean dark) {
         prefs.putBoolean("dark", dark);
-        Theme.apply(dark);
+        // Тёмная тема — палитра «Стол» в цвете фракции; перекраска запечённых
+        // цветов умеет только тёмную и светлую, поэтому окно собирается заново.
+        applyPalette(dark);
         com.formdev.flatlaf.FlatLaf.updateUI();
-        restyle();
-        frame.repaint();
-        say(dark ? "Тёмная тема." : "Светлая тема — в ней снимают картинки для правил.");
+        rebuildWindow(dark ? "Тёмная тема — цвета стола."
+            : "Светлая тема — в ней снимают картинки для правил.");
     }
 
     /** Наши подложки и рамки: цвет задаётся кодом, поэтому меняем его руками. */
@@ -1151,17 +1205,6 @@ public final class Replay2Gui {
         } else {
             drawerSplit.setDividerLocation(1.0);
         }
-    }
-
-    private void rebuildStrips() {
-        int players = session.record() == null ? 4 : session.record().players;
-        stripsRow.removeAll();
-        stripsRow.setLayout(new java.awt.GridLayout(1, players, Theme.px(6), 0));
-        for (int i = 0; i < players; i++) {
-            stripsRow.add(strips[i]);
-        }
-        stripsRow.revalidate();
-        stripsRow.repaint();
     }
 
     private void refreshContext() {

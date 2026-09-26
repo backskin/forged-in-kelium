@@ -233,8 +233,8 @@ public final class DecksPanel extends JPanel {
         модель.clear();
         List<String> ids = карты(выбранныйНабор, выбранСброс);
         for (int i = 0; i < ids.size(); i++) {
-            модель.addElement((i + 1) + ".  " + имяКарты(выбранныйНабор, ids.get(i))
-                + "   [" + ids.get(i) + "]");
+            // без служебного номера карты: на экране — только печатное имя
+            модель.addElement((i + 1) + ".  " + имяКарты(выбранныйНабор, ids.get(i)));
         }
         подпись.setText(имяНабора(выбранныйНабор) + (выбранСброс ? " · СБРОС" : " · КОЛОДА")
             + " — карт " + ids.size() + ", сверху вниз");
@@ -800,7 +800,7 @@ public final class DecksPanel extends JPanel {
                     Math.max(6, Math.min(w, h) / 28.0));
                 g.setFont(Theme.font(10, Font.PLAIN));
                 g.setColor(Theme.ink3());
-                String имя = имяКарты(выбранныйНабор, id) + "  ·  " + id;
+                String имя = имяКарты(выбранныйНабор, id);
                 g.drawString(обрезать(g, имя, getWidth() - поле * 2), x, y + h + 16);
                 g.dispose();
                 return;
@@ -1024,7 +1024,7 @@ public final class DecksPanel extends JPanel {
                 default -> "";
             };
         }
-        return набор + (вид.isEmpty() ? "" : ", " + вид) + "  ·  " + id;
+        return набор + (вид.isEmpty() ? "" : ", " + вид);
     }
 
     private static String строка(Object v, String иначе) {

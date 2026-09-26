@@ -75,12 +75,25 @@ public final class CardChoiceOverlay extends JComponent {
         addMouseMotionListener(m);
     }
 
+    /**
+     * ВЫБРАННАЯ КАРТА — для разбора партии: там церемонию показывают уже
+     * решённой, и выбранная карта отмечена, остальные пригашены. −1 — выбора
+     * ещё нет (живая партия).
+     */
+    private int picked = -1;
+
+    public void setPicked(int index) {
+        picked = index;
+        repaint();
+    }
+
     public void open(String title, String subtitle, List<Card> newCards) {
         this.title = title;
         this.subtitle = subtitle == null ? "" : subtitle;
         cards.clear();
         cards.addAll(newCards);
         hoverIdx = -1;
+        picked = -1;
         setVisible(true);
         anim.snap(0);
         anim.play(1, 180, v -> repaint(), null);
@@ -197,6 +210,8 @@ public final class CardChoiceOverlay extends JComponent {
         if (hoverIdx >= 0 && hoverIdx < cards.size()) {
             paintCard(g, hoverIdx, slide);
             paintDescription(g, cards.get(hoverIdx));
+        } else if (picked >= 0 && picked < cards.size()) {
+            paintDescription(g, cards.get(picked));
         }
         g.dispose();
     }
@@ -233,11 +248,28 @@ public final class CardChoiceOverlay extends JComponent {
                 ty += fm.getHeight();
             }
         }
-        if (i == hoverIdx) {
+        if (picked >= 0 && i != picked) {
+            g.setColor(new Color(0x10, 0x14, 0x1A, 120));
+            g.fillRoundRect(r.x, r.y, r.width, r.height, Theme.px(10), Theme.px(10));
+        }
+        if (i == hoverIdx || i == picked) {
             g.setColor(Theme.accent());
-            g.setStroke(new BasicStroke(Theme.pxf(2.4)));
+            g.setStroke(new BasicStroke(Theme.pxf(i == picked ? 4.0 : 2.4)));
             g.drawRoundRect(r.x - 1, r.y - 1, r.width + 2, r.height + 2,
                 Theme.px(11), Theme.px(11));
+        }
+        if (i == picked) {
+            String tag = "ВЫБРАНО";
+            g.setFont(Theme.font(13, Font.BOLD));
+            var fm = g.getFontMetrics();
+            int tw = fm.stringWidth(tag) + Theme.px(18);
+            int th = fm.getHeight() + Theme.px(6);
+            int tx = r.x + (r.width - tw) / 2;
+            int ty = r.y - th / 2;
+            g.setColor(Theme.accent());
+            g.fillRoundRect(tx, ty, tw, th, th, th);
+            g.setColor(new Color(0x10, 0x14, 0x1A));
+            g.drawString(tag, tx + Theme.px(9), ty + Theme.px(3) + fm.getAscent());
         }
     }
 

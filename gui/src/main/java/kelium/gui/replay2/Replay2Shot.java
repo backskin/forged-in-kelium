@@ -30,7 +30,14 @@ public final class Replay2Shot {
 
         kelium.dataio.Locations.applyDataFolder();
         Theme.setUserScale(scale);
-        Theme.apply(dark);
+        // запись читаем заранее: окно сразу собирается в цвете её стола
+        String replayFile = System.getProperty("shot.replay");
+        kelium.report.ReplayRecord preRec = replayFile == null ? null
+            : kelium.report.ReplayRecord.load(java.nio.file.Path.of(replayFile));
+        if (preRec != null) {
+            Replay2Gui.presetPalette(preRec);
+        }
+        Replay2Gui.applyPalette(dark);
 
         Replay2Gui gui = new Replay2Gui();
         Method show = Replay2Gui.class.getDeclaredMethod("show");
@@ -58,10 +65,8 @@ public final class Replay2Shot {
         // -Dshot.frame=<шаг> (по умолчанию середина), -Dshot.drawer=<место>
         // (ящик «Игрок»), -Dshot.orders=<место> (панель приказов),
         // -Dshot.zoom=<id карты> (рядом снимок увеличения: <файл>-zoom.png).
-        String replay = System.getProperty("shot.replay");
-        if (replay != null) {
-            kelium.report.ReplayRecord rec = kelium.report.ReplayRecord.load(
-                java.nio.file.Path.of(replay));
+        if (preRec != null) {
+            kelium.report.ReplayRecord rec = preRec;
             var sf = Replay2Gui.class.getDeclaredField("session");
             sf.setAccessible(true);
             Session session = (Session) sf.get(gui);
@@ -101,17 +106,14 @@ public final class Replay2Shot {
                     }
                 });
             }
+            // -Dshot.orders=<место> — раскрыть приказы в руке этого места;
+            // -Dshot.spread=<место>:<группа> — любую группу карт стола
             String ord = System.getProperty("shot.orders");
-            if (ord != null) {
-                Method tog = Replay2Gui.class.getDeclaredMethod("toggleOrders", int.class);
-                tog.setAccessible(true);
-                SwingUtilities.invokeAndWait(() -> {
-                    try {
-                        tog.invoke(gui, Integer.parseInt(ord));
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+            String spreadProp = System.getProperty("shot.spread");
+            if (ord != null || spreadProp != null) {
+                String[] sp = spreadProp != null ? spreadProp.split(":") : new String[]{ord, "orders"};
+                SwingUtilities.invokeAndWait(() ->
+                    gui.openTableSpread(Integer.parseInt(sp[0]), sp[1]));
             }
             Thread.sleep(900);
             // -Dshot.reader=<место>: читалка заданий этого места (<файл>-reader.png)
@@ -197,28 +199,11 @@ public final class Replay2Shot {
         Thread.sleep(400);
 
         if (args.length > 6 && "debug".equals(args[6])) {
-            var srf = Replay2Gui.class.getDeclaredField("stripsRow");
-            srf.setAccessible(true);
-            var ssf = Replay2Gui.class.getDeclaredField("stripsScroll");
-            ssf.setAccessible(true);
-            javax.swing.JPanel stripsRow = (javax.swing.JPanel) srf.get(gui);
-            javax.swing.JScrollPane stripsScroll = (javax.swing.JScrollPane) ssf.get(gui);
-            System.out.println("stripsRow.getSize()=" + stripsRow.getSize());
-            System.out.println("stripsRow.getPreferredSize()=" + stripsRow.getPreferredSize());
-            System.out.println("stripsScroll.getSize()=" + stripsScroll.getSize());
-            System.out.println("stripsScroll.getViewport().getExtentSize()="
-                + stripsScroll.getViewport().getExtentSize());
-            System.out.println("stripsScroll.getViewport().getViewSize()="
-                + stripsScroll.getViewport().getViewSize());
-            System.out.println("hScrollBar.isVisible()="
-                + stripsScroll.getHorizontalScrollBar().isVisible());
-            System.out.println("hScrollBar.getVisibleAmount()/Max="
-                + stripsScroll.getHorizontalScrollBar().getVisibleAmount() + "/"
-                + stripsScroll.getHorizontalScrollBar().getMaximum());
-            for (java.awt.Component c : stripsRow.getComponents()) {
-                System.out.println("  strip: pref=" + c.getPreferredSize()
-                    + " min=" + c.getMinimumSize() + " actual=" + c.getSize());
-            }
+            var tzf = Replay2Gui.class.getDeclaredField("tableZone");
+            tzf.setAccessible(true);
+            java.awt.Component zone = (java.awt.Component) tzf.get(gui);
+            System.out.println("tableZone.getSize()=" + zone.getSize()
+                + " pref=" + zone.getPreferredSize());
             System.out.println("frame.getSize()=" + frame.getSize());
             System.out.println("frame.getMinimumSize()=" + frame.getMinimumSize());
             System.out.println("frame.getPreferredSize()=" + frame.getPreferredSize());

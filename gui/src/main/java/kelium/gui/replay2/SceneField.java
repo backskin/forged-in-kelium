@@ -67,7 +67,9 @@ public final class SceneField extends JComponent {
         DAMAGE("кубики урона", true),
         ENERGY("ячейки и кубики энергии", true),
         KELIUM("остаток келемия на тайлах", true),
-        OWNERSHIP("подкраску владения", true),
+        // Подкраска владения выключена, как в окне партии: там зона видна
+        // только в миг Стройки (26.09.2026). Включается в «Слоях поля».
+        OWNERSHIP("подкраску владения", false),
         BUILD_ZONES("зоны стройки", false),
         TRAILS("шлейфы движения за раунд", false),
         HEATMAP("тепловую карту боёв", false),
@@ -388,8 +390,16 @@ public final class SceneField extends JComponent {
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
-        g.setColor(Theme.bg());
-        g.fillRect(0, 0, getWidth(), getHeight());
+        // СУКНО СТОЛА — КАК В ОКНЕ ПАРТИИ (26.09.2026: «подтяни графику реплея
+        // до цифровой версии»). Светлая тема — для картинок в правила — остаётся
+        // на бумаге.
+        boolean table = Theme.isDark();
+        if (table) {
+            kelium.gui.FieldView.paintTableBackdrop(g, getWidth(), getHeight());
+        } else {
+            g.setColor(Theme.bg());
+            g.fillRect(0, 0, getWidth(), getHeight());
+        }
 
         ReplayRecord.Frame f = session.frame();
         if (f == null || f.snapshot == null) {
@@ -400,15 +410,15 @@ public final class SceneField extends JComponent {
         if (fitPending) {
             fitToWindow();
         }
-        // ПОДЛОЖКА-«БУМАГА» ровно под полем, а не на весь экран: авторские цвета
-        // жетонов рисовались для белой бумаги, и показывать их надо в том же
-        // окружении — но тёмная рама вокруг должна остаться, иначе поле сливается
-        // с интерфейсом и перестаёт быть главным объектом.
-        paintPaper(g);
+        if (!table) {
+            // ПОДЛОЖКА-«БУМАГА» ровно под полем: авторские цвета жетонов
+            // рисовались для белой бумаги.
+            paintPaper(g);
+        }
 
-        // ПОЛЕ ЗНАЕТ ПРО ТЕМУ: на тёмной теме гексы темнеют, а жетоны и тайлы
-        // наоборот светлеют — см. FieldPainter.dark (просьба дизайнера 13.08.2026).
-        kelium.report.FieldPainter.dark = Theme.isDark();
+        // ПЕЧАТНЫЕ КРАСКИ, КАК В ОКНЕ ПАРТИИ: поле — картон с печатью, и жетоны
+        // на нём того же цвета, что за столом, при любой теме окна.
+        kelium.report.FieldPainter.dark = false;
         Graphics2D gf = (Graphics2D) g.create();
         kelium.report.Сглаживание.включить(gf);
         gf.transform(вид());
@@ -436,13 +446,70 @@ public final class SceneField extends JComponent {
         if (!cheapMode) {
             paintMarkup(gm, f);
         }
+        paintDecisionHexes(gm, f);
         paintSelection(gm);
         gm.dispose();
 
-        if (showTitle && !cheapMode) {
+        // ИТОГИ ПАРТИИ — на последнем шаге доигранной партии, как в окне партии
+        ReplayRecord rec = session.record();
+        boolean over = rec != null && rec.winner != null && rec.frames.size() > 1
+            && session.cursor() >= rec.frames.size() - 1;
+        if (over) {
+            Graphics2D gp = (Graphics2D) g.create();
+            kelium.report.Сглаживание.включить(gp);
+            kelium.gui.FieldView.paintPodium(gp, getWidth(), getHeight(),
+                Theme.font(12, java.awt.Font.PLAIN), rec, f, table);
+            gp.dispose();
+        } else if (showTitle && !cheapMode) {
             paintTitleCard(g, f);
         }
         g.dispose();
+    }
+
+    /**
+     * ГЕКСЫ РЕШЕНИЯ: из чего выбирали — пунктиром цветом места, выбранный —
+     * сплошной обводкой с заливкой (как подсветка вариантов в окне партии).
+     */
+    private void paintDecisionHexes(Graphics2D g, ReplayRecord.Frame f) {
+        ReplayRecord.Decision d = null;
+        for (int i = f.decisions.size() - 1; i >= 0 && d == null; i--) {
+            for (ReplayRecord.DecisionOption o : f.decisions.get(i).options) {
+                if (o.hex != null) {
+                    d = f.decisions.get(i);
+                    break;
+                }
+            }
+        }
+        if (d == null) {
+            return;
+        }
+        Color c = Theme.seat(d.seat);
+        String picked = d.picked >= 0 && d.picked < d.options.size()
+            ? d.options.get(d.picked).hex : null;
+        Set<String> seen = new HashSet<>();
+        g.setStroke(new BasicStroke((float) (2.2 / Math.max(0.2, zoom)) * (float) Theme.pxf(1),
+            BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f,
+            new float[]{(float) (7 / Math.max(0.2, zoom)), (float) (5 / Math.max(0.2, zoom))}, 0));
+        for (ReplayRecord.DecisionOption o : d.options) {
+            if (o.hex == null || o.hex.equals(picked) || !seen.add(o.hex)) {
+                continue;
+            }
+            double[] cc = centre(o.hex);
+            if (cc != null) {
+                g.setColor(Theme.alpha(c, 0.85));
+                g.draw(hexPath(cc[0], cc[1], BASE * 0.9));
+            }
+        }
+        if (picked != null) {
+            double[] cc = centre(picked);
+            if (cc != null) {
+                g.setColor(Theme.alpha(c, 0.22));
+                g.fill(hexPath(cc[0], cc[1], BASE * 0.95));
+                g.setColor(c);
+                g.setStroke(pen(3.4));
+                g.draw(hexPath(cc[0], cc[1], BASE * 0.95));
+            }
+        }
     }
 
     /** «Бумага» под полем: скруглённая плашка по границам гексов, с мягкой тенью. */
