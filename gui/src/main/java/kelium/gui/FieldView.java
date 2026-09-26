@@ -166,7 +166,8 @@ public final class FieldView extends JComponent {
         java.awt.RadialGradientPaint p = new java.awt.RadialGradientPaint(
             new java.awt.geom.Point2D.Double(w / 2.0, h * 0.48),
             (float) Math.max(w, h) * 0.75f, new float[]{0f, 0.55f, 1f},
-            new Color[]{new Color(0x3C6A7C), new Color(0x1F3F4E), new Color(0x0C1A22)});
+            new Color[]{kelium.gui.replay2.Theme.divider(), kelium.gui.replay2.Theme.paper(),
+                    kelium.gui.replay2.Theme.darken(kelium.gui.replay2.Theme.bg(), 0.2)});
         g.setPaint(p);
         g.fillRect(0, 0, w, h);
         // сетка стола: редкие гексы-водяные знаки
@@ -1425,12 +1426,20 @@ public final class FieldView extends JComponent {
                 g.draw(path);
                 continue;
             }
-            if (hovered) {
-                g.setColor(withAlpha(accent, 90));
-                g.fill(path);
+            // МЯГКОЕ СВЕЧЕНИЕ ПО ФОРМЕ ГЕКСА (ревью 26.09.2026): тонкий пунктир на
+            // светлом поле не читался. Ореол расходится наружу в прозрачность,
+            // по краю — сплошная кромка, внутри лёгкая заливка.
+            java.awt.Shape clipWas = g.getClip();
+            for (int k = 5; k >= 1; k--) {
+                g.setColor(withAlpha(accent, (int) ((hovered ? 70 : 48) * (1 - (k - 1) / 5.0))));
+                g.setStroke(pen((hovered ? 14 : 10) * k / 5.0 + 2));
+                g.draw(path);
             }
-            g.setColor(withAlpha(accent, hovered ? 255 : 190));
-            g.setStroke(hovered ? pen(3.0) : penDashed(2.2, 5, 4));
+            g.setClip(clipWas);
+            g.setColor(withAlpha(accent, hovered ? 95 : 42));
+            g.fill(path);
+            g.setColor(withAlpha(accent, 255));
+            g.setStroke(pen(hovered ? 3.6 : 2.6));
             g.draw(path);
         }
     }

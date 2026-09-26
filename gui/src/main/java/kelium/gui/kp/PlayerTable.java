@@ -177,14 +177,29 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
                     hoverGroup = group;
                     repaint = true;
                 }
+                // УВЕЛИЧЕНИЕ И У ЛЕЖАЩИХ НА СТОЛЕ КАРТ (ревью 26.09.2026): вскрытый
+                // приказ, установленный арсенал — по наведению крупно, как карты руки
+                String zoomId = card;
+                Rectangle zoomRect = card == null ? null : fanRect(card);
+                if (zoomId == null && !overBubble) {
+                    for (var z : zoomCards.entrySet()) {
+                        if (z.getKey().contains(p)) {
+                            zoomId = z.getValue();
+                            zoomRect = z.getKey();
+                        }
+                    }
+                }
+                if (!java.util.Objects.equals(zoomId, hoverZoom)) {
+                    hoverZoom = zoomId;
+                    if (zoomId == null) {
+                        onHoverOff.run();
+                    } else {
+                        onHoverCard.accept(zoomId, zoomRect);
+                    }
+                }
                 if (!java.util.Objects.equals(card, hoverCard)) {
                     hoverCard = card;
                     repaint = true;
-                    if (card == null) {
-                        onHoverOff.run();
-                    } else {
-                        onHoverCard.accept(card, fanRect(card));
-                    }
                 }
                 boolean onTab = tabRects.keySet().stream().anyMatch(r -> r.contains(p));
                 boolean hand = bubbles.hovering() || group != null || onTab
@@ -202,6 +217,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             public void mouseExited(MouseEvent e) {
                 hoverKey = null;
                 hoverGroup = null;
+                hoverZoom = null;
                 if (hoverCard != null) {
                     hoverCard = null;
                     onHoverOff.run();
@@ -470,6 +486,10 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         return hit;
     }
 
+    /** Карты на столе, которые увеличиваются по наведению: место → id. */
+    private final Map<Rectangle, String> zoomCards = new LinkedHashMap<>();
+    private String hoverZoom;
+
     private String fanCardAt(Point p) {
         for (int i = fanCards.size() - 1; i >= 0; i--) {
             if (((Shape) fanCards.get(i)[1]).contains(p)) {
@@ -534,6 +554,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         spots.clear();
         outlines.clear();
         fanCards.clear();
+        zoomCards.clear();
         groups.clear();
         paintMat(g, w, h);
         if (state == null) {
@@ -543,13 +564,18 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             g.dispose();
             return;
         }
-        int pad = Theme.px(12);
-        int top = pad + Theme.px(4);
-        int tabsH = paintSeatTabs(g, w);
-        int resH = paintResources(g, pad + Theme.px(8), Theme.px(8));
-        top += Math.max(tabsH, resH);
+        // ПЛАНШЕТЫ — НА ВСЮ ВЫСОТУ ЗОНЫ, ресурсы и вкладки мест — полосой над
+        // картами слева и справа (ревью 26.09.2026: строка ресурсов отнимала
+        // высоту у всего стола, а над руками место свободно).
+        int pad = Theme.px(10);
+        int band = bandH();
+        int boardsTop = pad;
+        int boardsH = h - 2 * pad;
+        int top = pad + band;
         int innerH = h - top - pad;
         Layout L = layout(w, h, top, innerH);
+        paintResources(g, Math.max(pad, L.leftX()), pad);
+        paintSeatTabs(g, w);
 
         // ---- СЛЕВА: руки стопками и свалка
         int sx0 = L.leftX();
@@ -569,7 +595,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             int bw = L.bw();
             int x = L.boardsX();
             int bh = (int) Math.round(bw / boards.aspect());
-            int by = top;
+            int by = boardsTop;
             int cardsBottom = by + (int) Math.round(bh * (1 + Math.max(0, boards.hang())));
             double[] sb = boards.storageBox();
             int stx = x + (int) (sb[0] * bw);
@@ -583,6 +609,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             for (String k : hits.keySet()) {
                 if (k.startsWith("installed:")) {
                     groups.put("installed", hits.get(k));
+                    zoomCards.put(hits.get(k), k.substring("installed:".length()));
                 }
             }
         }
@@ -695,8 +722,14 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         if (pw <= 0 || boards.aspect() <= 0) {
             return innerH / 1300.0;
         }
+        // планшеты занимают всю высоту зоны (с полосой ресурсов над картами)
         double pairH = pw / boards.aspect() * (1 + Math.max(0, boards.hang()));
-        return Math.min(innerH / pairH, (innerH - capH()) / (double) CARD_H);
+        return Math.min((innerH + bandH()) / pairH, (innerH - capH()) / (double) CARD_H);
+    }
+
+    /** Полоса над картами: ресурсы слева, вкладки мест справа. */
+    private static int bandH() {
+        return Theme.px(40);
     }
 
     /** Карта приказа и задания в печати: 661×1028 (56×87 мм). */
@@ -711,8 +744,12 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         int cardH = (int) Math.round(CARD_H * sc);
         int stackH = cardH + capH();
         int left = 0;
-        for (Object[] hd : handGroups()) {
-            left += stackWidth(((List<?>) hd[2]).size(), stackH) + gap;
+        // МЕСТО ПОД РУКИ — ПОСТОЯННОЕ (ревью 26.09.2026): планшеты не ездят,
+        // когда в руке прибавилась карта; стопка до трёх карт в запасе
+        int[] counts = state == null ? new int[]{0, 0, 0} : new int[]{
+            state.objectives().size(), state.superObjectives().size(), state.ordersInHand().size()};
+        for (int c : counts) {
+            left += stackWidth(Math.max(3, c), stackH) + gap;
         }
         // свалка — та же карта приказа, лёжа
         int dumpW = cardH;
@@ -724,7 +761,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
                 : (int) Math.round(innerH / (1 + Math.max(0, boards.hang())) * boards.aspect());
         }
         int orderW = cardW;
-        int endW = Theme.px(150);
+        int endW = Theme.px(132);
         int right = orderW + Theme.px(10) + endW;
         int minW = pad + left + gap + bw + gap + right + pad;
         // планшеты по центру окна, пока соседям хватает места
@@ -740,8 +777,8 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
 
     /** Сколько ширины нужно зоне при высоте {@code h} (для ползунка прокрутки). */
     public int contentWidth(int h) {
-        int pad = Theme.px(12);
-        int top = pad + Theme.px(4) + Theme.px(30);
+        int pad = Theme.px(10);
+        int top = pad + bandH();
         return layout(0, h, top, Math.max(Theme.px(80), h - top - pad)).width();
     }
 
@@ -799,7 +836,18 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
      */
     private int paintSeatTabs(Graphics2D g, int w) {
         tabRects.clear();
-        if (seatTabs.size() < 2 || state == null) {
+        // ВКЛАДОК БОЛЬШЕ НЕТ: чужой стол открывается щелчком по чипу соперника
+        // в верхней строке (ревью 26.09.2026 — вкладки наезжали на планшеты).
+        // Здесь — только пометка, что стол чужой.
+        if (state == null || !state.hidden()) {
+            return 0;
+        }
+        if (true) {
+            g.setFont(Theme.font(14, Font.BOLD));
+            g.setColor(Theme.seatInk(state.seat()));
+            String s = "Стол: " + state.seatName() + " — видно только открытое";
+            FontMetrics fm0 = g.getFontMetrics();
+            g.drawString(s, w - fm0.stringWidth(s) - Theme.px(14), Theme.px(8) + fm0.getAscent());
             return 0;
         }
         int th = Theme.px(24);
@@ -837,8 +885,9 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
     }
 
     /** Подписи на коврике: светлые, коврик тёмный. */
-    private static final Color MAT_INK = new Color(0xDCEAF0);
-    private static final Color MAT_INK2 = new Color(0x9FBCC9);
+    // подписи на коврике — токены палитры стола (цвет фракции, 26.09.2026)
+    private static Color MAT_INK = Theme.ink();
+    private static Color MAT_INK2 = Theme.ink2();
 
     /**
      * КОВРИК ЗОНЫ ИГРОКА — тёмно-бирюзовое сукно стола (просьба дизайнера
@@ -848,7 +897,9 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
      */
     private void paintMat(Graphics2D g, int w, int h) {
         Color seat = state == null ? new Color(0x3B82D0) : Theme.seat(state.seat());
-        g.setPaint(new GradientPaint(0, 0, new Color(0x21414F), 0, h, new Color(0x0D1B23)));
+        MAT_INK = Theme.ink();
+        MAT_INK2 = Theme.ink2();
+        g.setPaint(new GradientPaint(0, 0, Theme.hover(), 0, h, Theme.darken(Theme.bg(), 0.25)));
         g.fillRect(0, 0, w, h);
         // лёгкий отсвет цвета места из левого верхнего угла
         java.awt.RadialGradientPaint glow = new java.awt.RadialGradientPaint(
@@ -1020,6 +1071,9 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
 
     private void paintOrder(Graphics2D g, int x, int y, int w, int h) {
         RoundRectangle2D shape = new RoundRectangle2D.Double(x, y, w, h, w * 0.08, w * 0.08);
+        if (state.orderId() != null) {
+            zoomCards.put(new Rectangle(x, y, w, h), state.orderId());
+        }
         if (state.orderId() == null) {
             g.setColor(Theme.alpha(MAT_INK2, 0.7));
             g.setStroke(new BasicStroke(Theme.pxf(1.5), BasicStroke.CAP_ROUND,
@@ -1185,7 +1239,8 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         }
         boolean can = choices.containsKey("end");
         boolean hot = can && "end".equals(hoverKey);
-        int eh = Math.min(h, Theme.px(118));
+        // компактная плашка: главный путь — кружок на полосе действий
+        int eh = Math.min(h, Theme.px(84));
         int ey = y + h - eh;
         RoundRectangle2D r = new RoundRectangle2D.Double(x, ey, w, eh, Theme.px(14), Theme.px(14));
         if (can) {

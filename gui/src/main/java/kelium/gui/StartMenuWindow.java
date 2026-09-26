@@ -199,7 +199,9 @@ public final class StartMenuWindow {
     void start() {
         // ОДИН СТИЛЬ С ОКНОМ ПАРТИИ (сдача под ключ 25.09.2026): «Штаб» в той
         // же тёмной палитре стола, что и партия, а не светлый «вордовский».
-        Theme.applyTable();
+        // «ШТАБ» — СЕРЫЙ МЕТАЛЛ (26.09.2026): цвет появится, когда игрок выберет
+        // место и сядет за стол
+        Theme.applyTable(null);
         frame = new JFrame("Кристаллы Раздора — Штаб");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new BorderLayout());

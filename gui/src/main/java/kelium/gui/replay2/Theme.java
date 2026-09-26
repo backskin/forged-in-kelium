@@ -307,7 +307,7 @@ public final class Theme {
      * глубокая бирюза, текст — светлый, акцент — яркая бирюза. Печатные
      * компоненты светлые и на ней горят.
      */
-    private static final Color[] TABLE = {
+    private static Color[] TABLE = {
         new Color(0x0E2029),   // 0 фон приложения
         new Color(0x14303C),   // 1 панели
         new Color(0x1B3C4A),   // 2 плитки
@@ -322,6 +322,43 @@ public final class Theme {
     };
 
     private static boolean table;
+
+    /**
+     * ПАЛИТРА СТОЛА ОТ ЦВЕТА ФРАКЦИИ (просьба дизайнера 26.09.2026: «главное
+     * меню серо-металлическое, а когда игрок выбрал фракцию и нажал „Играть“,
+     * окно игры окрашивается: акцент всех эффектов — цвет фракции»).
+     *
+     * <p>Поверхности — глубокие тона того же оттенка, что цвет фракции, но
+     * приглушённые, чтобы печатные компоненты горели на них; текст — светлый
+     * с лёгким оттенком; акцент — яркий цвет фракции. {@code null} — серый
+     * металл без оттенка (меню до выбора).
+     */
+    public static void applyTable(Color faction) {
+        float[] hsb = faction == null ? new float[]{0.55f, 0f, 1f}
+            : Color.RGBtoHSB(faction.getRed(), faction.getGreen(), faction.getBlue(), null);
+        float hue = hsb[0];
+        // серый металл — почти без насыщенности; фракция — умеренно
+        float sat = faction == null ? 0.07f : Math.min(0.62f, Math.max(0.35f, hsb[1] * 0.75f));
+        TABLE = new Color[]{
+            hsb(hue, sat, 0.13f),          // 0 фон
+            hsb(hue, sat, 0.19f),          // 1 панели
+            hsb(hue, sat * 0.95f, 0.24f),  // 2 плитки
+            hsb(hue, sat * 0.95f, 0.31f),  // 3 наведение
+            hsb(hue, sat * 0.8f, 0.36f),   // 4 границы
+            hsb(hue, sat * 0.7f, 0.46f),   // 5 разделители
+            hsb(hue, 0.04f, 0.97f),        // 6 текст главный
+            hsb(hue, 0.12f, 0.85f),        // 7 текст второй
+            hsb(hue, 0.16f, 0.68f),        // 8 текст тихий
+            hsb(hue, sat, 0.26f),          // 9 подложка поля
+            faction == null ? new Color(0xB9C4CC)
+                : hsb(hue, Math.max(0.55f, hsb[1]), Math.max(0.86f, hsb[2])),  // 10 акцент
+        };
+        applyTable();
+    }
+
+    private static Color hsb(float h, float s, float b) {
+        return Color.getHSBColor(h, Math.max(0f, Math.min(1f, s)), Math.max(0f, Math.min(1f, b)));
+    }
 
     /** Включить палитру «Стол» (тёмная тема в тонах сукна). */
     public static void applyTable() {

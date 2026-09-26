@@ -295,8 +295,14 @@ public final class HotSeatWindow {
     // ==================== сборка окна ====================
 
     private void buildUi() {
-        // Светлая тема — просьба дизайнера 24.08.2026 («работай пока со светлой»).
-        Theme.applyTable();
+        // ОКНО ПАРТИИ — В ЦВЕТЕ ФРАКЦИИ ИГРОКА (26.09.2026): поверхности и
+        // акценты — оттенок цвета своего места; живых несколько — первого.
+        kelium.report.FieldGeometry.useSeatColors(options.seatColors());
+        int own = meSeat(seatSpecs);
+        if (own < 0) {
+            own = Math.max(0, seatSpecs.indexOf("human"));
+        }
+        Theme.applyTable(Theme.seat(own));
         frame = new JFrame("Кристаллы Раздора — Командный пункт");
         // Закрытие окна НЕ гасит программу: партию всегда можно закрыть и
         // вернуться в меню, а гасит программу уже само меню.
@@ -332,7 +338,7 @@ public final class HotSeatWindow {
             javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         tableScroll.setBorder(null);
         tableScroll.getHorizontalScrollBar().setUnitIncrement(Theme.px(40));
-        tableScroll.getViewport().setBackground(new Color(0x0E2029));
+        tableScroll.getViewport().setBackground(Theme.bg());
         javax.swing.JSplitPane split = new javax.swing.JSplitPane(
             javax.swing.JSplitPane.VERTICAL_SPLIT, upper, tableScroll);
         split.setResizeWeight(1.0);
@@ -464,6 +470,15 @@ public final class HotSeatWindow {
             // и поле становилось марочным. Зона — 40% высоты, от 230 до 340.
             int h = tableSplit.getHeight();
             int zone = Math.max(Theme.px(230), Math.min(Theme.px(340), (int) (h * 0.40)));
+            // СТОЛ ЦЕЛИКОМ ВЛЕЗАЕТ В ШИРИНУ ОКНА (ревью 26.09.2026): высота зоны
+            // по умолчанию — наибольшая, при которой ползунок не нужен.
+            // Растянуть зону выше можно руками, тогда и появится ползунок.
+            int wide = tableSplit.getWidth();
+            if (table != null && wide > 0) {
+                while (zone > Theme.px(200) && table.contentWidth(zone) > wide) {
+                    zone -= Theme.px(6);
+                }
+            }
             tableSplit.setDividerLocation(Math.max(Theme.px(200), h - zone));
         }
     }
@@ -726,7 +741,8 @@ public final class HotSeatWindow {
         if (inTable == null) {
             return;
         }
-        java.awt.image.BufferedImage img = cardFace(id);
+        // лицо любой карты стола — и приказа, и арсенала, и задания
+        java.awt.image.BufferedImage img = anyFace(id);
         String note = null;
         if (img != null) {
             zoom.showFace(img, note);
@@ -808,6 +824,9 @@ public final class HotSeatWindow {
     /** Пересесть взглядом за стол места {@code seat}. */
     private void lookAtSeat(int seat) {
         tableSeat = seat == viewedSeat ? null : seat;
+        if (opponents != null) {
+            opponents.setShown(tableSeat == null ? -1 : tableSeat);
+        }
         if (spread != null && spread.isOpen()) {
             spread.close();
         }
@@ -920,7 +939,7 @@ public final class HotSeatWindow {
     }
 
     /** Фон верхней полосы — глубокий цвет стола. */
-    private static final Color BAR_BG = new Color(0x15303C);
+    private static Color BAR_BG = Theme.panel();
 
     /** Цвет места, читаемый на тёмной полосе: светлее самого цвета. */
     private static Color barInk(int seat) {
@@ -930,14 +949,14 @@ public final class HotSeatWindow {
     private JComponent buildTopBar() {
         JPanel bar = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets " + Theme.px(8) + " " + Theme.px(12) + " " + Theme.px(8) + " " + Theme.px(12)
-                + ", gapx " + Theme.px(12), "[][shrinkprio 200, shrink 200]push[][][][][]"));
+                + ", gapx " + Theme.px(12), "[][shrinkprio 200, shrink 200][grow, fill][][][][][]"));
         // ВЕРХНЯЯ ПОЛОСА — ГЛУБОКИМ ЦВЕТОМ СТОЛА (25.09.2026: «не серо-белое»).
         bar.setBackground(BAR_BG);
-        bar.setBorder(BorderFactory.createMatteBorder(0, 0, Theme.px(2), 0, new Color(0x3C6A7C)));
+        bar.setBorder(BorderFactory.createMatteBorder(0, 0, Theme.px(2), 0, Theme.divider()));
 
         roundLabel = new JLabel("Подготовка…");
         roundLabel.setFont(Theme.font(15, Font.PLAIN));
-        roundLabel.setForeground(new Color(0xA9C6D2));
+        roundLabel.setForeground(Theme.ink2());
         bar.add(roundLabel);
 
         // ЗАГОЛОВОК ХОДА НЕ ШИРЕ СВОБОДНОГО МЕСТА: длинное «какую карту
@@ -992,6 +1011,11 @@ public final class HotSeatWindow {
         bar.add(turnLabel, "width 80:pref:pref, shrinkprio 200");
         // РЕСУРСЫ — НЕ ЗДЕСЬ, А НА СТОЛЕ ИГРОКА (26.09.2026): верхняя полоса —
         // чей ход и кнопки; счёт своего стола — рядом со своими компонентами.
+        // СОПЕРНИКИ — В ЭТОЙ ЖЕ СТРОКЕ, а не отдельной полосой (ревью
+        // 26.09.2026): поле получает высоту, которую съедала вторая полоса.
+        opponents = new kelium.gui.kp.OpponentStrip();
+        opponents.onSeat(s -> lookAtSeat(tableSeat != null && tableSeat == s ? viewedSeat : s));
+        bar.add(opponents, "growx, wmin 120, shrinkprio 150");
 
         // СПРАВОЧНИК ПРАВИЛ — главы книги с поиском (заказ 25.09.2026), и на F1.
         KpButton rulesBtn = new KpButton("Правила", "справочник · F1", null);
@@ -1030,15 +1054,6 @@ public final class HotSeatWindow {
         north.setBackground(BAR_BG);
         bar.setAlignmentX(Component.LEFT_ALIGNMENT);
         north.add(bar);
-        opponents = new kelium.gui.kp.OpponentStrip();
-        opponents.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JPanel oppWrap = new JPanel(new BorderLayout());
-        oppWrap.setBackground(new Color(0x1B3845));
-        oppWrap.setBorder(BorderFactory.createMatteBorder(Theme.px(1), 0, Theme.px(2), 0,
-            Theme.border()));
-        oppWrap.add(opponents, BorderLayout.CENTER);
-        oppWrap.setAlignmentX(Component.LEFT_ALIGNMENT);
-        north.add(oppWrap);
         return north;
     }
 
@@ -1091,8 +1106,10 @@ public final class HotSeatWindow {
         field.setTableBackdrop(true);
         // без постоянной подкраски зон: зона видна только в миг Стройки
         field.setOwnershipTint(false);
-        field.setTopReserve(Theme.px(92));
-        field.setBottomReserve(Theme.px(56));
+        // Поле — герой (ревью 26.09.2026): сверху карточка вопроса стоит сбоку и
+        // места не просит; снизу — полоса кружков действий.
+        field.setTopReserve(Theme.px(8));
+        field.setBottomReserve(Theme.px(118));
         field.setShowTurnCaption(false);
         // Отладочные подписи гексов игроку не показываются; для наведения
         // работает подсказка гекса, для решений — подсветка целей.
@@ -2349,7 +2366,7 @@ public final class HotSeatWindow {
         if (awaitingSeat == null) {
             if (active == null) {
                 turnLabel.setText("Общая фаза раунда");
-                turnLabel.setForeground(new Color(0xA9C6D2));
+                turnLabel.setForeground(Theme.ink2());
             } else {
                 boolean bot = !"human".equals(seatSpecs.get(active));
                 turnLabel.setText("Ходит: " + seatName(active) + (bot ? " (бот)" : ""));
@@ -2369,6 +2386,9 @@ public final class HotSeatWindow {
         if (f.snapshot != null) {
             List<kelium.gui.kp.OpponentStrip.Row> rows = new ArrayList<>();
             for (ReplayRecord.Player p : f.snapshot.players) {
+                if (mySeat >= 0 && p.seat == mySeat) {
+                    continue;
+                }
                 rows.add(new kelium.gui.kp.OpponentStrip.Row(p.seat, seatName(p.seat),
                     p.seat == mySeat, vpTotal(p), p.coin, p.kelium, p.ammo,
                     p.orderHand.size(), p.objectiveHand.size(), p.arsenalHand.size(),
@@ -3173,6 +3193,9 @@ public final class HotSeatWindow {
 
     private void showDecisionNow(int seat, InteractiveAgent.PendingDecision d) {
         viewedSeat = seat;
+        if (stepsCaption != null) {
+            stepsCaption.setText("ШАГИ ХОДА — ИГРОК " + (seat + 1));
+        }
         // решение пришло — взгляд возвращается за свой стол
         tableSeat = null;
         refreshSheetSeats();
@@ -3443,8 +3466,6 @@ public final class HotSeatWindow {
                     kelium.gui.kp.ChoiceWords.sub("spec", c), 0, () -> submit(agent, d, idx));
                 if (c.payload() instanceof String id && onTableCard(id)) {
                     onCard.computeIfAbsent("card:" + id, k -> new ArrayList<>()).add(opt);
-                } else {
-                    offCard.add(opt);
                 }
             }
             if (passIdx >= 0) {
@@ -3480,9 +3501,8 @@ public final class HotSeatWindow {
             actionStrip.show(d.context().get("remaining") instanceof Number rn2
                 ? "Ваш ход — действий: " + rn2 : "Ваш ход", strip, Theme.seat(seat));
             field.setChoices(null, "Ваш ход: выберите действие",
-                "Щёлкните действие прямо на вскрытой карте приказа внизу — "
-                    + (anySpec ? "или спец-действие: подсвеченную карту или вариант ниже, " : "")
-                    + "или «Завершить ход» рядом с ней", offCard, Theme.seat(seat));
+                anySpec ? "Действие или спец-действие — на кружках внизу поля"
+                    : "Действие — на кружках внизу поля", offCard, Theme.seat(seat));
         } else {
             actionBar.idle("не сейчас");
             endBtn.setTexts("Сначала решение", kindLabel(kind));
@@ -4084,6 +4104,19 @@ public final class HotSeatWindow {
     }
 
     private String cardName(String id) {
+        // ПЕЧАТНОЕ ИМЯ, А НЕ СЛУЖЕБНОЕ (ревью 26.09.2026): у дублей печати
+        // имя в каталоге служебное, на карте же напечатано другое
+        GameConfig c = cfg;
+        if (c != null && id != null) {
+            try {
+                Map<String, Object> card = c.content.get("arsenal").find(id);
+                if (card != null && card.get("печатное_имя") != null) {
+                    return String.valueOf(card.get("печатное_имя"));
+                }
+            } catch (RuntimeException ignored) {
+                // не арсенал — обычное имя ниже
+            }
+        }
         return rec == null ? id : rec.cardNames.getOrDefault(id, id);
     }
 

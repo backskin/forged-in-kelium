@@ -239,7 +239,7 @@ public final class FieldGallery extends JComponent {
         // картинка поля — на тёмной подложке стола, чтобы светлые гексы читались
         int ip = Theme.px(8);
         Rectangle img = new Rectangle(r.x + ip, r.y + ip, r.width - 2 * ip, imgH - ip);
-        g.setColor(new Color(0x14303C));
+        g.setColor(Theme.panel());
         g.fill(new RoundRectangle2D.Double(img.x, img.y, img.width, img.height, rad - 4, rad - 4));
         BufferedImage th = t.thumb;
         if (th != null) {
@@ -251,7 +251,7 @@ public final class FieldGallery extends JComponent {
                 dw, dh, null);
         } else {
             g.setFont(Theme.italic());
-            g.setColor(new Color(0x9FBCC9));
+            g.setColor(Theme.ink2());
             String s = t.failed ? "поле не собралось" : "рисуется…";
             FontMetrics fm = g.getFontMetrics();
             g.drawString(s, img.x + (img.width - fm.stringWidth(s)) / 2,

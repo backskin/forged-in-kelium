@@ -235,9 +235,9 @@ public final class ActionStrip extends JComponent {
             new java.awt.geom.Point2D.Double(w / 2.0, scy), (float) rx,
             new java.awt.geom.Point2D.Double(w / 2.0, scy),
             new float[]{0f, 0.6f, 1f},
-            new Color[]{Theme.alpha(new Color(0x0E2029), 0.62f),
-                Theme.alpha(new Color(0x0E2029), 0.32f),
-                Theme.alpha(new Color(0x0E2029), 0f)},
+            new Color[]{Theme.alpha(Theme.bg(), 0.62f),
+                Theme.alpha(Theme.bg(), 0.32f),
+                Theme.alpha(Theme.bg(), 0f)},
             java.awt.MultipleGradientPaint.CycleMethod.NO_CYCLE,
             java.awt.MultipleGradientPaint.ColorSpaceType.SRGB, squash);
         Graphics2D gs = (Graphics2D) g.create();
@@ -291,12 +291,12 @@ public final class ActionStrip extends JComponent {
             int ty = cy + dd / 2 + Theme.px(22);
             g.setColor(Theme.alpha(Color.BLACK, 0.7));
             g.drawString(lab, cx - fm.stringWidth(lab) / 2 + 1, ty + 1);
-            g.setColor(dim ? new Color(0x9FBCC9) : hot ? Color.WHITE : new Color(0xEEF7FA));
+            g.setColor(dim ? Theme.ink2() : hot ? Color.WHITE : Theme.ink());
             g.drawString(lab, cx - fm.stringWidth(lab) / 2, ty);
             if (it.sub() != null && !it.sub().isBlank()) {
                 g.setFont(Theme.font(12.5, Font.PLAIN));
                 FontMetrics fs = g.getFontMetrics();
-                g.setColor(new Color(0xB8D3DD));
+                g.setColor(Theme.ink2());
                 g.drawString(it.sub(), cx - fs.stringWidth(it.sub()) / 2, ty + Theme.px(18));
             }
         }
@@ -327,13 +327,13 @@ public final class ActionStrip extends JComponent {
         int mx = Math.max(Theme.px(20), Math.min(getWidth() - mw - Theme.px(20), cx - mw / 2));
         int my = Math.max(Theme.px(6), bottom - mh);
         menuPanel = new Rectangle(mx, my, mw, mh);
-        g.setColor(Theme.alpha(new Color(0x0E2029), 0.94f));
+        g.setColor(Theme.alpha(Theme.bg(), 0.94f));
         g.fill(new RoundRectangle2D.Double(mx, my, mw, mh, Theme.px(16), Theme.px(16)));
         g.setColor(accent);
         g.setStroke(new BasicStroke(Theme.pxf(2)));
         g.draw(new RoundRectangle2D.Double(mx, my, mw, mh, Theme.px(16), Theme.px(16)));
         g.setFont(Theme.font(13, Font.BOLD));
-        g.setColor(new Color(0x9FBCC9));
+        g.setColor(Theme.ink2());
         g.drawString("ЧЕМ ПОТРАТИТЬ СПЕЦ-ДЕЙСТВИЕ", mx + pad, my + pad + Theme.px(16));
         int y = my + pad + Theme.px(28);
         for (int i = 0; i < menu.size(); i++) {
@@ -346,11 +346,11 @@ public final class ActionStrip extends JComponent {
                     Theme.px(10), Theme.px(10)));
             }
             g.setFont(f1);
-            g.setColor(si.enabled() ? Color.WHITE : new Color(0x7FA3B2));
+            g.setColor(si.enabled() ? Color.WHITE : Theme.ink3());
             g.drawString(si.label(), r.x + Theme.px(10), r.y + Theme.px(20));
             if (si.sub() != null) {
                 g.setFont(f2);
-                g.setColor(si.enabled() ? new Color(0xB8D3DD) : new Color(0x6F8F9C));
+                g.setColor(si.enabled() ? Theme.ink2() : Theme.ink3());
                 g.drawString(si.sub(), r.x + Theme.px(10), r.y + Theme.px(38));
             }
             y += rowH;
