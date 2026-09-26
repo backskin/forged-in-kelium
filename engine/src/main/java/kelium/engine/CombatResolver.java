@@ -332,6 +332,13 @@ public final class CombatResolver {
                                                 UnitToken unit) {
         List<AttackRow> rows = new ArrayList<>();
         int universalCost = rs.getInt("actions.combat.universal_ammo_cost");
+        // «БАЛЛИСТИЧЕСКИЙ РАСЧЁТ» (супер-арсенал 4.0.0): «Твоя универсальная
+        // атака стоит 1 боеприпас вместо 2». Печатная цена строки, а не скидка
+        // поверх: прочие правки цены (наценка защитника и т. п.) идут от неё.
+        if (universalCost > 1
+                && Passives.superArsenalPassive(state, seat, "universal_attack_one_ammo")) {
+            universalCost = 1;
+        }
 
         // КУДА КЛАДЁТСЯ ЖЕТОН МОДУЛЯ — ТОЧКА ПРАВИЛ (предложение дизайнера
         // 25.08.2026, ключ actions.combat.module_on_universal).

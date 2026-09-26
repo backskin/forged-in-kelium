@@ -778,7 +778,15 @@ public final class Setup {
         for (int seat = 0; seat < players.size() && seat < startingArsenal.size(); seat++) {
             String cid = startingArsenal.get(seat);
             players.get(seat).arsenalHand.add(cid);
-            decks.get("arsenal").removeCard(cid);   // не должна выпасть повторно
+        }
+        // НЕРОЗДАННЫЕ НАЧАЛЬНЫЕ — В КОРОБКУ, А НЕ В ОБЩУЮ КОЛОДУ. У начального
+        // арсенала своя рубашка («Начальный арсенал»), и за столом его остаток
+        // в колоду арсенала не замешать: книга (гл. 3, шаг 16) раздаёт по одной
+        // карте, остальное в игре не участвует. Прежде убирались только
+        // розданные, и при 7 начальных картах (набор 7.1.0) вчетвером три
+        // карты с чужой рубашкой оставались в колоде арсенала.
+        for (String cid : startingArsenal) {
+            decks.get("arsenal").removeCard(cid);
         }
 
         GameState s = new GameState(config, players, field, stats, tech, decks, rng, 0);

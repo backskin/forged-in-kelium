@@ -883,6 +883,16 @@ public final class GameEngine {
             .base(Math.max(rs.getInt("actions.spec_per_turn"), Passives.specActions(s, seat)))
             .ask());
         specLimit = Math.max(0, specLimit - specPenalty);
+        // «ШТАБНАЯ ДИРЕКТИВА» (супер-арсенал 4.0.0, печать 25.09.2026): «За
+        // совпадение нижнего приказа ты получаешь ещё 1 спец. действие». Нижний
+        // приказ открыт — к его действию прибавляется спец-действие этого хода.
+        boolean директива = Passives.superArsenalPassive(s, seat,
+            "directive_coincidence_both_bottom_spec");
+        if (директива && !isJoker && card.get("bottom") != null && reveal.bottomOpen()) {
+            specLimit += 1;
+            emit(ev("type", "spec_bonus", "seat", seat, "bonus", 1,
+                "ability", "directive_coincidence_both_bottom_spec"));
+        }
         TurnContext ctx = new TurnContext(seat, specLimit);
         // Контекст хода — памятка для отката безопасных действий (концепт
         // «Командный пункт» §5): без него откат возвращал состояние, но не
@@ -930,7 +940,10 @@ public final class GameEngine {
             // партии на четверых, зато боёв стало на 39–64% меньше. Новых
             // вариантов розыгрыша действий не заводим.
             int topA = rs.getInt("actions.top_actions_per_turn", 2);
-            int maxA = coincided ? Math.min(1, topA) : topA;
+            // «ШТАБНАЯ ДИРЕКТИВА» (4.0.0): «При совпадении приказов ты играешь
+            // оба действия». Совпадение при этом СЛУЧИЛОСЬ (журнал его помнит —
+            // задания «сыграй тот же приказ» выполняются), не случился только срез.
+            int maxA = coincided && !директива ? Math.min(1, topA) : topA;
             // Признак блокировки нужен способностям карт («Резервный штаб»
             // обходит её за келемий): OptionSource видит состояние партии, но не
             // ход, поэтому флаг живёт в журнале хода.
@@ -1307,6 +1320,13 @@ public final class GameEngine {
         }
         s.decks.get("containers").discard(cid);
         s.journal.of(p.seat).containersOpened += 1;
+        // «СДАЧА ТАРЫ» (начальный арсенал 7.1.0): «Вскрывая контейнер, получи
+        // ещё 1 монету» — за каждую вскрытую карту, сверх напечатанного на ней.
+        if (Passives.hasPassive(s, p.seat, "coin_on_container_open")) {
+            p.resources.add(kelium.core.Resource.COIN, 1);
+            got = new HashMap<>(got);
+            got.put("card_bonus_coin", 1);   // отдельно от напечатанного на контейнере
+        }
         emit(ev("type", "container", "seat", p.seat, "card", cid, "variant", payload[0],
             "effect", variant.getOrDefault("effect", ""),
             "label", variant.getOrDefault("label", ""), "got", got));

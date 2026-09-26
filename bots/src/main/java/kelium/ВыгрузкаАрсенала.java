@@ -13,6 +13,7 @@ import kelium.cards.arsenal.Арсенал6;
 import kelium.cards.arsenal.Арсенал7;
 import kelium.cards.arsenal.КартаАрсеналаВКоде;
 import kelium.cards.superarsenal.СуперАрсенал3;
+import kelium.cards.superarsenal.СуперАрсенал4;
 import kelium.cards.superarsenal.СуперВКоде;
 import kelium.engine.cards.Card;
 
@@ -30,8 +31,12 @@ import kelium.engine.cards.Card;
  *       стартовых {@code bs1}–{@code bs8};</li>
  *   <li>7.0.0 — тридцать две обычные {@code a7_*} и четыре начальные
  *       {@code bs7_*} из {@link Арсенал7} (печать дизайнера);</li>
+ *   <li>7.1.0 — то же плюс обычная №33 {@code a7_33} и начальные
+ *       {@code bs7_5}–{@code bs7_7} (печать и заготовки 25.09.2026);</li>
  *   <li>{@code super 3.0.0} — четыре супер-войска {@code sa3_*} из
- *       {@link СуперАрсенал3} в {@code data/cards/super_arsenal.3.0.0.yaml}.</li>
+ *       {@link СуперАрсенал3} в {@code data/cards/super_arsenal.3.0.0.yaml};</li>
+ *   <li>{@code super 4.0.0} — они же плюс пять способностей
+ *       {@code sa4_05…09} из {@link СуперАрсенал4}.</li>
  * </ul>
  *
  * <p>Запуск: {@code kelium.ВыгрузкаАрсенала 7.0.0 "почему выгружено"} или
@@ -50,13 +55,15 @@ public final class ВыгрузкаАрсенала {
             String зачем = args.length > 2 ? args[2]
                 : "супер-арсенал 3.0.0: четыре супер-войска по печати дизайнера 17.09.2026";
             List<Map<String, Object>> записи = new ArrayList<>();
-            for (Card c : СуперАрсенал3.карты()) {
+            boolean четвёртый = версия.startsWith("4.");
+            for (Card c : четвёртый ? СуперАрсенал4.карты() : СуперАрсенал3.карты()) {
                 if (c instanceof СуперВКоде k) {
                     записи.add(new LinkedHashMap<>(k.data()));
                 }
             }
-            записать("super_arsenal", версия, зачем, записи,
-                "kelium.cards.superarsenal.СуперАрсенал3");
+            записать("super_arsenal", версия, зачем, записи, четвёртый
+                ? "kelium.cards.superarsenal.СуперАрсенал4"
+                : "kelium.cards.superarsenal.СуперАрсенал3");
             return;
         }
         String версия = args.length > 0 ? args[0] : "7.0.0";
@@ -69,9 +76,14 @@ public final class ВыгрузкаАрсенала {
             все.addAll(Арсенал6.карты());
             все.addAll(стартовые6());
             класс = "kelium.cards.arsenal.Арсенал6";
-        } else {
+        } else if ("7.0.0".equals(версия)) {
             все.addAll(Арсенал7.карты());
             все.addAll(Арсенал7.начальные());
+            класс = "kelium.cards.arsenal.Арсенал7";
+        } else {
+            // 7.1.0 (25.09.2026): плюс обычная №33 и начальные №5–7
+            все.addAll(Арсенал7.карты71());
+            все.addAll(Арсенал7.начальные71());
             класс = "kelium.cards.arsenal.Арсенал7";
         }
 

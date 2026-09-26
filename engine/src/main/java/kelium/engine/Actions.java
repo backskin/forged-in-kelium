@@ -544,8 +544,20 @@ public final class Actions {
                 }
             }
             ctx.actionsPlayed.add(name());
+            // «КЕЛЕМИЕВЫЙ РУДНИК» (супер-арсенал 4.0.0): «Получай 1 келемий из
+            // общего запаса каждый раз, когда выполняешь действие «Добыча»». Любая
+            // Добыча — с приказа, с карты, с награды; но не срабатывание
+            // добытчика при постройке (толькоЗдание): это не действие.
+            int рудник = 0;
+            if (ctx.толькоЗдание < 0
+                    && Passives.superArsenalPassive(s, player.seat, "kelium_per_mining_action")) {
+                рудник = Storage.addKeliumCapped(s, player, 1);
+            }
             Map<String, Object> tel = new HashMap<>();
             tel.put("kelium", gainedK);
+            if (рудник > 0) {
+                tel.put("super_kelium", рудник);
+            }
             tel.put("power_coins", paid[0]);
             tel.put("power_offers", paid[1]);
             tel.put("containers", gainedC);
@@ -772,7 +784,20 @@ public final class Actions {
                 }
             }
             ctx.actionsPlayed.add(name());
+            // «ОРУЖЕЙНЫЙ КОНВЕЙЕР» (супер-арсенал 4.0.0): «Получай 1 боеприпас из
+            // общего запаса каждый раз, когда выполняешь действие «Снаряжение»».
+            // Как у «Келемиевого рудника»: не за срабатывание здания при постройке.
+            // В телеметрию — отдельной строкой: это не выпуск зданий, и задания
+            // «произведи боеприпасы» его не считают.
+            int конвейер = 0;
+            if (ctx.толькоЗдание < 0
+                    && Passives.superArsenalPassive(state, player.seat, "ammo_per_assembly_action")) {
+                конвейер = Storage.addAmmoCapped(state, player, 1);
+            }
             Map<String, Object> tel = new HashMap<>();
+            if (конвейер > 0) {
+                tel.put("super_ammo", конвейер);
+            }
             tel.put("units", unitsMade);
             tel.put("units_by_type", madeByType);
             tel.put("power_coins", paid[0]);

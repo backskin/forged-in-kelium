@@ -53,15 +53,32 @@ class ArsenalSevenDeckTest {
     }
 
     @Test
-    void действующийСводБерётСедьмойНаборИТретийСупер() {
-        assertEquals("7.0.0", arsenal().version);
-        assertEquals("3.0.0", cfg().content.get("super_arsenal").version);
+    void действующийСводБерётНабор71ИЧетвёртыйСупер() {
+        assertEquals("7.1.0", arsenal().version);
+        assertEquals("4.0.0", cfg().content.get("super_arsenal").version);
     }
 
     @Test
-    void тридцатьДвеОбычныхИЧетыреНачальных() {
-        assertEquals(32, вид("regular").size(), "обычных карт — печатные №1…32");
-        assertEquals(4, вид("starting").size(), "начальных — по одной на игрока");
+    void тридцатьТриОбычныхИСемьНачальных() {
+        // 7.1.0 (25.09.2026): печатные №1…32 и заполненная заготовка №33;
+        // начальные — печатные №1…6 и заполненная заготовка №7.
+        assertEquals(33, вид("regular").size(), "обычных карт — №1…33");
+        assertEquals(7, вид("starting").size(), "начальных — №1…7");
+    }
+
+    @Test
+    void начальныеНеПовторяютНизИИмя() {
+        // «Одно название — одна карта»: две начальные с разным низом под одним
+        // именем нельзя было бы установить вместе. Имена печатных дублей —
+        // служебные, печатное лежит в поле печатное_имя.
+        Set<String> имена = new HashSet<>();
+        Set<String> низы = new HashSet<>();
+        for (Map<String, Object> c : вид("starting")) {
+            assertTrue(имена.add(String.valueOf(c.get("name"))), "имя повторяется: " + c.get("id"));
+            assertTrue(низы.add(низ(c)), "низ повторяется: " + c.get("id"));
+        }
+        assertEquals("Полевой генератор", arsenal().byId("bs7_5").get("печатное_имя"));
+        assertEquals("Мародёрка", arsenal().byId("bs7_6").get("печатное_имя"));
     }
 
     @Test
@@ -129,14 +146,20 @@ class ArsenalSevenDeckTest {
     @Test
     void суперВойскаПоПечати() {
         List<Map<String, Object>> супер = cfg().content.get("super_arsenal").entries;
-        assertEquals(4, супер.size(), "четыре заполненных лица");
+        assertEquals(9, супер.size(), "четыре супер-войска и пять способностей");
         Set<String> роды = new HashSet<>();
+        int способностей = 0;
         for (Map<String, Object> c : супер) {
+            assertEquals(1, ((Number) c.get("vp_on_card")).intValue(), "одна звезда: " + c.get("id"));
+            if ("power".equals(c.get("kind"))) {
+                способностей++;
+                continue;
+            }
             assertEquals("troop", c.get("kind"));
             assertEquals(1, ((Number) c.get("attacks")).intValue(), "одна рамка атаки");
-            assertEquals(1, ((Number) c.get("vp_on_card")).intValue(), "одна звезда");
             роды.add(String.valueOf(c.get("unit")));
         }
         assertEquals(Set.of("infantry", "vehicle", "aircraft", "tower"), роды);
+        assertEquals(5, способностей);
     }
 }
