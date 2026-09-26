@@ -62,6 +62,12 @@ public final class MoveLog {
             inner.observePublicEvent(event);
         }
 
+        /** Живой игрок остаётся живым и под записью: меню хода с тем же списком. */
+        @Override
+        public boolean specInActionMenu() {
+            return inner.specInActionMenu();
+        }
+
         /** Настоящий агент под обёрткой. */
         public Agent inner() {
             return inner;
@@ -122,6 +128,12 @@ public final class MoveLog {
         @Override
         public void observePublicEvent(Map<String, Object> event) {
             inner.observePublicEvent(event);
+        }
+
+        /** Проигрывание обязано видеть те же варианты, что видел игрок. */
+        @Override
+        public boolean specInActionMenu() {
+            return inner.specInActionMenu();
         }
 
         public Agent inner() {

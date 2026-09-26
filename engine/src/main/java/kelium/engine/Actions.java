@@ -3923,6 +3923,27 @@ public final class Actions {
                 }
             }
             картаСуперЗаданияЗаШаг(state, cfg, player, agent, reached);
+            картаЗаданияЗаШаг(state, cfg, player, reached);
+        }
+
+        /**
+         * КАРТА ЗАДАНИЯ ЗА ВТОРУЮ СТУПЕНЬ (решение дизайнера 26.09.2026: «давай
+         * на втором шаге будет карта задания — игроку ещё карта задания
+         * прилетит»). Ступень задаёт свод ({@code tech.objective_card_on_step});
+         * нет ключа — надбавки нет, прошлые редакции играются как раньше.
+         * Карта берётся с верха колоды заданий в руку; колода пуста — не беда.
+         */
+        private static void картаЗаданияЗаШаг(GameState state, GameConfig cfg,
+                                              PlayerState player, int reached) {
+            int шаг = cfg.ruleset.getInt("tech.objective_card_on_step", 0);
+            if (шаг <= 0 || reached != шаг) {
+                return;
+            }
+            var колода = state.decks.get("objectives");
+            String cid = колода == null ? null : колода.draw(state.rng);
+            if (cid != null) {
+                player.objectiveHand.add(cid);
+            }
         }
 
         /**

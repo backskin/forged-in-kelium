@@ -85,6 +85,7 @@ class HotSeatWindowRobotTest {
         Random rnd = new Random(seed);
         long deadline = System.currentTimeMillis() + DEADLINE_MS;
         int answered = 0;
+        java.util.Map<Integer, InteractiveAgent.PendingDecision> lastAnswered = new java.util.HashMap<>();
         while (!w.finishedForTest()) {
             if (System.currentTimeMillis() > deadline) {
                 fail("партия не доиграна за " + DEADLINE_MS / 1000 + " с; ответов дано "
@@ -100,7 +101,9 @@ class HotSeatWindowRobotTest {
                     continue;
                 }
                 InteractiveAgent.PendingDecision d = agent.pending();
-                if (d == null) {
+                // уже отвеченное решение, которое движок ещё не забрал, — не
+                // отвечать второй раз (иначе «предыдущий ответ ещё не забран»)
+                if (d == null || d == lastAnswered.get(seat)) {
                     continue;
                 }
                 // Дать окну ПОКАЗАТЬ решение: движок ставит pending и лишь потом
@@ -120,6 +123,7 @@ class HotSeatWindowRobotTest {
                 int idx = pick(rnd, d.options());
                 int seatFinal = seat;
                 SwingUtilities.invokeAndWait(() -> w.answerForTest(seatFinal, idx));
+                lastAnswered.put(seat, d);
                 answered++;
                 acted = true;
             }

@@ -449,6 +449,8 @@ public final class RuleWords {
                 "сколько РАЗНЫХ треков берёт одно действие Науки";
             case "tech.super_objective_on_step" ->
                 "на каком шаге трека дают ещё и карту супер-задания (0 — не дают)";
+            case "tech.objective_card_on_step" ->
+                "на каком шаге трека дают ещё и карту задания в руку (0 — не дают)";
             case "actions.build.military_fires_only_on_container" ->
                 "военное здание при постройке даёт войско, только если накрыло ячейку контейнера";
             case "tech.step_coin_prize" ->

@@ -91,7 +91,8 @@ public final class MarkIcons {
             case "TROPHY" -> "trophy";
             case "CONTAINER" -> "container";
             case "ARSENAL" -> "arsenal";
-            case "SUPER" -> "super_objective";
+            case "SUPER" -> "vp";              // в полосах SUPER исторически = очки (звезда)
+            case "DESTROYED" -> "damage";
             case "CARD" -> "objective";
             case "ENERGY" -> "energy";
             case "VP", "STAR" -> "vp";

@@ -1663,7 +1663,11 @@ public final class HotSeatWindow {
                 : cap(kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe));
         }
         return switch (kind) {
-            case "action" -> p instanceof String a ? ActionBar.ACTIONS.getOrDefault(a, a) : raw;
+            // в меню хода рядом с действиями лежит и спец-действие
+            case "action" -> "action".equals(c.kind()) && p instanceof String a
+                ? ActionBar.ACTIONS.getOrDefault(a, a)
+                : "СПЕЦ: " + kelium.gui.kp.ChoiceWords.label("spec", c, this::cardNameSafe)
+                    .replaceFirst("^СПЕЦ:\\s*", "");
             case "reveal_order" -> "Вскрыт приказ «" + cardNameSafe(String.valueOf(p)) + "»";
             case "blind_discard" -> "Отложен приказ «" + cardNameSafe(String.valueOf(p)) + "»";
             // полное название здания («Авиабаза», а не «Авб»); снос и перенос —
@@ -3110,8 +3114,13 @@ public final class HotSeatWindow {
         kelium.gui.kp.ChoiceWords.moduleWords = id -> moduleRu(st, id);
         kelium.core.UndoableAgent agent = humansBySeat.get(seat);
         List<Choice> options = d.options();
-        specMenuOptions = "spec".equals(kind) ? options : null;
-        specMenuAgent = "spec".equals(kind) ? agent : null;
+        // Спец-действие живого игрока приходит и внутри выбора хода (меню хода,
+        // 26.09.2026) — меню карт работают и там.
+        boolean specHere = "spec".equals(kind) || "action".equals(kind)
+            && options.stream().anyMatch(c -> c.kind() != null && (c.kind().startsWith("spec_")
+                || "free_objective_burn".equals(c.kind()) || "order_plate".equals(c.kind())));
+        specMenuOptions = specHere ? options : null;
+        specMenuAgent = specHere ? agent : null;
         refreshCardMenus();
         String title = "Игрок " + (seat + 1) + " — " + kindLabel(kind);
 
@@ -3288,7 +3297,8 @@ public final class HotSeatWindow {
         if ("action".equals(kind)) {
             Map<String, Integer> avail = new LinkedHashMap<>();
             for (int i = 0; i < options.size(); i++) {
-                if (options.get(i).payload() instanceof String name) {
+                if ("action".equals(options.get(i).kind())
+                        && options.get(i).payload() instanceof String name) {
                     avail.put(name, i);
                 }
             }
@@ -3343,6 +3353,26 @@ public final class HotSeatWindow {
                     offCard.add(opt);
                 }
             }
+            // СПЕЦ-ДЕЙСТВИЕ В МЕНЮ ХОДА: карта задания/арсенала — на самой
+            // карте в руке или на полке, остальное (контейнеры, плашка приказа,
+            // способности) — в карточке вопроса над полем.
+            boolean anySpec = false;
+            for (int i = 0; i < options.size(); i++) {
+                Choice c = options.get(i);
+                if ("action".equals(c.kind()) || "pass".equals(c.kind())) {
+                    continue;
+                }
+                anySpec = true;
+                int idx = i;
+                var opt = new kelium.gui.kp.FieldBubbles.Opt(
+                    kelium.gui.kp.ChoiceWords.label("spec", c, this::cardName),
+                    kelium.gui.kp.ChoiceWords.sub("spec", c), 0, () -> submit(agent, d, idx));
+                if (c.payload() instanceof String id && onTableCard(id)) {
+                    onCard.computeIfAbsent("card:" + id, k -> new ArrayList<>()).add(opt);
+                } else {
+                    offCard.add(opt);
+                }
+            }
             if (passIdx >= 0) {
                 int pi = passIdx;
                 onCard.put("end", List.of(new kelium.gui.kp.FieldBubbles.Opt("Завершить ход",
@@ -3355,6 +3385,7 @@ public final class HotSeatWindow {
             setTableChoices(onCard, Theme.seat(seat));
             field.setChoices(null, "Ваш ход: выберите действие",
                 "Щёлкните действие прямо на вскрытой карте приказа внизу — "
+                    + (anySpec ? "или спец-действие: подсвеченную карту или вариант ниже, " : "")
                     + "или «Завершить ход» рядом с ней", offCard, Theme.seat(seat));
         } else {
             actionBar.idle("не сейчас");
@@ -3509,6 +3540,13 @@ public final class HotSeatWindow {
                     }
                 }
                 optSides.put(opt, sides);
+            }
+            // КОНЕЦ ХОДА ПОСЛЕ ДЕЙСТВИЙ: спец-действие ещё можно, отказ от него
+            // и есть «Завершить ход» — на своём месте, у карты приказа.
+            if (pass && "spec".equals(kind) && Boolean.TRUE.equals(d.context().get("turn_end"))) {
+                onTable.put("end", List.of(new kelium.gui.kp.FieldBubbles.Opt(
+                    "Завершить ход", "спец-действие ещё не сыграно", 1, () -> submit(agent, d, idx))));
+                continue;
             }
             // КАРТА ПЕРЕД ИГРОКОМ — выбирается на самой карте, на столе.
             if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)) {

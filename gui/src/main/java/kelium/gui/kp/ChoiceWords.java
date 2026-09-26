@@ -133,8 +133,11 @@ public final class ChoiceWords {
                 return "Снять модуль с ячейки «" + ("move_red".equals(c.kind())
                     ? unitRu(code) : buildingRu(code)) + "»";
             }
-            case "order_spec" -> {
-                return "Взять плашку: " + switch (String.valueOf(p)) {
+            case "spec_cu_return" -> {
+                return "Вернуть ЦУ на поле";
+            }
+            case "order_spec", "order_plate" -> {
+                return "Плашка приказа: " + switch (String.valueOf(p)) {
                     case "ammo" -> "1 боеприпас";
                     case "objective" -> "1 карта задания";
                     case "coin" -> "1 монета";

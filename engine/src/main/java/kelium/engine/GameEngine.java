@@ -903,6 +903,13 @@ public final class GameEngine {
                 "ability", "ignore_coincidence"));
         }
 
+        // ПЛАШКА ЭТОГО ХОДА — живой игрок видит её в меню хода.
+        ходПлашка = card.get("spec") instanceof String пл ? пл
+            : (Boolean.TRUE.equals(card.get("maneuver")) ? "movement" : null);
+        ходПлашкаЦена = card.get("spec_cost_coin") instanceof Number нц ? нц.intValue() : 0;
+        ходПлашкаСыграна = false;
+        boolean менюХода = agents.get(seat).specInActionMenu();
+
         if (isJoker) {
             // Джокер даёт столько же действий, сколько верх обычной карты: иначе
             // в варианте «одно действие за ход» БЕЗОПАСНОСТЬ станет вдвое сильнее
@@ -1013,10 +1020,13 @@ public final class GameEngine {
             // на нём игрались как игрались.
             String плашка = card.get("spec") instanceof String с ? с
                 : (Boolean.TRUE.equals(card.get("maneuver")) ? "movement" : null);
-            if (плашка != null) {
+            if (плашка != null && !менюХода) {
                 int цена = card.get("spec_cost_coin") instanceof Number н ? н.intValue() : 0;
                 разыгратьПлашку(p, ctx, плашка, цена);
             }
+        }
+        if (менюХода && !s.finished) {
+            finalSpecMenu(p, ctx);
         }
         s.turnUndo = null;
         emit(ev("type", "turn_end", "seat", seat, "resources", resourcesMap(p)));
@@ -1071,6 +1081,13 @@ public final class GameEngine {
             for (String nname : candidates) {
                 opts.add(new Choice("action", nname, nname));
             }
+            // СПЕЦ-ДЕЙСТВИЕ В МЕНЮ ХОДА (просьба дизайнера 26.09.2026): живой
+            // игрок видит его рядом с действиями и играет, когда хочет, — а не
+            // отдельным вопросом после каждого действия.
+            boolean меню = agents.get(p.seat).specInActionMenu();
+            if (меню) {
+                opts.addAll(menuSpecOptions(p, ctx));
+            }
             opts.add(new Choice("pass", null, "ничего не делать"));
             // Что известно о вскрытии — в контекст решения: бот, который
             // планирует ход целиком, должен знать, сколько действий у него есть
@@ -1083,6 +1100,10 @@ public final class GameEngine {
                     "spec_left", ctx.canSpec()));
             if (ch.payload() == null) {
                 break;
+            }
+            if (меню && !"action".equals(ch.kind())) {
+                applyMenuSpec(p, ctx, ch);
+                continue;
             }
             String actionName = (String) ch.payload();
             Action action = Actions.create(actionName, s);
@@ -1103,7 +1124,9 @@ public final class GameEngine {
             if (!containersOpenIsSpec()) {
                 offerOpenContainer(p);
             }
-            offerSpec(p, ctx);
+            if (!меню) {
+                offerSpec(p, ctx);
+            }
             int bought = s.journal.of(p.seat).takeBlockBypassGrants();
             extra += bought;
             repeatable += bought;
@@ -1112,11 +1135,83 @@ public final class GameEngine {
         // пустой список кандидатов) НЕ отбирает СПЕЦ: игрок всё ещё может
         // завершить задание, установить арсенал, внести вклад в супер-задание
         // или развернуть готовое супер-задание ради мгновенной победы.
-        if (!s.finished && ctx.canSpec()) {
+        if (!s.finished && ctx.canSpec() && !agents.get(p.seat).specInActionMenu()) {
             if (!containersOpenIsSpec()) {
                 offerOpenContainer(p);
             }
             offerSpec(p, ctx);
+        }
+    }
+
+    /** Плашка приказа этого хода: вид, цена, сыграна ли (для меню хода). */
+    private String ходПлашка;
+    private int ходПлашкаЦена;
+    private boolean ходПлашкаСыграна;
+
+    /**
+     * ВАРИАНТЫ СПЕЦ-ДЕЙСТВИЯ ДЛЯ МЕНЮ ХОДА: всё, что можно сделать спецом, плюс
+     * плашка карты приказа. Спец истрачен — остаются только свободные верхи ∞.
+     * ЦУ в запасе — единственный вариант: он обязан вернуться первым спецом.
+     */
+    private List<Choice> menuSpecOptions(PlayerState p, TurnContext ctx) {
+        ctx.specUnlimited = state.journal.of(p.seat).unlimitedSpec;
+        ctx.specLimit = ctx.specLimitBase + state.journal.of(p.seat).specBonus;
+        List<Choice> out = new ArrayList<>();
+        if (!ctx.canSpec()) {
+            for (String cid : new ArrayList<>(p.objectiveHand)) {
+                if (верхСвободный(state, cid)) {
+                    out.add(new Choice("free_objective_burn", cid, "burn free top " + cid));
+                }
+            }
+            return out;
+        }
+        if (Ctx.rules(state).getBool("command_center.must_replace_cu_with_spec", false)
+                && ЦуИзЗапаса.вЗапасе(p) != null) {
+            out.add(new Choice("spec_cu_return", "cu", "вернуть ЦУ на поле"));
+            return out;
+        }
+        out.addAll(buildSpecOptions(p));
+        if (ходПлашка != null && !ходПлашкаСыграна
+                && (ходПлашкаЦена <= 0 || p.resources.coin() >= ходПлашкаЦена)) {
+            out.add(new Choice("order_plate", ходПлашка, "плашка приказа"));
+        }
+        return out;
+    }
+
+    /** Сыграть спец-вариант, выбранный в меню хода. */
+    private void applyMenuSpec(PlayerState p, TurnContext ctx, Choice ch) {
+        switch (ch.kind()) {
+            case "spec_cu_return" -> {
+                if (ЦуИзЗапаса.поставить(state, p, agents.get(p.seat))) {
+                    ctx.useSpec();
+                    emit(ev("type", "cu_replaced", "seat", p.seat));
+                }
+            }
+            case "order_plate" -> {
+                ходПлашкаСыграна = true;
+                разыгратьПлашку(p, ctx, ходПлашка, ходПлашкаЦена, false);
+            }
+            default -> applySpec(p, ctx, ch);
+        }
+    }
+
+    /**
+     * КОНЕЦ ХОДА ЖИВОГО ИГРОКА: действия сыграны, а спец-действие (и плашка)
+     * ещё доступны — то же меню, пока игрок не нажмёт «Завершить ход».
+     */
+    private void finalSpecMenu(PlayerState p, TurnContext ctx) {
+        for (int guard = 0; guard < 24 && !state.finished; guard++) {
+            List<Choice> opts = menuSpecOptions(p, ctx);
+            if (opts.isEmpty()) {
+                return;
+            }
+            opts.add(new Choice("pass", null, "завершить ход"));
+            Choice ch = agents.get(p.seat).choose(state, opts, ev("kind", "spec",
+                "turn_end", true));
+            if (ch == null || ch.payload() == null) {
+                return;
+            }
+            applyMenuSpec(p, ctx, ch);
         }
     }
 
@@ -1133,6 +1228,15 @@ public final class GameEngine {
      * задание, плашка просто не предлагается — это и есть конкуренция.
      */
     private void разыгратьПлашку(PlayerState p, TurnContext ctx, String вид, int цена) {
+        разыгратьПлашку(p, ctx, вид, цена, true);
+    }
+
+    /**
+     * @param спросить {@code false} — игрок уже выбрал плашку в меню хода,
+     *                 переспрашивать «платить ли» не нужно
+     */
+    private void разыгратьПлашку(PlayerState p, TurnContext ctx, String вид, int цена,
+                                 boolean спросить) {
         if (!ctx.canSpec()) {
             return;
         }
@@ -1143,7 +1247,7 @@ public final class GameEngine {
             if (p.resources.coin() < цена) {
                 return;
             }
-            if (!"movement".equals(вид)) {
+            if (спросить && !"movement".equals(вид)) {
                 Choice ч = agents.get(p.seat).choose(state, List.of(
                     new Choice("order_spec", вид, "−" + цена + " мон: " + вид),
                     new Choice("pass", null, "не брать плашку")),
@@ -1386,6 +1490,37 @@ public final class GameEngine {
         }
         GameState s = state;
         TurnJournal j = s.journal;
+        List<Choice> opts = buildSpecOptions(p);
+        if (opts.isEmpty()) {
+            return;
+        }
+        opts.add(new Choice("pass", null, "без спец-действия"));
+        // ИНДИКАТОРЫ ЗАДАНИЙ (заказ дизайнера 17.08.2026). Движок сам считает по
+        // каждой карте руки: горит ли «ГОТОВО», горит ли «ДОСТИЖИМО В ЭТОТ ХОД»,
+        // и если достижимо — какими действиями. Кладём в контекст выбора, чтобы
+        // агент решал СПЕЦ-действие, видя пути к наградам, а не одни награды.
+        List<ObjectiveHints.Hint> hints = ObjectiveHints.forHand(s, p.seat, j,
+            ctx.remainingActionNames(), ctx.remainingActions());
+        Map<String, Object> specCtx = ev("kind", "spec");
+        specCtx.put("objective_hints", hints);
+        emit(ev("type", "objective_hints", "seat", p.seat, "round", s.round,
+            "hints", hintsForLog(hints)));
+        Choice ch = agents.get(p.seat).choose(s, opts, specCtx);
+        if (ch.payload() == null) {
+            return;
+        }
+        applySpec(p, ctx, ch);
+    }
+
+    /**
+     * ВАРИАНТЫ СПЕЦ-ДЕЙСТВИЯ — что игрок может сделать спец-действием прямо
+     * сейчас (без «паса»). Один список на оба способа спросить: отдельным
+     * вопросом после действия (боты) и в меню хода рядом с действиями (живой
+     * игрок, {@link kelium.core.Agent#specInActionMenu}).
+     */
+    private List<Choice> buildSpecOptions(PlayerState p) {
+        GameState s = state;
+        TurnJournal j = s.journal;
         List<Choice> opts = new ArrayList<>();
         for (String cid : Objectives.playableObjectives(s, p.seat, j)) {
             opts.add(new Choice("spec_objective", cid, "complete " + cid));
@@ -1493,24 +1628,13 @@ public final class GameEngine {
             opts.add(new Choice("spec_combat", specBattleAmmo,
                 "СПЕЦ: провести Бой за " + specBattleAmmo + " боеприпас(ов)"));
         }
-        if (opts.isEmpty()) {
-            return;
-        }
-        opts.add(new Choice("pass", null, "без спец-действия"));
-        // ИНДИКАТОРЫ ЗАДАНИЙ (заказ дизайнера 17.08.2026). Движок сам считает по
-        // каждой карте руки: горит ли «ГОТОВО», горит ли «ДОСТИЖИМО В ЭТОТ ХОД»,
-        // и если достижимо — какими действиями. Кладём в контекст выбора, чтобы
-        // агент решал СПЕЦ-действие, видя пути к наградам, а не одни награды.
-        List<ObjectiveHints.Hint> hints = ObjectiveHints.forHand(s, p.seat, j,
-            ctx.remainingActionNames(), ctx.remainingActions());
-        Map<String, Object> specCtx = ev("kind", "spec");
-        specCtx.put("objective_hints", hints);
-        emit(ev("type", "objective_hints", "seat", p.seat, "round", s.round,
-            "hints", hintsForLog(hints)));
-        Choice ch = agents.get(p.seat).choose(s, opts, specCtx);
-        if (ch.payload() == null) {
-            return;
-        }
+        return opts;
+    }
+
+    /** СЫГРАТЬ ВЫБРАННЫЙ ВАРИАНТ СПЕЦ-ДЕЙСТВИЯ и потратить спец, если положено. */
+    private void applySpec(PlayerState p, TurnContext ctx, Choice ch) {
+        GameState s = state;
+        TurnJournal j = s.journal;
         switch (ch.kind()) {
             case "spec_objective" -> Objectives.playObjective(s, p.seat, j, (String) ch.payload(), this::emit);
             case "spec_objective_enh" -> Objectives.playObjective(

@@ -32,6 +32,9 @@ public final class OpponentStrip extends JComponent {
     private static final String FIRST = "ПЕРВЫЙ";
 
     private static int firstBadgeW(Graphics2D g) {
+        if (kelium.report.Textures.icon("first_player") != null) {
+            return Theme.px(22);
+        }
         g.setFont(Theme.font(9.5, Font.BOLD));
         return g.getFontMetrics().stringWidth(FIRST) + Theme.px(12);
     }
@@ -51,9 +54,9 @@ public final class OpponentStrip extends JComponent {
 
     @Override
     public String getToolTipText(java.awt.event.MouseEvent e) {
-        return "Открытый счёт всех мест: очки · монеты · келемий · БПР · "
-            + "карты в руках (приказы/задания/арсенал) · трофеи. "
-            + "Золотая плашка «ПЕРВЫЙ» — у кого жетон первого игрока";
+        return "Открытый счёт всех мест: очки · монеты · келемий · боеприпасы · "
+            + "задания в руке · арсенал в руке · приказы в руке · уничтоженное на свалке. "
+            + "Жетон «#1» — у кого жетон первого игрока";
     }
 
     @Override
@@ -88,6 +91,13 @@ public final class OpponentStrip extends JComponent {
             if (r.first()) {
                 // ЖЕТОН ПЕРВОГО ИГРОКА — золотой плашкой перед именем
                 int bw = firstBadgeW(g);
+                java.awt.image.BufferedImage token = kelium.report.Textures.icon("first_player");
+                if (token != null) {
+                    // печатный жетон первого игрока «#1»
+                    int ts = Theme.px(24);
+                    kelium.report.Mips.draw(g, token, cx - Theme.px(1), cy - ts / 2, ts, ts);
+                    cx += bw + Theme.px(4);
+                } else {
                 int bh = Theme.px(16);
                 g.setColor(Theme.points());
                 g.fillRoundRect(cx, cy - bh / 2, bw, bh, bh, bh);
@@ -96,6 +106,7 @@ public final class OpponentStrip extends JComponent {
                 g.drawString(FIRST, cx + (bw - bf.stringWidth(FIRST)) / 2,
                     cy + (bf.getAscent() - bf.getDescent()) / 2);
                 cx += bw + Theme.px(6);
+                }
             }
             g.setFont(Theme.font(11.5, Font.BOLD));
             g.setColor(Theme.seatInk(r.seat()));
@@ -108,8 +119,10 @@ public final class OpponentStrip extends JComponent {
             cx = stat(g, cx, cy, "COIN", Theme.points(), String.valueOf(r.coin()));
             cx = stat(g, cx, cy, "KELIUM", Theme.kelium(), String.valueOf(r.kelium()));
             cx = stat(g, cx, cy, "AMMO", Theme.energy(), String.valueOf(r.ammo()));
-            cx = stat(g, cx, cy, "CARD", Theme.neutral(),
-                r.orderCards() + "·" + r.objectiveCards() + "·" + r.arsenalCards());
+            // Руки — каждая своим значком, а не «0·0·0» под одной картой.
+            cx = stat(g, cx, cy, "CARD", Theme.neutral(), String.valueOf(r.objectiveCards()));
+            cx = stat(g, cx, cy, "ARSENAL", Theme.neutral(), String.valueOf(r.arsenalCards()));
+            cx = stat(g, cx, cy, "ORDER_LEFT", Theme.neutral(), String.valueOf(r.orderCards()));
             cx = stat(g, cx, cy, "DESTROYED", Theme.destroyed(), String.valueOf(r.destroyedValue()));
 
             x += cardW + Theme.px(8);
@@ -124,17 +137,17 @@ public final class OpponentStrip extends JComponent {
             .stringWidth(r.name() + (r.me() ? " (вы)" : ""));
         g.setFont(Theme.mono(11, Font.BOLD));
         var fm = g.getFontMetrics();
-        String cards = r.orderCards() + "·" + r.objectiveCards() + "·" + r.arsenalCards();
         for (String v : List.of(String.valueOf(r.vp()), String.valueOf(r.coin()),
-                String.valueOf(r.kelium()), String.valueOf(r.ammo()), cards,
-                String.valueOf(r.destroyedValue()))) {
-            w += Theme.px(15) + fm.stringWidth(v) + Theme.px(7);
+                String.valueOf(r.kelium()), String.valueOf(r.ammo()),
+                String.valueOf(r.objectiveCards()), String.valueOf(r.arsenalCards()),
+                String.valueOf(r.orderCards()), String.valueOf(r.destroyedValue()))) {
+            w += Theme.px(25) + fm.stringWidth(v);
         }
         return w + Theme.px(6);
     }
 
     private int stat(Graphics2D g, int x, int cy, String icon, Color color, String value) {
-        double s = Theme.px(11);
+        double s = Theme.px(15);
         MarkIcons.paint(g, icon, x + s / 2, cy, s, color);
         g.setFont(Theme.mono(11, Font.BOLD));
         g.setColor(Theme.ink());
