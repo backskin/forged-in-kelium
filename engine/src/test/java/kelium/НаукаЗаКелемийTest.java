@@ -52,8 +52,9 @@ class НаукаЗаКелемийTest {
     void шагТолькоЗаКелемий() {
         GameState s = Fix.game();
         PlayerState p = s.player(0);
-        p.resources.setKelium(1);
-        Actions.create("science", s).perform(p, new TurnContext(0, 1), учёный(1));
+        // первая ступень стоит 2 (печать 26.09.2026)
+        p.resources.setKelium(2);
+        Actions.create("science", s).perform(p, new TurnContext(0, 1), учёный(2));
         assertEquals(1, p.techSteps.values().stream().mapToInt(Integer::intValue).sum(),
             "первая ступень куплена келемием");
         assertEquals(0, p.resources.kelium(), "келемий потрачен");
@@ -64,7 +65,7 @@ class НаукаЗаКелемийTest {
         GameState s = Fix.game();
         PlayerState p = s.player(0);
         p.resources.setKelium(1);
-        p.resources.add(kelium.core.Resource.TROPHY, 1);
+        p.resources.add(kelium.core.Resource.TROPHY, 2);
         Actions.create("science", s).perform(p, new TurnContext(0, 1), учёный(0));
         assertEquals(1, p.techSteps.values().stream().mapToInt(Integer::intValue).sum());
         assertEquals(1, p.resources.kelium(), "келемий сохранён — заплачено трофеем");

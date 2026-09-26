@@ -189,8 +189,8 @@ class ЭффектыРынка2Test {
     /**
      * НАУКА «КАК БУДТО НА ТРОФЕЙ БОЛЬШЕ» — трофей ВИРТУАЛЬНЫЙ: шаг он
      * оплачивает, но в хранилище не появляется и после действия не остаётся.
-     * Первый шаг трека стоит один трофей, поэтому игрок с пустым складом
-     * обязан на него встать — и остаться с пустым складом.
+     * Первый шаг трека стоит два трофея: с одним своим трофеем игрок обязан
+     * на него встать — и остаться с пустым складом.
      */
     @Test
     void наукаСВиртуальнымТрофеем() {
@@ -199,14 +199,40 @@ class ЭффектыРынка2Test {
         while (p.resources.trophy() > 0) {
             p.resources.pay(Resource.TROPHY, 1);
         }
+        // первый шаг стоит 2 (печать 26.09.2026): один трофей свой, второй —
+        // виртуальный
+        p.resources.setKelium(0);
+        p.resources.add(Resource.TROPHY, 1);
+        int трофеевБыло = p.resources.trophy();
         int шаговБыло = p.techSteps.values().stream().mapToInt(Integer::intValue).sum();
 
+        // Решает не бот (старые боты забракованы 23.09 и шаг за 2 не берут),
+        // а игрок, который встаёт на первый же предложенный шаг.
+        List<kelium.core.Agent> agents = new java.util.ArrayList<>(s.agents);
+        agents.set(0, new kelium.core.Agent(0, "учёный") {
+            @Override
+            public kelium.core.Choice choose(GameState st, List<kelium.core.Choice> options,
+                                             Map<String, Object> ctx) {
+                for (kelium.core.Choice c : options) {
+                    if ("sci_track".equals(c.kind())) {
+                        return c;
+                    }
+                }
+                for (kelium.core.Choice c : options) {
+                    if (c.payload() == null) {
+                        return c;
+                    }
+                }
+                return options.get(0);
+            }
+        });
+        GameEngine.bind(s, agents);
         Effects.apply("free_action", s, 0,
             Map.of("action", "science", "virtual_trophy", 1));
 
         int шаговСтало = p.techSteps.values().stream().mapToInt(Integer::intValue).sum();
         assertTrue(шаговСтало > шаговБыло,
-            "виртуальный трофей обязан оплатить первый шаг трека");
+            "виртуальный трофей обязан оплатить первый шаг трека; трофеев было " + трофеевБыло);
         assertEquals(0, p.resources.trophy(),
             "виртуальный трофей в хранилище не появляется");
     }

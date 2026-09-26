@@ -38,11 +38,11 @@ class TechStepOnePrizeTest {
             "вдвоём открыты те же ячейки, что и втроём");
     }
 
-    /** Призы ячеек — только монеты; прежних боеприпасов и келемия нет. */
+    /** Призов ячеек нет вовсе (печать «Наука» 26.09.2026): ни монет, ни ресурсов. */
     @Test
     void призыЯчеекТолькоМонеты() {
         Ruleset rs = Ctx.rules(Fix.game());
-        assertEquals(List.of(List.of(1), List.of(2, 1), List.of(3), List.of()),
+        assertEquals(List.of(List.of(), List.of(), List.of(), List.of()),
             rs.get("tech.step_coin_prize", null));
         Object старые = rs.get("tech.step1_prize", null);
         assertTrue(старые == null || (старые instanceof Map<?, ?> m && m.isEmpty()),

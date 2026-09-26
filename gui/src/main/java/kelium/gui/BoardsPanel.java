@@ -249,7 +249,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         g.drawImage(scaled(art, w, h), x, y, null);
         kelium.gui.replay2.BoardAnchors.Science sc = kelium.gui.replay2.BoardAnchors.science();
         double k = w / (double) sc.artW();
-        int[] cost = ints("tech.step_cost_trophy", new int[]{1, 2, 3, 4});
+        int[] cost = ints("tech.step_cost_trophy", new int[]{2, 3, 4, 5});
         int[] cap = ints("tech.step_capacity", new int[]{3, 3, 2, 1});
         int steps = Math.min(cost.length, cap.length);
         int players = record == null ? snap.players.size() : record.players;
@@ -720,7 +720,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
     private void paintScience(Graphics2D g, int x, int y, int w, int h) {
         frame(g, x, y, w, h, "ПЛАНШЕТ НАУКИ");
 
-        int[] cost = ints("tech.step_cost_trophy", new int[]{1, 2, 3, 4});
+        int[] cost = ints("tech.step_cost_trophy", new int[]{2, 3, 4, 5});
         int[] vp = ints("tech.step_vp_cumulative", new int[]{1, 1, 2, 3});
         int[] cap = ints("tech.step_capacity", new int[]{3, 2, 2, 1});
         int steps = Math.max(1, Math.min(cost.length, Math.min(vp.length, cap.length)));

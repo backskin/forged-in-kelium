@@ -40,8 +40,8 @@ from PIL import Image
            for n in range(1, 5)]
 РАСКЛАД += [(os.path.join(ИГРОКА, "Планшет-хранилища-new-%d.png" % n), "storage-p%d.png" % n)
             for n in range(1, 5)]
-РАСКЛАД += [(os.path.join(ОБЩИЕ, "Планшет научный отдел.png"), "science.png"),
-            (os.path.join(ОБЩИЕ, "Планшет рынка new.png"), "market.png")]
+РАСКЛАД += [(os.path.join(ОБЩИЕ, "Планшет научный отдел-2.png"), "science.png"),
+            (os.path.join(ОБЩИЕ, "Планшет рынка new-1.png"), "market.png")]
 
 
 def средний_цвет(img):
