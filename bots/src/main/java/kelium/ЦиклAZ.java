@@ -179,6 +179,31 @@ public final class ЦиклAZ {
         Path архив = ПАПКА.resolve("архив-" + java.time.LocalDate.now() + "-"
             + System.currentTimeMillis() % 100000);
         Files.createDirectories(архив);
+        // СЕТИ БЕЗ БЛОКА ЗАДАНИЙ (обучены до 26.09) не выбрасываются: им
+        // добавляются входы под задания с нулевым весом, и обучение идёт дальше
+        // с того же поколения. Прежние файлы — копией в архив; данные партий
+        // (genN.bin) записаны старой длиной и уходят в архив целиком.
+        int прежняя = Кодировщик.длина(4) - Кодировщик.ЛИЧНЫХ;
+        if (Сеть.загрузить(образец).вход() == прежняя) {
+            try (java.util.stream.Stream<Path> файлы = Files.list(ПАПКА)) {
+                for (Path ф : файлы.toList()) {
+                    String имя = ф.getFileName().toString();
+                    if (!Files.isRegularFile(ф) || !имя.endsWith(".bin") || имя.equals("runner.jar")) {
+                        continue;
+                    }
+                    if (имя.startsWith("value_") || имя.startsWith("policy_")) {
+                        Files.copy(ф, архив.resolve(имя));
+                        Сеть.загрузить(ф).расширитьВход(прежняя, Кодировщик.ЛИЧНЫХ).сохранить(ф);
+                    } else {
+                        Files.move(ф, архив.resolve(имя));
+                    }
+                }
+            }
+            out.println(" бот теперь видит свои задания: прежним сетям добавлены входы под"
+                + " задания, обучение продолжается с того же поколения (копия прежних сетей — в "
+                + архив.getFileName() + ")");
+            return;
+        }
         try (java.util.stream.Stream<Path> файлы = Files.list(ПАПКА)) {
             for (Path ф : файлы.toList()) {
                 String имя = ф.getFileName().toString();
