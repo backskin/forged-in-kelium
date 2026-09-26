@@ -270,6 +270,13 @@ public final class ReplayRecord {
          * показывал спрятанными войска, которые ими не были.
          */
         public Integer insideBuildingUid;
+        /**
+         * СЕКТОРЫ ВОЙСКА на гексе — ровно та раскладка, по которой движок
+         * считает контейнеры и соседство ({@code СекторыВойск}); с 26.09.2026
+         * игрок выбирает их сам. null — старая запись: рисовальщик рассаживает
+         * войска сам, как раньше.
+         */
+        public List<Integer> sides;
     }
 
     /** Полное состояние одного игрока (всё, что показывает его зона). */
@@ -717,6 +724,10 @@ public final class ReplayRecord {
                 t.alive = u.alive();
                 t.capturedBy = u.capturedBy;
                 t.insideBuildingUid = u.insideBuildingUid;
+                if (u.hexId != null && !u.inside()) {
+                    List<Integer> сек = kelium.engine.СекторыВойск.секторыЖетона(s, u);
+                    t.sides = сек == null ? null : new ArrayList<>(сек);
+                }
                 snap.tokens.add(t);
             }
             snap.players.add(playerView(s, p));
@@ -1143,6 +1154,9 @@ public final class ReplayRecord {
             to.put("alive", t.alive);
             to.put("cap", t.capturedBy);
             to.put("in", t.insideBuildingUid);   // войско внутри этого здания
+            if (t.sides != null) {
+                to.put("us", t.sides);           // секторы войска на гексе
+            }
             tk.add(to);
         }
         o.put("tokens", tk);
@@ -1505,6 +1519,12 @@ public final class ReplayRecord {
             tok.alive = Json.b(t, "alive");
             tok.capturedBy = Json.io(t, "cap");
             tok.insideBuildingUid = Json.io(t, "in");
+            if (t.get("us") instanceof List<?> us) {
+                tok.sides = new ArrayList<>();
+                for (Object o2 : us) {
+                    tok.sides.add(((Number) o2).intValue());
+                }
+            }
             s.tokens.add(tok);
         }
         for (Object po : Json.list(o, "players")) {

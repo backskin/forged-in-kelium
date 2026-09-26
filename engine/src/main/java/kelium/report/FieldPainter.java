@@ -1825,6 +1825,14 @@ public final class FieldPainter {
         }
         int overflow = 0;
         Set<Integer> занятые = new java.util.LinkedHashSet<>();
+        // СЕКТОРЫ ИЗ ЗАПИСИ — первыми (26.09.2026): войско стоит там, куда его
+        // поставил игрок; рассадка вразброс — только для старых записей.
+        for (ReplayRecord.Tok u : tokens) {
+            if (!u.building && u.sides != null && u.insideBuildingUid == null) {
+                free.removeAll(u.sides);
+                занятые.addAll(u.sides);
+            }
+        }
         for (ReplayRecord.Tok u : tokens) {
             if (u.building || "aircraft".equals(u.type)) {
                 continue;
@@ -1844,7 +1852,8 @@ public final class FieldPainter {
             // свободный сектор, и три жетона на пустом гексе слипались в одну
             // кучу с краю, хотя места хватало на весь круг. За столом их так и
             // раскладывают — по разным сторонам, чтобы каждый был виден.
-            List<Integer> place = "vehicle".equals(u.type)
+            List<Integer> place = u.sides != null && !u.sides.isEmpty() ? u.sides
+                : "vehicle".equals(u.type)
                 ? параСекторов(free, занятые) : одинСектор(free, занятые);
             FieldGeometry.Shape sh = FieldGeometry.unitByCode(u.type);
             double[] pos;

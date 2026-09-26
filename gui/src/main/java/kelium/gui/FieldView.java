@@ -1366,6 +1366,10 @@ public final class FieldView extends JComponent {
             }
         }
         double face = FieldGeometry.meanEdgeAngle(sides);
+        if (UNIT_CODES.contains(ghostType)) {
+            drawUnitGhostOnSides(g, c, sides, face);
+            return;
+        }
         double[] pos = FieldGeometry.polar(c[0], c[1], BASE * GHOST_EDGE_SHIFT, face);
         FieldGeometry.Shape sh;
         try {
@@ -1395,6 +1399,45 @@ public final class FieldView extends JComponent {
             g.drawString("нельзя", (float) (c[0] - fm.stringWidth("нельзя") / 2.0),
                 (float) (c[1] + fm.getAscent() / 2.0 - 2));
         }
+    }
+
+    private static final java.util.Set<String> UNIT_CODES =
+        java.util.Set.of("infantry", "vehicle", "tower");
+
+    /**
+     * ПРИЗРАК ВОЙСКА НА ВЫБРАННЫХ СЕКТОРАХ (выбор сектора, 26.09.2026): жетон
+     * ложится вдоль кромки той же геометрией, что стоящие войска в
+     * {@code FieldPainter.paintUnits}, — где призрак, там и встанет.
+     */
+    private void drawUnitGhostOnSides(Graphics2D g, double[] c, List<Integer> sides, double face) {
+        FieldGeometry.Shape sh = FieldGeometry.unitByCode(ghostType);
+        java.awt.image.BufferedImage tex = kelium.report.Textures.unit(ghostType, ghostSeat);
+        double w = FieldGeometry.unitWidth(ghostType, sides.size(), BASE);
+        double h = tex != null ? w * tex.getHeight() / (double) tex.getWidth()
+            : w * sh.vbH() / sh.vbW();
+        double[] pos = FieldGeometry.polar(c[0], c[1], FieldGeometry.unitSeatRadius(BASE, h), face);
+        double rot = FieldGeometry.unitRotation(sh, face);
+        java.awt.geom.AffineTransform was = g.getTransform();
+        java.awt.Composite comp = g.getComposite();
+        g.translate(pos[0], pos[1]);
+        g.rotate(Math.toRadians(rot));
+        java.awt.geom.RoundRectangle2D plate = new java.awt.geom.RoundRectangle2D.Double(
+            -w / 2 - 3, -h / 2 - 3, w + 6, h + 6, 8, 8);
+        g.setColor(withAlpha(Color.WHITE, 190));
+        g.fill(plate);
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
+        if (tex != null) {
+            g.drawImage(tex, (int) Math.round(-w / 2), (int) Math.round(-h / 2),
+                (int) Math.round(w), (int) Math.round(h), null);
+        } else {
+            g.setColor(seatColor(ghostSeat));
+            g.fill(new java.awt.geom.Rectangle2D.Double(-w / 2, -h / 2, w, h));
+        }
+        g.setComposite(comp);
+        g.setColor(withAlpha(seatColor(ghostSeat), 240));
+        g.setStroke(penDashed(2.2, 4, 3));
+        g.draw(plate);
+        g.setTransform(was);
     }
 
     /**

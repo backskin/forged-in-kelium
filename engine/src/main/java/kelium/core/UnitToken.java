@@ -37,6 +37,46 @@ public final class UnitToken implements Token {
      */
     public Integer insideBuildingUid = null;
 
+    /**
+     * СЕКТОРЫ, НА КОТОРЫЕ ЖЕТОН ПОСТАВЛЕН (битовая маска 0..5; 0 — не выбраны).
+     *
+     * <p>Действительны только на гексе {@link #sidesHex}: ушёл жетон с гекса —
+     * выбор сам перестаёт действовать, и его не надо сбрасывать в двух десятках
+     * мест, где войска переставляются. Раскладку гекса по-прежнему считает
+     * {@link kelium.engine.СекторыВойск}: выбранные секторы она соблюдает, а
+     * жетон без выбора (или с выбором, который накрыло здание) садится сам.
+     */
+    public int sideMask = 0;
+    public String sidesHex = null;
+
+    /** Выбранные и ещё действующие секторы, или null. */
+    public java.util.List<Integer> chosenSides() {
+        if (sideMask == 0 || hexId == null || !hexId.equals(sidesHex) || inside()) {
+            return null;
+        }
+        java.util.List<Integer> out = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            if ((sideMask & (1 << i)) != 0) {
+                out.add(i);
+            }
+        }
+        // пара техники через шов 5–0 — в порядке обхода: 5, 0
+        if (out.size() == 2 && out.get(0) == 0 && out.get(1) == 5) {
+            out = java.util.List.of(5, 0);
+        }
+        return out;
+    }
+
+    /** Поставить жетон на эти секторы его нынешнего гекса. */
+    public void chooseSides(java.util.List<Integer> sides) {
+        int m = 0;
+        for (int i : sides) {
+            m |= 1 << i;
+        }
+        sideMask = m;
+        sidesHex = hexId;
+    }
+
     /** Вставлено ли войско внутрь своего здания. */
     public boolean inside() {
         return insideBuildingUid != null;
@@ -83,6 +123,8 @@ public final class UnitToken implements Token {
         u.superUnit = superUnit;
         u.superCardId = superCardId;
         u.insideBuildingUid = insideBuildingUid;
+        u.sideMask = sideMask;
+        u.sidesHex = sidesHex;
         return u;
     }
 

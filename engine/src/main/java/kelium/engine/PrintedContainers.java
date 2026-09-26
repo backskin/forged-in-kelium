@@ -327,7 +327,10 @@ public final class PrintedContainers {
         // Войска в модели ячеек не значатся (sideOwner заполняют только здания и
         // стенки нейтралов), поэтому считаем консервативно: есть на гексе наземные
         // жетоны — ячейка может быть под ними, контейнера не видно.
-        return groundContainerFree(s, h) && h.groundTokens.isEmpty();
+        // ВОЙСКО НА ЯЧЕЙКЕ тоже её накрывает (26.09.2026): сектор войска теперь
+        // выбирает игрок, и раскладку гекса знает СекторыВойск.
+        return groundContainerFree(s, h) && h.groundTokens.isEmpty()
+            && СекторыВойск.наСекторе(s, h, h.containerCell) == null;
     }
 
     /**
@@ -464,6 +467,11 @@ public final class PrintedContainers {
         Integer владелец = h.sideOwner[h.containerCell];
         if (владелец != null) {
             return своё(p, владелец);
+        }
+        // войско, поставленное на ячейку контейнера (выбор сектора 26.09.2026)
+        kelium.core.UnitToken наЯчейке = СекторыВойск.наСекторе(s, h, h.containerCell);
+        if (наЯчейке != null) {
+            return наЯчейке.owner == p.seat;
         }
         for (Integer uid : h.groundTokens) {
             if (своё(p, uid)) {

@@ -1388,6 +1388,8 @@ public final class GameEngine {
             f.unitsMoved = f.movedUids.size();
             f.movedFromHexes.add(fromHex);
         }
+        // КУДА ВСТАЛО — выбирает игрок (26.09.2026)
+        СекторыВойск.поставить(s, agents.get(p.seat), unit);
         ctx.useSpec();
         emit(ev("type", "maneuver", "seat", p.seat, "unit", uid, "to", unit.hexId));
     }

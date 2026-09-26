@@ -561,6 +561,7 @@ public final class Effects {
                     String wasAt = u.hexId;
                     boolean wasInside = u.inside();     // снять ДО хода
                     u.setHexId((String) mp.get("to"));   // выводит из здания
+                    СекторыВойск.поставить(s, agentFor(s, pl.seat), u);
                     // E3: печатный контейнер срабатывает так же, как при Движении
                     PrintedContainers.onUnitMoved(s, pl, wasAt, u.hexId, u.type, wasInside);
                     break;
@@ -757,6 +758,7 @@ public final class Effects {
             UnitToken u = s.tokenStats.makeUnit(ut, seat, Placement.nextUid(s), pl.unitsOfKind(ut));
             u.hexId = hex;
             pl.units.add(u);
+            СекторыВойск.поставить(s, agentFor(s, pl.seat), u);
             PrintedContainers.onUnitPlaced(s, pl, hex, ut);
             used.add(ut);
             placed++;
@@ -1635,6 +1637,7 @@ public final class Effects {
                     pl.unitsOfKind(ut));
                 u.hexId = b.hexId;
                 pl.units.add(u);
+                СекторыВойск.поставить(s, agentFor(s, pl.seat), u);
                 // Разворот жетона — тоже НАКРЫТИЕ печатной ячейки.
                 PrintedContainers.onUnitPlaced(s, pl, b.hexId, ut);
                 placed++;
@@ -1732,6 +1735,7 @@ public final class Effects {
             String был = u.hexId;
             boolean внутри = u.inside();
             u.setHexId(кудаГекс);
+            СекторыВойск.поставить(s, agentFor(s, pl.seat), u);
             // Печатные контейнеры срабатывают так же, как при обычном ходе:
             // жетон встал на ячейку — ячейка накрыта.
             PrintedContainers.onUnitMoved(s, pl, был, u.hexId, u.type, внутри);
@@ -2289,6 +2293,7 @@ public final class Effects {
             }
             boolean wasInside = u.inside();
             u.setHexId(target);
+            СекторыВойск.поставить(s, agentFor(s, pl.seat), u);
             PrintedContainers.onUnitMoved(s, pl, from, target, u.type, wasInside);
             movedUnits++;
         }

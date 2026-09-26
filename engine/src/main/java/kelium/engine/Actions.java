@@ -903,6 +903,7 @@ public final class Actions {
                         Map.of("kind", "tower_hex")).payload();
                 }
                 u.hexId = placeHex;
+                СекторыВойск.поставить(state, agent, u);
                 boolean cuHere = false;
                 for (BuildingToken own : player.buildingsOnField()) {
                     if (own.type == BuildingType.COMMAND_CENTER
@@ -935,6 +936,7 @@ public final class Actions {
             // ей нельзя (см. ветку выше), и без места на поле она не нанимается.
             if (hasRoomForUnit(player, from.hexId, u.type)) {
                 u.hexId = from.hexId;
+                СекторыВойск.поставить(state, agent, u);
                 PrintedContainers.onUnitPlaced(state, player, from.hexId, u.type);
                 return true;
             }
@@ -2530,6 +2532,8 @@ public final class Actions {
                 // setHexId, а не присваивание: смена гекса ВЫВОДИТ войско из
                 // здания, внутри которого оно стояло.
                 unit.setHexId(dest);
+                // КУДА ВСТАЛО — выбирает игрок (26.09.2026)
+                СекторыВойск.поставить(s, agent, unit);
                 // ПЕЧАТНЫЙ КОНТЕЙНЕР: войско встало на ячейку — берёт карту.
                 // o30 «Мародёр» считает такие контейнеры (учёт внутри).
                 PrintedContainers.onUnitMoved(s, player, fromHex, dest, unit.type, wasInside);
@@ -2616,7 +2620,7 @@ public final class Actions {
                     if (pick.payload() == null) {
                         break;
                     }
-                    сходили.add(провестиМаршрут(s, player, pick));
+                    сходили.add(провестиМаршрут(s, player, pick, agent));
                     ходов++;
                 }
                 // 2. ЗАГНАТЬ: любые другие свои войска, которые дойдут до гекса.
@@ -2640,7 +2644,7 @@ public final class Actions {
                     if (pick.payload() == null) {
                         break;
                     }
-                    сходили.add(провестиМаршрут(s, player, pick));
+                    сходили.add(провестиМаршрут(s, player, pick, agent));
                     ходов++;
                 }
             }
@@ -2690,7 +2694,7 @@ public final class Actions {
                 if (pick == null || pick.payload() == null) {
                     break;
                 }
-                сходили.add(провестиМаршрут(s, player, pick));
+                сходили.add(провестиМаршрут(s, player, pick, agent));
             }
             ctx.recordOp("movement");
             ctx.actionsPlayed.add(name());
@@ -2704,7 +2708,7 @@ public final class Actions {
          * или заводит его в гарнизон. Возвращает uid жетона.
          */
         @SuppressWarnings("unchecked")
-        private int провестиМаршрут(GameState s, PlayerState player, Choice pick) {
+        private int провестиМаршрут(GameState s, PlayerState player, Choice pick, Agent agent) {
             Map<String, Object> mp = (Map<String, Object>) pick.payload();
             int uid = ((Number) mp.get("uid")).intValue();
             UnitToken unit = null;
@@ -2727,6 +2731,8 @@ public final class Actions {
                 PrintedContainers.onUnitMoved(s, player, fromHex, шаг, unit.type, wasInside);
                 TokenContainers.onUnitEntered(s, player, шаг);
             }
+            // КУДА ВСТАЛО В КОНЦЕ МАРШРУТА — выбирает игрок (26.09.2026)
+            СекторыВойск.поставить(s, agent, unit);
             f.movedUids.add(uid);
             f.unitsMoved = f.movedUids.size();
             return uid;

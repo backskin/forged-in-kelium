@@ -1774,6 +1774,7 @@ public final class HotSeatWindow {
                     kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe));
             case "build_hex", "tower_hex", "cu_hex" -> "Гекс стройки " + hexWords(String.valueOf(p));
             case "build_facing", "cu_sides" -> "Поворот здания";
+            case "unit_sector" -> "Куда поставить войско";
             case "move" -> p instanceof Map<?, ?> m && m.get("to") != null
                 ? "Шаг на " + hexWords(String.valueOf(m.get("to"))) : "Шаг: " + raw;
             case "maneuver_hex" -> "Манёвр через " + hexWords(String.valueOf(p));
@@ -2759,6 +2760,7 @@ public final class HotSeatWindow {
         Map.entry("blind_discard", "отложите приказ — место для трофеев"),
         Map.entry("build_pick", "стройка: что строим"),
         Map.entry("build_facing", "какими секторами поставить"),
+        Map.entry("unit_sector", "на какой сектор поставить войско"),
         Map.entry("tower_hex", "гекс для вышки"),
         Map.entry("build_hex", "гекс для постройки"),
         Map.entry("move_hex", "гекс для переноса"),
@@ -3363,7 +3365,8 @@ public final class HotSeatWindow {
         // ВЫБОР ДУГИ СЕКТОРОВ (концепт §4): движок уже назвал гекс и варианты,
         // колесо мыши вращает дугу, клик по гексу ставит. Плашки-варианты внизу
         // остаются как равноправный путь.
-        if (("build_facing".equals(kind) || "cu_sides".equals(kind))
+        if (("build_facing".equals(kind) || "cu_sides".equals(kind)
+                || "unit_sector".equals(kind))
                 && d.context().get("hex") instanceof String fhex) {
             List<List<Integer>> variants = new ArrayList<>();
             boolean allLists = true;
@@ -3387,13 +3390,18 @@ public final class HotSeatWindow {
                     field.setGhost(bt, seat);
                 } else if ("cu_sides".equals(kind)) {
                     field.setGhost("command_center", seat);
+                } else if (d.context().get("utype") instanceof String ut) {
+                    field.setGhost(ut, seat);
                 }
                 field.setFacingChoice(fhex, variants, idx -> {
                     submit(agent, d, idx);
                 });
                 field.setChoices(null, cap(kindLabel(kind)),
-                    "Наведите курсор на сторону гекса или крутите колесо — "
-                        + "здание встаёт призраком; щелчок по гексу ставит", null,
+                    "unit_sector".equals(kind)
+                        ? "Наведите курсор на сектор гекса или крутите колесо — "
+                            + "жетон встаёт призраком; щелчок по гексу ставит"
+                        : "Наведите курсор на сторону гекса или крутите колесо — "
+                            + "здание встаёт призраком; щелчок по гексу ставит", null,
                     Theme.seat(seat));
                 refreshSteps();
                 frame.toFront();

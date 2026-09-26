@@ -228,6 +228,56 @@ class PrintedContainersTest {
             "перешёл с контейнера на другой открытый — карта");
     }
 
+    /**
+     * СЕКТОР ВОЙСКА РЕШАЕТ (выбор сектора, 26.09.2026): войско, поставленное
+     * игроком НЕ на ячейку контейнера, её не накрывает — контейнер остаётся
+     * открытым; поставленное НА ячейку — накрывает, карта его.
+     */
+    @Test
+    void контейнерБерётТолькоВойскоНаЕгоСекторе() {
+        Object[] f = полеСКонтейнерами();
+        GameState s = (GameState) f[0];
+        Hex земля = (Hex) f[1];
+        PlayerState p = s.player(0);
+        int ячейка = земля.containerCell;
+        int другой = -1;
+        for (int i = 0; i < 6; i++) {
+            if (i != ячейка && земля.sideOwner[i] == null) {
+                другой = i;
+                break;
+            }
+        }
+        assertTrue(другой >= 0, "на гексе нашёлся другой свободный сектор");
+
+        java.util.Set<String> до = PrintedContainers.открытые(s);
+        kelium.core.UnitToken u = s.tokenStats.makeUnit(UnitType.INFANTRY, p.seat, 9341);
+        p.units.add(u);
+        u.hexId = земля.id;
+        u.chooseSides(List.of(другой));
+        assertTrue(PrintedContainers.visibleContainer(s, земля),
+            "пехота на соседнем секторе ячейку не накрыла");
+        assertEquals(0, PrintedContainers.накрытия(s, p, до), "карты нет");
+
+        до = PrintedContainers.открытые(s);
+        u.chooseSides(List.of(ячейка));
+        assertFalse(PrintedContainers.visibleContainer(s, земля), "ячейка накрыта пехотой");
+        assertEquals(1, PrintedContainers.накрытия(s, p, до), "пехота встала на контейнер");
+    }
+
+    /** Бот ставит войско сам — на свободный контейнер, как поставил бы человек. */
+    @Test
+    void ботСтавитВойскоНаКонтейнер() {
+        Object[] f = полеСКонтейнерами();
+        GameState s = (GameState) f[0];
+        Hex земля = (Hex) f[1];
+        PlayerState p = s.player(0);
+        kelium.core.UnitToken u = s.tokenStats.makeUnit(UnitType.INFANTRY, p.seat, 9351);
+        p.units.add(u);
+        u.hexId = земля.id;
+        kelium.engine.СекторыВойск.поставить(s, null, u);
+        assertEquals(List.of(земля.containerCell), u.chosenSides());
+    }
+
     @Test
     void никакихСтартовыхКонтейнеров() {
         // ПРАВИЛО ДИЗАЙНЕРА 13.09.2026: «карты контейнера на старте нет».

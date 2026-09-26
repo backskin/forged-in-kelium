@@ -93,7 +93,28 @@ public final class СекторыВойск {
             .thenComparingInt(u -> u.uid));
 
         Map<Integer, List<Integer>> итог = new LinkedHashMap<>();
+        // ВЫБРАННЫЕ ИГРОКОМ СЕКТОРЫ — ПЕРВЫМИ (26.09.2026): жетон стоит там, куда
+        // его поставили. Выбор, который с тех пор накрыло здание, не действует —
+        // такой жетон садится сам вместе с остальными.
+        List<UnitToken> сами = new ArrayList<>();
         for (UnitToken u : наземные) {
+            List<Integer> выбор = u.chosenSides();
+            boolean годится = выбор != null && выбор.size() == секторов(u.type);
+            if (годится) {
+                for (int i : выбор) {
+                    годится &= свободно[i];
+                }
+            }
+            if (!годится) {
+                сами.add(u);
+                continue;
+            }
+            for (int i : выбор) {
+                свободно[i] = false;
+            }
+            итог.put(u.uid, выбор);
+        }
+        for (UnitToken u : сами) {
             List<Integer> место = найтиМесто(s, h, свободно, u);
             if (место == null) {
                 continue;
@@ -104,6 +125,36 @@ public final class СекторыВойск {
             итог.put(u.uid, место);
         }
         return итог;
+    }
+
+    /** Войско, стоящее на секторе {@code side} гекса, или null. */
+    public static UnitToken наСекторе(GameState s, Hex h, int side) {
+        if (h == null || side < 0 || side > 5) {
+            return null;
+        }
+        boolean есть = false;
+        for (PlayerState p : s.players) {
+            for (UnitToken u : p.units) {
+                if (h.id.equals(u.hexId)) {
+                    есть = true;
+                }
+            }
+        }
+        if (!есть) {
+            return null;
+        }
+        for (var e : разложить(s, h.id).entrySet()) {
+            if (e.getValue().contains(side)) {
+                for (PlayerState p : s.players) {
+                    for (UnitToken u : p.units) {
+                        if (u.uid == e.getKey()) {
+                            return u;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /** Секторы одного жетона, или null если он не на земле или места нет. */
@@ -174,5 +225,112 @@ public final class СекторыВойск {
             }
         }
         return false;
+    }
+
+    // ======================================================================
+    //  ВЫБОР СЕКТОРА ИГРОКОМ (решение дизайнера 26.09.2026)
+    // ======================================================================
+
+    /**
+     * Куда можно поставить жетон {@code u} на его гексе: одиночный сектор или
+     * пара смежных у техники. Годится место, свободное от зданий, стенок и
+     * уже поставленных войск, при котором на гексе умещаются и все остальные
+     * войска (жетоны без выбора подвинутся сами).
+     */
+    public static List<List<Integer>> варианты(GameState s, UnitToken u) {
+        List<List<Integer>> out = new ArrayList<>();
+        Hex h = u.hexId == null ? null : s.field.hexes.get(u.hexId);
+        int нужно = секторов(u.type);
+        if (h == null || нужно == 0 || u.inside()) {
+            return out;
+        }
+        int былаМаска = u.sideMask;
+        String былГекс = u.sidesHex;
+        try {
+            u.sideMask = 0;
+            int разместилось = разложить(s, u.hexId).size();
+            for (int i = 0; i < 6; i++) {
+                List<Integer> место = нужно == 1 ? List.of(i) : List.of(i, (i + 1) % 6);
+                boolean свободно = true;
+                for (int k : место) {
+                    свободно &= h.sideOwner[k] == null;
+                }
+                if (!свободно) {
+                    continue;
+                }
+                u.chooseSides(место);
+                Map<Integer, List<Integer>> р = разложить(s, u.hexId);
+                if (место.equals(р.get(u.uid)) && р.size() >= разместилось) {
+                    out.add(место);
+                }
+            }
+        } finally {
+            u.sideMask = былаМаска;
+            u.sidesHex = былГекс;
+        }
+        return out;
+    }
+
+    /**
+     * Войско встало на гекс: поставить его на секторы. Живой игрок выбирает сам
+     * ({@link kelium.core.Agent#choosesSectors}); бот — как поставил бы человек,
+     * берущий карту: на печатный контейнер, если он свободен, иначе к своим.
+     * Авиация и войско в здании секторов не занимают — вопроса нет.
+     */
+    public static void поставить(GameState s, kelium.core.Agent agent, UnitToken u) {
+        List<List<Integer>> вар = варианты(s, u);
+        if (вар.isEmpty()) {
+            return;
+        }
+        Hex h = s.field.hexes.get(u.hexId);
+        List<Integer> лучший = поУмолчанию(s, h, u, вар);
+        if (agent == null || !agent.choosesSectors() || вар.size() == 1) {
+            u.chooseSides(лучший);
+            return;
+        }
+        // лучший — первым: пропуск вопроса и робот-тесты берут его
+        List<List<Integer>> порядок = new ArrayList<>(вар);
+        порядок.remove(лучший);
+        порядок.add(0, лучший);
+        List<kelium.core.Choice> opts = new ArrayList<>();
+        for (List<Integer> м : порядок) {
+            boolean контейнер = h.containerCell >= 0 && м.contains(h.containerCell);
+            opts.add(new kelium.core.Choice("unit_sector", м,
+                (м.size() == 1 ? "сектор " + м.get(0) : "секторы " + м.get(0) + "-" + м.get(1))
+                    + (контейнер ? " (контейнер)" : "")));
+        }
+        Map<String, Object> ctx = new LinkedHashMap<>();
+        ctx.put("kind", "unit_sector");
+        ctx.put("hex", u.hexId);
+        ctx.put("uid", u.uid);
+        ctx.put("utype", u.type.code);
+        kelium.core.Choice pick = agent.choose(s, opts, ctx);
+        List<Integer> м = new ArrayList<>();
+        if (pick != null && pick.payload() instanceof List<?> l) {
+            for (Object o : l) {
+                м.add(((Number) o).intValue());
+            }
+        }
+        u.chooseSides(вар.contains(м) ? м : лучший);
+    }
+
+    /** Место по умолчанию: печатный контейнер, если он в вариантах, иначе к своим. */
+    private static List<Integer> поУмолчанию(GameState s, Hex h, UnitToken u,
+                                             List<List<Integer>> вар) {
+        if (h.containerCell >= 0 && h.containerCell < 6) {
+            for (List<Integer> м : вар) {
+                if (м.contains(h.containerCell)) {
+                    return м;
+                }
+            }
+        }
+        for (int i : порядокСекторов(s, h, u.owner())) {
+            for (List<Integer> м : вар) {
+                if (м.get(0) == i) {
+                    return м;
+                }
+            }
+        }
+        return вар.get(0);
     }
 }
