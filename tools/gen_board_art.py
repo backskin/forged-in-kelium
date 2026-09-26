@@ -32,7 +32,7 @@ from PIL import Image
 
 КОРЕНЬ = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 КУДА = os.path.join(КОРЕНЬ, "data", "textures", "board")
-ДИСК = os.path.join(os.path.expanduser("~"), "Yandex.Disk", "Forged in Kelium")
+ДИСК = os.environ.get("KELIUM_EXPORT") or r"C:\shared\Yandex.Disk\Forged in Kelium"
 ИГРОКА = os.path.join(ДИСК, "Компоненты игрока", "экспорт-планшеты")
 ОБЩИЕ = os.path.join(ДИСК, "Общие компоненты", "экспорт-планшеты")
 

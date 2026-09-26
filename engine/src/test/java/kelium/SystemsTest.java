@@ -33,12 +33,12 @@ class SystemsTest {
     void blueModuleRaisesAssemblyOutput() {
         GameState s = build();
         PlayerState p = s.player(0);
-        // без модуля — печать планшета красных: казарма 2 БПР / 1 войско,
-        // авиабаза 1 БПР / 2 войска (наём двух за раз).
-        assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
-        assertEquals(2, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
-        assertEquals(2, Modules.assemblyOutput(p, BuildingType.AIRBASE, "unit"));
-        assertEquals(1, Modules.assemblyOutput(p, BuildingType.AIRBASE, "ammo"));
+        // без модуля — печать планшета красных (26.09.2026): казарма 1 БПР /
+        // 2 войска (наём двух за раз), авиабаза 2 БПР / 1 войско.
+        assertEquals(2, Modules.assemblyOutput(p, BuildingType.BARRACKS, "unit"));
+        assertEquals(1, Modules.assemblyOutput(p, BuildingType.BARRACKS, "ammo"));
+        assertEquals(1, Modules.assemblyOutput(p, BuildingType.AIRBASE, "unit"));
+        assertEquals(2, Modules.assemblyOutput(p, BuildingType.AIRBASE, "ammo"));
         // АССОРТИМЕНТ 23.09.2026: C1 2БПР/2в (зол.войска), C2 2БПР/2в (зол.БПР),
         // C3 3БПР/1в (зол.войска), C4 1БПР/3в (зол.БПР).
         // C2 лицом: 2 БПР / 2 войска.
@@ -90,7 +90,8 @@ class SystemsTest {
         // жетон на поле получает прочность своего цвета
         assertEquals(1, t.makeUnit(kelium.core.UnitType.INFANTRY, 3, 9001).hp);
         // планшет: скорость и цена
-        assertEquals(1, s.player(1).board.troop.speed(kelium.core.UnitType.INFANTRY));
+        assertEquals(2, s.player(1).board.troop.speed(kelium.core.UnitType.INFANTRY));
+        assertEquals(1, s.player(2).board.troop.speed(kelium.core.UnitType.TOWER));
         assertEquals(3, s.player(0).board.troop.buildingPrice("barracks"));
         assertEquals(1, s.player(2).board.troop.buildingPrice("factory"));
     }
