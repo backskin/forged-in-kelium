@@ -412,6 +412,8 @@ public final class HotSeatWindow {
             return o != null ? o : cardFace(id);
         });
         frame.getLayeredPane().add(ceremony, JLayeredPane.MODAL_LAYER);
+        // мимо карт мышь ведёт поле: перетаскивание и колесо (27.09.2026)
+        ceremony.setPassThrough(() -> field);
 
         // Модальное окно необратимого — во весь слой окна, поверх всего.
         confirm = new kelium.gui.kp.ConfirmDialog();

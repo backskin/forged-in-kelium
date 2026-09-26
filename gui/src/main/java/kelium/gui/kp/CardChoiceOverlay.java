@@ -56,23 +56,81 @@ public final class CardChoiceOverlay extends JComponent {
                         : Cursor.getDefaultCursor());
                     repaint();
                 }
+                if (i < 0) {
+                    pass(e);
+                }
             }
 
             @Override
             public void mouseClicked(MouseEvent e) {
                 int i = cardAt(e.getPoint());
-                if (i >= 0) {
+                if (i >= 0 && !passing) {
                     cards.get(i).onPick().run();
                 }
             }
 
             @Override
             public void mousePressed(MouseEvent e) {
-                // шторка глотает клики
+                // Нажатие МИМО КАРТ — начало перетаскивания поля под шторкой
+                // (жалоба дизайнера 27.09.2026: пока открыт выбор карты, поле
+                // нельзя было ни сдвинуть, ни приблизить).
+                passing = cardAt(e.getPoint()) < 0;
+                if (passing) {
+                    pass(e);
+                }
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (passing) {
+                    pass(e);
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (passing) {
+                    pass(e);
+                }
             }
         };
         addMouseListener(m);
         addMouseMotionListener(m);
+        // колесо мимо карт — масштаб поля под шторкой
+        addMouseWheelListener(e -> {
+            if (cardAt(e.getPoint()) < 0) {
+                pass(e);
+            }
+        });
+    }
+
+    /** Поле под шторкой: ему уходят нажатия, перетаскивание и колесо мимо карт. */
+    private java.util.function.Supplier<java.awt.Component> passTo = () -> null;
+    /** Идёт перетаскивание, начатое мимо карт, — его ведёт поле. */
+    private boolean passing;
+
+    public void setPassThrough(java.util.function.Supplier<java.awt.Component> c) {
+        this.passTo = c == null ? () -> null : c;
+    }
+
+    /** Переслать событие мыши полю — в его координатах. */
+    private void pass(MouseEvent e) {
+        java.awt.Component c = passTo.get();
+        if (c == null || !c.isShowing()) {
+            return;
+        }
+        java.awt.Point p = javax.swing.SwingUtilities.convertPoint(this, e.getPoint(), c);
+        if (!passing && !new Rectangle(c.getSize()).contains(p)) {
+            return;
+        }
+        MouseEvent out = e instanceof java.awt.event.MouseWheelEvent w
+            ? new java.awt.event.MouseWheelEvent(c, w.getID(), w.getWhen(), w.getModifiersEx(),
+                p.x, p.y, w.getXOnScreen(), w.getYOnScreen(), w.getClickCount(), false,
+                w.getScrollType(), w.getScrollAmount(),
+                w.getWheelRotation(), w.getPreciseWheelRotation())
+            : new MouseEvent(c, e.getID(), e.getWhen(), e.getModifiersEx(), p.x, p.y,
+                e.getClickCount(), false, e.getButton());
+        c.dispatchEvent(out);
     }
 
     /**
@@ -113,11 +171,13 @@ public final class CardChoiceOverlay extends JComponent {
     private int cardW() {
         int n = Math.max(1, cards.size());
         int fit = (getWidth() - Theme.px(80)) / n + Theme.px(30);
-        // печатные лица крупнее: на них мелкий текст, его надо прочесть
+        // КАРТЫ ПОМЕНЬШЕ (жалоба дизайнера 27.09.2026: «слишком крупные»): все
+        // карты занимают около половины высоты поля, а не почти всё окно.
+        // Мелкий текст читается в описании под веером.
         boolean printed = !cards.isEmpty() && art.apply(cards.get(0).id()) != null;
-        int max = printed ? Theme.px(230) : Theme.px(170);
-        int byHeight = (int) ((getHeight() - Theme.px(260)) * ratio());
-        return Math.max(Theme.px(120), Math.min(Math.min(max, byHeight), fit));
+        int max = printed ? Theme.px(170) : Theme.px(140);
+        int byHeight = (int) (getHeight() * 0.36 * ratio());
+        return Math.max(Theme.px(80), Math.min(Math.min(max, byHeight), fit));
     }
 
     private int cardH() {
@@ -180,7 +240,8 @@ public final class CardChoiceOverlay extends JComponent {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setComposite(AlphaComposite.SrcOver.derive((float) (0.5 * a)));
+        // затемнение легче прежнего: поле под шторкой видно и его можно двигать
+        g.setComposite(AlphaComposite.SrcOver.derive((float) (0.38 * a)));
         g.setColor(new Color(0x10, 0x14, 0x1A));
         g.fillRect(0, 0, getWidth(), getHeight());
         g.setComposite(AlphaComposite.SrcOver.derive((float) a));
