@@ -80,6 +80,15 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         /** Насколько вставленные карты свисают под сцепкой — доля её высоты. */
         double hang();
 
+        /**
+         * Ширина сцепки в пикселях печати (экспорт 300 точек на дюйм). Через
+         * неё всё на столе рисуется ОДНОЙ МЕРОЙ: карта 661×1028 печати рядом с
+         * планшетом 3354×886 — ровно как на столе.
+         */
+        default double printWidth() {
+            return 0;
+        }
+
         /** Нарисовать и записать зоны щелчка и контуры деталей; вернуть высоту. */
         int paint(Graphics2D g, int x, int y, int width, Map<String, Rectangle> hits,
                   Map<String, Shape> outlines);
@@ -579,8 +588,10 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         }
 
         // ---- СПРАВА: вскрытый приказ круга и «Завершить ход»
-        paintOrder(g, L.orderX(), top, L.orderW(), innerH);
-        paintEnd(g, L.orderX() + L.orderW() + Theme.px(6), top, L.endW(), innerH);
+        int orderH = (int) Math.round(L.orderW() * CARD_H / (double) CARD_W);
+        int oy = top + Math.max(0, (innerH - orderH) / 2);
+        paintOrder(g, L.orderX(), oy, L.orderW(), orderH);
+        paintEnd(g, L.orderX() + L.orderW() + Theme.px(10), oy, L.endW(), orderH);
 
         // ---- обводка всего, что можно выбрать
         for (String key : choices.keySet()) {
@@ -661,29 +672,60 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
 
     /** Ширина стопки из {@code n} карт: карты заходят друг на друга, видна кромка каждой. */
     private static int stackWidth(int n, int stackH) {
-        double cw = (stackH - Theme.px(22)) * 0.643;
+        double cw = (stackH - capH()) * CARD_W / (double) CARD_H;
         return (int) Math.round(cw * (1 + 0.22 * (Math.max(1, n) - 1)) + Theme.px(4));
     }
+
+    /** Подпись над стопкой руки. */
+    private static int capH() {
+        return Theme.px(26);
+    }
+
+    /**
+     * ОДНА МЕРА НА ВЕСЬ СТОЛ (замечание дизайнера 26.09.2026: «карта под
+     * свалку — такая же карта, как остальные, только в повороте; приказы не
+     * того размера; гигантская карта справа»). Все компоненты экспортированы
+     * в 300 точек на дюйм, поэтому пиксель печати — одна и та же доля
+     * миллиметра у планшета, карты и жетона. {@code s} — экранных точек на
+     * пиксель печати; выбирается так, чтобы по высоте влезла самая высокая
+     * вещь зоны — сцепка планшетов со свисающими картами или карта с подписью.
+     */
+    private double printScale(int innerH) {
+        double pw = boards == null ? 0 : boards.printWidth();
+        if (pw <= 0 || boards.aspect() <= 0) {
+            return innerH / 1300.0;
+        }
+        double pairH = pw / boards.aspect() * (1 + Math.max(0, boards.hang()));
+        return Math.min(innerH / pairH, (innerH - capH()) / (double) CARD_H);
+    }
+
+    /** Карта приказа и задания в печати: 661×1028 (56×87 мм). */
+    private static final int CARD_W = 661;
+    private static final int CARD_H = 1028;
 
     private Layout layout(int w, int h, int top, int innerH) {
         int pad = Theme.px(20);
         int gap = Theme.px(18);
-        int stackH = (int) Math.round(innerH * 0.70);
+        double sc = printScale(innerH);
+        int cardW = (int) Math.round(CARD_W * sc);
+        int cardH = (int) Math.round(CARD_H * sc);
+        int stackH = cardH + capH();
         int left = 0;
         for (Object[] hd : handGroups()) {
             left += stackWidth(((List<?>) hd[2]).size(), stackH) + gap;
         }
-        int dumpW = (int) Math.round(innerH * 0.52);
-        int dumpH = (int) Math.round(dumpW * 661 / 1028.0);
+        // свалка — та же карта приказа, лёжа
+        int dumpW = cardH;
+        int dumpH = cardW;
         left += dumpW;
         int bw = 0;
         if (boards != null && boards.aspect() > 0) {
-            double hang = Math.max(0, boards.hang());
-            bw = (int) Math.round(innerH / (1 + hang) * boards.aspect());
+            bw = boards.printWidth() > 0 ? (int) Math.round(boards.printWidth() * sc)
+                : (int) Math.round(innerH / (1 + Math.max(0, boards.hang())) * boards.aspect());
         }
-        int orderW = (int) Math.round(innerH * 661 / 1028.0);
-        int endW = Theme.px(104);
-        int right = orderW + Theme.px(6) + endW;
+        int orderW = cardW;
+        int endW = Theme.px(150);
+        int right = orderW + Theme.px(10) + endW;
         int minW = pad + left + gap + bw + gap + right + pad;
         // планшеты по центру окна, пока соседям хватает места
         int bx = w / 2 - bw / 2;
@@ -723,10 +765,10 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         if (resources.isEmpty()) {
             return 0;
         }
-        int h = Theme.px(28);
-        double s = Theme.px(16);
-        Font num = Theme.mono(15, Font.BOLD);
-        Font cap = Theme.font(11, Font.PLAIN);
+        int h = Theme.px(34);
+        double s = Theme.px(24);
+        Font num = Theme.mono(19, Font.BOLD);
+        Font cap = Theme.font(13, Font.PLAIN);
         int cy = y + h / 2;
         for (Res r : resources) {
             MarkIcons.paint(g, r.icon(), x + s / 2, cy, s, r.color());
@@ -763,7 +805,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         int th = Theme.px(24);
         int x = w - Theme.px(12);
         int y = Theme.px(8);
-        g.setFont(Theme.font(11, Font.BOLD));
+        g.setFont(Theme.font(13, Font.BOLD));
         FontMetrics fm = g.getFontMetrics();
         for (int i = seatTabs.size() - 1; i >= 0; i--) {
             SeatTab t = seatTabs.get(i);
@@ -785,7 +827,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             x -= Theme.px(6);
         }
         if (state.hidden()) {
-            g.setFont(Theme.font(11, Font.PLAIN));
+            g.setFont(Theme.font(13, Font.PLAIN));
             g.setColor(MAT_INK2);
             String s = "стол " + state.seatName() + " — видно только открытое";
             g.drawString(s, x - g.getFontMetrics().stringWidth(s) - Theme.px(8),
@@ -856,7 +898,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             Math.max(total, cw) + Theme.px(8), bottom - boardBottom + Theme.px(6));
         if (hand.isEmpty()) {
             // Пусто — тихой подписью под кромкой: место не должно кричать.
-            g.setFont(Theme.font(10, Font.PLAIN));
+            g.setFont(Theme.font(12.5, Font.PLAIN));
             g.setColor(MAT_INK2);
             centred(g, "закрытого арсенала нет", cx, bottom - Theme.px(6));
             return;
@@ -891,7 +933,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
      * трофейной стороной; под ним — сколько они стоят.
      */
     private void paintDump(Graphics2D g, int x, int y, int w, int h) {
-        g.setFont(Theme.caption());
+        g.setFont(Theme.font(13, Font.BOLD));
         g.setColor(MAT_INK2);
         g.drawString("СВАЛКА", x, y - Theme.px(6));
         RoundRectangle2D shape = new RoundRectangle2D.Double(x, y, w, h, h * 0.08, h * 0.08);
@@ -900,7 +942,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             g.setStroke(new BasicStroke(Theme.pxf(1.3), BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND, 10f, new float[]{Theme.pxf(5), Theme.pxf(4)}, 0f));
             g.draw(shape);
-            g.setFont(Theme.font(10, Font.PLAIN));
+            g.setFont(Theme.font(12.5, Font.PLAIN));
             centred(g, "приказ ещё не отложен", x + w / 2, y + h / 2 + Theme.px(4));
             return;
         }
@@ -949,7 +991,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         }
         String cap = tokens.isEmpty() ? "пусто"
             : tokens.size() + " жет. · трофеев " + state.dumpValue();
-        g.setFont(Theme.font(10, Font.BOLD));
+        g.setFont(Theme.font(12.5, Font.BOLD));
         g.setColor(MAT_INK);
         centred(g, cap, x + w / 2, y + h + Theme.px(14));
         groups.put("dump", shape);
@@ -983,7 +1025,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             g.setStroke(new BasicStroke(Theme.pxf(1.5), BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND, 10f, new float[]{Theme.pxf(6), Theme.pxf(5)}, 0f));
             g.draw(shape);
-            g.setFont(Theme.font(11, Font.PLAIN));
+            g.setFont(Theme.font(13, Font.PLAIN));
             g.setColor(MAT_INK2);
             centred(g, "приказ круга", x + w / 2, y + h / 2 - Theme.px(6));
             centred(g, "ещё не вскрыт", x + w / 2, y + h / 2 + Theme.px(10));
@@ -1157,19 +1199,19 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         g.setStroke(new BasicStroke(1f));
         g.draw(r);
         g.setColor(can ? Color.WHITE : MAT_INK2);
-        g.setFont(Theme.font(15, Font.BOLD));
+        g.setFont(Theme.font(19, Font.BOLD));
         // ВСЕГДА «Завершить ход»: гаснет, когда нажать нельзя, а под ним — почему,
         // обычными словами (вместо «Сначала решение», которое никто не понял).
         String a = "Завершить";
         String b = "ход";
         if (!can && state.status() != null) {
             List<String> why = List.of(state.status());
-            g.setFont(Theme.font(10, Font.PLAIN));
+            g.setFont(Theme.font(12.5, Font.PLAIN));
             int ly = ey + eh - Theme.px(12);
             for (String line : why) {
                 centred(g, line, x + w / 2, ly);
             }
-            g.setFont(Theme.font(15, Font.BOLD));
+            g.setFont(Theme.font(19, Font.BOLD));
         }
         centred(g, a, x + w / 2, ey + eh / 2 - Theme.px(4));
         if (!b.isEmpty()) {
@@ -1177,7 +1219,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         }
         List<FieldBubbles.Opt> end = choices.get("end");
         if (can && end != null && !end.isEmpty() && end.get(0).sub() != null) {
-            g.setFont(Theme.font(9, Font.PLAIN));
+            g.setFont(Theme.font(12, Font.PLAIN));
             g.setColor(new Color(255, 255, 255, 210));
             centred(g, end.get(0).sub(), x + w / 2, ey + eh - Theme.px(10));
         }
@@ -1190,7 +1232,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             if (ch > Theme.px(70)) {
                 int cx = x + (w - cw) / 2;
                 int cy = y + Theme.px(16);
-                g.setFont(Theme.caption());
+                g.setFont(Theme.font(13, Font.BOLD));
                 g.setColor(MAT_INK2);
                 g.drawString("СЫГРАНО · " + played.size(), x, y + Theme.px(10));
                 for (int i = 0; i < Math.min(4, played.size()); i++) {
@@ -1211,7 +1253,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
                 g.setColor(Theme.alpha(MAT_INK2, 0.8));
                 g.setStroke(new BasicStroke(1f));
                 g.draw(pill);
-                g.setFont(Theme.font(10.5, Font.BOLD));
+                g.setFont(Theme.font(13, Font.BOLD));
                 g.setColor(MAT_INK);
                 centred(g, "сыграно · " + played.size(), x + w / 2, py + ph / 2 + Theme.px(4));
                 groups.put("played", pill.getBounds());
@@ -1236,10 +1278,10 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         g.setStroke(new BasicStroke(Theme.pxf(1.6)));
         g.draw(r);
         g.setColor(MAT_INK);
-        g.setFont(Theme.font(13, Font.BOLD));
+        g.setFont(Theme.font(15, Font.BOLD));
         centred(g, "К своему", x + w / 2, ey + eh / 2 - Theme.px(4));
         centred(g, "столу", x + w / 2, ey + eh / 2 + Theme.px(13));
-        g.setFont(Theme.font(10, Font.PLAIN));
+        g.setFont(Theme.font(12.5, Font.PLAIN));
         g.setColor(MAT_INK2);
         centred(g, "только смотреть", x + w / 2, ey + eh - Theme.px(10));
         spots.put("back", new Rectangle(x, ey, w, eh));
@@ -1330,16 +1372,17 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
      */
     private void fan(Graphics2D g, String group, String caption, List<String> ids,
                      int x, int y, int w, int h, boolean small) {
-        int capH = Theme.px(16);
-        g.setFont(Theme.caption());
+        int capH = capH();
+        // подпись стопки крупно: её читают с расстояния, как надпись на столе
+        g.setFont(Theme.font(15, Font.BOLD));
         boolean chosen = ids.stream().anyMatch(id -> choices.containsKey("card:" + id));
         g.setColor(chosen ? seatColor : MAT_INK2);
         g.drawString(clipText(g, caption + " · " + ids.size()
                 + (chosen ? " — щёлкните, чтобы сыграть" : ""), Math.max(w, Theme.px(40))),
-            x, y + capH - Theme.px(4));
-        int ch = h - capH - Theme.px(6);
-        // ПРОПОРЦИЯ — С ПЕЧАТНОГО ЛИЦА (не «кукожить» карты, 25.09.2026)
-        double ratio = ids.isEmpty() ? 0.643 : aspect(faceOf.apply(ids.get(0)), 0.643);
+            x, y + capH - Theme.px(8));
+        int ch = h - capH;
+        // ПРОПОРЦИЯ — ПЕЧАТНАЯ, 661×1028: у приказов и заданий она одна
+        double ratio = CARD_W / (double) CARD_H;
         int cw = (int) Math.round(ch * ratio);
         int n = ids.size();
         if (n == 0) {
@@ -1420,7 +1463,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             gc.draw(local);
             String tag = tagOf.apply(id);
             if (tag != null && !small) {
-                gc.setFont(Theme.font(9, Font.BOLD));
+                gc.setFont(Theme.font(12, Font.BOLD));
                 FontMetrics fm = gc.getFontMetrics();
                 int tw = fm.stringWidth(tag) + Theme.px(10);
                 int th = Theme.px(16);
@@ -1458,7 +1501,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
     }
 
     private void badge(Graphics2D g, int x, int y, String text, Color c) {
-        g.setFont(Theme.font(10, Font.BOLD));
+        g.setFont(Theme.font(12.5, Font.BOLD));
         FontMetrics fm = g.getFontMetrics();
         int bw = fm.stringWidth(text) + Theme.px(12);
         int bh = Theme.px(18);

@@ -272,7 +272,7 @@ public final class FieldBubbles {
         g.setColor(Color.WHITE);
         g.setStroke(new BasicStroke(Theme.pxf(1.6)));
         g.drawOval((int) (x - d / 2.0), (int) (y - d / 2.0), d, d);
-        g.setFont(Theme.font(11, Font.BOLD));
+        g.setFont(Theme.font(13, Font.BOLD));
         FontMetrics fm = g.getFontMetrics();
         g.drawString(n, (float) (x - fm.stringWidth(n) / 2.0),
             (float) (y + fm.getAscent() / 2.0 - Theme.px(1)));
@@ -281,10 +281,10 @@ public final class FieldBubbles {
     /** Карточка вопроса у верхней кромки поля: что ждут и варианты без гекса. */
     private void paintDock(Graphics2D g, int w) {
         int pad = Theme.px(12);
-        Font tf = Theme.font(14, Font.BOLD);
-        Font hf = Theme.font(12, Font.PLAIN);
-        Font cf = Theme.font(13, Font.BOLD);
-        Font sf = Theme.font(10, Font.PLAIN);
+        Font tf = Theme.font(16, Font.BOLD);
+        Font hf = Theme.font(14, Font.PLAIN);
+        Font cf = Theme.font(15, Font.BOLD);
+        Font sf = Theme.font(12.5, Font.PLAIN);
         boolean сбоку = dockSide - dockInset >= dockSideMin();
         int maxW = сбоку ? dockSide - dockInset - Theme.px(20)
             : Math.min(w - Theme.px(40), Theme.px(900));
@@ -422,8 +422,8 @@ public final class FieldBubbles {
 
     /** Пузырь со списком вариантов у гекса, с «хвостиком» к гексу. */
     private void paintBubble(Graphics2D g, int w, int h, Point2D c, double hexR, List<Opt> opts) {
-        Font lf = Theme.font(13, Font.BOLD);
-        Font sf = Theme.font(10, Font.PLAIN);
+        Font lf = Theme.font(15, Font.BOLD);
+        Font sf = Theme.font(12.5, Font.PLAIN);
         g.setFont(lf);
         FontMetrics lm = g.getFontMetrics();
         g.setFont(sf);

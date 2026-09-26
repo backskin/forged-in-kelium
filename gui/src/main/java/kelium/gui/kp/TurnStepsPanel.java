@@ -177,7 +177,7 @@ public final class TurnStepsPanel extends JComponent {
                 }
             }
             // номер в узле
-            g.setFont(Theme.mono(9.5, Font.BOLD));
+            g.setFont(Theme.mono(12, Font.BOLD));
             String n = String.valueOf(i + 1);
             var nfm = g.getFontMetrics();
             g.setColor(row.kind() == Kind.UNDOABLE ? Color.WHITE
@@ -187,7 +187,7 @@ public final class TurnStepsPanel extends JComponent {
 
             // текст
             boolean current = row.kind() == Kind.CURRENT;
-            g.setFont(Theme.font(11.5, current ? Font.BOLD : Font.PLAIN));
+            g.setFont(Theme.font(14, current ? Font.BOLD : Font.PLAIN));
             g.setColor(row.kind() == Kind.LOCKED ? Theme.ink3()
                 : current ? Theme.ink() : Theme.ink2());
             var fm = g.getFontMetrics();
@@ -201,7 +201,7 @@ public final class TurnStepsPanel extends JComponent {
                 paintLock(g, getWidth() - Theme.px(20), cy);
             } else if (hovered) {
                 paintUndoArrow(g, getWidth() - Theme.px(44), cy);
-                g.setFont(Theme.font(9.5, Font.BOLD));
+                g.setFont(Theme.font(12, Font.BOLD));
                 g.setColor(Theme.accent());
                 g.drawString("сюда", getWidth() - Theme.px(34),
                     cy + (g.getFontMetrics().getAscent() - g.getFontMetrics().getDescent()) / 2);

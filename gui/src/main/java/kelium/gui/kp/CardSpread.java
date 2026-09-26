@@ -218,7 +218,7 @@ public final class CardSpread extends JComponent {
         FontMetrics tf = g.getFontMetrics();
         g.drawString(title, (w - tf.stringWidth(title)) / 2, top - Theme.px(34));
         if (!subtitle.isEmpty()) {
-            g.setFont(Theme.font(12, Font.PLAIN));
+            g.setFont(Theme.font(14, Font.PLAIN));
             g.setColor(new Color(255, 255, 255, 200));
             FontMetrics sf = g.getFontMetrics();
             g.drawString(subtitle, (w - sf.stringWidth(subtitle)) / 2, top - Theme.px(14));
@@ -273,7 +273,7 @@ public final class CardSpread extends JComponent {
         g.draw(shape);
         int cy = r.y + h + Theme.px(8) + lift;
         if (c.note() != null) {
-            g.setFont(Theme.font(13, Font.BOLD));
+            g.setFont(Theme.font(15, Font.BOLD));
             g.setColor(new Color(255, 255, 255, 220));
             FontMetrics nf = g.getFontMetrics();
             String s = FieldBubbles.clip(nf, c.note(), w);
@@ -298,7 +298,7 @@ public final class CardSpread extends JComponent {
                     cr.y + (chipH + fm.getAscent()) / 2 - Theme.px(2));
             } else {
                 g.drawString(l, cr.x + (w - fm.stringWidth(l)) / 2, cr.y + Theme.px(3) + fm.getAscent());
-                g.setFont(Theme.font(12, Font.PLAIN));
+                g.setFont(Theme.font(14, Font.PLAIN));
                 FontMetrics sm = g.getFontMetrics();
                 String s = FieldBubbles.clip(sm, o.sub(), w - Theme.px(16));
                 g.setColor(new Color(255, 255, 255, 210));

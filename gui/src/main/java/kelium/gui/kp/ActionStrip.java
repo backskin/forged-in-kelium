@@ -13,6 +13,7 @@ import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,22 +29,41 @@ import kelium.gui.replay2.Theme;
  * действий: печатный кружок действия, поверх — прозрачная иконка самого
  * действия, под ним — подпись. Щелчок по кружку играет действие.
  *
+ * <p>КНОПКА «СПЕЦ-ДЕЙСТВИЕ» раскрывает над полосой список: чем можно потратить
+ * спец-действие прямо сейчас — и что нельзя, серым, с причиной.
+ *
  * <p>Фона у полосы нет: она лежит поверх поля и не должна его закрывать.
- * Отдельно — кнопка «Завершить ход», если действия ещё остались.
  */
 public final class ActionStrip extends JComponent {
 
     private static final long serialVersionUID = 1L;
 
-    /** Кнопка полосы: код действия (иконка), подпись, что сделать по щелчку. */
-    public record Item(String action, String label, String sub, Runnable onPick) {
+    /** Строка меню спец-действия: доступна ({@code onPick} не null) или нет — с причиной. */
+    public record SubItem(String label, String sub, Runnable onPick) {
+        public boolean enabled() {
+            return onPick != null;
+        }
+    }
+
+    /**
+     * Кнопка полосы: код действия (иконка; {@code null} — «Завершить ход»,
+     * {@code "spec"} — спец-действие), подпись, что сделать по щелчку, и меню.
+     */
+    public record Item(String action, String label, String sub, Runnable onPick,
+                       List<SubItem> menu) {
+        public Item(String action, String label, String sub, Runnable onPick) {
+            this(action, label, sub, onPick, null);
+        }
     }
 
     private final List<Item> items = new ArrayList<>();
     private final List<Rectangle> rects = new ArrayList<>();
+    private final List<Rectangle> menuRects = new ArrayList<>();
     private int hover = -1;
+    private int menuHover = -1;
+    /** Какая кнопка раскрыла меню (−1 — меню закрыто). */
+    private int menuOf = -1;
     private Color accent = Theme.accent();
-    private String caption;
 
     public ActionStrip() {
         setOpaque(false);
@@ -52,9 +72,13 @@ public final class ActionStrip extends JComponent {
             @Override
             public void mouseMoved(MouseEvent e) {
                 int h = at(e.getX(), e.getY());
-                if (h != hover) {
+                int mh = menuAt(e.getX(), e.getY());
+                if (h != hover || mh != menuHover) {
                     hover = h;
-                    setCursor(h >= 0 ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                    menuHover = mh;
+                    boolean hand = h >= 0 || mh >= 0 && menuItem(mh) != null
+                        && menuItem(mh).enabled();
+                    setCursor(hand ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                         : Cursor.getDefaultCursor());
                     repaint();
                 }
@@ -63,14 +87,30 @@ public final class ActionStrip extends JComponent {
             @Override
             public void mouseExited(MouseEvent e) {
                 hover = -1;
+                menuHover = -1;
                 repaint();
             }
 
             @Override
             public void mouseClicked(MouseEvent e) {
+                int mh = menuAt(e.getX(), e.getY());
+                if (mh >= 0) {
+                    SubItem si = menuItem(mh);
+                    if (si != null && si.enabled()) {
+                        hide0();
+                        si.onPick().run();
+                    }
+                    return;
+                }
                 int h = at(e.getX(), e.getY());
                 if (h >= 0 && h < items.size()) {
-                    Runnable r = items.get(h).onPick();
+                    Item it = items.get(h);
+                    if (it.menu() != null) {
+                        menuOf = menuOf == h ? -1 : h;
+                        repaint();
+                        return;
+                    }
+                    Runnable r = it.onPick();
                     hide0();
                     if (r != null) {
                         r.run();
@@ -82,20 +122,40 @@ public final class ActionStrip extends JComponent {
         addMouseMotionListener(m);
     }
 
-    /** Показать полосу с этими кнопками; {@code caption} — строка над ними. */
+    private SubItem menuItem(int i) {
+        if (menuOf < 0 || menuOf >= items.size() || items.get(menuOf).menu() == null) {
+            return null;
+        }
+        List<SubItem> menu = items.get(menuOf).menu();
+        return i >= 0 && i < menu.size() ? menu.get(i) : null;
+    }
+
+    /** Показать полосу с этими кнопками. */
     public void show(String caption, List<Item> list, Color seatColor) {
         items.clear();
         items.addAll(list);
-        this.caption = caption;
         this.accent = seatColor == null ? Theme.accent() : seatColor;
         hover = -1;
+        menuHover = -1;
+        menuOf = -1;
         setVisible(!items.isEmpty());
         repaint();
     }
 
     public void hide0() {
         items.clear();
+        menuOf = -1;
         setVisible(false);
+    }
+
+    /** Раскрыть меню спец-действия (как щелчок) — для снимков и тестов. */
+    public void openSpecMenu() {
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).menu() != null) {
+                menuOf = i;
+            }
+        }
+        repaint();
     }
 
     /** Кнопки полосы — для прогонщиков и тестов. */
@@ -106,7 +166,13 @@ public final class ActionStrip extends JComponent {
     /** Не ловить мышь там, где кнопок нет: поле под полосой остаётся живым. */
     @Override
     public boolean contains(int x, int y) {
-        return at(x, y) >= 0;
+        return at(x, y) >= 0 || menuAt(x, y) >= 0 || menuPanelContains(x, y);
+    }
+
+    private Rectangle menuPanel;
+
+    private boolean menuPanelContains(int x, int y) {
+        return menuOf >= 0 && menuPanel != null && menuPanel.contains(x, y);
     }
 
     private int at(int x, int y) {
@@ -118,9 +184,26 @@ public final class ActionStrip extends JComponent {
         return -1;
     }
 
-    /** Высота, которая нужна полосе. */
+    private int menuAt(int x, int y) {
+        if (menuOf < 0) {
+            return -1;
+        }
+        for (int i = 0; i < menuRects.size(); i++) {
+            if (menuRects.get(i).contains(x, y)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Высота самой полосы (кружки с подписями). */
     public static int stripHeight() {
-        return Theme.px(128);
+        return Theme.px(150);
+    }
+
+    /** Высота с запасом под раскрытое меню спец-действия. */
+    public static int boundsHeight() {
+        return Theme.px(560);
     }
 
     @Override
@@ -135,16 +218,15 @@ public final class ActionStrip extends JComponent {
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         int w = getWidth();
         int h = getHeight();
-        int d = Theme.px(64);
-        int cell = Theme.px(112);
+        int d = Theme.px(76);
+        int cell = Theme.px(136);
         int total = cell * items.size();
         int x0 = (w - total) / 2;
-        int cy = h - Theme.px(44) - d / 2;
-        // мягкое пятно тени под кружками — без прямоугольника: полоса читается
-        // поверх светлого поля, но ничего не закрывает
-        double rx = total / 2.0 + Theme.px(70);
-        double ry = h * 0.62;
-        double scy = cy + Theme.px(14);
+        int cy = h - Theme.px(56) - d / 2;
+        // мягкое пятно тени под кружками — без прямоугольника
+        double rx = total / 2.0 + Theme.px(80);
+        double ry = stripHeight() * 0.62;
+        double scy = cy + Theme.px(16);
         java.awt.geom.AffineTransform squash = new java.awt.geom.AffineTransform();
         squash.translate(w / 2.0, scy);
         squash.scale(1, ry / rx);
@@ -153,68 +235,125 @@ public final class ActionStrip extends JComponent {
             new java.awt.geom.Point2D.Double(w / 2.0, scy), (float) rx,
             new java.awt.geom.Point2D.Double(w / 2.0, scy),
             new float[]{0f, 0.6f, 1f},
-            new Color[]{Theme.alpha(new Color(0x0E2029), 0.6f),
-                Theme.alpha(new Color(0x0E2029), 0.3f),
+            new Color[]{Theme.alpha(new Color(0x0E2029), 0.62f),
+                Theme.alpha(new Color(0x0E2029), 0.32f),
                 Theme.alpha(new Color(0x0E2029), 0f)},
             java.awt.MultipleGradientPaint.CycleMethod.NO_CYCLE,
             java.awt.MultipleGradientPaint.ColorSpaceType.SRGB, squash);
         Graphics2D gs = (Graphics2D) g.create();
         gs.setPaint(spot);
-        gs.fillRect(0, 0, w, h);
+        gs.fillRect(0, h - stripHeight() - Theme.px(20), w, stripHeight() + Theme.px(20));
         gs.dispose();
         rects.clear();
         BufferedImage ring = kelium.report.Textures.icon("action_ring");
         for (int i = 0; i < items.size(); i++) {
             Item it = items.get(i);
             int cx = x0 + cell * i + cell / 2;
-            boolean hot = i == hover;
+            boolean hot = i == hover || i == menuOf;
             int dd = hot ? d + Theme.px(6) : d;
             Rectangle r = new Rectangle(cx - cell / 2 + Theme.px(4), cy - dd / 2 - Theme.px(4),
-                cell - Theme.px(8), dd + Theme.px(34));
+                cell - Theme.px(8), dd + Theme.px(46));
             rects.add(r);
-            // свечение цвета места под кружком
             for (int k = 6; k >= 1; k--) {
-                double gr = dd / 2.0 + Theme.px(hot ? 14 : 8) * k / 6.0;
-                g.setColor(Theme.alpha(accent, (hot ? 0.16 : 0.09) * (1 - (k - 1) / 6.0)));
+                double gr = dd / 2.0 + Theme.px(hot ? 16 : 9) * k / 6.0;
+                g.setColor(Theme.alpha(accent, (hot ? 0.17 : 0.10) * (1 - (k - 1) / 6.0)));
                 g.fill(new Ellipse2D.Double(cx - gr, cy - gr, gr * 2, gr * 2));
             }
-            if (ring != null && it.action() != null) {
-                kelium.report.Mips.draw(g, ring, cx - dd / 2, cy - dd / 2, dd, dd);
+            boolean dim = it.menu() != null && it.menu().stream().noneMatch(SubItem::enabled);
+            Graphics2D gi = (Graphics2D) g.create();
+            if (dim) {
+                gi.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.45f));
+            }
+            if (ring != null && it.action() != null && !"spec".equals(it.action())) {
+                kelium.report.Mips.draw(gi, ring, cx - dd / 2, cy - dd / 2, dd, dd);
             } else {
-                g.setColor(Theme.alpha(Color.BLACK, 0.55));
-                g.fill(new Ellipse2D.Double(cx - dd / 2.0, cy - dd / 2.0, dd, dd));
-                g.setColor(accent);
-                g.setStroke(new BasicStroke(Theme.pxf(2.4)));
-                g.draw(new Ellipse2D.Double(cx - dd / 2.0, cy - dd / 2.0, dd, dd));
+                gi.setColor(Theme.alpha(Color.BLACK, 0.55));
+                gi.fill(new Ellipse2D.Double(cx - dd / 2.0, cy - dd / 2.0, dd, dd));
+                gi.setColor(accent);
+                gi.setStroke(new BasicStroke(Theme.pxf(2.6)));
+                gi.draw(new Ellipse2D.Double(cx - dd / 2.0, cy - dd / 2.0, dd, dd));
             }
-            // иконка действия — прозрачно поверх кружка
-            // «Завершить ход» — финишным флажком из иконок игры
-            BufferedImage icon = kelium.report.Textures.icon(
-                it.action() == null ? "condition" : "action_" + it.action());
+            String iconName = it.action() == null ? "condition"
+                : "spec".equals(it.action()) ? "spec" : "action_" + it.action();
+            BufferedImage icon = kelium.report.Textures.icon(iconName);
             if (icon != null) {
-                Graphics2D gi = (Graphics2D) g.create();
-                gi.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
-                    hot ? 0.95f : 0.82f));
-                int is = (int) Math.round(dd * 0.74);
-                kelium.report.Mips.draw(gi, icon, cx - is / 2, cy - is / 2, is, is);
-                gi.dispose();
+                Graphics2D gi2 = (Graphics2D) gi.create();
+                gi2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
+                    (dim ? 0.45f : 1f) * (hot ? 0.95f : 0.84f)));
+                int is = (int) Math.round(dd * ("spec".equals(it.action()) ? 0.86 : 0.74));
+                kelium.report.Mips.draw(gi2, icon, cx - is / 2, cy - is / 2, is, is);
+                gi2.dispose();
             }
-            // подпись
-            g.setFont(Theme.font(12.5, Font.BOLD));
+            gi.dispose();
+            g.setFont(Theme.font(15, Font.BOLD));
             FontMetrics fm = g.getFontMetrics();
             String lab = it.label();
-            int ty = cy + dd / 2 + Theme.px(18);
-            g.setColor(Theme.alpha(Color.BLACK, 0.6));
+            int ty = cy + dd / 2 + Theme.px(22);
+            g.setColor(Theme.alpha(Color.BLACK, 0.7));
             g.drawString(lab, cx - fm.stringWidth(lab) / 2 + 1, ty + 1);
-            g.setColor(hot ? Color.WHITE : new Color(0xEEF7FA));
+            g.setColor(dim ? new Color(0x9FBCC9) : hot ? Color.WHITE : new Color(0xEEF7FA));
             g.drawString(lab, cx - fm.stringWidth(lab) / 2, ty);
             if (it.sub() != null && !it.sub().isBlank()) {
-                g.setFont(Theme.font(10, Font.PLAIN));
+                g.setFont(Theme.font(12.5, Font.PLAIN));
                 FontMetrics fs = g.getFontMetrics();
                 g.setColor(new Color(0xB8D3DD));
-                g.drawString(it.sub(), cx - fs.stringWidth(it.sub()) / 2, ty + Theme.px(14));
+                g.drawString(it.sub(), cx - fs.stringWidth(it.sub()) / 2, ty + Theme.px(18));
             }
         }
+        paintMenu(g, x0, cell, cy - d / 2 - Theme.px(14));
         g.dispose();
+    }
+
+    /** Меню спец-действия над своей кнопкой: доступное ярко, недоступное серым с причиной. */
+    private void paintMenu(Graphics2D g, int x0, int cell, int bottom) {
+        menuRects.clear();
+        menuPanel = null;
+        if (menuOf < 0 || menuOf >= items.size() || items.get(menuOf).menu() == null) {
+            return;
+        }
+        List<SubItem> menu = items.get(menuOf).menu();
+        Font f1 = Theme.font(15, Font.BOLD);
+        Font f2 = Theme.font(12.5, Font.PLAIN);
+        int rowH = Theme.px(50);
+        int pad = Theme.px(12);
+        int mw = Theme.px(420);
+        g.setFont(f1);
+        for (SubItem si : menu) {
+            mw = Math.max(mw, g.getFontMetrics().stringWidth(si.label()) + Theme.px(40));
+        }
+        mw = Math.min(mw, getWidth() - Theme.px(40));
+        int mh = pad * 2 + Theme.px(28) + rowH * menu.size();
+        int cx = x0 + cell * menuOf + cell / 2;
+        int mx = Math.max(Theme.px(20), Math.min(getWidth() - mw - Theme.px(20), cx - mw / 2));
+        int my = Math.max(Theme.px(6), bottom - mh);
+        menuPanel = new Rectangle(mx, my, mw, mh);
+        g.setColor(Theme.alpha(new Color(0x0E2029), 0.94f));
+        g.fill(new RoundRectangle2D.Double(mx, my, mw, mh, Theme.px(16), Theme.px(16)));
+        g.setColor(accent);
+        g.setStroke(new BasicStroke(Theme.pxf(2)));
+        g.draw(new RoundRectangle2D.Double(mx, my, mw, mh, Theme.px(16), Theme.px(16)));
+        g.setFont(Theme.font(13, Font.BOLD));
+        g.setColor(new Color(0x9FBCC9));
+        g.drawString("ЧЕМ ПОТРАТИТЬ СПЕЦ-ДЕЙСТВИЕ", mx + pad, my + pad + Theme.px(16));
+        int y = my + pad + Theme.px(28);
+        for (int i = 0; i < menu.size(); i++) {
+            SubItem si = menu.get(i);
+            Rectangle r = new Rectangle(mx + Theme.px(6), y, mw - Theme.px(12), rowH - Theme.px(4));
+            menuRects.add(r);
+            if (si.enabled() && i == menuHover) {
+                g.setColor(Theme.alpha(accent, 0.28f));
+                g.fill(new RoundRectangle2D.Double(r.x, r.y, r.width, r.height,
+                    Theme.px(10), Theme.px(10)));
+            }
+            g.setFont(f1);
+            g.setColor(si.enabled() ? Color.WHITE : new Color(0x7FA3B2));
+            g.drawString(si.label(), r.x + Theme.px(10), r.y + Theme.px(20));
+            if (si.sub() != null) {
+                g.setFont(f2);
+                g.setColor(si.enabled() ? new Color(0xB8D3DD) : new Color(0x6F8F9C));
+                g.drawString(si.sub(), r.x + Theme.px(10), r.y + Theme.px(38));
+            }
+            y += rowH;
+        }
     }
 }

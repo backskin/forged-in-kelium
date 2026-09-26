@@ -460,7 +460,8 @@ final class PrintedBoards {
         // где начинаются планшеты. Отсюда и «вровень по высоте».
         запасВойск(g, (int) Math.round(x + с.хрX() * k), y,
             (int) Math.round(хр.getWidth() * с.хрМасштаб() * k),
-            (int) Math.round((с.зданияH() - ЗДАНИЕ_ЗАЗОР) * k), запас, p.seat);
+            (int) Math.round((с.зданияH() - ЗДАНИЕ_ЗАЗОР) * k), запас, p.seat,
+            подписиЗапаса ? -1 : k);
     }
 
     /**
@@ -507,13 +508,28 @@ final class PrintedBoards {
     /** Оставшиеся жетоны рода стопкой внахлёст — вид со стола. */
     private static void стопкаЖетонов(Graphics2D g, BufferedImage tex, int cx, int y,
                                       int colW, int высота, int сколько) {
+        стопкаЖетонов(g, tex, cx, y, colW, высота, сколько, -1);
+    }
+
+    /**
+     * @param k экранных точек на пиксель печати; больше нуля — жетон в
+     *          НАТУРАЛЬНУЮ величину (картинки жетонов — в той же мере, что
+     *          планшеты: 300 точек на дюйм), стопка стоит на нижней кромке
+     */
+    private static void стопкаЖетонов(Graphics2D g, BufferedImage tex, int cx, int y,
+                                      int colW, int высота, int сколько, double k) {
         if (tex == null || сколько <= 0) {
             return;
         }
         double доля = tex.getWidth() / (double) tex.getHeight();
         int th = высота;
         int tw = (int) Math.round(th * доля);
-        if (tw > colW - 6) {
+        if (k > 0) {
+            th = (int) Math.round(tex.getHeight() * k);
+            tw = (int) Math.round(tex.getWidth() * k);
+            y += высота - th;
+            высота = th;
+        } else if (tw > colW - 6) {
             tw = colW - 6;
             th = (int) Math.round(tw / доля);
         }
@@ -527,6 +543,11 @@ final class PrintedBoards {
 
     private static void запасВойск(Graphics2D g, int x, int y, int width, int height,
                                    Map<String, int[]> запас, int seat) {
+        запасВойск(g, x, y, width, height, запас, seat, -1);
+    }
+
+    private static void запасВойск(Graphics2D g, int x, int y, int width, int height,
+                                   Map<String, int[]> запас, int seat, double k) {
         if (запас == null || запас.isEmpty() || width <= 0 || height <= 0) {
             return;
         }
@@ -546,7 +567,7 @@ final class PrintedBoards {
             if (!подписиЗапаса) {
                 // СТОЛ: лежат САМИ ОСТАВШИЕСЯ ЖЕТОНЫ, стопкой внахлёст, — и
                 // сколько их, видно по стопке, а не по цифре.
-                стопкаЖетонов(g, tex, cx, y, colW, картинкаH, вЗапасе);
+                стопкаЖетонов(g, tex, cx, y, colW, картинкаH, вЗапасе, k);
                 continue;
             }
             java.awt.Composite было = g.getComposite();

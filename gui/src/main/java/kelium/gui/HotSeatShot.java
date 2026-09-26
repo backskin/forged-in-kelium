@@ -73,6 +73,11 @@ public final class HotSeatShot {
             answered++;
         }
         Thread.sleep(400);
+        // -Dshot.specmenu — раскрыть меню спец-действия на полосе действий
+        if (System.getProperty("shot.specmenu") != null) {
+            SwingUtilities.invokeAndWait(() -> win.actionStrip.openSpecMenu());
+            Thread.sleep(200);
+        }
         // -Dshot.seat=N — посмотреть стол другого места
         String seatProp = System.getProperty("shot.seat");
         if (seatProp != null) {

@@ -35,7 +35,7 @@ public final class OpponentStrip extends JComponent {
         if (kelium.report.Textures.icon("first_player") != null) {
             return Theme.px(22);
         }
-        g.setFont(Theme.font(9.5, Font.BOLD));
+        g.setFont(Theme.font(12, Font.BOLD));
         return g.getFontMetrics().stringWidth(FIRST) + Theme.px(12);
     }
 
@@ -61,7 +61,7 @@ public final class OpponentStrip extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(Theme.px(300), Theme.px(34));
+        return new Dimension(Theme.px(300), Theme.px(42));
     }
 
     @Override
@@ -108,7 +108,7 @@ public final class OpponentStrip extends JComponent {
                 cx += bw + Theme.px(6);
                 }
             }
-            g.setFont(Theme.font(11.5, Font.BOLD));
+            g.setFont(Theme.font(14, Font.BOLD));
             g.setColor(Theme.seatInk(r.seat()));
             var fm = g.getFontMetrics();
             String nm = r.name() + (r.me() ? " (вы)" : "");
@@ -132,24 +132,24 @@ public final class OpponentStrip extends JComponent {
 
     private int cardWidth(Graphics2D g, Row r) {
         int badge = r.first() ? firstBadgeW(g) + Theme.px(6) : 0;
-        g.setFont(Theme.font(11.5, Font.BOLD));
+        g.setFont(Theme.font(14, Font.BOLD));
         int w = Theme.px(22) + badge + g.getFontMetrics()
             .stringWidth(r.name() + (r.me() ? " (вы)" : ""));
-        g.setFont(Theme.mono(11, Font.BOLD));
+        g.setFont(Theme.mono(13, Font.BOLD));
         var fm = g.getFontMetrics();
         for (String v : List.of(String.valueOf(r.vp()), String.valueOf(r.coin()),
                 String.valueOf(r.kelium()), String.valueOf(r.ammo()),
                 String.valueOf(r.objectiveCards()), String.valueOf(r.arsenalCards()),
                 String.valueOf(r.orderCards()), String.valueOf(r.destroyedValue()))) {
-            w += Theme.px(25) + fm.stringWidth(v);
+            w += Theme.px(30) + fm.stringWidth(v);
         }
         return w + Theme.px(6);
     }
 
     private int stat(Graphics2D g, int x, int cy, String icon, Color color, String value) {
-        double s = Theme.px(15);
+        double s = Theme.px(20);
         MarkIcons.paint(g, icon, x + s / 2, cy, s, color);
-        g.setFont(Theme.mono(11, Font.BOLD));
+        g.setFont(Theme.mono(13, Font.BOLD));
         g.setColor(Theme.ink());
         var fm = g.getFontMetrics();
         g.drawString(value, (int) (x + s + Theme.px(3)),

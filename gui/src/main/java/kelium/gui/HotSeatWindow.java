@@ -499,6 +499,11 @@ public final class HotSeatWindow {
             }
 
             @Override
+            public double printWidth() {
+                return tableSheet.tablePrintWidth();
+            }
+
+            @Override
             public int paint(java.awt.Graphics2D g, int x, int y, int width,
                              Map<String, java.awt.Rectangle> hits,
                              Map<String, java.awt.Shape> outlines) {
@@ -931,7 +936,7 @@ public final class HotSeatWindow {
         bar.setBorder(BorderFactory.createMatteBorder(0, 0, Theme.px(2), 0, new Color(0x3C6A7C)));
 
         roundLabel = new JLabel("Подготовка…");
-        roundLabel.setFont(Theme.font(13, Font.PLAIN));
+        roundLabel.setFont(Theme.font(15, Font.PLAIN));
         roundLabel.setForeground(new Color(0xA9C6D2));
         bar.add(roundLabel);
 
@@ -978,7 +983,7 @@ public final class HotSeatWindow {
                 com.formdev.flatlaf.ui.FlatUIUtils.drawString(this, g, s.trim() + "…", in.left, y);
             }
         };
-        turnLabel.setFont(Theme.font(16, Font.BOLD));
+        turnLabel.setFont(Theme.font(19, Font.BOLD));
         turnLabel.setForeground(Color.WHITE);
         // запас справа: текст рисуется на пару пикселей шире замера, и без
         // запаса последняя буква срезалась, а многоточие не ставилось
@@ -1087,7 +1092,7 @@ public final class HotSeatWindow {
         // без постоянной подкраски зон: зона видна только в миг Стройки
         field.setOwnershipTint(false);
         field.setTopReserve(Theme.px(92));
-        field.setBottomReserve(kelium.gui.kp.ActionStrip.stripHeight() - Theme.px(20));
+        field.setBottomReserve(Theme.px(56));
         field.setShowTurnCaption(false);
         // Отладочные подписи гексов игроку не показываются; для наведения
         // работает подсказка гекса, для решений — подсветка целей.
@@ -1193,11 +1198,61 @@ public final class HotSeatWindow {
         // Карточка вопроса не прячется под выехавший ящик.
         field.bubbles.setDockInset(openDrawerSpan());
         if (actionStrip != null) {
-            int sh = kelium.gui.kp.ActionStrip.stripHeight();
+            int sh = Math.min(layered.getHeight(), kelium.gui.kp.ActionStrip.boundsHeight());
             actionStrip.setBounds(0, layered.getHeight() - sh, layered.getWidth(), sh);
         }
         field.repaint();
         layoutPrompt();
+    }
+
+    /**
+     * КНОПКА «СПЕЦ-ДЕЙСТВИЕ» НА ПОЛОСЕ (26.09.2026): меню того, чем его можно
+     * потратить сейчас, — и того, чем нельзя, серым с причиной, чтобы было
+     * видно, чего не хватает.
+     */
+    private kelium.gui.kp.ActionStrip.Item specStripItem(kelium.core.UndoableAgent agent,
+                                                         InteractiveAgent.PendingDecision d,
+                                                         List<Choice> options) {
+        List<kelium.gui.kp.ActionStrip.SubItem> menu = new ArrayList<>();
+        java.util.Set<String> kinds = new java.util.HashSet<>();
+        for (int i = 0; i < options.size(); i++) {
+            Choice c = options.get(i);
+            if ("action".equals(c.kind()) || "pass".equals(c.kind()) || c.kind() == null) {
+                continue;
+            }
+            kinds.add(c.kind());
+            int idx = i;
+            menu.add(new kelium.gui.kp.ActionStrip.SubItem(
+                kelium.gui.kp.ChoiceWords.label("spec", c, this::cardName),
+                kelium.gui.kp.ChoiceWords.sub("spec", c), () -> submit(agent, d, idx)));
+        }
+        boolean left = !Boolean.FALSE.equals(d.context().get("spec_left"));
+        ReplayRecord.Player p = viewedPlayer();
+        if (!left) {
+            menu.add(new kelium.gui.kp.ActionStrip.SubItem("Спец-действие уже потрачено",
+                "в этом ходу — одно спец-действие", null));
+        } else if (p != null) {
+            if (!kinds.contains("spec_objective") && !kinds.contains("spec_objective_enh")) {
+                menu.add(new kelium.gui.kp.ActionStrip.SubItem("Выполнить задание",
+                    p.objectiveHand.isEmpty() ? "в руке нет карт заданий"
+                        : "ни одно задание в руке сейчас не выполнено", null));
+            }
+            if (!kinds.contains("spec_arsenal_install") && !kinds.contains("spec_arsenal_burn")) {
+                menu.add(new kelium.gui.kp.ActionStrip.SubItem("Установить или сжечь арсенал",
+                    "в руке нет карт арсенала", null));
+            }
+            if (!kinds.contains("spec_container")) {
+                menu.add(new kelium.gui.kp.ActionStrip.SubItem("Вскрыть контейнер",
+                    "контейнеров нет", null));
+            }
+            if (!kinds.contains("order_plate")) {
+                menu.add(new kelium.gui.kp.ActionStrip.SubItem("Плашка приказа",
+                    "уже сыграна, не хватает монет или на карте её нет", null));
+            }
+        }
+        long can = menu.stream().filter(kelium.gui.kp.ActionStrip.SubItem::enabled).count();
+        return new kelium.gui.kp.ActionStrip.Item("spec", "Спец-действие",
+            can > 0 ? "вариантов: " + can : "сейчас нечего", null, menu);
     }
 
     /** Кружки доступных действий над зоной игрока. */
@@ -3415,6 +3470,7 @@ public final class HotSeatWindow {
                         submit(agent, d, idx);
                     }));
             }
+            strip.add(specStripItem(agent, d, options));
             if (passIdx >= 0) {
                 int pi = passIdx;
                 strip.add(new kelium.gui.kp.ActionStrip.Item(null, "Завершить ход",

@@ -603,6 +603,12 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         return с == null ? 0.17 : PrintedBoards.картаШирина(seat) / с.ширина();
     }
 
+    /** Ширина сцепки в пикселях печати (300 точек на дюйм) — мера стола. */
+    public double tablePrintWidth() {
+        var с = PrintedBoards.сцепка(seat);
+        return с == null ? 0 : с.ширина();
+    }
+
     /** Пропорция сцепки для стола живой партии (0 — планшетов нет). */
     public double tableAspect() {
         return пропорцияСцепки();
