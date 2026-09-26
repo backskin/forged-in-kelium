@@ -35,9 +35,24 @@ public final class Кодировщик {
     /** Общих чисел стола. */
     public static final int ОБЩИХ = 4;
 
+    /**
+     * ЗАДАНИЯ НА РУКЕ (26.09.2026). Без этого блока сеть видела только,
+     * СКОЛЬКО у неё карт заданий, но не что они требуют и насколько она близка,
+     * — и выполняла задания разве что случайно. Каждую карту читает сама карта
+     * ({@link kelium.engine.cards.ObjectiveCard}): выполнено ли требование,
+     * усиленное требование, близость, каким действием обычно закрывается и
+     * сколько стоит награда. Видно только своё: чужая рука скрыта.
+     */
+    public static final int СЛОТОВ_ЗАДАНИЙ = 4;
+    private static final String[] ДЕЙСТВИЯ_ЗАДАНИЙ = {
+        "build", "assembly", "mining", "combat", "movement", "energy_swap", "science", "market"};
+    private static final int НА_ЗАДАНИЕ = 5 + ДЕЙСТВИЯ_ЗАДАНИЙ.length;
+    /** Чисел о своих заданиях и супер-заданиях. */
+    public static final int ЛИЧНЫХ = СЛОТОВ_ЗАДАНИЙ * НА_ЗАДАНИЕ + 1;
+
     /** Длина вектора для {@code мест} игроков. */
     public static int длина(int мест) {
-        return ОБЩИХ + НА_ИГРОКА * мест;
+        return ОБЩИХ + НА_ИГРОКА * мест + ЛИЧНЫХ;
     }
 
     /** Закодировать стол глазами места {@code seat}. */
@@ -64,7 +79,53 @@ public final class Кодировщик {
             PlayerState p = s.player((seat + k) % мест);
             i = игрок(s, p, v, i);
         }
+        задания(s, seat, v, i);
         return v;
+    }
+
+    /** Блок {@link #ЛИЧНЫХ}: карты заданий на руке, ближайшие к выполнению первыми. */
+    private static void задания(GameState s, int seat, float[] v, int i) {
+        PlayerState me = s.player(seat);
+        kelium.engine.cards.EngineCardContext ctx = new kelium.engine.cards.EngineCardContext(s, seat);
+        java.util.List<float[]> карты = new java.util.ArrayList<>();
+        for (String cid : me.objectiveHand) {
+            kelium.engine.cards.ObjectiveCard oc = kelium.engine.cards.CardRegistry.objective(cid);
+            if (oc == null) {
+                continue;
+            }
+            float[] x = new float[НА_ЗАДАНИЕ];
+            try {
+                boolean готово = oc.satisfied(ctx);
+                double близость = готово ? 1 : Math.max(0, Math.min(1, oc.progress(ctx)));
+                x[0] = 1;
+                x[1] = (float) близость;
+                x[2] = готово ? 1 : 0;
+                x[3] = готово && oc.satisfiedEnhanced(ctx) ? 1 : 0;
+                java.util.Map<String, Object> данные = kelium.dataio.Ctx.cards(s, "objectives").find(cid);
+                if (данные != null) {
+                    x[4] = (float) (kelium.engine.ObjectiveHints.rewardValue(данные.get("base_reward"))
+                        + kelium.engine.ObjectiveHints.rewardValue(данные.get("special_reward"))) / 8f;
+                }
+                String действие = oc.suggestedAction(ctx);
+                for (int a = 0; a < ДЕЙСТВИЯ_ЗАДАНИЙ.length; a++) {
+                    if (ДЕЙСТВИЯ_ЗАДАНИЙ[a].equals(действие)) {
+                        x[5 + a] = 1;
+                    }
+                }
+            } catch (RuntimeException e) {
+                // условие карты — произвольный код; сломанная карта не ломает стол
+                continue;
+            }
+            карты.add(x);
+        }
+        карты.sort((a, b) -> Float.compare(b[1], a[1]));
+        for (int k = 0; k < СЛОТОВ_ЗАДАНИЙ; k++) {
+            if (k < карты.size()) {
+                System.arraycopy(карты.get(k), 0, v, i, НА_ЗАДАНИЕ);
+            }
+            i += НА_ЗАДАНИЕ;
+        }
+        v[i] = kelium.engine.СуперЗадания.vp(s, seat) / 10f;
     }
 
     // ======================================================================

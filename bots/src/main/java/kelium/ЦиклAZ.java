@@ -97,6 +97,10 @@ public final class ЦиклAZ {
         out.println(" отчёт по поколениям — data\\selfplay\\az\\отчёт.md");
         out.println("============================================================");
         Files.createDirectories(ПАПКА);
+        // СЕТИ ПОД ДРУГОЙ СТОЛ. Если бот стал видеть на столе больше (например,
+        // задания на руке, 26.09), прежние сети читать нельзя: вход другой длины.
+        // Тогда всё прежнее обучение уходит в архив, и цикл начинает заново.
+        архивироватьНесовместимое(out);
         // СТАРТ ОТ ПРЕЖНИХ БОТОВ (решение дизайнера 26.09): поколение 0 — сети,
         // выученные подражанием прежним ботам. Дальше учит только самоигра.
         if (!Files.exists(ПАПКА.resolve("value_0.bin"))
@@ -156,6 +160,35 @@ public final class ЦиклAZ {
             Files.writeString(отчёт, строка, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
             out.print("ОТЧЁТ " + строка);
         }
+    }
+
+    /** Прежние сети не подходят к нынешнему столу — переложить их и данные в архив. */
+    private static void архивироватьНесовместимое(PrintStream out) throws Exception {
+        Path образец = null;
+        for (int g = 0; ; g++) {
+            Path v = ПАПКА.resolve("value_" + g + ".bin");
+            if (!Files.exists(v)) {
+                break;
+            }
+            образец = v;
+        }
+        if (образец == null || Сеть.загрузить(образец).вход() == Кодировщик.длина(4)) {
+            return;
+        }
+        Path архив = ПАПКА.resolve("архив-" + java.time.LocalDate.now() + "-"
+            + System.currentTimeMillis() % 100000);
+        Files.createDirectories(архив);
+        try (java.util.stream.Stream<Path> файлы = Files.list(ПАПКА)) {
+            for (Path ф : файлы.toList()) {
+                String имя = ф.getFileName().toString();
+                if (Files.isRegularFile(ф) && (имя.endsWith(".bin") && !имя.equals("runner.jar")
+                        || имя.equals("отчёт.md"))) {
+                    Files.move(ф, архив.resolve(имя));
+                }
+            }
+        }
+        out.println(" бот видит на столе больше, чем видели прежние сети, — прежнее обучение"
+            + " перенесено в " + архив.getFileName() + ", начинаю заново");
     }
 
     // ======================================================================
