@@ -1097,8 +1097,9 @@ public final class HotSeatWindow {
     /** Имя места для игрока: без сырых «human»/«balanced» (блокер приёмки №4). */
     private String seatName(int seat) {
         String spec = seatSpecs.get(seat);
+        String net = kelium.gui.net.NetSeats.label(spec, seat);
         return "human".equals(spec) ? "Игрок " + (seat + 1)
-            : kelium.agents.BotCatalog.label(spec);
+            : net != null ? net : kelium.agents.BotCatalog.label(spec);
     }
 
     private JComponent buildCenter() {
@@ -1728,7 +1729,8 @@ public final class HotSeatWindow {
             return;
         }
         ReplayRecord.Frame f = r.frames.get(r.frames.size() - 1);
-        if (f.seat == null || humansBySeat.containsKey(f.seat)) {
+        if (f.seat == null || humansBySeat.containsKey(f.seat)
+                || kelium.gui.net.NetSeats.claims(seatSpecs.get(f.seat))) {
             return;
         }
         long ms = !f.highlight.isEmpty() ? 420 : "action".equals(f.type) ? 260 : 0;
@@ -1884,9 +1886,10 @@ public final class HotSeatWindow {
                 // он же разбирает уровень умения («punisher:4»). Прежний прямой
                 // Bots.create принимал только имя характера и на составе с
                 // уровнем падал, пытаясь открыть файл с двоеточием в имени.
-                agents.add(kelium.agents.BotCatalog.create(spec, seat,
+                Agent net = kelium.gui.net.NetSeats.agentFor(spec, seat);   // сетевое место
+                agents.add(net != null ? net : kelium.agents.BotCatalog.create(spec, seat,
                     new Random(seed * 131 + seat + 1), players));
-                labels.add(spec);
+                labels.add(net != null ? "human" : spec);
             }
         }
         mySeat = meSeat(seatSpecs);
@@ -1947,6 +1950,7 @@ public final class HotSeatWindow {
                         // надо, и дальше он доигрывать не должен.
                         throw new kelium.core.GameAborted("прогон отменён откатом");
                     }
+                    kelium.gui.net.NetSeats.frame(r);     // кадры — сетевым местам
                     // ОДНО ОБНОВЛЕНИЕ В ОЧЕРЕДИ, А НЕ ПО ОДНОМУ НА СОБЫТИЕ
                     // (тормоза, 26.09.2026): каждое стоит десятки миллисекунд,
                     // а боты дают сотни событий за ход. Стоящее в очереди
@@ -2018,6 +2022,9 @@ public final class HotSeatWindow {
             return;
         }
         ReplayRecord finalRec = result;
+        synchronized (moves) {
+            kelium.gui.net.NetSeats.over(finalRec, new ArrayList<>(moves));
+        }
         // ЖУРНАЛ — ДО объявления «партия окончена»: иначе читатель журнала
         // (робот-тест, дизайнер сразу после партии) застаёт файл недописанным.
         saveJournal(finalRec, "");
@@ -2575,6 +2582,9 @@ public final class HotSeatWindow {
                 if (d.round() != round || d.circle() != circle) {
                     break;
                 }
+                if (d.seat() != seat && kelium.gui.net.NetSeats.active()) {
+                    break;       // в сети чужое решение запекает всё до него
+                }
                 if (d.seat() == seat) {
                     out.add(0, i);
                 }
@@ -2737,7 +2747,7 @@ public final class HotSeatWindow {
         "combat_target");
 
     /** Заголовок решения словами; неизвестный вид — «ваш выбор», не служебное имя. */
-    static String kindLabel(String kind) {
+    public static String kindLabel(String kind) {
         String l = KIND_LABELS.get(kind);
         return l != null ? l : "ваш выбор";
     }

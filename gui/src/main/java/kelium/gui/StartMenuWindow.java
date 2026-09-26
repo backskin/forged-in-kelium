@@ -466,16 +466,12 @@ public final class StartMenuWindow {
         b.setPreferredSize(new Dimension(Theme.px(280), Theme.px(44)));
         b.setMaximumSize(new Dimension(Integer.MAX_VALUE, Theme.px(44)));
         b.setAlignmentX(Component.LEFT_ALIGNMENT);
-        // Сетевой стол в движке есть (GameServer/Lobby), а ЭКРАНА лобби ещё нет —
-        // плитка честно говорит об этом, вместо того чтобы вести в никуда.
-        boolean ready = m != Mode.NET;
-        b.setState(!ready ? KpButton.State.DISABLED
-            : m == mode ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
-        if (!ready) {
-            b.setTexts(title, "экран лобби ещё не сделан");
-        }
+        // СЕТЕВОЙ СТОЛ (26.09.2026): плитка открывает окно «Сетевой стол» —
+        // создать стол по тому, что собрано здесь, или войти к другу.
+        b.setState(m == mode ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
         b.onClick(() -> {
-            if (!ready) {
+            if (m == Mode.NET) {
+                kelium.gui.net.LobbyWindow.open(netOptions(), frame);
                 return;
             }
             mode = m;
@@ -491,7 +487,8 @@ public final class StartMenuWindow {
         b.setToolTipText(switch (m) {
             case OFFLINE -> "Все за одним экраном: сколько из игроков боты, "
                 + "выбирается ниже; живые ходят по очереди, между ними опускается шторка";
-            default -> "Стол поднимается на этом компьютере, соперники подключаются по сети";
+            default -> "Создать стол на этом компьютере (по тому, что собрано в Штабе) "
+                + "или войти к другу по адресу";
         });
         modeTiles.put(m.name(), b);
         col.add(b);
@@ -1490,6 +1487,28 @@ public final class StartMenuWindow {
             training && coinStep.changed() ? coinStep.value() : null,
             training && keliumStep.changed() ? keliumStep.value() : null,
             training && ammoStep.changed() ? ammoStep.value() : null,
+            prepChoice(), marketCardsChoice());
+    }
+
+    /**
+     * СТОЛ ДЛЯ СЕТИ: как собран, но своё место можно не выбирать — хост
+     * садится на первое живое место, остальные живые открываются друзьям.
+     */
+    HotSeatWindow.Options netOptions() {
+        HotSeatWindow.Options o = optionsNow();
+        if (o != null) {
+            return o;
+        }
+        List<String> specs = new ArrayList<>();
+        for (int i = 0; i < players; i++) {
+            specs.add(HUMAN.equals(bots.get(i)) ? HUMAN : bots.get(i));
+        }
+        if (!specs.contains(HUMAN)) {
+            specs.set(0, HUMAN);
+        }
+        return new HotSeatWindow.Options(rulesetId, players, seed,
+            specs, map == null ? null : map.id(), map == null ? null : map.file(), null,
+            List.copyOf(colors.subList(0, players)), null, null, null,
             prepChoice(), marketCardsChoice());
     }
 
