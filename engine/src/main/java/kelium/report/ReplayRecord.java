@@ -914,6 +914,14 @@ public final class ReplayRecord {
         }
     }
 
+    /**
+     * Запись из уже разобранной структуры JSON — сетевой клиент получает её
+     * кусками по проводу, а не из файла.
+     */
+    public static ReplayRecord fromJsonMap(Map<String, Object> m) {
+        return fromMap(m);
+    }
+
     // -------------------- запись в структуру --------------------
     /** Представить запись как вложенные карты/списки — прямо под {@link Json}. */
     public Map<String, Object> toMap() {

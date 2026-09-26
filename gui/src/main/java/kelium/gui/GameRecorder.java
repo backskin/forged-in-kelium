@@ -486,7 +486,7 @@ public final class GameRecorder {
      * Положить живой кадр этой партии, если состояние изменилось с прошлого
      * кадра. Зовётся на потоке движка перед вопросом живому игроку.
      */
-    static void live(GameState state, int seat) {
+    public static void live(GameState state, int seat) {
         Consumer<Map<String, Object>> sink;
         synchronized (SINKS) {
             sink = SINKS.get(state);
