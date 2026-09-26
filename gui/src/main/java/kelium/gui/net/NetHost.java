@@ -627,6 +627,10 @@ public final class NetHost {
             if (sub != null && !sub.isBlank()) {
                 o.put("sub", sub);
             }
+            String hex = hexOf(kind, c);
+            if (hex != null) {
+                o.put("hex", hex);        // вариант выбирается щелчком по гексу
+            }
             opts.add(o);
         }
         Object view = null;
@@ -638,6 +642,21 @@ public final class NetHost {
         return msg(NetProtocol.DECIDE, "seq", seq, "kind", kind,
             "prompt", HotSeatWindow.kindLabel(kind), "round", state.round, "circle", state.circle,
             "options", opts, "view", view);
+    }
+
+    private static final java.util.regex.Pattern HEX_ID = java.util.regex.Pattern.compile(
+        "h-?\\d+_-?\\d+");
+
+    /** Гекс варианта — по тем же признакам, что в окне партии ({@code hexIdOf}). */
+    static String hexOf(String kind, Choice c) {
+        if (c.payload() instanceof String s && HEX_ID.matcher(s).matches()) {
+            return s;
+        }
+        if ("move".equals(kind) && c.payload() instanceof Map<?, ?> m
+                && m.get("to") instanceof String s) {
+            return s;
+        }
+        return null;
     }
 
     /**
@@ -729,6 +748,26 @@ public final class NetHost {
         if (out.isEmpty()) {
             out.add("127.0.0.1");
         }
+        // Домашняя сеть и Radmin/Tailscale — вперёд; 172.16–31 чаще всего
+        // виртуальные адаптеры Hyper-V/WSL/Docker — в конец.
+        out.sort(java.util.Comparator.comparingInt(NetHost::addressRank));
         return out;
+    }
+
+    private static int addressRank(String a) {
+        if (a.startsWith("192.168.") || a.startsWith("26.") || a.startsWith("100.")) {
+            return 0;
+        }
+        if (a.startsWith("10.")) {
+            return 1;
+        }
+        String[] p = a.split("\\.");
+        if (p.length == 4 && "172".equals(p[0])) {
+            int b = Integer.parseInt(p[1]);
+            if (b >= 16 && b <= 31) {
+                return 3;
+            }
+        }
+        return 2;
     }
 }

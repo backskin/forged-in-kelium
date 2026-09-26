@@ -52,7 +52,27 @@ class NetLoopbackTest {
 
     @Test
     void партияПоСетиДоКонцаБезУтечек() {
-        Assertions.assertTimeoutPreemptively(Duration.ofMinutes(5), this::play);
+        // Сторож: если партия встала, в вывод — стеки всех потоков (где ждём).
+        Thread dog = new Thread(() -> {
+            try {
+                Thread.sleep(Duration.ofMinutes(4).toMillis());
+            } catch (InterruptedException e) {
+                return;
+            }
+            Thread.getAllStackTraces().forEach((t, st) -> {
+                System.out.println("THREAD " + t.getName());
+                for (StackTraceElement el : st) {
+                    System.out.println("    at " + el);
+                }
+            });
+        });
+        dog.setDaemon(true);
+        dog.start();
+        try {
+            Assertions.assertTimeoutPreemptively(Duration.ofMinutes(5), this::play);
+        } finally {
+            dog.interrupt();
+        }
     }
 
     private void play() throws Exception {

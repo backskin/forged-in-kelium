@@ -8,6 +8,8 @@ import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -37,6 +39,9 @@ public final class Wire {
             StandardCharsets.UTF_8));
         this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(),
             StandardCharsets.UTF_8));
+        Thread w = new Thread(this::writeLoop, "net-write-" + socket.getPort());
+        w.setDaemon(true);
+        w.start();
     }
 
     /**
@@ -76,7 +81,7 @@ public final class Wire {
             } catch (IOException ignored) {
                 // обрыв — штатно
             } finally {
-                close();
+                hardClose();
                 if (onClose != null) {
                     onClose.run();
                 }
@@ -86,27 +91,70 @@ public final class Wire {
         t.start();
     }
 
-    /** Отправить; на оборванной связи — тихо false. */
+    /**
+     * Отправить; на оборванной связи — тихо false. Не блокирует: строка ложится
+     * в очередь, пишет её свой поток. Иначе медленный читатель на том конце
+     * (или встречная запись) мог бы заклинить поток движка хоста, держащий
+     * замок стола, — взаимная блокировка через полные буферы сокетов.
+     */
     public boolean send(Map<String, Object> msg) {
         if (closed) {
             return false;
         }
-        String line = Json.write(msg);
-        synchronized (out) {
-            try {
+        outbox.add(Json.write(msg));
+        return true;
+    }
+
+    private final LinkedBlockingQueue<String> outbox = new LinkedBlockingQueue<>();
+
+    private void writeLoop() {
+        try {
+            while (!closed || !outbox.isEmpty()) {
+                String line = outbox.poll(200, TimeUnit.MILLISECONDS);
+                if (line == null) {
+                    continue;
+                }
                 out.write(line);
                 out.write('\n');
-                out.flush();
                 sentBytes.addAndGet(line.length() + 1L);
-                return true;
-            } catch (IOException e) {
-                close();
-                return false;
+                if (outbox.isEmpty()) {
+                    out.flush();
+                }
+            }
+        } catch (IOException | InterruptedException e) {
+            closed = true;
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException ignored) {
+                // и так закрыт
             }
         }
     }
 
+    /**
+     * Закрыть: уже поставленное в очередь (отказ, «пока») ещё уходит, потом
+     * сокет закрывается. Через секунду — закрывается в любом случае.
+     */
     public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ignored) {
+                // закрываем сразу
+            }
+            hardClose();
+        }, "net-close");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** Порвать сразу (тот конец уже ушёл). */
+    void hardClose() {
         closed = true;
         try {
             socket.close();

@@ -58,7 +58,8 @@ public final class NetGame {
                     players);
             }
             agents.add(a);
-            labels.add(spec);
+            // сетевое место в журнале — живой игрок, как за горячим стулом
+            labels.add(NetSeats.claims(spec) ? "human" : spec);
         }
         List<Agent> playing = MoveLog.recording(agents, moves);
         return GameRecorder.playWithAgents(cfg, state, playing, labels, seed, o.seatColors(),
