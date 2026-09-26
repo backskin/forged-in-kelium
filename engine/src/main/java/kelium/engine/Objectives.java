@@ -496,6 +496,13 @@ public final class Objectives {
         Map<String, Object> granted = new HashMap<>();
         granted.put("base", base);
         granted.put("special", special);
+        // «БОЕВОЕ ДОВОЛЬСТВИЕ» (арсенал 7.1.0, №33): «Выполнив задание, получи
+        // 1 боеприпас». Только за выполненное задание — сожжённое ради верха
+        // идёт другим путём и сюда не попадает. Боеприпас ложится в хранилище
+        // по общим правилам: нет ячейки — не берётся.
+        if (Passives.hasPassive(s, seat, "ammo_on_objective_done")) {
+            granted.put("arsenal_bonus_ammo", Storage.addAmmoCapped(s, p, 1));
+        }
         Map<String, Object> ev = new HashMap<>();
         ev.put("type", "objective");
         ev.put("seat", seat);
