@@ -1452,6 +1452,9 @@ public final class HotSeatWindow {
         // ПОЛОСА ДЕЙСТВИЙ — над зоной игрока, поверх поля (26.09.2026)
         actionStrip = new kelium.gui.kp.ActionStrip();
         layered.add(actionStrip, JLayeredPane.PALETTE_LAYER);
+        // МЕНЮ СТРОЙКИ — слева поверх поля (27.09.2026)
+        buildMenu = new kelium.gui.kp.BuildMenu();
+        layered.add(buildMenu, JLayeredPane.PALETTE_LAYER);
 
         layered.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -1483,6 +1486,17 @@ public final class HotSeatWindow {
         }
         // Карточка вопроса не прячется под выехавший ящик.
         field.bubbles.setDockInset(openDrawerSpan());
+        if (buildMenu != null) {
+            int bottom = layered.getHeight() - zoneCover();
+            int left = openDrawerSpan() + Theme.px(8);
+            buildMenu.setBounds(left, Theme.px(8), kelium.gui.kp.BuildMenu.menuWidth() + Theme.px(8),
+                Math.max(Theme.px(200), bottom - Theme.px(16)));
+            // карточка вопроса поля не прячется под меню
+            if (buildMenu.isOpen()) {
+                field.bubbles.setDockInset(left + kelium.gui.kp.BuildMenu.menuWidth()
+                    + Theme.px(8));
+            }
+        }
         if (actionStrip != null) {
             // полоса стоит над кромкой зоны игрока и едет вместе с ней
             int bottom = layered.getHeight() - zoneCover();
@@ -1547,6 +1561,7 @@ public final class HotSeatWindow {
 
     /** Кружки доступных действий над зоной игрока. */
     kelium.gui.kp.ActionStrip actionStrip;
+    kelium.gui.kp.BuildMenu buildMenu;
 
     /**
      * Ширина ящика — ПО ЕГО СОДЕРЖИМОМУ, а не одна на всех. Планшету нужен
@@ -3950,6 +3965,10 @@ public final class HotSeatWindow {
 
     private void routeOnField(int seat, String kind, kelium.core.UndoableAgent agent,
                               List<Choice> options, InteractiveAgent.PendingDecision d) {
+        if ("build_pick".equals(kind) && buildMenu != null) {
+            showBuildMenu(seat, agent, options, d);
+            return;
+        }
         Map<String, List<kelium.gui.kp.FieldBubbles.Opt>> byHex = new LinkedHashMap<>();
         List<kelium.gui.kp.FieldBubbles.Opt> dock = new ArrayList<>();
         Map<String, Integer> cardToOption = new LinkedHashMap<>();
@@ -4082,6 +4101,286 @@ public final class HotSeatWindow {
             drawerCloser.stop();
             closeAutoDrawer();
         }
+    }
+
+    // ==================== МЕНЮ СТРОЙКИ (27.09.2026) ====================
+
+    /**
+     * СТРОЙКА — МЕНЮ СЛЕВА, А НЕ ЩЕЛЧОК ПО ПЛАНШЕТУ (заказ дизайнера 27.09.2026).
+     * Стол в Стройке только для просмотра; здания — списком с печатными
+     * жетонами по категориям, недоступное серым с причиной. Гексы поля НЕ
+     * подсвечены, пока здание не выбрано (прежде подсвеченный гекс на деле
+     * сносил стоящее там здание); подсвечены по форме свои здания под снос, и
+     * щелчок по такому спрашивает подтверждение.
+     */
+    private void showBuildMenu(int seat, kelium.core.UndoableAgent agent, List<Choice> options,
+                               InteractiveAgent.PendingDecision d) {
+        GameState st = d.state();
+        kelium.core.PlayerState me = st.player(seat);
+        java.util.Set<Integer> built = new java.util.HashSet<>();
+        java.util.Set<Integer> demolished = new java.util.HashSet<>();
+        if (d.context().get("built") instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Number n) {
+                    built.add(n.intValue());
+                }
+            }
+        }
+        if (d.context().get("demolished") instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Number n) {
+                    demolished.add(n.intValue());
+                }
+            }
+        }
+        boolean начато = !built.isEmpty() || !demolished.isEmpty();
+        // варианты движка: здание (тип+уровень) → номер варианта
+        Map<String, Integer> buildIdx = new LinkedHashMap<>();
+        Map<String, Integer> buildCost = new LinkedHashMap<>();
+        Map<Integer, Integer> demolishIdx = new LinkedHashMap<>();
+        Map<Integer, String> demolishLabel = new LinkedHashMap<>();
+        List<Integer> other = new ArrayList<>();
+        int passIdx = -1;
+        for (int i = 0; i < options.size(); i++) {
+            Choice c = options.get(i);
+            if ("build_pick".equals(c.kind()) && c.payload() instanceof Map<?, ?> m
+                    && m.get("btype") instanceof kelium.core.BuildingType bt) {
+                String key = bt.code + ":" + m.get("level");
+                buildIdx.put(key, i);
+                if (m.get("cost") instanceof Number n) {
+                    buildCost.put(key, n.intValue());
+                }
+            } else if ("demolish_pick".equals(c.kind()) && c.payload() instanceof Number u) {
+                demolishIdx.put(u.intValue(), i);
+                demolishLabel.put(u.intValue(), c.label());
+            } else if ("pass".equals(c.kind()) && c.payload() == null) {
+                passIdx = i;
+            } else {
+                other.add(i);
+            }
+        }
+        int coin = me.resources.coin();
+        List<kelium.gui.kp.BuildMenu.Row> rows = new ArrayList<>();
+        // каталог зданий игрока в постоянном порядке, по категориям
+        for (int lv = 1; lv <= 4; lv++) {
+            rows.add(buildRow(seat, st, me, "Добытчики", kelium.core.BuildingType.MINER, lv,
+                "добывает " + st.tokenStats.minerYield(lv) + " келемия · ячеек склада "
+                    + cellCount(me, "miner", lv),
+                buildIdx, buildCost, built, demolished, coin, agent, d));
+        }
+        for (int lv = 1; lv <= 4; lv++) {
+            rows.add(buildRow(seat, st, me, "Энергостанции", kelium.core.BuildingType.POWER_PLANT,
+                lv, "даёт энергии " + st.tokenStats.plantEnergyGives(lv) + " · ячеек склада "
+                    + cellCount(me, "plant", lv),
+                buildIdx, buildCost, built, demolished, coin, agent, d));
+        }
+        for (kelium.core.BuildingType bt : List.of(kelium.core.BuildingType.BARRACKS,
+                kelium.core.BuildingType.FACTORY, kelium.core.BuildingType.AIRBASE)) {
+            String unit = switch (bt) {
+                case BARRACKS -> "пехоту";
+                case FACTORY -> "технику";
+                default -> "авиацию";
+            };
+            rows.add(buildRow(seat, st, me, "Военные здания", bt, null,
+                "выпускает " + unit + " или боеприпасы · ячеек энергии "
+                    + st.tokenStats.buildingEnergySlots(bt, null),
+                buildIdx, buildCost, built, demolished, coin, agent, d));
+        }
+        if (buildIdx.containsKey("command_center:null")) {
+            rows.add(buildRow(seat, st, me, "Центр управления",
+                kelium.core.BuildingType.COMMAND_CENTER, null,
+                "выпускает вышки или боеприпасы, даёт энергию",
+                buildIdx, buildCost, built, demolished, coin, agent, d));
+        }
+        // снос своего здания — отдельным пунктом, с подтверждением
+        Map<Integer, Runnable> onField = new LinkedHashMap<>();
+        for (var e : demolishIdx.entrySet()) {
+            int uid = e.getKey();
+            int idx = e.getValue();
+            kelium.core.BuildingToken b = null;
+            for (kelium.core.BuildingToken x : me.buildings) {
+                if (x.uid == uid) {
+                    b = x;
+                }
+            }
+            String name = b == null ? "здание"
+                : GameRecorder.buildingName(b.type.code, b.level);
+            String gain = demolishGain(demolishLabel.get(uid));
+            Runnable ask = () -> confirmDemolish(seat, agent, d, idx, name, gain);
+            onField.put(uid, ask);
+            rows.add(new kelium.gui.kp.BuildMenu.Row("Снести своё здание",
+                b == null ? null : kelium.report.Textures.building(b.type.code, b.level, seat),
+                "Снести: " + name, gain + " — или щёлкните его на поле", null, ask));
+        }
+        for (int i : other) {
+            int idx = i;
+            Choice c = options.get(i);
+            rows.add(new kelium.gui.kp.BuildMenu.Row("Прочее", null,
+                kelium.gui.kp.ChoiceWords.label("build_pick", c, this::cardName),
+                kelium.gui.kp.ChoiceWords.sub("build_pick", c), null, () -> submit(agent, d, idx)));
+        }
+        List<kelium.gui.kp.BuildMenu.Button> buttons = new ArrayList<>();
+        if (passIdx >= 0) {
+            int pi = passIdx;
+            buttons.add(new kelium.gui.kp.BuildMenu.Button(
+                начато ? "Закончить стройку" : "Ничего не строить", () -> submit(agent, d, pi)));
+        }
+        // ОТМЕНА — назад к выбору действия: откат к решению «какое действие»,
+        // с которого началась эта Стройка
+        Integer назад = actionStartIndex(seat);
+        if (назад != null) {
+            buttons.add(new kelium.gui.kp.BuildMenu.Button("Отмена", () -> undoTo(назад)));
+        }
+        String title = начато ? "Стройка — ещё здание?" : "Стройка";
+        String sub = "Монет: " + coin + ". Выберите здание — затем гекс на поле"
+            + (onField.isEmpty() ? "" : "; своё здание можно снести");
+        buildMenu.open(title, sub, rows, buttons, Theme.seat(seat));
+        layoutLayers();
+        field.bubbles.setDockInset(openDrawerSpan() + Theme.px(16)
+            + kelium.gui.kp.BuildMenu.menuWidth());
+        setTableChoices(Map.of(), Theme.seat(seat));
+        field.setChoices(null, начато ? "Стройка: здание поставлено" : "Стройка: выберите здание слева",
+            onField.isEmpty() ? "Меню зданий — слева" : "Меню зданий — слева; или щёлкните своё "
+                + "здание на поле, чтобы снести", null, Theme.seat(seat));
+        field.setDemolishTargets(onField, Theme.seat(seat));
+    }
+
+    /** Строка меню Стройки для одного здания каталога. */
+    private kelium.gui.kp.BuildMenu.Row buildRow(int seat, GameState st, kelium.core.PlayerState me,
+                                                 String section, kelium.core.BuildingType bt,
+                                                 Integer level, String does,
+                                                 Map<String, Integer> buildIdx,
+                                                 Map<String, Integer> buildCost,
+                                                 java.util.Set<Integer> built,
+                                                 java.util.Set<Integer> demolished, int coin,
+                                                 kelium.core.UndoableAgent agent,
+                                                 InteractiveAgent.PendingDecision d) {
+        String key = bt.code + ":" + level;
+        String name = cap(GameRecorder.buildingName(bt.code, level));
+        java.awt.image.BufferedImage art = kelium.report.Textures.building(bt.code, level, seat);
+        int printed = printedPrice(st, me, bt, level);
+        Integer idx = buildIdx.get(key);
+        if (idx != null) {
+            int cost = buildCost.getOrDefault(key, printed);
+            int i = idx;
+            return new kelium.gui.kp.BuildMenu.Row(section, art, name,
+                cost + " " + монет(cost) + " · " + does, null, () -> {
+                    buildMenu.close();
+                    field.bubbles.setDockInset(openDrawerSpan());
+                    field.setDemolishTargets(Map.of(), null);
+                    submit(agent, d, i);
+                });
+        }
+        // почему нельзя — словами
+        String why = null;
+        for (kelium.core.BuildingToken b : me.buildings) {
+            if (b.type != bt || !java.util.Objects.equals(b.level, level)) {
+                continue;
+            }
+            if (built.contains(b.uid)) {
+                why = "поставлено в этом действии";
+            } else if (demolished.contains(b.uid)) {
+                why = "снесено в этом действии — снова только в другой Стройке";
+            } else if (b.hexId != null && why == null) {
+                why = "уже стоит на поле";
+            }
+        }
+        if (why == null && printed > coin) {
+            int не = printed - coin;
+            why = "не хватает " + не + " " + (не % 10 == 1 && не % 100 != 11 ? "монеты" : "монет");
+        }
+        if (why == null) {
+            why = "сейчас поставить нельзя";
+        }
+        return new kelium.gui.kp.BuildMenu.Row(section, art, name,
+            (printed >= 0 ? printed + " " + монет(printed) + " · " : "") + does, why, null);
+    }
+
+    private static String монет(int n) {
+        int m = Math.abs(n) % 100;
+        if (m >= 11 && m <= 14) {
+            return "монет";
+        }
+        return switch (m % 10) {
+            case 1 -> "монета";
+            case 2, 3, 4 -> "монеты";
+            default -> "монет";
+        };
+    }
+
+    /** Печатная цена здания (без надбавок), −1 — неизвестна. */
+    private int printedPrice(GameState st, kelium.core.PlayerState me, kelium.core.BuildingType bt,
+                             Integer level) {
+        try {
+            return switch (bt) {
+                case MINER -> st.tokenStats.minerCost(level);
+                case POWER_PLANT -> st.tokenStats.plantCost(level);
+                case BARRACKS -> me.board.troop.buildingPrice("barracks");
+                case FACTORY -> me.board.troop.buildingPrice("factory");
+                case AIRBASE -> me.board.troop.buildingPrice("airbase");
+                default -> -1;
+            };
+        } catch (RuntimeException e) {
+            return -1;
+        }
+    }
+
+    /** Сколько ячеек склада открывает здание (по печати планшета хранилища). */
+    private static int cellCount(kelium.core.PlayerState me, String group, int level) {
+        try {
+            String c = "miner".equals(group) ? me.board.storage.minerCells(level)
+                : me.board.storage.plantCells(level);
+            return c == null ? 0 : c.replace(" ", "").length();
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    /** Что даёт снос — словами из подписи движка «(+1 мон)» / «(-1 мон)». */
+    private static String demolishGain(String label) {
+        if (label == null) {
+            return "вернётся в запас";
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\(([+-])(\\d+) мон\\)")
+            .matcher(label);
+        if (m.find()) {
+            int n = Integer.parseInt(m.group(2));
+            return "вернётся в запас, " + ("+".equals(m.group(1)) ? "+" : "−") + n + " "
+                + монет(n);
+        }
+        if (label.contains("жетон уничтожения")) {
+            return "вернётся в запас, свой жетон уничтожения ЦУ — сопернику";
+        }
+        return "вернётся в запас";
+    }
+
+    /** Окно-подтверждение сноса: «Снести …? Вернётся в запас, +1 монета». */
+    private void confirmDemolish(int seat, kelium.core.UndoableAgent agent,
+                                 InteractiveAgent.PendingDecision d, int idx, String name,
+                                 String gain) {
+        confirm.open("Снести " + name + "?", null, List.of(cap(gain) + "."),
+            List.of(new kelium.gui.kp.ConfirmDialog.Option("Да, снести", null, () -> {
+                confirm.close();
+                submit(agent, d, idx);
+            })),
+            new kelium.gui.kp.ConfirmDialog.Option("Нет", null, confirm::close));
+    }
+
+    /**
+     * С какого решения началась текущая Стройка: номер последнего «какое
+     * действие» этого места в этом круге; null — откатывать некуда.
+     */
+    private Integer actionStartIndex(int seat) {
+        List<Integer> t = undoTargets(seat);
+        synchronized (moves) {
+            for (int k = t.size() - 1; k >= 0; k--) {
+                Decision dd = decisions.get(t.get(k));
+                if ("action".equals(dd.kind())) {
+                    return t.get(k);
+                }
+            }
+        }
+        return null;
     }
 
     /** Отложенное закрытие ящика науки, открытого окном для решения. */
@@ -4408,6 +4707,10 @@ public final class HotSeatWindow {
         field.clearFacingChoice();
         if (actionStrip != null) {
             actionStrip.hide0();
+        }
+        if (buildMenu != null && buildMenu.isVisible()) {
+            buildMenu.close();
+            field.bubbles.setDockInset(openDrawerSpan());
         }
         hands.clearPickable();
         if (table != null) {

@@ -272,6 +272,31 @@ class HotSeatUiClickTest {
                 plays.add(c.onPick());
             }
         }
+        // МЕНЮ СТРОЙКИ (27.09.2026): доступные здания и кнопки; снос спрашивает
+        // подтверждение — робот его и даёт. «Отмена» — откат, не ход: её не жмём.
+        if (w.buildMenu != null && w.buildMenu.isOpen()) {
+            for (var row : w.buildMenu.rowsForTest()) {
+                checkText("строка меню стройки", row.title());
+                checkText("пояснение строки меню стройки", row.sub());
+                if (!row.enabled()) {
+                    checkText("причина в меню стройки", row.why());
+                    continue;
+                }
+                Runnable r = () -> {
+                    row.onPick().run();
+                    if (w.confirm.isOpen() && !w.confirm.options().isEmpty()) {
+                        w.confirm.options().get(0).onPick().run();
+                    }
+                };
+                all.add(r);
+                plays.add(r);
+            }
+            for (var b : w.buildMenu.buttonsForTest()) {
+                if (!"Отмена".equals(b.label())) {
+                    all.add(b.onPick());
+                }
+            }
+        }
         if (w.field.facingVariants != null && w.field.onFacingPick != null) {
             int n = w.field.facingVariants.size();
             for (int i = 0; i < n; i++) {

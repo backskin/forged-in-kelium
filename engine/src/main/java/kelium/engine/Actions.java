@@ -1098,6 +1098,10 @@ public final class Actions {
             // 25.08.2026, ключ actions.build.one_op_per_building). Иначе то же
             // здание можно поставить и тут же снять, доя монету за снос.
             java.util.Set<Integer> тронутые = new java.util.HashSet<>();
+            // что именно сделано с тронутыми: окну — чтобы в меню Стройки сказать
+            // словами «поставлено в этом действии» / «снесено в этом действии»
+            java.util.Set<Integer> поставленные = new java.util.LinkedHashSet<>();
+            java.util.Set<Integer> снесённые = new java.util.LinkedHashSet<>();
             StringBuilder detail = new StringBuilder();
             // ПОТОЛКА ОПЕРАЦИЙ НЕТ ВОВСЕ (решение дизайнера 06.09.2026). Ни
             // надбавки за объём, ни нарядов от военных зданий: строй столько,
@@ -1119,7 +1123,8 @@ public final class Actions {
                 if (ops >= opLimit) {
                     break;
                 }
-                ActionResult one = performOneOp(player, ctx, agent, тронутые);
+                ActionResult one = performOneOp(player, ctx, agent, тронутые, поставленные,
+                    снесённые);
                 if (one == null) {
                     break;   // пас или ничего доступного
                 }
@@ -1162,7 +1167,9 @@ public final class Actions {
         /** Одна операция стройки/переноса; null = пас или нет доступного. */
         @SuppressWarnings("unchecked")
         private ActionResult performOneOp(PlayerState player, TurnContext ctx, Agent agent,
-                                          java.util.Set<Integer> тронутые) {
+                                          java.util.Set<Integer> тронутые,
+                                          java.util.Set<Integer> поставленные,
+                                          java.util.Set<Integer> снесённые) {
             // УДОРОЖАНИЕ КАСАЕТСЯ ТОЛЬКО РАЗМЕЩЕНИЯ ИЗ ЗАПАСА (правило дизайнера
             // 17.08.2026). У Стройки три операции: разместить здание из запаса на
             // поле, вернуть здание с поля в запас, переместить здание по полю
@@ -1217,6 +1224,15 @@ public final class Actions {
             if (одноНаЗдание && !тронутые.isEmpty()) {
                 moveMenu.removeIf(m -> m.get("uid") instanceof Number n
                     && тронутые.contains(n.intValue()));
+                // СНЕСЁННОЕ В ЭТОМ ДЕЙСТВИИ НЕ СТАВИТСЯ СНОВА (книга, глава 7: с
+                // каждым зданием за действие делается одно — поставить или
+                // снести). Снесённый жетон вернулся в запас, и постройка взяла бы
+                // именно его — значит, это то же здание во второй операции.
+                menu.removeIf(m -> {
+                    BuildingToken запасной = reserveToken(player, (BuildingType) m.get("btype"),
+                        (Integer) m.get("level"));
+                    return запасной != null && тронутые.contains(запасной.uid);
+                });
             }
             if (menu.isEmpty() && moveMenu.isEmpty()) {
                 return null;
@@ -1326,7 +1342,8 @@ public final class Actions {
                 opts.add(new Choice("repair_pick", чинить, (String) чинить.get("label")));
             }
             opts.add(new Choice("pass", null, "stop building"));
-            Choice pick = agent.choose(state, opts, Map.of("kind", "build_pick"));
+            Choice pick = agent.choose(state, opts, Map.of("kind", "build_pick",
+                "built", new ArrayList<>(поставленные), "demolished", new ArrayList<>(снесённые)));
             if (pick.payload() == null) {
                 return null;
             }
@@ -1340,6 +1357,7 @@ public final class Actions {
             if ("demolish_pick".equals(pick.kind())) {
                 int uid = ((Number) pick.payload()).intValue();
                 тронутые.add(uid);
+                снесённые.add(uid);
                 boolean этоЦу = false;
                 for (BuildingToken x : player.buildingsOnField()) {
                     if (x.uid == uid && x.type == BuildingType.COMMAND_CENTER) {
@@ -1402,14 +1420,7 @@ public final class Actions {
             Integer level = (Integer) spec.get("level");
             // B2/B3: физический жетон здания один — уничтоженный (hexId == null)
             // ПЕРЕИСПОЛЬЗУЕТСЯ при повторной стройке, а не плодится дубликат.
-            BuildingToken b = null;
-            for (BuildingToken rb : player.buildings) {
-                if (rb.hexId == null && rb.type == btype
-                        && java.util.Objects.equals(rb.level, level)) {
-                    b = rb;
-                    break;
-                }
-            }
+            BuildingToken b = reserveToken(player, btype, level);
             if (b == null) {
                 b = state.tokenStats.makeBuilding(btype, player.seat, nextUid(state), level);
                 // B7: активные пассивки «+HP» действуют и на новые здания
@@ -1423,6 +1434,11 @@ public final class Actions {
                 player.buildings.add(b);
             }
             b.resetDamage();
+            // ПОСТАВЛЕННОЕ В ЭТОМ ДЕЙСТВИИ НЕ СНОСИТСЯ в нём же (книга, глава 7):
+            // прежде новое здание в список «тронутых» не попадало, и его можно
+            // было тут же снести за монету
+            тронутые.add(b.uid);
+            поставленные.add(b.uid);
             b.hexId = targetHex;
             // B10/§12.1/§3.2: «новый источник приходит со своими кубиками уже
             // на себе». ЭС — кубики простаивают на станции до Смены энергии;
@@ -1936,6 +1952,21 @@ public final class Actions {
          * <p>Отрицательная цена в меню невозможна: скидка опускает её только до
          * нуля — «постройка не может доплачивать».
          */
+        /**
+         * ЖЕТОН ИЗ ЗАПАСА, КОТОРЫЙ ВОЗЬМЁТ ПОСТРОЙКА (B2/B3: физический жетон
+         * здания один — ушедший с поля переиспользуется, а не плодится
+         * дубликат). {@code null} — такого в запасе нет, будет новый.
+         */
+        private BuildingToken reserveToken(PlayerState player, BuildingType btype, Integer level) {
+            for (BuildingToken rb : player.buildings) {
+                if (rb.hexId == null && rb.type == btype
+                        && java.util.Objects.equals(rb.level, level)) {
+                    return rb;
+                }
+            }
+            return null;
+        }
+
         private List<Map<String, Object>> buildable(PlayerState player, int surcharge,
                                                      boolean free) {
             List<Map<String, Object>> out = buildable(player, free ? -999 : surcharge);

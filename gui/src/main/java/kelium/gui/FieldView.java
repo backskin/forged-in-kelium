@@ -185,7 +185,158 @@ public final class FieldView extends JComponent {
         }
     }
 
+    // ==================== свои здания под снос (27.09.2026) ====================
+    //
+    // В СТРОЙКЕ ГЕКСЫ НЕ ПОДСВЕЧИВАЮТСЯ, пока здание не выбрано в меню (жалоба
+    // дизайнера: подсвеченный гекс на деле сносил здание). Подсвечены — по
+    // форме жетона — свои здания, которые можно снести; щелчок по такому
+    // зданию зовёт {@code onPick}, а уже оно спрашивает подтверждение.
+
+    private Map<Integer, Runnable> demolishTargets = Map.of();
+    private Color demolishColor = Color.WHITE;
+    private Integer hoverUid;
+
+    public void setDemolishTargets(Map<Integer, Runnable> targets, Color seat) {
+        demolishTargets = targets == null ? Map.of() : new LinkedHashMap<>(targets);
+        demolishColor = seat == null ? Color.WHITE : seat;
+        hoverUid = null;
+        repaint();
+    }
+
+    /** Здания под снос — для прогонщиков и тестов. */
+    public java.util.Set<Integer> demolishTargetsForTest() {
+        return java.util.Set.copyOf(demolishTargets.keySet());
+    }
+
+    /** Экранная точка середины жетона здания (для щелчков в тестах), либо null. */
+    public Point buildingOnScreenForTest(int uid) {
+        double[] pos = buildingPos(uid);
+        if (pos == null) {
+            return null;
+        }
+        // точка чуть ближе к середине гекса, чем центр жетона: сектор под ней — его
+        double x = pos[0] * 0.75 + pos[3] * 0.25;
+        double y = pos[1] * 0.75 + pos[4] * 0.25;
+        return new Point((int) Math.round(panX + zoom * x), (int) Math.round(panY + zoom * y));
+    }
+
+    /** Где на поле стоит здание: {x, y, угол, гекс x, гекс y} в мировых точках, либо null. */
+    private double[] buildingPos(int uid) {
+        if (record == null || frame == null || frame.snapshot == null) {
+            return null;
+        }
+        ReplayRecord.Tok t = null;
+        for (ReplayRecord.Tok x : frame.snapshot.tokens) {
+            if (x.uid == uid && x.building && x.hexId != null) {
+                t = x;
+            }
+        }
+        if (t == null) {
+            return null;
+        }
+        Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo h : record.hexes) {
+            info.put(h.id, h);
+        }
+        double[] c = center(info, t.hexId);
+        if (c == null) {
+            return null;
+        }
+        List<Integer> sides = new ArrayList<>();
+        for (ReplayRecord.HexState st : frame.snapshot.hexes) {
+            if (st.id.equals(t.hexId)) {
+                for (int i = 0; i < 6; i++) {
+                    if (st.sideOwner[i] == uid) {
+                        sides.add(i);
+                    }
+                }
+            }
+        }
+        if (sides.isEmpty()) {
+            return null;
+        }
+        double face = FieldGeometry.meanEdgeAngle(sides);
+        double[] pos = FieldGeometry.polar(c[0], c[1], BASE * GHOST_EDGE_SHIFT, face);
+        return new double[]{pos[0], pos[1], face, c[0], c[1]};
+    }
+
+    private String typeOf(int uid) {
+        if (frame == null || frame.snapshot == null) {
+            return null;
+        }
+        for (ReplayRecord.Tok x : frame.snapshot.tokens) {
+            if (x.uid == uid) {
+                return x.type;
+            }
+        }
+        return null;
+    }
+
+    /** Своё здание под снос под курсором: сектор гекса под мышью занят им. */
+    private Integer demolishAt(Point screen) {
+        if (demolishTargets.isEmpty() || frame == null || frame.snapshot == null) {
+            return null;
+        }
+        String hex = hexIdAt(screen);
+        if (hex == null) {
+            return null;
+        }
+        Map<String, ReplayRecord.HexInfo> info = new LinkedHashMap<>();
+        for (ReplayRecord.HexInfo h : record.hexes) {
+            info.put(h.id, h);
+        }
+        double[] c = center(info, hex);
+        if (c == null) {
+            return null;
+        }
+        int side = nearestSide(c[0], c[1], screen);
+        for (ReplayRecord.HexState st : frame.snapshot.hexes) {
+            if (st.id.equals(hex) && demolishTargets.containsKey(st.sideOwner[side])) {
+                return st.sideOwner[side];
+            }
+        }
+        return null;
+    }
+
+    /** Свечение по форме жетона вокруг каждого здания под снос. */
+    private void drawDemolish(Graphics2D g) {
+        if (demolishTargets.isEmpty()) {
+            return;
+        }
+        kelium.report.Java2DCanvas canvas = new kelium.report.Java2DCanvas(g, zoom, getFont());
+        String seatHex = String.format("#%02X%02X%02X", demolishColor.getRed(),
+            demolishColor.getGreen(), demolishColor.getBlue());
+        for (int uid : demolishTargets.keySet()) {
+            double[] pos = buildingPos(uid);
+            String type = typeOf(uid);
+            if (pos == null || type == null) {
+                continue;
+            }
+            FieldGeometry.Shape sh;
+            try {
+                sh = FieldGeometry.buildingByCode(type);
+            } catch (RuntimeException unknown) {
+                continue;
+            }
+            boolean hot = Integer.valueOf(uid).equals(hoverUid);
+            double scale = FieldGeometry.seatScale(sh, BASE);
+            for (int k = 5; k >= 1; k--) {
+                canvas.alpha((hot ? 0.34 : 0.22) * (1 - (k - 1) / 5.0));
+                canvas.shape(sh, pos[0], pos[1], pos[2] - sh.outward(), scale, sh.hexCx(),
+                    sh.hexCy(), "none", seatHex, (hot ? 16 : 11) * k / 5.0 + 2);
+            }
+            canvas.alpha(1);
+            canvas.shape(sh, pos[0], pos[1], pos[2] - sh.outward(), scale, sh.hexCx(),
+                sh.hexCy(), "none", seatHex, hot ? 4.4 : 3.2);
+            canvas.shape(sh, pos[0], pos[1], pos[2] - sh.outward(), scale, sh.hexCx(),
+                sh.hexCy(), "none", "#FFFFFF", hot ? 1.8 : 1.3);
+        }
+        canvas.alpha(1);
+    }
+
     public void clearChoices() {
+        demolishTargets = Map.of();
+        hoverUid = null;
         bubbles.clear();
         sourceHexId = null;
         selectFill = null;
@@ -332,6 +483,8 @@ public final class FieldView extends JComponent {
                     if (facingHexId != null && facingHexId.equals(id)) {
                         onFacingPick.accept(facingSelected);
                     }
+                } else if (isClick && demolishAt(e.getPoint()) != null) {
+                    demolishTargets.get(demolishAt(e.getPoint())).run();
                 } else if (isClick && onHexPick != null) {
                     String id = hexIdAt(e.getPoint());
                     if (id != null && selectableHexIds.contains(id) && onHexPick != null) {
@@ -372,8 +525,14 @@ public final class FieldView extends JComponent {
                     repaint();
                 }
                 String id = hexIdAt(e.getPoint());
+                Integer podSnos = demolishAt(e.getPoint());
+                if (!java.util.Objects.equals(podSnos, hoverUid)) {
+                    hoverUid = podSnos;
+                    repaint();
+                }
                 boolean selectable = id != null && selectableHexIds.contains(id)
-                    || facingVariants != null && id != null && id.equals(facingHexId);
+                    || facingVariants != null && id != null && id.equals(facingHexId)
+                    || podSnos != null;
                 setCursor(selectable ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
                 boolean liveGhost = ghostType != null || facingVariants != null;
@@ -1258,6 +1417,7 @@ public final class FieldView extends JComponent {
         if (!selectableHexIds.isEmpty()) {
             drawSelectable(g);
         }
+        drawDemolish(g);
         drawSource(g);
         if (facingVariants != null && facingHexId != null) {
             drawFacing(g);
