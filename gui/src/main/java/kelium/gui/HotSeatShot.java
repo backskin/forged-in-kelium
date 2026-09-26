@@ -30,6 +30,10 @@ public final class HotSeatShot {
 
     public static void main(String[] args) throws Exception {
         System.setProperty("kelium.gui.offscreen", "true");
+        // -Dshot.gamescale — масштаб, как у запуска игры (по экрану этой машины)
+        if (System.getProperty("shot.gamescale") != null) {
+            kelium.gui.replay2.Theme.useGameScale();
+        }
         String out = args[0];
         String kind = args.length > 1 && !"-".equals(args[1]) ? args[1] : null;
         int skip = args.length > 2 ? Integer.parseInt(args[2]) : 0;
@@ -37,8 +41,10 @@ public final class HotSeatShot {
         int w = args.length > 4 ? Integer.parseInt(args[4]) : 1600;
         int h = args.length > 5 ? Integer.parseInt(args[5]) : 1000;
 
+        // -Dshot.specs=human,builder:1,punisher:1 — состав мест (по умолчанию двое)
+        List<String> specs = List.of(System.getProperty("shot.specs", "human,builder:1").split(","));
         HotSeatWindow win = new HotSeatWindow(
-            HotSeatWindow.Options.simple(2, seed, List.of("human", "builder:1")));
+            HotSeatWindow.Options.simple(specs.size(), seed, specs));
         SwingUtilities.invokeAndWait(win::start);
         SwingUtilities.invokeAndWait(() -> win.frame.setSize(w, h));
 
@@ -72,6 +78,21 @@ public final class HotSeatShot {
         if (seatProp != null) {
             SwingUtilities.invokeAndWait(() -> win.lookAtSeatForTest(Integer.parseInt(seatProp)));
             Thread.sleep(300);
+        }
+        // -Dshot.fake=<вид> — показать редкое решение, собранное из этой партии
+        String fake = System.getProperty("shot.fake");
+        if (fake != null) {
+            var agent0 = win.humansBySeat.get(0);
+            var now = agent0 == null ? null : agent0.pending();
+            if (now != null) {
+                var d = РедкиеРешения.собрать(fake, now.state(), 0);
+                if (d == null) {
+                    System.out.println("не из чего собрать решение " + fake);
+                } else {
+                    SwingUtilities.invokeAndWait(() -> win.previewDecisionForTest(0, d));
+                    Thread.sleep(400);
+                }
+            }
         }
         // -Dshot.spread=objectives|arsenal|dump… — снять раскрытую группу карт
         String spreadGroup = System.getProperty("shot.spread");

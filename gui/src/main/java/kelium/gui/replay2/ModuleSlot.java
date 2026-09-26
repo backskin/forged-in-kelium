@@ -300,7 +300,8 @@ final class ModuleSlot {
                     : "Синий накрывает зону сборки здания «" + slotName + "».");
         }
         StringBuilder sb = new StringBuilder();
-        sb.append(redSlot ? "Красный модуль " : "Синий модуль ").append(m.id);
+        // номер жетона из данных («R30-1») игроку ничего не говорит — без него
+        sb.append(redSlot ? "Модуль боя" : "Модуль сборки");
         sb.append(m.gold ? "  ·  ПОЗОЛОЧЁННАЯ сторона" : "  ·  обычная сторона");
         sb.append("\nстоит на: ").append(slotName);
         if (redSlot) {

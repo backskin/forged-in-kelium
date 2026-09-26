@@ -194,6 +194,7 @@ class HotSeatUiClickTest {
                         w.curtain.ready();
                     }
                     collect(w, controls, plays);
+                    checkText("заголовок хода", w.statusForTest());
                 });
                 if (!controls.isEmpty() || System.currentTimeMillis() > show
                         || agent.pending() != d) {
@@ -234,7 +235,17 @@ class HotSeatUiClickTest {
         assertTrue(Files.exists(journal), "журнал не записан: " + journal.toAbsolutePath());
         System.out.println("партия " + options.players() + " мест, сид " + options.seed()
             + ": щелчков " + clicks + ", откатов " + undos + ", раундов " + w.rec.rounds);
+        for (String line : w.feedLog) {
+            checkText("лента", line);
+        }
+        // шаги хода — тоже строки на экране (панель «Шаги хода»)
+        synchronized (w.moves) {
+            for (HotSeatWindow.Decision d : w.decisions) {
+                checkText("шаг хода", d.label());
+            }
+        }
         SwingUtilities.invokeAndWait(() -> w.frame.dispose());
+        assertTrue(RAW.isEmpty(), "служебный текст на экране:\n" + String.join("\n", RAW));
     }
 
     /**
@@ -253,8 +264,10 @@ class HotSeatUiClickTest {
         // Карты вскрытия — только пока решение и правда карточное: гаснущая
         // раскладка прошлого вопроса ещё видна, но уже ничего не решает.
         if (w.ceremony.isVisible() && List.of("reveal_order", "blind_discard", "super_pick",
-                "start_objective_pick").contains(w.pendingKindForTest())) {
+                "start_objective_pick", "arsenal_draw2", "keep_objective", "objective_keep")
+                .contains(w.pendingKindForTest())) {
             for (var c : w.ceremony.cards()) {
+                checkText("карта выбора", c.title());
                 all.add(c.onPick());
                 plays.add(c.onPick());
             }
@@ -270,10 +283,27 @@ class HotSeatUiClickTest {
         }
     }
 
+    /**
+     * СЫРОЙ ТЕКСТ НА ЭКРАНЕ (сдача под ключ 25.09.2026): латиница, «@», «_»,
+     * скобки списков, «null», стрелки «->» — значит, подпись варианта ушла к
+     * игроку служебной строкой движка, а не словами.
+     */
+    static final java.util.Set<String> RAW = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final java.util.regex.Pattern RAW_TEXT = java.util.regex.Pattern.compile(
+        "[A-Za-z]{2,}|@|_|\\[|\\]|null|->|\\{");
+
+    static void checkText(String where, String text) {
+        if (text != null && RAW_TEXT.matcher(text).find()) {
+            RAW.add(where + ": «" + text + "»");
+        }
+    }
+
     private static void add(FieldBubbles.Opt o, List<Runnable> all, List<Runnable> plays) {
         if (o.pick() == null) {
             return;
         }
+        checkText("вариант", o.label());
+        checkText("пояснение варианта", o.sub());
         all.add(o.pick());
         if (o.tone() != 2) {
             plays.add(o.pick());

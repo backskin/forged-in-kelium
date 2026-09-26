@@ -1883,6 +1883,13 @@ public final class CombatResolver {
         int need = ((Number) rs.get("command_center.cu_tokens_for_military_win", 2))
             .intValue();
         boolean heldForeignToken = attacker.cuDestructionTokens >= need - 1;
+        // ПОБЕДА ЗА ВТОРОЕ УНИЧТОЖЕНИЕ, А НЕ ЗА ЖЕТОНЫ (решение дизайнера
+        // 25.09.2026): кто за партию ВТОРОЙ РАЗ уничтожает любой ЦУ, побеждает
+        // сразу — и только втроём и вчетвером. Жетоны уничтожения — просто очки.
+        if (rs.getBool("command_center.military_win_counts_kills", false)) {
+            heldForeignToken = attacker.cuKills >= need
+                && s.numPlayers() >= rs.getInt("command_center.military_win_min_players", 2);
+        }
         // Супер-задания 5.0: «Трофейный обоз» и «Тень штаба» смотрят, разрушалось
         // ли ЦУ игрока ХОТЬ РАЗ за партию.
         owner.cuEverLost = true;

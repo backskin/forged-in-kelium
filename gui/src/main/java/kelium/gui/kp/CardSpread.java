@@ -254,7 +254,7 @@ public final class CardSpread extends JComponent {
         if (c.face() != null) {
             java.awt.Shape clip = g.getClip();
             g.clip(shape);
-            g.drawImage(c.face(), r.x, r.y, w, h, null);
+            kelium.report.Mips.draw(g, c.face(), r.x, r.y, w, h);
             g.setClip(clip);
         } else {
             g.setColor(Theme.panel());

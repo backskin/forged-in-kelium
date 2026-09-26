@@ -30,6 +30,7 @@ import java.util.function.Function;
 
 import javax.swing.JComponent;
 
+import kelium.gui.replay2.MarkIcons;
 import kelium.gui.replay2.Theme;
 
 /**
@@ -179,7 +180,8 @@ public final class PlayerTable extends JComponent {
                 boolean onTab = tabRects.keySet().stream().anyMatch(r -> r.contains(p));
                 boolean hand = bubbles.hovering() || group != null || onTab
                     || "back".equals(key)
-                    || key != null && choices.containsKey(key);
+                    || key != null && choices.containsKey(key)
+                    || !overBubble && boardAt(p) != null;
                 setCursor(hand ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
                 if (repaint) {
@@ -233,6 +235,18 @@ public final class PlayerTable extends JComponent {
                     bubbles.clickHex(key);
                 } else {
                     bubbles.closeBubble();
+                    // стопка контейнеров под планшетом — раскладывается сама по себе
+                    if ("containers".equals(key) && state != null) {
+                        onHoverOff.run();
+                        onOpen.accept("containers");
+                        return;
+                    }
+                    String board = boardAt(p);
+                    if (board != null && state != null) {
+                        onHoverOff.run();
+                        onOpen.accept("board:" + board);
+                        return;
+                    }
                 }
                 repaint();
             }
@@ -360,6 +374,8 @@ public final class PlayerTable extends JComponent {
                 long a = (long) r.width * r.height;
                 if (choices.containsKey(e.getKey())) {
                     a /= 4;
+                } else if (e.getKey().startsWith("cell:")) {
+                    a *= 8;     // ячейка склада — только для подсказки, жетон важнее
                 }
                 if (a < bestArea) {
                     bestArea = a;
@@ -368,6 +384,40 @@ public final class PlayerTable extends JComponent {
             }
         }
         return best;
+    }
+
+    /**
+     * КАКОЙ ПЛАНШЕТ ПОД ТОЧКОЙ: {@code troop} или {@code storage}, иначе null.
+     * Щелчок по планшету, когда на нём ничего не выбирают, открывает его крупно
+     * (заказ дизайнера 25.09.2026).
+     */
+    private String boardAt(Point p) {
+        String hit = null;
+        for (String b : List.of("storage", "troop")) {
+            Rectangle r = spots.get(b);
+            if (r != null && r.contains(p)) {
+                hit = b;
+            }
+        }
+        if (hit != null) {
+            return hit;
+        }
+        // жетоны военных зданий лежат над планшетом войск, добытчики и
+        // энергостанции — на хранилище
+        String key = keyAt(p);
+        if (key == null) {
+            return null;
+        }
+        if (key.startsWith("building:miner") || key.startsWith("building:power_plant")
+                || key.startsWith("store:") || key.startsWith("cell:")) {
+            return "storage";
+        }
+        if (key.startsWith("building:") || key.startsWith("red:") || key.startsWith("blue:")
+                || key.startsWith("unit:") || key.startsWith("installed:")
+                || "containers".equals(key)) {
+            return "troop";
+        }
+        return null;
     }
 
     private String groupAt(Point p) {
@@ -413,10 +463,16 @@ public final class PlayerTable extends JComponent {
         if (g != null) {
             return switch (g) {
                 case "arsenal" -> "Закрытые карты арсенала — щелчок раскрывает";
-                case "dump" -> "Свалка: уничтоженные жетоны врагов на отложенном приказе";
+                case "dump" -> "Свалка: отложенный приказ и уничтоженные жетоны врагов на нём — "
+                    + "щелчок раскрывает";
                 case "orders" -> "Приказы в руке — щелчок раскрывает";
                 default -> "Щелчок раскрывает карты";
             };
+        }
+        String board = boardAt(e.getPoint());
+        if (board != null) {
+            return ("storage".equals(board) ? "Планшет хранилища" : "Планшет войск")
+                + " — щелчок открывает его крупно, с подсказкой по каждой детали";
         }
         return null;
     }
@@ -449,9 +505,28 @@ public final class PlayerTable extends JComponent {
         }
         int pad = Theme.px(12);
         int top = pad + Theme.px(4);
-        top += paintSeatTabs(g, w);
+        int tabsH = paintSeatTabs(g, w);
+        int resH = paintResources(g, pad + Theme.px(8), Theme.px(8));
+        top += Math.max(tabsH, resH);
         int innerH = h - top - pad;
         int x = pad + Theme.px(8);
+        // ВЕСЬ РЯД ВПИСЫВАЕТСЯ ПО ШИРИНЕ (сдача под ключ 25.09.2026): все
+        // детали зоны растут от её высоты, и на узком окне сумма ширин
+        // оказывалась больше экрана — руки уезжали за правый край. Не
+        // влезает — ряд уменьшается целиком и встаёт по центру высоты.
+        {
+            double hang = boards != null && boards.aspect() > 0 ? Math.max(0, boards.hang()) : 0;
+            double perH = (boards != null && boards.aspect() > 0
+                ? boards.aspect() / (1 + hang) : 0)
+                + 0.66 + 0.643 + handsPerHeight();
+            int fixed = x + pad + Theme.px(18) * 2 + Theme.px(6) + Theme.px(104)
+                + Theme.px(22) + Theme.px(16) * 2;
+            int fitH = (int) ((w - fixed) / perH);
+            if (fitH < innerH) {
+                top += (innerH - Math.max(Theme.px(80), fitH)) / 2;
+                innerH = Math.max(Theme.px(80), fitH);
+            }
+        }
 
         // ---- планшеты и стопка арсенала под хранилищем
         if (boards != null && boards.aspect() > 0) {
@@ -459,7 +534,7 @@ public final class PlayerTable extends JComponent {
             // торчит из-под планшета войск вниз, и стопка арсенала под
             // хранилищем торчит ровно так же — полосу под них считаем честно.
             double hang = Math.max(0, boards.hang());
-            int bw = (int) Math.min(w * 0.52, innerH / (1 + hang) * boards.aspect());
+            int bw = (int) Math.min(w * 0.60, innerH / (1 + hang) * boards.aspect());
             int bh = (int) Math.round(bw / boards.aspect());
             int by = top;
             int cardsBottom = by + (int) Math.round(bh * (1 + hang));
@@ -523,6 +598,49 @@ public final class PlayerTable extends JComponent {
             return r == null ? null : new Point2D.Double(r.getCenterX(), r.getCenterY());
         }, Theme.px(30));
         g.dispose();
+    }
+
+    /** Ресурс игрока в строке над столом: значок, цвет, значение, предел (или null). */
+    public record Res(String icon, Color color, String value, String cap, String label) {
+    }
+
+    private List<Res> resources = List.of();
+
+    /**
+     * РЕСУРСЫ — НА СВОЁМ СТОЛЕ, А НЕ В ВЕРХНЕЙ ПОЛОСЕ (просьба дизайнера
+     * 26.09.2026: «почему деньги и очки сверху, а не там же, где моя зона?»).
+     */
+    public void setResources(List<Res> res) {
+        this.resources = res == null ? List.of() : res;
+        repaint();
+    }
+
+    /** Строка ресурсов крупно; возвращает её высоту. */
+    private int paintResources(Graphics2D g, int x, int y) {
+        if (resources.isEmpty()) {
+            return 0;
+        }
+        int h = Theme.px(28);
+        double s = Theme.px(16);
+        Font num = Theme.mono(15, Font.BOLD);
+        Font cap = Theme.font(11, Font.PLAIN);
+        int cy = y + h / 2;
+        for (Res r : resources) {
+            MarkIcons.paint(g, r.icon(), x + s / 2, cy, s, r.color());
+            x += (int) s + Theme.px(6);
+            g.setFont(num);
+            g.setColor(Color.WHITE);
+            FontMetrics fm = g.getFontMetrics();
+            String v = r.value() + (r.cap() == null ? "" : "/" + r.cap());
+            g.drawString(v, x, cy + (fm.getAscent() - fm.getDescent()) / 2);
+            x += fm.stringWidth(v) + Theme.px(5);
+            g.setFont(cap);
+            g.setColor(MAT_INK2);
+            fm = g.getFontMetrics();
+            g.drawString(r.label(), x, cy + (fm.getAscent() - fm.getDescent()) / 2);
+            x += fm.stringWidth(r.label()) + Theme.px(18);
+        }
+        return h + Theme.px(6);
     }
 
     /** Где лежат вкладки мест после отрисовки. */
@@ -693,7 +811,7 @@ public final class PlayerTable extends JComponent {
         at.translate(x, y + h);
         at.rotate(-Math.PI / 2);
         at.scale(h / (double) back.getWidth(), w / (double) back.getHeight());
-        g.drawImage(back, at, null);
+        kelium.report.Mips.draw(g, back, at);
         g.setClip(clip);
         g.setColor(Theme.alpha(Color.BLACK, 0.3));
         g.setStroke(new BasicStroke(1f));
@@ -718,7 +836,7 @@ public final class PlayerTable extends JComponent {
                     tt.rotate(Math.toRadians((i * 37) % 30 - 15));
                     tt.scale(k, k);
                     tt.translate(-t.face().getWidth() / 2.0, -t.face().getHeight() / 2.0);
-                    g.drawImage(t.face(), tt, null);
+                    kelium.report.Mips.draw(g, t.face(), tt);
                 } else {
                     g.setColor(Theme.trophy());
                     g.fill(new Ellipse2D.Double(cx - cell * 0.3, cy - cell * 0.3,
@@ -773,7 +891,7 @@ public final class PlayerTable extends JComponent {
         if (state.orderArt() != null) {
             java.awt.Shape clip = g.getClip();
             g.clip(shape);
-            g.drawImage(state.orderArt(), x, y, w, h, null);
+            kelium.report.Mips.draw(g, state.orderArt(), x, y, w, h);
             g.setClip(clip);
         } else if (state.orderInfo() != null) {
             paintOrderBack(g, state.orderInfo(), shape, x, y, w, h);
@@ -966,7 +1084,7 @@ public final class PlayerTable extends JComponent {
         if (!played.isEmpty()) {
             int ch = Math.min(eh, h - eh - Theme.px(26));
             int cw = (int) Math.round(ch * aspect(faceOf.apply(played.get(0)), 0.643));
-            if (ch > Theme.px(40)) {
+            if (ch > Theme.px(70)) {
                 int cx = x + (w - cw) / 2;
                 int cy = y + Theme.px(16);
                 g.setFont(Theme.caption());
@@ -978,6 +1096,22 @@ public final class PlayerTable extends JComponent {
                         Theme.tile());
                 }
                 groups.put("played", new Rectangle(cx, cy, cw + Theme.px(16), ch + Theme.px(12)));
+            } else {
+                // Места под стопку нет (низкое окно) — плашка со счётом,
+                // щелчок раскрывает сыгранные карты так же, как стопка.
+                int ph = Theme.px(26);
+                int py = Math.max(y, ey - ph - Theme.px(8));
+                boolean hotP = "played".equals(hoverGroup);
+                RoundRectangle2D pill = new RoundRectangle2D.Double(x, py, w, ph, ph, ph);
+                g.setColor(hotP ? Theme.alpha(Color.WHITE, 0.16) : Theme.alpha(Color.BLACK, 0.25));
+                g.fill(pill);
+                g.setColor(Theme.alpha(MAT_INK2, 0.8));
+                g.setStroke(new BasicStroke(1f));
+                g.draw(pill);
+                g.setFont(Theme.font(10.5, Font.BOLD));
+                g.setColor(MAT_INK);
+                centred(g, "сыграно · " + played.size(), x + w / 2, py + ph / 2 + Theme.px(4));
+                groups.put("played", pill.getBounds());
             }
         }
     }
@@ -1023,6 +1157,26 @@ public final class PlayerTable extends JComponent {
 
     // ---------- руки веером ----------
 
+    /**
+     * СКОЛЬКО ШИРИНЫ ЗАНИМАЮТ РУКИ НА ЕДИНИЦУ ВЫСОТЫ — по настоящему числу карт
+     * (вёрстка стола, 26.09.2026). Прежде бралась оценка «2,4 карты», руки же
+     * бывают шире, и их дожимал собственный множитель: зону уменьшали — приказ
+     * и планшеты сужались, рукам доставалось больше места, и карты заданий
+     * РОСЛИ. Теперь высота ряда подбирается по честной ширине, и уменьшается
+     * всё вместе.
+     */
+    private double handsPerHeight() {
+        if (state == null) {
+            return 2.4 * 0.643;
+        }
+        double sum = 0;
+        for (int n : new int[]{state.objectives().size(), state.superObjectives().size(),
+                state.ordersInHand().size()}) {
+            sum += 1 + 0.3 * (Math.max(1, n) - 1);
+        }
+        return sum * 0.643;
+    }
+
     private void paintHands(Graphics2D g, int x, int y, int w, int h) {
         if (w < Theme.px(80)) {
             return;
@@ -1035,9 +1189,9 @@ public final class PlayerTable extends JComponent {
         if (!state.superObjectives().isEmpty()) {
             hands.add(new Object[]{"super", "СУПЕР", state.superObjectives()});
         }
-        if (!state.ordersInHand().isEmpty()) {
-            hands.add(new Object[]{"orders", "ПРИКАЗЫ", state.ordersInHand()});
-        }
+        // Рука приказов видна и пустой — пунктирным местом с «· 0»: пропавшая
+        // группа читается как баг рисования, а не как «всё сыграно».
+        hands.add(new Object[]{"orders", "ПРИКАЗЫ", state.ordersInHand()});
         int gap = Theme.px(16);
         int ch = h - Theme.px(22);
         double cw = ch * 0.643;
@@ -1130,7 +1284,7 @@ public final class PlayerTable extends JComponent {
             RoundRectangle2D local = new RoundRectangle2D.Double(0, 0, cw, ch, cw * 0.08, cw * 0.08);
             if (face != null) {
                 gc.clip(local);
-                gc.drawImage(face, 0, 0, cw, ch, null);
+                kelium.report.Mips.draw(gc, face, 0, 0, cw, ch);
                 gc.setClip(null);
             } else {
                 // ПЕЧАТИ НЕТ — рисуем карту, а не белый прямоугольник: цвет
@@ -1189,7 +1343,7 @@ public final class PlayerTable extends JComponent {
         if (img != null) {
             java.awt.Shape clip = g.getClip();
             g.clip(shape);
-            g.drawImage(img, x, y, w, h, null);
+            kelium.report.Mips.draw(g, img, x, y, w, h);
             g.setClip(clip);
         } else {
             g.setColor(fallback);

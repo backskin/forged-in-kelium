@@ -25,7 +25,15 @@ public final class OpponentStrip extends JComponent {
 
     public record Row(int seat, String name, boolean me, int vp, int coin,
                        int kelium, int ammo, int orderCards, int objectiveCards,
-                       int arsenalCards, int destroyedValue) {
+                       int arsenalCards, int destroyedValue, boolean first) {
+    }
+
+    /** Плашка «ПЕРВЫЙ» у места с жетоном первого игрока (26.09.2026). */
+    private static final String FIRST = "ПЕРВЫЙ";
+
+    private static int firstBadgeW(Graphics2D g) {
+        g.setFont(Theme.font(9.5, Font.BOLD));
+        return g.getFontMetrics().stringWidth(FIRST) + Theme.px(12);
     }
 
     private final List<Row> rows = new ArrayList<>();
@@ -45,7 +53,7 @@ public final class OpponentStrip extends JComponent {
     public String getToolTipText(java.awt.event.MouseEvent e) {
         return "Открытый счёт всех мест: очки · монеты · келемий · БПР · "
             + "карты в руках (приказы/задания/арсенал) · трофеи. "
-            + "Полный планшет — в ящике «Планшет»";
+            + "Золотая плашка «ПЕРВЫЙ» — у кого жетон первого игрока";
     }
 
     @Override
@@ -77,6 +85,18 @@ public final class OpponentStrip extends JComponent {
             g.setColor(Theme.seat(r.seat()));
             g.fillRoundRect(cx, cy - Theme.px(7), Theme.px(4), Theme.px(14), 2, 2);
             cx += Theme.px(9);
+            if (r.first()) {
+                // ЖЕТОН ПЕРВОГО ИГРОКА — золотой плашкой перед именем
+                int bw = firstBadgeW(g);
+                int bh = Theme.px(16);
+                g.setColor(Theme.points());
+                g.fillRoundRect(cx, cy - bh / 2, bw, bh, bh, bh);
+                g.setColor(java.awt.Color.BLACK);
+                var bf = g.getFontMetrics();
+                g.drawString(FIRST, cx + (bw - bf.stringWidth(FIRST)) / 2,
+                    cy + (bf.getAscent() - bf.getDescent()) / 2);
+                cx += bw + Theme.px(6);
+            }
             g.setFont(Theme.font(11.5, Font.BOLD));
             g.setColor(Theme.seatInk(r.seat()));
             var fm = g.getFontMetrics();
@@ -98,8 +118,9 @@ public final class OpponentStrip extends JComponent {
     }
 
     private int cardWidth(Graphics2D g, Row r) {
+        int badge = r.first() ? firstBadgeW(g) + Theme.px(6) : 0;
         g.setFont(Theme.font(11.5, Font.BOLD));
-        int w = Theme.px(22) + g.getFontMetrics()
+        int w = Theme.px(22) + badge + g.getFontMetrics()
             .stringWidth(r.name() + (r.me() ? " (вы)" : ""));
         g.setFont(Theme.mono(11, Font.BOLD));
         var fm = g.getFontMetrics();

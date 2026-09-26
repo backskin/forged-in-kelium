@@ -233,6 +233,11 @@ public final class Names {
             return "конец по келемию: источников осталось " + left
                 + " при пороге свода " + threshold + хвост;
         }
+        if (threshold == 0) {
+            return длинная
+                ? "конец по келемию: все тайлы зарождения истощены · победа по очкам"
+                : "кончился келемий на поле";
+        }
         return длинная
             ? "конец по келемию: на поле остался последний тайл зарождения · победа по очкам"
             : "кончился келемий на поле";
@@ -256,8 +261,10 @@ public final class Names {
             case "victory_points" -> "по победным очкам";
             case "super_objective" -> "супер-заданием";
             case "all_peaks_occupied" -> "заняты все вершины треков";
+            case "all_peaks" -> "победа наукой";
             case "last_spawn_tile" -> "кончился келемий на поле";
             case "military" -> "военная победа";
+            case "market_out" -> "кончились карты рынка";
             case "" -> "партия завершена";
             default -> unknown(code);
         };
@@ -279,7 +286,8 @@ public final class Names {
     private static String conditionLongBase(String code) {
         return switch (code == null ? "" : code) {
             case "victory_points" -> "победа по победным очкам";
-            case "military" -> "ВОЕННАЯ победа: уничтожено второе ЦУ";
+            case "military" -> "ВОЕННАЯ победа: игрок второй раз уничтожил ЦУ";
+            case "all_peaks" -> "ПОБЕДА НАУКОЙ: игрок занял вершины всех трёх треков";
             case "super_objective" -> "победа по СУПЕР-ЗАДАНИЮ: проект развёрнут";
             case "all_peaks_occupied" -> "конец по науке: заняты все три вершины треков "
                 + "· победа по очкам";

@@ -155,6 +155,31 @@ public final class Theme {
         scale = DPI * (userScale == 0 ? AUTO : userScale);
     }
 
+    /**
+     * МАСШТАБ ОКНА ИГРЫ — по экрану, В ОБЕ СТОРОНЫ (26.09.2026). Прибор разбора
+     * партии рассчитан на 1500×950 и на больших экранах не растёт; игру же
+     * смотрят с расстояния, и на Full HD её текст оставался мелким. Окно игры
+     * выверено на 1366×768 при множителе 1.0 — от этого размера и считаем:
+     * Full HD даёт около 1.37, ноутбук 1366×768 — 1.0. Ручной множитель, если
+     * он выбран, главнее.
+     */
+    public static void useGameScale() {
+        if (userScale != 0) {
+            return;
+        }
+        try {
+            if (GraphicsEnvironment.isHeadless()) {
+                return;
+            }
+            java.awt.Rectangle b = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .getMaximumWindowBounds();
+            double fit = Math.min(b.width / DPI / 1366.0, b.height / DPI / 768.0);
+            scale = DPI * Math.max(0.75, Math.min(1.8, fit));
+        } catch (RuntimeException | Error e) {
+            // остаётся прежний масштаб
+        }
+    }
+
     /** Ручной множитель: 0 — включён автоподбор. */
     public static double userScale() {
         return userScale;

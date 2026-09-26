@@ -51,6 +51,10 @@ import kelium.report.ReplayRecord;
 public final class StartMenuWindow {
 
     public static void main(String[] args) {
+        // МАСШТАБ ИГРЫ — ПО ЭКРАНУ (жалоба дизайнера 26.09.2026: «на Full HD всё
+        // мелко, ничего не прочитать»). До первого окна: размеры запекаются в
+        // компоненты при создании.
+        kelium.gui.replay2.Theme.useGameScale();
         SwingUtilities.invokeLater(() -> new StartMenuWindow().start());
     }
 
@@ -193,14 +197,24 @@ public final class StartMenuWindow {
     // ==================== сборка окна ====================
 
     void start() {
-        Theme.apply(false);
+        // ОДИН СТИЛЬ С ОКНОМ ПАРТИИ (сдача под ключ 25.09.2026): «Штаб» в той
+        // же тёмной палитре стола, что и партия, а не светлый «вордовский».
+        Theme.applyTable();
         frame = new JFrame("Кристаллы Раздора — Штаб");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new BorderLayout());
         frame.getContentPane().setBackground(Theme.bg());
 
         frame.add(buildHead(), BorderLayout.NORTH);
-        frame.add(buildRail(), BorderLayout.WEST);
+        // Колонка решений прокручивается: на экране 768 точек высотой она не
+        // влезает, и BoxLayout сплющивал списки до нечитаемых полосок.
+        javax.swing.JScrollPane railScroll = new javax.swing.JScrollPane(buildRail(),
+            javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+            javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        railScroll.setBorder(null);
+        railScroll.setPreferredSize(new Dimension(Theme.px(RAIL_W) + Theme.px(14), Theme.px(10)));
+        railScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
+        frame.add(railScroll, BorderLayout.WEST);
         frame.add(buildStage(), BorderLayout.CENTER);
         frame.add(buildFoot(), BorderLayout.SOUTH);
 
@@ -211,8 +225,7 @@ public final class StartMenuWindow {
         frame.getLayeredPane().addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
-                gallery.setBounds(0, 0, frame.getLayeredPane().getWidth(),
-                    frame.getLayeredPane().getHeight());
+                gallery.setBounds(frame.getContentPane().getBounds());
             }
         });
         Offscreen.show(frame);
@@ -319,7 +332,6 @@ public final class StartMenuWindow {
         JPanel rail = new JPanel();
         rail.setLayout(new BoxLayout(rail, BoxLayout.Y_AXIS));
         rail.setBackground(Theme.panel());
-        rail.setPreferredSize(new Dimension(Theme.px(RAIL_W), Theme.px(10)));
         rail.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 0, Theme.px(1), Theme.border()),
             BorderFactory.createEmptyBorder(Theme.px(12), Theme.px(12),
@@ -619,12 +631,18 @@ public final class StartMenuWindow {
      * планшете — столько раундов с рынком, и переключатель «подготовительный
      * раунд»: первый раунд без карты рынка, партия на раунд длиннее.
      */
+    /** Меньше карт рынка на партию класть нельзя. */
+    public static final int MIN_MARKET_CARDS = 4;
+
     private JComponent buildRounds() {
         JPanel col = new JPanel();
         col.setOpaque(false);
         col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
         int[] m = printedMarket();
-        marketStep = new Stepper("карт рынка", null, m[0], 1, Math.max(1, m[1]),
+        // от 4 до 10 карт (решение дизайнера 25.09.2026): меньше четырёх —
+        // партия не успевает развернуться
+        marketStep = new Stepper("карт рынка", null, Math.max(MIN_MARKET_CARDS, m[0]),
+            MIN_MARKET_CARDS, Math.max(MIN_MARKET_CARDS, m[1]),
             v -> refreshRounds());
         marketStep.setAlignmentX(Component.LEFT_ALIGNMENT);
         col.add(marketStep);
@@ -771,6 +789,7 @@ public final class StartMenuWindow {
         stage.add(top, BorderLayout.NORTH);
 
         field = new FieldView();
+        field.setTableBackdrop(true);
         field.setShowIds(false);
         field.setShowTurnCaption(false);
         stage.add(field, BorderLayout.CENTER);
@@ -1234,8 +1253,7 @@ public final class StartMenuWindow {
                 current = i;
             }
         }
-        gallery.setBounds(0, 0, frame.getLayeredPane().getWidth(),
-            frame.getLayeredPane().getHeight());
+        gallery.setBounds(frame.getContentPane().getBounds());
         int ps = players;
         long sd = seed;
         String rs = rulesetId;
@@ -1283,6 +1301,7 @@ public final class StartMenuWindow {
         int w = Theme.px(560);
         int h = Theme.px(380);
         FieldView fv = new FieldView();
+        fv.setTableBackdrop(true);
         fv.setShowIds(false);
         fv.setShowTurnCaption(false);
         fv.setSize(w, h);

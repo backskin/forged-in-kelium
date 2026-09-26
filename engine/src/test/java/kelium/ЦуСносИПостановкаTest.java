@@ -3,6 +3,7 @@ package kelium;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -22,9 +23,9 @@ import kelium.engine.ЦуИзЗапаса;
 import kelium.support.Fix;
 
 /**
- * ЦУ СНОСИТСЯ И СТАВИТСЯ ЗАНОВО (решение дизайнера 23.09.2026): снос Стройкой —
- * только при оставшемся спец-действии, и оно сразу ставит ЦУ на свободные
- * сектора любого гекса; за снос — монета.
+ * СНОС СВОЕГО ЦУ — РАЗ ЗА ПАРТИЮ (решение дизайнера 25.09.2026, вечер):
+ * без монеты, свой пустой модуль боя уходит сопернику жетоном уничтожения ЦУ;
+ * нет жетона — сносить нельзя. Из запаса ЦУ ставят на любой гекс.
  */
 class ЦуСносИПостановкаTest {
 
@@ -63,28 +64,33 @@ class ЦуСносИПостановкаTest {
     }
 
     @Test
-    void безСпецДействияЦуНеСносится() {
+    void безСвоегоЖетонаЦуНеСносится() {
         GameState s = Fix.game();
+        PlayerState p = s.player(0);
+        p.ownCuTokenAvailable = false;                   // жетон уже отдан
         Сносчик агент = new Сносчик(0);
-        TurnContext ход = new TurnContext(0, 1);
-        ход.useSpec();                                   // спец-действие уже потрачено
-        Actions.create("build", s).perform(s.player(0), ход, агент);
-        assertFalse(агент.предлагалиСносЦу, "снос ЦУ без спец-действия не предлагается");
-        assertNotNull(цу(s.player(0)).hexId, "ЦУ на поле");
+        Actions.create("build", s).perform(p, new TurnContext(0, 1), агент);
+        assertFalse(агент.предлагалиСносЦу, "без своего жетона снос ЦУ не предлагается");
+        assertNotNull(цу(p).hexId, "ЦУ на поле");
     }
 
     @Test
-    void сносЦуСразуСтавитЕгоЗаново() {
+    void сносЦуОтдаётЖетонСоперникуБезМонеты() {
         GameState s = Fix.game();
         PlayerState p = s.player(0);
+        assertTrue(p.ownCuTokenAvailable, "на старте свой жетон у игрока");
         int монет = p.resources.coin();
+        int жетоновУСоседа = s.player(1).cuDestructionTokens;
         Сносчик агент = new Сносчик(0);
         TurnContext ход = new TurnContext(0, 1);
+        ход.useSpec();                                   // спец-действие не нужно
         Actions.create("build", s).perform(p, ход, агент);
-        assertTrue(агент.предлагалиСносЦу, "со спец-действием снос ЦУ предлагается");
-        assertNotNull(цу(p).hexId, "ЦУ снова на поле");
-        assertFalse(ход.canSpec(), "спец-действие ушло на постановку ЦУ");
-        assertEquals(монет + 1, p.resources.coin(), "за снос — 1 монета");
+        assertTrue(агент.предлагалиСносЦу, "снос ЦУ предлагается и без спец-действия");
+        assertNull(цу(p).hexId, "ЦУ ушёл в запас, сразу не ставится");
+        assertEquals(монет, p.resources.coin(), "за снос ЦУ монеты нет");
+        assertFalse(p.ownCuTokenAvailable, "свой жетон ушёл");
+        assertEquals(жетоновУСоседа + 1, s.player(1).cuDestructionTokens,
+            "сосед получил жетон уничтожения ЦУ");
     }
 
     @Test

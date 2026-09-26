@@ -133,6 +133,12 @@ final class PrintedBoards {
         return хр == null ? 0 : хр.getHeight() * с.хрМасштаб();
     }
 
+    /** Высота планшета войск в пикселях печати сцепки (0 — картинки нет). */
+    static double войскаВысота(int seat) {
+        BufferedImage вой = troopArt(seat);
+        return вой == null ? 0 : вой.getHeight();
+    }
+
     /** Высота планшета хранилища при такой ширине (0 — картинки нет). */
     static int storageHeight(int seat, int width) {
         return height(storageArt(seat), width);
@@ -174,7 +180,7 @@ final class PrintedBoards {
         }
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
-        g.drawImage(art, x, y, width, h, null);
+        kelium.report.Mips.draw(g, art, x, y, width, h);
         hit("troop", new Rectangle(x, y, width, h));
         for (BoardAnchors.Column c : troopCols(p.seat)) {
             paintTroopAttack(g, x, y, k, c, p, troop, spots);
@@ -422,6 +428,27 @@ final class PrintedBoards {
     }
 
     /**
+     * ТОЛЬКО ПЛАНШЕТ ВОЙСК со своим — картами в пазах, жетонами военных зданий
+     * и контейнерами, без хранилища сбоку (увеличение планшета, заказ
+     * дизайнера 26.09.2026: «чтобы хранилище к войскам не прилипало»).
+     * {@code x, y} — начало сцепки, как у {@link #paintPair}.
+     */
+    static void paintTroopOnly(Graphics2D g, int x, int y, double k, Сцепка с,
+                               ReplayRecord.Player p, kelium.core.TroopSide troop,
+                               Set<String> вЗапасе, Map<Rectangle, Object[]> spots) {
+        BufferedImage вой = troopArt(p.seat);
+        if (с == null || вой == null) {
+            return;
+        }
+        int войX = (int) Math.round(x + с.войX() * k);
+        int войY = (int) Math.round(y + с.войY() * k);
+        картыВПазах(g, войX, войY, k, p);
+        paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
+        военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
+        подписьКонтейнеров(g);
+    }
+
+    /**
      * ПОДПИСИ ПОД СТОПКАМИ ЗАПАСА («пехота», «3 из 4»). На столе таких цифр нет:
      * там просто лежат оставшиеся жетоны. Прибору они нужны, картинке стола для
      * книги правил — нет, поэтому выключаются на время снимка.
@@ -457,8 +484,8 @@ final class PrintedBoards {
         int сдвиг = Math.max(1, th / 9);
         int всего = (сколько - 1) * сдвиг;
         for (int i = сколько - 1; i >= 0; i--) {
-            g.drawImage(tex, cx - tw / 2 - всего / 2 + i * сдвиг,
-                y + (высота - th) / 2 - i * сдвиг / 2, tw, th, null);
+            kelium.report.Mips.draw(g, tex, cx - tw / 2 - всего / 2 + i * сдвиг,
+                y + (высота - th) / 2 - i * сдвиг / 2, tw, th);
         }
     }
 
@@ -499,7 +526,7 @@ final class PrintedBoards {
                     tw = colW - 4;
                     th = (int) Math.round(tw / доля);
                 }
-                g.drawImage(tex, cx - tw / 2, y + (картинкаH - th) / 2, tw, th, null);
+                kelium.report.Mips.draw(g, tex, cx - tw / 2, y + (картинкаH - th) / 2, tw, th);
             }
             g.setComposite(было);
             g.setColor(вЗапасе == 0 ? Theme.ink3() : Theme.ink2());
@@ -618,7 +645,7 @@ final class PrintedBoards {
             // планшет, нарисованный следом. Ничего не сжимается.
             int h = (int) Math.round(box.width
                 * картинка.getHeight() / (double) картинка.getWidth());
-            g.drawImage(картинка, box.x, box.y + box.height - h, box.width, h, null);
+            kelium.report.Mips.draw(g, картинка, box.x, box.y + box.height - h, box.width, h);
             return;
         }
         // Печати нет — рисуем саму карту: паз не должен выглядеть пустым, когда
@@ -685,7 +712,7 @@ final class PrintedBoards {
             kelium.report.ТеньЖетона.силуэт(tex,
                 kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
             at, d, d);
-        g.drawImage(tex, at, null);
+        kelium.report.Mips.draw(g, tex, at);
         hit("building:" + code, new Rectangle((int) Math.round(cx - ш / 2),
             (int) Math.round(низ - высота), (int) Math.round(ш), (int) Math.round(высота)));
         if (spots != null) {
@@ -716,7 +743,7 @@ final class PrintedBoards {
         }
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
-        g.drawImage(art, x, y, width, h, null);
+        kelium.report.Mips.draw(g, art, x, y, width, h);
         hit("storage", new Rectangle(x, y, width, h));
         // Рамки ячеек КАЖДОГО складского здания: по ним ляжет сам жетон, если он
         // ещё на планшете (см. ниже, жетонПоверхЯчеек).
@@ -742,6 +769,10 @@ final class PrintedBoards {
                 char[] arr = fill.get(key);
                 has = open && arr != null && seen < arr.length ? arr[seen] : 0;
             }
+            // ЗОНА ЯЧЕЙКИ — для подсказки по каждой детали планшета (увеличение
+            // планшета, 25.09.2026): чья ячейка, открыта ли и что в ней лежит.
+            hit("cell:" + c.group() + ":" + c.level() + ":" + seen + ":" + (open ? 1 : 0)
+                + ":" + (has == 0 ? '-' : has), box);
             seen++;
             if (!open) {
                 // ЯЧЕЙКА НАКРЫТА СВОИМ ЖЕТОНОМ — и жетон мы сейчас на неё и
@@ -967,7 +998,7 @@ final class PrintedBoards {
                 kelium.report.ТеньЖетона.силуэт(tex,
                     kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
                 at, d, d);
-            g.drawImage(tex, at, null);
+            kelium.report.Mips.draw(g, tex, at);
             hit("building:" + code + ":" + уровень, at.createTransformedShape(
                 new Rectangle(0, 0, tex.getWidth(), tex.getHeight())));
             return;

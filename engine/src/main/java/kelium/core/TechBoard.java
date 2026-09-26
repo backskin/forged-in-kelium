@@ -148,6 +148,16 @@ public final class TechBoard {
         return null;
     }
 
+    /** Стоит ли кубик игрока на вершине каждого трека. */
+    public boolean onAllPeaks(int seat) {
+        for (String t : tracks) {
+            if (!occupancy.get(t).get(steps - 1).contains(seat)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Занял ли ОДИН игрок вершины всех треков — условие конца партии. */
     public boolean allPeaksByOneSeat() {
         return seatOnAllPeaks() != null;

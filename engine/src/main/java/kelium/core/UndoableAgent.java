@@ -77,6 +77,12 @@ public final class UndoableAgent extends Agent {
         this.delegate = new InteractiveAgent(seat, name, onDecision, onPublicEvent);
     }
 
+    /** Живой игрок: спец-действие — в меню хода (см. {@link Agent#specInActionMenu}). */
+    @Override
+    public boolean specInActionMenu() {
+        return true;
+    }
+
     @Override
     public Choice choose(GameState s, List<Choice> options, Map<String, Object> context) {
         Choice pick = delegate.choose(s, options, context);

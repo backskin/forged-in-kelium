@@ -162,6 +162,8 @@ public final class HotSeatWindow {
     private JPanel chipsPanel;
     FieldView field;
     private BoardsPanel boards;
+    private BoardsPanel scienceBoard;
+    private BoardsPanel marketBoard;
     private BoardSheet sheet;
 
     /** Планшет смотрящего места — для прогонщиков и тестов. */
@@ -360,6 +362,10 @@ public final class HotSeatWindow {
         spread = new kelium.gui.kp.CardSpread();
         frame.getLayeredPane().add(spread, JLayeredPane.MODAL_LAYER);
 
+        boardZoom = new kelium.gui.kp.BoardZoom();
+        // выше прочих модальных окон (выбор приказа, раскрытые карты), ниже шторки
+        frame.getLayeredPane().add(boardZoom, Integer.valueOf(JLayeredPane.MODAL_LAYER + 10));
+
         curtain = new kelium.gui.kp.HandoverCurtain();
         frame.getLayeredPane().add(curtain, JLayeredPane.DRAG_LAYER);
         frame.getLayeredPane().addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -409,6 +415,9 @@ public final class HotSeatWindow {
                 if (spread != null) {
                     spread.close();
                 }
+                if (boardZoom != null) {
+                    boardZoom.close();
+                }
             }
         });
 
@@ -417,24 +426,37 @@ public final class HotSeatWindow {
         frame.setLocationByPlatform(true);
         Offscreen.show(frame);
         placeTableDivider();
+        // Разделитель поля и зоны ставится по размеру окна при каждом его
+        // изменении — пока игрок не передвинул его сам.
+        if (tableSplit.getUI() instanceof javax.swing.plaf.basic.BasicSplitPaneUI ui) {
+            ui.getDivider().addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    dividerByHand = true;
+                }
+            });
+        }
         frame.addComponentListener(new java.awt.event.ComponentAdapter() {
-            private boolean placed;
-
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
-                if (!placed) {
-                    placed = true;
-                    placeTableDivider();
+                if (!dividerByHand) {
+                    SwingUtilities.invokeLater(HotSeatWindow.this::placeTableDivider);
                 }
             }
         });
     }
 
+    private boolean dividerByHand;
+
     /** Стол игрока занимает свою высоту снизу, остальное — поле. */
     private void placeTableDivider() {
         if (tableSplit != null && tableSplit.getHeight() > 0) {
-            tableSplit.setDividerLocation(Math.max(Theme.px(300),
-                tableSplit.getHeight() - Theme.px(340)));
+            // ВЫСОТА ЗОНЫ — ДОЛЯ ОКНА (сдача под ключ 25.09.2026): на экране
+            // ноутбука 1366×768 постоянные 340 точек съедали половину высоты,
+            // и поле становилось марочным. Зона — 40% высоты, от 230 до 340.
+            int h = tableSplit.getHeight();
+            int zone = Math.max(Theme.px(230), Math.min(Theme.px(340), (int) (h * 0.40)));
+            tableSplit.setDividerLocation(Math.max(Theme.px(200), h - zone));
         }
     }
 
@@ -519,6 +541,10 @@ public final class HotSeatWindow {
      * текущего решения движка, из того же списка, что обводит карты на столе.
      */
     void openSpread(String group) {
+        if (group.startsWith("board:")) {
+            openBoardZoom(group.substring("board:".length()));
+            return;
+        }
         ReplayRecord.Player p = shownPlayer();
         boolean hidden = shownSeat() != viewedSeat;
         if (hidden && List.of("objectives", "super", "arsenal", "orders").contains(group)) {
@@ -559,6 +585,10 @@ public final class HotSeatWindow {
                 openDumpSpread(p);
                 return;
             }
+            case "containers" -> {
+                openContainersSpread(p);
+                return;
+            }
             default -> {
                 return;
             }
@@ -584,9 +614,55 @@ public final class HotSeatWindow {
             Theme.seat(shownSeat()), null);
     }
 
+    /** Планшет крупно, с подсказкой по каждой детали (заказ дизайнера 25.09.2026). */
+    kelium.gui.kp.BoardZoom boardZoom;
+
+    private void openBoardZoom(String which) {
+        if (tableSheet == null) {
+            return;
+        }
+        int seat = shownSeat();
+        tableSheet.setSeat(seat);
+        zoom.setVisible(false);
+        boardZoom.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        boardZoom.open(tableSheet, seat, which, seatName(seat));
+    }
+
+    /**
+     * КОНТЕЙНЕРЫ ПОД ПЛАНШЕТОМ — раскладкой рубашкой вверх. По правилам их
+     * берут не глядя, и что внутри, не знает и сам владелец: раскладка
+     * показывает, сколько их, и говорит, как вскрыть (жалоба дизайнера
+     * 26.09.2026: «нажимаю на контейнер — ничего не происходит»).
+     */
+    private void openContainersSpread(ReplayRecord.Player p) {
+        java.awt.image.BufferedImage back = kelium.report.Textures.card("deck_containers", "deck");
+        List<kelium.gui.kp.CardSpread.Card> cards = new ArrayList<>();
+        for (int i = 0; i < p.containers; i++) {
+            cards.add(new kelium.gui.kp.CardSpread.Card("container" + i, back, "Контейнер",
+                "рубашкой вверх", List.of()));
+        }
+        if (cards.isEmpty()) {
+            return;
+        }
+        zoom.setVisible(false);
+        spread.setBounds(0, 0, frame.getLayeredPane().getWidth(),
+            frame.getLayeredPane().getHeight());
+        spread.open("Контейнеры под планшетом: " + p.containers,
+            "Лежат рубашкой вверх — что внутри, узнаете при вскрытии спец-действием. "
+                + "Щёлкните мимо карт, чтобы сложить их", cards, Theme.seat(shownSeat()), null);
+    }
+
     /** Свалка раскрытием: жетоны врагов трофейной стороной. */
     private void openDumpSpread(ReplayRecord.Player p) {
         List<kelium.gui.kp.CardSpread.Card> cards = new ArrayList<>();
+        // САМ ОТЛОЖЕННЫЙ ПРИКАЗ — первой картой: свалка лежит на нём, и
+        // посмотреть его надо и пустым (жалоба дизайнера 26.09.2026)
+        if (p.orderSetAside != null) {
+            cards.add(new kelium.gui.kp.CardSpread.Card(p.orderSetAside,
+                orderArt(p.orderSetAside, p.orderColor), cardName(p.orderSetAside),
+                "отложенный приказ — свалка", List.of()));
+        }
         for (ReplayRecord.DestroyedToken t : p.destroyedCard) {
             String nm = t.building ? kelium.report.Labels.buildingName(t.type, t.level)
                 : kelium.report.Labels.unitName(t.type);
@@ -776,6 +852,16 @@ public final class HotSeatWindow {
         }
         int seat = shownSeat();
         boolean hidden = seat != viewedSeat;
+        // ресурсы того, чей стол перед глазами — на самом столе
+        table.setResources(List.of(
+            new kelium.gui.kp.PlayerTable.Res("SUPER", Theme.points(), String.valueOf(vpTotal(p)), null, "очков"),
+            new kelium.gui.kp.PlayerTable.Res("COIN", Theme.points(), String.valueOf(p.coin), null, "монет"),
+            new kelium.gui.kp.PlayerTable.Res("KELIUM", Theme.kelium(), String.valueOf(p.kelium),
+                String.valueOf(p.keliumCap), "келемий"),
+            new kelium.gui.kp.PlayerTable.Res("AMMO", Theme.energy(), String.valueOf(p.ammo),
+                String.valueOf(p.ammoCap), "боеприпасы"),
+            new kelium.gui.kp.PlayerTable.Res("TROPHY", Theme.neutral(), String.valueOf(p.trophy),
+                String.valueOf(p.trophyCap), "трофеи")));
         List<kelium.gui.kp.PlayerTable.SeatTab> tabs = new ArrayList<>();
         for (int s = 0; s < seatSpecs.size(); s++) {
             tabs.add(new kelium.gui.kp.PlayerTable.SeatTab(s, shortName(s), s == viewedSeat));
@@ -831,7 +917,7 @@ public final class HotSeatWindow {
     private JComponent buildTopBar() {
         JPanel bar = new JPanel(new net.miginfocom.swing.MigLayout(
             "insets " + Theme.px(8) + " " + Theme.px(12) + " " + Theme.px(8) + " " + Theme.px(12)
-                + ", gapx " + Theme.px(12), "[][]push[][][][][]"));
+                + ", gapx " + Theme.px(12), "[][shrinkprio 200, shrink 200]push[][][][][]"));
         // ВЕРХНЯЯ ПОЛОСА — ГЛУБОКИМ ЦВЕТОМ СТОЛА (25.09.2026: «не серо-белое»).
         bar.setBackground(BAR_BG);
         bar.setBorder(BorderFactory.createMatteBorder(0, 0, Theme.px(2), 0, new Color(0x3C6A7C)));
@@ -841,13 +927,58 @@ public final class HotSeatWindow {
         roundLabel.setForeground(new Color(0xA9C6D2));
         bar.add(roundLabel);
 
-        turnLabel = new JLabel("Партия начинается…");
+        // ЗАГОЛОВОК ХОДА НЕ ШИРЕ СВОБОДНОГО МЕСТА: длинное «какую карту
+        // арсенала оставить» на 1366 наезжало на плашку очков — сжатие
+        // раскладки его не трогало. Лишнее JLabel сам срезает многоточием.
+        turnLabel = new JLabel("Партия начинается…") {
+            @Override
+            public Dimension getPreferredSize() {
+                Dimension d = super.getPreferredSize();
+                java.awt.Container p = getParent();
+                if (p != null && p.getWidth() > 0) {
+                    int others = 0;
+                    for (Component c : p.getComponents()) {
+                        if (c != this && c.isVisible()) {
+                            others += c.getPreferredSize().width;
+                        }
+                    }
+                    int gaps = Theme.px(12) * (p.getComponentCount() + 1);
+                    d.width = Math.max(Theme.px(80), Math.min(d.width, p.getWidth() - others - gaps));
+                }
+                return d;
+            }
+
+            // FlatLaf здесь не ставит многоточие, а просто срезает последние
+            // буквы — не влезло, сокращаем сами
+            @Override
+            protected void paintComponent(java.awt.Graphics g) {
+                String full = getText() == null ? "" : getText();
+                java.awt.Insets in = getInsets();
+                int avail = getWidth() - in.left - in.right;
+                java.awt.FontMetrics fm = getFontMetrics(getFont());
+                if (fm.stringWidth(full) <= avail) {
+                    super.paintComponent(g);
+                    return;
+                }
+                String s = full;
+                while (s.length() > 1 && fm.stringWidth(s.trim() + "…") > avail) {
+                    s = s.substring(0, s.length() - 1);
+                }
+                g.setFont(getFont());
+                g.setColor(getForeground());
+                int y = in.top + (getHeight() - in.top - in.bottom - fm.getHeight()) / 2 + fm.getAscent();
+                com.formdev.flatlaf.ui.FlatUIUtils.drawString(this, g, s.trim() + "…", in.left, y);
+            }
+        };
         turnLabel.setFont(Theme.font(16, Font.BOLD));
         turnLabel.setForeground(Color.WHITE);
-        bar.add(turnLabel);
-        if (chipsPanel != null) {
-            bar.add(chipsPanel);
-        }
+        // запас справа: текст рисуется на пару пикселей шире замера, и без
+        // запаса последняя буква срезалась, а многоточие не ставилось
+        turnLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, Theme.px(8)));
+        // длинный заголовок сжимается многоточием, а не наезжает на плашки
+        bar.add(turnLabel, "width 80:pref:pref, shrinkprio 200");
+        // РЕСУРСЫ — НЕ ЗДЕСЬ, А НА СТОЛЕ ИГРОКА (26.09.2026): верхняя полоса —
+        // чей ход и кнопки; счёт своего стола — рядом со своими компонентами.
 
         // СПРАВОЧНИК ПРАВИЛ — главы книги с поиском (заказ 25.09.2026), и на F1.
         KpButton rulesBtn = new KpButton("Правила", "справочник · F1", null);
@@ -907,10 +1038,11 @@ public final class HotSeatWindow {
             BorderFactory.createEmptyBorder(Theme.px(10), Theme.px(4), Theme.px(10), Theme.px(4))));
         // ЯЩИКИ — ВКЛАДКАМИ СБОКУ (25.09.2026): внизу теперь стол игрока из
         // компонентов, и кнопкам ящиков там больше не место.
-        addDrawerTab(strip, "Наука и рынок");
-        addDrawerTab(strip, "Планшет");
-        addDrawerTab(strip, "Сброс приказов");
-        addDrawerTab(strip, "Журнал");
+        // ДВЕ ВКЛАДКИ — ДВЕ ДОСКИ (просьба дизайнера 26.09.2026): планшет игрока
+        // и сброс приказов и так лежат на столе и раскрываются щелчком, журнал —
+        // кнопкой справа; здесь только общие доски, каждая отдельно.
+        addDrawerTab(strip, "Научный отдел");
+        addDrawerTab(strip, "Рынок");
         strip.add(javax.swing.Box.createVerticalGlue());
         return strip;
     }
@@ -918,12 +1050,15 @@ public final class HotSeatWindow {
     private void addDrawerTab(JPanel strip, String name) {
         KpTab tab = new KpTab(name, () -> toggleDrawer(name));
         tab.setToolTipText(switch (name) {
+            case "Научный отдел" -> "Планшет научного отдела: треки, кубики игроков, вершины";
+            case "Рынок" -> "Планшет рынка и открытая карта рынка";
             case "Наука и рынок" -> "Доска науки и активная карта рынка — открываются поверх поля в любой момент";
             case "Планшет" -> "Планшеты игроков: склад, войска, трофеи, арсенал — свой и соперников";
             case "Сброс приказов" -> "Ваш личный сброс приказов: карты, разыгранные в этом раунде";
             default -> "Полная лента событий партии";
         });
         tab.setPreferredSize(new Dimension(Theme.px(36), Theme.px(132)));
+        tab.setMinimumSize(new Dimension(Theme.px(36), Theme.px(60)));
         tab.setMaximumSize(new Dimension(Theme.px(36), Theme.px(132)));
         tab.setAlignmentX(Component.CENTER_ALIGNMENT);
         drawerTabs.put(name, tab);
@@ -941,6 +1076,9 @@ public final class HotSeatWindow {
     private JComponent buildCenter() {
         field = new FieldView();
         field.setTableBackdrop(true);
+        // без постоянной подкраски зон: зона видна только в миг Стройки
+        field.setOwnershipTint(false);
+        field.setTopReserve(Theme.px(92));
         field.setShowTurnCaption(false);
         // Отладочные подписи гексов игроку не показываются; для наведения
         // работает подсказка гекса, для решений — подсветка целей.
@@ -954,6 +1092,13 @@ public final class HotSeatWindow {
         JScrollPane boardsScroll = new JScrollPane(boards);
         boardsScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
         drawers.put("Наука и рынок", wrapDrawer(boardsScroll));
+        // отдельные доски для двух вкладок
+        scienceBoard = new BoardsPanel();
+        scienceBoard.setOnly("science");
+        drawers.put("Научный отдел", wrapDrawer(new JScrollPane(scienceBoard)));
+        marketBoard = new BoardsPanel();
+        marketBoard.setOnly("market");
+        drawers.put("Рынок", wrapDrawer(new JScrollPane(marketBoard)));
 
         JPanel sheetWrap = new JPanel(new BorderLayout());
         sheetWrap.setBackground(Theme.panel());
@@ -1159,8 +1304,53 @@ public final class HotSeatWindow {
         feedScroll.setBorder(BorderFactory.createMatteBorder(Theme.px(1), 0, 0, 0, Theme.border()));
         feedScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(20));
         feedWrap.add(feedScroll, BorderLayout.CENTER);
-        rail.add(feedWrap, BorderLayout.CENTER);
+        // ЛЕНТА — НЕ В ПАНЕЛИ, А КНОПКОЙ (просьба дизайнера 26.09.2026: «мелко,
+        // ничего не читается»): журнал партии открывается отдельным окном
+        // крупным шрифтом. Сама лента собирается как прежде — для журнала и тестов.
+        JPanel journalWrap = new JPanel(new net.miginfocom.swing.MigLayout(
+            "insets " + Theme.px(8) + ", fillx", "[grow,fill]", "[]push"));
+        journalWrap.setBackground(Theme.panel());
+        KpButton journalBtn = new KpButton("Журнал партии", "всё, что случилось, крупно", null);
+        journalBtn.setToolTipText("Открыть журнал партии отдельным окном");
+        journalBtn.onClick(this::openJournalWindow);
+        journalBtn.setState(KpButton.State.AVAILABLE);
+        journalWrap.add(journalBtn, "h " + Theme.px(48) + "!");
+        rail.add(journalWrap, BorderLayout.CENTER);
         return rail;
+    }
+
+    /** Окно журнала партии (одно на окно игры; открыто — дописывается). */
+    private javax.swing.JDialog journalWindow;
+    private javax.swing.JTextArea journalText;
+
+    private void openJournalWindow() {
+        if (journalWindow == null) {
+            journalWindow = new javax.swing.JDialog(frame, "Журнал партии", false);
+            journalText = new javax.swing.JTextArea();
+            journalText.setEditable(false);
+            journalText.setLineWrap(true);
+            journalText.setWrapStyleWord(true);
+            journalText.setFont(Theme.font(15, Font.PLAIN));
+            journalText.setBackground(Theme.panel());
+            journalText.setForeground(Theme.ink());
+            journalText.setBorder(BorderFactory.createEmptyBorder(
+                Theme.px(12), Theme.px(16), Theme.px(12), Theme.px(16)));
+            JScrollPane sp = new JScrollPane(journalText);
+            sp.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
+            journalWindow.add(sp);
+            journalWindow.setSize(Theme.px(760), Math.max(Theme.px(420), frame.getHeight() - Theme.px(80)));
+            journalWindow.setLocationRelativeTo(frame);
+        }
+        StringBuilder sb = new StringBuilder();
+        synchronized (feedLog) {
+            for (String l : feedLog) {
+                sb.append(l).append("\n\n");
+            }
+        }
+        journalText.setText(sb.toString());
+        journalText.setCaretPosition(journalText.getDocument().getLength());
+        journalWindow.setVisible(true);
+        journalWindow.toFront();
     }
 
     private JLabel caption(String text) {
@@ -1397,7 +1587,17 @@ public final class HotSeatWindow {
         }
 
         @Override
+        public boolean specInActionMenu() {
+            return inner.specInActionMenu();
+        }
+
+        @Override
         public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
+            // перед вопросом — живой кадр: поставленное здание, списанные монеты
+            // видны сразу, а не в конце действия
+            if (humansBySeat.containsKey(seat) && !catchingUp) {
+                GameRecorder.live(state, seat);
+            }
             Choice picked = inner.choose(state, options, context);
             int idx = options.indexOf(picked);
             synchronized (moves) {
@@ -1458,18 +1658,23 @@ public final class HotSeatWindow {
         Object p = c.payload();
         String raw = humanLabel(c.label() == null ? String.valueOf(p) : c.label());
         if ("pass".equals(c.kind()) && p == null) {
+            // отказ — словами кнопки («Никого не возвращать»), а не «вопрос: отказ»
             return "action".equals(kind) ? "Завершил ход"
-                : KIND_LABELS.getOrDefault(kind, "Решение") + ": отказ";
+                : cap(kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe));
         }
         return switch (kind) {
             case "action" -> p instanceof String a ? ActionBar.ACTIONS.getOrDefault(a, a) : raw;
             case "reveal_order" -> "Вскрыт приказ «" + cardNameSafe(String.valueOf(p)) + "»";
             case "blind_discard" -> "Отложен приказ «" + cardNameSafe(String.valueOf(p)) + "»";
+            // полное название здания («Авиабаза», а не «Авб»); снос и перенос —
+            // словами из ChoiceWords, а не строкой движка
             case "build_pick" -> p instanceof Map<?, ?> m && m.get("btype") != null
-                ? "Строю: " + kelium.report.Labels.buildingLabel(
+                && "build_pick".equals(c.kind())
+                ? "Строю: " + GameRecorder.buildingName(
                     String.valueOf(m.get("btype")).toLowerCase(java.util.Locale.ROOT),
                     m.get("level") instanceof Number n ? n.intValue() : null)
-                : "Строю: " + raw;
+                : "Стройка — " + lowerFirst(
+                    kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe));
             case "build_hex", "tower_hex", "cu_hex" -> "Гекс стройки " + hexWords(String.valueOf(p));
             case "build_facing", "cu_sides" -> "Поворот здания";
             case "move" -> p instanceof Map<?, ?> m && m.get("to") != null
@@ -1478,12 +1683,39 @@ public final class HotSeatWindow {
             case "combat_source" -> "Бой из " + hexWords(String.valueOf(p));
             case "attack" -> p instanceof Map<?, ?> m ? "Атака " + attackLabelRu(
                 c.label() == null ? "" : c.label(), m) : "Атака";
-            case "spec" -> "СПЕЦ: " + kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe);
-            default -> {
-                String w = kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe);
-                yield KIND_LABELS.containsKey(kind) ? cap(KIND_LABELS.get(kind)) + ": " + w : w;
-            }
+            case "spec" -> "СПЕЦ: " + kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe)
+                .replaceFirst("^СПЕЦ:\\s*", "");
+            default -> stepWords(kind, kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe));
         };
+    }
+
+    /**
+     * ШАГ ХОДА — ОТВЕТ, А НЕ ВОПРОС С ОТВЕТОМ (полировка 25.09.2026): было
+     * «Сборка: что нанять: Нанять: пехота». Вопрос из заголовка решения
+     * отбрасывается; остаётся тема («Сборка — нанять: пехота»), а если
+     * заголовок — чистый вопрос («куда поставить энергию»), то один ответ.
+     */
+    private static String lowerFirst(String s) {
+        return s == null || s.length() < 2 || Character.isUpperCase(s.charAt(1)) ? s
+            : Character.toLowerCase(s.charAt(0)) + s.substring(1);
+    }
+
+    private static String stepWords(String kind, String answer) {
+        String label = KIND_LABELS.get(kind);
+        if (label == null || answer == null || answer.isBlank()) {
+            return answer == null ? "" : answer;
+        }
+        int colon = label.indexOf(':');
+        String theme = colon > 0 ? label.substring(0, colon).trim()
+            : label.matches("(?iu)^(куда|какой|какую|какое|какие|кого|кому|что|откуда|где|чем|"
+                + "сколько|как|чей|чью)\\b.*") ? null : label;
+        if (theme == null) {
+            return cap(answer);
+        }
+        String a = answer.length() > 1 && Character.isUpperCase(answer.charAt(0))
+            && !Character.isUpperCase(answer.charAt(1))
+            ? Character.toLowerCase(answer.charAt(0)) + answer.substring(1) : answer;
+        return cap(theme) + " — " + a;
     }
 
     private static String cap(String s) {
@@ -1524,6 +1756,8 @@ public final class HotSeatWindow {
             GameConfig c = cfg;
             SwingUtilities.invokeLater(() -> {
                 boards.setRules(c.ruleset, c.content);
+                scienceBoard.setRules(c.ruleset, c.content);
+                marketBoard.setRules(c.ruleset, c.content);
                 session.setContent(c.content);
             });
         }
@@ -1618,11 +1852,18 @@ public final class HotSeatWindow {
                         // надо, и дальше он доигрывать не должен.
                         throw new kelium.core.GameAborted("прогон отменён откатом");
                     }
-                    SwingUtilities.invokeLater(() -> {
-                        if (gen == generation) {
-                            onFrame(r);
-                        }
-                    });
+                    // ОДНО ОБНОВЛЕНИЕ В ОЧЕРЕДИ, А НЕ ПО ОДНОМУ НА СОБЫТИЕ
+                    // (тормоза, 26.09.2026): каждое стоит десятки миллисекунд,
+                    // а боты дают сотни событий за ход. Стоящее в очереди
+                    // обновление само заберёт все новые кадры.
+                    if (framePending.compareAndSet(false, true)) {
+                        SwingUtilities.invokeLater(() -> {
+                            framePending.set(false);
+                            if (gen == generation) {
+                                onFrame(r);
+                            }
+                        });
+                    }
                     paceBot(r);
                 });
         } catch (kelium.core.GameAborted e) {
@@ -1737,6 +1978,16 @@ public final class HotSeatWindow {
     }
 
     /** Вид ожидаемого решения — для прогонщиков и тестов. */
+    /**
+     * ПОКАЗАТЬ РЕШЕНИЕ, КОТОРОГО В ЭТОЙ ПАРТИИ НЕ БЫЛО — для съёмки редких
+     * видов (найм на заводе, позолота, оплата жетоном со свалки…): окно
+     * рисует его тем же кодом, что и настоящее. Ответ на него не уходит в
+     * движок, это только картинка.
+     */
+    void previewDecisionForTest(int seat, InteractiveAgent.PendingDecision d) {
+        showDecisionNow(seat, d);
+    }
+
     String pendingKindForTest() {
         return pendingKind;
     }
@@ -1784,8 +2035,10 @@ public final class HotSeatWindow {
             java.nio.file.Path out = java.nio.file.Path.of("reports", "hotseat",
                 "hotseat-" + seed + suffix + ".kelium-replay.json");
             r.save(out);
+            // путь с латиницей — в консоль, игроку в ленте только слова
+            System.out.println("Журнал партии записан: " + out.toAbsolutePath());
             SwingUtilities.invokeLater(() ->
-                feedLine(null, "Журнал партии записан: " + out.toAbsolutePath()));
+                feedLine(null, "Журнал партии записан в папку отчётов"));
         } catch (java.io.IOException e) {
             SwingUtilities.invokeLater(() ->
                 feedLine(null, "Не удалось записать журнал: " + e.getMessage()));
@@ -1817,6 +2070,8 @@ public final class HotSeatWindow {
         // скорости, и последний из них мог оказаться пропущенным — окно тогда
         // встречает игрока пустым полем, хотя партия уже идёт.
         if (rec != null && !rec.frames.isEmpty()) {
+            // строки доигрывания в ленту не сыплем — только последний кадр
+            shownFrames = Math.max(shownFrames, rec.frames.size() - 1);
             onFrame(rec);
         }
         if (undoNote != null) {
@@ -1939,6 +2194,13 @@ public final class HotSeatWindow {
         return String.join(", ", parts);
     }
 
+    /** Обновление окна уже стоит в очереди — новое не ставим. */
+    private final java.util.concurrent.atomic.AtomicBoolean framePending =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    /** Сколько кадров записи уже разобрано в ленту и шаги. */
+    private int shownFrames;
+    private long lastCatchUpPaint;
+
     private void onFrame(ReplayRecord r) {
         if (stopped) {
             return;          // окно закрыто — движку уже некуда рисовать
@@ -1951,18 +2213,29 @@ public final class HotSeatWindow {
             this.rec = r;
             field.setRecord(r);
             sessionBound = false;
+            shownFrames = 0;
         }
         if (r.frames.isEmpty()) {
             return;
         }
-        if (catchingUp && r.frames.size() % 40 != 0) {
+        if (catchingUp && System.nanoTime() - lastCatchUpPaint < 200_000_000L) {
             // Доигрывание сохранения идёт сотнями кадров в секунду: перерисовывать
-            // каждый — только тормозить. Показываем каждый сороковой, чтобы было
+            // каждый — только тормозить. Раз в пятую долю секунды, чтобы было
             // видно, что дело движется.
             return;
         }
+        lastCatchUpPaint = System.nanoTime();
         int last = r.frames.size() - 1;
         ReplayRecord.Frame f = r.frames.get(last);
+        // ЛЕНТА И ШАГИ — ПО КАЖДОМУ НОВОМУ КАДРУ, перерисовка — один раз
+        for (int i = Math.max(0, shownFrames); i <= last; i++) {
+            ReplayRecord.Frame fi = r.frames.get(i);
+            if (!catchingUp && fi.log != null && !fi.log.isBlank()) {
+                feedLine(fi.seat, fi.log);
+            }
+            trackSteps(fi);
+        }
+        shownFrames = last + 1;
         field.setFrame(f);
         if (!sessionBound) {
             sessionBound = true;
@@ -1971,11 +2244,12 @@ public final class HotSeatWindow {
         session.seek(last);
         if (f.snapshot != null) {
             boards.show(r, f.snapshot);
+            scienceBoard.show(r, f.snapshot);
+            marketBoard.show(r, f.snapshot);
         }
-        if (f.log != null && !f.log.isBlank()) {
-            feedLine(f.seat, f.log);
+        if (boardZoom != null) {
+            boardZoom.refresh();
         }
-        trackSteps(f);
         refreshHands(f);
         refreshTopBar(f);
         refreshTable();
@@ -2020,7 +2294,7 @@ public final class HotSeatWindow {
                 rows.add(new kelium.gui.kp.OpponentStrip.Row(p.seat, seatName(p.seat),
                     p.seat == mySeat, vpTotal(p), p.coin, p.kelium, p.ammo,
                     p.orderHand.size(), p.objectiveHand.size(), p.arsenalHand.size(),
-                    p.destroyedValue));
+                    p.destroyedValue, p.seat == f.snapshot.firstPlayer));
             }
             opponents.update(rows);
         }
@@ -2099,6 +2373,19 @@ public final class HotSeatWindow {
 
     /** События хода → источники ленты шагов (концепт §5). */
     private void trackSteps(ReplayRecord.Frame f) {
+        // ВСКРЫТИЕ — ВСЕ КАРТЫ НА СТОЛ СРАЗУ (26.09.2026): приказ «ЗАТАИТЬСЯ» сообщает
+        // о ходе только после обоих действий, и до того стол показывал «приказ
+        // ещё не вскрыт», хотя карта уже открыта.
+        if ("reveal".equals(f.type) && rec != null) {
+            java.util.Set<Integer> seen = new java.util.HashSet<>();
+            for (int i = rec.orderPlays.size() - 1; i >= 0; i--) {
+                var play = rec.orderPlays.get(i);
+                if (seen.add(play.seat)) {
+                    revealed.put(play.seat, play.card);
+                }
+            }
+            refreshTable();
+        }
         if ("turn_orders".equals(f.type) && f.seat != null) {
             turnSeat = f.seat;
             lockedSteps.clear();
@@ -2286,6 +2573,9 @@ public final class HotSeatWindow {
     }
 
     /** Строка ленты (и её копия в ящик «Журнал»). seat null — служебное. */
+    /** Все строки ленты, как их увидел игрок, — для проверки текста в тестах. */
+    final List<String> feedLog = new java.util.concurrent.CopyOnWriteArrayList<>();
+
     private void feedLine(Integer seat, String text) {
         // Сырые служебные события (телеметрия ботов вида «objective_hints {…}»)
         // человеку в ленте не нужны — в полном журнале партии они остаются.
@@ -2300,6 +2590,8 @@ public final class HotSeatWindow {
         // Человеческое место называется «Игрок N», и playerName записи склеивает
         // «Игрок 1 · Игрок 1» — второй повтор игроку не нужен.
         text = text.replaceAll("(Игрок \\d+) · \\1", "$1");
+        // Отчёты движка — словами, без кодов зданий и английских хвостов.
+        text = kelium.gui.kp.FeedWords.ru(text);
         if (text.length() > 160) {
             text = text.substring(0, 159) + "…";
         }
@@ -2309,6 +2601,10 @@ public final class HotSeatWindow {
             return;
         }
         lastFeedText = text;
+        feedLog.add(text);
+        if (journalText != null && journalWindow.isVisible()) {
+            journalText.append(text + "\n\n");
+        }
         feedBox.add(feedRow(seat, text));
         journalBox.add(feedRow(seat, text));
         while (feedBox.getComponentCount() > 250) {
@@ -2341,6 +2637,12 @@ public final class HotSeatWindow {
     private static final Set<String> HEX_TARGET_KINDS = Set.of(
         "tower_hex", "build_hex", "move_hex", "move_source", "maneuver_hex", "energy_hex", "combat_source",
         "combat_target");
+
+    /** Заголовок решения словами; неизвестный вид — «ваш выбор», не служебное имя. */
+    static String kindLabel(String kind) {
+        String l = KIND_LABELS.get(kind);
+        return l != null ? l : "ваш выбор";
+    }
 
     private static final Map<String, String> KIND_LABELS = Map.ofEntries(
         Map.entry("action", "выберите действие"),
@@ -2401,6 +2703,43 @@ public final class HotSeatWindow {
         Map.entry("mass_open", "вскрытие находок"),
         Map.entry("cu_hex", "где поставить центр управления"),
         Map.entry("cu_sides", "поворот центра управления"),
+        Map.entry("cu_token_to", "кому отдать жетон уничтожения ЦУ"),
+        Map.entry("storage_burn_choice", "ячейка хранилища закрылась: что сжечь"),
+        Map.entry("arsenal_replace", "какую установленную карту заменить"),
+        Map.entry("barrage", "заградительный огонь"),
+        Map.entry("barrage_hit", "куда ударить заградительным огнём"),
+        Map.entry("battle_first", "кто бьёт первым"),
+        Map.entry("carry_token", "кого взять с собой"),
+        Map.entry("convert_any", "что на что обменять"),
+        Map.entry("counter_battle", "ответить на бой"),
+        Map.entry("counterattack", "контратака"),
+        Map.entry("cu_facing", "куда повернуть центр управления"),
+        Map.entry("evacuate", "эвакуация"),
+        Map.entry("evacuate_on_attack", "эвакуация под ударом"),
+        Map.entry("evacuate_trophy", "эвакуация трофея"),
+        Map.entry("exchange_table", "обмен по таблице"),
+        Map.entry("garrison_out", "вывести гарнизон"),
+        Map.entry("heal_target", "кого подлечить"),
+        Map.entry("loot", "что забрать у противника"),
+        Map.entry("mandate_install", "установить карту по мандату"),
+        Map.entry("module_bag", "из какого мешка тянуть модуль"),
+        Map.entry("module_replace_blue", "какой модуль сборки заменить"),
+        Map.entry("module_replace_red", "какой модуль боя заменить"),
+        Map.entry("order_trade", "обмен приказа"),
+        Map.entry("place_damage", "кому нанести урон"),
+        Map.entry("redeploy_from", "откуда перебросить войска"),
+        Map.entry("redeploy_to", "куда перебросить войска"),
+        Map.entry("replace_building", "какое здание заменить"),
+        Map.entry("return_fire", "ответный огонь"),
+        Map.entry("ricochet", "рикошет"),
+        Map.entry("ring_hit", "куда ударить по кольцу"),
+        Map.entry("shield", "кому поставить щит"),
+        Map.entry("speed_boost", "кому прибавить скорость"),
+        Map.entry("steal_resource", "что забрать у противника"),
+        Map.entry("swap_module", "какой модуль обменять"),
+        Map.entry("trophy_hold", "какие трофеи оставить"),
+        Map.entry("withdraw", "отступить"),
+        Map.entry("withdraw_to", "куда отступить"),
         Map.entry("build_neutral", "где поставить нейтральное здание"),
         Map.entry("ricochet_target", "куда уходит рикошет"),
         Map.entry("discard_enemy_arsenal", "какой установленный арсенал врага удалить"),
@@ -2766,15 +3105,18 @@ public final class HotSeatWindow {
 
         String kind = String.valueOf(d.context().get("kind"));
         pendingKind = kind;
+        // жетоны модулей в подписях — словами по библиотеке этой партии
+        GameState st = d.state();
+        kelium.gui.kp.ChoiceWords.moduleWords = id -> moduleRu(st, id);
         kelium.core.UndoableAgent agent = humansBySeat.get(seat);
         List<Choice> options = d.options();
         specMenuOptions = "spec".equals(kind) ? options : null;
         specMenuAgent = "spec".equals(kind) ? agent : null;
         refreshCardMenus();
-        String title = "Игрок " + (seat + 1) + " — " + KIND_LABELS.getOrDefault(kind, kind);
+        String title = "Игрок " + (seat + 1) + " — " + kindLabel(kind);
 
         turnLabel.setText("ВАШ ХОД — Игрок " + (seat + 1) + ": "
-            + KIND_LABELS.getOrDefault(kind, kind));
+            + kindLabel(kind));
         turnLabel.setForeground(barInk(seat));
 
         // «Завершить ход» = вариант "пас" точки вида action.
@@ -2804,7 +3146,7 @@ public final class HotSeatWindow {
             boolean allCards = options.stream().allMatch(c -> c.payload() instanceof String);
             if (allCards && !options.isEmpty()) {
                 actionBar.idle("не сейчас");
-                endBtn.setTexts("Сначала решение", KIND_LABELS.getOrDefault(kind, kind));
+                endBtn.setTexts("Сначала решение", kindLabel(kind));
                 endBtn.setState(KpButton.State.DISABLED);
                 zoom.setVisible(false);
                 List<kelium.gui.kp.CardChoiceOverlay.Card> cards = new ArrayList<>();
@@ -2839,7 +3181,7 @@ public final class HotSeatWindow {
                 && options.stream().allMatch(c -> c.payload() instanceof String)
                 && !options.isEmpty()) {
             actionBar.idle("не сейчас");
-            endBtn.setTexts("Сначала решение", KIND_LABELS.getOrDefault(kind, kind));
+            endBtn.setTexts("Сначала решение", kindLabel(kind));
             endBtn.setState(KpButton.State.DISABLED);
             zoom.setVisible(false);
             String набор = CARD_PICKS.get(kind);
@@ -2856,9 +3198,47 @@ public final class HotSeatWindow {
             boolean супер = "super_pick".equals(kind);
             ceremony.open(
                 супер ? "Выберите супер-задание" : "Выберите стартовое задание",
-                супер ? "Оно лежит открытым всю партию: соперники видят, к чему вы идёте"
+                супер ? "Оно лежит у вас в руке всю партию и приносит победные очки в конце"
                     : "Задание отправится к вам в руку",
                 cards);
+            refreshSteps();
+            frame.toFront();
+            return;
+        }
+
+        // ЛЮБОЙ ВЫБОР МЕЖДУ КАРТАМИ — ЛИЦАМИ, А НЕ ИМЕНАМИ (сдача под ключ
+        // 25.09.2026): «какую карту арсенала оставить», «какое задание
+        // оставить», «4 задания — 2 себе» раньше шли кнопками с названием, и
+        // игрок выбирал вслепую. Все варианты — карты с печатным лицом, значит
+        // показываем карты крупно, как выбор приказа.
+        if (options.size() > 1 && options.stream().allMatch(c -> c.payload() instanceof String
+                && cardFace((String) c.payload()) != null)
+                && options.stream().map(Choice::kind).distinct().count() == 1
+                && options.stream().map(Choice::payload).distinct().count() == options.size()) {
+            boolean drop = options.stream().allMatch(c -> "drop_objective".equals(c.kind()));
+            boolean arsenal = options.stream().anyMatch(c ->
+                kelium.report.Textures.cardFace("arsenal", (String) c.payload()) != null
+                    || kelium.report.Textures.cardFace("arsenal_start", (String) c.payload()) != null
+                    || kelium.report.Textures.cardFace("arsenal_super", (String) c.payload()) != null);
+            actionBar.idle("не сейчас");
+            zoom.setVisible(false);
+            List<kelium.gui.kp.CardChoiceOverlay.Card> cards = new ArrayList<>();
+            for (int i = 0; i < options.size(); i++) {
+                String id = (String) options.get(i).payload();
+                int idx = i;
+                cards.add(new kelium.gui.kp.CardChoiceOverlay.Card(id, null,
+                    cardName(id), cardFullText(arsenal ? "arsenal" : "objectives", id), () -> {
+                        ceremony.close();
+                        submit(agent, d, idx);
+                    }));
+            }
+            String cTitle = drop ? "Какое задание сбросить"
+                : arsenal ? "Какую карту арсенала оставить" : "Какое задание оставить";
+            String cSub = drop
+                ? "Щёлкните карту, которая уйдёт в сброс"
+                    + (d.context().get("keep") instanceof Number k ? " — себе останется " + k : "")
+                : "Щёлкните карту, которую берёте; остальные уйдут в сброс";
+            ceremony.open(cTitle, cSub, cards);
             refreshSteps();
             frame.toFront();
             return;
@@ -2867,7 +3247,8 @@ public final class HotSeatWindow {
         // ВЫБОР ДУГИ СЕКТОРОВ (концепт §4): движок уже назвал гекс и варианты,
         // колесо мыши вращает дугу, клик по гексу ставит. Плашки-варианты внизу
         // остаются как равноправный путь.
-        if ("build_facing".equals(kind) && d.context().get("hex") instanceof String fhex) {
+        if (("build_facing".equals(kind) || "cu_sides".equals(kind))
+                && d.context().get("hex") instanceof String fhex) {
             List<List<Integer>> variants = new ArrayList<>();
             boolean allLists = true;
             for (Choice c : options) {
@@ -2884,15 +3265,17 @@ public final class HotSeatWindow {
             }
             if (allLists && !variants.isEmpty()) {
                 actionBar.idle("не сейчас");
-                endBtn.setTexts("Сначала решение", KIND_LABELS.get(kind));
+                endBtn.setTexts("Сначала решение", kindLabel(kind));
                 endBtn.setState(KpButton.State.DISABLED);
                 if (d.context().get("btype") instanceof String bt) {
                     field.setGhost(bt, seat);
+                } else if ("cu_sides".equals(kind)) {
+                    field.setGhost("command_center", seat);
                 }
                 field.setFacingChoice(fhex, variants, idx -> {
                     submit(agent, d, idx);
                 });
-                field.setChoices(null, KIND_LABELS.get(kind),
+                field.setChoices(null, cap(kindLabel(kind)),
                     "Наведите курсор на сторону гекса или крутите колесо — "
                         + "здание встаёт призраком; щелчок по гексу ставит", null,
                     Theme.seat(seat));
@@ -2975,14 +3358,22 @@ public final class HotSeatWindow {
                     + "или «Завершить ход» рядом с ней", offCard, Theme.seat(seat));
         } else {
             actionBar.idle("не сейчас");
-            endBtn.setTexts("Сначала решение", KIND_LABELS.getOrDefault(kind, kind));
+            endBtn.setTexts("Сначала решение", kindLabel(kind));
             endBtn.setState(KpButton.State.DISABLED);
-            // Призрак здания за курсором — для стройки и переноса (§4).
-            if (("build_hex".equals(kind) || "move_hex".equals(kind))
-                    && d.context().get("btype") instanceof String bt) {
-                field.setGhost(bt, seat);
-            }
+            // ПРИЗРАКА ЗДАНИЯ НА ВЫБОРЕ ГЕКСА НЕТ (просьба дизайнера 26.09.2026):
+            // казалось, что щелчок сразу ставит здание. Гекс — заливкой, здание
+            // призраком — только на следующем шаге, повороте.
+            field.clearGhost();
             routeOnField(seat, kind, agent, options, d);
+            // КУДА СТАВИТЬ — ЗАЛИВКОЙ (заказ дизайнера 25.09.2026): в миг Стройки
+            // и найма вышки допустимые гексы залиты цветом игрока
+            field.setSelectFill(PLACE_KINDS.contains(kind) ? FieldView.seatColor(seat) : null);
+            if ("assemble".equals(kind)) {
+                field.setUnitGhosts(hireGhosts(options), seat);
+            }
+            if ("tower_hex".equals(kind)) {
+                field.setHoverUnitGhost("tower", seat);
+            }
         }
         refreshSteps();
         frame.toFront();
@@ -2998,6 +3389,90 @@ public final class HotSeatWindow {
      * поле — у своего гекса; без гекса (отказ, курс рынка, трек науки) — в
      * карточку вопроса над полем. Карта из руки остаётся орган ввода самой руки.
      */
+    /**
+     * ПРИЗРАКИ НАЙМА: у гекса нанимающего здания — столько жетонов его рода,
+     * сколько встанет на сам гекс (число считает движок, {@code fits}).
+     */
+    private Map<String, Object[]> hireGhosts(List<Choice> options) {
+        Map<String, Object[]> out = new LinkedHashMap<>();
+        Map<Integer, String> uidHex = uidHexes();
+        for (Choice c : options) {
+            if (!(c.payload() instanceof Map<?, ?> m) || m.get("unit") == null
+                    || !(m.get("fits") instanceof Number fits) || fits.intValue() <= 0
+                    || !(m.get("building") instanceof Number b)) {
+                continue;
+            }
+            String hex = uidHex.get(b.intValue());
+            if (hex != null) {
+                out.put(hex, new Object[]{String.valueOf(m.get("unit")), fits.intValue()});
+            }
+        }
+        return out;
+    }
+
+    /** Ставил ли игрок здание в этой Стройке (после неё снова «что строим»). */
+    private boolean builtThisAction(int seat) {
+        synchronized (moves) {
+            for (int i = decisions.size() - 1; i >= 0; i--) {
+                Decision d = decisions.get(i);
+                if (d.seat() != seat || "action".equals(d.kind())) {
+                    return false;
+                }
+                if ("build_facing".equals(d.kind()) || "build_hex".equals(d.kind())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Решения «на какой гекс поставить» — Стройка, найм вышки, ЦУ из запаса. */
+    private static final java.util.Set<String> PLACE_KINDS = java.util.Set.of(
+        "build_hex", "tower_hex", "cu_hex", "move_hex", "build_neutral");
+
+    /** Жетон модуля словами: что он делает, без номера из данных. */
+    static String moduleRu(GameState s, String id) {
+        try {
+            var t = kelium.engine.ModuleSets.token(kelium.engine.ModuleSets.of(s), id);
+            if (t == null) {
+                return null;
+            }
+            if (t.blue()) {
+                return "модуль сборки: " + t.ammo() + " БПР или " + t.units()
+                    + (t.units() == 1 ? " войско" : " войска");
+            }
+            if (!t.targets().isEmpty()) {
+                List<String> цели = new ArrayList<>();
+                for (String c : t.targets()) {
+                    цели.add(switch (c) {
+                        case "infantry" -> "пехота";
+                        case "vehicle" -> "техника";
+                        case "aircraft" -> "авиация";
+                        case "buildings_towers" -> "здания и вышки";
+                        default -> c;
+                    });
+                }
+                return "модуль боя: " + String.join(" или ", цели);
+            }
+            if (t.stat() != null) {
+                String what = switch (t.stat()) {
+                    case "speed" -> "скорость";
+                    case "hp" -> "прочность";
+                    case "range" -> "дальность";
+                    default -> "свойство";
+                };
+                return "модуль боя: +" + t.plus() + " " + what;
+            }
+            return "модуль";
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Варианты, где выбирают игрока (число — номер места). */
+    private static final java.util.Set<String> SEAT_CHOICES = java.util.Set.of(
+        "cu_token_to", "steal_objectives", "steal_from", "steal_arsenal");
+
     private void routeOnField(int seat, String kind, kelium.core.UndoableAgent agent,
                               List<Choice> options, InteractiveAgent.PendingDecision d) {
         Map<String, List<kelium.gui.kp.FieldBubbles.Opt>> byHex = new LinkedHashMap<>();
@@ -3012,6 +3487,7 @@ public final class HotSeatWindow {
         }
         String ctxHex = contextHex(d.context(), hexIds);
         Map<String, List<kelium.gui.kp.FieldBubbles.Opt>> onTable = new LinkedHashMap<>();
+        Map<kelium.gui.kp.FieldBubbles.Opt, List<Integer>> optSides = new java.util.HashMap<>();
         refreshTable();
         for (int i = 0; i < options.size(); i++) {
             Choice c = options.get(i);
@@ -3019,10 +3495,21 @@ public final class HotSeatWindow {
             boolean pass = "pass".equals(c.kind()) && c.payload() == null
                 || Boolean.FALSE.equals(c.payload());
             var opt = new kelium.gui.kp.FieldBubbles.Opt(
-                kelium.gui.kp.ChoiceWords.label(kind, c, this::cardName),
+                SEAT_CHOICES.contains(c.kind()) && c.payload() instanceof Number who
+                    ? seatName(who.intValue())
+                    : kelium.gui.kp.ChoiceWords.label(kind, c, this::cardName),
                 kelium.gui.kp.ChoiceWords.sub(kind, c), pass ? 2 : 0, () -> {
                     submit(agent, d, idx);
                 });
+            if (c.payload() instanceof Map<?, ?> pm && pm.get("sectors") instanceof List<?> ss) {
+                List<Integer> sides = new ArrayList<>();
+                for (Object o : ss) {
+                    if (o instanceof Number n) {
+                        sides.add(n.intValue());
+                    }
+                }
+                optSides.put(opt, sides);
+            }
             // КАРТА ПЕРЕД ИГРОКОМ — выбирается на самой карте, на столе.
             if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)) {
                 onTable.computeIfAbsent("card:" + id, k -> new ArrayList<>()).add(opt);
@@ -3034,8 +3521,11 @@ public final class HotSeatWindow {
                 onTable.computeIfAbsent(boardKey, k -> new ArrayList<>()).add(opt);
                 continue;
             }
-            String hex = pass ? null : anchorOf(c, uidHex, hexIds);
-            if (hex == null && !pass && ctxHex != null) {
+            // ВЫБОР ИГРОКА — в карточку: число в варианте — номер места, а не
+            // номер жетона, и на поле ему места нет
+            boolean seatChoice = SEAT_CHOICES.contains(c.kind());
+            String hex = pass || seatChoice ? null : anchorOf(c, uidHex, hexIds);
+            if (hex == null && !pass && !seatChoice && ctxHex != null) {
                 hex = ctxHex;
             }
             if (hex == null) {
@@ -3052,13 +3542,35 @@ public final class HotSeatWindow {
                 + (multi ? " — где стоит цифра, откроется список вариантов" : "");
         } else if (onTable.keySet().stream().anyMatch(k -> k.startsWith("card:"))) {
             hint = "Щёлкните подсвеченную карту на столе внизу";
+        } else if ("build_pick".equals(kind) && builtThisAction(seat)) {
+            // СТРОЙКА ИДЁТ ДАЛЬШЕ: здание поставлено, и снова «что строим» —
+            // без этой строки казалось, что щелчок ничего не сделал
+            title = "Здание поставлено";
+            hint = "Постройте ещё — щёлкните здание на планшете внизу — или «Закончить стройку»";
         } else if (!onTable.isEmpty()) {
             hint = "Щёлкните подсвеченную деталь на планшете внизу";
         } else {
             hint = null;
         }
+        // СМЕНА ЭНЕРГИИ — СЛОВАМИ ПО ШАГАМ (26.09.2026): сначала источник, потом
+        // по одному кубику — потребитель; без этого оба шага выглядели одинаково,
+        // «выберите гекс», и казалось, что игра ходит по кругу
+        if ("energy_activation".equals(kind)) {
+            title = "Смена энергии: выберите источник";
+            hint = "Щёлкните энергостанцию или ЦУ на поле: раздать с неё кубики "
+                + "или забрать все обратно — или «Закончить смену энергии»";
+        } else if ("energy_place".equals(kind)) {
+            Object left = d.context().get("remaining");
+            Object from = d.context().get("source_type");
+            title = "Куда поставить кубик"
+                + ("power_plant".equals(from) ? " с энергостанции"
+                    : "command_center".equals(from) ? " с ЦУ" : "")
+                + (left instanceof Number n ? " — осталось " + n : "");
+            hint = "Щёлкните здание, которое запитать, — или «Хватит»";
+        }
         setTableChoices(onTable, Theme.seat(seat));
         field.setChoices(byHex, title, hint, dock, Theme.seat(seat));
+        field.setOptSides(optSides);
         if (d.context().get("source") instanceof String src && hexIds.contains(src)) {
             field.setSource(src, Theme.seat(seat));
         }
@@ -3066,10 +3578,16 @@ public final class HotSeatWindow {
         // пока идёт решение, и уезжает, когда решение принято.
         if (SCIENCE_MARKET.contains(kind)) {
             drawerCloser.stop();
-            if (openDrawer != drawers.get("Наука и рынок")) {
-                toggleDrawer("Наука и рынок");
+            String нужный = autoDrawer(kind);
+            if (openDrawer != drawers.get(нужный)) {
+                toggleDrawer(нужный);
                 drawerAutoOpened = true;
             }
+        } else if (drawerAutoOpened) {
+            // следующее решение не про науку — ящик уезжает сразу, не дожидаясь
+            // таймера: иначе он закрывает поле на быстрой цепочке решений
+            drawerCloser.stop();
+            closeAutoDrawer();
         }
     }
 
@@ -3081,10 +3599,18 @@ public final class HotSeatWindow {
         if (drawerAutoOpened && (awaitingSeat == null
                 || !SCIENCE_MARKET.contains(String.valueOf(pendingKind)))) {
             drawerAutoOpened = false;
-            if (openDrawer == drawers.get("Наука и рынок")) {
-                toggleDrawer("Наука и рынок");
+            for (String имя : List.of("Научный отдел", "Рынок", "Наука и рынок")) {
+                if (openDrawer != null && openDrawer == drawers.get(имя)) {
+                    toggleDrawer(имя);
+                    break;
+                }
             }
         }
+    }
+
+    /** Какую доску показать на решении: рынок — «Рынок», прочее — «Научный отдел». */
+    private static String autoDrawer(String kind) {
+        return "market".equals(kind) ? "Рынок" : "Научный отдел";
     }
 
     {

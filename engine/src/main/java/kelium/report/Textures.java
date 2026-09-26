@@ -71,7 +71,7 @@ public final class Textures {
         ready = true;
         if (root == null) {
             try {
-                root = kelium.dataio.GameConfig.resolveDataRoot(null).resolve("textures");
+                root = kelium.dataio.GameConfig.texturesRoot();
             } catch (RuntimeException e) {
                 root = null;
                 return;

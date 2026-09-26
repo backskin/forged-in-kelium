@@ -106,7 +106,7 @@ public final class ЦуИзЗапаса {
             }
             @SuppressWarnings("unchecked")
             List<Integer> выбор = (List<Integer>) агент.choose(s, варианты,
-                Map.of("kind", "cu_sides")).payload();
+                Map.of("kind", "cu_sides", "hex", гекс)).payload();
             стороны = выбор;
         }
         java.util.Set<String> открытыДо = PrintedContainers.открытые(s);

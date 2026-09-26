@@ -1,0 +1,300 @@
+<title>Разбор для автора</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#f3f5f2;
+  --paper:#fbfcfa;
+  --ink:#18211d;
+  --ink-soft:#4a5a52;
+  --rule:#d5ddd8;
+  --kelium:#12815a;
+  --kelium-wash:#e1f1e9;
+  --red:#b3432d;
+  --red-wash:#f7e6e1;
+  --blue:#2d5ea6;
+  --blue-wash:#e3ebf7;
+  --gold:#a8791c;
+  --gold-wash:#f5ecd8;
+  --grey-wash:#eceeed;
+  --display:"Russo One","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#101613;
+    --paper:#161e1a;
+    --ink:#e2eae6;
+    --ink-soft:#9fb2a8;
+    --rule:#2a3631;
+    --kelium:#46cf95;
+    --kelium-wash:#16362a;
+    --red:#e3765f;
+    --red-wash:#3a211b;
+    --blue:#7fa6e6;
+    --blue-wash:#1b2740;
+    --gold:#d9ad55;
+    --gold-wash:#352b16;
+    --grey-wash:#222b27;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#101613;
+  --paper:#161e1a;
+  --ink:#e2eae6;
+  --ink-soft:#9fb2a8;
+  --rule:#2a3631;
+  --kelium:#46cf95;
+  --kelium-wash:#16362a;
+  --red:#e3765f;
+  --red-wash:#3a211b;
+  --blue:#7fa6e6;
+  --blue-wash:#1b2740;
+  --gold:#d9ad55;
+  --gold-wash:#352b16;
+  --grey-wash:#222b27;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16.5px;line-height:1.62;padding-inline:16px;padding-block:0 64px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr);gap:0}.toc{display:none}}
+header.top{max-width:1120px;margin:0 auto;padding-block:48px 28px;border-bottom:1px solid var(--rule);margin-bottom:36px}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--kelium)}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,5.4vw,56px);line-height:1.05;margin:10px 0 16px;text-wrap:balance;letter-spacing:.005em}
+.lede{font-size:19px;max-width:66ch;color:var(--ink-soft);margin:0}
+.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 20px);align-self:start;font-size:14px}
+.toc b{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;font-weight:500}
+.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.toc a{color:var(--ink);text-decoration:none;border-left:2px solid var(--rule);padding-left:10px;display:block}
+.toc a:hover,.toc a:focus-visible{border-left-color:var(--kelium);color:var(--kelium);outline:none}
+main{min-width:0}
+main > section{margin-bottom:56px}
+h2{font-family:var(--display);font-weight:400;font-size:clamp(26px,3.4vw,34px);line-height:1.15;margin:0 0 14px;text-wrap:balance}
+h3{font-size:21px;font-weight:600;margin:34px 0 8px;line-height:1.3;text-wrap:balance}
+h4{font-size:15px;font-weight:600;margin:20px 0 6px;letter-spacing:.01em}
+p,li{max-width:68ch}
+p{margin:0 0 14px}
+ul,ol{margin:0 0 14px;padding-left:22px}
+li{margin-bottom:6px}
+strong{font-weight:600}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.94em}
+a{color:var(--kelium)}
+.note{background:var(--paper);border:1px solid var(--rule);border-left:3px solid var(--gold);padding:14px 18px;margin:18px 0;border-radius:3px;max-width:72ch}
+.note p:last-child{margin-bottom:0}
+.game{border-top:1px solid var(--rule);padding-top:22px;margin-top:30px}
+.game .meta{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);letter-spacing:.03em;margin:-2px 0 12px}
+.paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:14px 0 16px}
+.path{background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:12px 14px}
+.path b{display:block;font-weight:600;margin-bottom:4px}
+.path span{font-size:15px;color:var(--ink-soft);line-height:1.5;display:block}
+.lesson{font-size:15.5px;padding-left:14px;border-left:2px solid var(--kelium);color:var(--ink);max-width:68ch}
+.lesson em{font-style:normal;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--kelium);display:block;margin-bottom:2px}
+.dossier{background:var(--paper);border:1px solid var(--rule);border-radius:4px;margin:26px 0;overflow:hidden}
+.dossier .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px;padding:16px 20px 12px;border-bottom:1px solid var(--rule)}
+.dossier .head h3{margin:0;font-family:var(--display);font-weight:400;font-size:24px}
+.dossier .body{padding:14px 20px 18px}
+.dossier .body p{max-width:none}
+.rows{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px 18px;margin:8px 0 12px}
+.rows dt{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);padding-top:3px}
+.rows dd{margin:0}
+@media (max-width:560px){.rows{grid-template-columns:minmax(0,1fr);gap:2px}.rows dd{margin-bottom:10px}}
+.pill{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--kelium-wash);color:var(--kelium)}
+.pill.half{background:var(--gold-wash);color:var(--gold)}
+.pill.weak{background:var(--red-wash);color:var(--red)}
+.tag{display:inline-block;font-size:13.5px;background:var(--grey-wash);border-radius:3px;padding:1px 7px;margin:2px 3px 2px 0;white-space:nowrap}
+.tbl{overflow-x:auto;margin:16px 0 20px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14.5px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--rule)}
+th{font-family:var(--mono);font-weight:500;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);background:var(--grey-wash)}
+tr:last-child td{border-bottom:none}
+td:first-child{font-weight:600;white-space:nowrap}
+.fix{counter-reset:f;list-style:none;padding:0}
+.fix li{counter-increment:f;position:relative;padding-left:40px;margin-bottom:14px;max-width:72ch}
+.fix li::before{content:counter(f);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--kelium-wash);color:var(--kelium);font-family:var(--mono);font-size:13px;display:grid;place-items:center}
+.flag{border-left:3px solid var(--red);background:var(--red-wash);padding:12px 16px;border-radius:3px;margin:12px 0;max-width:72ch}
+.flag b{color:var(--red)}
+footer{max-width:1120px;margin:40px auto 0;border-top:1px solid var(--rule);padding-top:16px;font-size:13.5px;color:var(--ink-soft)}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+html{scroll-behavior:smooth}
+</style>
+
+<header class="top">
+  <div class="eyebrow">Обзор · прототип · свод 1.45.0 · 25.09.2026</div>
+  <h1>Кристаллы раздора: обзор прототипа</h1>
+  <p class="lede">Конфликтная стратегия на гексах для 2–4 игроков в духе Command &amp; Conquer: базы, добыча кристаллов, энергосеть, армия и снос чужого штаба. Обзор написан по своду правил, книге, данным карт, онлайн-партии 18.09 и замерам. Сам я за столом не сидел — там, где это важно, так и говорю.</p>
+</header>
+
+<div class="wrap">
+<nav class="toc" aria-label="Оглавление">
+  <b>Содержание</b>
+  <ol>
+    <li><a href="#what">Что это за игра</a></li>
+    <li><a href="#genre">Какой это жанр</a></li>
+    <li><a href="#round">Как идёт партия</a></li>
+    <li><a href="#moments">Что в ней интересного</a></li>
+    <li><a href="#good">Сильные стороны</a></li>
+    <li><a href="#bad">Слабые стороны</a></li>
+    <li><a href="#compare">На что похожа</a></li>
+    <li><a href="#who">Кому понравится</a></li>
+    <li><a href="#verdict">Вердикт</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="what">
+  <h2>Что это за игра</h2>
+  <p>Каждый игрок управляет военной корпорацией. У него есть <strong>ЦУ</strong> — штаб, он же первое здание и первый источник энергии. Цель — набрать больше всех победных очков к концу партии. Можно и выиграть сразу: снести второй чужой ЦУ, когда один уже снесён.</p>
+  <p>Главный ресурс — <strong>келемий</strong>. Он лежит кубиками на тайлах зарождения. Добытчики его вынимают, рынок превращает в монеты, а с 25.09 им можно платить и за науку. Келемий кончается, и с последним тайлом кончается партия.</p>
+  <p>Вокруг этого крутится экономика в пять слоёв:</p>
+  <ul>
+    <li><strong>здания</strong> — казарма, завод, авиабаза, добытчики, энергостанции;</li>
+    <li><strong>энергия</strong> — кубики, которые физически лежат на зданиях и включают их;</li>
+    <li><strong>хранилище</strong> — одни ячейки на келемий, боеприпасы и трофеи;</li>
+    <li><strong>наука</strong> — три трека, дающие модули, супер-задания и супер-войска;</li>
+    <li><strong>карты</strong> — арсенал, задания, контейнеры, рынок.</li>
+  </ul>
+  <p>Поле собирается из картонных блоков по раскладке. Партия — 5–8 раундов, в каждом четыре круга, в каждом круге у каждого игрока один ход.</p>
+</section>
+
+<section id="genre">
+  <h2>Какой это жанр</h2>
+  <p>Ты называешь игру евро с контролем территорий. Это верно лишь наполовину, и различие здесь важное.</p>
+  <ul>
+    <li><strong>Евро по экономике.</strong> Победа по очкам, превращение ресурсов, треки, выбор действий, бой без кубиков, правила читаются с иконок.</li>
+    <li><strong>Америтреш по конфликту.</strong> Прямой урон, снос зданий, мгновенная военная победа, сильная тема, асимметричные фракции.</li>
+    <li><strong>Но это не area control.</strong> В жанре контроля территорий очки дают за большинство в областях: «Игра престолов», «Циркадианцы», Blood Rage, Анх. У нас за владение полем очков не дают вовсе. Поле — это место, где добывают, строят и стреляют, а не то, что считают в конце. Отсюда и ощущение «одной цепочки»: драка идёт, но ни за что, кроме трофеев.</li>
+  </ul>
+  <p>Точнее всего так: <strong>конфликтное евро с выбором действий и следованием, на гексах</strong>, в родстве с «Эклипсом» и «Серпом». Если захочешь настоящего кризиса позиции, очки придётся связать с местами на поле. Хранилище, спорные тайлы и звёзды на гарнизонах из прошлого документа — это шаги в ту сторону.</p>
+</section>
+
+<section id="round">
+  <h2>Как идёт партия</h2>
+  <h4>Подготовка</h4>
+  <p>Поле собирают по раскладке, на тайлы кладут келемий, ставят нейтральные постройки. У каждого:</p>
+  <ul>
+    <li>планшет войск своего цвета;</li>
+    <li>планшет хранилища;</li>
+    <li>5 карт приказов;</li>
+    <li>одно тайное супер-задание;</li>
+    <li>ЦУ с кубиком энергии и один жетон пехоты на стартовом гексе;</li>
+    <li>немного монет, у всех кроме первого — ещё келемий, в возмещение очереди.</li>
+  </ul>
+  <h4>Раунд</h4>
+  <ol>
+    <li><strong>Обновление.</strong> Новая карта рынка. Каждый откладывает одну из пяти карт приказов на «свалку» — туда весь раунд ложатся жетоны, которые он уничтожит. Фишка первого игрока уходит против часовой стрелки.</li>
+    <li><strong>Управление — четыре круга.</strong> Все одновременно и втайне выбирают карту приказа, потом вскрывают по очереди и тут же ходят. Приказов четыре, в каждом по два действия:
+      <ul>
+        <li><strong>Разместить:</strong> Манёвр + Стройка;</li>
+        <li><strong>Приобрести:</strong> Снабжение + Рынок;</li>
+        <li><strong>Контролировать:</strong> Питание + Бой;</li>
+        <li><strong>Исследовать:</strong> Добыча + Наука.</li>
+      </ul>
+      Кто первым в круге вскрыл приказ, играет оба его действия, кто повторил — одно. На каждой карте есть ещё «чужой» приказ: если его уже вскрыл сосед, он даёт тебе дополнительное действие. Плюс одно спец-действие в ход: задание, арсенал, контейнер, плашка на карте. Пятая карта, «Затаиться», даёт любые два действия без оглядки на соседей.</li>
+    <li><strong>Возвращение.</strong> Проверка конца партии. Жетоны со свалки превращаются в кубики трофеев — если есть свободная ячейка хранилища — и уходят владельцам. Добор заданий.</li>
+  </ol>
+  <h4>Ход на поле</h4>
+  <ul>
+    <li><strong>Стройка.</strong> Здания ставятся в зоне, куда смотрят стенки твоих зданий. Поворот здания — решение: он определяет, куда ты сможешь строить и какой тайл сможет копать добытчик.</li>
+    <li><strong>Питание.</strong> Энергию перекладывают с источников на здания. Без энергии здание не работает. Станция даёт энергию, только стоя на жёлтом круге.</li>
+    <li><strong>Снабжение.</strong> Запитанное военное здание делает войска своего рода или боеприпасы. ЦУ делает вышки только с модулем сборки.</li>
+    <li><strong>Манёвр.</strong> Выбираешь гекс, выводишь с него своих, затем вводишь своих, кто дойдёт.</li>
+    <li><strong>Бой.</strong> Выбираешь гекс рядом со своими войсками. Каждое соседнее войско бьёт один раз своей атакой за 1–2 боеприпаса. Боеприпас кладётся на цель кубиком урона. Урон копится, прочность исчерпана — жетон уходит на твою свалку.</li>
+    <li><strong>Добыча и Рынок</strong> превращают тайлы в келемий, а келемий — в монеты, карты и предложения рынка.</li>
+    <li><strong>Наука.</strong> Трофеи или келемий идут на ступени треков, а трофеи — ещё и на обмены: смена модуля, позолота, карта арсенала.</li>
+  </ul>
+</section>
+
+<section id="moments">
+  <h2>Что в ней интересного</h2>
+  <h4>Вскрытие приказов — лучший момент игры</h4>
+  <p>Одновременный выбор и вскрытие по кругу с «совпадением» и «чужим приказом» — это выбор ролей со следованием, родня «Пуэрто-Рико», «Гонки за галактику» и Glory to Rome. Каждый круг ты гадаешь, что вскроют соседи:</p>
+  <ul>
+    <li>вскрыл Разместить первым — получил оба действия;</li>
+    <li>вскрыл вторым — одно;</li>
+    <li>сосед открыл твой нижний приказ — ты получил бесплатное третье действие.</li>
+  </ul>
+  <p>Это то самое постоянное мелкое взаимодействие, которого ты искал в «Дюне». Оно уже есть, просто живёт в руке, а не на поле. Первая позиция в круге ценна, поэтому фишка первого игрока идёт встречно вскрытию — хорошее решение.</p>
+  <h4>Энергия как физическая сеть</h4>
+  <p>Кубики лежат на зданиях. Снесли станцию — владелец снимает столько кубиков, сколько она давала, и сам решает, какие здания гаснут. Удар по станции даже без сноса армии выключает полбазы. Это тактильная головоломка, какой в других играх жанра почти нет.</p>
+  <h4>Боеприпас становится уроном</h4>
+  <p>Кубик боеприпаса, которым ты заплатил за выстрел, ложится на цель и остаётся там. Урон виден, его можно добивать в следующий ход, и никаких кубиков удачи. Бой планируется, а не разыгрывается, в духе евро. Цена — счёт боеприпасов важнее числа войск.</p>
+  <h4>Стенки зданий</h4>
+  <p>Здание занимает сектора гекса и поворачивается стенкой. Стенка определяет зону стройки, направление добычи и проход: чужая стенка закрывает проход и выстрел наземным войскам. База собирается как крепость — это самая самобытная часть игры.</p>
+  <h4>Общее хранилище</h4>
+  <p>Келемий, боеприпасы и трофеи делят одни ячейки. Трофей приходит, только если есть свободная ячейка. Когда ячеек мало, каждый кубик — выбор: держать, тратить, отказаться от трофея. Этот узел ещё не раскрыт до конца. После очков за ячейки 0/1/2/2 он может стать сердцем экономической стратегии.</p>
+  <h4>Карты двойного назначения</h4>
+  <p>Карту арсенала либо ставишь навсегда, либо сжигаешь в утиль ради разового эффекта. У задания тоже два назначения: либо выполнить условие ради награды-действия, либо сжечь ради верхнего эффекта — реакции в бою. Так в игре появляется движкострой и блеф: у соперника в руке может лежать «Контратака».</p>
+  <h4>ЦУ — и сердце, и мишень</h4>
+  <p>Снесли один твой ЦУ — ты ставишь его заново, но у соперника уже есть твой жетон, и второй снос кончит партию. После первого сноса стол меняется: все понимают, что до конца один удар.</p>
+</section>
+
+<section id="good">
+  <h2>Сильные стороны</h2>
+  <ul>
+    <li><strong>Выбор приказов со следованием</strong> — сильная, проверенная жанром основа с реальным взаимодействием каждый круг.</li>
+    <li><strong>Пространственная головоломка базы</strong>: стенки, сектора, поворот, жёлтые круги, контейнеры на ячейках.</li>
+    <li><strong>Бой без кубиков, урон копится</strong> — удар можно планировать через несколько ходов.</li>
+    <li><strong>Короткая дистанция до соседа.</strong> Военное здание рядом со своим ЦУ достаёт до чужого за один Манёвр, угроза есть с первых раундов. Это лечит главную беду «Серпа».</li>
+    <li><strong>Правила на компонентах.</strong> Цены на планшетах, призы на ячейках, выпуск на заголовках зданий. Принцип «только из компонентов» выдержан лучше, чем у большинства прототипов.</li>
+    <li><strong>Тема держится.</strong> Штаб, энергосеть, добыча, «бум», раш, диверсия — всё узнаётся из C&amp;C без натяжки.</li>
+    <li><strong>Много рычагов под асимметрию:</strong> скорости, атаки, цены, выпуск, прочность и ячейки по фракциям.</li>
+  </ul>
+</section>
+
+<section id="bad">
+  <h2>Слабые стороны</h2>
+  <ul>
+    <li><strong>Одна цепочка к победе.</strong> Почти все очки идут через науку, наука питается трофеями и келемием. Пути различаются мало. Это главный минус, ему посвящены два прошлых документа.</li>
+    <li><strong>Не area control, а драка ни за что.</strong> Поле не приносит очков, поэтому нет повода держать место. Бьют, чтобы взять трофей, а не чтобы занять.</li>
+    <li><strong>Длинная цепочка до первого удара.</strong> Добыл → продал → построил → запитал → нанял → снабдил → дошёл → ударил. Первые раунды проходят в раздельном строительстве. Сегодняшние правки — вышки только с модулем, войска при постройке только на контейнере — убрали дешёвые короткие пути, но и темп раннего конфликта стоит проверить.</li>
+    <li><strong>Много мелкой ручной работы.</strong> Кубики энергии на зданиях, кубики урона на жетонах, один кубик в ячейке, контейнеры на секторах, повороты зданий. Каждое по отдельности хорошо, вместе — много возни за столом. Партию это удлинит, и цифровая версия спасёт больше, чем картонная.</li>
+    <li><strong>Паралич выбора.</strong> Ход — это до трёх действий из восьми в любом порядке, плюс спец-действие из восьми вариантов, плюс карты. Новичку тяжело, опытному — долго. Два-четыре ожидающих игрока — заметный простой.</li>
+    <li><strong>Снежный ком.</strong> Кто первым снёс чужое здание, получает трофеи, которые идут в науку, модули и очки. Прямого механизма догонялок почти нет. «Все бьют лидера» работает, только пока лидера видно.</li>
+    <li><strong>Условия конца слабые или случайные.</strong> Вершины треков вчетвером практически недостижимы. Смену карты рынка может использовать лидер, чтобы укоротить партию. Реально партию кончают тайлы и колода.</li>
+    <li><strong>Поле — калейдоскоп.</strong> Раскладки почти симметричны. Со стенками нейтралов три пути к соперникам есть только в одной раскладке из восьми. Позиции не различаются, а значит, не подсказывают разных решений.</li>
+    <li><strong>Книга и данные расходятся.</strong> Много правок за короткое время. Сегодня нашлось с десяток мест, где книга, свод и планшеты говорят разное. Это нормально для прототипа, но к слепому тесту книгу придётся вычистить.</li>
+    <li><strong>Нет надёжной проверки баланса.</strong> Боты признаны негодными, замеры по ним недействительны. Вся проверка — живые партии.</li>
+  </ul>
+</section>
+
+<section id="compare">
+  <h2>На что похожа</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Игра</th><th>Что общего</th><th>Чем мы лучше</th><th>Чем хуже</th></tr></thead>
+    <tbody>
+      <tr><td>«Серп»</td><td>экономика + войска на гексах, очки из многих мест</td><td>контакт с первых раундов, настоящий бой</td><td>у «Серпа» десять поводов для звёзд и очки за территории</td></tr>
+      <tr><td>«Циркадианцы»</td><td>здания, фундаменты, ресурсы, бой, асимметрия</td><td>нет «аукциона», позиция строится стенками</td><td>там у каждого свой путь к славе и очки за реликвии на поле</td></tr>
+      <tr><td>«Эклипс»</td><td>экономика с поддержанием, наука, бой</td><td>бой без кубиков, быстрее контакт</td><td>там восемь источников очков, и каждый связан с частью игры</td></tr>
+      <tr><td>«Дюна. Империя»</td><td>выбор действий с блокировкой, конфликт за приз</td><td>настоящее поле и позиция</td><td>там конфликт каждый раунд за объявленный приз, второе место тоже в выигрыше</td></tr>
+      <tr><td>«Пуэрто-Рико»</td><td>выбор роли с привилегией и следованием</td><td>одновременный выбор, война</td><td>там каждая роль ведёт к своему источнику очков</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="who">
+  <h2>Кому понравится</h2>
+  <ul>
+    <li>Тем, кто любит «Эклипс», «Серп», «Циркадианцев» и хочет, чтобы война начиналась раньше.</li>
+    <li>Тем, кто вырос на RTS и хочет базы, энергосети и раш за столом.</li>
+    <li>Любителям планировать бой без кубиков.</li>
+  </ul>
+  <p><strong>Не понравится</strong> тем, кто не любит, когда его базу сносят, и тем, кто ждёт лёгкую игру на вечер: порог входа высокий.</p>
+</section>
+
+<section id="verdict">
+  <h2>Вердикт</h2>
+  <p><strong>Движок игры сильный, слой очков не закончен.</strong> Выбор приказов со следованием, энергия кубиками на зданиях, урон кубиками боеприпасов и стенки зданий — четыре находки, которые стоит беречь. Они создают и постоянное взаимодействие, и позиционную головоломку, и тему. Так не выглядят «ещё одна войнушка на карте».</p>
+  <p>Не хватает того, что делает евро евро: нескольких равноценных путей к очкам, связанных с местами на поле, и таймера, которым управляют игроки. Это чинится без переделки ядра. Правки описаны в «Четырёх дорогах к победе», и первые из них — хранилище с очками и спорные тайлы — дешёвые.</p>
+  <p>Если бы это был чужой прототип на фестивале, я бы сказал автору: <em>ядро не трогай, займись тем, за что дают очки, и перерисуй поле асимметричным</em>. Как законченная игра — рано. Как основа для хорошей игры — да.</p>
+</section>
+
+</main>
+</div>
+
+<footer>Обзор по своду 1.45.0, книге правил (черновик), картам арсенала 7.0.0, заданий 1.19.0, супер-заданий 8.0.0 и замерам на 25.09.2026. Время партии и ощущение за столом не оценивались — нужна живая партия.</footer>

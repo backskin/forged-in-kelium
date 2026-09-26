@@ -1,70 +1,265 @@
-﻿# Сборка ОДНОФАЙЛОВЫХ exe (самораспаковка во временную папку):
-#   dist\KeliumConstructor.exe — конструктор раскладок
-#   dist\KeliumRunner.exe      — прогоны симуляций
-#   dist\KeliumReplay2.exe     — разбор партии
-#   dist\KeliumHelp.exe        — СПРАВОЧНИК отдельно (правила и все карты)
-#   dist\Играть.exe            — САМА ИГРА: «Штаб» и партия
-#   (проигрыватель 1.0 заархивирован 13.08.2026 — см. archive/replay-1.0/)
-# Внутрь каждого зашито всё приложение вместе с урезанной Java-средой.
-# Запуск: powershell -ExecutionPolicy Bypass -File make-exe.ps1
+﻿# СБОРКА ПРИЛОЖЕНИЙ: МАЛЕНЬКИЕ EXE + ПАКИ (26.09.2026).
+#
+# Прежде (make-exe-old.ps1) каждый из пяти exe был самораспаковывающимся
+# архивом на 390 МБ: Java, код, данные и картинки внутри каждого, и любая
+# правка перепаковывала всё. Теперь:
+#
+#   dist\Играть.exe, KeliumReplay2.exe, KeliumHelp.exe, KeliumRunner.exe,
+#   KeliumConstructor.exe   — только запускатели (launcher.cs), десятки КБ
+#   dist\packs\runtime.pak  — Java-среда (jlink)
+#   dist\packs\libs.pak     — сторонние библиотеки
+#   dist\packs\code.pak     — код игры: четыре jar
+#   dist\packs\rules.pak    — правила, карты, сценарии, справка, книга правил
+#   dist\packs\textures.pak — картинки (без сжатия: PNG уже сжаты)
+#   dist\packs\packs.txt    — имя, отпечаток и файл каждого пака
+#
+# ЧТО ПЕРЕСОБИРАЕТСЯ. По умолчанию — только то, у чего изменились исходники:
+# у каждого пака свой отпечаток исходников (target\packs\<пак>.fp). Поправил
+# код — пересоберётся code.pak, картинки не тронутся. Явно:
+#   make-exe.ps1 -Only code            только код
+#   make-exe.ps1 -Only rules,textures  данные
+#   make-exe.ps1 -Only exe             только запускатели
+#   make-exe.ps1 -All                  всё заново
+# Запуск: powershell -ExecutionPolicy Bypass -File make-exe.ps1 [-Only ...] [-All]
 #
 # ВНИМАНИЕ: файл должен быть сохранён в UTF-8 С BOM, иначе PowerShell 5.1
 # читает его как ANSI и спотыкается о кириллицу.
+param(
+    [string[]]$Only = @(),
+    [switch]$All
+)
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# каталог данных игры (правила, карты, раскладки, модели) — только ПРЯМЫЕ слэши
-$dataPath = (Resolve-Path "data").Path -replace '\\', '/'
+$dataPath = (Resolve-Path "data").Path
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+$state = "target\packs"
+$packsOut = "dist\packs"
+New-Item -ItemType Directory -Force $state, $packsOut | Out-Null
 
-# ЗАПУЩЕННОЕ ПРИЛОЖЕНИЕ БОЛЬШЕ НЕ МЕШАЕТ СБОРКЕ (правка 08.09.2026).
-#
-# Раньше сборка отказывалась работать, пока открыто хоть одно окно: Windows
-# держит запущенный exe и перезаписать его нельзя. На деле это значило «закрой
-# то, что смотришь, и жди пять минут» — а смотрят как раз затем, чтобы сказать,
-# что поправить.
-#
-# Занятый файл ПЕРЕИМЕНОВЫВАЕТСЯ: открытое приложение продолжает работать из
-# переименованного файла (Windows это разрешает — дескриптор остаётся у файла, а
-# не у имени), а сборка спокойно кладёт на его место новый. Старые «занятые»
-# копии подчищаются при следующем запуске, когда их уже никто не держит.
-$busy = Get-Process | Where-Object { $_.Name -like "Kelium*" }
-Get-ChildItem "dist\*.занят-*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
-    try { Remove-Item -Force $_.FullName } catch { }
-}
-if ($busy) {
-    $имена = ($busy | Select-Object -ExpandProperty Path -Unique) |
-        Where-Object { $_ -and (Test-Path $_) }
-    foreach ($путь in $имена) {
-        $новое = [System.IO.Path]::GetFileNameWithoutExtension($путь) +
-            ".занят-" + (Get-Date -Format "HHmmss") + ".exe"
-        try {
-            Rename-Item -LiteralPath $путь -NewName $новое -Force
-            Write-Output "   открытое приложение отодвинуто: $новое"
-        } catch {
-            throw "Приложение $путь запущено, и отодвинуть файл не удалось: $_`nЗакрой окно и запусти сборку снова."
+# Приложения: имя exe, точка входа Java, иконка.
+$apps = @(
+    @{ Name = "Играть";            Main = "kelium.gui.StartMenuWindow";      Icon = "game";        Title = "игра" },
+    @{ Name = "KeliumReplay2";     Main = "kelium.gui.replay2.Replay2Gui";   Icon = "replay2";     Title = "разбор партии" },
+    @{ Name = "KeliumHelp";        Main = "kelium.gui.replay2.HelpApp";      Icon = "help";        Title = "справочник" },
+    @{ Name = "KeliumRunner";      Main = "kelium.gui.RunnerGui";            Icon = "runner";      Title = "прогоны" },
+    @{ Name = "KeliumConstructor"; Main = "kelium.gui.LayoutEditor";         Icon = "constructor"; Title = "конструктор" }
+)
+# В раздачу не идёт: обучение ботов, архивы, заготовки художника.
+$junk = @("training", "selfplay", "genomes-archive-*", "genomes-boi2", "_archive", "tsv")
+
+# ==================== отпечатки исходников ====================
+
+# Отпечаток набора файлов: путь, размер и время правки каждого. Дёшево и надёжно:
+# меняется, когда меняется хоть один файл.
+function Get-Fingerprint([string[]]$roots, [scriptblock]$filter, [string]$extra = "") {
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.AppendLine($extra)
+    foreach ($r in $roots) {
+        if (-not (Test-Path $r)) { continue }
+        $items = if ((Get-Item $r) -is [System.IO.DirectoryInfo]) {
+            Get-ChildItem -Recurse -File $r
+        } else { @(Get-Item $r) }
+        foreach ($f in ($items | Where-Object $filter | Sort-Object FullName)) {
+            $line = "{0}|{1}|{2}" -f $f.FullName, $f.Length, $f.LastWriteTimeUtc.Ticks
+            [void]$sb.AppendLine($line)
         }
     }
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($sb.ToString())
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    return ([BitConverter]::ToString($sha.ComputeHash($bytes)) -replace "-", "").Substring(0, 16)
 }
 
-# Свежесозданный крупный exe часто ещё держат антивирус или синхронизация
-# Яндекс.Диска — удаляем с повторами, а не падаем с первой попытки.
-function Remove-FileStubborn([string]$path) {
-    if (-not (Test-Path $path)) { return }
-    for ($i = 0; $i -lt 20; $i++) {
-        try { Remove-Item -Force $path; return }
-        catch { Start-Sleep -Milliseconds 500 }
+function Test-Junk([System.IO.FileInfo]$f) {
+    $rel = $f.FullName.Substring($dataPath.Length + 1)
+    $top = $rel.Split('\')[0]
+    foreach ($j in $junk) { if ($top -like $j) { return $true } }
+    return $false
+}
+
+# версия Java — из свойств файла: `java -version` пишет в поток ошибок, и
+# PowerShell с $ErrorActionPreference = Stop счёл бы это падением
+$javaExe = (Get-Command java).Source
+$javaVer = "$javaExe|" + (Get-Item $javaExe).VersionInfo.ProductVersion
+$fp = @{
+    code     = Get-Fingerprint @("engine\src\main", "cards\src\main", "bots\src\main", "gui\src\main",
+                                 "pom.xml", "engine\pom.xml", "cards\pom.xml", "bots\pom.xml", "gui\pom.xml") { $true }
+    libs     = Get-Fingerprint @("pom.xml", "engine\pom.xml", "cards\pom.xml", "bots\pom.xml", "gui\pom.xml") { $true }
+    rules    = Get-Fingerprint @("data", "rules") {
+                   if ($_.FullName.StartsWith($dataPath)) {
+                       -not (Test-Junk $_) -and $_.FullName -notlike "$dataPath\textures\*"
+                   } else { $_.Extension -eq ".md" -or $_.FullName -like "*\иконки*" }
+               }
+    textures = Get-Fingerprint @("data\textures") { $_.FullName -notlike "*\_образцы\*" }
+    runtime  = Get-Fingerprint @() { $true } "$javaVer|java.base,java.desktop,java.logging,java.management,jdk.unsupported"
+    exe      = Get-Fingerprint @("launcher.cs", "icons") { $true } (($apps | ForEach-Object { $_.Name + $_.Main }) -join ";") + $dataPath
+}
+
+$allParts = @("code", "libs", "rules", "textures", "runtime", "exe")
+$want = @()
+if ($All) {
+    $want = $allParts
+} elseif ($Only.Count -gt 0) {
+    $want = $Only | ForEach-Object { $_.Split(",") } | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    foreach ($w in $want) { if ($allParts -notcontains $w) { throw "нет такой части: $w (есть: $($allParts -join ', '))" } }
+} else {
+    foreach ($p in $allParts) {
+        $old = if (Test-Path "$state\$p.fp") { (Get-Content "$state\$p.fp" -Raw).Trim() } else { "" }
+        $pak = if ($p -eq "exe") { "dist\Играть.exe" } else { "$packsOut\$p.pak" }
+        if ($old -ne $fp[$p] -or -not (Test-Path $pak)) { $want += $p }
     }
-    throw "Файл занят другим процессом: $path`nСкорее всего его сканирует антивирус или синхронизирует Яндекс.Диск. Подожди несколько секунд и запусти сборку снова."
+}
+if ($want.Count -eq 0) {
+    Write-Output "Ничего не изменилось — пересобирать нечего. (-All — пересобрать всё.)"
+    exit 0
+}
+Write-Output ("Пересобираю: " + ($want -join ", "))
+
+# ==================== пак: zip без лишнего ====================
+
+# Пак — обычный zip. Картинки и jar уже сжаты — кладутся без сжатия (распаковка
+# тогда — простое копирование); текст и Java-среда — со сжатием.
+function New-Pak([string]$srcDir, [string]$pak, [bool]$store) {
+    $tmp = "$pak.tmp"
+    if (Test-Path $tmp) { Remove-Item -Force $tmp }
+    $level = if ($store) { [System.IO.Compression.CompressionLevel]::NoCompression }
+             else { [System.IO.Compression.CompressionLevel]::Optimal }
+    $root = (Resolve-Path $srcDir).Path
+    $zip = [System.IO.Compression.ZipFile]::Open((Join-Path $PSScriptRoot $tmp),
+        [System.IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($f in Get-ChildItem -Recurse -File $root) {
+            $name = $f.FullName.Substring($root.Length + 1).Replace('\', '/')
+            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $f.FullName, $name, $level)
+        }
+    } finally {
+        $zip.Dispose()
+    }
+    if (Test-Path $pak) { Remove-Item -Force $pak }
+    Move-Item $tmp $pak
+    $sha = (Get-FileHash $pak -Algorithm SHA256).Hash.Substring(0, 12).ToLower()
+    Set-Content -Encoding ascii "$pak.sha" $sha
+    "   {0} — {1:N1} МБ, отпечаток {2}" -f (Split-Path $pak -Leaf), ((Get-Item $pak).Length / 1MB), $sha | Write-Output
 }
 
-# Иконка приложения: делаем .ico из квадратного PNG.
-#
-# Формат ICO с Vista умеет нести PNG прямо в записи, поэтому картинку не надо
-# перерисовывать — достаточно приписать 22-байтовую шапку. Так иконка остаётся
-# ровно той, что нарисовал дизайнер, без потери качества и без сторонних утилит.
-# Кладём в одну иконку несколько размеров: 256 (исходник), 48, 32 и 16 — иначе
-# Проводник в мелких видах масштабирует 256-й и получается мыло.
+function Reset-Dir([string]$d) {
+    if (Test-Path $d) { Remove-Item -Recurse -Force $d }
+    New-Item -ItemType Directory -Force $d | Out-Null
+}
+
+# ==================== код и библиотеки ====================
+
+if ($want -contains "code" -or $want -contains "libs") {
+    Write-Output "код: mvn package…"
+    mvn -q package -DskipTests
+    # СБОРКА ОБЯЗАНА ПАДАТЬ ГРОМКО: иначе пак собрался бы из прошлых классов.
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "СБОРКА НЕ ПРОШЛА: mvn package вернул $LASTEXITCODE. Паки не тронуты." -ForegroundColor Red
+        exit 1
+    }
+}
+if ($want -contains "code") {
+    Reset-Dir "target\stage\code"
+    foreach ($m in @("engine", "cards", "bots", "gui")) {
+        Copy-Item "$m\target\kelium-$m-0.1.0.jar" "target\stage\code\"
+    }
+    New-Pak "target\stage\code" "$packsOut\code.pak" $true
+}
+if ($want -contains "libs") {
+    Reset-Dir "target\pkg-libs"
+    mvn -q -pl gui dependency:copy-dependencies "-DoutputDirectory=$PSScriptRoot\target\pkg-libs"
+    Reset-Dir "target\stage\libs"
+    Copy-Item target\pkg-libs\*.jar target\stage\libs\ -Exclude junit*, apiguardian*, opentest4j*, kelium-*, onnxruntime-*
+    # ONNX Runtime — с нативами под все платформы и 290 МБ отладочных символов:
+    # оставляем классы и только win-x64 .dll.
+    $onnx = Get-ChildItem target\pkg-libs\onnxruntime-*.jar | Select-Object -First 1
+    if ($onnx) {
+        $slim = Join-Path $PSScriptRoot "target\stage\libs\onnxruntime-win-x64.jar"
+        $src = [System.IO.Compression.ZipFile]::OpenRead($onnx.FullName)
+        $dst = [System.IO.Compression.ZipFile]::Open($slim, [System.IO.Compression.ZipArchiveMode]::Create)
+        foreach ($e in $src.Entries) {
+            if ($e.FullName.EndsWith("/") -or $e.FullName -like "*.pdb") { continue }
+            if ($e.FullName -like "ai/onnxruntime/native/*" -and
+                $e.FullName -notlike "ai/onnxruntime/native/win-x64/*") { continue }
+            if ($e.FullName -like "META-INF/*.SF" -or $e.FullName -like "META-INF/*.RSA" -or
+                $e.FullName -like "META-INF/*.DSA") { continue }
+            $ne = $dst.CreateEntry($e.FullName, [System.IO.Compression.CompressionLevel]::Optimal)
+            $rs = $e.Open(); $ws = $ne.Open(); $rs.CopyTo($ws); $ws.Close(); $rs.Close()
+        }
+        $dst.Dispose(); $src.Dispose()
+    }
+    New-Pak "target\stage\libs" "$packsOut\libs.pak" $true
+}
+
+# ==================== Java-среда ====================
+
+if ($want -contains "runtime") {
+    Write-Output "Java-среда: jlink…"
+    if (Test-Path target\runtime-slim) { Remove-Item -Recurse -Force target\runtime-slim }
+    jlink --add-modules java.base,java.desktop,java.logging,java.management,jdk.unsupported `
+          --strip-debug --no-header-files --no-man-pages --compress=zip-9 `
+          --output target\runtime-slim
+    if ($LASTEXITCODE -ne 0) { throw "jlink не прошёл" }
+    New-Pak "target\runtime-slim" "$packsOut\runtime.pak" $false
+}
+
+# ==================== данные ====================
+
+if ($want -contains "rules") {
+    Write-Output "данные: правила, карты, сценарии, книга правил…"
+    Reset-Dir "target\stage\rules"
+    New-Item -ItemType Directory -Force "target\stage\rules\data" | Out-Null
+    foreach ($d in Get-ChildItem "data") {
+        if ($d.Name -eq "textures") { continue }
+        $skip = $false
+        foreach ($j in $junk) { if ($d.Name -like $j) { $skip = $true } }
+        if ($skip) { continue }
+        Copy-Item -Recurse -Force $d.FullName "target\stage\rules\data\"
+    }
+    # книга правил — рядом с data: справочник ищет <data>\..\rules\Книга правил…
+    $bookSrc = Get-ChildItem -Path "rules" -Directory -Filter "Книга правил*" | Select-Object -First 1
+    if ($bookSrc) {
+        $bookDst = "target\stage\rules\rules\$($bookSrc.Name)"
+        New-Item -ItemType Directory -Force $bookDst | Out-Null
+        Get-ChildItem -Path $bookSrc.FullName -Filter "*.md" | Copy-Item -Destination $bookDst -Force
+        foreach ($icons in @("иконки-экспорт", "иконки")) {
+            if (Test-Path "rules\$icons") {
+                Copy-Item -Recurse -Force "rules\$icons" "target\stage\rules\rules\$icons"
+            }
+        }
+    }
+    New-Pak "target\stage\rules" "$packsOut\rules.pak" $false
+}
+
+if ($want -contains "textures") {
+    Write-Output "картинки…"
+    Reset-Dir "target\stage\textures"
+    Copy-Item -Recurse -Force "data\textures\*" "target\stage\textures\"
+    Get-ChildItem -Path "target\stage\textures" -Filter "_образцы" -Directory -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force
+    New-Pak "target\stage\textures" "$packsOut\textures.pak" $true
+}
+
+# ==================== список паков ====================
+
+$lines = @("# имя`tотпечаток`tфайл — читает запускатель; пишет make-exe.ps1")
+foreach ($p in @("runtime", "libs", "code", "rules", "textures")) {
+    $pak = "$packsOut\$p.pak"
+    if (-not (Test-Path $pak)) { throw "нет пака $pak — запусти с -All" }
+    if (-not (Test-Path "$pak.sha")) {
+        Set-Content -Encoding ascii "$pak.sha" (Get-FileHash $pak -Algorithm SHA256).Hash.Substring(0, 12).ToLower()
+    }
+    $lines += "$p`t$((Get-Content "$pak.sha" -Raw).Trim())`t$p.pak"
+}
+[System.IO.File]::WriteAllLines((Join-Path $PSScriptRoot "$packsOut\packs.txt"), $lines,
+    (New-Object System.Text.UTF8Encoding $false))
+
+# ==================== запускатели ====================
+
+# Иконка приложения: .ico из квадратного PNG (ICO с Vista несёт PNG прямо в
+# записи). Несколько размеров, иначе Проводник мылит мелкие виды.
 function Convert-PngToIco([string]$png, [string]$ico) {
     if (-not (Test-Path $png)) { return $null }
     Add-Type -AssemblyName System.Drawing
@@ -74,8 +269,7 @@ function Convert-PngToIco([string]$png, [string]$ico) {
         foreach ($size in @(256, 48, 32, 16)) {
             $bmp = New-Object System.Drawing.Bitmap $size, $size
             $g = [System.Drawing.Graphics]::FromImage($bmp)
-            $g.InterpolationMode =
-                [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
             $g.Clear([System.Drawing.Color]::Transparent)
             $g.DrawImage($src, 0, 0, $size, $size)
             $g.Dispose()
@@ -99,7 +293,6 @@ function Convert-PngToIco([string]$png, [string]$ico) {
         }
         foreach ($f in $frames) { $w.Write($f.Bytes) }
         $w.Flush()
-        New-Item -ItemType Directory -Force (Split-Path $ico) | Out-Null
         [System.IO.File]::WriteAllBytes((Join-Path $PSScriptRoot $ico), $out.ToArray())
         $w.Dispose(); $out.Dispose()
         return $ico
@@ -108,270 +301,57 @@ function Convert-PngToIco([string]$png, [string]$ico) {
     }
 }
 
-Write-Output "1/6 сборка jar…"
-# Три модуля вместо одного (разделено 14.08.2026): корень — реестр-агрегатор
-# (packaging=pom), реальные jar лежат в engine\target, bots\target, gui\target.
-# `mvn package` из корня собирает все три по реактору в правильном порядке.
-mvn -q package -DskipTests
-# СБОРКА ОБЯЗАНА ПАДАТЬ ГРОМКО. Без этой проверки провалившийся mvn проходил
-# мимо: exe собирался из ПРОШЛЫХ классов, и наружу уходил движок одной версии
-# с окнами другой. Именно так 11.09.2026 уехала сборка, где кнопка «игроки…»
-# падала с NoSuchMethodError.
-if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "СБОРКА НЕ ПРОШЛА: mvn package вернул $LASTEXITCODE." -ForegroundColor Red
-    Write-Host "Exe не пересобраны — в dist лежит прежнее." -ForegroundColor Red
-    exit 1
-}
-# Копировать зависимости надо от модуля gui — только у него полный
-# ТРАНЗИТИВНЫЙ набор (движок + боты + все сторонние библиотеки). Собственные
-# kelium-* jar сюда тоже попадут — они НЕ лишние: pkgin ниже наполняется
-# per-module jar-ами вручную, а из pkg-libs берутся именно сторонние.
-mvn -q -pl gui dependency:copy-dependencies "-DoutputDirectory=$PSScriptRoot\target\pkg-libs"
-
-New-Item -ItemType Directory -Force target\pkgin | Out-Null
-Remove-Item target\pkgin\*.jar -ErrorAction SilentlyContinue
-# Классы приложения — из ВСЕХ ТРЁХ модулей (jpackage строит classpath из
-# каждого jar в --input, отдельным файлом на модуль, а не одним fat-jar).
-# МОДУЛЕЙ ЧЕТЫРЕ, А НЕ ТРИ (разделено 14.08.2026, cards добавлен позже):
-# kelium-cards сюда не копировался, а из pkg-libs его вычищал -Exclude kelium-*,
-# и в собранное приложение он не попадал вовсе — карты не грузились.
-Copy-Item engine\target\kelium-engine-0.1.0.jar target\pkgin\
-Copy-Item cards\target\kelium-cards-0.1.0.jar target\pkgin\
-Copy-Item bots\target\kelium-bots-0.1.0.jar target\pkgin\
-Copy-Item gui\target\kelium-gui-0.1.0.jar target\pkgin\
-Copy-Item target\pkg-libs\*.jar target\pkgin\ -Exclude junit*, apiguardian*, opentest4j*, kelium-*
-
-# ONNX Runtime поставляется с нативами под ВСЕ платформы и с 290 МБ отладочных
-# символов. Для Windows-сборки оставляем классы и только win-x64 .dll — иначе
-# 89 МБ библиотеки перевешивают всё приложение.
-Write-Output "1-бис/6 обрезка ONNX до Windows…"
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$onnx = Get-ChildItem target\pkgin\onnxruntime-*.jar | Select-Object -First 1
-if ($onnx) {
-    $slim = Join-Path $PSScriptRoot "target\onnx-win.jar"
-    if (Test-Path $slim) { Remove-Item -Force $slim }
-    $src = [System.IO.Compression.ZipFile]::OpenRead($onnx.FullName)
-    $dst = [System.IO.Compression.ZipFile]::Open($slim, [System.IO.Compression.ZipArchiveMode]::Create)
-    foreach ($e in $src.Entries) {
-        if ($e.FullName.EndsWith("/")) { continue }
-        $keep = $false
-        if ($e.FullName -like "*.pdb") { $keep = $false }
-        elseif ($e.FullName -like "ai/onnxruntime/native/*") {
-            $keep = $e.FullName -like "ai/onnxruntime/native/win-x64/*"
-        }
-        elseif ($e.FullName -like "META-INF/*.SF" -or $e.FullName -like "META-INF/*.RSA" -or
-                $e.FullName -like "META-INF/*.DSA") { $keep = $false }
-        else { $keep = $true }
-        if (-not $keep) { continue }
-        $ne = $dst.CreateEntry($e.FullName, [System.IO.Compression.CompressionLevel]::Optimal)
-        $rs = $e.Open(); $ws = $ne.Open(); $rs.CopyTo($ws); $ws.Close(); $rs.Close()
+# Свежий exe держат антивирус или Яндекс.Диск — удаляем с повторами.
+function Remove-FileStubborn([string]$path) {
+    if (-not (Test-Path $path)) { return }
+    for ($i = 0; $i -lt 20; $i++) {
+        try { Remove-Item -Force $path; return } catch { Start-Sleep -Milliseconds 500 }
     }
-    $dst.Dispose(); $src.Dispose()
-    $wasMb = $onnx.Length / 1MB
-    Remove-Item $onnx.FullName -Force
-    Copy-Item $slim (Join-Path $PSScriptRoot "target\pkgin\onnxruntime-win-x64.jar")
-    "   ONNX: {0:N1} МБ -> {1:N1} МБ" -f $wasMb, ((Get-Item $slim).Length / 1MB) | Write-Output
+    throw "Файл занят другим процессом: $path"
 }
 
-Write-Output "2/6 урезанная Java-среда (jlink)…"
-if (Test-Path target\runtime-slim) { Remove-Item -Recurse -Force target\runtime-slim }
-# jdeps показал java.base + java.desktop + java.logging; management и unsupported
-# добавлены с запасом под сторонние библиотеки (ONNX Runtime).
-jlink --add-modules java.base,java.desktop,java.logging,java.management,jdk.unsupported `
-      --strip-debug --no-header-files --no-man-pages --compress=zip-9 `
-      --output target\runtime-slim
-
-Write-Output "3/6 jpackage (образ приложения)…"
-$props = @()
-$props += "main-class=kelium.gui.RunnerGui"
-$props += "java-options=-Dkelium.data=`"$dataPath`""
-$props += "win-console=false"
-$props | Out-File -Encoding ascii target\runner-launcher.properties
-
-# ПРОИГРЫВАТЕЛЬ 1.0 БОЛЬШЕ НЕ СОБИРАЕТСЯ (решение дизайнера 13.08.2026): версия
-# устарела, её заменил разбор партии 2.0. Исходник убран из сборки в
-# archive/replay-1.0/, лончер и exe для неё не делаются. Общие панели (планшеты
-# науки и рынка, супер-задания) остались в проекте — их использует 2.0.
-
-# РАЗБОР ПАРТИИ 2.0 — единственный проигрыватель.
-$replay2Props = @()
-$replay2Props += "main-class=kelium.gui.replay2.Replay2Gui"
-$replay2Props += "java-options=-Dkelium.data=`"$dataPath`""
-$replay2Props += "win-console=false"
-$replay2Props | Out-File -Encoding ascii target\replay2-launcher.properties
-
-# СПРАВОЧНИК ОТДЕЛЬНО. Дизайнер читает правила и каталог карт, не собираясь
-# смотреть партию, — ради этого не нужно поднимать весь проигрыватель
-# (просьба 13.08.2026). Данные те же: правила и карточные наборы из data.
-$helpProps = @()
-$helpProps += "main-class=kelium.gui.replay2.HelpApp"
-$helpProps += "java-options=-Dkelium.data=`"$dataPath`""
-$helpProps += "win-console=false"
-$helpProps | Out-File -Encoding ascii target\help-launcher.properties
-
-# САМА ИГРА (просьба дизайнера 27.08.2026). Точка входа — «Штаб»: собрать
-# стол и сесть играть. Отдельным лончером, а не заменой RunnerGui: раннер
-# прогонов — инструмент дизайнера, и подменять его игрой нельзя.
-$gameProps = @()
-$gameProps += "main-class=kelium.gui.StartMenuWindow"
-$gameProps += "java-options=-Dkelium.data=`"$dataPath`""
-$gameProps += "win-console=false"
-$gameProps | Out-File -Encoding ascii target\game-launcher.properties
-
-# KeliumBuilder В СБОРКУ НЕ ВХОДИТ (19.08.2026).
-#
-# Он затевался как «перенос конструктора на новый движок рендера», но проверка
-# показала, что переносить нечего: LayoutEditor УЖЕ считает геометрию через
-# kelium.report.FieldGeometry — те же hexCenter и TILT, что у разбора партии
-# (см. LayoutEditor.center и LayoutEditor.hexPoly). Движок у старого
-# конструктора и так новый.
-#
-# Поэтому отдельное приложение давало только потери: не было вкладок, журнала
-# проверок, настроек экспорта, кнопки темы, нейтралов и сборки из блоков — всё
-# это в LayoutEditor есть. Собирать и отдавать дизайнеру заведомо более бедный
-# инструмент вредно, поэтому exe из него не делается.
-#
-# Исходник оставлен в дереве (gui/.../KeliumBuilder.java, BuilderScene.java) как
-# заготовка: если однажды понадобится ДРУГОЙ конструктор — не копия старого, а
-# инструмент с иным набором задач, — начинать будет с чего. Правки внешнего вида
-# (скругления, вид ячеек) идут в LayoutEditor, а не сюда.
-
-if (Test-Path dist\app) { Remove-Item -Recurse -Force dist\app }
-New-Item -ItemType Directory -Force dist | Out-Null
-jpackage --type app-image --name Kelium --input target\pkgin --runtime-image target\runtime-slim `
-  --main-jar kelium-gui-0.1.0.jar --main-class kelium.gui.LayoutEditor `
-  --add-launcher KeliumRunner=target\runner-launcher.properties `
-  --add-launcher KeliumReplay2=target\replay2-launcher.properties `
-  --add-launcher KeliumHelp=target\help-launcher.properties `
-  --add-launcher KeliumGame=target\game-launcher.properties --dest dist\app
-
-# jpackage режет --java-options по пробелам в пути, поэтому секцию [JavaOptions]
-# главного лончера собираем сами (у add-launcher она берётся из properties и цела).
-$cfgPath = "dist\app\Kelium\app\Kelium.cfg"
-$lines = Get-Content $cfgPath
-$out = @()
-$inJava = $false
-foreach ($l in $lines) {
-    if ($l.Trim() -eq "[JavaOptions]") {
-        $out += $l
-        $out += "java-options=-Djpackage.app-version=1.0"
-        $out += "java-options=-Dkelium.data=$dataPath"
-        $inJava = $true
-        continue
-    }
-    if ($inJava) {
-        if ($l -like "java-options=*") { continue }
-        $inJava = $false
-    }
-    $out += $l
-}
-if (-not ($out -join "`n").Contains("[JavaOptions]")) {
-    $out += ""
-    $out += "[JavaOptions]"
-    $out += "java-options=-Dkelium.data=$dataPath"
-}
-Set-Content $cfgPath $out -Encoding ascii
-if (-not (Select-String -Path $cfgPath -Pattern ([regex]::Escape($dataPath)) -Quiet)) {
-    throw "cfg главного лончера не содержит kelium.data — проверь патч"
-}
-
-# ДАННЫЕ ИГРЫ — ВНУТРЬ ПРИЛОЖЕНИЯ (08.09.2026).
-#
-# Прежде в exe прибивался только ПУТЬ к папке data на машине сборки, и на чужом
-# компьютере приложение оставалось без правил, карт и картинок: показать
-# кому-нибудь готовую сборку было нельзя. Теперь data кладётся рядом с jar-ами,
-# а движок ищет её там сам (GameConfig.resolveDataRoot), если прибитого пути на
-# машине нет. Свойство kelium.data остаётся: на машине разработчика оно и
-# указывает на рабочую папку, а править данные удобнее в проекте, а не в exe.
-Write-Output "3-бис/6 данные игры внутрь образа…"
-$dataDst = "dist\app\Kelium\app\data"
-Copy-Item -Recurse -Force "data" $dataDst
-# В РАЗДАЧУ ИДЁТ ТОЛЬКО ТО, ЧЕМ ИГРАЮТ. Обученные модели, архивы геномов,
-# отработанные наборы и размеченные образцы для художника игре не нужны, а весят
-# они больше самой игры (одно data/training — два гигабайта).
-foreach ($junk in @("training", "genomes-archive-*", "genomes-boi2", "_archive", "tsv")) {
-    Get-ChildItem -Path $dataDst -Filter $junk -ErrorAction SilentlyContinue |
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-}
-Get-ChildItem -Path (Join-Path $dataDst "textures") -Filter "_образцы" `
-    -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-"   данные: {0:N1} МБ" -f ((Get-ChildItem -Recurse $dataDst | Measure-Object Length -Sum).Sum / 1MB) | Write-Output
-
-# КНИГА ПРАВИЛ — РЯДОМ С ДАННЫМИ (справочник правил, 25.09.2026). Справочник ищет
-# главы в <data>\..\rules\Книга правил… (RulesMarkdown.bookDir): на машине
-# разработчика это рабочая папка проекта, в раздаче — эта копия. Берутся только
-# главы и значки; рисунки вёрстки (tools\книга\_*.svg) в раздачу не идут — там
-# справочник пишет «смотрите в печатной книге».
-$rulesDst = "dist\app\Kelium\app\rules"
-$bookSrc = Get-ChildItem -Path "rules" -Directory -Filter "Книга правил*" | Select-Object -First 1
-if ($bookSrc) {
-    $bookDst = Join-Path $rulesDst $bookSrc.Name
-    New-Item -ItemType Directory -Force $bookDst | Out-Null
-    Get-ChildItem -Path $bookSrc.FullName -Filter "*.md" | Copy-Item -Destination $bookDst -Force
-    foreach ($icons in @("иконки-экспорт", "иконки")) {
-        if (Test-Path (Join-Path "rules" $icons)) {
-            Copy-Item -Recurse -Force (Join-Path "rules" $icons) (Join-Path $rulesDst $icons)
-        }
+if ($want -contains "exe") {
+    Write-Output "запускатели…"
+    $stub = Get-Content launcher.cs -Raw -Encoding UTF8
+    $refs = "/r:System.dll /r:System.Drawing.dll /r:System.IO.Compression.dll " +
+            "/r:System.IO.Compression.FileSystem.dll /r:System.Windows.Forms.dll"
+    foreach ($app in $apps) {
+        $src = "target\launcher_$($app.Icon).cs"
+        $stub.Replace("@MAIN@", $app.Main).Replace("@APP@", $app.Title).Replace("@DEVDATA@", $dataPath) |
+            Out-File -Encoding UTF8 $src
+        $exe = "dist\$($app.Name).exe"
+        Remove-FileStubborn $exe
+        $iconArg = ""
+        $ico = Convert-PngToIco "icons\$($app.Icon).png" "target\$($app.Icon).ico"
+        if ($ico) { $iconArg = "/win32icon:$ico " }
+        $cmd = "& `"$csc`" /nologo /target:winexe /platform:anycpu /optimize+ " +
+               "$iconArg/out:`"$exe`" $refs $src"
+        Invoke-Expression $cmd
+        if (-not (Test-Path $exe)) { throw "не собрался $exe" }
     }
 }
 
-Write-Output "4/6 упаковка образа в архив…"
-$zip = "target\payload.zip"
-if (Test-Path $zip) { Remove-Item -Force $zip }
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory(
-    (Resolve-Path "dist\app\Kelium").Path, (Join-Path $PSScriptRoot $zip),
-    [System.IO.Compression.CompressionLevel]::Optimal, $false)
+# Отпечатки — только после успешной сборки: упавшая часть пересоберётся в следующий раз.
+foreach ($p in $want) { Set-Content -Encoding ascii "$state\$p.fp" $fp[$p] }
 
-# Отпечаток содержимого — им же именуется временная папка: новая сборка
-# распакуется в новую папку, старая версия не подхватится по ошибке.
-$hash = (Get-FileHash $zip -Algorithm SHA256).Hash.Substring(0, 12).ToLower()
-"   архив {0:N1} МБ, отпечаток {1}" -f ((Get-Item $zip).Length / 1MB), $hash | Write-Output
-
-Write-Output "5/6 сборка однофайловых exe…"
-$stub = Get-Content sfx-stub.cs -Raw -Encoding UTF8
-$refs = "/r:System.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /r:System.Windows.Forms.dll"
-foreach ($app in @(
-        @{ Name = "KeliumConstructor"; Target = "Kelium.exe"; Icon = "constructor" },
-        @{ Name = "KeliumRunner"; Target = "KeliumRunner.exe"; Icon = "runner" },
-        @{ Name = "KeliumReplay2"; Target = "KeliumReplay2.exe"; Icon = "replay2" },
-        @{ Name = "KeliumHelp"; Target = "KeliumHelp.exe"; Icon = "help" },
-        @{ Name = "Играть"; Target = "KeliumGame.exe"; Icon = "game" })) {
-    $src = "target\stub_$($app.Name).cs"
-    $stub.Replace("@VERSION@", $hash).Replace("@TARGET@", $app.Target) |
-        Out-File -Encoding UTF8 $src
-    $exe = "dist\$($app.Name).exe"
-    Remove-FileStubborn $exe
-    # ИКОНКА приложения: PNG из icons\ превращается в .ico и вшивается в exe.
-    # Нет файла — собираем без иконки, а не падаем.
-    $iconArg = ""
-    $ico = Convert-PngToIco "icons\$($app.Icon).png" "target\$($app.Icon).ico"
-    if ($ico) { $iconArg = "/win32icon:$ico " }
-    $cmd = "& `"$csc`" /nologo /target:winexe /platform:anycpu /optimize+ " +
-           "$iconArg/out:$exe /resource:$zip,payload.zip $refs $src"
-    Invoke-Expression $cmd
-    if (-not (Test-Path $exe)) { throw "не собрался $exe" }
+# Прежние «толстые» сборки больше не нужны.
+foreach ($old in @("dist\app", "target\payload.zip")) {
+    if (Test-Path $old) { Remove-Item -Recurse -Force $old -ErrorAction SilentlyContinue }
 }
-
-Write-Output "6/6 проверка…"
-foreach ($n in @("KeliumConstructor", "KeliumRunner", "KeliumReplay2", "KeliumHelp",
-                 "Играть")) {
-    $f = Get-Item "dist\$n.exe"
-    "   {0} — {1:N1} МБ" -f $f.Name, ($f.Length / 1MB) | Write-Output
+Get-ChildItem "dist\*.занят-*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+    try { Remove-Item -Force $_.FullName } catch { }
 }
 
 Write-Output ""
-Write-Output "ГОТОВО — по одному файлу на приложение:"
-Write-Output "  dist\KeliumConstructor.exe  — конструктор раскладок"
-Write-Output "  dist\KeliumRunner.exe       — прогоны симуляций"
-Write-Output "  dist\KeliumReplay2.exe      — разбор партии"
-Write-Output "  dist\KeliumHelp.exe         — справочник: правила и все карты"
-Write-Output "  dist\Играть.exe             — САМА ИГРА: «Штаб» и партия"
+Write-Output "ГОТОВО. Раздача — папка dist целиком (exe + packs):"
+foreach ($app in $apps) {
+    $f = Get-Item "dist\$($app.Name).exe" -ErrorAction SilentlyContinue
+    if ($f) { "   {0,-24} {1,8:N0} КБ   {2}" -f $f.Name, ($f.Length / 1KB), $app.Title | Write-Output }
+}
+foreach ($p in Get-ChildItem "$packsOut\*.pak") {
+    "   packs\{0,-17} {1,8:N1} МБ" -f $p.Name, ($p.Length / 1MB) | Write-Output
+}
 Write-Output ""
-Write-Output "Файлы самодостаточны: Java внутри, при первом запуске распаковываются"
-Write-Output "в %TEMP%\Kelium-$hash (дальше стартуют сразу). Отчёты и логи пишутся"
-Write-Output "рядом с тем exe, который запустили. Данные игры: $dataPath"
-
-
-
+Write-Output "Первый запуск на машине распаковывает паки в %LOCALAPPDATA%\Kelium (один раз;"
+Write-Output "дальше — только изменившиеся). На машине сборки игра берёт живые данные проекта"
+Write-Output "($dataPath); KELIUM_PACKS=1 заставляет брать паки и здесь."

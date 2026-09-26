@@ -668,8 +668,14 @@ public final class Actions {
                     roomForUnit = false;
                 }
                 List<Choice> opts = new ArrayList<>();
+                // ПРИЗРАКИ НАЙМА (окно партии, 25.09.2026): сколько жетонов выйдет
+                // и сколько из них встанет на сам гекс — остальные сядут внутрь
+                // здания, и призрака на поле для них нет.
+                int встанут = unitType == UnitType.TOWER ? 0
+                    : Placement.hireFits(state, player, b.hexId, unitType, unitsOut);
                 if (roomForUnit) {
-                    opts.add(new Choice("assemble", Map.of("kind", "unit", "building", b.uid),
+                    opts.add(new Choice("assemble", Map.of("kind", "unit", "building", b.uid, "unit", unitType.code,
+                        "units", unitsOut, "fits", встанут),
                         b.type.code + "->" + unitType.code));
                 }
                 if (!ctx.сборкаТолькоВойска) {
@@ -683,7 +689,8 @@ public final class Actions {
                 boolean dualLeft = ctx.assemblyDualOutput > 0;
                 if (dualLeft && roomForUnit) {
                     opts.add(new Choice("assemble",
-                        Map.of("kind", "both", "building", b.uid),
+                        Map.of("kind", "both", "building", b.uid, "unit", unitType.code, "units", unitsOut,
+                            "fits", встанут),
                         b.type.code + "->" + unitType.code + " И ammo"));
                 }
                 opts.add(new Choice("pass", null, "skip " + b.type.code));
@@ -1222,8 +1229,28 @@ public final class Actions {
             // из тупика, когда строить не на что; расплата в том, что в свой ход
             // игрок ОБЯЗАН вернуть ЦУ на поле спец-действием.
             boolean цуМожноСносить = rs.getBool("actions.build.demolish_cu_allowed", false);
+            // СНОС ЦУ ЦЕНОЙ СВОЕГО ЖЕТОНА (решение дизайнера 25.09.2026): монеты
+            // за снос нет, свой пустой модуль боя уходит оборотом «жетон
+            // уничтожения ЦУ» одному из соперников. Нет жетона — сносить нельзя,
+            // то есть раз за партию. Ставят ЦУ заново потом спец-действием.
+            boolean цуЗаЖетон = rs.getBool("actions.build.demolish_cu_gives_token", false);
             for (BuildingToken b : player.buildingsOnField()) {
                 if (b.type == BuildingType.COMMAND_CENTER && !цуМожноСносить) {
+                    continue;
+                }
+                if (b.type == BuildingType.COMMAND_CENTER && цуЗаЖетон) {
+                    if (!player.ownCuTokenAvailable || player.cuTokenRemoved
+                            || state.numPlayers() < 2) {
+                        continue;
+                    }
+                    if (одноНаЗдание && тронутые.contains(b.uid)) {
+                        continue;
+                    }
+                    if (Placement.enemyUnitsLockHex(state, b.hexId, player.seat)) {
+                        continue;
+                    }
+                    opts.add(new Choice("demolish_pick", b.uid,
+                        "снести " + b.type.code + "@" + b.hexId + " (отдать жетон уничтожения ЦУ)"));
                     continue;
                 }
                 // СНОС ЦУ — ТОЛЬКО ПРИ ОСТАВШЕМСЯ СПЕЦ-ДЕЙСТВИИ (решение дизайнера
@@ -1292,6 +1319,13 @@ public final class Actions {
                     if (x.uid == uid && x.type == BuildingType.COMMAND_CENTER) {
                         этоЦу = true;
                     }
+                }
+                if (этоЦу && цуЗаЖетон) {
+                    ActionResult итог = performDemolish(player, ctx, uid, 0, 0);
+                    if (итог.ok()) {
+                        отдатьЖетонЦу(player, agent);
+                    }
+                    return итог;
                 }
                 ActionResult итог = performDemolish(player, ctx, uid, refund, сносСтоит);
                 // Снесённый ЦУ сразу ставится заново оставшимся спец-действием.
@@ -1546,6 +1580,32 @@ public final class Actions {
                 + " (-" + было + " урона, -" + цена + " мон)", tel);
         }
 
+        /**
+         * СВОЙ ЖЕТОН УХОДИТ СОПЕРНИКУ (снос своего ЦУ, решение дизайнера
+         * 25.09.2026): игрок выбирает, кому отдать свой пустой модуль боя —
+         * тот кладёт его к себе оборотом «жетон уничтожения ЦУ» (3 очка).
+         * Ячейка атаки, которую жетон закрывал, открывается.
+         */
+        private void отдатьЖетонЦу(PlayerState player, Agent agent) {
+            List<Choice> кому = new ArrayList<>();
+            for (int seat = 0; seat < state.numPlayers(); seat++) {
+                if (seat != player.seat) {
+                    кому.add(new Choice("cu_token_to", seat, "Игрок " + (seat + 1)));
+                }
+            }
+            if (кому.isEmpty()) {
+                return;
+            }
+            Choice ch = кому.size() == 1 ? кому.get(0)
+                : agent.choose(state, кому, Map.of("kind", "cu_token_to"));
+            int seat = ch != null && ch.payload() instanceof Number n
+                ? n.intValue() : ((Number) кому.get(0).payload()).intValue();
+            player.ownCuTokenAvailable = false;
+            player.redPlacements.entrySet().removeIf(e ->
+                Boolean.TRUE.equals(e.getValue().get("blocks")));
+            state.player(seat).cuDestructionTokens += 1;
+        }
+
         private ActionResult performDemolish(PlayerState player, TurnContext ctx, int uid,
                                              int refund, int цена) {
             BuildingToken b = null;
@@ -1643,6 +1703,11 @@ public final class Actions {
             boolean cuMovedThisTurn = cuAlreadyMoved(player);
             for (BuildingToken b : player.buildingsOnField()) {
                 boolean isCu = b.type == BuildingType.COMMAND_CENTER;
+                // ЦУ НЕ ПЕРЕНОСИТСЯ НИЧЕМ (решение дизайнера 25.09.2026): ни
+                // базовой Стройкой, ни картами переноса зданий.
+                if (isCu) {
+                    continue;
+                }
                 int cost = freeMove ? 0 : moveCost(player, b);
                 if (isCu && cuMovedThisTurn) {
                     continue;   // ЦУ уже переносили в этот ход
@@ -2060,7 +2125,11 @@ public final class Actions {
                     if (!isSource(src) || used.contains(src.uid)) {
                         continue;
                     }
-                    if (src.energyIdle > 0) {
+                    // РАЗДАТЬ — ТОЛЬКО ЕСЛИ ЕСТЬ КУДА (26.09.2026): иначе вопрос
+                    // «куда поставить» состоял из одного «хватит», проходил сам,
+                    // кубик возвращался, и игроку снова предлагали то же самое —
+                    // по кругу.
+                    if (src.energyIdle > 0 && естьКудаПоставить(player, src)) {
                         opts.add(new Choice("energy_give", String.valueOf(src.uid),
                             "отдать " + src.energyIdle + " с " + src.type));
                     }
@@ -2223,9 +2292,16 @@ public final class Actions {
                     }
                 }
                 opts.add(new Choice("pass", null, "оставить простаивать"));
+                // откуда кубик — окно рисует от источника стрелку к потребителю
+                Map<String, Object> вопрос = new HashMap<>();
+                вопрос.put("kind", "energy_place");
+                вопрос.put("remaining", pool - i);
+                if (src != null && src.hexId != null) {
+                    вопрос.put("source", src.hexId);
+                    вопрос.put("source_type", src.type.code);
+                }
                 Choice pick = opts.size() == 1 ? opts.get(0)
-                    : agent.choose(state, opts, Map.of("kind", "energy_place",
-                        "remaining", pool - i));
+                    : agent.choose(state, opts, вопрос);
                 if (pick.payload() == null) {
                     if (src != null) {
                         src.energyIdle += pool - i;
@@ -2248,6 +2324,19 @@ public final class Actions {
                 }
             }
             return placed;
+        }
+
+        /** Есть ли здание со свободной ячейкой, куда кубик источника может лечь. */
+        private static boolean естьКудаПоставить(PlayerState player, BuildingToken src) {
+            for (BuildingToken c : player.buildingsOnField()) {
+                if (c.uid == src.uid && c.type == BuildingType.COMMAND_CENTER) {
+                    continue;          // ЦУ само себе кубик не перекладывает
+                }
+                if (c.energySlots > c.energyPlaced) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /** Источник энергии: энергостанция или ЦУ. */
@@ -3131,9 +3220,13 @@ public final class Actions {
                 }
                 // ---- ОБНОВЛЕНИЕ КАРТЫ РЫНКА за келемий ----
                 // Ячейка слева от слота карты. Кладёшь в неё келемий — открытая
-                // карта немедленно уходит из игры со всеми кубиками на её
-                // ячейках предложений, и открывается следующая. Ячейка одна и
+                // карта немедленно уходит со всеми кубиками на её ячейках
+                // предложений, и открывается следующая. Ячейка одна и
                 // чистится на Обновлении, поэтому за раунд карту меняют раз.
+                //
+                // КАРТА УХОДИТ ПОД НИЗ КОЛОДЫ, А НЕ ИЗ ИГРЫ (решение дизайнера
+                // 25.09.2026, ключ market.refresh_to_bottom): карт в колоде
+                // столько же, и прокрутка не укорачивает партию.
                 //
                 // ОБНОВЛЕНИЕ НЕ ЕСТЬ ПРЕДЛОЖЕНИЕ: обновив карту, тем же
                 // действием берут предложение с новой — но платят за него
@@ -3213,7 +3306,12 @@ public final class Actions {
 
                 if ("market_refresh".equals(pick.kind())) {
                     s.marketRefreshCell = player.seat;
+                    String prev = s.marketActive;
                     String next = s.decks.get("market").draw(s.rng);
+                    if (next != null && prev != null
+                            && rs.getBool("market.refresh_to_bottom", false)) {
+                        s.decks.get("market").putUnder(prev);
+                    }
                     if (next != null) {
                         s.marketActive = next;
                         for (int[] side : s.marketCells) {
@@ -3616,6 +3714,17 @@ public final class Actions {
                 // Награда — ТОЛЬКО за ячейку, куда встал: бонусы перепрыгнутых
                 // ячеек не достаются никому.
                 techStepReward(player, track, target, agent);
+                // ВЕРШИНЫ ВСЕХ ТРЁХ ТРЕКОВ — МГНОВЕННАЯ ПОБЕДА (решение дизайнера
+                // 25.09.2026): прошёл все три трека до конца — победил, очки не
+                // считают. Вершину может занимать сколько угодно игроков.
+                if (rs.getBool("end_conditions.peaks_instant_win", false)
+                        && tech.onAllPeaks(player.seat)) {
+                    state.finished = true;
+                    state.winner = player.seat;
+                    state.winCondition = "all_peaks";
+                    detail.append("вершины всех треков — победа; ");
+                    break;
+                }
                 // МОНЕТЫ ЗА СТУПЕНЬ ТРЕКА (решение дизайнера 23.09.2026): растущий
                 // доход — чем дальше ступень, тем больше, на каждом из трёх
                 // треков. Список по ступеням 1..4; нет ключа — монет нет.

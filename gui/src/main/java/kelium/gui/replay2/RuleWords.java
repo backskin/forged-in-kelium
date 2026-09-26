@@ -411,6 +411,14 @@ public final class RuleWords {
             // ---------- Рынок ----------
             case "market.deck_size" -> "карт рынка кладут на планшет";
             case "market.preparatory_round" -> "первый раунд подготовительный — без карты рынка";
+            case "market.refresh_to_bottom" -> "обновлённая карта рынка уходит под низ колоды";
+            case "tech.peak_unlimited" -> "вершину трека занимает сколько угодно игроков";
+            case "end_conditions.peaks_instant_win" -> "вершины всех трёх треков — мгновенная победа";
+            case "actions.build.demolish_cu_gives_token" ->
+                "снос своего ЦУ — без монеты, модуль блокировки боя уходит сопернику";
+            case "command_center.military_win_counts_kills" ->
+                "военная победа — за второе уничтожение ЦУ";
+            case "command_center.military_win_min_players" -> "военная победа — с какого числа игроков";
             case "market.cell_cost_kelium" -> "келемия за одну ячейку предложения";
             case "market.base_exchanges" -> "печатные обмены рынка";
             case "market.pair_bonus_coin" -> "монет за парный обмен";

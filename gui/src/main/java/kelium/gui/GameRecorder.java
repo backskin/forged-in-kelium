@@ -277,6 +277,9 @@ public final class GameRecorder {
             rc.accept(event);
             onFrame.accept(rec);
         };
+        synchronized (SINKS) {
+            SINKS.put(state, sink);
+        }
         Map<String, Object> result = GameEngine.playGame(state, agents, sink);
 
         rec.winner = result.get("winner") instanceof Number n ? n.intValue() : null;
@@ -472,6 +475,27 @@ public final class GameRecorder {
         }
     }
 
+    /** Служебное событие «живой кадр» (не из движка). */
+    static final String LIVE = "live";
+
+    /** Приёмник событий каждой идущей партии — по её состоянию. */
+    private static final Map<GameState, Consumer<Map<String, Object>>> SINKS =
+        new java.util.WeakHashMap<>();
+
+    /**
+     * Положить живой кадр этой партии, если состояние изменилось с прошлого
+     * кадра. Зовётся на потоке движка перед вопросом живому игроку.
+     */
+    static void live(GameState state, int seat) {
+        Consumer<Map<String, Object>> sink;
+        synchronized (SINKS) {
+            sink = SINKS.get(state);
+        }
+        if (sink != null) {
+            sink.accept(Map.of("type", LIVE, "seat", seat));
+        }
+    }
+
     // ==================== приёмник событий ====================
 
     /** Приёмник событий движка: на каждое событие кладёт кадр в запись. */
@@ -483,6 +507,73 @@ public final class GameRecorder {
         private final List<ReplayRecord.Thought> pending;
         private ReplayRecord.Snapshot prev;
 
+        /**
+         * ЖИВОЙ КАДР перед вопросом игроку (окно партии, 26.09.2026). Движок
+         * пишет событие на действие целиком, а внутри Стройки игрок ставит
+         * здания одно за другим — без этого кадра поставленное здание и
+         * списанные монеты не видны до конца действия, и кажется, что щелчок
+         * ничего не сделал. Кадр кладётся, только если что-то изменилось, и
+         * строки в ленту не даёт.
+         */
+        private void live(Map<String, Object> event) {
+            ReplayRecord.Snapshot snap = snapshot(state,
+                event.get("seat") instanceof Number n ? n.intValue() : null);
+            ReplayRecord.Highlight h = diff(prev, snap);
+            if (h.isEmpty() && !resourcesChanged(prev, snap) && !tokensChanged(prev, snap)) {
+                return;
+            }
+            ReplayRecord.Frame f = new ReplayRecord.Frame();
+            f.type = LIVE;
+            f.round = state.round;
+            f.circle = state.circle;
+            f.seat = event.get("seat") instanceof Number n ? n.intValue() : null;
+            f.log = "";
+            f.highlight = h;
+            f.snapshot = snap;
+            prev = snap;
+            rec.frames.add(f);
+        }
+
+        /**
+         * Жетоны: место, энергия, урон, жив ли. Кубик энергии, переложенный со
+         * станции на добытчик, — изменение, которое игрок обязан увидеть сразу
+         * (жалоба дизайнера 26.09.2026: «энергию увидел только после
+         * „закончить“»).
+         */
+        private static boolean tokensChanged(ReplayRecord.Snapshot a, ReplayRecord.Snapshot b) {
+            if (a == null || b == null || a.tokens.size() != b.tokens.size()) {
+                return true;
+            }
+            Map<Integer, ReplayRecord.Tok> was = new java.util.HashMap<>();
+            for (ReplayRecord.Tok t : a.tokens) {
+                was.put(t.uid, t);
+            }
+            for (ReplayRecord.Tok t : b.tokens) {
+                ReplayRecord.Tok o = was.get(t.uid);
+                if (o == null || !java.util.Objects.equals(o.hexId, t.hexId)
+                        || o.energyPlaced != t.energyPlaced || o.energyIdle != t.energyIdle
+                        || o.damage != t.damage || o.alive != t.alive) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static boolean resourcesChanged(ReplayRecord.Snapshot a, ReplayRecord.Snapshot b) {
+            if (a == null || b == null || a.players.size() != b.players.size()) {
+                return true;
+            }
+            for (int i = 0; i < a.players.size(); i++) {
+                ReplayRecord.Player x = a.players.get(i);
+                ReplayRecord.Player y = b.players.get(i);
+                if (x.coin != y.coin || x.kelium != y.kelium || x.ammo != y.ammo
+                        || x.trophy != y.trophy) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         Recorder(GameState state, ReplayRecord rec, ReplayText text,
                  List<ReplayRecord.Thought> pending) {
             this.state = state;
@@ -493,6 +584,10 @@ public final class GameRecorder {
 
         @Override
         public void accept(Map<String, Object> event) {
+            if (LIVE.equals(event.get("type"))) {
+                live(event);
+                return;
+            }
             ReplayRecord.Frame f = new ReplayRecord.Frame();
             f.type = String.valueOf(event.get("type"));
             f.round = state.round;
@@ -804,6 +899,12 @@ public final class GameRecorder {
                 : kelium.gui.replay2.Names.card(rec, String.valueOf(cid));
         }
 
+        /** Что дал сожжённый верх: имя вида реакции «ОТВЕТНЫЙ_ОГОНЬ» — словами. */
+        private static String burnLabel(Object label) {
+            String s = label == null ? "" : String.valueOf(label);
+            return s.matches("[А-ЯЁ_]+") ? s.replace('_', ' ').toLowerCase() : s;
+        }
+
         /** Строка лога для одного события. */
         @SuppressWarnings("unchecked")
         String describe(Map<String, Object> ev, GameState s) {
@@ -906,7 +1007,7 @@ public final class GameRecorder {
                         + "»" + (Boolean.TRUE.equals(ev.get("enhanced")) ? " с усилением" : "");
                 case "objective_burn":
                     return who(ev.get("seat")) + " сжёг верх задания «" + card(ev.get("card"))
-                        + "» (" + ev.getOrDefault("label", "") + ")";
+                        + "» (" + burnLabel(ev.get("label")) + ")";
                 case "objective_drawn":
                     return who(ev.get("seat")) + " получил задание «" + card(ev.get("card"))
                         + "» (в руке " + ev.get("hand") + ")";
@@ -984,7 +1085,8 @@ public final class GameRecorder {
                         case "last_spawn_tile" -> kelium.gui.replay2.Names.condition(code,
                             ev.get("spawn_left") instanceof Number sl ? sl.intValue() : -1,
                             ev.get("spawn_threshold") instanceof Number st ? st.intValue() : -1);
-                        case "military" -> "военная победа (второе ЦУ)";
+                        case "military" -> "военная победа (второй уничтоженный ЦУ)";
+                        case "all_peaks" -> "победа наукой (вершины всех трёх треков)";
                         default -> code;
                     };
                     return "КОНЕЦ ПАРТИИ — победил " + (w == null ? "никто" : rec.playerName(w))

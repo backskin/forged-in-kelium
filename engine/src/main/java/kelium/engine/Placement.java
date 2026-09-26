@@ -312,6 +312,49 @@ public final class Placement {
      * чужими войсками. Нанимают не только Снаряжением, но и карты арсенала —
      * правило одно на всех, иначе карта тихо обходит его.
      */
+    /**
+     * СКОЛЬКО ИЗ {@code n} НАНЯТЫХ ЖЕТОНОВ ВСТАНЕТ НА САМ ГЕКС, а не сядет
+     * гарнизоном внутрь здания. Нужно призракам найма в окне партии (заказ
+     * дизайнера 25.09.2026: «на места, куда нельзя выставить, — призрак не
+     * ставится»). Считает и запас рода: жетонов больше, чем лежит в запасе, не
+     * будет.
+     */
+    public static int hireFits(GameState state, PlayerState player, String hexId,
+                               kelium.core.UnitType t, int n) {
+        Hex h = state.field.get(hexId);
+        if (h == null || n <= 0 || enemyUnitsLockHex(state, hexId, player.seat)) {
+            return 0;
+        }
+        int вЗапасе = 0;
+        for (UnitToken u : player.units) {
+            if (u.hexId == null && u.type == t) {
+                вЗапасе++;
+            }
+        }
+        вЗапасе += Math.max(0, state.tokenStats.unitStock(t) - player.unitsOfKind(t));
+        int можно = Math.min(n, вЗапасе);
+        if (t == kelium.core.UnitType.AIRCRAFT) {
+            return skyOpen(state, hexId, player.seat, -1) ? можно : 0;
+        }
+        int[] load = groundLoad(state, hexId, -1);
+        int veh = load[0];
+        int single = load[1];
+        int fits = 0;
+        for (int i = 0; i < можно; i++) {
+            int fp = t == kelium.core.UnitType.VEHICLE ? 2 : 1;
+            if (!h.fitsWithRepack(fp, veh, single)) {
+                break;
+            }
+            if (fp == 2) {
+                veh++;
+            } else {
+                single++;
+            }
+            fits++;
+        }
+        return fits;
+    }
+
     public static boolean canHireOn(GameState state, PlayerState player,
                                     String hexId, kelium.core.UnitType t) {
         return !enemyUnitsLockHex(state, hexId, player.seat)

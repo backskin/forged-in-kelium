@@ -710,16 +710,19 @@ public final class SetupPanel extends JPanel {
         });
         JComboBox<String> cards = new JComboBox<>();
         cards.addItem(AS_IN_RULES);
-        for (int i = 1; i <= 10; i++) {
+        // от 4 до 10 карт (решение дизайнера 25.09.2026)
+        int least = kelium.gui.StartMenuWindow.MIN_MARKET_CARDS;
+        for (int i = least; i <= 10; i++) {
             cards.addItem(String.valueOf(i));
         }
         int now = settings.getInt(kelium.gui.Expansions.MARKET_CARDS_COUNT, 0);
-        cards.setSelectedIndex(Math.max(0, Math.min(10, now)));
+        cards.setSelectedIndex(now < least ? 0 : Math.min(10, now) - least + 1);
         cards.setToolTipText(Ui2.tip("Сколько карт рынка положить на планшет. Кончились "
             + "карты — кончилась партия, поэтому это и есть предел числа раундов "
             + "(плюс подготовительный, если он включён)."));
         cards.addActionListener(e -> {
-            settings.putInt(kelium.gui.Expansions.MARKET_CARDS_COUNT, cards.getSelectedIndex());
+            int idx = cards.getSelectedIndex();
+            settings.putInt(kelium.gui.Expansions.MARKET_CARDS_COUNT, idx <= 0 ? 0 : idx + least - 1);
             onPreview.run();
         });
         return group("Раунды", prep, cell(Ui2.label("карт рынка:"), cards));
