@@ -54,7 +54,7 @@ class ArsenalSevenDeckTest {
 
     @Test
     void действующийСводБерётНабор71ИЧетвёртыйСупер() {
-        assertEquals("7.1.0", arsenal().version);
+        assertEquals("7.2.0", arsenal().version);
         assertEquals("4.0.0", cfg().content.get("super_arsenal").version);
     }
 
@@ -77,8 +77,9 @@ class ArsenalSevenDeckTest {
             assertTrue(имена.add(String.valueOf(c.get("name"))), "имя повторяется: " + c.get("id"));
             assertTrue(низы.add(низ(c)), "низ повторяется: " + c.get("id"));
         }
-        assertEquals("Полевой генератор", arsenal().byId("bs7_5").get("печатное_имя"));
-        assertEquals("Мародёрка", arsenal().byId("bs7_6").get("печатное_имя"));
+        // 7.2.0 (26.09.2026): те же карты, верх — стартовый набор
+        assertEquals("Полевой генератор", arsenal().byId("bs72_5").get("печатное_имя"));
+        assertEquals("Мародёрка", arsenal().byId("bs72_6").get("печатное_имя"));
     }
 
     @Test

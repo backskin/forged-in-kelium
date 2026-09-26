@@ -31,7 +31,9 @@ import kelium.core.UnitType;
 class Арсенал_7_1_НовыеКарты {
 
     private static final String НАБОР = "arsenal";
-    private static final List<String> КАРТЫ = List.of("a7_33", "bs7_5", "bs7_6", "bs7_7");
+    // Начальные 7.1.0 в действующем своде заменены стартовыми наборами 7.2.0
+    // (их проверяет Арсенал_7_2_СтартовыеНаборы); здесь — обычная №33.
+    private static final List<String> КАРТЫ = List.of("a7_33");
 
     /** Способы, покрытые тестами этого класса (у №6 есть ещё ПРИМЕНИТЬ). */
     private static final Set<CardBench.Способ> ПОКРЫТО = EnumSet.of(
@@ -83,7 +85,7 @@ class Арсенал_7_1_НовыеКарты {
     @Test
     void применитьЗаменуЖетона() {
         var b = CardBench.партия(4)
-            .арсеналУстановлен(0, "bs7_6")
+            .арсеналУстановлен(0, "bs72_6")
             .войско(0, null, UnitType.INFANTRY)
             .монеты(0, 6);
         assertTrue(b.доступныеСпец(0).stream().anyMatch(v -> v.startsWith(
@@ -98,7 +100,7 @@ class Арсенал_7_1_НовыеКарты {
     @Test
     void безДвухМонетЗаменаНеПредлагается() {
         var b = CardBench.партия(4)
-            .арсеналУстановлен(0, "bs7_6")
+            .арсеналУстановлен(0, "bs72_6")
             .войско(0, null, UnitType.INFANTRY)
             .монеты(0, 1);
         assertFalse(b.доступныеСпец(0).stream().anyMatch(v -> v.startsWith(

@@ -112,7 +112,7 @@ class ArsenalSevenOneAbilitiesTest {
     void переформированиеСтоитДвеМонеты() {
         GameState s = стол(82L);
         PlayerState p = s.player(0);
-        p.arsenalInstalled.add("bs7_6");
+        p.arsenalInstalled.add("bs72_6");
         UnitToken пехота = s.tokenStats.makeUnit(UnitType.INFANTRY, 0, Placement.nextUid(s),
             p.unitsOfKind(UnitType.INFANTRY));
         p.units.add(пехота);
@@ -132,7 +132,7 @@ class ArsenalSevenOneAbilitiesTest {
             p.arsenalHand.clear();
             p.arsenalInstalled.clear();
             if (сКартой) {
-                p.arsenalInstalled.add("bs7_7");
+                p.arsenalInstalled.add("bs72_7");
             }
             p.containers = 1;
             List<Map<String, Object>> события = new ArrayList<>();

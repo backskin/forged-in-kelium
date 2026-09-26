@@ -98,6 +98,8 @@ public final class ArsenalPack implements CardRegistry.CardPack {
         // плюс a7_33 и bs7_5…7. Набор 7.0.0 новых номеров не знает и не видит.
         out.addAll(Арсенал7.карты71());
         out.addAll(Арсенал7.начальные71());
+        // 7.2.0 (26.09.2026): начальные со стартовыми наборами вместо утиля
+        out.addAll(Арсенал7.начальные72());
 
         return out;
     }

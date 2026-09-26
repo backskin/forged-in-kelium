@@ -1550,7 +1550,9 @@ public final class GameEngine {
             }
         }
         for (String cid : new ArrayList<>(p.arsenalHand)) {
-            opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
+            if (стартовыйНабор(s, cid) == null) {
+                opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
+            }
             if (!sameNameInstalled(p, cid)) {
                 opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
             }
@@ -1801,7 +1803,9 @@ public final class GameEngine {
                     "open container (" + p.containers + " left)"));
             }
             for (String cid : new ArrayList<>(p.arsenalHand)) {
-                opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
+                if (стартовыйНабор(s, cid) == null) {
+                    opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
+                }
                 if (!sameNameInstalled(p, cid)) {
                     opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
                 }
@@ -2185,6 +2189,39 @@ public final class GameEngine {
         p.arsenalInstalled.add(cid);
         applyHpPassive(p, cid, +1);           // B7: вшить бонус HP в жетоны
         emit(ev("type", "arsenal", "seat", p.seat, "card", cid, "mode", "install"));
+        выдатьСтартовыйНабор(p, cid);
+    }
+
+    /**
+     * СТАРТОВЫЙ НАБОР НАЧАЛЬНОГО АРСЕНАЛА (решение дизайнера 26.09.2026):
+     * «вместо эффектов утиля сверху указано, что игрок получает, — и он
+     * получает это сразу при установке, затем текст скрывается под
+     * планшетом». Верх такой карты помечен {@code kit: true}; сжечь её нельзя
+     * (разрыва на печати нет), только установить.
+     */
+    private void выдатьСтартовыйНабор(PlayerState p, String cid) {
+        Map<String, Object> top = стартовыйНабор(state, cid);
+        if (top == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> params = top.get("params") instanceof Map<?, ?> m
+            ? (Map<String, Object>) m : Map.of();
+        Map<String, Object> got = Effects.apply(String.valueOf(top.get("effect")), state,
+            p.seat, params);
+        emit(ev("type", "starter_kit", "seat", p.seat, "card", cid, "got", got));
+    }
+
+    /** Верх-набор карты арсенала или {@code null}, если это обычный утиль. */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> стартовыйНабор(GameState s, String cid) {
+        Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+        if (card == null || !(card.get("top") instanceof Map<?, ?> t)) {
+            return null;
+        }
+        Map<String, Object> top = (Map<String, Object>) t;
+        return top.get("params") instanceof Map<?, ?> пар
+            && Boolean.TRUE.equals(пар.get("kit")) ? top : null;
     }
 
     /**
