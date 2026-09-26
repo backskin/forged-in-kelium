@@ -1,0 +1,502 @@
+# CONTENT: blocks  version 6.0.0
+# СНЯТ С ПЕЧАТИ ДИЗАЙНЕРА: экспорт «Модули-поля-тесно-1…20.png» (26.09.2026).
+# Снял tools/снять-блоки-с-печати.py: кольца энергии и ящики контейнеров
+# найдены на картинках, их гекс и сторона записаны сюда. Геометрия картонок —
+# из набора 5.0.0 (физический картон не менялся).
+# Вручную не править: перерисовали модули — снять заново.
+meta:
+  id: 6.0.0
+  type: blocks
+  описание: снят с печати дизайнера «Модули-поля-тесно»
+  сгенерировано: tools/снять-блоки-с-печати.py
+blocks:
+- id: М1
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 2
+    - q: 1
+      r: 0
+      cell: -1
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 0
+      energy: 3
+    - q: 0
+      r: 1
+      cell: 3
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 6
+      energy: 5
+    B:
+    - q: 0
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 0
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 4
+    - q: 0
+      r: 1
+      cell: 2
+      energy: 5
+    - q: 1
+      r: 1
+      cell: 1
+      energy: -1
+- id: М2
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 4
+    - q: 1
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 5
+      energy: -1
+    - q: 0
+      r: 1
+      cell: -1
+      energy: 3
+    - q: 1
+      r: 1
+      cell: 4
+      energy: 1
+    B:
+    - q: 0
+      r: 0
+      cell: 0
+      energy: 5
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 1
+    - q: 2
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 0
+      r: 1
+      cell: -1
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 3
+      energy: 2
+- id: М3
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 4
+      energy: -1
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 3
+    - q: 2
+      r: 0
+      cell: 3
+      energy: -1
+    - q: 0
+      r: 1
+      cell: 6
+      energy: 4
+    - q: 1
+      r: 1
+      cell: -1
+      energy: 0
+    B:
+    - q: 0
+      r: 0
+      cell: 6
+      energy: 0
+    - q: 1
+      r: 0
+      cell: 1
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 4
+      energy: 2
+    - q: 0
+      r: 1
+      cell: -1
+      energy: -1
+    - q: 1
+      r: 1
+      cell: -1
+      energy: 1
+- id: М4
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 2
+    - q: 1
+      r: 0
+      cell: 6
+      energy: 5
+    - q: 2
+      r: 0
+      cell: 1
+      energy: -1
+    - q: 0
+      r: 1
+      cell: 5
+      energy: 1
+    - q: 1
+      r: 1
+      cell: -1
+      energy: -1
+    B:
+    - q: 0
+      r: 0
+      cell: 3
+      energy: 5
+    - q: 1
+      r: 0
+      cell: 2
+      energy: -1
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 1
+    - q: 0
+      r: 1
+      cell: -1
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 6
+      energy: 4
+- id: М5
+  kind: small
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 1
+    - q: 1
+      r: 0
+      cell: 0
+      energy: 2
+    - q: 2
+      r: 0
+      cell: 6
+      energy: 0
+    - q: 0
+      r: 1
+      cell: 5
+      energy: -1
+    - q: 1
+      r: 1
+      cell: -1
+      energy: -1
+    B:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 5
+      energy: 4
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 5
+    - q: 0
+      r: 1
+      cell: 6
+      energy: 2
+    - q: 1
+      r: 1
+      cell: 2
+      energy: -1
+- id: Б1
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 2
+      energy: -1
+    - q: 1
+      r: 0
+      cell: -1
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 6
+      energy: 3
+    - q: 0
+      r: 1
+      cell: -1
+      energy: 4
+    - q: 1
+      r: 1
+      cell: 3
+      energy: 5
+    - q: 1
+      r: -1
+      cell: 0
+      energy: 2
+    B:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 4
+      energy: 2
+    - q: 2
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 0
+      r: 1
+      cell: 1
+      energy: 4
+    - q: 1
+      r: 1
+      cell: 5
+      energy: 3
+    - q: 1
+      r: -1
+      cell: -1
+      energy: 1
+- id: Б2
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 4
+      energy: 0
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 5
+    - q: 2
+      r: 0
+      cell: 0
+      energy: -1
+    - q: 0
+      r: 1
+      cell: 6
+      energy: 3
+    - q: 1
+      r: 1
+      cell: -1
+      energy: 4
+    - q: 1
+      r: -1
+      cell: 5
+      energy: -1
+    B:
+    - q: 0
+      r: 0
+      cell: 5
+      energy: 2
+    - q: 1
+      r: 0
+      cell: 0
+      energy: 5
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 3
+    - q: 0
+      r: 1
+      cell: 2
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 6
+      energy: -1
+    - q: 1
+      r: -1
+      cell: -1
+      energy: 0
+- id: Б3
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 3
+      energy: 4
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 2
+    - q: 0
+      r: 1
+      cell: -1
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 4
+      energy: 0
+    - q: 1
+      r: -1
+      cell: 1
+      energy: -1
+    B:
+    - q: 0
+      r: 0
+      cell: 3
+      energy: -1
+    - q: 1
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 2
+      r: 0
+      cell: -1
+      energy: 4
+    - q: 0
+      r: 1
+      cell: 0
+      energy: 5
+    - q: 1
+      r: 1
+      cell: -1
+      energy: 1
+    - q: 1
+      r: -1
+      cell: 4
+      energy: -1
+- id: Б4
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: 6
+      energy: 1
+    - q: 1
+      r: 0
+      cell: -1
+      energy: 3
+    - q: 2
+      r: 0
+      cell: 1
+      energy: 0
+    - q: 0
+      r: 1
+      cell: 3
+      energy: -1
+    - q: 1
+      r: 1
+      cell: 2
+      energy: 4
+    - q: 1
+      r: -1
+      cell: -1
+      energy: -1
+    B:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 4
+    - q: 1
+      r: 0
+      cell: -1
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 2
+      energy: 5
+    - q: 0
+      r: 1
+      cell: 5
+      energy: 2
+    - q: 1
+      r: 1
+      cell: 1
+      energy: -1
+    - q: 1
+      r: -1
+      cell: 6
+      energy: 3
+- id: Б5
+  kind: big
+  faces:
+    A:
+    - q: 0
+      r: 0
+      cell: -1
+      energy: 5
+    - q: 1
+      r: 0
+      cell: 6
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 5
+      energy: -1
+    - q: 0
+      r: 1
+      cell: -1
+      energy: 0
+    - q: 1
+      r: 1
+      cell: 5
+      energy: 2
+    - q: 1
+      r: -1
+      cell: 3
+      energy: 4
+    B:
+    - q: 0
+      r: 0
+      cell: 1
+      energy: 3
+    - q: 1
+      r: 0
+      cell: 2
+      energy: -1
+    - q: 2
+      r: 0
+      cell: 4
+      energy: 1
+    - q: 0
+      r: 1
+      cell: -1
+      energy: 5
+    - q: 1
+      r: 1
+      cell: -1
+      energy: -1
+    - q: 1
+      r: -1
+      cell: 6
+      energy: 0
