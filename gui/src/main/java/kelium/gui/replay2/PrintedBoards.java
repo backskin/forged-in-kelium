@@ -541,6 +541,71 @@ final class PrintedBoards {
         }
     }
 
+    /** Перекрашенные иконки жетонов войск: «род:место» → картинка. */
+    private static final Map<String, BufferedImage> ЗНАЧКИ_ЗАПАСА =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * ИКОНКА ЖЕТОНА РОДА В ЦВЕТЕ ФРАКЦИИ. На печатной иконке ({@code unit_<род>})
+     * рамка и фигура — тёмный серо-синий; эти пиксели перекрашиваются в цвет
+     * места с сохранением светлоты (тени и блики остаются), белое не трогается.
+     */
+    static BufferedImage значокРода(String род, int seat) {
+        return ЗНАЧКИ_ЗАПАСА.computeIfAbsent(род + ":" + seat, key -> {
+            BufferedImage src = kelium.report.Textures.icon("unit_" + род);
+            if (src == null) {
+                return null;
+            }
+            Color цвет = Theme.seat(seat);
+            BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(),
+                BufferedImage.TYPE_INT_ARGB);
+            double свет0 = 0.299 * 75 + 0.587 * 83 + 0.114 * 104;   // печатный серо-синий
+            for (int yy = 0; yy < src.getHeight(); yy++) {
+                for (int xx = 0; xx < src.getWidth(); xx++) {
+                    int argb = src.getRGB(xx, yy);
+                    int a = argb >>> 24;
+                    int r = (argb >> 16) & 255, gg = (argb >> 8) & 255, b = argb & 255;
+                    float[] hsb = Color.RGBtoHSB(r, gg, b, null);
+                    if (a > 0 && hsb[1] < 0.45f && hsb[2] < 0.75f && b >= r) {
+                        double свет = 0.299 * r + 0.587 * gg + 0.114 * b;
+                        double м = свет / свет0;
+                        int nr = (int) Math.min(255, цвет.getRed() * м);
+                        int ng = (int) Math.min(255, цвет.getGreen() * м);
+                        int nb = (int) Math.min(255, цвет.getBlue() * м);
+                        argb = (a << 24) | (nr << 16) | (ng << 8) | nb;
+                    }
+                    out.setRGB(xx, yy, argb);
+                }
+            }
+            return out;
+        });
+    }
+
+    /** Значок рода и число жетонов в запасе — одна колонка запаса на столе. */
+    private static void значокЗапаса(Graphics2D g, String род, int seat, int x, int y,
+                                     int colW, int height, int вЗапасе) {
+        BufferedImage ic = значокРода(род, seat);
+        int s = Math.max(10, Math.min(height - 4, (int) (colW * 0.58)));
+        java.awt.Font шрифт = Theme.font(Math.max(10, (int) (s * 0.62)), Font.BOLD);
+        g.setFont(шрифт);
+        String число = String.valueOf(вЗапасе);
+        int tw = g.getFontMetrics().stringWidth(число);
+        int left = x + (colW - s - 3 - tw) / 2;
+        int top = y + (height - s) / 2;
+        java.awt.Composite было = g.getComposite();
+        if (вЗапасе == 0) {
+            g.setComposite(java.awt.AlphaComposite.getInstance(
+                java.awt.AlphaComposite.SRC_OVER, 0.35f));
+        }
+        if (ic != null) {
+            kelium.report.Mips.draw(g, ic, left, top, s, s);
+        }
+        g.setColor(вЗапасе == 0 ? Theme.ink3() : Theme.ink());
+        java.awt.FontMetrics fm = g.getFontMetrics();
+        g.drawString(число, left + s + 3, top + (s + fm.getAscent() - fm.getDescent()) / 2);
+        g.setComposite(было);
+    }
+
     private static void запасВойск(Graphics2D g, int x, int y, int width, int height,
                                    Map<String, int[]> запас, int seat) {
         запасВойск(g, x, y, width, height, запас, seat, -1);
@@ -565,9 +630,10 @@ final class PrintedBoards {
             int картинкаH = Math.max(8, height - строка * 2 - 2);
             BufferedImage tex = Textures.unit(роды[i], seat);
             if (!подписиЗапаса) {
-                // СТОЛ: лежат САМИ ОСТАВШИЕСЯ ЖЕТОНЫ, стопкой внахлёст, — и
-                // сколько их, видно по стопке, а не по цифре.
-                стопкаЖетонов(g, tex, cx, y, colW, картинкаH, вЗапасе, k);
+                // СТОЛ (решение дизайнера 27.09.2026): вместо стопки жетонов —
+                // печатная иконка жетона рода, перекрашенная в цвет фракции, и
+                // рядом число оставшихся жирным шрифтом стола.
+                значокЗапаса(g, роды[i], seat, x + i * colW, y, colW, height, вЗапасе);
                 continue;
             }
             java.awt.Composite было = g.getComposite();
