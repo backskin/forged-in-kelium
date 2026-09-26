@@ -558,6 +558,12 @@ public final class Replay2Gui {
             }
         }
         String key = d == null ? null : session.cursor() + ":" + d.seat + ":" + d.kind;
+        // убранная щелчком не всплывает, пока стоим на этом шаге; ушли и
+        // вернулись — показывается снова
+        if (ceremonyDismissed != null
+                && !ceremonyDismissed.startsWith(session.cursor() + ":")) {
+            ceremonyDismissed = null;
+        }
         if (d == null || key.equals(ceremonyDismissed)) {
             if (ceremony.isVisible()) {
                 ceremony.close();

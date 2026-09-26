@@ -88,6 +88,10 @@ public final class Redact {
     private static Map<String, Object> frame(Map<String, Object> src, int seat, long seed) {
         Map<String, Object> f = new LinkedHashMap<>(src);
         f.put("thoughts", List.of());
+        // РЕШЕНИЯ (что предлагали и что выбрали) клиенту не уходят: варианты —
+        // это рука игрока, и id карт в них раньше времени открыли бы колоду.
+        // Окну клиента они не нужны — их показывает разбор партии по журналу.
+        f.remove("decisions");
         String type = String.valueOf(f.get("type"));
         Integer who = f.get("seat") instanceof Number n ? n.intValue() : null;
         String log = f.get("log") == null ? "" : String.valueOf(f.get("log"));

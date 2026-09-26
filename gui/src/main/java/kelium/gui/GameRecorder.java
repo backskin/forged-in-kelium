@@ -644,6 +644,10 @@ public final class GameRecorder {
                 }
                 if (p instanceof String id && rec.cardNames.containsKey(id)) {
                     o.card = id;
+                    // вариант-карта словами — печатным именем, не служебным id
+                    if (o.text == null || o.text.contains(id)) {
+                        o.text = "«" + kelium.gui.replay2.Names.card(rec, id) + "»";
+                    }
                 }
                 if ("cu_facing".equals(kind)) {
                     // число в варианте — сторона гекса, а не номер жетона:
