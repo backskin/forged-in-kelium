@@ -60,6 +60,9 @@ public final class ChoiceWords {
             case "free_objective_burn" -> {
                 return "Сжечь «" + cardName.apply(String.valueOf(p)) + "» — верх даром";
             }
+            case "arsenal_replace" -> {
+                return "Снять «" + cardName.apply(String.valueOf(p)) + "»";
+            }
             case "spec_arsenal_use" -> {
                 return "СПЕЦ: «" + cardName.apply(String.valueOf(p)) + "»";
             }

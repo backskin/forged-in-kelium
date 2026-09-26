@@ -1803,6 +1803,8 @@ public final class HotSeatWindow {
                     .replaceFirst("^СПЕЦ:\\s*", "");
             case "reveal_order" -> "Вскрыт приказ «" + cardNameSafe(String.valueOf(p)) + "»";
             case "blind_discard" -> "Отложен приказ «" + cardNameSafe(String.valueOf(p)) + "»";
+            case "arsenal_replace" -> p == null ? "Карту арсенала не устанавливать"
+                : "Снять с планшета «" + cardNameSafe(String.valueOf(p)) + "»";
             // полное название здания («Авиабаза», а не «Авб»); снос и перенос —
             // словами из ChoiceWords, а не строкой движка
             case "build_pick" -> p instanceof Map<?, ?> m && m.get("btype") != null
