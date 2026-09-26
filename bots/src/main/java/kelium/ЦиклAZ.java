@@ -83,8 +83,12 @@ public final class ЦиклAZ {
         }, true, StandardCharsets.UTF_8);
         int поколений = args.length > 0 ? Integer.parseInt(args[0]) : 1000;
         int партий = args.length > 1 ? Integer.parseInt(args[1]) : 200;
-        int симуляций = args.length > 2 ? Integer.parseInt(args[2]) : 64;
-        ДОЛЯ = args.length > 3 ? Double.parseDouble(args[3]) : 0.5;
+        int симуляций = args.length > 2 ? Integer.parseInt(args[2]) : 128;
+        // Позицию в поиске судит сеть оценки, без случайного доигрывания: замер
+        // 26.09 — доигрывание длинной партии даёт шум, поиск раздаёт посещения
+        // почти поровну, и сети ходов учиться не на чем.
+        ДОЛЯ = args.length > 3 ? Double.parseDouble(args[3]) : 0;
+        int партийПодражания = args.length > 4 ? Integer.parseInt(args[4]) : 4000;
         out.println("============================================================");
         out.println(" ОБУЧЕНИЕ БОТОВ — AlphaZero, самоигра поколениями");
         out.printf(" партий в поколении %d, проб на решение %d, ядер %d%n", партий, симуляций,
@@ -93,12 +97,20 @@ public final class ЦиклAZ {
         out.println(" отчёт по поколениям — data\\selfplay\\az\\отчёт.md");
         out.println("============================================================");
         Files.createDirectories(ПАПКА);
+        // СТАРТ ОТ ПРЕЖНИХ БОТОВ (решение дизайнера 26.09): поколение 0 — сети,
+        // выученные подражанием прежним ботам. Дальше учит только самоигра.
+        if (!Files.exists(ПАПКА.resolve("value_0.bin"))
+                && !Files.exists(ПАПКА.resolve("value_1.bin"))) {
+            ПодражаниеAZ.обучить(ПАПКА, партийПодражания, out);
+        }
         int старт = 1;
         while (Files.exists(ПАПКА.resolve("value_" + старт + ".bin"))) {
             старт++;
         }
-        Сеть оценка = старт > 1 ? Сеть.загрузить(ПАПКА.resolve("value_" + (старт - 1) + ".bin")) : null;
-        Сеть ходы = старт > 1 ? Сеть.загрузить(ПАПКА.resolve("policy_" + (старт - 1) + ".bin")) : null;
+        Сеть оценка = Files.exists(ПАПКА.resolve("value_" + (старт - 1) + ".bin"))
+            ? Сеть.загрузить(ПАПКА.resolve("value_" + (старт - 1) + ".bin")) : null;
+        Сеть ходы = Files.exists(ПАПКА.resolve("policy_" + (старт - 1) + ".bin"))
+            ? Сеть.загрузить(ПАПКА.resolve("policy_" + (старт - 1) + ".bin")) : null;
         Path отчёт = ПАПКА.resolve("отчёт.md");
         if (!Files.exists(отчёт)) {
             Files.writeString(отчёт, "# Цикл AlphaZero — отчёт по поколениям\n\n"
@@ -116,7 +128,7 @@ public final class ЦиклAZ {
             out.printf("%n=== ПОКОЛЕНИЕ %d: самоигра %d партий, %d симуляций на решение ===%n",
                 пок, партий, симуляций);
             List<Сеть[]> прошлые = new ArrayList<>();
-            for (int g = Math.max(1, пок - 5); g < пок; g++) {
+            for (int g = Math.max(0, пок - 5); g < пок; g++) {
                 Path v = ПАПКА.resolve("value_" + g + ".bin");
                 Path h = ПАПКА.resolve("policy_" + g + ".bin");
                 if (Files.exists(v) && Files.exists(h)) {
