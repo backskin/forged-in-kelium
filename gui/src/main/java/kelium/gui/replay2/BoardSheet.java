@@ -348,6 +348,21 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                                     Map<String, Rectangle> hits,
                                     Map<Rectangle, Object[]> modules,
                                     Map<Rectangle, String> stores) {
+        return paintBoardZoom(g, view, which, hits, modules, stores, null, null);
+    }
+
+    /**
+     * То же, и вдобавок НАСТОЯЩИЕ ФОРМЫ деталей — для подсветки по форме
+     * (жалоба дизайнера 27.09.2026: наведённый жетон крыла обводился огромным
+     * прямоугольником, накрывавшим соседей): {@code outlines} — контур детали,
+     * {@code silhouettes} — картинка жетона с его матрицей.
+     */
+    public Rectangle paintBoardZoom(Graphics2D g, Rectangle view, String which,
+                                    Map<String, Rectangle> hits,
+                                    Map<Rectangle, Object[]> modules,
+                                    Map<Rectangle, String> stores,
+                                    Map<String, java.awt.Shape> outlines,
+                                    Map<String, TokenSilhouettes.Entry> silhouettes) {
         ReplayRecord.Frame f = session.frame();
         if (f == null || f.snapshot == null || seat >= f.snapshot.players.size()
             || !PrintedBoards.available(seat)) {
@@ -387,7 +402,13 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         java.awt.Shape clip = g.getClip();
         g.clip(board);
         PrintedBoards.hits = всеЗоны;
-        PrintedBoards.outlines = new LinkedHashMap<>();
+        Map<String, java.awt.Shape> всеКонтуры = new LinkedHashMap<>();
+        Map<String, TokenSilhouettes.Entry> всеСилуэты = new LinkedHashMap<>();
+        PrintedBoards.outlines = всеКонтуры;
+        boolean былаЗапись = TokenSilhouettes.recording;
+        var былоКуда = TokenSilhouettes.into;
+        TokenSilhouettes.into = всеСилуэты;
+        TokenSilhouettes.recording = true;
         try {
             if ("storage".equals(which)) {
                 // хранилище — одно, без угла планшета войск, лежащего поверх
@@ -402,12 +423,20 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         } finally {
             PrintedBoards.hits = null;
             PrintedBoards.outlines = null;
+            TokenSilhouettes.recording = былаЗапись;
+            TokenSilhouettes.into = былоКуда;
             g.setClip(clip);
         }
         // в подсказки — только то, что попало на показанный планшет
         всеЗоны.forEach((key, r) -> {
             if (board.intersects(r)) {
                 hits.put(key, r);
+                if (outlines != null && всеКонтуры.containsKey(key)) {
+                    outlines.put(key, всеКонтуры.get(key));
+                }
+                if (silhouettes != null && всеСилуэты.containsKey(key)) {
+                    silhouettes.put(key, всеСилуэты.get(key));
+                }
             }
         });
         всеМодули.forEach((r, v) -> {
@@ -568,6 +597,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         PrintedBoards.hits = hits;
         PrintedBoards.outlines = outlines;
         TokenSilhouettes.LAST.clear();
+        TokenSilhouettes.into = TokenSilhouettes.LAST;
         TokenSilhouettes.recording = true;
         // На столе запас войск лежит САМИМИ ЖЕТОНАМИ стопкой, без подписей:
         // сколько осталось, столько и видно (подписи — прибору разбора).
@@ -940,6 +970,41 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 types.add(str.charAt(i));
             }
         }
+        // ЯЧЕЙКИ ВНЕ ПЕЧАТИ ПЛАНШЕТА (жалоба дизайнера 27.09.2026: «келемия 2/3,
+        // а на хранилище один кубик»). Склад движка считает ещё жетон хранилища
+        // стороной «+1 ячейка» и карты со способностью «+1 ячейка склада»;
+        // окно раскладывало кубики только по печатным ячейкам, и кубик в такой
+        // ячейке не рисовался нигде. Теперь у каждой такой ячейки своё место:
+        // на самом жетоне хранилища и на самой карте.
+        int printed = holders.size();
+        for (int i = 0; i < p.storageTokens.size(); i++) {
+            if ("+1_universal_cell".equals(p.storageTokens.get(i))) {
+                char[] arr = new char[1];
+                cellFill.put("store-" + i, arr);
+                holders.add(arr);
+                idx.add(new int[]{0});
+                types.add('U');
+            }
+        }
+        Map<String, Integer> наКартах = new LinkedHashMap<>(p.cellCards);
+        int сверх = p.storeCap - holders.size()
+            - наКартах.values().stream().mapToInt(Integer::intValue).sum();
+        // запись без раскладки по картам (сетевой стол, старые записи): лишние
+        // ячейки — по одной на установленные карты, как у «+1 ячейка склада»
+        for (int i = 0; сверх > 0 && i < p.arsenalInstalled.size(); i++) {
+            наКартах.merge(p.arsenalInstalled.get(i), 1, Integer::sum);
+            сверх--;
+        }
+        for (Map.Entry<String, Integer> e : наКартах.entrySet()) {
+            char[] arr = new char[Math.max(0, e.getValue())];
+            cellFill.put("card-" + e.getKey(), arr);
+            for (int i = 0; i < arr.length; i++) {
+                holders.add(arr);
+                idx.add(new int[]{i});
+                types.add('U');
+            }
+        }
+        extraCells = holders.size() - printed;
         int k = Math.max(0, p.kelium);
         int a = Math.max(0, p.ammo);
         for (int i = 0; i < types.size() && k > 0; i++) {
@@ -978,6 +1043,39 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             holders.get(i)[idx.get(i)[0]] = 'D';
             d--;
         }
+        PrintedBoards.кубикиВнеПечати = cellFill;
+    }
+
+    /** Сколько ячеек склада лежит вне печати планшета (жетоны, карты) — для проверок. */
+    private int extraCells;
+
+    /**
+     * Сколько кубиков (келемий, боеприпас, трофей) НАРИСОВАНО с прошлого вызова —
+     * для проверок, что каждый кубик склада виден на планшете.
+     */
+    public static int[] takeDrawnCubesForTest() {
+        int[] out = PrintedBoards.НАРИСОВАНО.clone();
+        java.util.Arrays.fill(PrintedBoards.НАРИСОВАНО, 0);
+        return out;
+    }
+
+    /** Сколько кубиков каждого вида разложено по ячейкам — для проверок. */
+    public int[] cubesForTest() {
+        int[] out = new int[3];
+        java.util.List<char[]> all = new ArrayList<>(cellFill.values());
+        all.add(startFill);
+        for (char[] arr : all) {
+            for (char c : arr) {
+                if (c == 'K') {
+                    out[0]++;
+                } else if (c == 'A') {
+                    out[1]++;
+                } else if (c == 'D') {
+                    out[2]++;
+                }
+            }
+        }
+        return out;
     }
 
     /** Значок ресурса, лежащего в ячейке склада: код для {@link MarkIcons}. */

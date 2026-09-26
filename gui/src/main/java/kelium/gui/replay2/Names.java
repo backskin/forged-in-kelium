@@ -23,6 +23,38 @@ public final class Names {
     }
 
     /**
+     * ЗАГОЛОВОК ПОДСКАЗКИ ГЕКСА — словами, без служебного имени вида
+     * {@code h-2_3} (жалоба дизайнера 27.09.2026: «Гекс h-2_3» на экране).
+     * Гекс называется тем, что на нём лежит.
+     */
+    public static String hexTitle(String kind, ReplayRecord.HexState st) {
+        if ("FORBIDDEN".equals(kind)) {
+            return "Запретный гекс";
+        }
+        if (st != null && st.spawn != null) {
+            return st.spawn.start ? "Стартовый тайл зарождения" : "Тайл зарождения";
+        }
+        if (st != null && st.containerCell >= 0) {
+            return "Гекс с печатным контейнером";
+        }
+        if (st != null && !st.neutrals.isEmpty()) {
+            return "Гекс с нейтральной постройкой";
+        }
+        return "Гекс поля";
+    }
+
+    /** Строка о печатном контейнере гекса: где он напечатан, без номера ячейки. */
+    public static String hexContainer(int cell) {
+        return cell == 6 ? "печатный контейнер — в воздушной ячейке (только для авиации)"
+            : "печатный контейнер — на одном из секторов гекса";
+    }
+
+    /** Строка о жёлтой ячейке энергостанции, без номера ячейки. */
+    public static String hexEnergyCell() {
+        return "жёлтая ячейка — только на ней энергостанция даёт номинал";
+    }
+
+    /**
      * Победные очки: откуда пришли.
      *
      * <p>НАЙДЕНО 18.08.2026: словарь и {@link kelium.engine.Scoring} разошлись —

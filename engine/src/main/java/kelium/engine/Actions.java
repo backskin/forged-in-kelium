@@ -500,14 +500,28 @@ public final class Actions {
                     : поВыработке
                         ? (PrintedContainers.visibleContainer(s, s.field.get(b.hexId)) ? b.hexId : null)
                         : PrintedContainers.minableContainerHex(s, b);
+                // КОНТЕЙНЕР ПОЛОЖИТЬ НЕКУДА — ВАРИАНТА НЕТ (жалоба дизайнера
+                // 27.09.2026: «взять контейнер» был в списке, но не срабатывал).
+                // Ячейки под планшетом заняты — выдача обрезалась до нуля, и
+                // выбор «контейнер вместо келемия» ничего не давал.
+                if (contHex != null && Storage.containerCapacity(s, player) <= player.containers) {
+                    contHex = null;
+                }
                 if (contHex != null) {
                     opts.add(new Choice("mine", "container", "take container @" + contHex));
                 }
                 if (opts.isEmpty()) {
                     continue;   // ни келемия рядом, ни открытого контейнера
                 }
-                opts.add(new Choice("pass", null, "пропустить добытчик"));
-                Choice pick = agent.choose(s, opts, Map.of("kind", "mine"));
+                // СРАБАТЫВАНИЕ ПРИ ПОСТРОЙКЕ — БЕЗ ПРОПУСКА (решение дизайнера
+                // 27.09.2026): поставленный добытчик берёт одно из того, что даёт;
+                // вариант один — берётся без вопроса.
+                boolean приПостройке = ctx.толькоЗдание >= 0;
+                if (!приПостройке) {
+                    opts.add(new Choice("pass", null, "пропустить добытчик"));
+                }
+                Choice pick = приПостройке && opts.size() == 1 ? opts.get(0)
+                    : agent.choose(s, opts, Map.of("kind", "mine"));
                 if (pick.payload() == null) {
                     continue;   // добытчик пропущен
                 }
@@ -693,9 +707,19 @@ public final class Actions {
                             "fits", встанут),
                         b.type.code + "->" + unitType.code + " И ammo"));
                 }
-                opts.add(new Choice("pass", null, "skip " + b.type.code));
-                Choice pick = agent.choose(state, opts,
-                    Map.of("kind", "assemble", "building_type", b.type.code));
+                // СРАБАТЫВАНИЕ ПРИ ПОСТРОЙКЕ — БЕЗ ПРОПУСКА (решение дизайнера
+                // 27.09.2026): новое здание выдаёт одно из того, что умеет;
+                // вариант один — выдаётся без вопроса.
+                boolean приПостройке = ctx.толькоЗдание >= 0;
+                if (приПостройке && opts.isEmpty()) {
+                    continue;   // выдать нечего (выпуск войск ноль, боеприпасы нельзя)
+                }
+                if (!приПостройке) {
+                    opts.add(new Choice("pass", null, "skip " + b.type.code));
+                }
+                Choice pick = приПостройке && opts.size() == 1 ? opts.get(0)
+                    : agent.choose(state, opts,
+                        Map.of("kind", "assemble", "building_type", b.type.code));
                 if (pick.payload() == null) {
                     continue;   // здание пропущено
                 }

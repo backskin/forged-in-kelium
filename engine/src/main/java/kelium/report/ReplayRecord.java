@@ -343,6 +343,12 @@ public final class ReplayRecord {
         public int keliumCap;
         public int ammoCap;
         public int storeCap;
+        /**
+         * ЯЧЕЙКИ СКЛАДА НА КАРТАХ: установленная карта → сколько ячеек она даёт
+         * (способности «+1 ячейка»). Окну — чтобы кубик в такой ячейке был
+         * виден на самой карте, а не пропадал (жалоба 27.09.2026).
+         */
+        public final Map<String, Integer> cellCards = new LinkedHashMap<>();
         public final Map<String, Integer> tech = new LinkedHashMap<>();
         /**
          * КУБИКИ НАУКИ, ОСТАВШИЕСЯ В ЛИЧНОМ ЗАПАСЕ. В сводах, где кубик занимает
@@ -862,6 +868,19 @@ public final class ReplayRecord {
         v.keliumCap = Storage.keliumMax(s, p);
         v.ammoCap = Storage.ammoMax(s, p);
         v.storeCap = Storage.totalMax(s, p);
+        for (String cid : p.allInstalledArsenal()) {
+            int n = kelium.engine.ability.Abilities.storageCellsOnCard(s, p.seat, "arsenal", cid);
+            if (n > 0) {
+                v.cellCards.put(cid, n);
+            }
+        }
+        for (String cid : p.superArsenalCards) {
+            int n = kelium.engine.ability.Abilities.storageCellsOnCard(s, p.seat,
+                "super_arsenal", cid);
+            if (n > 0) {
+                v.cellCards.put(cid, n);
+            }
+        }
         v.tech.putAll(new TreeMap<>(p.techSteps));
         v.techCubes = p.techCubesLeft;
         v.redModules = p.redModules;
@@ -1326,6 +1345,9 @@ public final class ReplayRecord {
         o.put("keliumCap", p.keliumCap);
         o.put("ammoCap", p.ammoCap);
         o.put("storeCap", p.storeCap);
+        if (!p.cellCards.isEmpty()) {
+            o.put("cellCards", p.cellCards);
+        }
         o.put("tech", p.tech);
         o.put("techCubes", p.techCubes);
         o.put("red", p.redModules);
@@ -1643,6 +1665,14 @@ public final class ReplayRecord {
         p.ammo = Json.i(o, "ammo");
         p.trophy = Json.i(o, "trophy");
         p.trophyCap = Json.i(o, "trophyCap");
+        Map<String, Object> cellCards = Json.map(o, "cellCards");
+        if (cellCards != null) {
+            for (Map.Entry<String, Object> e : cellCards.entrySet()) {
+                if (e.getValue() instanceof Number n) {
+                    p.cellCards.put(e.getKey(), n.intValue());
+                }
+            }
+        }
         Map<String, Object> cells = Json.map(o, "storageCells");
         if (cells != null) {
             for (Map.Entry<String, Object> e : cells.entrySet()) {

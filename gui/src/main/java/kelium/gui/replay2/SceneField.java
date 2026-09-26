@@ -1038,7 +1038,21 @@ public final class SceneField extends JComponent {
         if (f == null || f.snapshot == null) {
             return null;
         }
-        StringBuilder sb = new StringBuilder("<html><b>Гекс ").append(id).append("</b>");
+        // ЗАГОЛОВОК СЛОВАМИ (27.09.2026): служебное имя гекса игроку не показывается
+        ReplayRecord.HexState own = null;
+        for (ReplayRecord.HexState st : f.snapshot.hexes) {
+            if (st.id.equals(id)) {
+                own = st;
+            }
+        }
+        String kind = null;
+        for (ReplayRecord.HexInfo hi : session.record().hexes) {
+            if (hi.id.equals(id)) {
+                kind = hi.kind;
+            }
+        }
+        StringBuilder sb = new StringBuilder("<html><b>").append(Names.hexTitle(kind, own))
+            .append("</b>");
         for (ReplayRecord.HexState st : f.snapshot.hexes) {
             if (!st.id.equals(id)) {
                 continue;
@@ -1049,12 +1063,10 @@ public final class SceneField extends JComponent {
                   .append(st.spawn.stack > 1 ? ", двойной" : "");
             }
             if (st.containerCell >= 0) {
-                sb.append("<br>печатный контейнер: ").append(st.containerCell == 6
-                    ? "воздушная ячейка" : "ячейка " + st.containerCell);
+                sb.append("<br>").append(Names.hexContainer(st.containerCell));
             }
             if (st.energyCell >= 0) {
-                sb.append("<br>жёлтая ячейка: ").append(st.energyCell)
-                  .append(" (только на ней энергостанция даёт номинал)");
+                sb.append("<br>").append(Names.hexEnergyCell());
             }
             for (ReplayRecord.Neutral nt : st.neutrals) {
                 sb.append("<br>нейтральная постройка (")

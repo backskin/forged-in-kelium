@@ -1650,7 +1650,15 @@ public final class FieldView extends JComponent {
 
     private String hexTip(ReplayRecord.HexInfo hi) {
         ReplayRecord.Snapshot s = frame.snapshot;
-        StringBuilder sb = new StringBuilder("<html><b>Гекс " + hi.id + "</b>");
+        // ЗАГОЛОВОК СЛОВАМИ (27.09.2026): служебное имя гекса «h-2_3» игроку не показывается
+        ReplayRecord.HexState own = null;
+        for (ReplayRecord.HexState st : s.hexes) {
+            if (st.id.equals(hi.id)) {
+                own = st;
+            }
+        }
+        StringBuilder sb = new StringBuilder("<html><b>"
+            + kelium.gui.replay2.Names.hexTitle(hi.kind, own) + "</b>");
         if ("FORBIDDEN".equals(hi.kind)) {
             sb.append("<br>запретный — сюда нельзя");
         }
@@ -1666,12 +1674,10 @@ public final class FieldView extends JComponent {
                   .append(st.spawn.flipped ? ", перевёрнут" : "");
             }
             if (st.containerCell >= 0) {
-                sb.append("<br>печатный контейнер: ")
-                  .append(st.containerCell == 6 ? "воздушная ячейка" : "ячейка " + st.containerCell);
+                sb.append("<br>").append(kelium.gui.replay2.Names.hexContainer(st.containerCell));
             }
             if (st.energyCell >= 0) {
-                sb.append("<br>жёлтая ячейка: ").append(st.energyCell)
-                  .append(" (только на ней энергостанция даёт номинал)");
+                sb.append("<br>").append(kelium.gui.replay2.Names.hexEnergyCell());
             }
             for (ReplayRecord.Neutral n : st.neutrals) {
                 sb.append("<br>нейтральная постройка (")

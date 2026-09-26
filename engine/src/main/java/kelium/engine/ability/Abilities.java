@@ -184,6 +184,24 @@ public final class Abilities {
         }
     }
 
+    /**
+     * СКОЛЬКО ЯЧЕЕК СКЛАДА ДАЁТ ОДНА КАРТА (жалоба дизайнера 27.09.2026:
+     * «келемия 2/3, а на хранилище один кубик»). Склад движка считает ячейки
+     * со способностей карт, а окну, чтобы положить кубик туда, где он лежит,
+     * нужно знать, на КАКОЙ карте эти ячейки.
+     */
+    public static int storageCellsOnCard(GameState state, int seat, String set, String cid) {
+        List<Ability> one = new ArrayList<>();
+        addFromCard(state, set, cid, one);
+        RuleQuery q = RuleQuery.of(state, seat, Hook.STORAGE_CELLS).base(0);
+        for (Ability a : one) {
+            if (a.trigger() == Ability.Trigger.PASSIVE && a.hooks().contains(Hook.STORAGE_CELLS)) {
+                a.modify(q);
+            }
+        }
+        return (int) Math.round(q.value());
+    }
+
     // ==================== новые варианты в меню решений ====================
 
     /**

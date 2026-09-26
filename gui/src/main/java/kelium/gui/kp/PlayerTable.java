@@ -438,7 +438,15 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         long bestArea = Long.MAX_VALUE;
         for (Map.Entry<String, Rectangle> e : spots.entrySet()) {
             Rectangle r = e.getValue();
-            if (r.contains(p)) {
+            // ПОПАДАНИЕ ПО ФОРМЕ ДЕТАЛИ (27.09.2026): у повёрнутого жетона крыла
+            // охват прямоугольником накрывает соседей — наведение на соседний
+            // жетон подсвечивало этот
+            Shape form = outlines.get(e.getKey());
+            var sil = kelium.gui.replay2.TokenSilhouettes.LAST.get(e.getKey());
+            boolean inside = sil != null
+                ? kelium.gui.replay2.TokenSilhouettes.contains(sil, p.x, p.y)
+                : form == null || form.contains(p);
+            if (r.contains(p) && inside) {
                 long a = (long) r.width * r.height;
                 if (choices.containsKey(e.getKey())) {
                     a /= 4;
@@ -649,9 +657,9 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             }
             Shape outline = outlines.get(key);
             Shape glow = outline != null ? outline
-                : new RoundRectangle2D.Double(r.x - 2, r.y - 2, r.width + 4, r.height + 4,
-                    Theme.px(8), Theme.px(8));
-            softGlow(g, glow, seatColor, hot);
+                : new RoundRectangle2D.Double(r.x, r.y, r.width, r.height,
+                    Math.min(r.width, r.height) * 0.16, Math.min(r.width, r.height) * 0.16);
+            kelium.gui.replay2.TokenSilhouettes.glowShape(g, glow, seatColor, hot);
         }
 
         bubbles.paint(g, w, h, key -> {
@@ -659,28 +667,6 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             return r == null ? null : new Point2D.Double(r.getCenterX(), r.getCenterY());
         }, Theme.px(30));
         g.dispose();
-    }
-
-    /**
-     * МЯГКОЕ СВЕЧЕНИЕ ВОКРУГ ФОРМЫ — для деталей без картинки (ячейки модулей,
-     * хранилище): несколько расширяющихся обводок всё прозрачнее, по краю —
-     * контур. Никаких сплошных заливок поверх печати.
-     */
-    private static void softGlow(Graphics2D g, Shape shape, Color c, boolean hot) {
-        int passes = 6;
-        float reach = Theme.pxf(hot ? 14 : 10);
-        for (int i = passes; i >= 1; i--) {
-            float wdt = reach * i / passes * 2;
-            g.setColor(Theme.alpha(c, (hot ? 0.16 : 0.11) * (1.0 - (i - 1) / (double) passes)));
-            g.setStroke(new BasicStroke(wdt, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.draw(shape);
-        }
-        g.setColor(Theme.alpha(c, hot ? 0.18 : 0.08));
-        g.fill(shape);
-        g.setColor(c);
-        g.setStroke(new BasicStroke(Theme.pxf(hot ? 3 : 2.2), BasicStroke.CAP_ROUND,
-            BasicStroke.JOIN_ROUND));
-        g.draw(shape);
     }
 
     // ---------- раскладка ряда ----------
@@ -968,18 +954,23 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         }
         boolean chosen = hand.stream().anyMatch(id -> choices.containsKey("card:" + id));
         boolean hot = "arsenal".equals(hoverGroup);
+        java.awt.geom.Area стопка = new java.awt.geom.Area();
+        for (int i = 0; i < n; i++) {
+            int x = x0 + i * spread;
+            int y = y0 - (hot ? Theme.px(10) : 0) + (i % 2) * Theme.px(2);
+            стопка.add(new java.awt.geom.Area(
+                new RoundRectangle2D.Double(x, y, cw, ch, cw * 0.08, cw * 0.08)));
+        }
+        if (chosen) {
+            // свечение ПО ФОРМЕ стопки карт — позади неё, а не рамкой вокруг
+            kelium.gui.replay2.TokenSilhouettes.glowShape(g, стопка, seatColor, hot);
+        }
         for (int i = 0; i < n; i++) {
             int x = x0 + i * spread;
             int y = y0 - (hot ? Theme.px(10) : 0) + (i % 2) * Theme.px(2);
             // рубашка СВОЕЙ колоды: начальный, обычный, супер-арсенал
             BufferedImage own = backOf.apply("arsenal:" + hand.get(hand.size() - n + i));
             paintBack(g, own != null ? own : back, x, y, cw, ch, Theme.container());
-        }
-        if (chosen) {
-            g.setColor(seatColor);
-            g.setStroke(new BasicStroke(Theme.pxf(2.6)));
-            g.draw(new RoundRectangle2D.Double(x0 - 3, y0 - 3 - (hot ? Theme.px(10) : 0),
-                total + 6, ch + 6, cw * 0.1, cw * 0.1));
         }
         badge(g, x0 + total + Theme.px(4), bottom - Theme.px(18),
             "арсенал · " + hand.size(), chosen ? seatColor : Theme.container());
@@ -1554,6 +1545,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
                 fanCards.add(new Object[]{id, card});
             }
             spots.put("card:" + id, card.getBounds());
+            outlines.put("card:" + id, card);
         }
     }
 

@@ -32,11 +32,72 @@ public final class TokenSilhouettes {
 
     /** Пишется ли сейчас (только во время рисования стола живой партии). */
     static boolean recording;
+    /**
+     * Куда пишутся силуэты, пока {@link #recording}: стол живой партии — в
+     * {@link #LAST}, увеличенный планшет — в свою карту (иначе он затирал бы
+     * силуэты стола под собой).
+     */
+    static Map<String, Entry> into = LAST;
 
     static void put(String key, BufferedImage img, AffineTransform at) {
         if (recording && img != null && at != null) {
-            LAST.put(key, new Entry(img, new AffineTransform(at)));
+            into.put(key, new Entry(img, new AffineTransform(at)));
         }
+    }
+
+    /**
+     * ПОПАЛА ЛИ ТОЧКА ЭКРАНА НА САМ ЖЕТОН — по непрозрачным пикселям его
+     * картинки, а не по охвату: повёрнутый жетон крыла охватом накрывает
+     * соседние жетоны (жалоба дизайнера 27.09.2026).
+     */
+    public static boolean contains(Entry e, double x, double y) {
+        try {
+            java.awt.geom.Point2D p = e.at().inverseTransform(
+                new java.awt.geom.Point2D.Double(x, y), null);
+            int px = (int) Math.floor(p.getX());
+            int py = (int) Math.floor(p.getY());
+            if (px < 0 || py < 0 || px >= e.img().getWidth() || py >= e.img().getHeight()) {
+                return false;
+            }
+            return (e.img().getRGB(px, py) >>> 24) > 40;
+        } catch (java.awt.geom.NoninvertibleTransformException ex) {
+            return false;
+        }
+    }
+
+    /**
+     * МЯГКОЕ СВЕЧЕНИЕ ВОКРУГ ФОРМЫ — для деталей без картинки-силуэта (ячейки,
+     * карты, гексы): несколько расширяющихся обводок всё прозрачнее, по краю —
+     * контур той же формы. Размер — ровно по детали, без прямоугольных рамок.
+     *
+     * @param strong наведён курсор — свечение ярче и шире
+     */
+    public static void glowShape(Graphics2D g0, java.awt.Shape shape, Color c, boolean strong) {
+        Graphics2D g = (Graphics2D) g0.create();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+            java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        int passes = 6;
+        float reach = Theme.pxf(strong ? 12 : 8);
+        for (int i = passes; i >= 1; i--) {
+            float wdt = reach * i / passes * 2;
+            g.setColor(Theme.alpha(c, (strong ? 0.16 : 0.11) * (1.0 - (i - 1) / (double) passes)));
+            g.setStroke(new java.awt.BasicStroke(wdt, java.awt.BasicStroke.CAP_ROUND,
+                java.awt.BasicStroke.JOIN_ROUND));
+            g.draw(shape);
+        }
+        g.setColor(Theme.alpha(c, strong ? 0.16 : 0.07));
+        g.fill(shape);
+        // контур в два цвета: снаружи краска места, по самой кромке — светлая
+        // линия, чтобы рамка не сливалась с деталью той же краски
+        g.setColor(c);
+        g.setStroke(new java.awt.BasicStroke(Theme.pxf(strong ? 5 : 3.6),
+            java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
+        g.draw(shape);
+        g.setColor(Theme.alpha(Color.WHITE, 0.9));
+        g.setStroke(new java.awt.BasicStroke(Theme.pxf(strong ? 1.8 : 1.3),
+            java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
+        g.draw(shape);
+        g.dispose();
     }
 
     private static final Map<BufferedImage, Map<Integer, BufferedImage>> TINTS =
@@ -64,6 +125,16 @@ public final class TokenSilhouettes {
      *
      * @param strong наведён курсор — свечение ярче и шире
      */
+    /** Силуэт, сдвинутый во все стороны на {@code t} (пикселей картинки), — рамка по форме. */
+    private static void ring(Graphics2D g, BufferedImage s, AffineTransform base, double t) {
+        for (int i = 0; i < 16; i++) {
+            double ang = Math.PI * 2 * i / 16;
+            AffineTransform at = new AffineTransform(base);
+            at.translate(Math.cos(ang) * t, Math.sin(ang) * t);
+            g.drawImage(s, at, null);
+        }
+    }
+
     public static void glow(Graphics2D g0, Entry e, Color c, boolean strong) {
         Graphics2D g = (Graphics2D) g0.create();
         BufferedImage s = tint(e.img(), c);
@@ -73,7 +144,7 @@ public final class TokenSilhouettes {
         // свечение: несколько увеличенных копий силуэта от середины, всё
         // прозрачнее — градиент в прозрачность без размытия пикселей
         int passes = 7;
-        double reach = (strong ? 16 : 11) / Math.max(0.0001, scr);   // в пикселях картинки
+        double reach = (strong ? 22 : 14) / Math.max(0.0001, scr);   // в пикселях картинки
         for (int i = passes; i >= 1; i--) {
             double grow = reach * i / passes;
             double kx = (w + 2 * grow) / w;
@@ -82,19 +153,16 @@ public final class TokenSilhouettes {
             at.translate(w / 2, h / 2);
             at.scale(kx, ky);
             at.translate(-w / 2, -h / 2);
-            float a = (float) ((strong ? 0.20 : 0.14) * (1.0 - (i - 1) / (double) passes));
+            float a = (float) ((strong ? 0.30 : 0.20) * (1.0 - (i - 1) / (double) passes));
             g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a));
             g.drawImage(s, at, null);
         }
-        // контур по форме: силуэт, сдвинутый во все стороны на толщину рамки
-        double t = (strong ? 3.2 : 2.4) / Math.max(0.0001, scr);
+        // КОНТУР ПО ФОРМЕ В ДВА ЦВЕТА (27.09.2026): снаружи краска места,
+        // вплотную к жетону — светлая кромка. Одной краской места рамка
+        // сливалась с жетонами той же фракции, и наведение было не видно.
         g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-        for (int i = 0; i < 12; i++) {
-            double ang = Math.PI * 2 * i / 12;
-            AffineTransform at = new AffineTransform(e.at());
-            at.translate(Math.cos(ang) * t, Math.sin(ang) * t);
-            g.drawImage(s, at, null);
-        }
+        ring(g, s, e.at(), (strong ? 6.0 : 4.5) / Math.max(0.0001, scr));
+        ring(g, tint(e.img(), Color.WHITE), e.at(), (strong ? 2.8 : 2.0) / Math.max(0.0001, scr));
         // сам жетон — поверх свечения и рамки
         kelium.report.Mips.draw(g, e.img(), e.at());
         g.dispose();

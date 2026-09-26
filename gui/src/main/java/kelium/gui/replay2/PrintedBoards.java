@@ -49,6 +49,14 @@ final class PrintedBoards {
         if (hits != null && r != null) {
             hits.put(key, new Rectangle(r));
         }
+        // ФОРМА ДЕТАЛИ ПО УМОЛЧАНИЮ — её рамка со скруглением печати (ячейки,
+        // пазы, места жетонов): подсветка идёт по детали, а не прямоугольником
+        // во весь её охват (жалоба дизайнера 27.09.2026). Детали сложной формы
+        // (жетоны крыльев) кладут свой контур следом и перекрывают этот.
+        if (outlines != null && r != null && !"troop".equals(key) && !"storage".equals(key)) {
+            double rad = Math.min(r.width, r.height) * 0.16;
+            outlines.put(key, new RoundRectangle2D.Double(r.x, r.y, r.width, r.height, rad, rad));
+        }
     }
 
     private static void hit(String key, java.awt.Shape s) {
@@ -582,7 +590,7 @@ final class PrintedBoards {
     }
 
     /** Значок рода и число жетонов в запасе — одна колонка запаса на столе. */
-    private static void значокЗапаса(Graphics2D g, String род, int seat, int x, int y,
+    private static Rectangle значокЗапаса(Graphics2D g, String род, int seat, int x, int y,
                                      int colW, int height, int вЗапасе) {
         BufferedImage ic = значокРода(род, seat);
         int s = Math.max(10, Math.min(height - 4, (int) (colW * 0.58)));
@@ -604,6 +612,8 @@ final class PrintedBoards {
         java.awt.FontMetrics fm = g.getFontMetrics();
         g.drawString(число, left + s + 3, top + (s + fm.getAscent() - fm.getDescent()) / 2);
         g.setComposite(было);
+        int pad = Math.max(2, s / 10);
+        return new Rectangle(left - pad, top - pad, s + 3 + tw + 2 * pad, s + 2 * pad);
     }
 
     private static void запасВойск(Graphics2D g, int x, int y, int width, int height,
@@ -633,7 +643,10 @@ final class PrintedBoards {
                 // СТОЛ (решение дизайнера 27.09.2026): вместо стопки жетонов —
                 // печатная иконка жетона рода, перекрашенная в цвет фракции, и
                 // рядом число оставшихся жирным шрифтом стола.
-                значокЗапаса(g, роды[i], seat, x + i * colW, y, colW, height, вЗапасе);
+                Rectangle знак = значокЗапаса(g, роды[i], seat, x + i * colW, y, colW, height,
+                    вЗапасе);
+                // зона и форма — ровно значок с числом, а не весь столбец
+                hit("unit:" + роды[i], знак);
                 continue;
             }
             java.awt.Composite было = g.getComposite();
@@ -699,8 +712,13 @@ final class PrintedBoards {
             // обычный, начальный и супер-арсенал — каждый из своей папки лиц
             BufferedImage лицо = kelium.gui.CardArt.arsenal(id);
             картаВПаз(g, войX, войY, k, вставлено.get(паз), лицо != null ? лицо : лицоНет);
-            hit("installed:" + id, scale(войX, войY, k, вставлено.get(паз)[0],
-                вставлено.get(паз)[1], вставлено.get(паз)[2], вставлено.get(паз)[3]));
+            Rectangle окно = scale(войX, войY, k, вставлено.get(паз)[0],
+                вставлено.get(паз)[1], вставлено.get(паз)[2], вставлено.get(паз)[3]);
+            hit("installed:" + id, окно);
+            char[] наКарте = кубикиВнеПечати == null ? null : кубикиВнеПечати.get("card-" + id);
+            if (наКарте != null && наКарте.length > 0) {
+                кубикиКарт.add(new Object[]{окно, наКарте});
+            }
             паз++;
         }
         // КОНТЕЙНЕРЫ: по два в паз, поэтому рамок шесть — берём те, что
@@ -732,7 +750,57 @@ final class PrintedBoards {
      * ПОДПИСЬ К КОНТЕЙНЕРАМ: квадратная рубашка в пазу без подписи читалась
      * как непонятный квадратик (замечание дизайнера 25.09.2026).
      */
+    /** Рамка ячейки склада, которой нет на печати: светлая подложка и контур. */
+    private static void рамкаБезПечати(Graphics2D g, Rectangle box) {
+        double r = box.width * 0.14;
+        g.setColor(Theme.alpha(Color.WHITE, 0.55));
+        g.fill(new RoundRectangle2D.Double(box.x, box.y, box.width, box.height, r, r));
+        g.setColor(Theme.alpha(new Color(0x55, 0x5F, 0x66), 0.9));
+        g.setStroke(new BasicStroke(Math.max(1f, box.width / 16f)));
+        g.draw(new RoundRectangle2D.Double(box.x, box.y, box.width, box.height, r, r));
+    }
+
+    /**
+     * КУБИКИ В ЯЧЕЙКАХ ВНЕ ПЕЧАТИ ПЛАНШЕТА — что куда разложено (ключи
+     * {@code store-N} — жетон хранилища, {@code card-ID} — карта «+1 ячейка»).
+     * Ставит {@code BoardSheet.planCells} перед рисованием.
+     */
+    static Map<String, char[]> кубикиВнеПечати;
+    /** Карты с ячейками склада: окно паза и что в ячейках. Рисуются поверх планшета. */
+    private static final java.util.List<Object[]> кубикиКарт = new java.util.ArrayList<>();
+    /** Сколько кубиков нарисовано с последнего сброса: 'K', 'A', 'D' — для проверок. */
+    static final int[] НАРИСОВАНО = new int[3];
+
+    /**
+     * КУБИКИ НА КАРТАХ «+1 ЯЧЕЙКА СКЛАДА» — поверх планшета, по нижнему краю
+     * видимой части карты: там кубик и лежит на столе.
+     */
+    private static void кубикиНаКартах(Graphics2D g) {
+        for (Object[] e : кубикиКарт) {
+            Rectangle окно = (Rectangle) e[0];
+            char[] arr = (char[]) e[1];
+            int cs = Math.max(8, Math.min(окно.width / 3, окно.height / 2));
+            int gap = Math.max(2, cs / 8);
+            int total = arr.length * cs + (arr.length - 1) * gap;
+            int x0 = окно.x + (окно.width - total) / 2;
+            int y0 = окно.y + окно.height - cs - gap * 2;
+            for (int i = 0; i < arr.length; i++) {
+                Rectangle box = new Rectangle(x0 + i * (cs + gap), y0, cs, cs);
+                g.setColor(Theme.alpha(Theme.paper(), 0.78));
+                g.fill(new RoundRectangle2D.Double(box.x, box.y, cs, cs, cs * 0.25, cs * 0.25));
+                g.setColor(Theme.alpha(Color.BLACK, 0.55));
+                g.setStroke(new BasicStroke(Math.max(1f, cs / 14f)));
+                g.draw(new RoundRectangle2D.Double(box.x, box.y, cs, cs, cs * 0.25, cs * 0.25));
+                if (arr[i] != 0) {
+                    cube(g, box, arr[i]);
+                }
+            }
+        }
+        кубикиКарт.clear();
+    }
+
     private static void подписьКонтейнеров(Graphics2D g) {
+        кубикиНаКартах(g);
         Rectangle первый = контейнерыПодпись;
         контейнерыПодпись = null;
         if (первый == null) {
@@ -882,6 +950,8 @@ final class PrintedBoards {
         int seen = 0;
         int lastLevel = -1;
         String lastGroup = "";
+        BoardAnchors.Cell последняяОбщая = null;
+        int общихНапечатано = 0;
         for (BoardAnchors.Cell c : storageCells(p.seat)) {
             if (!c.group().equals(lastGroup) || c.level() != lastLevel) {
                 lastGroup = c.group();
@@ -894,6 +964,8 @@ final class PrintedBoards {
             if ("base".equals(c.group())) {
                 open = true;
                 has = base != null && seen < base.length ? base[seen] : 0;
+                последняяОбщая = c;
+                общихНапечатано = seen + 1;
             } else {
                 String key = ("miner".equals(c.group()) ? "miner-" : "plant-") + c.level();
                 open = !covered.contains(key);
@@ -923,6 +995,24 @@ final class PrintedBoards {
         java.util.List<Крыло> крылья = крылья(лист);
         for (var e : зоны.entrySet()) {
             жетонНаКрыле(g, e.getKey(), e.getValue(), p.seat, крылья);
+        }
+        // ОБЩАЯ ЯЧЕЙКА БЕЗ ПЕЧАТИ (жалоба дизайнера 27.09.2026: «келемия 2/3, а
+        // на хранилище один кубик»). По своду и книге (глава 4, «Д») ячеек,
+        // открытых всегда, ДВЕ, а на новой печати планшета их одна. Кубик во
+        // второй ячейке раньше не рисовался нигде; теперь она нарисована рамкой
+        // рядом с печатной, пока печать и свод не сойдутся; поверх жетонов крыльев,
+        // чтобы её не накрыл лежащий рядом жетон.
+        if (последняяОбщая != null && base != null) {
+            for (int i = общихНапечатано; i < base.length; i++) {
+                int сдвиг = (i - общихНапечатано + 1) * (последняяОбщая.w() + 14);
+                Rectangle box = scale(x, y, k, последняяОбщая.x() + сдвиг,
+                    последняяОбщая.y(), последняяОбщая.w(), последняяОбщая.h());
+                рамкаБезПечати(g, box);
+                hit("cell:base:0:" + i + ":1:" + (base[i] == 0 ? '-' : base[i]), box);
+                if (base[i] != 0) {
+                    cube(g, box, base[i]);
+                }
+            }
         }
         жетоныХранилища(g, x, y, k, p, storeSpots);
     }
@@ -957,6 +1047,14 @@ final class PrintedBoards {
             int sx = box.x + (box.width - side) / 2;
             int sy = box.y + (box.height - side) / 2;
             ModuleSlot.paintStorageToken(g, tok, sx, sy, side);
+            // жетон стороной «+1 ячейка» — сам ячейка склада: кубик в ней
+            // лежит на жетоне (жалоба 27.09.2026 — кубик не рисовался нигде)
+            char[] вЯчейке = кубикиВнеПечати == null ? null : кубикиВнеПечати.get("store-" + i);
+            if (вЯчейке != null && вЯчейке.length > 0 && вЯчейке[0] != 0) {
+                int cs = (int) Math.round(side * 0.6);
+                cube(g, new Rectangle(sx + (side - cs) / 2, sy + (side - cs) / 2, cs, cs),
+                    вЯчейке[0]);
+            }
             if (storeSpots != null) {
                 storeSpots.put(new Rectangle(sx, sy, side, side), tok);
             }
@@ -1190,6 +1288,7 @@ final class PrintedBoards {
 
     /** Кубик ресурса в напечатанной ячейке: тем же значком, что и везде. */
     private static void cube(Graphics2D g, Rectangle box, char has) {
+        НАРИСОВАНО[has == 'K' ? 0 : has == 'D' ? 2 : 1]++;
         // КУБИК КРУПНЕЕ НА ПЯТУЮ (заказ дизайнера 09.09.2026): в печатной ячейке
         // он сидел мелко, и ячейка читалась как пустая рамка со значком внутри.
         double s = Math.min(box.width, box.height) * 0.79;

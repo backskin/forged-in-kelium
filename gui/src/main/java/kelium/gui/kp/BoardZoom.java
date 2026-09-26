@@ -48,6 +48,10 @@ public final class BoardZoom extends JComponent {
     private final Map<String, Rectangle> hits = new LinkedHashMap<>();
     private final Map<Rectangle, Object[]> modules = new LinkedHashMap<>();
     private final Map<Rectangle, String> stores = new LinkedHashMap<>();
+    /** Настоящие формы деталей: контур и силуэт жетона — для подсветки по форме. */
+    private final Map<String, java.awt.Shape> outlines = new LinkedHashMap<>();
+    private final Map<String, kelium.gui.replay2.TokenSilhouettes.Entry> silhouettes =
+        new LinkedHashMap<>();
     /** Нарисованный планшет — перерисовывается при открытии, смене размера и кадра. */
     private BufferedImage layer;
     private boolean dirty = true;
@@ -157,6 +161,19 @@ public final class BoardZoom extends JComponent {
             if ("troop".equals(e.getKey()) || "storage".equals(e.getKey()) || !r.contains(p)) {
                 continue;
             }
+            // по ФОРМЕ детали: повёрнутый жетон крыла своим охватом накрывает
+            // соседние жетоны — попадание считается только внутри контура
+            java.awt.Shape form = outlines.get(e.getKey());
+            var sil = silhouettes.get(e.getKey());
+            if (sil != null ? !kelium.gui.replay2.TokenSilhouettes.contains(sil, p.x, p.y)
+                    : form != null && !form.contains(p)) {
+                continue;
+            }
+            // ячейка, накрытая жетоном, — под жетоном: о ней говорит сам жетон
+            if (e.getKey().startsWith("cell:") && e.getKey().split(":").length > 4
+                    && "0".equals(e.getKey().split(":")[4])) {
+                continue;
+            }
             if (area(r) < bestArea) {
                 best = r;
                 bestArea = area(r);
@@ -167,6 +184,16 @@ public final class BoardZoom extends JComponent {
 
     private static long area(Rectangle r) {
         return (long) r.width * r.height;
+    }
+
+    /** Ключ зоны планшета по её прямоугольнику (null — жетон модуля или хранилища). */
+    private String keyOf(Rectangle r) {
+        for (Map.Entry<String, Rectangle> en : hits.entrySet()) {
+            if (en.getValue() == r) {
+                return en.getKey();
+            }
+        }
+        return null;
     }
 
     /** Что сказать о детали. */
@@ -204,12 +231,15 @@ public final class BoardZoom extends JComponent {
         hits.clear();
         modules.clear();
         stores.clear();
+        outlines.clear();
+        silhouettes.clear();
         board = null;
         int pad = Theme.px(24);
         if (sheet != null) {
             Rectangle view = new Rectangle(pad, pad + Theme.px(44), w - pad * 2,
                 h - pad * 2 - Theme.px(44));
-            board = sheet.paintBoardZoom(g, view, which, hits, modules, stores);
+            board = sheet.paintBoardZoom(g, view, which, hits, modules, stores, outlines,
+                silhouettes);
         }
         g.dispose();
         dirty = false;
@@ -245,13 +275,22 @@ public final class BoardZoom extends JComponent {
         }
         Rectangle show = pinned != null ? pinned : hot;
         if (show != null) {
-            RoundRectangle2D rr = new RoundRectangle2D.Double(show.x - 3, show.y - 3,
-                show.width + 6, show.height + 6, Theme.px(8), Theme.px(8));
-            g.setColor(Theme.alpha(Theme.seat(seat), 0.18));
-            g.fill(rr);
-            g.setColor(Theme.seat(seat));
-            g.setStroke(new BasicStroke(Theme.pxf(2.5)));
-            g.draw(rr);
+            // ПОДСВЕТКА ПО ФОРМЕ ДЕТАЛИ (жалоба дизайнера 27.09.2026: жетон крыла
+            // обводился огромным прямоугольником поверх соседей): у жетона —
+            // его силуэт, у ячейки, места и карты — их рамка ровно по размеру
+            String key = keyOf(show);
+            var sil = key == null ? null : silhouettes.get(key);
+            if (sil != null) {
+                kelium.gui.replay2.TokenSilhouettes.glow(g, sil, Theme.seat(seat), true);
+            } else {
+                java.awt.Shape form = key == null ? null : outlines.get(key);
+                if (form == null) {
+                    double rad = Math.min(show.width, show.height) * 0.16;
+                    form = new RoundRectangle2D.Double(show.x, show.y, show.width, show.height,
+                        rad, rad);
+                }
+                kelium.gui.replay2.TokenSilhouettes.glowShape(g, form, Theme.seat(seat), true);
+            }
             String text = describe(show);
             if (text != null) {
                 paintInfo(g, show, text);
