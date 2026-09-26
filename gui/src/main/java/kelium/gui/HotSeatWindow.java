@@ -2077,13 +2077,14 @@ public final class HotSeatWindow {
                     m.get("level") instanceof Number n ? n.intValue() : null)
                 : "Стройка — " + lowerFirst(
                     kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe));
-            case "build_hex", "tower_hex", "cu_hex" -> "Гекс стройки " + hexWords(String.valueOf(p));
+            // ГЕКС — СЛОВАМИ, БЕЗ КООРДИНАТ (27.09.2026: «никакого текста с id»)
+            case "build_hex", "tower_hex", "cu_hex" -> "Выбран гекс стройки";
             case "build_facing", "cu_sides" -> "Поворот здания";
             case "unit_sector" -> "Куда поставить войско";
             case "move" -> p instanceof Map<?, ?> m && m.get("to") != null
-                ? "Шаг на " + hexWords(String.valueOf(m.get("to"))) : "Шаг: " + raw;
-            case "maneuver_hex" -> "Манёвр через " + hexWords(String.valueOf(p));
-            case "combat_source" -> "Бой из " + hexWords(String.valueOf(p));
+                ? "Жетон перемещён" : "Шаг: " + raw;
+            case "maneuver_hex" -> "Выбран гекс манёвра";
+            case "combat_source" -> "Выбран гекс, откуда бить";
             case "attack" -> p instanceof Map<?, ?> m ? "Атака " + attackLabelRu(
                 c.label() == null ? "" : c.label(), m) : "Атака";
             case "spec" -> "СПЕЦ: " + kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe)
@@ -2126,12 +2127,6 @@ public final class HotSeatWindow {
     }
 
     /** Гекс словами: координаты, как их пишет правило, а не внутренний id. */
-    private static String hexWords(String hexId) {
-        if (hexId != null && hexId.startsWith("h")) {
-            return "(" + hexId.substring(1).replace('_', ',') + ")";
-        }
-        return String.valueOf(hexId);
-    }
 
     /** Имя карты без обращения к живой записи (её пишет поток Swing). */
     private String cardNameSafe(String id) {
@@ -3969,6 +3964,10 @@ public final class HotSeatWindow {
             showBuildMenu(seat, agent, options, d);
             return;
         }
+        if ("move".equals(kind) && d.context().get("phase") instanceof String phase) {
+            showManeuver(seat, agent, options, d, phase);
+            return;
+        }
         Map<String, List<kelium.gui.kp.FieldBubbles.Opt>> byHex = new LinkedHashMap<>();
         List<kelium.gui.kp.FieldBubbles.Opt> dock = new ArrayList<>();
         Map<String, Integer> cardToOption = new LinkedHashMap<>();
@@ -4067,6 +4066,12 @@ public final class HotSeatWindow {
             hint = "Запитанное здание даёт войско своего рода ИЛИ боеприпасы — выберите "
                 + "у здания на поле; «Пропустить здание» — ничего";
         }
+        if ("maneuver_hex".equals(kind)) {
+            // МАНЁВР ПО ШАГАМ (27.09.2026): правило главы 7 — словами на экране
+            title = "Манёвр, шаг 1 из 3: выберите гекс манёвра";
+            hint = "Сначала с него выводят свои жетоны, потом в него вводят те, что дойдут; "
+                + "каждый жетон ходит один раз";
+        }
         if ("energy_activation".equals(kind)) {
             title = "Смена энергии: выберите источник";
             hint = "Щёлкните энергостанцию или ЦУ на поле: раздать с неё кубики "
@@ -4101,6 +4106,120 @@ public final class HotSeatWindow {
             drawerCloser.stop();
             closeAutoDrawer();
         }
+    }
+
+    // ==================== МАНЁВР ПО ШАГАМ (27.09.2026) ====================
+
+    /** Какой жетон выбран на шаге «выводите» (null — ещё не выбран). */
+    private Integer maneuverUnit;
+    /** Решение, к которому относится {@link #maneuverUnit}. */
+    private InteractiveAgent.PendingDecision maneuverFor;
+
+    /**
+     * МАНЁВР: ВЫВЕСТИ, ПОТОМ ВВЕСТИ (книга, глава 7; заказ дизайнера 27.09.2026).
+     * Шаг 2 — жетоны на гексе манёвра подсвечены по форме; щелчок по жетону
+     * подсвечивает гексы, куда он дойдёт, щелчок по гексу ведёт его туда.
+     * Шаг 3 — подсвечены свои жетоны, что ещё не ходили и дойдут до гекса;
+     * щелчок вводит. Уже ходившие — серые.
+     */
+    @SuppressWarnings("unchecked")
+    private void showManeuver(int seat, kelium.core.UndoableAgent agent, List<Choice> options,
+                              InteractiveAgent.PendingDecision d, String phase) {
+        if (maneuverFor != d) {
+            maneuverFor = d;
+            maneuverUnit = null;
+        }
+        String цель = d.context().get("source") instanceof String src ? src : null;
+        java.util.Set<Integer> moved = new java.util.HashSet<>();
+        if (d.context().get("moved") instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Number n) {
+                    moved.add(n.intValue());
+                }
+            }
+        }
+        Map<Integer, List<Integer>> byUnit = new LinkedHashMap<>();
+        int passIdx = -1;
+        for (int i = 0; i < options.size(); i++) {
+            Choice c = options.get(i);
+            if (c.payload() instanceof Map<?, ?> m && m.get("uid") instanceof Number u) {
+                byUnit.computeIfAbsent(u.intValue(), k -> new ArrayList<>()).add(i);
+            } else if ("pass".equals(c.kind())) {
+                passIdx = i;
+            }
+        }
+        boolean out = "out".equals(phase);
+        if (out && maneuverUnit == null && byUnit.size() == 1) {
+            maneuverUnit = byUnit.keySet().iterator().next();
+        }
+        Map<String, List<kelium.gui.kp.FieldBubbles.Opt>> byHex = new LinkedHashMap<>();
+        List<kelium.gui.kp.FieldBubbles.Opt> dock = new ArrayList<>();
+        Map<Integer, Runnable> units = new LinkedHashMap<>();
+        for (var e : byUnit.entrySet()) {
+            int uid = e.getKey();
+            List<Integer> idxs = e.getValue();
+            if (out) {
+                units.put(uid, () -> {
+                    maneuverUnit = uid;
+                    showManeuver(seat, agent, options, d, phase);
+                });
+            } else {
+                int idx = idxs.get(0);
+                units.put(uid, () -> submit(agent, d, idx));
+            }
+        }
+        String unitName = null;
+        if (out && maneuverUnit != null && byUnit.containsKey(maneuverUnit)) {
+            for (int idx : byUnit.get(maneuverUnit)) {
+                Choice c = options.get(idx);
+                Map<String, Object> m = (Map<String, Object>) c.payload();
+                var opt = new kelium.gui.kp.FieldBubbles.Opt(
+                    kelium.gui.kp.ChoiceWords.label("move", c, this::cardName), null, 0,
+                    () -> submit(agent, d, idx));
+                unitName = unitNameOf(d.state(), maneuverUnit);
+                if ("garrison".equals(c.kind())) {
+                    dock.add(opt);
+                } else if (m.get("to") instanceof String to) {
+                    byHex.computeIfAbsent(to, k -> new ArrayList<>()).add(opt);
+                }
+            }
+        }
+        if (passIdx >= 0) {
+            int pi = passIdx;
+            dock.add(new kelium.gui.kp.FieldBubbles.Opt(out ? "Дальше — вводить в гекс"
+                : "Закончить манёвр", null, 1, () -> submit(agent, d, pi)));
+        }
+        String title;
+        String hint;
+        if (out) {
+            title = "Манёвр, шаг 2 из 3: выводите жетоны с гекса";
+            hint = unitName == null
+                ? "Щёлкните свой жетон на гексе манёвра — подсветятся гексы, куда он дойдёт"
+                : cap(unitName) + ": щёлкните подсвеченный гекс, куда уйти, — или другой жетон";
+        } else {
+            title = "Манёвр, шаг 3 из 3: вводите жетоны в гекс";
+            hint = "Щёлкните свой жетон, который дойдёт до гекса манёвра, — он войдёт в него";
+        }
+        turnLabel.setText("ВАШ ХОД — Игрок " + (seat + 1) + ": манёвр — "
+            + (out ? "выводите жетоны" : "вводите жетоны"));
+        setTableChoices(Map.of(), Theme.seat(seat));
+        field.setChoices(byHex, title, hint, dock, Theme.seat(seat));
+        field.setUnitTargets(units, moved, out ? maneuverUnit : null, Theme.seat(seat));
+        if (цель != null) {
+            field.setSource(цель, Theme.seat(seat));
+        }
+    }
+
+    /** Имя рода войска по его номеру жетона. */
+    private static String unitNameOf(GameState st, int uid) {
+        for (kelium.core.PlayerState p : st.players) {
+            for (kelium.core.UnitToken u : p.units) {
+                if (u.uid == uid) {
+                    return GameRecorder.unitName(u.type.code);
+                }
+            }
+        }
+        return "жетон";
     }
 
     // ==================== МЕНЮ СТРОЙКИ (27.09.2026) ====================

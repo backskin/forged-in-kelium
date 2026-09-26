@@ -2671,7 +2671,10 @@ public final class Actions {
                         break;
                     }
                     opts.add(new Choice("pass", null, "stop moving"));
-                    Choice pick = agent.choose(s, opts, Map.of("kind", "move", "source", цель));
+                    // ШАГ МАНЁВРА — В ВОПРОСЕ (27.09.2026): окну, чтобы сказать
+                    // игроку словами «выводите» или «вводите», и кто уже ходил
+                    Choice pick = agent.choose(s, opts, Map.of("kind", "move", "source", цель,
+                        "phase", "out", "moved", new ArrayList<>(сходили)));
                     if (pick.payload() == null) {
                         break;
                     }
@@ -2695,7 +2698,8 @@ public final class Actions {
                         break;
                     }
                     opts.add(new Choice("pass", null, "stop moving"));
-                    Choice pick = agent.choose(s, opts, Map.of("kind", "move", "source", цель));
+                    Choice pick = agent.choose(s, opts, Map.of("kind", "move", "source", цель,
+                        "phase", "in", "moved", new ArrayList<>(сходили)));
                     if (pick.payload() == null) {
                         break;
                     }

@@ -334,7 +334,108 @@ public final class FieldView extends JComponent {
         canvas.alpha(1);
     }
 
+    // ==================== войска под выбор (манёвр, 27.09.2026) ====================
+    //
+    // ЖЕТОН ВОЙСКА ВЫБИРАЕТСЯ НА САМОМ ПОЛЕ: подсвечен по своей форме (картонка
+    // жетона), щелчок по нему зовёт {@code onPick}. Уже ходившие — серые.
+
+    /** Где нарисовано каждое войско при последней отрисовке (точки поля). */
+    private java.util.Map<Integer, double[]> unitSpots = Map.of();
+    private Map<Integer, Runnable> unitTargets = Map.of();
+    private java.util.Set<Integer> grayUnits = java.util.Set.of();
+    private Integer chosenUnit;
+    private Integer hoverUnit;
+    private Color unitColor = Color.WHITE;
+
+    public void setUnitTargets(Map<Integer, Runnable> targets, java.util.Set<Integer> gray,
+                               Integer chosen, Color seat) {
+        unitTargets = targets == null ? Map.of() : new LinkedHashMap<>(targets);
+        grayUnits = gray == null ? java.util.Set.of() : java.util.Set.copyOf(gray);
+        chosenUnit = chosen;
+        unitColor = seat == null ? Color.WHITE : seat;
+        hoverUnit = null;
+        repaint();
+    }
+
+    /** Войска под выбор — для прогонщиков и тестов. */
+    public java.util.Set<Integer> unitTargetsForTest() {
+        return java.util.Set.copyOf(unitTargets.keySet());
+    }
+
+    /** Экранная середина жетона войска (для щелчков в тестах), либо null. */
+    public Point unitOnScreenForTest(int uid) {
+        double[] u = unitSpots.get(uid);
+        return u == null ? null
+            : new Point((int) Math.round(panX + zoom * u[0]), (int) Math.round(panY + zoom * u[1]));
+    }
+
+    /** Картонка жетона войска в точках поля (повёрнутый прямоугольник). */
+    private java.awt.Shape unitShape(int uid, double grow) {
+        double[] u = unitSpots.get(uid);
+        if (u == null) {
+            return null;
+        }
+        java.awt.geom.RoundRectangle2D r = new java.awt.geom.RoundRectangle2D.Double(
+            -u[2] / 2 - grow, -u[3] / 2 - grow, u[2] + 2 * grow, u[3] + 2 * grow,
+            Math.min(u[2], u[3]) * 0.2, Math.min(u[2], u[3]) * 0.2);
+        AffineTransform at = new AffineTransform();
+        at.translate(u[0], u[1]);
+        at.rotate(Math.toRadians(u[4]));
+        return at.createTransformedShape(r);
+    }
+
+    /** Войско под выбор под курсором, либо null. */
+    private Integer unitAt(Point screen) {
+        if (unitTargets.isEmpty()) {
+            return null;
+        }
+        java.awt.geom.Point2D w = worldPoint(screen);
+        if (w == null) {
+            return null;
+        }
+        for (int uid : unitTargets.keySet()) {
+            java.awt.Shape sh = unitShape(uid, 2);
+            if (sh != null && sh.contains(w)) {
+                return uid;
+            }
+        }
+        return null;
+    }
+
+    private void drawUnitTargets(Graphics2D g) {
+        for (int uid : grayUnits) {
+            java.awt.Shape sh = unitShape(uid, 1);
+            if (sh != null) {
+                g.setColor(withAlpha(new Color(0x30, 0x34, 0x3A), 150));
+                g.fill(sh);
+            }
+        }
+        for (int uid : unitTargets.keySet()) {
+            java.awt.Shape sh = unitShape(uid, 1.5);
+            if (sh == null) {
+                continue;
+            }
+            boolean hot = Integer.valueOf(uid).equals(hoverUnit)
+                || Integer.valueOf(uid).equals(chosenUnit);
+            for (int k = 5; k >= 1; k--) {
+                g.setColor(withAlpha(unitColor, (int) ((hot ? 90 : 60) * (1 - (k - 1) / 5.0))));
+                g.setStroke(pen((hot ? 14 : 9) * k / 5.0 + 2));
+                g.draw(sh);
+            }
+            g.setColor(withAlpha(unitColor, 255));
+            g.setStroke(pen(hot ? 4 : 2.8));
+            g.draw(sh);
+            g.setColor(withAlpha(Color.WHITE, 230));
+            g.setStroke(pen(hot ? 1.8 : 1.2));
+            g.draw(sh);
+        }
+    }
+
     public void clearChoices() {
+        unitTargets = Map.of();
+        grayUnits = java.util.Set.of();
+        chosenUnit = null;
+        hoverUnit = null;
         demolishTargets = Map.of();
         hoverUid = null;
         bubbles.clear();
@@ -483,6 +584,8 @@ public final class FieldView extends JComponent {
                     if (facingHexId != null && facingHexId.equals(id)) {
                         onFacingPick.accept(facingSelected);
                     }
+                } else if (isClick && unitAt(e.getPoint()) != null) {
+                    unitTargets.get(unitAt(e.getPoint())).run();
                 } else if (isClick && demolishAt(e.getPoint()) != null) {
                     demolishTargets.get(demolishAt(e.getPoint())).run();
                 } else if (isClick && onHexPick != null) {
@@ -525,6 +628,11 @@ public final class FieldView extends JComponent {
                     repaint();
                 }
                 String id = hexIdAt(e.getPoint());
+                Integer podUnit = unitAt(e.getPoint());
+                if (!java.util.Objects.equals(podUnit, hoverUnit)) {
+                    hoverUnit = podUnit;
+                    repaint();
+                }
                 Integer podSnos = demolishAt(e.getPoint());
                 if (!java.util.Objects.equals(podSnos, hoverUid)) {
                     hoverUid = podSnos;
@@ -532,7 +640,7 @@ public final class FieldView extends JComponent {
                 }
                 boolean selectable = id != null && selectableHexIds.contains(id)
                     || facingVariants != null && id != null && id.equals(facingHexId)
-                    || podSnos != null;
+                    || podSnos != null || podUnit != null;
                 setCursor(selectable ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
                 boolean liveGhost = ghostType != null || facingVariants != null;
@@ -1380,9 +1488,16 @@ public final class FieldView extends JComponent {
     private void drawField(Graphics2D g, ReplayRecord.Frame f) {
         ReplayRecord.Snapshot s = f.snapshot;
         // ЕДИНЫЙ рендер: то же самое рисует и картинка в отчёте.
-        kelium.report.FieldPainter.paintField(
-            new kelium.report.Java2DCanvas(g, zoom, getFont()),
-            BASE, record.hexes, s, 0, 0, showIds);
+        java.util.Map<Integer, double[]> spots = new java.util.HashMap<>();
+        kelium.report.FieldPainter.unitSpots = spots;
+        try {
+            kelium.report.FieldPainter.paintField(
+                new kelium.report.Java2DCanvas(g, zoom, getFont()),
+                BASE, record.hexes, s, 0, 0, showIds);
+        } finally {
+            kelium.report.FieldPainter.unitSpots = null;
+        }
+        unitSpots = spots;
 
         // Поверх — то, чего нет в отчёте: рамка гексов активного игрока.
         if (s.active != null) {
@@ -1418,6 +1533,7 @@ public final class FieldView extends JComponent {
             drawSelectable(g);
         }
         drawDemolish(g);
+        drawUnitTargets(g);
         drawSource(g);
         if (facingVariants != null && facingHexId != null) {
             drawFacing(g);

@@ -1766,6 +1766,21 @@ public final class FieldPainter {
         }
     }
 
+    /**
+     * ГДЕ НАРИСОВАНО КАЖДОЕ ВОЙСКО — для подсветки по форме жетона и щелчка по
+     * нему в окне партии (манёвр, 27.09.2026). Пока поле не null, рисование
+     * пишет сюда uid → {x, y, ширина, высота, поворот в градусах} в точках поля.
+     * Войска в гарнизоне не пишутся: они внутри здания.
+     */
+    public static java.util.Map<Integer, double[]> unitSpots;
+
+    private static void spot(ReplayRecord.Tok u, double x, double y, double w, double h,
+                             double rot) {
+        if (unitSpots != null) {
+            unitSpots.put(u.uid, new double[]{x, y, w, h, rot});
+        }
+    }
+
     private static void paintUnits(FieldCanvas c, double size, List<ReplayRecord.Tok> tokens,
                                    ReplayRecord.HexState st, Set<Integer> taken,
                                    Map<String, double[]> hideSpots, double cx, double cy) {
@@ -1812,6 +1827,9 @@ public final class FieldPainter {
                     FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
             }
             paintHpPipsAt(c, size, u.hp, u.damage, ax, ay - size * 0.20, 0);
+            double aw = size * 0.40;
+            spot(u, ax, ay, aw, airTex != null ? aw * airTex.getHeight() / (double) airTex.getWidth()
+                : aw * sh.vbH() / sh.vbW(), 0);
             airDrawn++;
         }
 
@@ -1894,6 +1912,7 @@ public final class FieldPainter {
                 }
                 unitAngle = face + 90;
                 paintUnitLetter(c, u, pos, w, unitAngle);
+                spot(u, pos[0], pos[1], w, hТок, поворотЖетона);
             } else {
                 pos = FieldGeometry.polar(cx, cy, size * 0.28,
                     60.0 * overflow - 30 + FieldGeometry.TILT);
@@ -1908,6 +1927,8 @@ public final class FieldPainter {
                 }
                 unitAngle = 0;
                 paintUnitLetter(c, u, pos, w, unitAngle);
+                spot(u, pos[0], pos[1], w, tex != null ? w * tex.getHeight() / (double) tex.getWidth()
+                    : w * sh.vbH() / sh.vbW(), 0);
                 overflow++;
             }
             // Гнёзда прочности — НАД буквой рода, в осях самого жетона: та же

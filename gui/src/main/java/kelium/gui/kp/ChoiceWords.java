@@ -159,6 +159,20 @@ public final class ChoiceWords {
             }
         }
         switch (kind) {
+            // ГЕКС-ЦЕЛЬ — СЛОВАМИ, А НЕ КООРДИНАТАМИ (27.09.2026: «никакого текста с
+            // id на экране»): вариант стоит пузырём на самом гексе, место видно и так
+            case "maneuver_hex" -> {
+                return "Манёвр на этом гексе";
+            }
+            case "build_hex", "tower_hex", "cu_hex" -> {
+                return "Строить здесь";
+            }
+            case "combat_source" -> {
+                return "Бить отсюда";
+            }
+            case "move_source" -> {
+                return "Двигать отсюда";
+            }
             case "action", "objective_reward_action", "energy_or_modules" -> {
                 if (p instanceof String a) {
                     return ActionBar.ACTIONS.getOrDefault(a, "modules".equals(a)
