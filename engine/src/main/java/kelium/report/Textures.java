@@ -173,6 +173,16 @@ public final class Textures {
     }
 
     /**
+     * ИКОНКА ИГРЫ из экспорта дизайнера ({@code icons/<имя>.png}, раскладывает
+     * {@code tools/gen_icons.py}): ресурсы, действия, кружок действия,
+     * спец-действие, жетон первого игрока, рода войск. {@code null} — иконки
+     * нет, рисуется прежний значок.
+     */
+    public static BufferedImage icon(String name) {
+        return name == null ? null : find(List.of("icons/" + name));
+    }
+
+    /**
      * ПЕЧАТНОЕ ЛИЦО КАРТЫ ПО ИДЕНТИФИКАТОРУ — задания, начальные задания, супер
      * задания, арсенал, начальный и супер арсенал, рынок, контейнеры. Лежат в
      * {@code card/<колода>/<id>.png}: {@code card/objective/o04},

@@ -81,6 +81,29 @@ public final class MarkIcons {
      */
     public static void paint(Graphics2D g, String code, double cx, double cy, double size,
                              Color colour) {
+        // ПЕЧАТНЫЕ ИКОНКИ ДИЗАЙНЕРА (экспорт-иконки, 26.09.2026) — если есть,
+        // рисуются они, а не самодельные фигуры: те же монета, кубики,
+        // контейнер и карты, что на картах и планшетах игры.
+        String icon = switch (code) {
+            case "COIN" -> "coin";
+            case "KELIUM" -> "kelium";
+            case "AMMO" -> "ammo";
+            case "TROPHY" -> "trophy";
+            case "CONTAINER" -> "container";
+            case "ARSENAL" -> "arsenal";
+            case "SUPER" -> "super_objective";
+            case "CARD" -> "objective";
+            case "ENERGY" -> "energy";
+            case "VP", "STAR" -> "vp";
+            default -> null;
+        };
+        java.awt.image.BufferedImage img = icon == null ? null : kelium.report.Textures.icon(icon);
+        if (img != null) {
+            int s = (int) Math.round(size * 1.15);
+            kelium.report.Mips.draw(g, img, (int) Math.round(cx - s / 2.0),
+                (int) Math.round(cy - s / 2.0), s, s);
+            return;
+        }
         double r = size / 2;
         g.setColor(colour);
         switch (code) {

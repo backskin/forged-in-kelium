@@ -62,6 +62,16 @@ public final class ActionIcons {
     /** Нарисовать глиф действия с центром (cx,cy), вписанный в size×size. */
     public static void paint(Graphics2D g, String action, double cx, double cy,
                              double size, Color color) {
+        // ПЕЧАТНЫЕ ИКОНКИ ДЕЙСТВИЙ (экспорт-иконки, 26.09.2026) — те же, что на
+        // картах приказов; самодельные фигуры остаются запасом.
+        java.awt.image.BufferedImage img = action == null ? null
+            : kelium.report.Textures.icon("action_" + action);
+        if (img != null) {
+            int s = (int) Math.round(size * 1.2);
+            kelium.report.Mips.draw(g, img, (int) Math.round(cx - s / 2.0),
+                (int) Math.round(cy - s / 2.0), s, s);
+            return;
+        }
         double r = size / 2;
         g.setColor(color);
         g.setStroke(new BasicStroke((float) (size * 0.12),
