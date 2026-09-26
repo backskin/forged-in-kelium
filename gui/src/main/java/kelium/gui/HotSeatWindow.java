@@ -325,8 +325,16 @@ public final class HotSeatWindow {
         upper.add(buildCenter(), BorderLayout.CENTER);
         upper.add(buildRail(), BorderLayout.EAST);
         table = buildTable();
+        // ЗОНА ИГРОКА ЛИСТАЕТСЯ ВБОК (26.09.2026): растёт она от своей высоты,
+        // и если стала шире окна — снизу ползунок, а не сжатие деталей.
+        javax.swing.JScrollPane tableScroll = new javax.swing.JScrollPane(table,
+            javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+            javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        tableScroll.setBorder(null);
+        tableScroll.getHorizontalScrollBar().setUnitIncrement(Theme.px(40));
+        tableScroll.getViewport().setBackground(new Color(0x0E2029));
         javax.swing.JSplitPane split = new javax.swing.JSplitPane(
-            javax.swing.JSplitPane.VERTICAL_SPLIT, upper, table);
+            javax.swing.JSplitPane.VERTICAL_SPLIT, upper, tableScroll);
         split.setResizeWeight(1.0);
         split.setBorder(null);
         split.setDividerSize(Theme.px(6));
@@ -1079,6 +1087,7 @@ public final class HotSeatWindow {
         // без постоянной подкраски зон: зона видна только в миг Стройки
         field.setOwnershipTint(false);
         field.setTopReserve(Theme.px(92));
+        field.setBottomReserve(kelium.gui.kp.ActionStrip.stripHeight() - Theme.px(20));
         field.setShowTurnCaption(false);
         // Отладочные подписи гексов игроку не показываются; для наведения
         // работает подсказка гекса, для решений — подсветка целей.
@@ -1149,6 +1158,9 @@ public final class HotSeatWindow {
 
         prompt = new PromptOverlay();
         layered.add(prompt, JLayeredPane.MODAL_LAYER);
+        // ПОЛОСА ДЕЙСТВИЙ — над зоной игрока, поверх поля (26.09.2026)
+        actionStrip = new kelium.gui.kp.ActionStrip();
+        layered.add(actionStrip, JLayeredPane.PALETTE_LAYER);
 
         layered.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -1180,9 +1192,16 @@ public final class HotSeatWindow {
         }
         // Карточка вопроса не прячется под выехавший ящик.
         field.bubbles.setDockInset(openDrawerSpan());
+        if (actionStrip != null) {
+            int sh = kelium.gui.kp.ActionStrip.stripHeight();
+            actionStrip.setBounds(0, layered.getHeight() - sh, layered.getWidth(), sh);
+        }
         field.repaint();
         layoutPrompt();
     }
+
+    /** Кружки доступных действий над зоной игрока. */
+    kelium.gui.kp.ActionStrip actionStrip;
 
     /**
      * Ширина ящика — ПО ЕГО СОДЕРЖИМОМУ, а не одна на всех. Планшету нужен
@@ -2670,7 +2689,7 @@ public final class HotSeatWindow {
         Map.entry("neutral_victim", "какой нейтрал атаковать"),
         Map.entry("attack", "атака"),
         Map.entry("mine", "добыча: что взять"),
-        Map.entry("assemble", "сборка: что нанять"),
+        Map.entry("assemble", "сборка: что даёт здание — войско или боеприпасы"),
         Map.entry("tuck", "подложить карту-символ"),
         Map.entry("open_container", "вскрытие контейнера"),
         Map.entry("market_rate", "курс рынка"),
@@ -2685,7 +2704,7 @@ public final class HotSeatWindow {
         Map.entry("energy_place", "куда поставить энергию"),
         Map.entry("energy_loss_shift", "куда перенести кубик энергии"),
         Map.entry("energy_or_modules", "смена энергии или смена модулей"),
-        Map.entry("return_unit", "кого вернуть в запас"),
+        Map.entry("return_unit", "сборка: снять свои войска с поля (по желанию)"),
         Map.entry("storage_side", "сторона жетона хранилища"),
         Map.entry("storage_discard", "что выбросить со склада"),
         Map.entry("module_keep", "какой модуль оставить"),
@@ -3383,6 +3402,27 @@ public final class HotSeatWindow {
             }
             refreshTable();
             setTableChoices(onCard, Theme.seat(seat));
+            // ПОЛОСА ДЕЙСТВИЙ: те же действия кружками над зоной, плюс конец хода
+            List<kelium.gui.kp.ActionStrip.Item> strip = new ArrayList<>();
+            for (var e : avail.entrySet()) {
+                int idx = e.getValue();
+                String nm = e.getKey();
+                strip.add(new kelium.gui.kp.ActionStrip.Item(nm,
+                    ActionBar.ACTIONS.getOrDefault(nm, nm), null, () -> {
+                        if (!kelium.core.UndoableAgent.SAFE_ACTIONS.contains(nm)) {
+                            pendingBakeName = ActionBar.ACTIONS.getOrDefault(nm, nm);
+                        }
+                        submit(agent, d, idx);
+                    }));
+            }
+            if (passIdx >= 0) {
+                int pi = passIdx;
+                strip.add(new kelium.gui.kp.ActionStrip.Item(null, "Завершить ход",
+                    d.context().get("remaining") instanceof Number rn
+                        ? "осталось действий: " + rn : null, () -> submit(agent, d, pi)));
+            }
+            actionStrip.show(d.context().get("remaining") instanceof Number rn2
+                ? "Ваш ход — действий: " + rn2 : "Ваш ход", strip, Theme.seat(seat));
             field.setChoices(null, "Ваш ход: выберите действие",
                 "Щёлкните действие прямо на вскрытой карте приказа внизу — "
                     + (anySpec ? "или спец-действие: подсвеченную карту или вариант ниже, " : "")
@@ -3593,6 +3633,17 @@ public final class HotSeatWindow {
         // СМЕНА ЭНЕРГИИ — СЛОВАМИ ПО ШАГАМ (26.09.2026): сначала источник, потом
         // по одному кубику — потребитель; без этого оба шага выглядели одинаково,
         // «выберите гекс», и казалось, что игра ходит по кругу
+        // СБОРКА — СЛОВАМИ (26.09.2026: «я не понял, что значит “кого вернуть в
+        // запас”, “что нанять”»)
+        if ("return_unit".equals(kind)) {
+            title = "Сборка, шаг 1: снять войска с поля?";
+            hint = "Можно даром вернуть свои войска с поля в запас — чтобы нанять их "
+                + "заново у другого здания. Щёлкните войско на поле или «Никого не снимать»";
+        } else if ("assemble".equals(kind)) {
+            title = "Сборка: что даёт здание";
+            hint = "Запитанное здание даёт войско своего рода ИЛИ боеприпасы — выберите "
+                + "у здания на поле; «Пропустить здание» — ничего";
+        }
         if ("energy_activation".equals(kind)) {
             title = "Смена энергии: выберите источник";
             hint = "Щёлкните энергостанцию или ЦУ на поле: раздать с неё кубики "
@@ -3951,6 +4002,9 @@ public final class HotSeatWindow {
         field.clearChoices();
         field.clearGhost();
         field.clearFacingChoice();
+        if (actionStrip != null) {
+            actionStrip.hide0();
+        }
         hands.clearPickable();
         if (table != null) {
             ownTableChoices = Map.of();

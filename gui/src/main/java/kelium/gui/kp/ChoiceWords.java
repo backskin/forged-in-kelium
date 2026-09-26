@@ -183,7 +183,7 @@ public final class ChoiceWords {
             }
             case "assemble" -> {
                 if (p instanceof Map<?, ?> m) {
-                    return "ammo".equals(m.get("kind")) ? "Боеприпасы"
+                    return "ammo".equals(m.get("kind")) ? "Взять боеприпасы"
                         : "Нанять: " + unitRu(after(raw, "->"));
                 }
             }
@@ -320,7 +320,7 @@ public final class ChoiceWords {
             case "mass_open" -> "Больше не вскрывать";
             case "reaction" -> "Не отвечать";
             case "maneuver_unit" -> "Без манёвра";
-            case "return_unit" -> "Никого не возвращать";
+            case "return_unit" -> "Никого не снимать";
             case "energy_place" -> "Хватит — остаток оставить на источнике";
             case "mine" -> "Пропустить добытчик";
             case "assemble" -> "Пропустить здание";

@@ -62,7 +62,7 @@ import kelium.gui.replay2.Theme;
  * планшета и действие на карте с одним вариантом играются щелчком сразу;
  * карты — через раскрытие руки.
  */
-public final class PlayerTable extends JComponent {
+public final class PlayerTable extends JComponent implements javax.swing.Scrollable {
 
     private static final long serialVersionUID = 1L;
 
@@ -362,7 +362,38 @@ public final class PlayerTable extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(Theme.px(1200), Theme.px(320));
+        int h = getHeight() > 0 ? getHeight() : Theme.px(320);
+        return new Dimension(Math.max(Theme.px(600), contentWidth(h)), h);
+    }
+
+    // ---------- прокрутка вбок ----------
+
+    @Override
+    public Dimension getPreferredScrollableViewportSize() {
+        return getPreferredSize();
+    }
+
+    @Override
+    public int getScrollableUnitIncrement(Rectangle r, int o, int d) {
+        return Theme.px(40);
+    }
+
+    @Override
+    public int getScrollableBlockIncrement(Rectangle r, int o, int d) {
+        return Math.max(Theme.px(40), r.width - Theme.px(80));
+    }
+
+    /** Высота — всегда во весь просвет: листается только вбок. */
+    @Override
+    public boolean getScrollableTracksViewportHeight() {
+        return true;
+    }
+
+    /** Помещается в окно — растягивается по окну; не помещается — ползунок. */
+    @Override
+    public boolean getScrollableTracksViewportWidth() {
+        return getParent() instanceof javax.swing.JViewport v
+            && v.getWidth() >= contentWidth(v.getHeight());
     }
 
     private String keyAt(Point p) {
@@ -509,41 +540,34 @@ public final class PlayerTable extends JComponent {
         int resH = paintResources(g, pad + Theme.px(8), Theme.px(8));
         top += Math.max(tabsH, resH);
         int innerH = h - top - pad;
-        int x = pad + Theme.px(8);
-        // ВЕСЬ РЯД ВПИСЫВАЕТСЯ ПО ШИРИНЕ (сдача под ключ 25.09.2026): все
-        // детали зоны растут от её высоты, и на узком окне сумма ширин
-        // оказывалась больше экрана — руки уезжали за правый край. Не
-        // влезает — ряд уменьшается целиком и встаёт по центру высоты.
-        {
-            double hang = boards != null && boards.aspect() > 0 ? Math.max(0, boards.hang()) : 0;
-            double perH = (boards != null && boards.aspect() > 0
-                ? boards.aspect() / (1 + hang) : 0)
-                + 0.66 + 0.643 + handsPerHeight();
-            int fixed = x + pad + Theme.px(18) * 2 + Theme.px(6) + Theme.px(104)
-                + Theme.px(22) + Theme.px(16) * 2;
-            int fitH = (int) ((w - fixed) / perH);
-            if (fitH < innerH) {
-                top += (innerH - Math.max(Theme.px(80), fitH)) / 2;
-                innerH = Math.max(Theme.px(80), fitH);
-            }
-        }
+        Layout L = layout(w, h, top, innerH);
 
-        // ---- планшеты и стопка арсенала под хранилищем
-        if (boards != null && boards.aspect() > 0) {
-            // ВЫСОТА СЦЕПКИ ВМЕСТЕ СО СВИСАЮЩИМИ КАРТАМИ: вставленная карта
-            // торчит из-под планшета войск вниз, и стопка арсенала под
-            // хранилищем торчит ровно так же — полосу под них считаем честно.
-            double hang = Math.max(0, boards.hang());
-            int bw = (int) Math.min(w * 0.60, innerH / (1 + hang) * boards.aspect());
+        // ---- СЛЕВА: руки стопками и свалка
+        int sx0 = L.leftX();
+        for (Object[] hd : handGroups()) {
+            @SuppressWarnings("unchecked")
+            List<String> ids = (List<String>) hd[2];
+            int hw = stackWidth(ids.size(), L.stackH());
+            fan(g, (String) hd[0], (String) hd[1], ids, sx0,
+                top + (innerH - L.stackH()) / 2, hw, L.stackH(), true);
+            sx0 += hw + L.gap();
+        }
+        paintDump(g, L.dumpX(), top + (innerH - L.dumpH()) / 2 - Theme.px(6), L.dumpW(),
+            L.dumpH());
+
+        // ---- ПО ЦЕНТРУ: планшеты хранилища и войск, под хранилищем — стопка арсенала
+        if (L.bw() > 0) {
+            int bw = L.bw();
+            int x = L.boardsX();
             int bh = (int) Math.round(bw / boards.aspect());
             int by = top;
-            int cardsBottom = by + (int) Math.round(bh * (1 + hang));
+            int cardsBottom = by + (int) Math.round(bh * (1 + Math.max(0, boards.hang())));
             double[] sb = boards.storageBox();
-            int sx = x + (int) (sb[0] * bw);
-            int sw = (int) (sb[1] * bw);
+            int stx = x + (int) (sb[0] * bw);
+            int stw = (int) (sb[1] * bw);
             int sBottom = by + (int) (sb[2] * bh);
             int cardW = (int) Math.round(boards.cardWidth() * bw);
-            paintArsenalStack(g, sx, sw, sBottom, cardsBottom, cardW);
+            paintArsenalStack(g, stx, stw, sBottom, cardsBottom, cardW);
             Map<String, Rectangle> hits = new LinkedHashMap<>();
             boards.paint(g, x, by, bw, hits, outlines);
             spots.putAll(hits);
@@ -552,26 +576,11 @@ public final class PlayerTable extends JComponent {
                     groups.put("installed", hits.get(k));
                 }
             }
-            x += bw + Theme.px(18);
         }
 
-        // ---- свалка — отложенный приказ, лёжа
-        int dumpW = (int) Math.round(innerH * 0.66);
-        int dumpH = (int) Math.round(dumpW * 661 / 1028.0);
-        paintDump(g, x, top + (innerH - dumpH) / 2 - Theme.px(6), dumpW, dumpH);
-        x += dumpW + Theme.px(18);
-
-        // ---- вскрытый приказ круга и «Завершить ход»
-        int cardH = innerH;
-        int cardW = (int) Math.round(cardH * 661 / 1028.0);
-        paintOrder(g, x, top, cardW, cardH);
-        x += cardW + Theme.px(6);
-        int endW = Theme.px(104);
-        paintEnd(g, x, top, endW, cardH);
-        x += endW + Theme.px(22);
-
-        // ---- руки веером
-        paintHands(g, x, top, w - x - pad, innerH);
+        // ---- СПРАВА: вскрытый приказ круга и «Завершить ход»
+        paintOrder(g, L.orderX(), top, L.orderW(), innerH);
+        paintEnd(g, L.orderX() + L.orderW() + Theme.px(6), top, L.endW(), innerH);
 
         // ---- обводка всего, что можно выбрать
         for (String key : choices.keySet()) {
@@ -581,16 +590,18 @@ public final class PlayerTable extends JComponent {
                 continue;
             }
             boolean hot = key.equals(hoverKey);
+            // ПОДСВЕТКА ПО ФОРМЕ ДЕТАЛИ (26.09.2026): у жетона — его силуэт,
+            // свечение позади в прозрачность и контур по краске.
+            var sil = kelium.gui.replay2.TokenSilhouettes.LAST.get(key);
+            if (sil != null) {
+                kelium.gui.replay2.TokenSilhouettes.glow(g, sil, seatColor, hot);
+                continue;
+            }
             Shape outline = outlines.get(key);
             Shape glow = outline != null ? outline
-                : new RoundRectangle2D.Double(r.x - 3, r.y - 3, r.width + 6, r.height + 6,
-                    Theme.px(10), Theme.px(10));
-            g.setColor(Theme.alpha(seatColor, hot ? 0.28 : 0.12));
-            g.fill(glow);
-            g.setColor(seatColor);
-            g.setStroke(new BasicStroke(hot ? Theme.pxf(3) : Theme.pxf(2),
-                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.draw(glow);
+                : new RoundRectangle2D.Double(r.x - 2, r.y - 2, r.width + 4, r.height + 4,
+                    Theme.px(8), Theme.px(8));
+            softGlow(g, glow, seatColor, hot);
         }
 
         bubbles.paint(g, w, h, key -> {
@@ -598,6 +609,98 @@ public final class PlayerTable extends JComponent {
             return r == null ? null : new Point2D.Double(r.getCenterX(), r.getCenterY());
         }, Theme.px(30));
         g.dispose();
+    }
+
+    /**
+     * МЯГКОЕ СВЕЧЕНИЕ ВОКРУГ ФОРМЫ — для деталей без картинки (ячейки модулей,
+     * хранилище): несколько расширяющихся обводок всё прозрачнее, по краю —
+     * контур. Никаких сплошных заливок поверх печати.
+     */
+    private static void softGlow(Graphics2D g, Shape shape, Color c, boolean hot) {
+        int passes = 6;
+        float reach = Theme.pxf(hot ? 14 : 10);
+        for (int i = passes; i >= 1; i--) {
+            float wdt = reach * i / passes * 2;
+            g.setColor(Theme.alpha(c, (hot ? 0.16 : 0.11) * (1.0 - (i - 1) / (double) passes)));
+            g.setStroke(new BasicStroke(wdt, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.draw(shape);
+        }
+        g.setColor(Theme.alpha(c, hot ? 0.18 : 0.08));
+        g.fill(shape);
+        g.setColor(c);
+        g.setStroke(new BasicStroke(Theme.pxf(hot ? 3 : 2.2), BasicStroke.CAP_ROUND,
+            BasicStroke.JOIN_ROUND));
+        g.draw(shape);
+    }
+
+    // ---------- раскладка ряда ----------
+
+    /**
+     * РАСКЛАДКА ЗОНЫ (просьба дизайнера 26.09.2026): планшеты — ПО ЦЕНТРУ
+     * перед игроком, слева руки стопками и свалка, справа приказ и «Завершить
+     * ход». Всё растёт от высоты зоны одним масштабом; не влезает в ширину —
+     * зона шире окна, и её листают ползунком.
+     */
+    private record Layout(int leftX, int dumpX, int dumpW, int dumpH, int stackH,
+                          int boardsX, int bw, int orderX, int orderW, int endW, int gap,
+                          int width) {
+    }
+
+    private List<Object[]> handGroups() {
+        List<Object[]> hands = new ArrayList<>();
+        if (state == null) {
+            return hands;
+        }
+        hands.add(new Object[]{"objectives", "ЗАДАНИЯ", state.objectives()});
+        if (!state.superObjectives().isEmpty()) {
+            hands.add(new Object[]{"super", "СУПЕР", state.superObjectives()});
+        }
+        hands.add(new Object[]{"orders", "ПРИКАЗЫ", state.ordersInHand()});
+        return hands;
+    }
+
+    /** Ширина стопки из {@code n} карт: карты заходят друг на друга, видна кромка каждой. */
+    private static int stackWidth(int n, int stackH) {
+        double cw = (stackH - Theme.px(22)) * 0.643;
+        return (int) Math.round(cw * (1 + 0.22 * (Math.max(1, n) - 1)) + Theme.px(4));
+    }
+
+    private Layout layout(int w, int h, int top, int innerH) {
+        int pad = Theme.px(20);
+        int gap = Theme.px(18);
+        int stackH = (int) Math.round(innerH * 0.70);
+        int left = 0;
+        for (Object[] hd : handGroups()) {
+            left += stackWidth(((List<?>) hd[2]).size(), stackH) + gap;
+        }
+        int dumpW = (int) Math.round(innerH * 0.52);
+        int dumpH = (int) Math.round(dumpW * 661 / 1028.0);
+        left += dumpW;
+        int bw = 0;
+        if (boards != null && boards.aspect() > 0) {
+            double hang = Math.max(0, boards.hang());
+            bw = (int) Math.round(innerH / (1 + hang) * boards.aspect());
+        }
+        int orderW = (int) Math.round(innerH * 661 / 1028.0);
+        int endW = Theme.px(104);
+        int right = orderW + Theme.px(6) + endW;
+        int minW = pad + left + gap + bw + gap + right + pad;
+        // планшеты по центру окна, пока соседям хватает места
+        int bx = w / 2 - bw / 2;
+        bx = Math.max(bx, pad + left + gap);
+        bx = Math.min(bx, Math.max(pad + left + gap, w - pad - right - gap - bw));
+        int leftX = bx - gap - left;
+        int dumpX = bx - gap - dumpW;
+        int orderX = bx + bw + gap;
+        return new Layout(leftX, dumpX, dumpW, dumpH, stackH, bx, bw, orderX, orderW, endW,
+            gap, minW);
+    }
+
+    /** Сколько ширины нужно зоне при высоте {@code h} (для ползунка прокрутки). */
+    public int contentWidth(int h) {
+        int pad = Theme.px(12);
+        int top = pad + Theme.px(4) + Theme.px(30);
+        return layout(0, h, top, Math.max(Theme.px(80), h - top - pad)).width();
     }
 
     /** Ресурс игрока в строке над столом: значок, цвет, значение, предел (или null). */

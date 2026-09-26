@@ -275,8 +275,44 @@ final class PrintedBoards {
      * меняется вместе с ним.
      */
     private static double зданиеH(int seat) {
+        // ОДИН МАСШТАБ СО ЖЕТОНАМИ ХРАНИЛИЩА (замечание дизайнера 26.09.2026:
+        // «военные здания нереально маленькие, не соответствуют размеру других
+        // зданий на планшете хранилища»). Все жетоны — картонки одного листа,
+        // значит один пиксель картинки — одна и та же доля планшета. Мера —
+        // добытчик в крыле хранилища.
+        double s = пиксельЖетона(seat);
+        if (s > 0) {
+            double max = 0;
+            for (String code : new String[]{"barracks", "factory", "airbase"}) {
+                var f = Textures.found(code, 0, seat);
+                if (f != null && f.image() != null) {
+                    max = Math.max(max, краскаЖетона(f.image())[3] * s);
+                }
+            }
+            if (max > 0) {
+                return max;
+            }
+        }
         var cols = troopCols(seat);
         return cols.isEmpty() ? 215 : cols.get(0).bh();
+    }
+
+    /**
+     * ПИКСЕЛЬ КАРТИНКИ ЖЕТОНА в пикселях печати ПЛАНШЕТА ВОЙСК — так, как
+     * добытчик ложится в верхнее крыло хранилища. −1 — картинок нет.
+     */
+    static double пиксельЖетона(int seat) {
+        BufferedImage вой = troopArt(seat);
+        BufferedImage хр = storageArt(seat);
+        var добытчик = Textures.found("miner", 1, seat);
+        if (вой == null || хр == null || добытчик == null || добытчик.image() == null) {
+            return -1;
+        }
+        // верхнее крыло: половина верхней кромки шестиугольника (доли — как в
+        // крылья()), по длине 0.96, жетон на 5% меньше крыла
+        double крыло = (0.8357 - 0.1657) / 2 * хр.getWidth() * 0.96 * УМЕНЬШЕНИЕ;
+        double f = вой.getHeight() / (double) хр.getHeight();
+        return крыло / добытчик.image().getWidth() * f;
     }
 
     /** Зазор между полосой зданий и кромкой планшета войск. */
@@ -680,8 +716,15 @@ final class PrintedBoards {
             if (!вЗапасе.contains(c.building())) {
                 continue;
             }
+            // рост — по краске СВОЕЙ картинки в общем масштабе жетонов
+            double рост = зданиеH(p.seat);
+            double пикс = пиксельЖетона(p.seat);
+            var f = Textures.found(c.building(), 0, p.seat);
+            if (пикс > 0 && f != null && f.image() != null) {
+                рост = краскаЖетона(f.image())[3] * пикс;
+            }
             жетонЗдания(g, войX + c.labelCx() * k, войY - ЗДАНИЕ_ЗАЗОР * k,
-                зданиеH(p.seat) * k, c.building(), p.seat, spots);
+                рост * k, c.building(), p.seat, spots);
         }
     }
 
@@ -713,6 +756,7 @@ final class PrintedBoards {
                 kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
             at, d, d);
         kelium.report.Mips.draw(g, tex, at);
+        TokenSilhouettes.put("building:" + code, tex, at);
         hit("building:" + code, new Rectangle((int) Math.round(cx - ш / 2),
             (int) Math.round(низ - высота), (int) Math.round(ш), (int) Math.round(высота)));
         if (spots != null) {
@@ -999,6 +1043,7 @@ final class PrintedBoards {
                     kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
                 at, d, d);
             kelium.report.Mips.draw(g, tex, at);
+            TokenSilhouettes.put("building:" + code + ":" + уровень, tex, at);
             hit("building:" + code + ":" + уровень, at.createTransformedShape(
                 new Rectangle(0, 0, tex.getWidth(), tex.getHeight())));
             return;

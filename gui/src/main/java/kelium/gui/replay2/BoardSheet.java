@@ -568,6 +568,8 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                                 Map<String, java.awt.Shape> outlines) {
         PrintedBoards.hits = hits;
         PrintedBoards.outlines = outlines;
+        TokenSilhouettes.LAST.clear();
+        TokenSilhouettes.recording = true;
         // На столе запас войск лежит САМИМИ ЖЕТОНАМИ стопкой, без подписей:
         // сколько осталось, столько и видно (подписи — прибору разбора).
         boolean былиПодписи = PrintedBoards.подписиЗапаса;
@@ -577,6 +579,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         } finally {
             PrintedBoards.hits = null;
             PrintedBoards.outlines = null;
+            TokenSilhouettes.recording = false;
             PrintedBoards.подписиЗапаса = былиПодписи;
         }
     }

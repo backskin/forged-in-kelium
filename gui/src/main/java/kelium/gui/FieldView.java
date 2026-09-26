@@ -761,6 +761,15 @@ public final class FieldView extends JComponent {
      * решения к решению.
      */
     private int topReserve;
+    /** Полоса снизу под кружки действий (26.09.2026). */
+    private int bottomReserve;
+
+    public void setBottomReserve(int px) {
+        this.bottomReserve = Math.max(0, px);
+        if (autoFit) {
+            fitToWindow();
+        }
+    }
     /** Левая кромка карты в мировых координатах — для полосы под карточку вопроса. */
     private double worldMinX = Double.NaN;
 
@@ -797,16 +806,17 @@ public final class FieldView extends JComponent {
         // по бокам от карты пустовало по трети ширины.
         int reserve = topReserve;
         if (reserve > 0) {
-            double full = Math.min(kx, (getHeight() - 2 * margin) / (maxy - miny));
+            double full = Math.min(kx, (getHeight() - bottomReserve - 2 * margin) / (maxy - miny));
             double side = (getWidth() - full * (maxx - minx)) / 2.0;
             if (side >= kelium.gui.kp.FieldBubbles.dockSideMin()) {
                 reserve = 0;
             }
         }
-        double ky = (getHeight() - reserve - 2 * margin) / (maxy - miny);
+        double ky = (getHeight() - reserve - bottomReserve - 2 * margin) / (maxy - miny);
         zoom = Math.max(0.25, Math.min(4.0, Math.min(kx, ky)));
         panX = getWidth() / 2.0 - zoom * (minx + maxx) / 2;
-        panY = reserve + (getHeight() - reserve) / 2.0 - zoom * (miny + maxy) / 2;
+        panY = reserve + (getHeight() - reserve - bottomReserve) / 2.0
+            - zoom * (miny + maxy) / 2;
         fitPending = false;
         repaint();
     }
