@@ -156,6 +156,10 @@ public final class Redact {
         for (String hand : List.of("arsHand", "objHand", "ordHand")) {
             p.put(hand, backs(size(p.get(hand))));
         }
+        // чужие контейнеры: число видно, карты — нет
+        if (p.get("contCards") != null) {
+            p.put("contCards", backs(size(p.get("contCards"))));
+        }
         if (p.get("ordAside") != null) {
             p.put("ordAside", BACK);
         }

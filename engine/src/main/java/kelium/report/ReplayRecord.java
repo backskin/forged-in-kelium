@@ -337,6 +337,8 @@ public final class ReplayRecord {
          */
         public final List<String> shieldedKinds = new ArrayList<>();
         public int containers;
+        /** Карты контейнеров под планшетом (видит владелец; с 27.09.2026). */
+        public final List<String> containerCards = new ArrayList<>();
         public int containerCap;
         public int keliumCap;
         public int ammoCap;
@@ -840,6 +842,7 @@ public final class ReplayRecord {
             v.shieldedKinds.add(u.code);
         }
         v.containers = p.containers;
+        v.containerCards.addAll(p.containerCards);
         int cap = Storage.containerCapacity(s, p);
         v.containerCap = cap == Integer.MAX_VALUE ? -1 : cap;
         // раскладка ячеек склада по складским зданиям — см. Player.storageCells
@@ -1337,6 +1340,9 @@ public final class ReplayRecord {
             o.put("bluePlaced", modulesToMap(p.bluePlaced));
         }
         o.put("arsHand", p.arsenalHand);
+        if (!p.containerCards.isEmpty()) {
+            o.put("contCards", p.containerCards);
+        }
         o.put("arsInst", p.arsenalInstalled);
         if (p.mandateArsenalCard != null) {
             o.put("mandCard", p.mandateArsenalCard);
@@ -1680,6 +1686,7 @@ public final class ReplayRecord {
         }
         p.shieldedKinds.addAll(Json.strings(o, "shields"));
         p.containers = Json.i(o, "containers");
+        p.containerCards.addAll(Json.strings(o, "contCards"));
         p.containerCap = Json.i(o, "containerCap");
         p.keliumCap = Json.i(o, "keliumCap");
         p.ammoCap = Json.i(o, "ammoCap");

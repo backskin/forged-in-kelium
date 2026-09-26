@@ -146,6 +146,15 @@ public final class PlayerState {
     public int containers = 0;
 
     /**
+     * КАКИЕ ИМЕННО КАРТЫ КОНТЕЙНЕРОВ ЛЕЖАТ ПОД ПЛАНШЕТОМ (решение дизайнера
+     * 27.09.2026): карту берут из колоды сразу, когда контейнер получен, и
+     * владелец её видит; вскрывают её спец-действием. Соперникам видно только
+     * число. Карт бывает меньше, чем {@link #containers}, только когда колода
+     * контейнеров кончилась: такой контейнер тянется при вскрытии, как прежде.
+     */
+    public final List<String> containerCards = new ArrayList<>();
+
+    /**
      * ЖЕТОНЫ ЩИТА, ЛЕЖАЩИЕ НА СТРОКАХ ПЛАНШЕТА ВОЙСК (эффект «щит», 17.08.2026).
      *
      * <p>Щит — физический жетон, он кладётся на строку РОДА войск и снимает
@@ -346,6 +355,7 @@ public final class PlayerState {
         p.storageTokens.addAll(storageTokens);
         p.superArsenalCards.addAll(superArsenalCards);
         p.containers = containers;
+        p.containerCards.addAll(containerCards);
         p.shieldedKinds.addAll(shieldedKinds);
         p.mandateArsenalCard = mandateArsenalCard;
         p.mandateContainers = mandateContainers;

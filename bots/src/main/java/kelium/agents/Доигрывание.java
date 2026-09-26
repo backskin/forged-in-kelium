@@ -73,9 +73,17 @@ public final class Доигрывание {
         kelium.core.Deck арсенал = c.decks.get("arsenal");
         int[] заданийУ = new int[c.numPlayers()];
         int[] арсеналаУ = new int[c.numPlayers()];
+        // контейнеры соперников: число видно, какие карты — нет (27.09.2026)
+        kelium.core.Deck контейнеры = c.decks.get("containers");
+        int[] контейнеровУ = new int[c.numPlayers()];
         for (kelium.core.PlayerState p : c.players) {
             if (p.seat == seat) {
                 continue;
+            }
+            if (контейнеры != null) {
+                контейнеровУ[p.seat] = p.containerCards.size();
+                контейнеры.drawPile.addAll(p.containerCards);
+                p.containerCards.clear();
             }
             if (задания != null) {
                 заданийУ[p.seat] = p.objectiveHand.size();
@@ -100,6 +108,10 @@ public final class Доигрывание {
             }
             for (int k = 0; k < арсеналаУ[p.seat] && арсенал != null && !арсенал.drawPile.isEmpty(); k++) {
                 p.arsenalHand.add(арсенал.drawPile.remove(арсенал.drawPile.size() - 1));
+            }
+            for (int k = 0; k < контейнеровУ[p.seat] && контейнеры != null
+                    && !контейнеры.drawPile.isEmpty(); k++) {
+                p.containerCards.add(контейнеры.drawPile.remove(контейнеры.drawPile.size() - 1));
             }
         }
     }

@@ -181,7 +181,16 @@ public final class Objectives {
     private static void paySacrifice(GameState s, PlayerState p, String res, int amt,
                                      String playedCid) {
         switch (res) {
-            case "container" -> p.containers = Math.max(0, p.containers - amt);
+            case "container" -> {
+                p.containers = Math.max(0, p.containers - amt);
+                // сданные карты — в сброс колоды контейнеров, лишних на руке не остаётся
+                while (p.containerCards.size() > p.containers) {
+                    String сдан = p.containerCards.remove(p.containerCards.size() - 1);
+                    if (s.decks.get("containers") != null) {
+                        s.decks.get("containers").discard(сдан);
+                    }
+                }
+            }
             case "objective_cards" -> {
                 int left = amt;
                 List<String> hand = new ArrayList<>(p.objectiveHand);

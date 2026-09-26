@@ -219,6 +219,15 @@ public final class Storage {
             add = Math.min(n, Math.max(0, cap - p.containers));
             p.containers += add;
         }
+        // КАРТА БЕРЁТСЯ СРАЗУ (27.09.2026): владелец видит, что получил.
+        for (int i = 0; i < add && s != null && s.decks != null
+                && s.decks.get("containers") != null; i++) {
+            String cid = s.decks.get("containers").draw(s.rng);
+            if (cid == null) {
+                break;   // колода кончилась — оставшиеся потянутся при вскрытии
+            }
+            p.containerCards.add(cid);
+        }
         if (add > 0) {
             SOURCE_STATS.computeIfAbsent(source,
                 k -> new java.util.concurrent.atomic.LongAdder()).add(add);

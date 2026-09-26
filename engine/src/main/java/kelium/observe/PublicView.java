@@ -216,6 +216,8 @@ public final class PublicView {
         public List<String> orderHand;
         public List<String> objectiveHand;
         public List<String> arsenalHand;
+        /** Карты своих контейнеров (с 27.09.2026 владелец их видит). */
+        public List<String> containerCards;
         public String setAsideOrder;
         /**
          * Свои подложенные карты-символы ЦЕЛИКОМ (kind/card/rev) — владелец
@@ -360,6 +362,7 @@ public final class PublicView {
             st.orderHand = List.copyOf(p.orderHand);
             st.objectiveHand = List.copyOf(p.objectiveHand);
             st.arsenalHand = List.copyOf(p.arsenalHand);
+            st.containerCards = List.copyOf(p.containerCards);
             st.setAsideOrder = p.orderSetAside;
             st.tucked = new ArrayList<>();
             for (ReplayRecord.Tucked t : p.tucked) {

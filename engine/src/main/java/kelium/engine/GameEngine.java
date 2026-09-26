@@ -1401,7 +1401,32 @@ public final class GameEngine {
             return;
         }
         GameState s = state;
-        String cid = s.decks.get("containers").draw(s.rng);
+        // КАРТА УЖЕ НА РУКЕ (27.09.2026): контейнер взят лицом, владелец знает,
+        // что в нём, — и выбирает, какой вскрыть, если их несколько разных.
+        String cid;
+        if (!p.containerCards.isEmpty()) {
+            List<String> разные = new ArrayList<>(new java.util.LinkedHashSet<>(p.containerCards));
+            cid = разные.get(0);
+            if (разные.size() > 1) {
+                List<Choice> opts = new ArrayList<>();
+                for (String id : разные) {
+                    Map<String, Object> k = Ctx.cards(s, "containers").byId(id);
+                    Object подпись = k == null ? id
+                        : ((Map<?, ?>) k.getOrDefault("a", Map.of())).get("label");
+                    // вид «pick_container», а не «open_container»: тот занят
+                    // выбором стороны карты у записей прежних партий
+                    opts.add(new Choice("pick_container", id,
+                        подпись == null ? id : String.valueOf(подпись)));
+                }
+                Choice ch = agents.get(p.seat).choose(s, opts, ev("kind", "pick_container"));
+                if (ch != null && ch.payload() instanceof String выбран) {
+                    cid = выбран;
+                }
+            }
+            p.containerCards.remove(cid);
+        } else {
+            cid = s.decks.get("containers").draw(s.rng);
+        }
         if (cid == null) {
             return;   // I3: пустая колода — жетон НЕ сгорает
         }

@@ -309,6 +309,8 @@ class NetLoopbackTest {
             closed.addAll(p.orderHand);
             closed.addAll(p.objectiveHand);
             closed.addAll(p.arsenalHand);
+            // карты контейнеров под планшетом: свои видны, чужие закрыты (27.09.2026)
+            closed.addAll(p.containerCards);
             if (p.orderSetAside != null) {
                 closed.add(p.orderSetAside);
             }

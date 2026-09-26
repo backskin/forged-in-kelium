@@ -904,17 +904,26 @@ public final class HotSeatWindow {
     }
 
     /**
-     * КОНТЕЙНЕРЫ ПОД ПЛАНШЕТОМ — раскладкой рубашкой вверх. По правилам их
-     * берут не глядя, и что внутри, не знает и сам владелец: раскладка
-     * показывает, сколько их, и говорит, как вскрыть (жалоба дизайнера
-     * 26.09.2026: «нажимаю на контейнер — ничего не происходит»).
+     * КОНТЕЙНЕРЫ ПОД ПЛАНШЕТОМ. Решение дизайнера 27.09.2026: карту контейнера
+     * берут лицом, и владелец видит, что в ней, — поэтому на своём столе
+     * раскладка показывает лица; открыть (получить написанное) — спец-действием.
+     * На чужом столе видно только число — рубашками.
      */
     private void openContainersSpread(ReplayRecord.Player p) {
         java.awt.image.BufferedImage back = kelium.report.Textures.card("deck_containers", "deck");
+        boolean свои = shownSeat() == viewedSeat;
         List<kelium.gui.kp.CardSpread.Card> cards = new ArrayList<>();
         for (int i = 0; i < p.containers; i++) {
-            cards.add(new kelium.gui.kp.CardSpread.Card("container" + i, back, "Контейнер",
-                "рубашкой вверх", List.of()));
+            String id = свои && i < p.containerCards.size() ? p.containerCards.get(i) : null;
+            java.awt.image.BufferedImage лицо = id == null ? null : CardArt.face(id);
+            if (лицо != null) {
+                cards.add(new kelium.gui.kp.CardSpread.Card(id, лицо, cardName(id),
+                    "вскрыть — спец-действием", List.of()));
+            } else {
+                cards.add(new kelium.gui.kp.CardSpread.Card("container" + i, back, "Контейнер",
+                    свои ? "карта ещё не взята — колода кончилась" : "чужой — рубашкой вверх",
+                    List.of()));
+            }
         }
         if (cards.isEmpty()) {
             return;
@@ -923,7 +932,8 @@ public final class HotSeatWindow {
         spread.setBounds(0, 0, frame.getLayeredPane().getWidth(),
             frame.getLayeredPane().getHeight());
         spread.open("Контейнеры под планшетом: " + p.containers,
-            "Лежат рубашкой вверх — что внутри, узнаете при вскрытии спец-действием. "
+            (свои ? "Ваши контейнеры — получите написанное, вскрыв карту спец-действием. "
+                  : "Чужие контейнеры — видно только, сколько их. ")
                 + "Щёлкните мимо карт, чтобы сложить их", cards, Theme.seat(shownSeat()), null);
     }
 
