@@ -92,7 +92,32 @@ public final class ActionStrip extends JComponent {
             }
 
             @Override
+            public void mousePressed(MouseEvent e) {
+                pressX = e.getX();
+                pressScroll = scroll;
+                dragged = false;
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                // ПЕРЕТАСКИВАНИЕ ЛИСТАЕТ ПОЛОСУ, когда кружки не влезают в ширину
+                if (overflow() > 0 && Math.abs(e.getX() - pressX) > Theme.px(6)) {
+                    dragged = true;
+                    setScroll(pressScroll - (e.getX() - pressX));
+                }
+            }
+
+            @Override
             public void mouseClicked(MouseEvent e) {
+                if (dragged) {
+                    dragged = false;
+                    return;              // это было перелистывание, а не щелчок
+                }
+                int arrow = arrowAt(e.getX(), e.getY());
+                if (arrow != 0) {
+                    setScroll(scroll + arrow * cellW() * 2);
+                    return;
+                }
                 int mh = menuAt(e.getX(), e.getY());
                 if (mh >= 0) {
                     SubItem si = menuItem(mh);
@@ -120,6 +145,81 @@ public final class ActionStrip extends JComponent {
         };
         addMouseListener(m);
         addMouseMotionListener(m);
+        // колесо листает полосу, если есть что листать
+        addMouseWheelListener(e -> {
+            if (overflow() > 0) {
+                setScroll(scroll + (int) Math.round(e.getPreciseWheelRotation() * cellW() * 0.6));
+            }
+        });
+    }
+
+    // ==================== перелистывание (27.09.2026) ====================
+    //
+    // ПОЛОСА ЛИСТАЕТСЯ, А НЕ ТЕРЯЕТ КНОПКИ: на «Затаиться» доступны все восемь
+    // действий, спец-действие и конец хода, и в узком окне крайние кружки
+    // молча уходили за край (жалоба дизайнера 27.09.2026 — «Снабжение не
+    // влезло»). Не влезает — у края стрелка и число скрытых, полосу листают
+    // колесом, перетаскиванием или стрелками.
+
+    private int scroll;
+    private int pressX;
+    private int pressScroll;
+    private boolean dragged;
+    private final Rectangle arrowL = new Rectangle();
+    private final Rectangle arrowR = new Rectangle();
+
+    /** Ширина одной кнопки полосы (кружок с подписью). */
+    private static int cellW() {
+        return Theme.px(128);
+    }
+
+    /** Кружок кнопки: на десятую меньше прежнего, подписи — прежние. */
+    private static int ringD() {
+        return Theme.px(68);
+    }
+
+    /** Поле для стрелки листания у края, когда кнопки не влезают. */
+    private static int edgeW() {
+        return Theme.px(46);
+    }
+
+    /** На сколько точек ряд кнопок шире полосы (0 — влезает). */
+    private int overflow() {
+        int total = cellW() * items.size();
+        return total <= getWidth() ? 0 : total - getWidth() + 2 * edgeW();
+    }
+
+    private void setScroll(int v) {
+        int nv = Math.max(0, Math.min(overflow(), v));
+        if (nv != scroll) {
+            scroll = nv;
+            hover = -1;
+            repaint();
+        }
+    }
+
+    /** −1 — стрелка влево, +1 — вправо, 0 — не стрелка. */
+    private int arrowAt(int x, int y) {
+        if (overflow() <= 0) {
+            return 0;
+        }
+        if (scroll > 0 && arrowL.contains(x, y)) {
+            return -1;
+        }
+        if (scroll < overflow() && arrowR.contains(x, y)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    /** Листать полосу — для прогонщиков и тестов. */
+    public void scrollForTest(int px) {
+        setScroll(scroll + px);
+    }
+
+    /** Где сейчас кнопки на полосе (пустой прямоугольник — кнопка за краем). */
+    public List<Rectangle> rectsForTest() {
+        return List.copyOf(rects);
     }
 
     private SubItem menuItem(int i) {
@@ -138,6 +238,7 @@ public final class ActionStrip extends JComponent {
         hover = -1;
         menuHover = -1;
         menuOf = -1;
+        scroll = 0;
         setVisible(!items.isEmpty());
         repaint();
     }
@@ -166,7 +267,8 @@ public final class ActionStrip extends JComponent {
     /** Не ловить мышь там, где кнопок нет: поле под полосой остаётся живым. */
     @Override
     public boolean contains(int x, int y) {
-        return at(x, y) >= 0 || menuAt(x, y) >= 0 || menuPanelContains(x, y);
+        return at(x, y) >= 0 || menuAt(x, y) >= 0 || menuPanelContains(x, y)
+            || arrowAt(x, y) != 0;
     }
 
     private Rectangle menuPanel;
@@ -218,13 +320,19 @@ public final class ActionStrip extends JComponent {
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         int w = getWidth();
         int h = getHeight();
-        int d = Theme.px(76);
-        int cell = Theme.px(136);
+        int d = ringD();
+        int cell = cellW();
         int total = cell * items.size();
-        int x0 = (w - total) / 2;
-        int cy = h - Theme.px(56) - d / 2;
+        scroll = Math.max(0, Math.min(overflow(), scroll));
+        boolean листать = overflow() > 0;
+        int x0 = листать ? edgeW() - scroll : (w - total) / 2;
+        // середина кружка — на прежней высоте, чтобы подписи стояли где стояли
+        int cy = h - Theme.px(56) - Theme.px(76) / 2;
+        // видимая часть ряда: при листании края отданы стрелкам
+        Rectangle окно = листать ? new Rectangle(edgeW(), 0, w - 2 * edgeW(), h)
+            : new Rectangle(0, 0, w, h);
         // мягкое пятно тени под кружками — без прямоугольника
-        double rx = total / 2.0 + Theme.px(80);
+        double rx = Math.min(total, w) / 2.0 + Theme.px(80);
         double ry = stripHeight() * 0.62;
         double scy = cy + Theme.px(16);
         java.awt.geom.AffineTransform squash = new java.awt.geom.AffineTransform();
@@ -246,6 +354,8 @@ public final class ActionStrip extends JComponent {
         gs.dispose();
         rects.clear();
         BufferedImage ring = kelium.report.Textures.icon("action_ring");
+        java.awt.Shape clipWas = g.getClip();
+        g.clip(окно);
         for (int i = 0; i < items.size(); i++) {
             Item it = items.get(i);
             int cx = x0 + cell * i + cell / 2;
@@ -253,7 +363,9 @@ public final class ActionStrip extends JComponent {
             int dd = hot ? d + Theme.px(6) : d;
             Rectangle r = new Rectangle(cx - cell / 2 + Theme.px(4), cy - dd / 2 - Theme.px(4),
                 cell - Theme.px(8), dd + Theme.px(46));
-            rects.add(r);
+            // за краем кнопку не нажать: зона щелчка — только видимая часть
+            Rectangle видно = r.intersection(окно);
+            rects.add(видно.isEmpty() ? new Rectangle() : видно);
             for (int k = 6; k >= 1; k--) {
                 double gr = dd / 2.0 + Theme.px(hot ? 16 : 9) * k / 6.0;
                 g.setColor(Theme.alpha(accent, (hot ? 0.17 : 0.10) * (1 - (k - 1) / 6.0)));
@@ -300,8 +412,56 @@ public final class ActionStrip extends JComponent {
                 g.drawString(it.sub(), cx - fs.stringWidth(it.sub()) / 2, ty + Theme.px(18));
             }
         }
+        g.setClip(clipWas);
+        if (листать) {
+            paintArrows(g, w, cy);
+        }
         paintMenu(g, x0, cell, cy - d / 2 - Theme.px(14));
         g.dispose();
+    }
+
+    /**
+     * СЛЕД, ЧТО ЕСТЬ ЕЩЁ: у края, за которым прячутся кнопки, — круглая стрелка
+     * и число скрытых кнопок; у края без скрытого — ничего.
+     */
+    private void paintArrows(Graphics2D g, int w, int cy) {
+        int r = Theme.px(17);
+        int cell = cellW();
+        int скрытоСлева = (int) Math.ceil(scroll / (double) cell - 0.1);
+        int скрытоСправа = (int) Math.ceil((overflow() - scroll) / (double) cell - 0.1);
+        arrowL.setBounds(0, 0, 0, 0);
+        arrowR.setBounds(0, 0, 0, 0);
+        for (int side = -1; side <= 1; side += 2) {
+            int скрыто = side < 0 ? скрытоСлева : скрытоСправа;
+            if (скрыто <= 0) {
+                continue;
+            }
+            int cx = side < 0 ? edgeW() / 2 : w - edgeW() / 2;
+            Rectangle zone = new Rectangle(cx - edgeW() / 2, cy - Theme.px(60), edgeW(),
+                Theme.px(120));
+            (side < 0 ? arrowL : arrowR).setBounds(zone);
+            g.setColor(Theme.alpha(Color.BLACK, 0.55));
+            g.fill(new Ellipse2D.Double(cx - r, cy - r, 2 * r, 2 * r));
+            g.setColor(accent);
+            g.setStroke(new BasicStroke(Theme.pxf(2.2)));
+            g.draw(new Ellipse2D.Double(cx - r, cy - r, 2 * r, 2 * r));
+            int a = Theme.px(6);
+            java.awt.geom.Path2D.Double tri = new java.awt.geom.Path2D.Double();
+            tri.moveTo(cx - side * a * 0.6, cy - a);
+            tri.lineTo(cx + side * a, cy);
+            tri.lineTo(cx - side * a * 0.6, cy + a);
+            g.setColor(Color.WHITE);
+            g.setStroke(new BasicStroke(Theme.pxf(2.6), BasicStroke.CAP_ROUND,
+                BasicStroke.JOIN_ROUND));
+            g.draw(tri);
+            g.setFont(Theme.font(12.5, Font.BOLD));
+            FontMetrics fm = g.getFontMetrics();
+            String n = "ещё " + скрыто;
+            g.setColor(Theme.alpha(Color.BLACK, 0.7));
+            g.drawString(n, cx - fm.stringWidth(n) / 2 + 1, cy + r + Theme.px(17) + 1);
+            g.setColor(Theme.ink());
+            g.drawString(n, cx - fm.stringWidth(n) / 2, cy + r + Theme.px(17));
+        }
     }
 
     /** Меню спец-действия над своей кнопкой: доступное ярко, недоступное серым с причиной. */
