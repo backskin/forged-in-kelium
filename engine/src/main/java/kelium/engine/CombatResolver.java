@@ -121,6 +121,35 @@ public final class CombatResolver {
      * бьёт не гекс, а любой жетон. Сидящие ВНУТРИ здания сюда не входят:
      * гарнизон не стреляет, он прячется.
      */
+    /**
+     * БОЙ ПО ЦЕЛИ: свои войска, которые бьют по гексу {@code target} — живые,
+     * не в здании, стоят на СОСЕДНЕМ гексе и не отгорожены от цели стенкой.
+     */
+    private List<UnitToken> стрелкиПоЦели(int seat, String target) {
+        List<UnitToken> out = new ArrayList<>();
+        for (UnitToken u : aliveUnitsOnField(seat)) {
+            if (!target.equals(u.hexId) && state.field.neighbors(u.hexId).contains(target)
+                    && Passability.canShootAcross(state, u, target)) {
+                out.add(u);
+            }
+        }
+        return out;
+    }
+
+    /** БОЙ ПО ЦЕЛИ: гексы, по которым хоть один свой жетон может ударить. */
+    private List<String> целиПоЦели(int seat, Integer restrictTargetOwner) {
+        Set<String> out = new java.util.TreeSet<>();
+        for (UnitToken u : aliveUnitsOnField(seat)) {
+            for (String n : state.field.neighbors(u.hexId)) {
+                if (!out.contains(n) && validTarget(n, seat, restrictTargetOwner)
+                        && Passability.canShootAcross(state, u, n)) {
+                    out.add(n);
+                }
+            }
+        }
+        return new ArrayList<>(out);
+    }
+
     private List<UnitToken> aliveUnitsOnField(int seat) {
         List<UnitToken> out = new ArrayList<>();
         for (UnitToken u : state.player(seat).units) {
@@ -688,55 +717,79 @@ public final class CombatResolver {
             бойПередБоем(attackerSeat);
         }
 
-        // Шаг 1: выбрать свой гекс, где есть хотя бы один живой юнит.
-        Set<String> srcSet = new java.util.TreeSet<>();
-        for (UnitToken u : p.units) {
-            if (u.hexId != null && u.alive()
-                    && (толькоСГекса == null || толькоСГекса.equals(u.hexId))) {
-                srcSet.add(u.hexId);
+        // БОЙ ПО ЦЕЛИ (решение дизайнера 26.09.2026: «выбираешь гекс, и все
+        // соседние гексы могут бить по этому гексу цели. Вот весь бой.»).
+        // Никаких доплат и присоединений: каждый свой жетон с соседнего гекса
+        // делает ОДНУ атаку, а жертву внутри атакуемого гекса выбирает сам.
+        // Контратака (бьёт принудительно заданный гекс) играет прежним путём.
+        boolean поЦели = толькоСГекса == null && "target_hex".equals(
+            rs.getStr("actions.combat.surcharge_model", "right_to_battle"));
+        String source;
+        if (поЦели) {
+            List<Choice> tgtOpts = new ArrayList<>();
+            for (String h : целиПоЦели(attackerSeat, restrictTargetOwner)) {
+                tgtOpts.add(new Choice("combat_target", h, h));
             }
-        }
-        if (srcSet.isEmpty()) {
-            dry(attackerSeat, null, null, "нет своих войск на поле");
-            return false;
-        }
-        List<Choice> srcOpts = new ArrayList<>();
-        for (String h : srcSet) {
-            srcOpts.add(new Choice("combat_source", h, h));
-        }
-        srcOpts.add(new Choice("pass", null, "не бить"));
-        Choice src = agent.choose(s, srcOpts,
-            Map.of("kind", "combat_source", "retaliation", isRetaliation));
-        if (src.payload() == null) {
-            // Игрок сам отказался бить. Но отказ отказу рознь, и различие тут
-            // принципиальное: если бить было НЕЧЕМ, отказ правильный, а действие
-            // испортила прежняя решимость взять Бой при пустом поле. Если же
-            // выстрел был — это ошибка бота, и чинится она в оценке, а не в
-            // правилах. Проверяем честно: есть ли хоть один свой гекс, с которого
-            // достаём хоть одну допустимую цель.
-            // Проверять НАДО ТЕМ ЖЕ мерилом, каким пользуется игрок, иначе замер
-            // соврёт: «цель рядом есть» — ещё не «я могу по ней попасть». Род
-            // войск бьёт только две категории из четырёх, и рядом может стоять
-            // ровно то, чего он не пробивает. Поэтому canAttack, а не соседство.
-            boolean hadShot = false;
+            if (tgtOpts.isEmpty()) {
+                dry(attackerSeat, null, null, "рядом с твоими войсками нет цели");
+                return false;
+            }
+            // Отказа здесь нет, как и в прежнем выборе цели: Бой уже выбран, а
+            // передумавший живой игрок отменяет шаг.
+            Choice tgt = agent.choose(s, tgtOpts,
+                Map.of("kind", "combat_target", "source", "", "retaliation", isRetaliation));
+            source = (String) tgt.payload();
+        } else {
+            // Шаг 1: выбрать свой гекс, где есть хотя бы один живой юнит.
+            Set<String> srcSet = new java.util.TreeSet<>();
+            for (UnitToken u : p.units) {
+                if (u.hexId != null && u.alive()
+                        && (толькоСГекса == null || толькоСГекса.equals(u.hexId))) {
+                    srcSet.add(u.hexId);
+                }
+            }
+            if (srcSet.isEmpty()) {
+                dry(attackerSeat, null, null, "нет своих войск на поле");
+                return false;
+            }
+            List<Choice> srcOpts = new ArrayList<>();
             for (String h : srcSet) {
-                for (String n : targetHexesFrom(h)) {
-                    if (validTarget(n, attackerSeat, restrictTargetOwner)
-                            && canAttack(attackerSeat, h, n)) {
-                        hadShot = true;
+                srcOpts.add(new Choice("combat_source", h, h));
+            }
+            srcOpts.add(new Choice("pass", null, "не бить"));
+            Choice src = agent.choose(s, srcOpts,
+                Map.of("kind", "combat_source", "retaliation", isRetaliation));
+            if (src.payload() == null) {
+                // Игрок сам отказался бить. Но отказ отказу рознь, и различие тут
+                // принципиальное: если бить было НЕЧЕМ, отказ правильный, а действие
+                // испортила прежняя решимость взять Бой при пустом поле. Если же
+                // выстрел был — это ошибка бота, и чинится она в оценке, а не в
+                // правилах. Проверяем честно: есть ли хоть один свой гекс, с которого
+                // достаём хоть одну допустимую цель.
+                // Проверять НАДО ТЕМ ЖЕ мерилом, каким пользуется игрок, иначе замер
+                // соврёт: «цель рядом есть» — ещё не «я могу по ней попасть». Род
+                // войск бьёт только две категории из четырёх, и рядом может стоять
+                // ровно то, чего он не пробивает. Поэтому canAttack, а не соседство.
+                boolean hadShot = false;
+                for (String h : srcSet) {
+                    for (String n : targetHexesFrom(h)) {
+                        if (validTarget(n, attackerSeat, restrictTargetOwner)
+                                && canAttack(attackerSeat, h, n)) {
+                            hadShot = true;
+                            break;
+                        }
+                    }
+                    if (hadShot) {
                         break;
                     }
                 }
-                if (hadShot) {
-                    break;
-                }
+                dry(attackerSeat, null, null, hadShot
+                    ? "сам отказался бить, ХОТЯ МОГ"
+                    : "сам отказался бить (бить было нечем)");
+                return false;
             }
-            dry(attackerSeat, null, null, hadShot
-                ? "сам отказался бить, ХОТЯ МОГ"
-                : "сам отказался бить (бить было нечем)");
-            return false;
+            source = (String) src.payload();
         }
-        String source = (String) src.payload();
 
         // ГРАММАТИКА БОЯ. Свод 1.35.0 и новее играет вариант С1 «Близнец
         // Движения» (решение дизайнера 04.09.2026): выбранный гекс бьёт даром,
@@ -773,13 +826,13 @@ public final class CombatResolver {
             .of(s, attackerSeat, kelium.engine.ability.Hook.ATTACK_RANGE)
             .about(source).base(1).ask());
         List<String> targets = new ArrayList<>();
-        for (String h : targetHexesFrom(source)) {
+        for (String h : поЦели ? List.of(source) : targetHexesFrom(source)) {
             if (validTarget(h, attackerSeat, restrictTargetOwner)
                     && anyCanShootAcross(attackerSeat, source, h)) {
                 targets.add(h);
             }
         }
-        if (range >= 2) {
+        if (range >= 2 && !поЦели) {
             // Второй пояс: соседи соседей. Стенки на пути не проверяем — цель
             // указывает авиация сверху, а бьют по указанному гексу.
             for (String near : s.field.neighbors(source)) {
@@ -791,14 +844,14 @@ public final class CombatResolver {
                 }
             }
         }
-        if (targets.isEmpty() && !близнецДвижения) {
+        if (targets.isEmpty() && !близнецДвижения && !поЦели) {
             dry(attackerSeat, source, null, "рядом нет цели, до которой достаём");
             return false;
         }
         // ОБЩАЯ ЦЕЛЬ — только в старой грамматике. В «Близнеце Движения» цель
         // выбирает каждый жетон отдельно, прямо в строке атаки.
-        String общаяЦель = null;
-        if (!близнецДвижения) {
+        String общаяЦель = поЦели ? source : null;
+        if (!близнецДвижения && !поЦели) {
             List<Choice> tgtOpts = new ArrayList<>();
             for (String h : targets) {
                 tgtOpts.add(new Choice("combat_target", h, h));
@@ -814,7 +867,8 @@ public final class CombatResolver {
         // КТО МОЖЕТ БИТЬ. В старой грамматике — только войска выбранного гекса.
         // В «Близнеце» — все свои войска на поле; те, что не в выбранном гексе,
         // доплачивают за право стрелять.
-        List<UnitToken> attackers = близнецДвижения && толькоСГекса == null
+        List<UnitToken> attackers = поЦели ? стрелкиПоЦели(attackerSeat, source)
+            : близнецДвижения && толькоСГекса == null
             ? aliveUnitsOnField(attackerSeat) : unitsOf(attackerSeat, source);
         Set<String> usedRows = new HashSet<>();   // "uid:row"
         boolean[] firstAttackUsed = {false};
@@ -834,6 +888,10 @@ public final class CombatResolver {
                 // а не при сборке списка: список собирается один раз, а гибнут
                 // по ходу дела.
                 if (u.hexId == null || !u.alive()) {
+                    continue;
+                }
+                // бой по цели: у каждого жетона ОДНА атака за действие
+                if (поЦели && стреляли.contains(u.uid)) {
                     continue;
                 }
                 // ЦЕЛИ ЭТОГО ЖЕТОНА. В старой грамматике она одна на всех, в
@@ -1405,7 +1463,10 @@ public final class CombatResolver {
     public boolean canAttack(int attackerSeat, String source, String target) {
         PlayerState p = state.player(attackerSeat);
         boolean closed = hexClosedAgainst(target, attackerSeat);
-        for (UnitToken u : unitsOf(attackerSeat, source)) {
+        // пустой источник — бой по цели: бьют все свои жетоны с соседних гексов
+        List<UnitToken> стрелки = source == null || source.isBlank()
+            ? стрелкиПоЦели(attackerSeat, target) : unitsOf(attackerSeat, source);
+        for (UnitToken u : стрелки) {
             for (AttackRow ar : attackRows(attackerSeat, u)) {
                 int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, target,
                     new boolean[]{true});
