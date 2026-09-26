@@ -54,6 +54,12 @@ public final class NetClientWindow {
     private JPanel optionList;
     private JTextArea hand;
     private JTextArea feed;
+    private KpButton undoBtn;
+    private KpButton undoAllBtn;
+    private NetOverlay overlay;
+    private NetChatDock chat;
+    private final List<String> pendingChat = new ArrayList<>();
+    private boolean closedByHost;
     private ReplayRecord rec;
     private Map<String, Object> question;
     private boolean finished;
@@ -101,6 +107,18 @@ public final class NetClientWindow {
         side.setBorder(BorderFactory.createMatteBorder(0, Theme.px(1), 0, 0, Theme.border()));
         promptLabel = label("Вопросов пока нет", 16, Font.BOLD, Theme.ink2());
         side.add(promptLabel, "wrap");
+        // ОТМЕНА СВОИХ РЕШЕНИЙ — как за горячим стулом, но не глубже первого
+        // чужого решения (решение Влада 26.09.2026); можно ли — говорит хост.
+        undoBtn = new KpButton("Шаг назад", "Ctrl+Z", null);
+        undoBtn.setToolTipText("Отменить последнее своё решение в этом круге");
+        undoBtn.onClick(() -> undo(false));
+        undoAllBtn = new KpButton("К началу хода", "", null);
+        undoAllBtn.setToolTipText("Отменить всё, что вы решили в этом круге, "
+            + "пока после вас не ходил другой игрок");
+        undoAllBtn.onClick(() -> undo(true));
+        side.add(undoBtn, "split 2, w " + Theme.px(180) + "!, h " + Theme.px(42) + "!");
+        side.add(undoAllBtn, "w " + Theme.px(200) + "!, h " + Theme.px(42) + "!, wrap");
+        refreshUndo(0);
         optionList = new JPanel(new MigLayout("insets 0, fillx, gapy " + Theme.px(6),
             "[grow,fill]"));
         optionList.setBackground(Theme.panel());
@@ -126,9 +144,26 @@ public final class NetClientWindow {
                 }
             }
         });
+        frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+            javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Z,
+                java.awt.event.InputEvent.CTRL_DOWN_MASK), "undo-step");
+        frame.getRootPane().getActionMap().put("undo-step", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                undo(false);
+            }
+        });
+
         frame.setSize(Theme.px(1500), Theme.px(900));
         frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
+        kelium.gui.Offscreen.show(frame);
+        overlay = new NetOverlay(frame);
+        chat = new NetChatDock(frame, client::chat);
+        overlay.allow(chat);
+        for (String line : pendingChat) {
+            chat.add(line);
+        }
+        pendingChat.clear();
     }
 
     // ==================== от хоста (поток провода) ====================
@@ -165,6 +200,83 @@ public final class NetClientWindow {
             status.setForeground(Theme.points());
             promptLabel.setText("Сид партии: " + r.get("seed") + " — её можно пересмотреть");
         });
+    }
+
+    /** Строка чата «кто: что». */
+    void chat(String line) {
+        SwingUtilities.invokeLater(() -> {
+            if (chat == null) {
+                pendingChat.add(line);
+            } else {
+                chat.add(line);
+            }
+        });
+    }
+
+    /** Игрок вышел из игры — затенение и «ждём решения хоста», без кнопок. */
+    void paused(int who, String whoName, boolean waiting) {
+        SwingUtilities.invokeLater(() -> {
+            if (overlay == null || closedByHost) {
+                return;
+            }
+            overlay.display("Игрок " + (who + 1) + (whoName == null ? "" : " (" + whoName + ")")
+                    + " вышел из игры",
+                waiting ? "Ждём решения хоста. Хост ждёт, когда игрок вернётся."
+                    : "Ждём решения хоста.", List.of());
+        });
+    }
+
+    /** Игрок вернулся или место отдано боту — игра продолжается. */
+    void resumed(int who, String how) {
+        SwingUtilities.invokeLater(() -> {
+            if (overlay == null || closedByHost) {
+                return;
+            }
+            overlay.dismiss();
+            feed.append(("bot".equals(how) ? "Место игрока " + name(who) + " отдано боту"
+                : name(who) + " вернулся в игру") + "\n");
+        });
+    }
+
+    /** Хост закрыл партию — в том же окне: текст и «Выйти из игры». */
+    void closed() {
+        SwingUtilities.invokeLater(() -> {
+            finished = true;
+            closedByHost = true;
+            clearQuestion();
+            status.setText("Хост закрыл партию");
+            status.setForeground(Theme.bad());
+            if (overlay != null) {
+                overlay.display("Хост закрыл партию", "Партия окончена без итога.",
+                    List.of(new NetOverlay.Action("Выйти из игры", "закрыть окно партии",
+                        () -> frame.dispose(), true, false)));
+            }
+        });
+    }
+
+    /** Хост не пустил обратно (место отдано боту) — то же окно, «Выйти из игры». */
+    void rejected(String reason) {
+        SwingUtilities.invokeLater(() -> {
+            finished = true;
+            closedByHost = true;
+            clearQuestion();
+            status.setText("Вы вне партии: " + reason);
+            status.setForeground(Theme.bad());
+            if (overlay != null) {
+                overlay.display("Вы вне партии", cap(reason) + ".",
+                    List.of(new NetOverlay.Action("Выйти из игры", "закрыть окно партии",
+                        () -> frame.dispose(), true, false)));
+            }
+        });
+    }
+
+    private static String cap(String s) {
+        return s == null || s.isEmpty() ? "" : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    /** Что на шторке сейчас (для проверок); null — шторки нет. */
+    String overlayTitle() {
+        return overlay != null && overlay.shown() ? overlay.titleText() : null;
     }
 
     void disconnected() {
@@ -299,7 +411,25 @@ public final class NetClientWindow {
         }
         optionList.revalidate();
         optionList.repaint();
-        if (!byHex.isEmpty()) {
+        refreshUndo(q.get("undo") instanceof Number n ? n.intValue() : 0);
+        if (q.get("facing") instanceof Map<?, ?> fm && fm.get("hex") instanceof String fhex
+                && fm.get("variants") instanceof List<?> vl) {
+            // ВЫБОР СЕКТОРОВ НА ГЕКСЕ — как в окне партии: колесо вращает дугу,
+            // щелчок по гексу ставит; кнопки остаются равноправным путём
+            List<List<Integer>> variants = new ArrayList<>();
+            for (Object v : vl) {
+                List<Integer> sides = new ArrayList<>();
+                for (Object o : (List<Object>) v) {
+                    sides.add(((Number) o).intValue());
+                }
+                variants.add(sides);
+            }
+            if (fm.get("ghost") instanceof String ghost) {
+                field.setGhost(ghost, seat);
+            }
+            field.clearSelectable();
+            field.setFacingChoice(fhex, variants, idx -> answer(seq, idx));
+        } else if (!byHex.isEmpty()) {
             field.setSelectable(byHex.keySet(), h -> {
                 Integer i = byHex.get(h);
                 if (i != null) {
@@ -309,6 +439,33 @@ public final class NetClientWindow {
         } else {
             field.clearSelectable();
         }
+    }
+
+    /** Отменить своё решение: шаг назад или к началу хода. */
+    private void undo(boolean all) {
+        if (question == null || finished) {
+            return;
+        }
+        int can = question.get("undo") instanceof Number k ? k.intValue() : 0;
+        if (can < (all ? 2 : 1)) {
+            return;
+        }
+        int seq = ((Number) question.get("seq")).intValue();
+        client.undo(seq, all);
+        clearQuestion();
+        status.setText("Отмена — стол переигрывается…");
+        status.setForeground(Theme.ink2());
+    }
+
+    /** Кнопки отмены живы, только когда есть что отменять. */
+    private void refreshUndo(int n) {
+        if (undoBtn == null) {
+            return;
+        }
+        undoBtn.setState(n > 0 ? KpButton.State.AVAILABLE : KpButton.State.DISABLED);
+        undoAllBtn.setState(n > 1 ? KpButton.State.AVAILABLE : KpButton.State.DISABLED);
+        undoBtn.setTexts("Шаг назад", n > 0 ? "Ctrl+Z" : "нечего отменять");
+        undoAllBtn.setTexts("К началу хода", n > 1 ? "шагов: " + n : "");
     }
 
     private void answer(int seq, int index) {
@@ -330,6 +487,9 @@ public final class NetClientWindow {
             promptLabel.setText("Вопросов пока нет");
             promptLabel.setForeground(Theme.ink2());
             field.clearSelectable();
+            field.clearFacingChoice();
+            field.clearGhost();
+            refreshUndo(0);
         }
     }
 

@@ -250,6 +250,11 @@ public final class LobbyWindow {
 
             @Override
             public void reject(String reason) {
+                NetClientWindow g = game;
+                if (g != null) {
+                    g.rejected(reason);      // посреди партии: место отдано боту
+                    return;
+                }
                 SwingUtilities.invokeLater(() -> {
                     client = null;
                     if (seatList != null) {
@@ -269,6 +274,34 @@ public final class LobbyWindow {
             @Override
             public void chat(String from, String text) {
                 SwingUtilities.invokeLater(() -> addChat(from + ": " + text));
+                NetClientWindow g = game;
+                if (g != null) {
+                    g.chat(from + ": " + text);
+                }
+            }
+
+            @Override
+            public void paused(int seat, String name, boolean waiting) {
+                NetClientWindow g = game;
+                if (g != null) {
+                    g.paused(seat, name, waiting);
+                }
+            }
+
+            @Override
+            public void resumed(int seat, String how) {
+                NetClientWindow g = game;
+                if (g != null) {
+                    g.resumed(seat, how);
+                }
+            }
+
+            @Override
+            public void closed() {
+                NetClientWindow g = game;
+                if (g != null) {
+                    g.closed();
+                }
             }
 
             @Override

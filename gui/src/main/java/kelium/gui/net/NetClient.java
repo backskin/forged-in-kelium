@@ -47,6 +47,15 @@ public final class NetClient {
 
         default void error(String text) { }
 
+        /** Игрок {@code seat} вышел из игры — партия на паузе; {@code waiting} — хост решил ждать. */
+        default void paused(int seat, String name, boolean waiting) { }
+
+        /** Пауза снята: {@code how} — {@code back} (вернулся) или {@code bot} (место боту). */
+        default void resumed(int seat, String how) { }
+
+        /** Хост закрыл партию. */
+        default void closed() { }
+
         default void disconnected() { }
     }
 
@@ -142,6 +151,14 @@ public final class NetClient {
             case NetProtocol.DECIDE -> listener.decide(m);
             case NetProtocol.OVER -> listener.over(m);
             case NetProtocol.ERROR -> listener.error(NetProtocol.s(m, "text"));
+            case NetProtocol.PAUSE -> listener.paused(NetProtocol.i(m, "seat", -1),
+                NetProtocol.s(m, "name"), Boolean.TRUE.equals(m.get("waiting")));
+            case NetProtocol.RESUME -> listener.resumed(NetProtocol.i(m, "seat", -1),
+                NetProtocol.s(m, "how"));
+            case NetProtocol.CLOSED -> {
+                closing = true;          // переподключаться больше не к чему
+                listener.closed();
+            }
             case NetProtocol.BYE -> closing = true;
             default -> { }
         }
@@ -183,6 +200,23 @@ public final class NetClient {
     /** Ответ на вопрос {@code seq}: номер варианта. */
     public void answer(int seq, int index) {
         send(msg(NetProtocol.ANSWER, "seq", seq, "i", index));
+    }
+
+    /**
+     * Отменить своё решение, пока висит вопрос {@code seq}: шаг назад или
+     * ({@code all}) к началу хода. Хост решает, можно ли (не глубже первого
+     * чужого решения), и присылает запись заново и вопрос.
+     */
+    public void undo(int seq, boolean all) {
+        send(msg(NetProtocol.UNDO, "seq", seq, "all", all));
+    }
+
+    /** Порвать связь без «пока» — как пропавшая сеть (для проверок). */
+    void drop() {
+        Wire w = wire;
+        if (w != null) {
+            w.hardClose();
+        }
     }
 
     public void resync() {

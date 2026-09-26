@@ -11,12 +11,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 import kelium.core.Choice;
+import kelium.core.GameAborted;
 import kelium.core.GameState;
 import kelium.gui.HotSeatWindow;
 import kelium.gui.kp.ChoiceWords;
@@ -84,6 +88,29 @@ public final class NetHost {
     public volatile Consumer<String> onChat = s -> { };
     /** Служебные строки (кто вошёл, кто отвалился). */
     public volatile Consumer<String> log = s -> System.out.println("[стол] " + s);
+    /** Слушатели чата сверх {@link #onChat} — окно партии, тесты. Любой поток. */
+    public final List<Consumer<String>> chatListeners = new CopyOnWriteArrayList<>();
+    /**
+     * Слушатели паузы: игрок вышел, хост решил ждать, пауза снята. Состояние —
+     * {@link #awaySeat()}, {@link #waitingFor(int)}. Любой поток.
+     */
+    public final List<Runnable> pauseListeners = new CopyOnWriteArrayList<>();
+
+    /** Бот, которому хост отдаёт место ушедшего игрока. */
+    public static final String STAND_IN_BOT = "builder:2";
+
+    // ---- пауза: кто вышел из идущей партии ----
+    private final Object pauseLock = new Object();
+    /** Места, вышедшие из партии, — пока есть хоть одно, партия стоит. Под pauseLock. */
+    private final Set<Integer> away = new LinkedHashSet<>();
+    /** Места, которых хост решил ждать. Под pauseLock. */
+    private final Set<Integer> waiting = new LinkedHashSet<>();
+    /** Хост закрыл стол посреди партии. */
+    private volatile boolean closed;
+    /** Ведущий партию (окно хоста или {@link NetGame}) — лента и отмена. */
+    private volatile NetSeats.Link link;
+    /** Сколько кадров пришло от движка — проверка паузы в тестах. */
+    private volatile int framesSeen;
 
     // ---- зеркало записи партии ----
     private ReplayRecord head;
@@ -186,6 +213,8 @@ public final class NetHost {
                 }
             }
             case NetProtocol.RESYNC -> resync(s);
+            case NetProtocol.UNDO -> undo(s, NetProtocol.i(m, "seq", -1),
+                Boolean.TRUE.equals(m.get("all")));
             case NetProtocol.BYE -> w.close();
             default -> { }
         }
@@ -217,6 +246,10 @@ public final class NetHost {
                         seat = s;
                         reconnect = true;
                         break;
+                    }
+                    if (token.equals(s.token) && s.kind == Kind.BOT) {
+                        reject(w, "хост отдал ваше место боту");
+                        return -1;
                     }
                 }
             }
@@ -255,6 +288,13 @@ public final class NetHost {
         if (started) {
             w.send(startMessage(seat.index));
             resync(seat);
+            if (reconnect) {
+                back(seat.index);          // вернулся — пауза по нему снимается
+            }
+            Map<String, Object> p = pauseMessage();
+            if (p != null) {
+                w.send(p);                 // кто-то другой ещё не вернулся
+            }
         }
         return seat.index;
     }
@@ -282,6 +322,9 @@ public final class NetHost {
         }
         log.accept((started ? "нет связи: " : "вышел: ") + s.name);
         changed();
+        if (started && !finished && !closed && s.kind == Kind.REMOTE) {
+            left(s.index);
+        }
     }
 
     private void moveSeat(int[] bound, int to) {
@@ -327,6 +370,11 @@ public final class NetHost {
 
     public boolean started() {
         return started;
+    }
+
+    /** Партия окончена или стол закрыт. */
+    public boolean finished() {
+        return finished;
     }
 
     /** Отдать открытое место боту (до старта). */
@@ -381,6 +429,9 @@ public final class NetHost {
         chatLog.add(from + ": " + t);
         broadcast(msg(NetProtocol.CHAT, "from", from, "text", t));
         onChat.accept(from + ": " + t);
+        for (Consumer<String> l : chatListeners) {
+            l.accept(from + ": " + t);
+        }
     }
 
     /** Почему нельзя начинать; null — можно. */
@@ -500,6 +551,13 @@ public final class NetHost {
      * заново вся запись.
      */
     public void onFrame(ReplayRecord r) {
+        gate();
+        framesSeen++;
+        mirror(r);
+    }
+
+    /** Кадры — в зеркало и, если пора, по местам. */
+    private void mirror(ReplayRecord r) {
         synchronized (this) {
             if (r != head) {
                 head = r;
@@ -633,6 +691,7 @@ public final class NetHost {
             }
             opts.add(o);
         }
+        Map<String, Object> facing = facingOf(kind, options, context);
         Object view = null;
         try {
             view = Json.parse(PublicView.of(state, seat).toJson());
@@ -641,7 +700,46 @@ public final class NetHost {
         }
         return msg(NetProtocol.DECIDE, "seq", seq, "kind", kind,
             "prompt", HotSeatWindow.kindLabel(kind), "round", state.round, "circle", state.circle,
-            "options", opts, "view", view);
+            "undo", undoTargets(seat, state.round, state.circle).size(),
+            "options", opts, "facing", facing, "view", view);
+    }
+
+    /**
+     * ВЫБОР СЕКТОРОВ НА ГЕКСЕ (поворот здания, центра управления, сектор
+     * войска): гекс, дуги секторов по вариантам и призрак — клиент ставит
+     * щелчком по полю, как окно партии. null — вопрос не такой.
+     */
+    static Map<String, Object> facingOf(String kind, List<Choice> options,
+                                        Map<String, Object> context) {
+        if (!("build_facing".equals(kind) || "cu_sides".equals(kind)
+                || "unit_sector".equals(kind)) || !(context.get("hex") instanceof String hex)) {
+            return null;
+        }
+        List<Object> variants = new ArrayList<>();
+        for (Choice c : options) {
+            if (!(c.payload() instanceof List<?> l)) {
+                return null;
+            }
+            List<Object> sides = new ArrayList<>();
+            for (Object o : l) {
+                if (!(o instanceof Number n)) {
+                    return null;
+                }
+                sides.add(n.intValue());
+            }
+            variants.add(sides);
+        }
+        if (variants.isEmpty()) {
+            return null;
+        }
+        String ghost = context.get("btype") instanceof String bt ? bt
+            : context.get("utype") instanceof String ut ? ut
+            : "cu_sides".equals(kind) ? "command_center" : null;
+        Map<String, Object> f = new LinkedHashMap<>();
+        f.put("hex", hex);
+        f.put("variants", variants);
+        f.put("ghost", ghost);
+        return f;
     }
 
     private static final java.util.regex.Pattern HEX_ID = java.util.regex.Pattern.compile(
@@ -666,7 +764,7 @@ public final class NetHost {
     public void finish(ReplayRecord rec, List<Integer> moves) {
         synchronized (this) {
             if (rec != null) {
-                onFrame(rec);
+                mirror(rec);
             }
             flush();
             finished = true;
@@ -683,7 +781,15 @@ public final class NetHost {
 
     /** Закрыть стол: агенты размыкаются, провода рвутся, порт закрывается. */
     public void close() {
+        boolean midGame = started && !finished;
+        closed = true;
         finished = true;
+        synchronized (pauseLock) {
+            pauseLock.notifyAll();
+        }
+        if (midGame) {
+            broadcast(msg(NetProtocol.CLOSED));
+        }
         for (Seat s : seats) {
             RemoteAgent a = s.agent;
             if (a != null) {
@@ -713,6 +819,278 @@ public final class NetHost {
                 w.send(m);
             }
         }
+    }
+
+    // ==================== отвал игрока: пауза ====================
+
+    /**
+     * ИГРОК ВЫШЕЛ ИЗ ИДУЩЕЙ ПАРТИИ (решение Влада 26.09.2026): партия встаёт на
+     * паузу. У хоста — шторка с выбором «ждать / боту / закрыть», у остальных —
+     * «игрок вышел, ждём решения хоста». Пауза держится на потоке движка:
+     * каждый кадр партии проходит {@link #gate()}.
+     */
+    private void left(int seat) {
+        synchronized (pauseLock) {
+            if (!away.add(seat)) {
+                return;
+            }
+        }
+        log.accept("партия на паузе: " + seatName(seat) + " вышел из игры");
+        pauseChanged(seat, null);
+    }
+
+    /** Игрок вернулся на своё место — пауза по нему снимается. */
+    private void back(int seat) {
+        synchronized (pauseLock) {
+            waiting.remove(seat);
+            if (!away.remove(seat)) {
+                return;
+            }
+            pauseLock.notifyAll();
+        }
+        log.accept("вернулся в партию: " + seatName(seat));
+        pauseChanged(seat, "back");
+    }
+
+    /** Хост решил ждать игрока: шторка остаётся с пометкой ожидания. */
+    public void waitFor(int seat) {
+        synchronized (pauseLock) {
+            if (!away.contains(seat) || !waiting.add(seat)) {
+                return;
+            }
+        }
+        log.accept("ждём игрока: " + seatName(seat));
+        pauseChanged(seat, null);
+    }
+
+    /**
+     * ОТДАТЬ МЕСТО УШЕДШЕГО БОТУ — как окно партии сажает бота на место: тот
+     * же справочник и то же зерно места. Бот отвечает и на уже висящий вопрос;
+     * вернуться на это место игрок больше не сможет (по его токену — отказ
+     * «место отдано боту»).
+     */
+    public void replaceWithBot(int seat) {
+        Seat s = seats[seat];
+        RemoteAgent a = s.agent;
+        synchronized (this) {
+            if (s.kind != Kind.REMOTE || a == null) {
+                return;
+            }
+            s.kind = Kind.BOT;
+            s.bot = STAND_IN_BOT;
+            s.ready = true;
+            Wire w = s.wire;
+            s.wire = null;
+            if (w != null) {
+                reject(w, "хост отдал ваше место боту");
+            }
+        }
+        a.useBot(kelium.agents.BotCatalog.create(STAND_IN_BOT, seat,
+            new Random(table.seed() * 131 + seat + 1), seats.length));
+        synchronized (pauseLock) {
+            away.remove(seat);
+            waiting.remove(seat);
+            pauseLock.notifyAll();
+        }
+        log.accept("место " + (seat + 1) + " (" + s.name + ") отдано боту");
+        pauseChanged(seat, "bot");
+        onChange.run();
+    }
+
+    /** Хост закрыл партию: игрокам — «хост закрыл партию», стол закрывается. */
+    public void closeGame() {
+        log.accept("хост закрыл партию");
+        close();
+        firePause();
+    }
+
+    /** Первое вышедшее место (по нему шторка); null — паузы нет. */
+    public Integer awaySeat() {
+        synchronized (pauseLock) {
+            return away.isEmpty() ? null : away.iterator().next();
+        }
+    }
+
+    /** Хост решил ждать это место. */
+    public boolean waitingFor(int seat) {
+        synchronized (pauseLock) {
+            return waiting.contains(seat);
+        }
+    }
+
+    /** Закрыл ли хост стол посреди партии. */
+    public boolean closedByHost() {
+        return closed;
+    }
+
+    /** Сообщение о текущей паузе; null — паузы нет. */
+    private Map<String, Object> pauseMessage() {
+        Integer first = awaySeat();
+        return first == null || closed ? null : msg(NetProtocol.PAUSE, "seat", first,
+            "name", seatName(first), "waiting", waitingFor(first));
+    }
+
+    /** Разослать новое состояние паузы: следующее вышедшее место или «продолжаем». */
+    private void pauseChanged(int seat, String how) {
+        Map<String, Object> p = pauseMessage();
+        broadcast(p != null ? p : msg(NetProtocol.RESUME, "seat", seat,
+            "how", how == null ? "back" : how));
+        firePause();
+    }
+
+    private void firePause() {
+        for (Runnable r : pauseListeners) {
+            r.run();
+        }
+    }
+
+    /**
+     * ПАУЗА НА ПОТОКЕ ДВИЖКА: пока кто-то вышел, кадр партии не проходит, и
+     * движок стоит. Стол закрыт — партия размыкается {@link GameAborted}.
+     */
+    private void gate() {
+        synchronized (pauseLock) {
+            while (!away.isEmpty() && !closed) {
+                try {
+                    pauseLock.wait(250);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new GameAborted("пауза прервана");
+                }
+            }
+        }
+        if (closed) {
+            throw new GameAborted("хост закрыл партию");
+        }
+    }
+
+    /** Сколько кадров движок уже отдал (для проверки паузы). */
+    int framesSeen() {
+        return framesSeen;
+    }
+
+    // ==================== отмена своих решений ====================
+
+    /** Ведущий партию: лента решений и отмена (окно хоста или {@link NetGame}). */
+    void link(NetSeats.Link l) {
+        link = l;
+    }
+
+    /** Куда месту можно откатиться сейчас (номера решений в ленте). */
+    List<Integer> undoTargets(int seat, int round, int circle) {
+        NetSeats.Link l = link;
+        return l == null ? List.of() : NetSeats.undoTargets(l.steps(), seat, round, circle);
+    }
+
+    /**
+     * ОТМЕНА СО СТОРОНЫ КЛИЕНТА (решение Влада 26.09.2026): свои решения — как
+     * за горячим стулом, но не глубже первого чужого после них. Отменять
+     * можно, пока месту задан вопрос: партия откатывается к его решению и
+     * переигрывается по ленте, всем уходит запись заново.
+     */
+    private void undo(Seat s, int seq, boolean all) {
+        RemoteAgent a = s.agent;
+        NetSeats.Link l = link;
+        if (a == null || l == null || a.botted() || awaySeat() != null || closed || finished) {
+            sendError(s.index, "отменить сейчас нельзя");
+            return;
+        }
+        if (a.pendingSeq() != seq) {
+            return;                      // вопрос уже не тот — запоздалая кнопка
+        }
+        List<Integer> t = undoTargets(s.index, a.pendingRound(), a.pendingCircle());
+        if (t.isEmpty()) {
+            sendError(s.index, "нечего отменять: после вашего решения ходил другой игрок");
+            Map<String, Object> q = a.pendingMessage();
+            if (s.wire != null && q != null) {
+                s.wire.send(q);
+            }
+            return;
+        }
+        if (!a.claimUndo(seq)) {
+            return;
+        }
+        int to = all ? t.get(0) : t.get(t.size() - 1);
+        log.accept(s.name + " отменяет " + (all ? "ход до начала" : "шаг"));
+        l.undoTo(to, () -> a.cancel(seq));
+    }
+
+    // ==================== окно партии хоста ====================
+
+    /**
+     * Окно партии хоста подключилось: лента и отмена — от него; поверх окна —
+     * шторка паузы и чат. Закрыли окно посреди партии — стол закрывается,
+     * игрокам уходит «хост закрыл партию».
+     */
+    void attachWindow(javax.swing.JFrame frame, NetSeats.Link l) {
+        link(l);
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            NetOverlay overlay = new NetOverlay(frame);
+            NetChatDock chat = new NetChatDock(frame, this::say);
+            overlay.allow(chat);
+            // снизу окна партии — стол игрока: чат встаёт над ним, в угол поля
+            javax.swing.JSplitPane split = findSplit(frame.getContentPane());
+            if (split != null && split.getBottomComponent() != null) {
+                chat.anchorAbove(split.getBottomComponent());
+            }
+            for (String line : chatLog()) {
+                chat.add(line);
+            }
+            chatListeners.add(line -> javax.swing.SwingUtilities.invokeLater(() -> chat.add(line)));
+            Runnable render = () -> javax.swing.SwingUtilities.invokeLater(
+                () -> renderHostPause(overlay, l));
+            pauseListeners.add(render);
+            frame.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosed(java.awt.event.WindowEvent e) {
+                    if (!finished) {
+                        closeGame();
+                    }
+                }
+            });
+            render.run();
+        });
+    }
+
+    /** Разделитель «поле / стол игрока» в окне партии; null — нет такого. */
+    private static javax.swing.JSplitPane findSplit(java.awt.Container c) {
+        for (java.awt.Component k : c.getComponents()) {
+            if (k instanceof javax.swing.JSplitPane sp
+                    && sp.getOrientation() == javax.swing.JSplitPane.VERTICAL_SPLIT) {
+                return sp;
+            }
+            if (k instanceof java.awt.Container cc) {
+                javax.swing.JSplitPane in = findSplit(cc);
+                if (in != null) {
+                    return in;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Шторка хоста: кто вышел и три выхода — ждать, бот, закрыть. */
+    private void renderHostPause(NetOverlay overlay, NetSeats.Link l) {
+        Integer seat = awaySeat();
+        if (closed || seat == null) {
+            overlay.dismiss();
+            return;
+        }
+        int st = seat;
+        boolean w = waitingFor(st);
+        overlay.display("Игрок " + (st + 1) + " (" + seatName(st) + ") вышел из игры",
+            w ? "Ждём, когда игрок вернётся. Можно передумать." : "Партия на паузе. Что делать?",
+            List.of(
+                new NetOverlay.Action("Ждать игрока",
+                    w ? "ждём…" : "вернётся по тому же адресу", () -> waitFor(st), !w, w),
+                new NetOverlay.Action("Заменить ботом", "место доиграет бот",
+                    () -> replaceWithBot(st), false, false),
+                new NetOverlay.Action("Закрыть партию", "у всех партия закончится",
+                    () -> {
+                        closeGame();
+                        overlay.dismiss();
+                        l.exit();
+                    }, false, false)));
     }
 
     /** Трафик к месту (для замеров). */

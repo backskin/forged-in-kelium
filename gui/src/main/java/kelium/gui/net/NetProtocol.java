@@ -17,8 +17,11 @@ public final class NetProtocol {
     private NetProtocol() {
     }
 
-    /** Версия протокола: разные версии за один стол не садятся. */
-    public static final int VERSION = 1;
+    /**
+     * Версия протокола: разные версии за один стол не садятся. 2 — отмена
+     * своих решений клиентом, пауза при отвале игрока, закрытие партии хостом.
+     */
+    public static final int VERSION = 2;
 
     /** Порт по умолчанию — вне занятых известными программами. */
     public static final int DEFAULT_PORT = 47100;
@@ -41,6 +44,14 @@ public final class NetProtocol {
     public static final String ANSWER = "answer";
     public static final String OVER = "over";
     public static final String ERROR = "error";
+    /** → хосту: отменить своё решение ({@code seq} висящего вопроса, {@code all} — к началу хода). */
+    public static final String UNDO = "undo";
+    /** ← от хоста: игрок вышел из игры, партия на паузе ({@code seat, name, waiting}). */
+    public static final String PAUSE = "pause";
+    /** ← от хоста: пауза снята ({@code seat, how}: {@code back} — вернулся, {@code bot} — место боту). */
+    public static final String RESUME = "resume";
+    /** ← от хоста: хост закрыл партию. */
+    public static final String CLOSED = "closed";
 
     /** Сообщение: тип и пары «ключ, значение». */
     public static Map<String, Object> msg(String type, Object... kv) {

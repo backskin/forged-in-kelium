@@ -287,9 +287,49 @@ public final class HotSeatWindow {
 
     void start() {
         buildUi();
+        if (seatSpecs.stream().anyMatch(kelium.gui.net.NetSeats::claims)) {
+            attachNet();
+        }
         Thread engine = new Thread(this::runGame, "hotseat-engine");
         engine.setDaemon(true);
         engine.start();
+    }
+
+    /**
+     * СЕТЕВОЙ СТОЛ: сети — лента решений (правило отмены «не глубже чужого»)
+     * и отмена по просьбе игрока за сетью; поверх окна сеть кладёт шторку
+     * паузы и чат. Ожидание сетевого места размыкается только ПОСЛЕ смены
+     * поколения — иначе выход из него приняли бы за закрытие партии.
+     */
+    private void attachNet() {
+        kelium.gui.net.NetSeats.attach(frame, new kelium.gui.net.NetSeats.Link() {
+            @Override
+            public List<kelium.gui.net.NetSeats.Step> steps() {
+                synchronized (moves) {
+                    List<kelium.gui.net.NetSeats.Step> out = new ArrayList<>(decisions.size());
+                    for (Decision d : decisions) {
+                        out.add(new kelium.gui.net.NetSeats.Step(d.seat(), d.round(), d.circle()));
+                    }
+                    return out;
+                }
+            }
+
+            @Override
+            public void undoTo(int index, Runnable then) {
+                SwingUtilities.invokeLater(() -> {
+                    int before = generation;
+                    HotSeatWindow.this.undoTo(index);
+                    if (generation != before) {
+                        then.run();
+                    }
+                });
+            }
+
+            @Override
+            public void exit() {
+                SwingUtilities.invokeLater(HotSeatWindow.this::closeToMenu);
+            }
+        });
     }
 
     // ==================== сборка окна ====================
@@ -2376,7 +2416,7 @@ public final class HotSeatWindow {
                 turnLabel.setText("Общая фаза раунда");
                 turnLabel.setForeground(Theme.ink2());
             } else {
-                boolean bot = !"human".equals(seatSpecs.get(active));
+                boolean bot = kelium.gui.net.NetSeats.isBot(seatSpecs.get(active), active);
                 turnLabel.setText("Ходит: " + seatName(active) + (bot ? " (бот)" : ""));
                 turnLabel.setForeground(barInk(active));
             }
