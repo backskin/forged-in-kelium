@@ -405,6 +405,23 @@ CSS = r"""
     .стр { box-shadow: none; break-after: page; }
     @page { size: 220mm 220mm; margin: 0; }
   }
+
+  /* ---- просторная вёрстка (главы, переписанные с 27.09.2026) ----
+     Замечание дизайнера: при нынешнем кегле поля внутри плашек малы, а сами
+     плашки слипаются. Поля и промежутки — одной мерой по всей полосе. */
+  .стр.просторно .блок { padding: 3.2mm 4mm 3mm; margin: 0 0 4.5mm; }
+  .стр.просторно .блок h2 { margin-bottom: 2.2mm; }
+  .стр.просторно .две { column-gap: 7mm; }
+  .стр.просторно .дст .и { height: 15mm; }
+  .стр.просторно td { padding-top: 2mm; padding-bottom: 2mm; }
+  /* карточки: вещи игры сеткой 2×2 во всю ширину, картинка над текстом */
+  .карточки { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    gap: 4.5mm 7mm; margin: 0 0 4.5mm; align-items: stretch; }
+  .карточки .блок.карточка { margin: 0; }
+  .карт-рис { height: 27mm; display: flex; align-items: center; justify-content: center;
+    gap: 5mm; margin: 0 0 3mm; }
+  .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
+  .карт-рис img.значок { max-height: 68%; }
 """
 
 

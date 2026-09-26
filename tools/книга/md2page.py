@@ -23,6 +23,30 @@ text = open(src, encoding="utf-8").read()
 
 title = re.match(r"# (.+)", text).group(1)
 body = text.split("\n", 1)[1]
+# :ПРОСТОРНО: — глава свёрстана с увеличенными полями блоков и промежутками
+# между ними (замечание дизайнера 27.09.2026: «нет отступов, всё слиплось»).
+# Главы переходят на неё по одной, по мере переписывания.
+ПРОСТОРНО = bool(re.search(r"^:просторно:\s*$", body, flags=re.M))
+body = re.sub(r"^:просторно:\s*\n", "", body, flags=re.M)
+КАРТИНКИ = os.path.join(os.path.dirname(КОРЕНЬ_КНИГ), "data", "textures")
+
+
+def картинка_текстуры(путь, ширина=360):
+    """Печатная картинка компонента (data/textures/…) — встроенным PNG."""
+    from PIL import Image
+    im = Image.open(os.path.join(КАРТИНКИ, путь.strip())).convert("RGBA")
+    box = im.getbbox()
+    if box:
+        im = im.crop(box)
+    if im.width > ширина:
+        im = im.resize((ширина, max(1, round(im.height * ширина / im.width))), Image.LANCZOS)
+    буфер = io.BytesIO()
+    im.save(буфер, "PNG", optimize=True)
+    # иконки (кубики, шестерёнки) рисуются мельче жетонов и тайлов: при одной
+    # высоте кубик выглядел бы втрое крупнее жетона ЦУ
+    класс = ' class="значок"' if путь.strip().startswith("icons/") else ""
+    return ('<img%s src="data:image/png;base64,%s" alt="">'
+            % (класс, base64.b64encode(буфер.getvalue()).decode()))
 
 
 # НАСТОЯЩИЕ ИКОНКИ ИГРЫ. `[иконка: монета]` в тексте превращается в саму
@@ -211,6 +235,38 @@ def blocks(md):
                        + f"[{inline(подпись.upper())}]</div></div>")
             i += 1
             continue
+        # КАРТОЧКИ — вещи игры сеткой в две колонки во всю ширину полосы:
+        # у каждой картинка компонента сверху, под ней заголовок и текст.
+        #   :карточки:
+        #   картинки: token/command_center_p1.png
+        #   ## Центр управления
+        #   текст…
+        #   :конец:
+        if ln.strip() == ":карточки:":
+            i += 1
+            карточки = []
+            while i < len(lines) and lines[i].strip() != ":конец:":
+                l = lines[i].strip()
+                if l.startswith("картинки:"):
+                    карточки.append({"рис": [x for x in l[len("картинки:"):].split(",") if x.strip()],
+                                     "имя": "", "текст": []})
+                elif l.startswith("## ") and карточки:
+                    карточки[-1]["имя"] = l[3:]
+                elif карточки:
+                    карточки[-1]["текст"].append(l)
+                i += 1
+            i += 1
+            flush()
+            html_к = []
+            for к in карточки:
+                абзацы = [" ".join(a.split())
+                          for a in "\n".join(к["текст"]).split("\n\n") if a.strip()]
+                html_к.append('<div class="блок карточка"><div class="карт-рис">'
+                              + "".join(картинка_текстуры(r) for r in к["рис"])
+                              + "</div><h2>" + inline(к["имя"]) + "</h2>"
+                              + "".join("<p>" + inline(a) + "</p>" for a in абзацы) + "</div>")
+            res.append('      <div class="карточки">' + "".join(html_к) + "</div>")
+            continue
         if ln.strip() == ":фазы:":
             i += 1
             ячейки = []
@@ -342,7 +398,8 @@ for k, chunk in enumerate(pages):
         куски[0] = куски[0].replace('<div class="блок">',
                                     '<div class="блок вводка">', 1)
     inner = (chr(10) * 2).join(куски)
-    html_pages.append(f'  <div class="стр {fons[n % 4]}">\n    {КАЙМА}\n{head}    <div class="две">\n{inner}\n    </div>\n\n'
+    просторно = " просторно" if ПРОСТОРНО else ""
+    html_pages.append(f'  <div class="стр {fons[n % 4]}{просторно}">\n    {КАЙМА}\n{head}    <div class="две">\n{inner}\n    </div>\n\n'
                       f'    <div class="колонцифра"><span>{n}</span></div>\n  </div>\n')
 
 frag = []
