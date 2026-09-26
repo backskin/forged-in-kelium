@@ -153,9 +153,10 @@ public final class ЦиклAZ {
             оценка.сохранить(ПАПКА.resolve("value_" + пок + ".bin"));
             ходы.сохранить(ПАПКА.resolve("policy_" + пок + ".bin"));
 
-            double[] замер = замер(8, симуляций, оценка, ходы, пок);
+            // 24 партии, а не 8: на восьми очки поколения скакали на ±4 от шума раздачи
+            double[] замер = замер(24, симуляций, оценка, ходы, пок);
             double часов = (System.currentTimeMillis() - t0) / 3_600_000.0;
-            String строка = String.format("| %d | %d | %.0f%% | %.0f%% | %.2f / %.2f | %.0f из 8 | %.2f |%n",
+            String строка = String.format("| %d | %d | %.0f%% | %.0f%% | %.2f / %.2f | %.0f из 24 | %.2f |%n",
                 пок, партий, качество[0], качество[1], замер[0], замер[1], замер[2], часов);
             Files.writeString(отчёт, строка, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
             out.print("ОТЧЁТ " + строка);
