@@ -254,6 +254,9 @@ public final class Names {
             case "supply" -> "снабжение";
             case "command" -> "командование";
             case "develop" -> "развитие";
+            case "build_miner" -> "построить добытчик";
+            case "build_plant" -> "построить энергостанцию";
+            case "build_military" -> "построить военное здание";
             case "special" -> "спец-действие";
             default -> unknown(code);
         };

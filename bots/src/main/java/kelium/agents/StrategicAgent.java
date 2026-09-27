@@ -607,10 +607,12 @@ public class StrategicAgent extends HeuristicAgent {
                 // РАЗВИЛКА (приказы 5.0.0): годится, если одна из веток — нужная.
                 List<String> ветки = kelium.engine.Actions.FORKS.get(name);
                 if (ветки != null) {
-                    if (step != null && ветки.contains(step.action)) {
+                    // List.of не принимает null в contains — план без действия бывает
+                    if (step != null && step.action != null && ветки.contains(step.action)) {
                         return k * 6.0;
                     }
-                    if (step == null && ветки.contains(finalAction(plan))) {
+                    String итог = step == null ? finalAction(plan) : null;
+                    if (итог != null && ветки.contains(итог)) {
                         return k * 8.0;
                     }
                     return 0.0;

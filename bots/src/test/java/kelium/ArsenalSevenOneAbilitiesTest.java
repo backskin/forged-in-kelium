@@ -205,7 +205,7 @@ class ArsenalSevenOneAbilitiesTest {
             List<Map<String, Object>> события = new ArrayList<>();
             GameEngine e = new GameEngine(s, агенты(), события::add);
             // совпал верхний приказ, нижний открыт
-            e.simulateTurn(0, "red_place", true, true);
+            e.simulateTurn(0, "red_settle", true, true);
             Map<String, Object> приказ = последнее(события, "turn_orders");
             assertNotNull(приказ);
             assertEquals(сКартой ? 2 : 1, ((Number) приказ.get("top_allowed")).intValue(),
@@ -221,7 +221,7 @@ class ArsenalSevenOneAbilitiesTest {
         s.player(0).superArsenalCards.add("sa4_05");
         List<Map<String, Object>> события = new ArrayList<>();
         GameEngine e = new GameEngine(s, агенты(), события::add);
-        e.simulateTurn(0, "red_place", false, false);
+        e.simulateTurn(0, "red_settle", false, false);
         assertEquals(null, последнее(события, "spec_bonus"));
     }
 

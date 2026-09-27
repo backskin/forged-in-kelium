@@ -996,17 +996,32 @@ public final class GameRecorder {
             Map.entry("movement", "движение"),
             Map.entry("combat", "бой"),
             Map.entry("market", "рынок"),
-            Map.entry("science", "наука"));
+            Map.entry("science", "наука"),
+            // пять развилок (свод 1.46.0) и их ветки «построить»
+            Map.entry("extract", "Добыча"),
+            Map.entry("power", "Питание"),
+            Map.entry("supply", "Снабжение"),
+            Map.entry("command", "Командование"),
+            Map.entry("develop", "Развитие"),
+            Map.entry("build_miner", "построить добытчик"),
+            Map.entry("build_plant", "построить энергостанцию"),
+            Map.entry("build_military", "построить военное здание"));
 
-        private static final Map<String, String> ORDERS = Map.of(
-            "development", "Разработка",
-            "infrastructure", "Инфраструктура",
-            "operation", "Наступление",
-            "acquisitions", "Приобретения",
-            "place", "Разместить",
-            "acquire", "Приобрести",
-            "control", "Контролировать",
-            "explore", "Исследовать");
+        private static final Map<String, String> ORDERS = Map.ofEntries(
+            Map.entry("development", "Разработка"),
+            Map.entry("infrastructure", "Инфраструктура"),
+            Map.entry("operation", "Наступление"),
+            Map.entry("acquisitions", "Приобретения"),
+            Map.entry("place", "Разместить"),
+            Map.entry("acquire", "Приобрести"),
+            Map.entry("control", "Контролировать"),
+            Map.entry("explore", "Исследовать"),
+            // приказы 5.0.0 — пять развилок (27.09.2026)
+            Map.entry("settle", "Освоить"),
+            Map.entry("mobilize", "Мобилизовать"),
+            Map.entry("advance", "Наступать"),
+            Map.entry("secure", "Контролировать"),
+            Map.entry("research", "Исследовать"));
 
         private final GameConfig cfg;
         private final ReplayRecord rec;

@@ -57,6 +57,10 @@ public final class ActionBar extends JPanel {
         ACTIONS.put("supply", "Снабжение");
         ACTIONS.put("command", "Командование");
         ACTIONS.put("develop", "Развитие");
+        // ветки «построить» отдельно — так их называют награды карт
+        ACTIONS.put("build_miner", "Построить добытчик");
+        ACTIONS.put("build_plant", "Построить энергостанцию");
+        ACTIONS.put("build_military", "Построить военное здание");
     }
 
     /**
@@ -87,8 +91,9 @@ public final class ActionBar extends JPanel {
     /** Что делает ветка — подпись под кнопкой. */
     public static String branchSub(String fork, String branch) {
         return switch (branch == null ? "" : branch) {
-            case "build" -> "supply".equals(fork) ? "казарма, завод, авиабаза или ЦУ"
-                : "и снос своих";
+            // одно здание своего вида или снос одного; ЦУ веткой не строится
+            case "build" -> "supply".equals(fork) ? "казарма, завод или авиабаза"
+                : "одно здание или снос";
             case "mining" -> "добытчики добывают";
             case "energy_swap" -> "кубики энергии";
             case "assembly" -> "войска или боеприпасы";
