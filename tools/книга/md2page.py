@@ -34,10 +34,15 @@ body = re.sub(r"^:просторно:\s*\n", "", body, flags=re.M)
 def картинка_текстуры(путь, ширина=360):
     """Печатная картинка компонента (data/textures/…) — встроенным PNG."""
     from PIL import Image
+    # «путь@0.75» — картинка на четверть мельче соседей по ряду: так жетон
+    # модуля хранилища стоит меньше модулей боя, как на столе
+    путь, _, доля = путь.strip().partition("@")
+    стиль = ' style="max-height:%d%%"' % round(float(доля) * 100) if доля else ""
     im = Image.open(os.path.join(КАРТИНКИ, путь.strip())).convert("RGBA")
     box = im.getbbox()
     if box:
         im = im.crop(box)
+    ширина = max(ширина, 900) if im.width > 1500 else ширина   # широкие планшеты — чётче
     if im.width > ширина:
         im = im.resize((ширина, max(1, round(im.height * ширина / im.width))), Image.LANCZOS)
     буфер = io.BytesIO()
@@ -45,8 +50,8 @@ def картинка_текстуры(путь, ширина=360):
     # иконки (кубики, шестерёнки) рисуются мельче жетонов и тайлов: при одной
     # высоте кубик выглядел бы втрое крупнее жетона ЦУ
     класс = ' class="значок"' if путь.strip().startswith("icons/") else ""
-    return ('<img%s src="data:image/png;base64,%s" alt="">'
-            % (класс, base64.b64encode(буфер.getvalue()).decode()))
+    return ('<img%s%s src="data:image/png;base64,%s" alt="">'
+            % (класс, стиль, base64.b64encode(буфер.getvalue()).decode()))
 
 
 # НАСТОЯЩИЕ ИКОНКИ ИГРЫ. `[иконка: монета]` в тексте превращается в саму

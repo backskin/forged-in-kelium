@@ -427,7 +427,9 @@ CSS = r"""
   /* ---- состав игры: сетка компонентов (27.09.2026) ---- */
   .комп-сетка { display: grid; gap: 3mm 3.5mm; margin: 1mm 0 3mm; }
   .комп-сетка:last-child { margin-bottom: 0; }
-  .комп-сетка.к2 { grid-template-columns: 1.9fr 1fr; }  /* планшет войск вдвое шире хранилища */
+  /* планшеты войск и хранилища одной высоты на столе: колонки в том же
+     соотношении, что их ширины, — тогда оба встают в одном масштабе */
+  .комп-сетка.к2 { grid-template-columns: 2.01fr 1fr; }
   .комп-сетка.к3 { grid-template-columns: repeat(3, 1fr); }
   .комп-сетка.к4 { grid-template-columns: repeat(4, 1fr); }
   .комп-сетка.к5 { grid-template-columns: repeat(5, 1fr); }
