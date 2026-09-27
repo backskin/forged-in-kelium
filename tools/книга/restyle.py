@@ -467,6 +467,7 @@ CSS = r"""
   .раздел span { font: 700 15pt/1 "Tektur", sans-serif; color: var(--охра); }
   .карточка ul { margin: 0 0 1.4mm; padding-left: 4mm; }
   .карточка li { margin: 0 0 .8mm; }
+  .карточка ol { margin: 0 0 1.4mm; padding-left: 5mm; }
 """
 
 
