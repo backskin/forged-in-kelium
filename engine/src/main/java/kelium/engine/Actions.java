@@ -1542,8 +1542,11 @@ public final class Actions {
                 opts.add(new Choice("repair_pick", чинить, (String) чинить.get("label")));
             }
             opts.add(new Choice("pass", null, "stop building"));
+            // ВЕТКА — в точку решения: интерфейс называет меню её именем
+            // («Построить добытчик») и не показывает чужих зданий
             Choice pick = agent.choose(state, opts, Map.of("kind", "build_pick",
-                "built", new ArrayList<>(поставленные), "demolished", new ArrayList<>(снесённые)));
+                "built", new ArrayList<>(поставленные), "demolished", new ArrayList<>(снесённые),
+                "branch", ctx.buildBranch == null ? "" : ctx.buildBranch));
             if (pick.payload() == null) {
                 return null;
             }

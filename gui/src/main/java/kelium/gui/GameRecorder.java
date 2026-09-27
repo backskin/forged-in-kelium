@@ -989,11 +989,13 @@ public final class GameRecorder {
     static final class ReplayText {
 
         private static final Map<String, String> ACTIONS = Map.ofEntries(
-            Map.entry("assembly", "сборка"),
+            // ВЕТКИ ПЯТИ РАЗВИЛОК — печатными словами (свод 1.46.0): «Стройки»,
+            // «Сборки» и «Смены энергии» больше нет
+            Map.entry("assembly", "выпуск"),
             Map.entry("mining", "добыча"),
-            Map.entry("build", "стройка"),
-            Map.entry("energy_swap", "энергия"),
-            Map.entry("movement", "движение"),
+            Map.entry("build", "постройка"),
+            Map.entry("energy_swap", "переложить энергию"),
+            Map.entry("movement", "манёвр"),
             Map.entry("combat", "бой"),
             Map.entry("market", "рынок"),
             Map.entry("science", "наука"),

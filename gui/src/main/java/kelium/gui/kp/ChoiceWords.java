@@ -91,7 +91,7 @@ public final class ChoiceWords {
                     + (m.find() ? sourceAcc(m.group(1)) : "источник");
             }
             case "energy_done" -> {
-                return "Закончить смену энергии";
+                return "Больше не перекладывать";
             }
             case "pay_power" -> {
                 if (Boolean.TRUE.equals(p)) {
@@ -206,7 +206,7 @@ public final class ChoiceWords {
             case "assemble" -> {
                 if (p instanceof Map<?, ?> m) {
                     return "ammo".equals(m.get("kind")) ? "Взять боеприпасы"
-                        : "Нанять: " + unitRu(after(raw, "->"));
+                        : "Выпустить: " + unitRu(after(raw, "->"));
                 }
             }
             case "landing" -> {
@@ -299,6 +299,15 @@ public final class ChoiceWords {
     /** Пояснение мелко: цена, расход, последствие; null — нечего сказать. */
     public static String sub(String kind, Choice c) {
         Object p = c.payload();
+        // ОТВЕТ КАРТОЙ: вторая строка кнопки — что даст ответ
+        if ("reaction_burn".equals(c.kind()) && c.label() != null) {
+            String raw = c.label();
+            int colon = raw.indexOf(':');
+            int тире = raw.lastIndexOf(" — ");
+            String даст = тире > colon ? raw.substring(тире + 3)
+                : colon > 0 ? raw.substring(colon + 1).trim() : null;
+            return даст;
+        }
         if ("pay_power".equals(c.kind()) && Boolean.TRUE.equals(p) && c.label() != null) {
             Matcher m = PAY_POWER.matcher(c.label());
             if (m.find()) {
@@ -343,14 +352,14 @@ public final class ChoiceWords {
             case "sci_track", "sci_exchange" -> "Закончить с наукой";
             case "market" -> "Хватит торговать";
             case "spec" -> "Без СПЕЦ-действия";
-            case "mass_open" -> "Больше не вскрывать";
+            case "mass_open" -> "Не вскрывать";
             case "reaction" -> "Не отвечать";
             case "maneuver_unit" -> "Без манёвра";
             case "return_unit" -> "Никого не снимать";
             case "energy_place" -> "Хватит — остаток оставить на источнике";
             case "mine" -> "Пропустить добытчик";
             case "assemble" -> "Пропустить здание";
-            case "build_pick" -> "Закончить стройку";
+            case "build_pick" -> "Больше не строить";
             case "build_hex", "build_facing" -> "Не строить";
             case "combat_victim", "neutral_victim" -> "Не выбирать";
             case "market_offer", "market_rate" -> "Хватит торговать";
@@ -378,8 +387,12 @@ public final class ChoiceWords {
             case "mass_container" -> "Вскрыть контейнер";
             case "reaction_burn" -> {
                 String raw = c.label() == null ? "" : c.label();
+                // коротко — что даст ответ: повод уже в заголовке окна
                 int colon = raw.indexOf(':');
-                yield "Сжечь " + name + (colon > 0 ? ":" + raw.substring(colon + 1) : "");
+                int тире = raw.lastIndexOf(" — ");
+                String даст = тире > colon ? raw.substring(тире + 3)
+                    : colon > 0 ? raw.substring(colon + 1).trim() : "";
+                yield "Сжечь " + name;
             }
             default -> {
                 String raw = c.label() == null ? String.valueOf(c.payload()) : c.label();
@@ -425,7 +438,7 @@ public final class ChoiceWords {
         {"stop building", "Не строить"},
         {"stop science", "Закончить с наукой"},
         {"stop attacking", "Прекратить бой"},
-        {"stop opening", "Больше не вскрывать"},
+        {"stop opening", "Не вскрывать"},
         {"leave in reserve", "Оставить в запасе"},
         {"cancel", "Отмена"},
         {"extract kelium", "Добыть келемий"},

@@ -33,6 +33,37 @@ final class РедкиеРешения {
         Map<String, Object> ctx = new HashMap<>();
         ctx.put("kind", kind);
         switch (kind) {
+            case "reaction" -> {
+                // Реакции.предложить + CombatResolver.окно: чужое войско бьёт по
+                // своему жетону, в руке карта с верхом-реакцией (любая — для вида)
+                UnitToken стрелок = null;
+                for (PlayerState o : s.players) {
+                    for (UnitToken u : o.units) {
+                        if (o.seat != seat && u.hexId != null && стрелок == null) {
+                            стрелок = u;
+                        }
+                    }
+                }
+                BuildingToken жертва = me.buildingsOnField().isEmpty() ? null
+                    : me.buildingsOnField().get(0);
+                String карта = me.objectiveHand.isEmpty() ? null : me.objectiveHand.get(0);
+                if (стрелок == null || жертва == null || карта == null) {
+                    return null;
+                }
+                opts.add(new Choice("reaction_burn", карта, "сжечь «" + карта
+                    + "»: атакуют твой жетон — получить 2 боеприпаса"));
+                opts.add(new Choice("pass", null, "не отвечать"));
+                ctx.put("reaction", "ammo_on_attack");
+                ctx.put("attacker", стрелок.owner);
+                ctx.put("attacker_type", стрелок.type.code);
+                ctx.put("attacker_hex", стрелок.hexId);
+                ctx.put("victim_type", жертва.type.code);
+                ctx.put("victim_building", true);
+                if (жертва.level != null) {
+                    ctx.put("victim_level", жертва.level);
+                }
+                ctx.put("victim_hex", жертва.hexId);
+            }
             case "combat_victim" -> {
                 // CombatResolver: «<жертва> игрока N (урон d/hp)»
                 String hex = null;

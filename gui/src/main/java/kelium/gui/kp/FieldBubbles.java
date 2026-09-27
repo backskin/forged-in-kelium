@@ -286,8 +286,10 @@ public final class FieldBubbles {
         Font cf = Theme.font(15, Font.BOLD);
         Font sf = Theme.font(12.5, Font.PLAIN);
         boolean сбоку = dockSide - dockInset >= dockSideMin();
+        // сверху — не под столбцом плашек чужих событий справа (обход 28.09:
+        // «+1 трофей» закрывал подсказку «Вас атакуют»)
         int maxW = сбоку ? dockSide - dockInset - Theme.px(20)
-            : Math.min(w - Theme.px(40), Theme.px(900));
+            : Math.max(Theme.px(360), Math.min(w - Theme.px(40) - Theme.px(470), Theme.px(900)));
 
         // ряды фишек-вариантов с переносом
         g.setFont(cf);
@@ -349,7 +351,8 @@ public final class FieldBubbles {
         int cardH = pad + titleH + hintH
             + (rows.isEmpty() ? 0 : Theme.px(8) + rows.size() * chipH + (rows.size() - 1) * gap)
             + pad;
-        int x = сбоку ? Theme.px(10) : (w - cardW) / 2;
+        int x = сбоку ? Theme.px(10) : Math.max(dockInset + Theme.px(10),
+            Math.min((w - cardW) / 2, w - Theme.px(470) - cardW - Theme.px(10)));
         int y = Theme.px(10);
         panel(g, x, y, cardW, cardH);
         // полоса цвета места слева — чей вопрос

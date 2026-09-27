@@ -43,10 +43,12 @@ public final class ActionBar extends JPanel {
     /** Русские имена действий. Порядок печатный — он же порядок на карте. */
     public static final Map<String, String> ACTIONS = new LinkedHashMap<>();
     static {
-        ACTIONS.put("build", "Стройка");
-        ACTIONS.put("energy_swap", "Энергия");
-        ACTIONS.put("assembly", "Сборка");
-        ACTIONS.put("mining", "Добыча");
+        // ВЕТКИ — ПЕЧАТНЫМИ СЛОВАМИ ПЯТИ РАЗВИЛОК (свод 1.46.0): «Стройки»,
+        // «Сборки» и «Энергии» как действий больше нет
+        ACTIONS.put("build", "Постройка");
+        ACTIONS.put("energy_swap", "Переложить энергию");
+        ACTIONS.put("assembly", "Выпустить");
+        ACTIONS.put("mining", "Добыть");
         ACTIONS.put("movement", "Манёвр");
         ACTIONS.put("combat", "Бой");
         ACTIONS.put("market", "Рынок");
@@ -73,7 +75,7 @@ public final class ActionBar extends JPanel {
                 case "extract" -> "Построить добытчик";
                 case "power" -> "Построить энергостанцию";
                 case "supply" -> "Построить военное здание";
-                default -> "Стройка";
+                default -> "Построить";
             };
         }
         return switch (branch == null ? "" : branch) {

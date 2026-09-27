@@ -1491,7 +1491,10 @@ public final class HotSeatWindow {
         field.bubbles.setDockInset(openDrawerSpan());
         if (toasts != null) {
             toasts.setBounds(0, 0, layered.getWidth(), layered.getHeight());
-            toasts.setOwnBottom(layered.getHeight() - zoneCover());
+            // плашки встают НАД полосой кружков действий, а не поверх неё: иначе
+            // «+2 монеты» закрывает выбор ветки (обход 28.09.2026)
+            int полоса = kelium.gui.kp.ActionStrip.stripHeight();
+            toasts.setOwnBottom(layered.getHeight() - zoneCover() - полоса);
         }
         if (buildMenu != null) {
             int bottom = layered.getHeight() - zoneCover();
@@ -2096,16 +2099,17 @@ public final class HotSeatWindow {
                 ? "Строю: " + GameRecorder.buildingName(
                     String.valueOf(m.get("btype")).toLowerCase(java.util.Locale.ROOT),
                     m.get("level") instanceof Number n ? n.intValue() : null)
-                : "Стройка — " + lowerFirst(
+                : "Постройка — " + lowerFirst(
                     kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe));
             // ГЕКС — СЛОВАМИ, БЕЗ КООРДИНАТ (27.09.2026: «никакого текста с id»)
-            case "build_hex", "tower_hex", "cu_hex" -> "Выбран гекс стройки";
+            case "build_hex", "tower_hex", "cu_hex" -> "Выбран гекс";
             case "build_facing", "cu_sides" -> "Поворот здания";
             case "unit_sector" -> "Куда поставить войско";
             case "move" -> p instanceof Map<?, ?> m && m.get("to") != null
                 ? "Жетон перемещён" : "Шаг: " + raw;
             case "maneuver_hex" -> "Выбран гекс манёвра";
             case "combat_source" -> "Выбран гекс, откуда бить";
+            case "combat_target" -> "Выбрана цель атаки";
             case "attack" -> p instanceof Map<?, ?> m ? "Атака " + attackLabelRu(
                 c.label() == null ? "" : c.label(), m) : "Атака";
             case "spec" -> "СПЕЦ: " + kelium.gui.kp.ChoiceWords.label(kind, c, this::cardNameSafe)
@@ -3168,7 +3172,7 @@ public final class HotSeatWindow {
         Map.entry("spec", "СПЕЦ-действие"),
         Map.entry("reveal_order", "выберите карту круга"),
         Map.entry("blind_discard", "отложите приказ — место для трофеев"),
-        Map.entry("build_pick", "стройка: что строим"),
+        Map.entry("build_pick", "что построить"),
         Map.entry("build_facing", "какими секторами поставить"),
         Map.entry("unit_sector", "на какой сектор поставить войско"),
         Map.entry("tower_hex", "гекс для вышки"),
@@ -3186,7 +3190,7 @@ public final class HotSeatWindow {
         Map.entry("neutral_victim", "какой нейтрал атаковать"),
         Map.entry("attack", "атака"),
         Map.entry("mine", "добыча: что взять"),
-        Map.entry("assemble", "сборка: что даёт здание — войско или боеприпасы"),
+        Map.entry("assemble", "выпуск: что даёт здание — войско или боеприпасы"),
         Map.entry("tuck", "подложить карту-символ"),
         Map.entry("open_container", "вскрытие контейнера"),
         Map.entry("pick_container", "какой контейнер вскрыть"),
@@ -3198,11 +3202,11 @@ public final class HotSeatWindow {
         // не всплывали внутренние коды (замер 25.09.2026: 46 видов за 6 партий)
         Map.entry("market", "рынок: сделка"),
         Map.entry("sci_exchange", "обмен науки"),
-        Map.entry("energy_activation", "смена энергии: откуда и куда"),
+        Map.entry("energy_activation", "переложить энергию: откуда и куда"),
         Map.entry("energy_place", "куда поставить энергию"),
         Map.entry("energy_loss_shift", "куда перенести кубик энергии"),
-        Map.entry("energy_or_modules", "смена энергии или смена модулей"),
-        Map.entry("return_unit", "сборка: снять свои войска с поля (по желанию)"),
+        Map.entry("energy_or_modules", "переложить энергию или модули"),
+        Map.entry("return_unit", "выпуск: снять свои войска с поля (по желанию)"),
         Map.entry("storage_side", "сторона жетона хранилища"),
         Map.entry("storage_discard", "что выбросить со склада"),
         Map.entry("module_keep", "какой модуль оставить"),
@@ -3215,7 +3219,7 @@ public final class HotSeatWindow {
         Map.entry("reaction", "ответ картой"),
         Map.entry("pay_power", "запитать монетами?"),
         Map.entry("order_spec", "плашка приказа"),
-        Map.entry("objective_reward_action", "награда: какое действие"),
+        Map.entry("objective_reward_action", "задание выполнено — какое действие сыграть"),
         Map.entry("destroyed_pay", "чем заплатить"),
         Map.entry("exchange_where", "где меняться"),
         Map.entry("keep_objective", "какое задание оставить"),
@@ -3225,7 +3229,7 @@ public final class HotSeatWindow {
         Map.entry("cu_hex", "где поставить центр управления"),
         Map.entry("cu_sides", "поворот центра управления"),
         Map.entry("cu_token_to", "кому отдать жетон уничтожения ЦУ"),
-        Map.entry("storage_burn_choice", "ячейка хранилища закрылась: что сжечь"),
+        Map.entry("storage_burn_choice", "склад уменьшился — что сжечь"),
         Map.entry("arsenal_replace", "какую установленную карту заменить"),
         Map.entry("barrage", "заградительный огонь"),
         Map.entry("barrage_hit", "куда ударить заградительным огнём"),
@@ -4124,6 +4128,17 @@ public final class HotSeatWindow {
                 dock.add(opt);     // кнопками в карточке вопроса, подпись — что на карте
                 continue;
             }
+            // ОТВЕТ КАРТОЙ — ПРЯМО НА АТАКОВАННОМ ГЕКСЕ (обход 28.09): кнопки
+            // ответа висят над своим жетоном, по которому бьют, — видно, где
+            // атака и чем на неё ответить; карта в руке тоже подсвечена
+            if ("reaction".equals(kind)) {
+                Object цель = d.context().get("victim_hex") != null ? d.context().get("victim_hex")
+                    : d.context().get("hex") != null ? d.context().get("hex")
+                    : d.context().get("target_hex");
+                if (цель instanceof String vh && hexIds.contains(vh)) {
+                    byHex.computeIfAbsent(vh, k -> new ArrayList<>()).add(opt);
+                }
+            }
             if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)) {
                 onTable.computeIfAbsent("card:" + id, k -> new ArrayList<>()).add(opt);
                 continue;
@@ -4149,10 +4164,26 @@ public final class HotSeatWindow {
         }
         String title = cap(KIND_LABELS.getOrDefault(kind, "Решение"));
         String hint;
-        if (!byHex.isEmpty()) {
+        if (!byHex.isEmpty() && !"reaction".equals(kind)) {
             boolean multi = byHex.values().stream().anyMatch(l -> l.size() > 1);
             hint = "Щёлкните подсвеченный гекс на поле"
                 + (multi ? " — где стоит цифра, откроется список вариантов" : "");
+        } else if ("objective_reward_action".equals(kind)) {
+            title = "Задание выполнено — награда";
+            hint = "Сыграйте одно из этих действий сейчас, сверх своих приказов";
+        } else if ("storage_burn_choice".equals(kind)) {
+            title = "Склад уменьшился";
+            hint = "Ячейка склада закрылась (здание снесено или уничтожено) — один кубик "
+                + "в ней не помещается: выберите, что сжечь";
+        } else if ("storage_discard".equals(kind)) {
+            // ПОЧЕМУ ВЫБРАСЫВАТЬ (обход 28.09): вопрос приходит, когда в склад
+            // не влезает поступление — без причины он выглядел как баг
+            Object нужно = d.context().get("needed");
+            title = "Склад полон";
+            hint = "Не хватает места" + (нужно instanceof Number n && n.intValue() > 0
+                ? " для " + n.intValue() + " поступающих кубиков" : "")
+                + ": выбросьте кубик со склада внизу — или «Ничего не выбрасывать», "
+                + "и лишнее просто не ляжет";
         } else if ("reaction".equals(kind)) {
             // ОТВЕТ КАРТОЙ — С ПРИЧИНОЙ (дизайнер 28.09: «какой ответ карты? что
             // это?»): кто атакует, какой картой и что она даст — словами.
@@ -4166,9 +4197,11 @@ public final class HotSeatWindow {
                         ? lv.intValue() : null)
                     : GameRecorder.unitName(vt))
                 : null;
-            title = (кто instanceof Number n ? "Вас атакует " + seatName(n.intValue()) : "Вас атакуют")
-                + (чемБьют == null ? "" : ": " + чемБьют)
-                + (покому == null ? "" : " бьёт по вашему жетону «" + покому + "»");
+            // заголовок короткий — влезает в карточку; подробности — строкой ниже
+            title = кто instanceof Number n ? "Вас атакует " + seatName(n.intValue()) : "Вас атакуют";
+            String что = (чемБьют == null ? "" : cap(чемБьют) + " бьёт")
+                + (покому == null ? "" : (чемБьют == null ? "Бьют" : "")
+                    + " по вашему жетону «" + покому + "»");
             List<String> чем = new ArrayList<>();
             String зачем = null;
             for (Choice c : options) {
@@ -4181,16 +4214,16 @@ public final class HotSeatWindow {
                     }
                 }
             }
-            hint = "Можно сжечь из руки " + String.join(" или ", чем)
-                + (зачем == null ? "" : ": " + зачем)
-                + ". Щёлкните карту внизу или «Не отвечать»";
+            hint = (что.isEmpty() ? "" : что + ". ")
+                + "Можно ответить картой " + String.join(" или ", чем)
+                + " — кнопки на атакованном гексе";
         } else if (onTable.keySet().stream().anyMatch(k -> k.startsWith("card:"))) {
             hint = "Щёлкните подсвеченную карту на столе внизу";
         } else if ("build_pick".equals(kind) && builtThisAction(seat)) {
             // СТРОЙКА ИДЁТ ДАЛЬШЕ: здание поставлено, и снова «что строим» —
             // без этой строки казалось, что щелчок ничего не сделал
             title = "Здание поставлено";
-            hint = "Постройте ещё — щёлкните здание на планшете внизу — или «Закончить стройку»";
+            hint = "Постройте ещё — щёлкните здание на планшете внизу — или «Больше не строить»";
         } else if (!onTable.isEmpty()) {
             hint = "Щёлкните подсвеченную деталь на планшете внизу";
         } else {
@@ -4202,11 +4235,11 @@ public final class HotSeatWindow {
         // СБОРКА — СЛОВАМИ (26.09.2026: «я не понял, что значит “кого вернуть в
         // запас”, “что нанять”»)
         if ("return_unit".equals(kind)) {
-            title = "Сборка, шаг 1: снять войска с поля?";
+            title = "Выпуск, шаг 1: снять войска с поля?";
             hint = "Можно даром вернуть свои войска с поля в запас — чтобы нанять их "
                 + "заново у другого здания. Щёлкните войско на поле или «Никого не снимать»";
         } else if ("assemble".equals(kind)) {
-            title = "Сборка: что даёт здание";
+            title = "Выпуск: что даёт здание";
             hint = "Запитанное здание даёт войско своего рода ИЛИ боеприпасы — выберите "
                 + "у здания на поле; «Пропустить здание» — ничего";
         }
@@ -4217,9 +4250,9 @@ public final class HotSeatWindow {
                 + "каждый жетон ходит один раз";
         }
         if ("energy_activation".equals(kind)) {
-            title = "Смена энергии: выберите источник";
+            title = "Переложить энергию: выберите источник";
             hint = "Щёлкните энергостанцию или ЦУ на поле: раздать с неё кубики "
-                + "или забрать все обратно — или «Закончить смену энергии»";
+                + "или забрать все обратно — или «Больше не перекладывать»";
         } else if ("energy_place".equals(kind)) {
             Object left = d.context().get("remaining");
             Object from = d.context().get("source_type");
@@ -4256,13 +4289,11 @@ public final class HotSeatWindow {
         // атакующего) и ПО ЧЕМУ (подсветка гекса своего жетона)
         if ("reaction".equals(kind)) {
             Map<String, Object> cx = d.context();
-            if (cx.get("attacker_hex") instanceof String ah && cx.get("attacker") instanceof Number an) {
-                field.setSource(ah, Theme.seat(an.intValue()));
-            }
             Object цель = cx.get("victim_hex") != null ? cx.get("victim_hex")
                 : cx.get("hex") != null ? cx.get("hex") : cx.get("target_hex");
-            if (цель instanceof String vh) {
-                field.setSelectable(java.util.Set.of(vh), h -> { });
+            if (cx.get("attacker_hex") instanceof String ah && cx.get("attacker") instanceof Number an) {
+                field.setAttack(ah, цель instanceof String vh ? vh : null,
+                    Theme.seat(an.intValue()));
             }
         }
         // РЫНОК И НАУКА — С ДОСКАМИ ПЕРЕД ГЛАЗАМИ: ящик с ними выезжает сам,
@@ -4403,7 +4434,18 @@ public final class HotSeatWindow {
             case "action" -> {
                 java.util.regex.Matcher m = java.util.regex.Pattern
                     .compile("·\s*([А-ЯЁ]+(?: [А-ЯЁ]+)?)").matcher(f.log == null ? "" : f.log);
-                return m.find() ? m.group(1).toLowerCase(java.util.Locale.ROOT) : null;
+                if (!m.find()) {
+                    return null;
+                }
+                // ИМЕНА ПЯТИ РАЗВИЛОК (свод 1.46.0): журнал движка называет ветки
+                // прежними словами — «Стройки» и «Сборки» больше нет
+                String слово = m.group(1).toLowerCase(java.util.Locale.ROOT);
+                return switch (слово) {
+                    case "стройка" -> "постройка";
+                    case "сборка" -> "выпуск";
+                    case "смена энергии", "энергия" -> "питание";
+                    default -> слово;
+                };
             }
             case "container" -> {
                 return "контейнер";
@@ -4436,7 +4478,7 @@ public final class HotSeatWindow {
         }
         return switch (kind) {
             case "mine" -> "добытчик";
-            case "assemble" -> "сборка";
+            case "assemble" -> "выпуск";
             case "market", "market_rate" -> "рынок";
             case "open_container", "spec" -> "спец-действие";
             case "move", "maneuver_unit", "unit_sector" -> "манёвр";
@@ -4617,21 +4659,28 @@ public final class HotSeatWindow {
         }
         int coin = me.resources.coin();
         List<kelium.gui.kp.BuildMenu.Row> rows = new ArrayList<>();
+        // ВЕТКА РАЗВИЛКИ (приказы 5.0.0): в меню только её здания — чужих по
+        // этой ветке не строят вовсе, и «сейчас нельзя» было бы неправдой
+        String ветка = String.valueOf(d.context().getOrDefault("branch", ""));
+        boolean добытчики = ветка.isEmpty() || "miner".equals(ветка);
+        boolean станции = ветка.isEmpty() || "plant".equals(ветка);
+        boolean военные = ветка.isEmpty() || "military".equals(ветка);
         // каталог зданий игрока в постоянном порядке, по категориям
-        for (int lv = 1; lv <= 4; lv++) {
+        for (int lv = 1; lv <= 4 && добытчики; lv++) {
             rows.add(buildRow(seat, st, me, "Добытчики", kelium.core.BuildingType.MINER, lv,
                 "добывает " + st.tokenStats.minerYield(lv) + " келемия · ячеек склада "
                     + cellCount(me, "miner", lv),
                 buildIdx, buildCost, built, demolished, coin, agent, d));
         }
-        for (int lv = 1; lv <= 4; lv++) {
+        for (int lv = 1; lv <= 4 && станции; lv++) {
             rows.add(buildRow(seat, st, me, "Энергостанции", kelium.core.BuildingType.POWER_PLANT,
                 lv, "даёт энергии " + st.tokenStats.plantEnergyGives(lv) + " · ячеек склада "
                     + cellCount(me, "plant", lv),
                 buildIdx, buildCost, built, demolished, coin, agent, d));
         }
-        for (kelium.core.BuildingType bt : List.of(kelium.core.BuildingType.BARRACKS,
-                kelium.core.BuildingType.FACTORY, kelium.core.BuildingType.AIRBASE)) {
+        for (kelium.core.BuildingType bt : военные ? List.of(kelium.core.BuildingType.BARRACKS,
+                kelium.core.BuildingType.FACTORY, kelium.core.BuildingType.AIRBASE)
+                : List.<kelium.core.BuildingType>of()) {
             String unit = switch (bt) {
                 case BARRACKS -> "пехоту";
                 case FACTORY -> "технику";
@@ -4679,7 +4728,7 @@ public final class HotSeatWindow {
         if (passIdx >= 0) {
             int pi = passIdx;
             buttons.add(new kelium.gui.kp.BuildMenu.Button(
-                начато ? "Закончить стройку" : "Ничего не строить", () -> submit(agent, d, pi)));
+                начато ? "Больше не строить" : "Ничего не строить", () -> submit(agent, d, pi)));
         }
         // ОТМЕНА — назад к выбору действия: откат к решению «какое действие»,
         // с которого началась эта Стройка
@@ -4687,7 +4736,13 @@ public final class HotSeatWindow {
         if (назад != null) {
             buttons.add(new kelium.gui.kp.BuildMenu.Button("Отмена", () -> undoTo(назад)));
         }
-        String title = начато ? "Стройка — ещё здание?" : "Стройка";
+        String имяВетки = switch (ветка) {
+            case "miner" -> "Построить добытчик";
+            case "plant" -> "Построить энергостанцию";
+            case "military" -> "Построить военное здание";
+            default -> "Постройка";
+        };
+        String title = начато ? имяВетки + " — ещё?" : имяВетки;
         String sub = "Монет: " + coin + ". Выберите здание — затем гекс на поле"
             + (onField.isEmpty() ? "" : "; своё здание можно снести");
         buildMenu.open(title, sub, rows, buttons, Theme.seat(seat));
@@ -4695,7 +4750,7 @@ public final class HotSeatWindow {
         field.bubbles.setDockInset(openDrawerSpan() + Theme.px(16)
             + kelium.gui.kp.BuildMenu.menuWidth());
         setTableChoices(Map.of(), Theme.seat(seat));
-        field.setChoices(null, начато ? "Стройка: здание поставлено" : "Стройка: выберите здание слева",
+        field.setChoices(null, начато ? "Здание поставлено" : имяВетки + ": выберите здание слева",
             onField.isEmpty() ? "Меню зданий — слева" : "Меню зданий — слева; или щёлкните своё "
                 + "здание на поле, чтобы снести", null, Theme.seat(seat));
         field.setDemolishTargets(onField, Theme.seat(seat));

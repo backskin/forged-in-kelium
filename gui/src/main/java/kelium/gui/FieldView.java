@@ -440,6 +440,7 @@ public final class FieldView extends JComponent {
         hoverUid = null;
         bubbles.clear();
         sourceHexId = null;
+        sourceTargetHexId = null;
         selectFill = null;
         unitGhosts = Map.of();
         optSides = Map.of();
@@ -461,6 +462,19 @@ public final class FieldView extends JComponent {
 
     private String sourceHexId;
     private Color sourceColor = new Color(0x3b82d0);
+    /** Постоянная цель стрелки (атака по вам); {@code null} — стрелка к курсору. */
+    private String sourceTargetHexId;
+
+    /**
+     * КТО ПО КОМУ БЬЁТ — стрелкой без наведения: окно «Вас атакуют» (обход
+     * 28.09.2026) показывает удар сразу, а не когда игрок догадается навести мышь.
+     */
+    public void setAttack(String fromHex, String toHex, Color color) {
+        this.sourceHexId = fromHex;
+        this.sourceTargetHexId = toHex;
+        this.sourceColor = color;
+        repaint();
+    }
 
     private void drawSource(Graphics2D g) {
         if (sourceHexId == null || record == null) {
@@ -477,11 +491,15 @@ public final class FieldView extends JComponent {
         g.setColor(sourceColor);
         g.setStroke(pen(3.4));
         g.draw(hexPath(s[0], s[1], BASE * 0.93));
-        if (hoverHexId == null || hoverHexId.equals(sourceHexId)
-                || !selectableHexIds.contains(hoverHexId)) {
+        String куда = sourceTargetHexId != null ? sourceTargetHexId : hoverHexId;
+        if (sourceTargetHexId == null && (hoverHexId == null || hoverHexId.equals(sourceHexId)
+                || !selectableHexIds.contains(hoverHexId))) {
             return;
         }
-        double[] t = center(info, hoverHexId);
+        if (куда == null || куда.equals(sourceHexId)) {
+            return;
+        }
+        double[] t = center(info, куда);
         if (t == null) {
             return;
         }
