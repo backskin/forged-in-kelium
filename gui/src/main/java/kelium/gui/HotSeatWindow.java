@@ -4032,8 +4032,11 @@ public final class HotSeatWindow {
             // ВЫБОР КОНТЕЙНЕРА ПРИ ВСКРЫТИИ — в карточку вопроса: лица своих
             // контейнеров на столе рисуются стопкой, щёлкнуть по каждому нельзя,
             // и вопрос оставался без единой кнопки (тупик, найден прогоном 27.09)
-            if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)
-                    && !"pick_container".equals(kind)) {
+            if ("pick_container".equals(kind)) {
+                dock.add(opt);     // кнопками в карточке вопроса, подпись — что на карте
+                continue;
+            }
+            if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)) {
                 onTable.computeIfAbsent("card:" + id, k -> new ArrayList<>()).add(opt);
                 continue;
             }

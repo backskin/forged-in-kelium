@@ -152,6 +152,17 @@ public final class GameEngine {
 
     /** Испустить событие: передать во внешний коллбэк и уведомить агента места. */
     private void emit(Map<String, Object> event) {
+        // СКЛАД НЕ ПЕРЕПОЛНЯЕТСЯ НИКОГДА (27.09.2026). Ячейки пропадают многими
+        // путями — сожжённая или отнятая карта арсенала с ячейкой, уведённое
+        // здание, — и не каждый путь помнил, что кубики из пропавшей ячейки
+        // падают. Поэтому перед тем, как событие увидят запись и игроки, лишнее
+        // сгорает фиксированным порядком (поймано StorageNeverOverflowsTest).
+        for (PlayerState p : state.players) {
+            if (p.resources.kelium() + p.resources.ammo() + p.resources.trophy()
+                    > Storage.totalMax(state, p)) {
+                Storage.forceEvictOnBuildingReturn(state, p);
+            }
+        }
         if (onEvent != null) {
             onEvent.accept(event);
         }

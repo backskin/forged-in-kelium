@@ -262,7 +262,12 @@ class NetLoopbackTest {
                 // кадром и следующим. Закрытым в миг вопроса наверняка было то,
                 // что закрыто и в том, и в другом.
                 int k = Math.max(0, r.framesBefore() - 1);
-                String text = Json.write(r.msg());
+                // варианты вопроса — это то, что показывают САМОМУ спрошенному:
+                // «какую из двух взятых карт арсенала оставить» называет карты,
+                // которые он только что взял (в записи они ещё числятся в колоде)
+                Map<String, Object> безВариантов = new java.util.LinkedHashMap<>(r.msg());
+                безВариантов.remove("options");
+                String text = Json.write(безВариантов);
                 assertClean(text, text, full, k, k + 1, me, "вопрос после кадра " + k);
             } else if (!NetProtocol.OVER.equals(t)) {
                 assertTrue(!Json.write(r.msg()).contains(seedText), "сид в сообщении " + t);

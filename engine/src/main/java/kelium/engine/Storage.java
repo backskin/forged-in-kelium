@@ -273,9 +273,12 @@ public final class Storage {
     /** Сколько ячеек склада ОТКРЫТО у игрока (по типам U/K/A). */
     private static Cells openCells(kelium.core.GameState s, PlayerState player) {
         StorageSide storage = player.board.storage;
-        // На планшете хранилища ВСЕГДА открыты 2 центральные универсальные
-        // ячейки (стартовые слоты), независимо от построенных зданий.
-        int u = 2, k = 0, a = 0;
+        // На планшете хранилища ВСЕГДА открыты центральные универсальные ячейки,
+        // независимо от построенных зданий. Сколько — ключ storage.open_cells:
+        // на печати планшета одна (решение дизайнера 27.09.2026), раньше две.
+        // без партии (s == null — старые вызовы без стола) — по печати, одна
+        int u = s == null ? 1 : ((Number) Ctx.rules(s).get("storage.open_cells", 2)).intValue();
+        int k = 0, a = 0;
         java.util.Set<Integer> minerLevels = new java.util.HashSet<>();
         java.util.Set<Integer> plantLevels = new java.util.HashSet<>();
         // ЖЕТОН НА ГЕКСЕ — ЗНАЧИТ НЕ НА ПЛАНШЕТЕ ХРАНИЛИЩА, а только лежащий на

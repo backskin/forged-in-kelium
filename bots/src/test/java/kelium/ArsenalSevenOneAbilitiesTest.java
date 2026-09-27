@@ -177,7 +177,9 @@ class ArsenalSevenOneAbilitiesTest {
             if (сКартой) {
                 p.arsenalInstalled.add("a7_33");
             }
+            // открытая ячейка склада одна (27.09.2026) — освободить её под боеприпас
             p.resources.pay(Resource.AMMO, p.resources.ammo());
+            p.resources.pay(Resource.KELIUM, p.resources.kelium());
             String задание = s.decks.get("objectives").draw(s.rng);
             p.objectiveHand.add(задание);
             Map<String, Object> выдано = Objectives.playObjective(s, 0, s.journal, задание, ev -> { });
@@ -251,7 +253,9 @@ class ArsenalSevenOneAbilitiesTest {
             if (сКартой) {
                 p.superArsenalCards.add("sa4_07");
             }
+            // открытая ячейка склада одна (27.09.2026) — освободить её под боеприпас
             p.resources.pay(Resource.AMMO, p.resources.ammo());
+            p.resources.pay(Resource.KELIUM, p.resources.kelium());
             // все пасуют: здания ничего не делают — боеприпас только от карты
             Actions.create("assembly", s).perform(p, new TurnContext(0, 0), new Пасующий(0));
             assertEquals(сКартой ? 1 : 0, p.resources.ammo());
