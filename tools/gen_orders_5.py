@@ -133,8 +133,15 @@ def заголовок(d, текст, cx, cy, макс_ш, размер, обв�
             break
         р -= 2
     if обводка:
-        d.text((cx * K, cy * K), текст, font=f, fill=(244, 243, 241), anchor='mm',
-               stroke_width=max(3, р // 9), stroke_fill=ЗАГ_ОБВОДКА)
+        # по буквам, с шагом на 15% шире (просьба дизайнера 27.09): обводка
+        # не должна заливать просветы букв («В») и склеивать соседние буквы
+        шаг = 1.15
+        ширины = [d.textlength(ч, font=f) * шаг for ч in текст]
+        x = cx * K - sum(ширины) / 2
+        for ч, ш in zip(текст, ширины):
+            d.text((x + ш / 2, cy * K), ч, font=f, fill=(244, 243, 241), anchor='mm',
+                   stroke_width=max(2, р // 14), stroke_fill=ЗАГ_ОБВОДКА)
+            x += ш
     else:
         d.text((cx * K, cy * K), текст, font=f, fill=ЗАГ_ЗАЛИВКА, anchor='mm')
 
