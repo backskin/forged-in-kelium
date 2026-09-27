@@ -3164,6 +3164,7 @@ public final class HotSeatWindow {
 
     private static final Map<String, String> KIND_LABELS = Map.ofEntries(
         Map.entry("action", "выберите действие"),
+        Map.entry("action_branch", "одно из двух"),
         Map.entry("spec", "СПЕЦ-действие"),
         Map.entry("reveal_order", "выберите карту круга"),
         Map.entry("blind_discard", "отложите приказ — место для трофеев"),
@@ -4187,6 +4188,23 @@ public final class HotSeatWindow {
                     : "command_center".equals(from) ? " с ЦУ" : "")
                 + (left instanceof Number n ? " — осталось " + n : "");
             hint = "Щёлкните здание, которое запитать, — или «Хватит»";
+        }
+        // ДЕЙСТВИЕ-РАЗВИЛКА (свод 1.46.0): одно из двух — кружками на полосе
+        // действий и словами в карточке вопроса
+        if ("action_branch".equals(kind)) {
+            String развилка = String.valueOf(d.context().get("action"));
+            title = ActionBar.ACTIONS.getOrDefault(развилка, "Действие") + ": одно из двух";
+            hint = "Выберите, что сделать этим действием, — кружком внизу поля";
+            List<kelium.gui.kp.ActionStrip.Item> ветки = new ArrayList<>();
+            for (int i = 0; i < options.size(); i++) {
+                Choice c = options.get(i);
+                int idx = i;
+                ветки.add(new kelium.gui.kp.ActionStrip.Item(
+                    c.payload() instanceof String b ? b : null,
+                    kelium.gui.kp.ChoiceWords.label(kind, c, this::cardName),
+                    kelium.gui.kp.ChoiceWords.sub(kind, c), () -> submit(agent, d, idx)));
+            }
+            actionStrip.show(title, ветки, Theme.seat(seat));
         }
         setTableChoices(onTable, Theme.seat(seat));
         field.setChoices(byHex, title, hint, dock, Theme.seat(seat));

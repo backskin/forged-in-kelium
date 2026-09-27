@@ -51,6 +51,51 @@ public final class ActionBar extends JPanel {
         ACTIONS.put("combat", "Бой");
         ACTIONS.put("market", "Рынок");
         ACTIONS.put("science", "Наука");
+        // ПЯТЬ ДЕЙСТВИЙ-РАЗВИЛОК свода 1.46.0 (приказы 5.0.0)
+        ACTIONS.put("extract", "Добыча");
+        ACTIONS.put("power", "Питание");
+        ACTIONS.put("supply", "Снабжение");
+        ACTIONS.put("command", "Командование");
+        ACTIONS.put("develop", "Развитие");
+    }
+
+    /**
+     * ВЕТКА РАЗВИЛКИ СЛОВАМИ: {@code (extract, build)} → «Построить добытчик».
+     * Неизвестная пара — прежнее имя действия.
+     */
+    public static String branchRu(String fork, String branch) {
+        if ("build".equals(branch)) {
+            return switch (fork == null ? "" : fork) {
+                case "extract" -> "Построить добытчик";
+                case "power" -> "Построить энергостанцию";
+                case "supply" -> "Построить военное здание";
+                default -> "Стройка";
+            };
+        }
+        return switch (branch == null ? "" : branch) {
+            case "mining" -> "Добыть";
+            case "energy_swap" -> "Переложить энергию";
+            case "assembly" -> "Выпустить";
+            case "movement" -> "Манёвр";
+            case "combat" -> "Бой";
+            case "market" -> "Рынок";
+            case "science" -> "Наука";
+            default -> ACTIONS.getOrDefault(branch, "Действие");
+        };
+    }
+
+    /** Что делает ветка — подпись под кнопкой. */
+    public static String branchSub(String fork, String branch) {
+        return switch (branch == null ? "" : branch) {
+            case "build" -> "supply".equals(fork) ? "казарма, завод, авиабаза или ЦУ"
+                : "и снос своих";
+            case "mining" -> "добытчики добывают";
+            case "energy_swap" -> "кубики энергии";
+            case "assembly" -> "войска или боеприпасы";
+            case "movement" -> "вывести и ввести";
+            case "combat" -> "по гексу цели";
+            default -> null;
+        };
     }
 
     private static final int BTN_W = 108;

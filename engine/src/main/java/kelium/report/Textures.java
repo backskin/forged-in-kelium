@@ -179,7 +179,25 @@ public final class Textures {
      * нет, рисуется прежний значок.
      */
     public static BufferedImage icon(String name) {
-        return name == null ? null : find(List.of("icons/" + name));
+        if (name == null) {
+            return null;
+        }
+        // ДЕЙСТВИЯ-РАЗВИЛКИ свода 1.46.0 своих иконок пока не имеют (дизайнер
+        // нарисует позже): берётся иконка первой ветки. Появится свой файл —
+        // он и будет взят.
+        BufferedImage своя = find(List.of("icons/" + name));
+        if (своя != null || !name.startsWith("action_")) {
+            return своя;
+        }
+        String первая = switch (name.substring("action_".length())) {
+            case "extract" -> "mining";
+            case "power" -> "energy_swap";
+            case "supply" -> "assembly";
+            case "command" -> "movement";
+            case "develop" -> "market";
+            default -> null;
+        };
+        return первая == null ? null : find(List.of("icons/action_" + первая));
     }
 
     /**

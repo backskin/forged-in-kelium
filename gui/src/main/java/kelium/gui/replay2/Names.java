@@ -223,6 +223,11 @@ public final class Names {
             case "acquire" -> "ПРИОБРЕСТИ";
             case "control" -> "КОНТРОЛИРОВАТЬ";
             case "explore" -> "ИССЛЕДОВАТЬ";
+            case "settle" -> "ОСВОИТЬ";
+            case "mobilize" -> "МОБИЛИЗОВАТЬ";
+            case "advance" -> "НАСТУПАТЬ";
+            case "secure" -> "КОНТРОЛИРОВАТЬ";
+            case "research" -> "ИССЛЕДОВАТЬ";
             // Джокер печатается как БЕЗОПАСНОСТЬ — у него нет верха и низа.
             case "security", "joker" -> "БЕЗОПАСНОСТЬ";
             // НЕИЗВЕСТНЫЙ КОД НЕ ВЫДАЁТ СЕБЯ ЗА КАРТУ. Прежде здесь стояла та же
@@ -244,6 +249,11 @@ public final class Names {
             case "combat" -> "бой";
             case "market" -> "рынок";
             case "science" -> "наука";
+            case "extract" -> "добыча";
+            case "power" -> "питание";
+            case "supply" -> "снабжение";
+            case "command" -> "командование";
+            case "develop" -> "развитие";
             case "special" -> "спец-действие";
             default -> unknown(code);
         };

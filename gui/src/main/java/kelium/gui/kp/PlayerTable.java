@@ -1277,7 +1277,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             return out;
         }
         if (info.joker()) {
-            out.addAll(ActionBar.ACTIONS.keySet());
+            out.addAll(kelium.engine.Actions.ALL_NAMES);
             return out;
         }
         out.addAll(ActionIcons.CATEGORY_ACTIONS.getOrDefault(info.top(), List.of()));

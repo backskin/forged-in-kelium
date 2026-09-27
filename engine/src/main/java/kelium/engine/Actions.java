@@ -423,7 +423,8 @@ public final class Actions {
             List<String> ветки = FORKS.get(id);
             List<Choice> opts = new ArrayList<>();
             for (String b : ветки) {
-                opts.add(new Choice("action_branch", b, b));
+                // подпись «развилка:ветка» — окну, чтобы назвать ветку словами
+                opts.add(new Choice("action_branch", b, id + ":" + b));
             }
             Choice ch = agent.choose(state, opts, Map.of("kind", "action_branch",
                 "action", id));

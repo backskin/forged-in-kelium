@@ -173,6 +173,11 @@ public final class ChoiceWords {
             case "move_source" -> {
                 return "Двигать отсюда";
             }
+            case "action_branch" -> {
+                // подпись варианта — «развилка:ветка» (Actions.ForkAction)
+                String развилка = raw.contains(":") ? before(raw, ":") : null;
+                return ActionBar.branchRu(развилка, p instanceof String b ? b : null);
+            }
             case "action", "objective_reward_action", "energy_or_modules" -> {
                 if (p instanceof String a) {
                     return ActionBar.ACTIONS.getOrDefault(a, "modules".equals(a)
@@ -315,6 +320,10 @@ public final class ChoiceWords {
         }
         if ("sci_exchange".equals(kind) && p instanceof Map<?, ?> m && m.get("give") != null) {
             return "трофеев: " + m.get("give");
+        }
+        if ("action_branch".equals(kind) && p instanceof String b && c.label() != null) {
+            String l = c.label();
+            return ActionBar.branchSub(l.contains(":") ? l.substring(0, l.indexOf(':')) : null, b);
         }
         if ("build_pick".equals(kind) && p instanceof Map<?, ?> m && m.get("cost") != null) {
             return "монет: " + m.get("cost");
