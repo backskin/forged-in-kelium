@@ -413,6 +413,7 @@ CSS = r"""
   .стр.просторно .блок h2 { margin-bottom: 2.2mm; }
   .стр.просторно .две { column-gap: 7mm; }
   .стр.просторно .дст .и { height: 15mm; }
+  .стр.просторно table { table-layout: fixed; width: 100%; }
   .стр.просторно td { padding-top: 2mm; padding-bottom: 2mm; }
   /* карточки: вещи игры сеткой 2×2 во всю ширину, картинка над текстом */
   .карточки { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
@@ -422,6 +423,27 @@ CSS = r"""
     gap: 5mm; margin: 0 0 3mm; }
   .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
   .карт-рис img.значок { max-height: 68%; }
+
+  /* ---- состав игры: сетка компонентов (27.09.2026) ---- */
+  .комп-сетка { display: grid; gap: 3mm 3.5mm; margin: 1mm 0 3mm; }
+  .комп-сетка:last-child { margin-bottom: 0; }
+  .комп-сетка.к2 { grid-template-columns: 1.9fr 1fr; }  /* планшет войск вдвое шире хранилища */
+  .комп-сетка.к3 { grid-template-columns: repeat(3, 1fr); }
+  .комп-сетка.к4 { grid-template-columns: repeat(4, 1fr); }
+  .комп-сетка.к5 { grid-template-columns: repeat(5, 1fr); }
+  .комп-сетка.к6 { grid-template-columns: repeat(6, 1fr); }
+  .комп-сетка.к7 { grid-template-columns: repeat(7, 1fr); }
+  .комп-сетка.к8 { grid-template-columns: repeat(8, 1fr); }
+  .комп { text-align: center; }
+  .комп-рис { height: var(--комп-h, 16mm); display: flex; align-items: center; justify-content: center; gap: 1.5mm; }
+  .комп-рис img { max-height: 100%; max-width: 100%; object-fit: contain; min-width: 0; }
+  .комп-рис img + img { max-width: 48%; }
+  .комп-число { font: 800 11pt/1 "Tektur", sans-serif; color: var(--келемий); margin: 1mm 0 .4mm; }
+  .комп-рис img.значок { max-height: 62%; }
+  .комп-имя { font: 600 8pt/1.15 "Tektur Narrow", "Tektur", sans-serif; color: var(--чернила); }
+  .цвета { display: flex; gap: 2.5mm; align-items: center; margin: 0 0 2mm; }
+  .цвета span { width: 5mm; height: 5mm; border-radius: 1mm; display: inline-block;
+    outline: .2mm solid rgba(0,0,0,.35); }
 """
 
 

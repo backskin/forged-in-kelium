@@ -242,6 +242,31 @@ def blocks(md):
         #   ## Центр управления
         #   текст…
         #   :конец:
+        # СОСТАВ ИГРЫ — сетка компонентов внутри блока: картинка, число, название.
+        #   :компоненты: 4
+        #   block/big-1-A.png | 5 | Большие блоки поля
+        #   token/command_center_p1.png + token/miner_l1_p1.png | 12 | Жетоны зданий
+        #   :конец:
+        if ln.strip().startswith(":компоненты:"):
+            # «:компоненты: 7 20» — 7 колонок, картинки высотой 20 мм
+            параметры = ln.strip()[len(":компоненты:"):].split()
+            колонок = параметры[0] if параметры else "4"
+            высота = параметры[1] if len(параметры) > 1 else "16"
+            i += 1
+            ячейки = []
+            while i < len(lines) and lines[i].strip() != ":конец:":
+                части = [ч.strip() for ч in lines[i].split("|")]
+                if len(части) == 3:
+                    рис = "".join(картинка_текстуры(r, 300) for r in части[0].split("+"))
+                    ячейки.append('<div class="комп"><div class="комп-рис">' + рис
+                                  + '</div><div class="комп-число">' + inline(части[1])
+                                  + '</div><div class="комп-имя">' + inline(части[2])
+                                  + "</div></div>")
+                i += 1
+            i += 1
+            cur.append('        <div class="комп-сетка к%s" style="--комп-h:%smm">' % (колонок, высота)
+                       + "".join(ячейки) + "</div>")
+            continue
         if ln.strip() == ":карточки:":
             i += 1
             карточки = []
@@ -261,9 +286,12 @@ def blocks(md):
             for к in карточки:
                 абзацы = [" ".join(a.split())
                           for a in "\n".join(к["текст"]).split("\n\n") if a.strip()]
-                html_к.append('<div class="блок карточка"><div class="карт-рис">'
-                              + "".join(картинка_текстуры(r) for r in к["рис"])
-                              + "</div><h2>" + inline(к["имя"]) + "</h2>"
+                # карточка без картинки («картинки:» пустая) — просто блок в сетке
+                рис = ('<div class="карт-рис">'
+                       + "".join(картинка_текстуры(r) for r in к["рис"]) + "</div>"
+                       if к["рис"] else "")
+                html_к.append('<div class="блок карточка">' + рис
+                              + "<h2>" + inline(к["имя"]) + "</h2>"
                               + "".join("<p>" + inline(a) + "</p>" for a in абзацы) + "</div>")
             res.append('      <div class="карточки">' + "".join(html_к) + "</div>")
             continue
