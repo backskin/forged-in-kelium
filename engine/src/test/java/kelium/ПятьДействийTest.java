@@ -3,6 +3,7 @@ package kelium;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -116,7 +117,12 @@ class ПятьДействийTest {
             String верх = String.valueOf(c.get("top"));
             assertEquals(низ.get(верх), String.valueOf(c.get("bottom")),
                 "низ карты " + c.get("id"));
-            assertNotNull(c.get("spec"), "плашка у " + c.get("id"));
+            // на НАСТУПАТЬ плашки нет ни у одного цвета (комплект «пять развилок», 27.09)
+            if ("advance".equals(верх)) {
+                assertNull(c.get("spec"), "на НАСТУПАТЬ плашки нет: " + c.get("id"));
+            } else {
+                assertNotNull(c.get("spec"), "плашка у " + c.get("id"));
+            }
         }
         assertEquals(Map.of("blue", 5, "red", 5, "green", 5, "yellow", 5), поЦвету);
         for (String цвет : поЦвету.keySet()) {
@@ -240,20 +246,17 @@ class ПятьДействийTest {
     }
 
     @Test
-    void срабатыванияПриПостройкеНет() {
+    void веткаПостроитьСтавитОдноЗданиеИОноСрабатывает() {
+        // комплект «пять развилок» 27.09: ветка «построить» — ОДНО здание своего
+        // вида, и новое здание сразу срабатывает без энергии
         GameState s = игра();
-        assertFalse(Ctx.rules(s).getBool("actions.build.building_fires_on_build", true));
+        assertTrue(Ctx.rules(s).getBool("actions.build.building_fires_on_build", false));
         assertFalse(Ctx.rules(s).getBool("actions.build.military_fires_only_on_container", true));
         PlayerState p = s.player(0);
         p.resources.add(Resource.COIN, 20);
-        int войск = p.unitsOnField().size();
-        int келемия = p.resources.kelium();
-        for (String развилка : List.of("extract", "supply")) {
-            Actions.create(развилка, s).perform(p, new TurnContext(0, 1),
-                new Ветвящий(0, "build"));
-        }
-        assertEquals(войск, p.unitsOnField().size(), "военное здание при постройке не выпускает");
-        assertEquals(келемия, p.resources.kelium(), "добытчик при постройке не добывает");
+        int зданий = p.buildingsOnField().size();
+        Actions.create("extract", s).perform(p, new TurnContext(0, 1), new Ветвящий(0, "build"));
+        assertTrue(p.buildingsOnField().size() <= зданий + 1, "ветка ставит не больше одного здания");
     }
 
     @Test

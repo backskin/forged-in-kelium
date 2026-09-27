@@ -876,6 +876,10 @@ public final class GameEngine {
         PlayerState p = s.player(seat);
         Ruleset rs = rs();
         s.journal.startTurn(seat);
+        // «АВАРИЙНОЕ ПИТАНИЕ» 7.3.0: монеты с ячеек энергии уходят в общий запас
+        for (BuildingToken b : p.buildingsOnField()) {
+            b.stripEnergyOf(Actions.COIN_SOURCE_UID);
+        }
         // «КЕЛЕМИЕВЫЙ РУДНИК» (супер-арсенал sa6, редакция 17.08.2026): +1 келемий
         // В НАЧАЛЕ КАЖДОГО ХОДА, не раз в раунд — до вершины трека игрок
         // добирается поздно, и награда за раунд к тому времени уже ничего не решает.
@@ -889,6 +893,9 @@ public final class GameEngine {
         // ТОЧКА ПРАВИЛ: сколько СПЕЦ-действий за ход. Карта арсенала может дать
         // второе («два СПЕЦ, если не играл Безопасность») или третье («Параллельные
         // штабы»).
+        // совпадение известно уже сейчас — «Оперативный отдел» (арсенал 7.3.0)
+        // даёт за него ещё одно спец-действие и спрашивает об этом здесь
+        s.journal.of(seat).orderBlocked = reveal.coincided();
         int specLimit = (int) Math.round(kelium.engine.ability.RuleQuery
             .of(s, seat, kelium.engine.ability.Hook.ORDER_SPEC_COUNT)
             .base(Math.max(rs.getInt("actions.spec_per_turn"), Passives.specActions(s, seat)))

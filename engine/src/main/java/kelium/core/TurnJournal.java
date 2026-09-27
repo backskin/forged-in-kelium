@@ -57,6 +57,8 @@ public final class TurnJournal {
         public boolean razedOwnBuilding = false;
         public final Set<String> razedOwnHexes = new HashSet<>();
         public final Set<String> builtOnHexes = new HashSet<>();
+        /** Гексы, где в этот ход поставлен добытчик или станция 3-го или 4-го уровня (o79). */
+        public final Set<String> builtBigEconomyHexes = new HashSet<>();
         public boolean tookLastKeliumFromGrid = false;
         public int containersOpened = 0;
         public int unitsMoved = 0;
@@ -323,6 +325,8 @@ public final class TurnJournal {
             razedOwnHexes.addAll(o.razedOwnHexes);
             builtOnHexes.clear();
             builtOnHexes.addAll(o.builtOnHexes);
+            builtBigEconomyHexes.clear();
+            builtBigEconomyHexes.addAll(o.builtBigEconomyHexes);
             tookLastKeliumFromGrid = o.tookLastKeliumFromGrid;
             containersOpened = o.containersOpened;
             unitsMoved = o.unitsMoved;
@@ -427,6 +431,7 @@ public final class TurnJournal {
             razedOwnBuilding = false;
             razedOwnHexes.clear();
             builtOnHexes.clear();
+            builtBigEconomyHexes.clear();
             tookLastKeliumFromGrid = false;
             containersOpened = 0;
             unitsMoved = 0;

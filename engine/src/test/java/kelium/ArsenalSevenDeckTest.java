@@ -54,7 +54,7 @@ class ArsenalSevenDeckTest {
 
     @Test
     void действующийСводБерётНабор71ИЧетвёртыйСупер() {
-        assertEquals("7.2.0", arsenal().version);
+        assertEquals("7.3.0", arsenal().version);   // 7.3 — комплект «пять развилок», 27.09
         assertEquals("4.0.0", cfg().content.get("super_arsenal").version);
     }
 

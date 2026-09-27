@@ -166,7 +166,7 @@ public final class ЗаданияТаблицы {
             return печатное("Обеспечение", СОСТОЯНИЕ,
                 "Накопи не менее 10 монет",
                 null,
-                Награда.выбор("science", "build"), Награда.нет(),
+                Награда.выбор("science", "build_military"), Награда.нет(),
                 Утиль.АТАКА_ДВУМЯ);
         }
 
@@ -202,69 +202,78 @@ public final class ЗаданияТаблицы {
     // ==================================================================
 
     /**
-     * o65 «Перестройка» — снести своё и построить другое в тот же ход.
-     *
-     * <p>Переноса здания в Стройке больше нет: со зданием делают одно из двух,
-     * ставят или сносят. Переезд собирается из этих двух операций, и карта
-     * платит именно за него — а усиление требует попасть новым зданием на
-     * освободившийся гекс.
+     * o78 «Встреть стенкой» (комплект «пять развилок», 27.09.2026, вместо o65
+     * «Перестройка»: переноса здания больше нет, а снос с постройкой в один ход
+     * ветками не собрать). Своё здание стенкой к гексу с чужими войсками —
+     * состояние стола, видно глазами.
      */
-    public static final class Перестройка extends ЗаданиеВКоде {
-        public Перестройка() {
-            super("o65");
+    public static final class ВстретьСтенкой extends ЗаданиеВКоде {
+        public ВстретьСтенкой() {
+            super("o78");
         }
 
         @Override
         public Лицо лицо() {
-            // ПЕЧАТНАЯ КАРТА «Развёртывание» № 18 (25.09.2026): «на том же гексе»
-            // перешло в базу, усиление — два своих здания снесены на одном гексе.
-            return печатное("Перестройка", ПРОИСШЕСТВИЕ,
-                "В ЭТОТ ХОД снеси своё здание и построй на том же гексе другое.",
-                "снеси 2 своих здания на одном гексе.",
+            return печатное("Встреть стенкой", СОСТОЯНИЕ,
+                "Имей своё здание, стенка которого обращена к гексу с войсками врага",
+                "две такие стенки на разных зданиях.",
                 Награда.выбор("mining", "energy_swap"),
                 Награда.трофеи(1).иМонеты(2),
                 Утиль.КОНТРАТАКА);
         }
 
-        @Override
-        public boolean satisfied(CardContext ctx) {
-            var ж = ход(ctx);
-            for (String гекс : ж.razedOwnHexes) {
-                if (ж.builtOnHexes.contains(гекс)) {
-                    return true;
+        /** Сколько своих зданий стоят стенкой к гексу с чужими войсками. */
+        private static int зданийСтенкой(CardContext ctx) {
+            var s = ctx.state();
+            int seat = ctx.seat();
+            java.util.Set<String> чужие = new java.util.HashSet<>();
+            for (var p : s.players) {
+                if (p.seat == seat) {
+                    continue;
+                }
+                for (var u : p.unitsOnField()) {
+                    if (u.hexId != null) {
+                        чужие.add(u.hexId);
+                    }
                 }
             }
-            return false;
+            int зданий = 0;
+            for (var b : ctx.me().buildingsOnField()) {
+                var h = s.field.get(b.hexId);
+                if (h == null) {
+                    continue;
+                }
+                for (int сторона = 0; сторона < 6; сторона++) {
+                    Integer хозяин = h.sideOwner[сторона];
+                    String сосед = h.neighborBySide[сторона];
+                    if (хозяин != null && хозяин == b.uid && сосед != null
+                            && чужие.contains(сосед)) {
+                        зданий++;
+                        break;
+                    }
+                }
+            }
+            return зданий;
+        }
+
+        @Override
+        public boolean satisfied(CardContext ctx) {
+            return зданийСтенкой(ctx) >= 1;
         }
 
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
-            if (!satisfied(ctx)) {
-                return false;
-            }
-            for (int снесено : ход(ctx).razedOwnOnHex.values()) {
-                if (снесено >= 2) {
-                    return true;
-                }
-            }
-            return false;
+            return зданийСтенкой(ctx) >= 2;
         }
 
         @Override
         public double progress(CardContext ctx) {
-            var ж = ход(ctx);
-            double сделано = (ж.razedOwnBuilding ? 0.5 : 0)
-                + (ж.builtOnHexes.isEmpty() ? 0 : 0.5);
-            return ступени(сделано, готовность(!ctx.me().buildingsOnField().isEmpty()));
+            return satisfied(ctx) ? 1.0 : готовность(!ctx.me().buildingsOnField().isEmpty()) * 0.3;
         }
 
         @Override
         public String needed(CardContext ctx) {
-            var ж = ход(ctx);
-            if (!ж.razedOwnBuilding) {
-                return "снести своё здание";
-            }
-            return ж.builtOnHexes.isEmpty() ? "построить здание после сноса" : "";
+            return satisfied(ctx) ? "" : "поставить здание стенкой к гексу с войсками врага";
         }
 
         @Override
@@ -341,7 +350,7 @@ public final class ЗаданияТаблицы {
             return печатное("Разрядка", ЖЕРТВА,
                 "Сдай в общий запас 2 боеприпаса",
                 null,
-                Награда.выбор("mining", "build"), Награда.нет(),
+                Награда.выбор("mining", "build_miner"), Награда.нет(),
                 Утиль.АТАКА_ДВУМЯ);
         }
 
@@ -716,7 +725,7 @@ public final class ЗаданияТаблицы {
             return печатное("Диверсия", ПРОИСШЕСТВИЕ,
                 "В ЭТОТ ХОД уничтожь энергостанцию врага",
                 "это была энергостанция 3 или 4 уровня.",
-                Награда.выбор("market", "build"),
+                Награда.выбор("market", "build_plant"),
                 Награда.позолотой(),
                 Утиль.МОДУЛИ);
         }
@@ -927,7 +936,7 @@ public final class ЗаданияТаблицы {
             return печатное("Растяжка", СОСТОЯНИЕ,
                 "Займи войсками 4 гекса на поле",
                 "на 2 из них есть здания врага.",
-                Награда.выбор("movement", "build"),
+                Награда.выбор("movement", "build_miner"),
                 Награда.монеты(3).иСпец(1),
                 Утиль.РИКОШЕТ);
         }

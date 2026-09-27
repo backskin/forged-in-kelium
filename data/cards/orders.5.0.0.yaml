@@ -23,9 +23,8 @@
 #    ПРИОБРЕСТИ (снабжение+рынок)     -> МОБИЛИЗОВАТЬ (снабжение)
 #    КОНТРОЛИРОВАТЬ (питание+бой)     -> КОНТРОЛИРОВАТЬ (то же слово)
 #    ИССЛЕДОВАТЬ (добыча+наука)       -> ИССЛЕДОВАТЬ (те же действия)
-#  НАСТУПАТЬ — новая карта; у всех цветов на ней «−1 монета → 1 боеприпас»
-#  (вторая такая плашка у цвета). ВОПРОС ДИЗАЙНЕРУ: какую плашку печатать на
-#  пятой карте.
+#  НАСТУПАТЬ — новая карта; спец-плашки на ней нет ни у одного цвета
+#  (решение 27.09, комплект «пять развилок», раздел 2.4).
 # ============================================================================
 
 meta:
@@ -35,21 +34,21 @@ meta:
 orders:
   - {id: blue_settle, deck: blue, top: settle, bottom: advance, spec: coin, spec_cost_coin: 0, описание: "Приказ ОСВОИТЬ (Добыча, Питание); нижний — НАСТУПАТЬ. Спец-плашка: +2 МОНЕТЫ."}
   - {id: blue_mobilize, deck: blue, top: mobilize, bottom: secure, spec: ammo, spec_cost_coin: 1, описание: "Приказ МОБИЛИЗОВАТЬ (Питание, Снабжение); нижний — КОНТРОЛИРОВАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
-  - {id: blue_advance, deck: blue, top: advance, bottom: research, spec: ammo, spec_cost_coin: 1, описание: "Приказ НАСТУПАТЬ (Снабжение, Командование); нижний — ИССЛЕДОВАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: blue_advance, deck: blue, top: advance, bottom: research, описание: "Приказ НАСТУПАТЬ (Снабжение, Командование); нижний — ИССЛЕДОВАТЬ. Спец-плашки нет."}
   - {id: blue_secure, deck: blue, top: secure, bottom: settle, spec: movement, spec_cost_coin: 1, описание: "Приказ КОНТРОЛИРОВАТЬ (Командование, Развитие); нижний — ОСВОИТЬ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
   - {id: blue_research, deck: blue, top: research, bottom: mobilize, spec: objective, spec_cost_coin: 1, описание: "Приказ ИССЛЕДОВАТЬ (Развитие, Добыча); нижний — МОБИЛИЗОВАТЬ. Спец-плашка: −1 монета → 1 карта задания."}
   - {id: red_settle, deck: red, top: settle, bottom: advance, spec: movement, spec_cost_coin: 1, описание: "Приказ ОСВОИТЬ (Добыча, Питание); нижний — НАСТУПАТЬ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
   - {id: red_mobilize, deck: red, top: mobilize, bottom: secure, spec: coin, spec_cost_coin: 0, описание: "Приказ МОБИЛИЗОВАТЬ (Питание, Снабжение); нижний — КОНТРОЛИРОВАТЬ. Спец-плашка: +2 МОНЕТЫ."}
-  - {id: red_advance, deck: red, top: advance, bottom: research, spec: ammo, spec_cost_coin: 1, описание: "Приказ НАСТУПАТЬ (Снабжение, Командование); нижний — ИССЛЕДОВАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: red_advance, deck: red, top: advance, bottom: research, описание: "Приказ НАСТУПАТЬ (Снабжение, Командование); нижний — ИССЛЕДОВАТЬ. Спец-плашки нет."}
   - {id: red_secure, deck: red, top: secure, bottom: settle, spec: ammo, spec_cost_coin: 1, описание: "Приказ КОНТРОЛИРОВАТЬ (Командование, Развитие); нижний — ОСВОИТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
   - {id: red_research, deck: red, top: research, bottom: mobilize, spec: objective, spec_cost_coin: 1, описание: "Приказ ИССЛЕДОВАТЬ (Развитие, Добыча); нижний — МОБИЛИЗОВАТЬ. Спец-плашка: −1 монета → 1 карта задания."}
   - {id: green_settle, deck: green, top: settle, bottom: advance, spec: objective, spec_cost_coin: 1, описание: "Приказ ОСВОИТЬ (Добыча, Питание); нижний — НАСТУПАТЬ. Спец-плашка: −1 монета → 1 карта задания."}
   - {id: green_mobilize, deck: green, top: mobilize, bottom: secure, spec: movement, spec_cost_coin: 1, описание: "Приказ МОБИЛИЗОВАТЬ (Питание, Снабжение); нижний — КОНТРОЛИРОВАТЬ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
-  - {id: green_advance, deck: green, top: advance, bottom: research, spec: ammo, spec_cost_coin: 1, описание: "Приказ НАСТУПАТЬ (Снабжение, Командование); нижний — ИССЛЕДОВАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: green_advance, deck: green, top: advance, bottom: research, описание: "Приказ НАСТУПАТЬ (Снабжение, Командование); нижний — ИССЛЕДОВАТЬ. Спец-плашки нет."}
   - {id: green_secure, deck: green, top: secure, bottom: settle, spec: coin, spec_cost_coin: 0, описание: "Приказ КОНТРОЛИРОВАТЬ (Командование, Развитие); нижний — ОСВОИТЬ. Спец-плашка: +2 МОНЕТЫ."}
   - {id: green_research, deck: green, top: research, bottom: mobilize, spec: ammo, spec_cost_coin: 1, описание: "Приказ ИССЛЕДОВАТЬ (Развитие, Добыча); нижний — МОБИЛИЗОВАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
   - {id: yellow_settle, deck: yellow, top: settle, bottom: advance, spec: ammo, spec_cost_coin: 1, описание: "Приказ ОСВОИТЬ (Добыча, Питание); нижний — НАСТУПАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
   - {id: yellow_mobilize, deck: yellow, top: mobilize, bottom: secure, spec: objective, spec_cost_coin: 1, описание: "Приказ МОБИЛИЗОВАТЬ (Питание, Снабжение); нижний — КОНТРОЛИРОВАТЬ. Спец-плашка: −1 монета → 1 карта задания."}
-  - {id: yellow_advance, deck: yellow, top: advance, bottom: research, spec: ammo, spec_cost_coin: 1, описание: "Приказ НАСТУПАТЬ (Снабжение, Командование); нижний — ИССЛЕДОВАТЬ. Спец-плашка: −1 монета → 1 боеприпас."}
+  - {id: yellow_advance, deck: yellow, top: advance, bottom: research, описание: "Приказ НАСТУПАТЬ (Снабжение, Командование); нижний — ИССЛЕДОВАТЬ. Спец-плашки нет."}
   - {id: yellow_secure, deck: yellow, top: secure, bottom: settle, spec: movement, spec_cost_coin: 1, описание: "Приказ КОНТРОЛИРОВАТЬ (Командование, Развитие); нижний — ОСВОИТЬ. Спец-плашка: −1 монета → манёвр одним жетоном на его скорость."}
   - {id: yellow_research, deck: yellow, top: research, bottom: mobilize, spec: coin, spec_cost_coin: 0, описание: "Приказ ИССЛЕДОВАТЬ (Развитие, Добыча); нижний — МОБИЛИЗОВАТЬ. Спец-плашка: +2 МОНЕТЫ."}
