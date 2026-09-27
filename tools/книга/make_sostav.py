@@ -97,10 +97,10 @@ def сохранить(im, имя):
 сохранить(кучка([img("token/vehicle_p2.png"), img("token/aircraft_p3.png"),
                  img("token/tower_p4.png"), img("token/infantry_p1.png")], 300,
                 МЕСТА), "войска")
-# рубашки карт приказов четырёх цветов, пятая — снова первого цвета
-сохранить(стопка([img("card/orders/back_yellow.png"), img("card/orders/back_green.png"),
-                  img("card/orders/back_scarlet.png"), img("card/orders/back_blue.png"),
-                  img("card/orders/back_yellow.png")], 520, шаг=(0.24, -0.06)), "приказы")
+# карты приказов: рубашка сзади, поверх — 4 разных приказа лицом (разных цветов)
+сохранить(стопка([img("card/orders/back_blue.png"), img("card/orders/yellow_acquire.png"),
+                  img("card/orders/green_explore.png"), img("card/orders/red_control.png"),
+                  img("card/orders/blue_place.png")], 520, шаг=(0.24, -0.06)), "приказы")
 # планшеты — стопкой четырёх цветов; высота одна, поэтому соотношение верное
 сохранить(стопка([img("board/troop-p4.png"), img("board/troop-p3.png"),
                   img("board/troop-p2.png"), img("board/troop-p1.png")], 600,
@@ -108,4 +108,20 @@ def сохранить(im, имя):
 сохранить(стопка([img("board/storage-p4.png"), img("board/storage-p3.png"),
                   img("board/storage-p2.png"), img("board/storage-p1.png")], 600,
                  шаг=(0.047, -0.13)), "планшет-хранилища")
+# кубики технологий 4 цветов квадратом 2×2
+from PIL import ImageDraw
+цвета = [(59, 130, 208), (200, 55, 50), (70, 150, 70), (225, 180, 40)]
+кв = Image.new("RGBA", (300, 290), (0, 0, 0, 0))
+dd = ImageDraw.Draw(кв)
+def тон(c, k):
+    return tuple(min(255, int(x * k)) for x in c) + (255,)
+for i, c in enumerate(цвета):
+    x, y, r = 20 + (i % 2) * 140, 15 + (i // 2) * 135, 55
+    верх = [(x + r, y), (x + 2 * r, y + r // 2), (x + r, y + r), (x, y + r // 2)]
+    лево = [(x, y + r // 2), (x + r, y + r), (x + r, y + 2 * r), (x, y + r + r // 2)]
+    право = [(x + r, y + r), (x + 2 * r, y + r // 2), (x + 2 * r, y + r + r // 2), (x + r, y + 2 * r)]
+    dd.polygon(верх, fill=тон(c, 1.12), outline=(30, 30, 30, 255))
+    dd.polygon(лево, fill=тон(c, 0.85), outline=(30, 30, 30, 255))
+    dd.polygon(право, fill=тон(c, 0.65), outline=(30, 30, 30, 255))
+кв.save(os.path.join(D, "_кубики-технологий.png"))
 print("ok")
