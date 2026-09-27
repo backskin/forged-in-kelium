@@ -110,6 +110,7 @@ public class StrategicAgent extends HeuristicAgent {
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
         String ctxKind = context != null ? String.valueOf(context.getOrDefault("kind", "")) : "";
+        options = безЦели(state, options);
         // ПЛАН ДЕРЖИТСЯ МЕЖДУ ХОДАМИ (15.08.2026). Раньше он пересоздавался с
         // нуля при каждом вскрытии и каждом действии: при двух близких по
         // ценности целях бот метался между ними и не доводил до конца НИ ОДНОЙ

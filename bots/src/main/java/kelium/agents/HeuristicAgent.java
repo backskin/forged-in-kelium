@@ -122,9 +122,31 @@ public class HeuristicAgent extends Agent {
     /** Решение «жечь или копить» супер-карту 5.0 — монета один раз за партию. */
     private Boolean super5БудетЖечь = null;
 
+    /**
+     * ПРЕЖНИЙ БОТ — как играл до заказа 27.09.2026 («боты играют против
+     * соперников»): без отсева ходов без цели. Нужен только для очной встречи
+     * новых ботов с прежними на одних раздачах; за стол садятся новые.
+     */
+    public boolean прежний = false;
+
+    /** Пометить бота прежним (см. {@link #прежний}). */
+    public HeuristicAgent прежним() {
+        this.прежний = true;
+        return this;
+    }
+
+    /**
+     * ХОДЫ БЕЗ ЦЕЛИ НЕ ПРЕДЛАГАЮТСЯ ВОВСЕ — снос и перенос своего ЦУ без угрозы
+     * ему ({@link Угрозы#отсеять}). Вход один для всех решений этого бота.
+     */
+    protected List<Choice> безЦели(GameState state, List<Choice> options) {
+        return прежний ? options : Угрозы.отсеять(state, seat, options);
+    }
+
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
         String kind = context != null ? String.valueOf(context.getOrDefault("kind", "")) : "";
+        options = безЦели(state, options);
         List<Choice> opts = new ArrayList<>(options);
         java.util.function.BiFunction<GameState, Choice, Double> scorer = scorerFor(kind, context);
         if (scorer == null) {

@@ -31,9 +31,19 @@ import kelium.gui.replay2.Theme;
  */
 public final class OpponentStrip extends JComponent {
 
+    /**
+     * @param intent последнее намерение бота словами («бью лидера — Игрока 2»),
+     *               {@code null} — не бот или ещё не ходил
+     */
     public record Row(int seat, String name, boolean me, int vp, int coin,
                        int kelium, int ammo, int orderCards, int objectiveCards,
-                       int arsenalCards, int destroyedValue, boolean first) {
+                       int arsenalCards, int destroyedValue, boolean first, String intent) {
+        public Row(int seat, String name, boolean me, int vp, int coin,
+                   int kelium, int ammo, int orderCards, int objectiveCards,
+                   int arsenalCards, int destroyedValue, boolean first) {
+            this(seat, name, me, vp, coin, kelium, ammo, orderCards, objectiveCards,
+                arsenalCards, destroyedValue, first, null);
+        }
     }
 
     private final List<Row> rows = new ArrayList<>();
@@ -115,6 +125,7 @@ public final class OpponentStrip extends JComponent {
             + "<br>в руке: заданий " + r.objectiveCards() + ", арсенала " + r.arsenalCards()
             + ", приказов " + r.orderCards()
             + "<br>уничтожено на свалке: " + r.destroyedValue()
+            + (r.intent() == null ? "" : "<br>зачем ходил: " + r.intent())
             + "<br><i>щелчок — посмотреть его стол</i></html>";
     }
 

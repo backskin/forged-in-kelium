@@ -74,6 +74,22 @@ class HotSeatUiClickTest {
         play(HotSeatWindow.Options.simple(3, 913L, List.of("human", "human", "builder:1")));
     }
 
+    /**
+     * ПРОТИВ НОВЫХ БОТОВ — НАМЕРЕНИЯ ВИДНЫ (заказ дизайнера 27.09.2026): у хода
+     * бота в ленте и в шагах хода есть строка «зачем», и в ней нет служебных
+     * кодов.
+     */
+    @Test
+    void противМастеровНамеренияВидны() throws Exception {
+        HotSeatWindow w = play(HotSeatWindow.Options.simple(3, 270927L,
+            List.of("human", "stalker:3", "punisher:2")));
+        long зачем;
+        synchronized (w.feedLog) {
+            зачем = w.feedLog.stream().filter(l -> l.contains("зачем:")).count();
+        }
+        assertTrue(зачем > 5, "в ленте почти нет намерений ботов: " + зачем);
+    }
+
     @Test
     void противСбалансированногоБота() throws Exception {
         play(HotSeatWindow.Options.simple(2, 555L, List.of("balanced", "human")));
@@ -113,7 +129,7 @@ class HotSeatUiClickTest {
             e.id(), e.file(), null, null, null, null, null));
     }
 
-    private void play(HotSeatWindow.Options options) throws Exception {
+    private HotSeatWindow play(HotSeatWindow.Options options) throws Exception {
         EDT_ERRORS.clear();
         HotSeatWindow w = new HotSeatWindow(options);
         SwingUtilities.invokeAndWait(w::start);
@@ -246,6 +262,7 @@ class HotSeatUiClickTest {
         }
         SwingUtilities.invokeAndWait(() -> w.frame.dispose());
         assertTrue(RAW.isEmpty(), "служебный текст на экране:\n" + String.join("\n", RAW));
+        return w;
     }
 
     /**

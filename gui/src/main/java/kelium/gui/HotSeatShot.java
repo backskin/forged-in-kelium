@@ -135,6 +135,21 @@ public final class HotSeatShot {
             g.dispose();
         });
         ImageIO.write(img, "png", new File(out));
+        // -Dshot.journal — снять и журнал партии (там лента с намерениями ботов)
+        if (System.getProperty("shot.journal") != null) {
+            javax.swing.JDialog[] jd = new javax.swing.JDialog[1];
+            SwingUtilities.invokeAndWait(() -> jd[0] = win.openJournalForTest());
+            Thread.sleep(300);
+            BufferedImage ji = new BufferedImage(jd[0].getWidth(), jd[0].getHeight(),
+                BufferedImage.TYPE_INT_RGB);
+            SwingUtilities.invokeAndWait(() -> {
+                jd[0].getRootPane().validate();
+                Graphics2D g = ji.createGraphics();
+                jd[0].getRootPane().paint(g);
+                g.dispose();
+            });
+            ImageIO.write(ji, "png", new File(out.replace(".png", "-journal.png")));
+        }
         System.out.println("ответов " + answered + ", точка: " + win.pendingKindForTest()
             + ", окно: " + win.statusForTest());
         System.exit(0);

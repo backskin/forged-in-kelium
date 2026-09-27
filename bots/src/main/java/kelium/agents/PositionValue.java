@@ -67,6 +67,23 @@ public final class PositionValue {
     }
 
     public static Breakdown breakdown(GameState s, int seat, Genome w, Intents in) {
+        return breakdown(s, seat, w, in, false);
+    }
+
+    /**
+     * ПОЗИЦИЯ СОПЕРНИКА ГЛАЗАМИ ИГРОКА ЗА СТОЛОМ — та же оценка, но руки
+     * (задания и арсенал) видны только числом карт: какие это карты, бот не
+     * знает и знать не вправе. Каждая закрытая карта стоит среднюю цену.
+     */
+    public static double publicValue(GameState s, int seat, Genome w) {
+        return breakdown(s, seat, w, null, true).total;
+    }
+
+    /**
+     * @param открыто считать руку закрытой: только число карт, без их лиц
+     */
+    public static Breakdown breakdown(GameState s, int seat, Genome w, Intents in,
+                                      boolean открыто) {
         Breakdown b = new Breakdown();
         PlayerState me = s.player(seat);
         double late = lateness(s);              // 0 в начале партии, 1 в конце
@@ -91,7 +108,7 @@ public final class PositionValue {
         double objW = w.get("pl.objective", 1.0);
         EngineCardContext cardCtx = new EngineCardContext(s, seat);
         double objSum = 0;
-        for (String cid : me.objectiveHand) {
+        for (String cid : открыто ? List.<String>of() : me.objectiveHand) {
             var card = CardRegistry.objective(cid);
             if (card == null) {
                 objSum += 0.4;
@@ -123,6 +140,9 @@ public final class PositionValue {
             double v = ready ? 0.75 * vpReward : vpReward * (0.15 + 0.85 * prog);
             objSum += v * focus;
         }
+        if (открыто) {
+            objSum = 0.6 * me.objectiveHand.size();   // средняя карта на руке
+        }
         b.add("objectives", objSum * objW);
         // ВЫПОЛНЕННОЕ ЗАДАНИЕ — событие партии, а не только ресурсы: за него
         // платят усилением (модуль, арсенал, трофеи), рука пополняется, а
@@ -136,9 +156,12 @@ public final class PositionValue {
         for (String cid : me.allInstalledArsenal()) {
             arsSum += 0.6 + 1.6 * usefulness(s, seat, cid, true);   // очко уже в vp
         }
-        for (String cid : me.arsenalHand) {
+        for (String cid : открыто ? List.<String>of() : me.arsenalHand) {
             arsSum += 0.5 + 0.8 * Math.max(usefulness(s, seat, cid, true),
                 usefulness(s, seat, cid, false));
+        }
+        if (открыто) {
+            arsSum += 0.9 * me.arsenalHand.size();       // закрытая карта — средняя
         }
         b.add("arsenal", arsSum * arsW);
         b.add("containers", me.containers * 0.35 * arsW);

@@ -156,6 +156,26 @@ public final class Bots {
         };
     }
 
+    /**
+     * ПРЕЖНИЙ БОТ ДЕЙСТВУЮЩЕГО СОСТАВА — как играл до заказа 27.09.2026 («боты
+     * играют против соперников»): своя оценка позиции без соперников, ходы без
+     * цели не отсеиваются. Нужен только для очной встречи новых ботов с
+     * прежними на одних раздачах ({@code kelium.ЗамерСоперничества турнир}).
+     *
+     * @param id имя вида «характер:уровень»
+     */
+    public static Agent createPrevious(String id, int seat, Random rng, int players) {
+        String canon = BotCatalog.canonical(id);
+        int colon = canon.indexOf(':');
+        String character = colon < 0 ? canon : canon.substring(0, colon);
+        int level = colon < 0 ? 2 : Integer.parseInt(canon.substring(colon + 1));
+        return switch (Level.of(level)) {
+            case НОВИЧОК -> new NoisyAgent(
+                new HeuristicAgent(seat, rng, character).прежним(), 0.20, rng).прежним();
+            default -> PlannerAgent.ofLevel(level, character, seat, rng, players).прежним();
+        };
+    }
+
     /** Прежняя лестница уровней (формула → просчёт) — для сравнительных замеров. */
     public static Agent createLegacy(String character, Level level, int seat, Random rng,
                                      int players) {

@@ -62,8 +62,19 @@ public final class TurnSim {
         return c.kind() + "|" + c.label();
     }
 
-    /** Итог симуляции: состояние после хода и сценарий, которым к нему пришли. */
-    public record Result(GameState after, List<Step> script, List<String> actionsPlayed) {
+    /**
+     * Итог симуляции: состояние после хода и сценарий, которым к нему пришли.
+     *
+     * @param working  сыгранных действий, после которых на столе что-то
+     *                 изменилось (материальный отпечаток {@link Lookahead#materialSignature})
+     * @param idle     сыгранных действий, после которых не изменилось ничего
+     * @param hits     чьи жетоны я бил за ход: место владельца → число попаданий
+     */
+    public record Result(GameState after, List<Step> script, List<String> actionsPlayed,
+                         int working, int idle, Map<Integer, Integer> hits) {
+        public Result(GameState after, List<Step> script, List<String> actionsPlayed) {
+            this(after, script, actionsPlayed, 0, 0, Map.of());
+        }
     }
 
     /**
@@ -75,6 +86,10 @@ public final class TurnSim {
         private final Deque<String> actionOrder;
         final List<Step> script = new ArrayList<>();
         final List<String> actionsPlayed = new ArrayList<>();
+        /** Отпечаток стола в миг каждого вопроса «какое действие» и был ли перед ним сыгран ход. */
+        final List<Long> отпечатки = new ArrayList<>();
+        final List<Boolean> сыграно = new ArrayList<>();
+        final Map<Integer, Integer> удары = new java.util.HashMap<>();
 
         Recorder(int seat, Agent policy, List<String> actionOrder) {
             super(seat, "сценарий#" + seat);
@@ -86,6 +101,9 @@ public final class TurnSim {
         public Choice choose(GameState state, List<Choice> options, Map<String, Object> ctx) {
             String kind = ctx == null ? "" : String.valueOf(ctx.getOrDefault("kind", ""));
             Choice pick = null;
+            if ("action".equals(kind)) {
+                отпечатки.add(Lookahead.materialSignature(state, seat));
+            }
             if ("action".equals(kind) && actionOrder != null) {
                 while (pick == null && !actionOrder.isEmpty()) {
                     String want = actionOrder.poll();
@@ -108,7 +126,45 @@ public final class TurnSim {
                 }
             }
             script.add(new Step(kind, pick.label(), pick.kind(), keyOf(pick)));
+            if ("action".equals(kind)) {
+                сыграно.add(pick.payload() != null && "action".equals(pick.kind()));
+            }
             return pick;
+        }
+
+        @Override
+        public void observePublicEvent(Map<String, Object> event) {
+            policy.observePublicEvent(event);
+            if ("combat_hit".equals(event.get("type")) && event.get("seat") instanceof Number by
+                    && by.intValue() == seat && event.get("victim_owner") instanceof Number vo
+                    && vo.intValue() >= 0 && vo.intValue() != seat) {
+                удары.merge(vo.intValue(), 1, Integer::sum);
+            }
+            // нейтральные постройки — под ключом −1
+            Object t = event.get("type");
+            if (("damage_neutral".equals(t) || "raze_neutral".equals(t))
+                    && event.get("seat") instanceof Number by && by.intValue() == seat) {
+                удары.merge(-1, 1, Integer::sum);
+            }
+        }
+
+        /** Сколько сыгранных действий что-то сделали и сколько — ничего. */
+        int[] рабочие(long конец) {
+            int раб = 0;
+            int пуст = 0;
+            for (int i = 0; i < сыграно.size(); i++) {
+                if (!сыграно.get(i)) {
+                    continue;
+                }
+                long до = отпечатки.get(i);
+                long после = i + 1 < отпечатки.size() ? отпечатки.get(i + 1) : конец;
+                if (до != после) {
+                    раб++;
+                } else {
+                    пуст++;
+                }
+            }
+            return new int[]{раб, пуст};
         }
 
         private static Choice pass(List<Choice> options) {
@@ -131,7 +187,22 @@ public final class TurnSim {
     public static Result run(GameState real, int seat, String cardId, boolean coincided,
                              boolean bottomOpen, List<String> actionOrder, Agent policy,
                              Genome others, long seed) {
+        return run(real, seat, cardId, coincided, bottomOpen, actionOrder, policy, others,
+            seed, false);
+    }
+
+    /**
+     * @param честно не подглядывать: перед прогоном закрытое в копии (руки
+     *               соперников, порядок колод) перемешивается так, как его видит
+     *               игрок за столом ({@link Доигрывание#перемешатьСкрытое})
+     */
+    public static Result run(GameState real, int seat, String cardId, boolean coincided,
+                             boolean bottomOpen, List<String> actionOrder, Agent policy,
+                             Genome others, long seed, boolean честно) {
         GameState c = real.deepCopy(seed);
+        if (честно) {
+            Доигрывание.перемешатьСкрытое(c, seat, new Random(seed ^ 0x2545F4914F6CDD1DL));
+        }
         List<Agent> agents = new ArrayList<>();
         Recorder rec = new Recorder(seat, policy, actionOrder);
         for (int i = 0; i < c.numPlayers(); i++) {
@@ -151,6 +222,8 @@ public final class TurnSim {
             // пустой итог и не станет ему верить.
             return null;
         }
-        return new Result(c, rec.script, rec.actionsPlayed);
+        int[] раб = rec.рабочие(Lookahead.materialSignature(c, seat));
+        return new Result(c, rec.script, rec.actionsPlayed, раб[0], раб[1],
+            Map.copyOf(rec.удары));
     }
 }

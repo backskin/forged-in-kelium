@@ -88,6 +88,11 @@ public final class Летопись {
         }
 
         @Override
+        public String intent() {
+            return агент.intent();
+        }
+
+        @Override
         public void observeEvent(Map<String, Object> event) {
             агент.observeEvent(event);
         }

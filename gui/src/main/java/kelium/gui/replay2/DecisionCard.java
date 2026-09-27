@@ -105,6 +105,12 @@ public final class DecisionCard extends JComponent {
                 lines.add(new Object[]{"Выбрано: " + optionWords(chosen), body, Theme.accent(),
                     Theme.px(4), "pick"});
             }
+            // ЗАЧЕМ (заказ дизайнера 27.09.2026): намерение бота словами — по нему
+            // видно, чего он хочет и против кого играет.
+            if (d.intent != null && !d.intent.isBlank()) {
+                lines.add(new Object[]{"Зачем: " + clean(d.intent), last ? body : small,
+                    Theme.ink2(), Theme.px(4), null});
+            }
             if (last && !folded) {
                 int shown = 0;
                 for (int i = 0; i < d.options.size() && shown < 6; i++) {

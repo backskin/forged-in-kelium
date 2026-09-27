@@ -1724,6 +1724,12 @@ public final class HotSeatWindow {
         return rail;
     }
 
+    /** Журнал партии для съёмки ({@link HotSeatShot}): открыть и отдать окно. */
+    javax.swing.JDialog openJournalForTest() {
+        openJournalWindow();
+        return journalWindow;
+    }
+
     /** Окно журнала партии (одно на окно игры; открыто — дописывается). */
     private javax.swing.JDialog journalWindow;
     private javax.swing.JTextArea journalText;
@@ -1989,6 +1995,11 @@ public final class HotSeatWindow {
         Journaled(Agent inner) {
             super(inner.seat, inner.name);
             this.inner = inner;
+        }
+
+        @Override
+        public String intent() {
+            return inner.intent();
         }
 
         @Override
@@ -2664,6 +2675,10 @@ public final class HotSeatWindow {
         // ЛЕНТА И ШАГИ — ПО КАЖДОМУ НОВОМУ КАДРУ, перерисовка — один раз
         for (int i = Math.max(0, shownFrames); i <= last; i++) {
             ReplayRecord.Frame fi = r.frames.get(i);
+            // намерение бота — ПЕРЕД строкой того, что он сделал
+            if (!"turn_orders".equals(fi.type)) {
+                noteIntents(fi);
+            }
             if (!catchingUp && fi.log != null && !fi.log.isBlank()) {
                 feedLine(fi.seat, fi.log);
             }
@@ -2737,7 +2752,8 @@ public final class HotSeatWindow {
                 rows.add(new kelium.gui.kp.OpponentStrip.Row(p.seat, seatName(p.seat),
                     p.seat == mySeat, vpTotal(p), p.coin, p.kelium, p.ammo,
                     p.orderHand.size(), p.objectiveHand.size(), p.arsenalHand.size(),
-                    p.destroyedValue, p.seat == f.snapshot.firstPlayer));
+                    p.destroyedValue, p.seat == f.snapshot.firstPlayer,
+                    intentBySeat.get(p.seat)));
             }
             opponents.update(rows);
         }
@@ -2815,7 +2831,58 @@ public final class HotSeatWindow {
     }
 
     /** События хода → источники ленты шагов (концепт §5). */
+    /**
+     * ЗАЧЕМ ХОДИТ БОТ (заказ дизайнера 27.09.2026): намерение каждого решения
+     * бота лежит в записи; в шаги хода и в ленту идёт каждое НОВОЕ намерение —
+     * «бью лидера — Игрока 2», «строю добытчик ради келемия». Намерение приказа
+     * («перекрываю приказ Игрока 3») принимается до хода и показывается, когда
+     * ход этого игрока начнётся.
+     */
+    private final Map<Integer, String> revealIntent = new java.util.HashMap<>();
+
+    private void noteIntents(ReplayRecord.Frame f) {
+        for (ReplayRecord.Decision d : f.decisions) {
+            if (d.intent == null || d.intent.isBlank() || humansBySeat.containsKey(d.seat)) {
+                continue;
+            }
+            if ("reveal_order".equals(d.kind)) {
+                revealIntent.put(d.seat, d.intent);
+                continue;
+            }
+            if ("blind_discard".equals(d.kind)) {
+                continue;           // решение вне хода — в ленте хода ему не место
+            }
+            // Ход под приказом «Безопасность» сообщает о себе только после обоих
+            // действий, поэтому намерение не ждёт начала хода: повтор отсеивается
+            // по месту, а в шаги хода оно идёт, когда ход этого игрока уже виден.
+            if (!d.intent.equals(shownBySeat.get(d.seat))) {
+                showIntent(d.seat, d.intent);
+            }
+        }
+    }
+
+    /** Последнее намерение каждого бота — в подсказку его чипа в верхней строке. */
+    private final Map<Integer, String> intentBySeat = new ConcurrentHashMap<>();
+
+    /** Что из намерений этого места уже показано в текущем ходу. */
+    private final Map<Integer, String> shownBySeat = new java.util.HashMap<>();
+
+    private void showIntent(int seat, String intent) {
+        shownBySeat.put(seat, intent);
+        intentBySeat.put(seat, intent);
+        String line = "Зачем: " + intent;
+        if (turnSeat != null && turnSeat == seat) {
+            botSteps.add(line.length() > 60 ? line.substring(0, 59) + "…" : line);
+        }
+        if (!catchingUp) {
+            feedLine(seat, "Игрок " + (seat + 1) + " — зачем: " + intent);
+        }
+    }
+
     private void trackSteps(ReplayRecord.Frame f) {
+        if ("turn_end".equals(f.type) && f.seat != null) {
+            shownBySeat.remove(f.seat);
+        }
         // ВСКРЫТИЕ — ВСЕ КАРТЫ НА СТОЛ СРАЗУ (26.09.2026): приказ «ЗАТАИТЬСЯ» сообщает
         // о ходе только после обоих действий, и до того стол показывал «приказ
         // ещё не вскрыт», хотя карта уже открыта.
@@ -2836,6 +2903,11 @@ public final class HotSeatWindow {
             pendingBakeName = null;
             lastAgentLabels = new ArrayList<>();
             lockedSteps.add("Приказ вскрыт");
+            String заПриказ = revealIntent.remove(f.seat);
+            if (заПриказ != null && !humansBySeat.containsKey(f.seat)) {
+                showIntent(f.seat, заПриказ);
+            }
+            noteIntents(f);
             stepsCaption.setText("ШАГИ ХОДА — ИГРОК " + (f.seat + 1));
             actionBar.turnStarted();
             // ВСКРЫТЫЙ ПРИКАЗ — К КНОПКАМ ДЕЙСТВИЙ: действия берутся с этой

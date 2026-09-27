@@ -590,6 +590,12 @@ public final class ReplayRecord {
         /** Сколько вариантов было всего (в записи может лежать не больше {@link #KEEP}). */
         public int total;
         public final List<DecisionOption> options = new ArrayList<>();
+        /**
+         * ЗАЧЕМ — намерение бота словами («бью лидера — Игрока 2»), или
+         * {@code null}: живой игрок и боты без объяснений его не дают (заказ
+         * дизайнера 27.09.2026).
+         */
+        public String intent;
 
         /** Больше вариантов не храним: хватит, чтобы показать выбор, и файл не пухнет. */
         public static final int KEEP = 24;
@@ -1119,6 +1125,9 @@ public final class ReplayRecord {
         m.put("title", d.title);
         m.put("picked", d.picked);
         m.put("total", d.total);
+        if (d.intent != null && !d.intent.isBlank()) {
+            m.put("intent", d.intent);
+        }
         List<Object> os = new ArrayList<>();
         for (DecisionOption o : d.options) {
             Map<String, Object> om = new LinkedHashMap<>();
@@ -1147,6 +1156,7 @@ public final class ReplayRecord {
         Integer p = Json.io(m, "picked");
         d.picked = p == null ? -1 : p;
         d.total = Json.i(m, "total");
+        d.intent = Json.s(m, "intent");
         for (Object o : Json.list(m, "options")) {
             Map<String, Object> om = (Map<String, Object>) o;
             DecisionOption opt = new DecisionOption();

@@ -54,6 +54,12 @@ public final class Intents {
     /** Насколько крепко держусь за противника (0..1): выше — реже меняю цель. */
     private final double commitment;
     private int lastRoundUpdated = -1;
+    /**
+     * ЛИДЕР — ТОТ, КТО БЛИЖЕ К ПОБЕДЕ (заказ 27.09.2026), а не тот, у кого
+     * больше очков прямо сейчас: к очкам прибавляется открытое — свободная
+     * ступень науки, вершины, войска у чужого ЦУ ({@link Угрозы#лидер}).
+     */
+    public boolean поУгрозам = false;
 
     public Intents(int players, double commitment) {
         this.grudge = new double[players];
@@ -169,7 +175,7 @@ public final class Intents {
     public void retarget(GameState s, int seat, double leaderBias, boolean force) {
         Map<Integer, Double> score = new HashMap<>();
         Rivalry riv = new Rivalry(s, seat);
-        int leader = riv.leader();
+        int leader = поУгрозам ? Угрозы.лидер(s, seat) : riv.leader();
         PlayerState me = s.player(seat);
         for (PlayerState p : s.players) {
             if (p.seat == seat) {
@@ -178,7 +184,8 @@ public final class Intents {
             double v = 1.0;
             v += grudge[p.seat] * 1.2;
             if (p.seat == leader) {
-                v += leaderBias;
+                // новый бот держит в прицеле того, кто ближе к победе, заметно крепче
+                v += leaderBias + (поУгрозам ? 1.5 : 0);
             }
             v += 0.8 * riv.threat(p.seat);
             // Близость: чем ближе его жетоны к моим, тем реальнее война с ним.

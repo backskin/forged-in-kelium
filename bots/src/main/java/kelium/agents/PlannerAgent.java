@@ -72,6 +72,26 @@ public class PlannerAgent extends Agent {
     private double lastPlanValue;
     private String lastPlanText = "";
 
+    // ---- игра против соперников (заказ дизайнера 27.09.2026) ----
+    /**
+     * ПРЕЖНИЙ БОТ — как играл до заказа «боты играют против соперников»: своя
+     * оценка позиции без вычета силы соперников, без отсева ходов без цели, без
+     * правила «не пасовать при рабочем ходе», без перекрытия чужого приказа и с
+     * подглядыванием в копию стола. Нужен только для очной встречи с новыми
+     * ботами на одних раздачах.
+     */
+    public boolean прежний = false;
+    /** Веса соперников на текущее решение (лидер тяжелее). */
+    private double[] веса;
+    /** Оценка соперника — нейтральным геномом, его характер боту неизвестен. */
+    private final Genome нейтральный;
+    /** Кого бот считает лидером на этот ход. */
+    private int лидерХода = -1;
+    /** Намерение хода и последнего решения — словами. */
+    private String намерениеХода;
+    private String намерение;
+    private String намерениеПриказа;
+
     // ---- телеметрия ----
     public int plansMade;
     public int simulations;
@@ -89,7 +109,39 @@ public class PlannerAgent extends Agent {
         this.revealBySim = revealBySim;
         this.fallback = new StrategicAgent(seat, new Random(this.rng.nextLong()), genome, character);
         this.others = Bots.genome("balanced", players);
+        this.нейтральный = plannerDefaults("balanced", players);
         this.intents = new Intents(players, genome.get("pl.commitment", 1.0));
+        this.intents.поУгрозам = true;
+    }
+
+    /** Пометить бота прежним (см. {@link #прежний}). */
+    public PlannerAgent прежним() {
+        this.прежний = true;
+        this.fallback.прежним();
+        this.intents.поУгрозам = false;
+        return this;
+    }
+
+    @Override
+    public String intent() {
+        return прежний ? null : намерение;
+    }
+
+    /** Оценка позиции после хода: новая — относительно соперников. */
+    private double оценка(GameState после) {
+        if (прежний || веса == null) {
+            return PositionValue.value(после, seat, genome, intents);
+        }
+        return Относительно.оценка(после, seat, genome, intents, веса, нейтральный);
+    }
+
+    /** Лидер и веса соперников на это решение — по позиции ДО него. */
+    private void кСоперникам(GameState s) {
+        if (прежний) {
+            return;
+        }
+        веса = Относительно.веса(s, seat, genome);
+        лидерХода = Угрозы.лидер(s, seat);
     }
 
     /** Ключи весов планировщика — их и настраивает обучение. */
@@ -273,6 +325,19 @@ public class PlannerAgent extends Agent {
             intents.newRound(state, seat, genome.get("pl.leader_bias", 0.8));
             refocus(state);
         }
+        if (!прежний) {
+            options = Угрозы.отсеять(state, seat, options);
+            // ПОСЛЕДНЯЯ КАРТА КРУГА — ТОЖЕ ВСКРЫТИЕ. В четвёртом круге на руке одна
+            // карта, и вопрос о приказе решался без бота (вариант один). Бот не
+            // запоминал её и планировал ход ПРЕДЫДУЩЕЙ картой: на копии стола
+            // предлагались чужие действия, ни одно из задуманных не находилось, и
+            // каждый сценарий кончался пасом. Отсюда «пасы в четвёртом круге при
+            // рабочем действии» — 79% таких решений в замере 27.09.2026.
+            if ("reveal_order".equals(kind) && options.size() == 1) {
+                lastRevealCard = String.valueOf(options.get(0).payload());
+                намерение = null;
+            }
+        }
         if (options.size() == 1) {
             return options.get(0);
         }
@@ -280,6 +345,7 @@ public class PlannerAgent extends Agent {
             case "reveal_order":
                 return chooseReveal(state, options);
             case "blind_discard":
+                намерение = "откладываю приказ, который нужен меньше других";
                 return chooseDiscard(state, options);
             case "action": {
                 long key = state.round * 100L + state.circle;
@@ -287,11 +353,63 @@ public class PlannerAgent extends Agent {
                     turnKey = key;
                     plan(state, options, ctx);
                 }
-                return follow(state, options, ctx, kind);
+                Choice c = follow(state, options, ctx, kind);
+                намерение = намерениеХода;
+                return c;
             }
-            default:
+            case "cu_token_to":
+                if (!прежний) {
+                    return кому(state, options);
+                }
                 return follow(state, options, ctx, kind);
+            default: {
+                Choice c = follow(state, options, ctx, kind);
+                намерение = частное(state, kind, c);
+                return c;
+            }
         }
+    }
+
+    /** Намерение мелкого решения хода: удар, стройка — своими словами, прочее — как у хода. */
+    private String частное(GameState s, String kind, Choice c) {
+        if (прежний || c == null) {
+            return намерениеХода;
+        }
+        if ("attack".equals(kind)) {
+            String у = Замысел.удар(s, seat, c, лидерХода);
+            return у != null ? у : намерениеХода;
+        }
+        if ("build_pick".equals(kind) && c.payload() instanceof Map<?, ?> m
+                && m.get("btype") instanceof kelium.core.BuildingType bt) {
+            return Замысел.здание(bt);
+        }
+        if ("build_pick".equals(kind) && Угрозы.трогаетСвоёЦу(s, seat, c)) {
+            return "сношу своё ЦУ: иначе соперник берёт военную победу";
+        }
+        return намерениеХода;
+    }
+
+    /**
+     * КОМУ ОТДАТЬ ЖЕТОН УНИЧТОЖЕНИЯ ЦУ — самому слабому сопернику, а не лидеру:
+     * три очка лидеру — ровно то, от чего бот должен его удерживать.
+     */
+    private Choice кому(GameState s, List<Choice> options) {
+        Choice best = options.get(0);
+        double bestV = Double.POSITIVE_INFINITY;
+        for (Choice o : options) {
+            if (!(o.payload() instanceof Number who)) {
+                continue;
+            }
+            double v = Угрозы.соперник(s, who.intValue()).сила();
+            if (v < bestV) {
+                bestV = v;
+                best = o;
+            }
+        }
+        if (best.payload() instanceof Number who) {
+            намерение = "отдаю жетон ЦУ самому отстающему — " + Замысел.игрока(who.intValue());
+        }
+        return best;
     }
 
     @Override
@@ -329,6 +447,7 @@ public class PlannerAgent extends Agent {
     @SuppressWarnings("unchecked")
     private void plan(GameState s, List<Choice> options, Map<String, Object> ctx) {
         plansMade++;
+        кСоперникам(s);
         String cardId = lastRevealCard != null && s.player(seat).orderHand
             .stream().noneMatch(c -> c.equals(lastRevealCard))
             ? lastRevealCard : guessCard(s, options);
@@ -354,36 +473,100 @@ public class PlannerAgent extends Agent {
         // собой единицы. Поэтому сперва все сценарии считаются дёшево
         // (статика), а доигрывание тратится только на ГОРСТКУ ЛУЧШИХ.
         List<Кандидат> лучшие = new ArrayList<>();
+        // ЛУЧШИЙ СЦЕНАРИЙ НА КАЖДОЕ ЧИСЛО РАБОЧИХ ДЕЙСТВИЙ (заказ 27.09.2026):
+        // пас при рабочем ходе, который ничего не портит, — ход без цели, и
+        // сравнивать его надо с лучшим из рабочих, а не только с лучшим вообще.
+        Map<Integer, Кандидат> поРаботе = new HashMap<>();
         for (List<String> seq : sequences) {
             for (int i = 0; i < samples; i++) {
                 long seed = rng.nextLong();
                 TurnSim.Result r = TurnSim.run(s, seat, cardId, coincided, bottomOpen, seq,
-                    policy(i, seed), others, seed);
+                    policy(i, seed), others, seed, !прежний);
                 simulations++;
                 if (r == null) {
                     continue;
                 }
-                double статика = PositionValue.value(r.after(), seat, genome, intents)
-                    + rng.nextDouble() * 0.01;
-                добавить(лучшие, new Кандидат(статика, r, seq, seed),
-                    horizonRounds > 0 ? ГОРСТКА : 1);
+                double статика = оценка(r.after()) + rng.nextDouble() * 0.01;
+                if (!прежний) {
+                    // Пустое действие — «Стройка, ничего не построил» — хуже паса.
+                    статика -= ЦЕНА_ПУСТОГО * r.idle();
+                }
+                Кандидат к = new Кандидат(статика, r, seq, seed);
+                добавить(лучшие, к, horizonRounds > 0 ? ГОРСТКА : 1);
+                if (!прежний) {
+                    Кандидат был = поРаботе.get(r.working());
+                    if (был == null || был.статика() < статика) {
+                        поРаботе.put(r.working(), к);
+                    }
+                }
+            }
+        }
+        for (Кандидат к : поРаботе.values()) {
+            if (!лучшие.contains(к)) {
+                лучшие.add(к);
             }
         }
         double best = Double.NEGATIVE_INFINITY;
         TurnSim.Result bestRes = null;
         List<String> bestSeq = null;
+        double bestСтатика = Double.NEGATIVE_INFINITY;
+        Map<Кандидат, Double> цены = new HashMap<>();
+        StringBuilder отл = ОТЛАДКА ? new StringBuilder() : null;
         for (Кандидат к : лучшие) {
             double v = оценить(к.результат.after(), к.seed, к.статика);
+            цены.put(к, v);
+            if (отл != null) {
+                отл.append(String.format(java.util.Locale.ROOT, "  %s раб=%d пуст=%d стат=%.2f итог=%.2f%n",
+                    к.результат.actionsPlayed(), к.результат.working(), к.результат.idle(),
+                    к.статика, v));
+            }
             if (v > best) {
                 best = v;
                 bestRes = к.результат;
                 bestSeq = к.порядок;
+                bestСтатика = к.статика();
             }
+        }
+        if (!прежний && bestRes != null) {
+            // НЕ ПАСОВАТЬ ПРИ РАБОЧЕМ ХОДЕ. Если есть сценарий, где рабочих
+            // действий больше, а позиция не хуже лучшей больше чем на допуск, —
+            // играем его: ход, который что-то делает и ничего не портит, лучше
+            // стояния. Допуск — треть очка.
+            //
+            // «НЕ ХУЖЕ» СУДИТ СТАТИКА, а не доигрывание: у гроссмейстера итог
+            // наполовину состоит из ОДНОГО доигрывания ответного раунда, и у
+            // одного и того же хода он гуляет на два-три очка (разбор 27.09.2026:
+            // три прогона одного сценария — 14.3, 14.9, 15.7). Таким шумом пас
+            // обгонял рабочий ход, который по оценке позиции ничего не портил.
+            double лучшийДелающий = Double.NEGATIVE_INFINITY;
+            Кандидат делающий = null;
+            for (Кандидат к : лучшие) {
+                double v = цены.get(к);
+                if (к.результат.working() > bestRes.working()
+                        && к.статика() >= bestСтатика - ДОПУСК_ПАСА
+                        && v > лучшийДелающий) {
+                    лучшийДелающий = v;
+                    делающий = к;
+                }
+            }
+            if (делающий != null) {
+                best = лучшийДелающий;
+                bestRes = делающий.результат;
+                bestSeq = делающий.порядок;
+            }
+        }
+        if (отл != null) {
+            последняяОтладка = отл.toString();
         }
         if (bestRes == null) {
             script = null;
             plannedActions = List.of();
+            намерениеХода = прежний ? null : "пропускаю: ни одно действие сейчас ничего не даёт";
             return;
+        }
+        if (!прежний) {
+            намерениеХода = Замысел.ход(s, bestRes.after(), seat, лидерХода, bestRes.hits(),
+                intents, bestRes.actionsPlayed());
         }
         script = bestRes.script();
         cursor = 0;
@@ -420,6 +603,17 @@ public class PlannerAgent extends Agent {
      * зависеть от числа сценариев и становится постоянной.
      */
     private static final int ГОРСТКА = 4;
+
+    /** Отладка планировщика: печатать кандидатов плана (для разбора, не для игры). */
+    public static boolean ОТЛАДКА = false;
+    /** Кандидаты последнего плана словами (только при {@link #ОТЛАДКА}). */
+    public String последняяОтладка = "";
+
+    /** Сколько стоит пустое действие — чуть хуже паса, чтобы пас его обгонял. */
+    private static final double ЦЕНА_ПУСТОГО = 0.15;
+
+    /** На сколько рабочий ход может уступать лучшему, чтобы всё равно играть его, а не пас. */
+    private static final double ДОПУСК_ПАСА = 0.35;
 
     /** Сценарий с его дешёвой оценкой — пока не решено, доигрывать ли его. */
     private record Кандидат(double статика, TurnSim.Result результат,
@@ -502,10 +696,9 @@ public class PlannerAgent extends Agent {
             for (String a : topNames) {
                 long seed = rng.nextLong();
                 TurnSim.Result r = TurnSim.run(s, seat, cardId, coincided, bottomOpen,
-                    List.of(a), policy(0, seed), others, seed);
+                    List.of(a), policy(0, seed), others, seed, !прежний);
                 simulations++;
-                single.put(a, r == null ? Double.NEGATIVE_INFINITY
-                    : PositionValue.value(r.after(), seat, genome, intents));
+                single.put(a, r == null ? Double.NEGATIVE_INFINITY : оценка(r.after()));
             }
             top = new ArrayList<>(topNames);
             top.sort((a, b) -> Double.compare(single.get(b), single.get(a)));
@@ -631,9 +824,13 @@ public class PlannerAgent extends Agent {
     private Agent policy(int i, long seed) {
         Random r = new Random(seed);
         StrategicAgent base = new StrategicAgent(seat, r, genome, character);
+        if (прежний) {
+            base.прежним();
+        }
         Agent a = base;
         if (i >= 4) {
-            a = new NoisyAgent(base, 0.2, r);
+            NoisyAgent n = new NoisyAgent(base, 0.2, r);
+            a = прежний ? n.прежним() : n;
         }
         return switch (i % 5) {
             case 1 -> new Prefer(a, Map.of("spec", PlannerAgent::выполнение));
@@ -650,6 +847,9 @@ public class PlannerAgent extends Agent {
                 StrategicAgent ради = new StrategicAgent(seat, r,
                     genome.with("objective.pursuit", genome.get("objective.pursuit", 3.0) * 3.0),
                     character);
+                if (прежний) {
+                    ради.прежним();
+                }
                 yield new Prefer(ради, Map.of("spec", PlannerAgent::выполнение));
             }
             default -> a;
@@ -659,8 +859,19 @@ public class PlannerAgent extends Agent {
     /** Уклон «война с целью»: движение к жетонам цели, удары по ней, войска в Сборке. */
     @SuppressWarnings("unchecked")
     private Agent aggressive(Agent base) {
-        int target = intents.targetSeat;
+        // НОВЫЙ БОТ ИГРАЕТ ПРОТИВ ЛИДЕРА: сценарий «война с целью» ведётся против
+        // того, кто ближе всех к победе, а не против того, кто ближе по карте.
+        // Без такого сценария в переборе хода просто не было — оценке нечего
+        // было выбрать, как бы дорого она ни ценила удар по лидеру.
+        int target = !прежний && лидерХода >= 0 ? лидерХода : intents.targetSeat;
         Map<String, java.util.function.Predicate<Choice>> pref = new HashMap<>();
+        if (!прежний && лидерХода >= 0 && lastState != null) {
+            PlayerState лидер = lastState.player(лидерХода);
+            // ЗАНЯТЬ СТУПЕНЬ НАУКИ, НА КОТОРУЮ ЛИДЕР ВСТАНЕТ СЛЕДУЮЩИМ ШАГОМ.
+            pref.put("sci_track", o -> o.payload() instanceof Object[] arr && arr.length >= 2
+                && arr[0] instanceof String track && arr[1] instanceof Number to
+                && лидер.techSteps.getOrDefault(track, 0) + 1 == to.intValue());
+        }
         pref.put("assemble", o -> o.payload() instanceof Map<?, ?> m && "unit".equals(m.get("kind")));
         pref.put("attack", o -> {
             if (!(o.payload() instanceof Map<?, ?> m)) {
@@ -796,6 +1007,8 @@ public class PlannerAgent extends Agent {
     // ======================================================================
 
     private Choice chooseReveal(GameState s, List<Choice> options) {
+        кСоперникам(s);
+        намерение = null;
         if (!revealBySim) {
             Choice c = fallback.choose(s, options, Map.of("kind", "reveal_order"));
             lastRevealCard = String.valueOf(c.payload());
@@ -809,6 +1022,9 @@ public class PlannerAgent extends Agent {
         ranked.sort((a, b) -> Double.compare(v0.get(b), v0.get(a)));
         Choice best = null;
         double bestE = Double.NEGATIVE_INFINITY;
+        Choice bestБез = null;
+        double bestБезE = Double.NEGATIVE_INFINITY;
+        Map<Choice, int[]> ктоСрезан = new HashMap<>();
         for (int i = 0; i < ranked.size(); i++) {
             Choice o = ranked.get(i);
             String cid = String.valueOf(o.payload());
@@ -822,16 +1038,94 @@ public class PlannerAgent extends Agent {
                 e = e - pBlock * Math.max(0, e - vBlock) + pBottom * Math.max(0, vBottom - e);
             }
             e += rng.nextDouble() * 0.02;
+            if (e > bestБезE) {
+                bestБезE = e;
+                bestБез = o;
+            }
+            if (!прежний && !isJoker(s, cid)) {
+                int[] кто = new int[1];
+                e += ценаПерекрытия(s, topCode(s, cid), кто);
+                ктоСрезан.put(o, кто);
+            }
             if (e > bestE) {
                 bestE = e;
                 best = o;
             }
         }
         lastRevealCard = String.valueOf(best.payload());
+        if (!прежний && best != bestБез && ктоСрезан.containsKey(best)
+                && ктоСрезан.get(best)[0] > 0) {
+            int r = ктоСрезан.get(best)[0] - 1;
+            намерение = "перекрываю приказ " + (r == лидерХода ? "лидера — " : "")
+                + Замысел.игрока(r);
+        }
         return best;
     }
 
+    /**
+     * ЧЕГО СТОИТ ПЕРЕКРЫТЬ ЧУЖОЙ ПРИКАЗ этой картой. Совпадение верхних приказов
+     * режет до одного действия того, кто вскрывается ПОЗЖЕ в круге. Значит, если
+     * соперник ходит после меня и может вскрыть тот же верх, моя карта отнимает
+     * у него действие — и это тем дороже, чем он ближе к победе.
+     *
+     * <p>Какие карты у соперника остались — открытая информация: колода цвета
+     * напечатана, сыгранные в раунде карты лежат на столе. Одна из оставшихся
+     * отложена, какая — неизвестно, поэтому каждая считается равновероятной, с
+     * поправкой на то, какие приказы он вскрывал раньше.
+     *
+     * @param кто сюда кладётся место+1 того, у кого срез вероятнее всего (0 — ни у кого)
+     */
+    private double ценаПерекрытия(GameState s, String мойВерх, int[] кто) {
+        if (мойВерх == null || веса == null) {
+            return 0;
+        }
+        double сумма = 0;
+        double лучший = 0;
+        boolean послеМеня = false;
+        for (int r : s.seatsInOrder()) {
+            if (r == seat) {
+                послеМеня = true;
+                continue;
+            }
+            if (!послеМеня) {
+                continue;
+            }
+            PlayerState p = s.player(r);
+            // оставшиеся карты соперника как МНОЖЕСТВО: колода минус сыгранное
+            java.util.Set<String> остались = new java.util.LinkedHashSet<>(p.orderHand);
+            if (p.orderSetAside != null) {
+                остались.add(p.orderSetAside);
+            }
+            if (остались.isEmpty()) {
+                continue;
+            }
+            Map<String, Integer> видел = topSeen.getOrDefault(r, Map.of());
+            double всего = 0;
+            double тот = 0;
+            for (String c : остались) {
+                String верх = topCode(s, c);
+                double вес = 1.0 + 0.3 * (верх == null ? 0 : видел.getOrDefault(верх, 0));
+                всего += вес;
+                if (мойВерх.equals(верх)) {
+                    тот += вес;
+                }
+            }
+            double p1 = всего <= 0 ? 0 : тот / всего;
+            double цена = p1 * ЦЕНА_СРЕЗА * веса[r];
+            сумма += цена;
+            if (цена > лучший) {
+                лучший = цена;
+                кто[0] = r + 1;
+            }
+        }
+        return сумма;
+    }
+
+    /** Одно отнятое у соперника действие — около очка. */
+    private static final double ЦЕНА_СРЕЗА = 2.0;
+
     private Choice chooseDiscard(GameState s, List<Choice> options) {
+        кСоперникам(s);
         Choice worst = null;
         double worstV = Double.POSITIVE_INFINITY;
         for (Choice o : options) {
@@ -860,10 +1154,10 @@ public class PlannerAgent extends Agent {
         for (List<String> seq : seqs) {
             long seed = rng.nextLong();
             TurnSim.Result r = TurnSim.run(s, seat, cardId, coincided, bottomOpen, seq,
-                policy(0, seed), others, seed);
+                policy(0, seed), others, seed, !прежний);
             simulations++;
             if (r != null) {
-                best = Math.max(best, PositionValue.value(r.after(), seat, genome, intents));
+                best = Math.max(best, оценка(r.after()));
             }
         }
         return best == Double.NEGATIVE_INFINITY ? -1e6 : best;
@@ -873,9 +1167,9 @@ public class PlannerAgent extends Agent {
     private double bestTurnValueCheap(GameState s, String cardId) {
         long seed = rng.nextLong();
         TurnSim.Result r = TurnSim.run(s, seat, cardId, false, false, null,
-            policy(0, seed), others, seed);
+            policy(0, seed), others, seed, !прежний);
         simulations++;
-        return r == null ? -1e6 : PositionValue.value(r.after(), seat, genome, intents);
+        return r == null ? -1e6 : оценка(r.after());
     }
 
     // ======================================================================

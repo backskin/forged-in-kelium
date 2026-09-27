@@ -526,7 +526,7 @@ public final class GameRecorder {
                                          Map<String, Object> context) {
             kelium.core.Choice picked = inner.choose(state, options, context);
             try {
-                rc.noteDecision(seat, options, context, picked);
+                rc.noteDecision(seat, options, context, picked, inner.intent());
             } catch (RuntimeException e) {
                 // запись решения — пояснение, партия важнее
             }
@@ -536,6 +536,11 @@ public final class GameRecorder {
         @Override
         public boolean specInActionMenu() {
             return inner.specInActionMenu();
+        }
+
+        @Override
+        public String intent() {
+            return inner.intent();
         }
 
         @Override
@@ -575,10 +580,12 @@ public final class GameRecorder {
 
         /** Записать решение словами: вопрос, варианты, выбранный. */
         synchronized void noteDecision(int seat, List<kelium.core.Choice> options,
-                                       Map<String, Object> context, kelium.core.Choice picked) {
+                                       Map<String, Object> context, kelium.core.Choice picked,
+                                       String intent) {
             String kind = context == null ? "" : String.valueOf(context.get("kind"));
             ReplayRecord.Decision d = new ReplayRecord.Decision();
             d.seat = seat;
+            d.intent = intent == null || intent.isBlank() ? null : intent;
             d.kind = kind;
             String l = HotSeatWindow.kindLabel(kind);
             d.title = "ваш выбор".equals(l) ? "решение" : l;
