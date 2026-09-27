@@ -446,6 +446,19 @@ CSS = r"""
   .цвета { display: flex; gap: 2.5mm; align-items: center; margin: 0 0 2mm; }
   .цвета span { width: 5mm; height: 5mm; border-radius: 1mm; display: inline-block;
     outline: .2mm solid rgba(0,0,0,.35); }
+
+  /* ---- плитки действий-развилок (28.09.2026) ---- */
+  .плитки { display: grid; gap: 3mm; margin: 2mm 0 0; }
+  .плитки.к5 { grid-template-columns: repeat(5, 1fr); }
+  .плитки.к4 { grid-template-columns: repeat(4, 1fr); }
+  .плитки.к3 { grid-template-columns: repeat(3, 1fr); }
+  .плитки.к2 { grid-template-columns: repeat(2, 1fr); }
+  .плитка { display: flex; flex-direction: column; align-items: center; text-align: center;
+    background: rgba(255, 255, 255, .45); outline: .18mm solid var(--кант); padding: 2.4mm 1.6mm 2.6mm; }
+  .плитка .и.плит { height: var(--плит-h, 14mm); margin: 0 0 1.4mm; vertical-align: 0; }
+  .плитка b { font: 700 10pt/1.15 "Tektur", sans-serif; color: var(--охра); margin: 0 0 1.6mm; }
+  .плитка .ветка { font: 600 9pt/1.2 "Tektur Narrow", sans-serif; color: var(--чернила); }
+  .плитка .или { font: 400 8pt/1.1 "Tektur Narrow", sans-serif; color: var(--серый); margin: .7mm 0; }
 """
 
 

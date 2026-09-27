@@ -272,6 +272,29 @@ def blocks(md):
             cur.append('        <div class="комп-сетка к%s" style="--комп-h:%smm">' % (колонок, высота)
                        + "".join(ячейки) + "</div>")
             continue
+        # ПЛИТКИ — иконка, название и две ветки «или»: действия-развилки в ряд.
+        #   :плитки: 5
+        #   добыча | Добыча | Добыть келемий | Построить добытчик
+        #   :конец:
+        if ln.strip().startswith(":плитки:"):
+            пар = ln.strip()[len(":плитки:"):].split()
+            колонок = пар[0] if пар else "5"
+            иконка_мм = пар[1] if len(пар) > 1 else "14"
+            i += 1
+            ячейки = []
+            while i < len(lines) and lines[i].strip() != ":конец:":
+                ч = [x.strip() for x in lines[i].split("|")]
+                if len(ч) >= 3:
+                    з = значок(ч[0]) or ""
+                    ветки = '<span class="или">или</span>'.join(
+                        '<span class="ветка">' + inline(x) + "</span>" for x in ч[2:])
+                    ячейки.append('<div class="плитка">' + з.replace('class="и"', 'class="и плит"')
+                                  + '<b>' + inline(ч[1]) + "</b>" + ветки + "</div>")
+                i += 1
+            i += 1
+            cur.append('        <div class="плитки к%s" style="--плит-h:%smm">' % (колонок, иконка_мм)
+                       + "".join(ячейки) + "</div>")
+            continue
         if ln.strip() == ":карточки:":
             i += 1
             карточки = []
