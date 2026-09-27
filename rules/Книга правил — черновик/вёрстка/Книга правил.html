@@ -342,7 +342,7 @@
     --графит: #F7F1E1; --панель: rgba(247, 241, 225, .93); --панель2: rgba(255, 252, 244, .82); --кант: #186C24;
     --кант-т: rgba(42, 35, 24, .38); --крем: #2A2318; --крем2: #5E5139; --зел: #186C24; --охра: #6B4413;
     color: var(--крем); padding: 0; overflow: hidden;
-    background: var(--графит) url("илл/903c16aa729b9ca7.jpg") center / cover no-repeat;
+    background: var(--графит) url("илл/03d7fb1d18237fbf.jpg") center / cover no-repeat;
     font-family: "Tektur Narrow", "Tektur", sans-serif;
   }
   .задняя .сетка-фон { position: absolute; inset: 0; z-index: 0; opacity: 1;
@@ -379,7 +379,7 @@
 
   .задняя ul { list-style: none; margin: 0; padding: 0; }
   .задняя li::marker { content: ""; }
-  .задняя li { font: 500 7.4pt/1.2 "Tektur Narrow", sans-serif; color: var(--крем); margin: 0 0 .85mm; padding-left: 2.8mm; position: relative; break-inside: avoid; }
+  .задняя li { font: 500 7.8pt/1.22 "Tektur Narrow", sans-serif; color: var(--крем); margin: 0 0 .85mm; padding-left: 2.8mm; position: relative; break-inside: avoid; }
   .задняя li::before { content: ""; position: absolute; left: 0; top: 1.05mm; width: 1.5mm; height: 1.5mm; background: var(--зел); clip-path: polygon(0 0, 100% 50%, 0 100%); }
   .задняя li b { color: var(--зел); font-weight: 700; }
   /* Обложка растягивает любой img на всю страницу — здесь картинки мелкие,
@@ -395,10 +395,11 @@
   .задняя .фаза span { font: 800 9pt/1 "Tektur", sans-serif; color: var(--зел); text-transform: uppercase; letter-spacing: .04em; }
   .задняя .фаза i { margin-left: auto; font: 500 6.6pt "Tektur Narrow", sans-serif; color: var(--крем2); font-style: normal; }
 
-  .задняя .дей-сетка { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 3mm; }
+  .задняя .дей-сетка { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6mm 3mm; }
+  .задняя .дей-сетка .дей:last-child { grid-column: 1 / -1; min-height: 24mm; }
   .задняя .дей { display: flex; gap: 2mm; align-items: flex-start; background: var(--панель2); outline: .15mm solid var(--кант-т); outline-offset: -.15mm; padding: 1.4mm 1.8mm 1mm 1.6mm;
-    clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm); min-height: 24mm; }
-  .задняя .мед { position: relative; width: 13.4mm; height: 13.4mm; flex: none;
+    clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm); min-height: 38mm; }
+  .задняя .мед { position: relative; width: 15mm; height: 15mm; flex: none;
     margin-top: .4mm; display: block; }
   .стр.обложка.задняя .мед .мед-круг { position: absolute; inset: 0;
     width: 100%; height: 100%; object-fit: contain; }
@@ -407,8 +408,9 @@
     object-fit: contain; }
   .задняя .дей-т { flex: 1; min-width: 0; }
   .задняя .дей-имя { font: 800 9.5pt/1 "Tektur", sans-serif; color: var(--зел); text-transform: uppercase; letter-spacing: .04em; margin: .3mm 0 1.1mm; display: flex; align-items: baseline; gap: 1.6mm; }
-  .задняя .дей-имя span { font: 500 6.4pt "Tektur Narrow", sans-serif; color: var(--охра); text-transform: none; letter-spacing: .02em; }
-  .задняя .дей li { font-size: 6.8pt; line-height: 1.17; margin-bottom: .45mm; }
+  .задняя .дей-имя { flex-wrap: wrap; row-gap: .6mm; }
+  .задняя .дей-имя span { flex-basis: 100%; font: 600 6pt "Tektur Narrow", sans-serif; color: var(--охра); text-transform: uppercase; letter-spacing: .04em; }
+  .задняя .дей li { font-size: 8.2pt; line-height: 1.25; margin-bottom: 1.1mm; }
 
   .задняя .низ li { font-size: 7.1pt; }
   .задняя .победа { margin-top: .9mm; padding-top: .8mm; border-top: .25mm dashed var(--кант-т); }
@@ -430,78 +432,6 @@
   .стр.обложка.задняя .легенда .и { height: 6.4mm; width: auto; vertical-align: 0;
     padding: 0; background: none; border-radius: 0; outline: 0; }
 
-  /* ---- полоса «мир игры» за обложкой ---- */
-  .мир-рис { margin: 5mm 0 4.5mm; }
-  .мир-рис img { display: block; width: 100%; height: auto;
-    clip-path: polygon(7mm 0, 100% 0, 100% calc(100% - 7mm), calc(100% - 7mm) 100%, 0 100%, 0 7mm); }
-  .мир-текст { column-count: 2; column-gap: 6mm; }
-  .мир-текст p { font: 10.4pt/1.36 "Tektur Narrow", sans-serif; margin: 0 0 2.4mm;
-    break-inside: avoid; }
-  .мир-текст p:last-child { margin-bottom: 0; color: var(--охра); }
-
-
-  /* ---- просторная вёрстка (главы, переписанные с 27.09.2026) ----
-     Замечание дизайнера: при нынешнем кегле поля внутри плашек малы, а сами
-     плашки слипаются. Поля и промежутки — одной мерой по всей полосе. */
-  .стр.просторно .блок { padding: 3.2mm 4mm 3mm; margin: 0 0 4.5mm; }
-  .стр.просторно .блок h2 { margin-bottom: 2.2mm; }
-  .стр.просторно .две { column-gap: 7mm; }
-  .стр.просторно .дст .и { height: 15mm; }
-  .стр.просторно table { table-layout: fixed; width: 100%; }
-  .стр.просторно td { padding-top: 2mm; padding-bottom: 2mm; }
-  /* карточки: вещи игры сеткой 2×2 во всю ширину, картинка над текстом */
-  .карточки { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
-    gap: 4.5mm 7mm; margin: 0 0 4.5mm; align-items: stretch; }
-  .карточки .блок.карточка { margin: 0; }
-  .карт-рис { height: 27mm; display: flex; align-items: center; justify-content: center;
-    gap: 5mm; margin: 0 0 3mm; }
-  .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
-  .карт-рис img.значок { max-height: 68%; }
-
-  /* ---- состав игры: сетка компонентов (27.09.2026) ---- */
-  .комп-сетка { display: grid; gap: 3mm 3.5mm; margin: 1mm 0 3mm; }
-  .комп-сетка:last-child { margin-bottom: 0; }
-  /* планшеты войск и хранилища одной высоты на столе: колонки в том же
-     соотношении, что их ширины, — тогда оба встают в одном масштабе */
-  .комп-сетка.к2 { grid-template-columns: 2.01fr 1fr; }
-  .комп-сетка.к3 { grid-template-columns: repeat(3, 1fr); }
-  .комп-сетка.к4 { grid-template-columns: repeat(4, 1fr); }
-  .комп-сетка.к5 { grid-template-columns: repeat(5, 1fr); }
-  .комп-сетка.к6 { grid-template-columns: repeat(6, 1fr); }
-  .комп-сетка.к7 { grid-template-columns: repeat(7, 1fr); }
-  .комп-сетка.к8 { grid-template-columns: repeat(8, 1fr); }
-  .комп { text-align: center; }
-  .комп-рис { height: var(--комп-h, 16mm); display: flex; align-items: center; justify-content: center; gap: 1.5mm; }
-  .комп-рис img { max-height: 100%; max-width: 100%; object-fit: contain; min-width: 0; }
-  .комп-рис img + img { max-width: 48%; }
-  .комп-число { font: 800 11pt/1 "Tektur", sans-serif; color: var(--келемий); margin: 1mm 0 .4mm; }
-  .комп-рис img.значок { max-height: 62%; }
-  .комп-имя { font: 600 8pt/1.15 "Tektur Narrow", "Tektur", sans-serif; color: var(--чернила); }
-  .цвета { display: flex; gap: 2.5mm; align-items: center; margin: 0 0 2mm; }
-  .цвета span { width: 5mm; height: 5mm; border-radius: 1mm; display: inline-block;
-    outline: .2mm solid rgba(0,0,0,.35); }
-
-  /* ---- плитки действий-развилок (28.09.2026) ---- */
-  .плитки { display: grid; gap: 3mm; margin: 2mm 0 0; }
-  .плитки.к5 { grid-template-columns: repeat(5, 1fr); }
-  .плитки.к4 { grid-template-columns: repeat(4, 1fr); }
-  .плитки.к3 { grid-template-columns: repeat(3, 1fr); }
-  .плитки.к2 { grid-template-columns: repeat(2, 1fr); }
-  .плитка { display: flex; flex-direction: column; align-items: center; text-align: center;
-    background: rgba(255, 255, 255, .45); outline: .18mm solid var(--кант); padding: 2.4mm 1.6mm 2.6mm; }
-  .плитка .и.плит { height: var(--плит-h, 14mm); margin: 0 0 1.4mm; vertical-align: 0; }
-  .плитка b { font: 700 10pt/1.15 "Tektur", sans-serif; color: var(--охра); margin: 0 0 1.6mm; }
-  .плитка .ветка { font: 600 9pt/1.2 "Tektur Narrow", sans-serif; color: var(--чернила); }
-  .плитка .или { font: 400 8pt/1.1 "Tektur Narrow", sans-serif; color: var(--серый); margin: .7mm 0; }
-
-  /* ---- раздел: заголовок группы карточек одного действия (28.09.2026) ---- */
-  .раздел { column-span: all; display: flex; align-items: center; gap: 3mm;
-    margin: 1mm 0 3mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--келемий); }
-  .раздел .и.разд { height: 11mm; margin: 0; vertical-align: 0; }
-  .раздел span { font: 700 15pt/1 "Tektur", sans-serif; color: var(--охра); }
-  .карточка ul { margin: 0 0 1.4mm; padding-left: 4mm; }
-  .карточка li { margin: 0 0 .8mm; }
-  .карточка ol { margin: 0 0 1.4mm; padding-left: 5mm; }
 </style>
 </head>
 <body>
@@ -2088,16 +2018,16 @@
   </div>
 </div>
 
+<!-- ============ ЗАДНЯЯ ОБЛОЖКА ============ -->
 <p class="подпись-разворота">Задняя сторона обложки · памятка</p>
 <div class="разворот одна">
-
   <div class="стр обложка задняя">
     <div class="сетка-фон"></div>
     <div class="рамка-техно"></div>
 
     <div class="титул">
       <div class="титул-плашка">Памятка</div>
-      <div class="титул-линия"><span>раунд</span><span>карта приказа</span><span>восемь действий</span><span>конец партии</span></div>
+      <div class="титул-линия"><span>раунд</span><span>карта приказа</span><span>пять действий</span><span>конец партии</span></div>
     </div>
 
     <div class="пан" style="left:8mm;top:26mm;width:63mm;height:102mm"><div class="пан-в">
@@ -2106,7 +2036,7 @@
 <ul>
 <li>Карта рынка уходит вместе с келемием на ней. Откройте следующую.</li>
 <li><b>Свалка:</b> одна из 5 карт приказов рубашкой вверх у планшета войск. В руке остаются 4.</li>
-<li>Фишка <img class="и" src="илл/9eef8780a273d10b.png" alt=""> первого игрока — соседу по часовой стрелке.</li>
+<li>Фишка <img class="и" src="илл/dbaa94f35eea62fd.png" alt=""> первого игрока — соседу против часовой стрелки.</li>
 </ul>
 <div class="фаза"><b>II</b><span>Управление</span><i>4 круга</i></div>
 <ul>
@@ -2116,75 +2046,60 @@
 </ul>
 <div class="фаза"><b>III</b><span>Возвращение</span><i></i></div>
 <ul>
-<li>Проверка условий <img class="и" src="илл/0c58e86ede62ad06.png" alt=""> конца партии.</li>
-<li><b>Трофеи:</b> каждый жетон на свалке с <img class="и" src="илл/f4b03e227767b12d.png" alt=""> на обороте — 1 кубик трофея в свободную ячейку хранилища. Жетоны — владельцам.</li>
+<li>Проверка условий <img class="и" src="илл/a42037385760de26.png" alt=""> конца партии.</li>
+<li><b>Трофеи:</b> каждый жетон на свалке с <img class="и" src="илл/cd929c39722fa5c8.png" alt=""> на обороте — 1 кубик трофея в свободную ячейку хранилища. Жетоны — владельцам.</li>
 <li>Все <b>5</b> карт приказов — в руку.</li>
-<li>В руке не больше <b>2</b> карт заданий.</li>
+<li>Карты заданий — добрать до <b>2</b>.</li>
 </ul>
 </div></div>
     <div class="пан" style="left:8mm;top:131mm;width:63mm;height:65mm"><div class="пан-в">
 <div class="шапка"><span class="таб">Карта приказа</span></div>
 <ul>
-<li><b>Выбранный (верхний) приказ</b> — оба <img class="и" src="илл/f99ab052648a1d85.png" alt=""> действия, каждое один раз. Такой же приказ уже вскрыт в этом круге — только <b>одно</b>.</li>
-<li><b>Чужой (нижний) приказ</b> <img class="и" src="илл/de078f4fb1cc2172.png" alt=""> — одно действие, если его как выбранный уже вскрыл другой игрок.</li>
-<li><b>+ 1</b> <img class="и" src="илл/43dd9246629140a7.png" alt=""> <b>спец-действие:</b> карта задания или арсенала, вскрытие контейнеров, спец-плашка карты приказа — Движение · Монета · Задание.</li>
-<li><b>Безопасность</b> — любые <b>2</b> разных действия из восьми и спец-действие. Совпадения не боится и не создаёт.</li>
-<li>Действия — в любом порядке, одно за другим. Можно сыграть меньше.</li>
+<li><b>Верх</b> — оба <img class="и" src="илл/f4ce8cf68d7c65e4.png" alt=""> действия. Такую же карту в этом круге уже вскрыли — только <b>одно</b>.</li>
+<li><b>Низ</b> <img class="и" src="илл/7726d2310afda1b3.png" alt=""> — одно действие, если карту с названием низа в этом круге уже вскрыли.</li>
+<li>Каждое действие — <b>одна ветка из двух</b>, и за ход — один раз.</li>
+<li><b>+ 1</b> <img class="и" src="илл/002cce66e0bf58d7.png" alt=""> <b>спец-действие:</b> задание, арсенал, контейнеры, ЦУ из запаса или спец-плашка — Монеты · Боеприпас · Задание · Движение.</li>
 </ul>
 </div></div>
 
     <div class="пан дейпан" style="left:74mm;top:26mm;width:138mm;height:130mm"><div class="пан-в">
-      <div class="шапка"><span class="таб">Восемь действий</span><i>по два на каждый приказ</i></div>
-      <div class="дей-сетка"><div class="дей"><span class="мед"><img class="мед-круг" src="илл/488bb85e26b8d7f6.png" alt=""><img class="мед-знак" src="илл/afb77d451dd363c4.png" alt=""></span><div class="дей-т"><div class="дей-имя">Стройка<span>Инфраструктура</span></div><ul>
-<li><b>Поставить</b> здание из запаса за его цену <img class="и" src="илл/f3cb1ed26a04d950.png" alt=""> на свободные сектора подряд в зоне стройки.</li>
-<li><b>Снести</b> своё здание в запас: +1 <img class="и" src="илл/f3cb1ed26a04d950.png" alt="">. ЦУ не сносится.</li>
-<li>С каждым зданием — одно из двух за действие.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/488bb85e26b8d7f6.png" alt=""><img class="мед-знак" src="илл/ac37fd438a5be211.png" alt=""></span><div class="дей-т"><div class="дей-имя">Смена энергии<span>Инфраструктура</span></div><ul>
-<li>Каждый источник срабатывает один раз:</li>
-<li><b>отдаёт</b> <img class="и" src="илл/52d8d35a7f4b5129.png" alt=""> свои кубики на ячейки <img class="и" src="илл/b1b1324deb665ff2.png" alt=""> своих зданий как угодно,</li>
-<li>или <b>забирает</b> их обратно с любых ячеек.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/488bb85e26b8d7f6.png" alt=""><img class="мед-знак" src="илл/1120a52330697ac3.png" alt=""></span><div class="дей-т"><div class="дей-имя">Снаряжение<span>Разработка</span></div><ul>
-<li>Каждое запитанное военное здание <img class="и" src="илл/76b6ab709a59377b.png" alt=""> делает одно:</li>
-<li><b>жетон</b> <img class="и" src="илл/797920842c63e1d9.png" alt=""> своего рода войск — внутрь здания или на его гекс,</li>
-<li>или <b>боеприпасы</b> <img class="и" src="илл/3549c72b14927adb.png" alt=""> в хранилище. Числа — на планшете войск.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/488bb85e26b8d7f6.png" alt=""><img class="мед-знак" src="илл/2d0cd64d52b73a25.png" alt=""></span><div class="дей-т"><div class="дей-имя">Добыча<span>Разработка</span></div><ul>
-<li>Каждый запитанный добытчик берёт одно:</li>
-<li><b>келемий</b> <img class="и" src="илл/5c1562dcaf0e90b7.png" alt=""> с тайла зарождения за своей стенкой,</li>
-<li>или <b>карту контейнера</b> <img class="и" src="илл/c3076e9a0956dbd5.png" alt=""> с соседнего сектора. Опустошил тайл — награда с оборота.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/488bb85e26b8d7f6.png" alt=""><img class="мед-знак" src="илл/65e9b63eb64b8a6f.png" alt=""></span><div class="дей-т"><div class="дей-имя">Манёвр<span>Наступление</span></div><ul>
-<li>Выберите гекс: каждый ваш жетон войск с него идёт даром на свою скорость или меньше.</li>
-<li>Затем любой жетон с другого гекса — за 1 <img class="и" src="илл/3549c72b14927adb.png" alt="">.</li>
-<li>Стенки закрывают проход. Пехота может войти в гарнизон.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/488bb85e26b8d7f6.png" alt=""><img class="мед-знак" src="илл/ff0f02f58d20a00a.png" alt=""></span><div class="дей-т"><div class="дей-имя">Бой<span>Наступление</span></div><ul>
-<li>Выберите соседний гекс: каждый ваш жетон рядом атакует один жетон на нём.</li>
-<li><b>Универсальная</b> атака — 2 <img class="и" src="илл/3549c72b14927adb.png" alt="">, любой тип; <b>специальная</b> — 1 <img class="и" src="илл/3549c72b14927adb.png" alt="">, тип из ячейки планшета. Урон 1.</li>
-<li>Здания закрывают войска от наземных атак.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/488bb85e26b8d7f6.png" alt=""><img class="мед-знак" src="илл/f3c26712742fd9a5.png" alt=""></span><div class="дей-т"><div class="дей-имя">Рынок<span>Приобретения</span></div><ul>
-<li>Обмены — сколько угодно раз: 1 <img class="и" src="илл/5c1562dcaf0e90b7.png" alt=""> → 3 <img class="и" src="илл/f3cb1ed26a04d950.png" alt="">, 2 <img class="и" src="илл/5c1562dcaf0e90b7.png" alt=""> → 7 <img class="и" src="илл/f3cb1ed26a04d950.png" alt="">, 1 <img class="и" src="илл/5c1562dcaf0e90b7.png" alt=""> → 2 <img class="и" src="илл/ebc1db7e097e5d4a.png" alt="">.</li>
-<li><b>Предложение карты рынка</b> — одно за действие; келемий ложится в ячейку карты.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/488bb85e26b8d7f6.png" alt=""><img class="мед-знак" src="илл/ee5fed4073826efb.png" alt=""></span><div class="дей-т"><div class="дей-имя">Наука<span>Приобретения</span></div><ul>
-<li>Платите трофеями <img class="и" src="илл/f4b03e227767b12d.png" alt=""> <img class="и" src="илл/3d91c867049f911c.png" alt=""> — кубиками или жетонами со свалки:</li>
-<li><b>ступень трека</b> по порядку — 1 / 2 / 3 / 4;</li>
-<li><b>1</b> — смена модуля · <b>2</b> — позолота · <b>2</b> — карта арсенала.</li></ul></div></div></div>
+      <div class="шапка"><span class="таб">Пять действий</span><i>каждое — одна ветка из двух</i></div>
+      <div class="дей-сетка"><div class="дей"><span class="мед"><img class="мед-круг" src="илл/fc2611e82f075584.png" alt=""><img class="мед-знак" src="илл/cdcda7040ecb07e3.png" alt=""></span><div class="дей-т"><div class="дей-имя">Добыча<span>ОСВОИТЬ · ИССЛЕДОВАТЬ</span></div><ul>
+<li><b>Добыть:</b> каждый запитанный добытчик берёт <b>келемий</b> <img class="и" src="илл/dfbf2b0358dd4098.png" alt=""> с тайла за своей стенкой или <b>контейнер</b> <img class="и" src="илл/3dd97b8123b613a6.png" alt=""> со своего гекса.</li>
+<li>или <b>построить добытчик</b> за его цену <img class="и" src="илл/d6b230d214085c85.png" alt=""> — он сразу добывает.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/fc2611e82f075584.png" alt=""><img class="мед-знак" src="илл/53e43ba15b3bdea4.png" alt=""></span><div class="дей-т"><div class="дей-имя">Питание<span>ОСВОИТЬ · МОБИЛИЗОВАТЬ</span></div><ul>
+<li><b>Переложить энергию:</b> любые свои кубики <img class="и" src="илл/f764aa2a6f09cffa.png" alt=""> — с источников на ячейки <img class="и" src="илл/ba297170bf5873df.png" alt=""> зданий и обратно.</li>
+<li>или <b>построить энергостанцию</b> — её кубики сразу раскладываются.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/fc2611e82f075584.png" alt=""><img class="мед-знак" src="илл/2c4069039a004859.png" alt=""></span><div class="дей-т"><div class="дей-имя">Снабжение<span>МОБИЛИЗОВАТЬ · НАСТУПАТЬ</span></div><ul>
+<li><b>Выпустить:</b> каждое запитанное военное здание и ЦУ делает <b>жетон</b> <img class="и" src="илл/1d3187ca4681a7e4.png" alt=""> своего рода или <b>боеприпасы</b> <img class="и" src="илл/8c513e8d1fbdfdaa.png" alt="">.</li>
+<li>или <b>построить военное здание</b> — оно сразу выпускает.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/fc2611e82f075584.png" alt=""><img class="мед-знак" src="илл/2c057007d0ee54f7.png" alt=""></span><div class="дей-т"><div class="дей-имя">Командование<span>НАСТУПАТЬ · КОНТРОЛИРОВАТЬ</span></div><ul>
+<li><b>Манёвр:</b> выведите войска с одного гекса и введите на него войска, которые дойдут.</li>
+<li>или <b>Бой:</b> выберите гекс — каждый ваш жетон рядом атакует один жетон на нём: 2 <img class="и" src="илл/8c513e8d1fbdfdaa.png" alt=""> любой тип, 1 <img class="и" src="илл/8c513e8d1fbdfdaa.png" alt=""> — тип с планшета.</li></ul></div></div><div class="дей"><span class="мед"><img class="мед-круг" src="илл/fc2611e82f075584.png" alt=""><img class="мед-знак" src="илл/e5847d094e9569d0.png" alt=""></span><div class="дей-т"><div class="дей-имя">Развитие<span>КОНТРОЛИРОВАТЬ · ИССЛЕДОВАТЬ</span></div><ul>
+<li><b>Рынок:</b> 0 / 1 / 2 <img class="и" src="илл/dfbf2b0358dd4098.png" alt=""> → 1 / 3 / 7 <img class="и" src="илл/d6b230d214085c85.png" alt="">, 1 <img class="и" src="илл/dfbf2b0358dd4098.png" alt=""> → задание, предложение карты рынка.</li>
+<li>или <b>Наука:</b> шаг на треке за <img class="и" src="илл/cd929c39722fa5c8.png" alt=""> трофеи или <img class="и" src="илл/dfbf2b0358dd4098.png" alt=""> — 2 / 3 / 4 / 5; обмены Научного отдела.</li></ul></div></div></div>
     </div></div>
 
     <div class="пан низ" style="left:74mm;top:158mm;width:63mm;height:41mm"><div class="пан-в">
 <div class="шапка"><span class="таб">Конец партии</span><i>проверка в Возвращении</i></div>
 <ul>
-<li><img class="и" src="илл/0c58e86ede62ad06.png" alt=""> На поле остался последний тайл зарождения.</li>
-<li><img class="и" src="илл/0c58e86ede62ad06.png" alt=""> Заняты вершины всех трёх треков технологий.</li>
-<li><img class="и" src="илл/0c58e86ede62ad06.png" alt=""> В Обновлении нечем открыть новую карту рынка.</li>
-<li class="победа"><b>Военная победа</b> — уничтожить ЦУ, уже имея перевёрнутый модуль блокировки боя.</li>
+<li><img class="и" src="илл/a42037385760de26.png" alt=""> На поле не осталось келемия на тайлах зарождения.</li>
+<li><img class="и" src="илл/a42037385760de26.png" alt=""> В колоде рынка не осталось карт.</li>
+<li class="победа"><b>Сразу побеждает</b> тот, кто второй раз уничтожил ЦУ (втроём и вчетвером) или встал на вершины всех 3 треков.</li>
 </ul>
 </div></div>
     <div class="пан низ" style="left:140mm;top:158mm;width:72mm;height:41mm"><div class="пан-в">
-<div class="шапка"><span class="таб">Победные очки</span><i><img class="и" src="илл/46a7f21a859dbf5f.png" alt=""> только это</i></div>
+<div class="шапка"><span class="таб">Победные очки</span><i><img class="и" src="илл/9dddf8e971e32095.png" alt=""> только это</i></div>
 <ul class="две-кол">
-<li><b>Треки технологий</b> — 1 · 1 · 2 · 3 за ступень с вашим кубиком.</li>
+<li><b>Треки технологий</b> — 1 · 2 · 3 · 5 за ступень с вашим кубиком.</li>
 <li><b>Установленный арсенал</b> и супер-арсенал — звёзды на картах.</li>
 <li><b>Золотые модули</b> — 1 за каждый.</li>
 <li><b>Модули блокировки боя</b> стороной 3 — по 3.</li>
-<li><b>Супер-задание</b> — обе категории карты.</li>
+<li><b>Супер-задание</b> — по ★ и по ★★ за условия карты.</li>
 <li><b>Жетоны модулей хранилища</b> — 1 за пустую ячейку.</li>
 </ul>
 <p class="ничья">Ничья: гексы с жетонами → трофеи → келемий.</p>
 </div></div>
 
     <div class="пан значки" style="left:9.5mm;top:199.6mm;width:201mm;height:15.4mm"><div class="пан-в">
-      <div class="легенда"><div><img class="и" src="илл/f3cb1ed26a04d950.png" alt=""><span>монета</span></div><div><img class="и" src="илл/5c1562dcaf0e90b7.png" alt=""><span>келемий</span></div><div><img class="и" src="илл/3549c72b14927adb.png" alt=""><span>боеприпас</span></div><div><img class="и" src="илл/3d91c867049f911c.png" alt=""><span>кубик<br>трофея</span></div><div><img class="и" src="илл/f4b03e227767b12d.png" alt=""><span>трофей</span></div><div><img class="и" src="илл/52d8d35a7f4b5129.png" alt=""><span>энергия</span></div><div><img class="и" src="илл/46a7f21a859dbf5f.png" alt=""><span>очко</span></div><div><img class="и" src="илл/f99ab052648a1d85.png" alt=""><span>действие</span></div><div><img class="и" src="илл/43dd9246629140a7.png" alt=""><span>спец-<br>действие</span></div><div><img class="и" src="илл/de078f4fb1cc2172.png" alt=""><span>чужой<br>приказ</span></div><div><img class="и" src="илл/0c58e86ede62ad06.png" alt=""><span>конец<br>партии</span></div><div><img class="и" src="илл/ebc1db7e097e5d4a.png" alt=""><span>задание</span></div><div><img class="и" src="илл/190ee5a47ec5518a.png" alt=""><span>супер-<br>задание</span></div><div><img class="и" src="илл/b39adb3b6c9a0584.png" alt=""><span>арсенал</span></div><div><img class="и" src="илл/079c764b3e081255.png" alt=""><span>супер-<br>арсенал</span></div><div><img class="и" src="илл/c3076e9a0956dbd5.png" alt=""><span>контейнер</span></div><div><img class="и" src="илл/797920842c63e1d9.png" alt=""><span>жетон<br>войск</span></div><div><img class="и" src="илл/76b6ab709a59377b.png" alt=""><span>военное<br>здание</span></div><div><img class="и" src="илл/b1b1324deb665ff2.png" alt=""><span>ячейка<br>энергии</span></div><div><img class="и" src="илл/18ec56cef1d2b4a6.png" alt=""><span>круг<br>энергии</span></div><div><img class="и" src="илл/a95f098206b6c544.png" alt=""><span>прочность</span></div><div><img class="и" src="илл/62050fa6b7091daa.png" alt=""><span>урон</span></div><div><img class="и" src="илл/1ce99fee2cd39700.png" alt=""><span>уничто-<br>жение</span></div></div>
+      <div class="легенда"><div><img class="и" src="илл/d6b230d214085c85.png" alt=""><span>монета</span></div><div><img class="и" src="илл/dfbf2b0358dd4098.png" alt=""><span>келемий</span></div><div><img class="и" src="илл/8c513e8d1fbdfdaa.png" alt=""><span>боеприпас</span></div><div><img class="и" src="илл/006ad6f5bdbf8440.png" alt=""><span>кубик<br>трофея</span></div><div><img class="и" src="илл/cd929c39722fa5c8.png" alt=""><span>трофей</span></div><div><img class="и" src="илл/f764aa2a6f09cffa.png" alt=""><span>энергия</span></div><div><img class="и" src="илл/9dddf8e971e32095.png" alt=""><span>очко</span></div><div><img class="и" src="илл/f4ce8cf68d7c65e4.png" alt=""><span>действие</span></div><div><img class="и" src="илл/002cce66e0bf58d7.png" alt=""><span>спец-<br>действие</span></div><div><img class="и" src="илл/7726d2310afda1b3.png" alt=""><span>низ<br>карты</span></div><div><img class="и" src="илл/a42037385760de26.png" alt=""><span>конец<br>партии</span></div><div><img class="и" src="илл/e340a379a4c8a6d9.png" alt=""><span>задание</span></div><div><img class="и" src="илл/676f6efbc4b40bd4.png" alt=""><span>супер-<br>задание</span></div><div><img class="и" src="илл/fd626a6ecfe13055.png" alt=""><span>арсенал</span></div><div><img class="и" src="илл/25c01fc7e704a1f2.png" alt=""><span>супер-<br>арсенал</span></div><div><img class="и" src="илл/3dd97b8123b613a6.png" alt=""><span>контейнер</span></div><div><img class="и" src="илл/1d3187ca4681a7e4.png" alt=""><span>жетон<br>войск</span></div><div><img class="и" src="илл/f6ae0e1eddbb1076.png" alt=""><span>военное<br>здание</span></div><div><img class="и" src="илл/ba297170bf5873df.png" alt=""><span>ячейка<br>энергии</span></div><div><img class="и" src="илл/694106ca7c14aa4c.png" alt=""><span>круг<br>энергии</span></div><div><img class="и" src="илл/1bc70071fd9744ea.png" alt=""><span>прочность</span></div><div><img class="и" src="илл/df7e194c85e99acc.png" alt=""><span>урон</span></div><div><img class="и" src="илл/79ecf95f5a92e307.png" alt=""><span>уничто-<br>жение</span></div></div>
     </div></div>
   </div>
 </div>
