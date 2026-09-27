@@ -1022,6 +1022,19 @@ public final class CombatResolver {
             Target tcat = Target.fromCode((String) pl.get("tcat"));
             String target = (String) pl.get("target");
             String key = uid + ":" + row;
+            // КТО БЬЁТ — для окон реакций: интерфейс показывает игроку, чем и
+            // откуда его атакуют (дизайнер 28.09: «нигде не было слова о том,
+            // что на меня кто-то нападает»).
+            текущийУдар = new HashMap<>();
+            for (UnitToken u : s.player(attackerSeat).units) {
+                if (u.uid == uid) {
+                    текущийУдар.put("attacker_type", u.type.code);
+                    if (u.hexId != null) {
+                        текущийУдар.put("attacker_hex", u.hexId);
+                    }
+                }
+            }
+            текущийУдар.put("target_hex", target);
             // ОТХОД — окно на КАЖДЫЙ гекс по одному разу, перед первой атакой по
             // нему. «Уже разыгранные атаки остаются» (текст карты), поэтому окно
             // не открывается заново после каждого выстрела: ушедший жетон уходит
@@ -2068,6 +2081,35 @@ public final class CombatResolver {
      * жетону-убийце и ТОЛЬКО один; если хрип добивает убийцу, второго хрипа не
      * будет — отвечать некому, а окно внутри окна {@link Реакции} не открывает.
      */
+    /** Подробности текущего удара для окон реакций (кто и откуда бьёт). */
+    private Map<String, Object> текущийУдар = new HashMap<>();
+
+    /**
+     * ОКНО РЕАКЦИИ С ПОДРОБНОСТЯМИ: кто атакует, чем, откуда и по какому жетону.
+     * Всё, что знает бой в этот миг, уходит в точку решения — интерфейс
+     * подсвечивает оба жетона и пишет это словами.
+     */
+    private Map<String, Object> окно(int attackerSeat, Token жертва, Map<String, Object> ещё) {
+        Map<String, Object> m = new HashMap<>(текущийУдар);
+        m.put("attacker", attackerSeat);
+        if (жертва != null) {
+            m.put("victim_type", жертва instanceof BuildingToken b ? b.type.code
+                : ((UnitToken) жертва).type.code);
+            m.put("victim_building", жертва instanceof BuildingToken);
+            if (жертва instanceof BuildingToken b && b.level != null) {
+                m.put("victim_level", b.level);
+            }
+            String гекс = жертва instanceof BuildingToken b ? b.hexId : ((UnitToken) жертва).hexId;
+            if (гекс != null) {
+                m.put("victim_hex", гекс);
+            }
+        }
+        if (ещё != null) {
+            m.putAll(ещё);
+        }
+        return m;
+    }
+
     private void хрип(Token убитый, UnitToken убийца, int attackerSeat) {
         if (убийца == null || !убийца.alive() || убийца.hexId == null) {
             return;                       // бить некого: убийцы на поле уже нет
@@ -2077,7 +2119,8 @@ public final class CombatResolver {
         int хозяин = убитый.owner();
         String карта = Реакции.предложить(state, хозяин, вид, agentFor(хозяин),
             "нанести 1 урон жетону, который тебя уничтожил",
-            Map.of("attacker", attackerSeat, "killer_hex", убийца.hexId),
+            окно(attackerSeat, убитый, Map.of("killer_hex", убийца.hexId,
+                "attacker_type", убийца.type.code, "attacker_hex", убийца.hexId)),
             emit);
         if (карта == null) {
             return;
@@ -2103,7 +2146,7 @@ public final class CombatResolver {
         int хозяин = жертва.owner();
         String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЭВАКУАЦИЯ_ТРОФЕЕВ,
             agentFor(хозяин), "увести свой уничтоженный жетон в запас, а не отдать врагу",
-            Map.of("attacker", attackerSeat), emit);
+            окно(attackerSeat, жертва, null), emit);
         if (карта == null) {
             return false;
         }
@@ -2143,7 +2186,7 @@ public final class CombatResolver {
         }
         String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЭВАКУАЦИЯ,
             agentFor(хозяин), "атакуют твой жетон — вернуть его в свой запас",
-            Map.of("attacker", attackerSeat), emit);
+            окно(attackerSeat, жертва, null), emit);
         if (карта == null) {
             return false;
         }
@@ -2173,7 +2216,7 @@ public final class CombatResolver {
         }
         String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЗАКРОМА,
             agentFor(хозяин), "атакуют твой жетон — получить 2 боеприпаса",
-            Map.of("attacker", attackerSeat), emit);
+            окно(attackerSeat, жертва, null), emit);
         if (карта == null) {
             return;
         }
@@ -2206,7 +2249,7 @@ public final class CombatResolver {
             }
             String карта = Реакции.предложить(state, pl.seat, Реакции.Вид.КОНТРАТАКА,
                 agentFor(pl.seat), "атакуют гекс с твоими жетонами — войска оттуда бьют первыми",
-                Map.of("attacker", attackerSeat, "hex", hexId), emit);
+                окно(attackerSeat, null, Map.of("hex", hexId)), emit);
             if (карта == null) {
                 continue;
             }
@@ -2244,7 +2287,7 @@ public final class CombatResolver {
         }
         String карта = Реакции.предложить(state, хозяин, Реакции.Вид.РИКОШЕТ,
             agentFor(хозяин), "перевести атаку на другой жетон в этом же гексе",
-            Map.of("attacker", attackerSeat, "hex", hexId), emit);
+            окно(attackerSeat, жертва, Map.of("hex", hexId)), emit);
         if (карта == null) {
             return жертва;
         }
@@ -2318,7 +2361,7 @@ public final class CombatResolver {
             }
             String карта = Реакции.предложить(state, pl.seat, Реакции.Вид.ОТХОД,
                 agentFor(pl.seat), "увести один жетон из атакуемого гекса",
-                Map.of("attacker", attackerSeat, "hex", hexId), emit);
+                окно(attackerSeat, null, Map.of("hex", hexId)), emit);
             if (карта == null) {
                 continue;
             }

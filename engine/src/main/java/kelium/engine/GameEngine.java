@@ -1879,6 +1879,14 @@ public final class GameEngine {
                 case "spec_arsenal_install" -> arsenalInstall(p, (String) ch.payload());
                 default -> { }
             }
+            // ОДНО СПЕЦ — ОДНО ВСКРЫТИЕ, когда массовое вскрытие отменено
+            // (containers_storage.mass_open: false, решение дизайнера 12.08.2026).
+            // Прежде цикл спрашивал «ещё?» и после единственного вскрытия —
+            // дизайнер 28.09: «нажал «Завершить ход», а он предлагает вскрыть».
+            if (!Boolean.TRUE.equals(Ctx.rules(s).get("containers_storage.mass_open",
+                    Boolean.TRUE))) {
+                return;
+            }
         }
     }
 

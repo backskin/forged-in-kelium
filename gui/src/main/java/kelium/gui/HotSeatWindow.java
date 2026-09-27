@@ -3826,7 +3826,12 @@ public final class HotSeatWindow {
             }
         }
 
-        if ("action".equals(kind)) {
+        // КОНЕЦ ХОДА — ТА ЖЕ ПОЛОСА, что и в ходу (дизайнер 28.09): спец-действие —
+        // кнопкой внизу со своим меню, рядом «Завершить ход»; плашки сверху,
+        // которая сама предлагает, что делать, больше нет.
+        boolean конецХода = "spec".equals(kind)
+            && Boolean.TRUE.equals(d.context().get("turn_end"));
+        if ("action".equals(kind) || конецХода) {
             Map<String, Integer> avail = new LinkedHashMap<>();
             for (int i = 0; i < options.size(); i++) {
                 if ("action".equals(options.get(i).kind())
@@ -3935,9 +3940,13 @@ public final class HotSeatWindow {
             }
             actionStrip.show(d.context().get("remaining") instanceof Number rn2
                 ? "Ваш ход — действий: " + rn2 : "Ваш ход", strip, Theme.seat(seat));
-            field.setChoices(null, "Ваш ход: выберите действие",
-                anySpec ? "Действие или спец-действие — на кружках внизу поля"
-                    : "Действие — на кружках внизу поля", offCard, Theme.seat(seat));
+            if (конецХода) {
+                field.clearChoices();
+            } else {
+                field.setChoices(null, "Ваш ход: выберите действие",
+                    anySpec ? "Действие или спец-действие — на кружках внизу поля"
+                        : "Действие — на кружках внизу поля", offCard, Theme.seat(seat));
+            }
         } else {
             actionBar.idle("не сейчас");
             endBtn.setTexts("Сначала решение", kindLabel(kind));
@@ -4144,6 +4153,37 @@ public final class HotSeatWindow {
             boolean multi = byHex.values().stream().anyMatch(l -> l.size() > 1);
             hint = "Щёлкните подсвеченный гекс на поле"
                 + (multi ? " — где стоит цифра, откроется список вариантов" : "");
+        } else if ("reaction".equals(kind)) {
+            // ОТВЕТ КАРТОЙ — С ПРИЧИНОЙ (дизайнер 28.09: «какой ответ карты? что
+            // это?»): кто атакует, какой картой и что она даст — словами.
+            Map<String, Object> cx = d.context();
+            Object кто = cx.get("attacker");
+            String чемБьют = cx.get("attacker_type") instanceof String at
+                ? GameRecorder.unitName(at) : null;
+            String покому = cx.get("victim_type") instanceof String vt
+                ? (Boolean.TRUE.equals(cx.get("victim_building"))
+                    ? GameRecorder.buildingName(vt, cx.get("victim_level") instanceof Number lv
+                        ? lv.intValue() : null)
+                    : GameRecorder.unitName(vt))
+                : null;
+            title = (кто instanceof Number n ? "Вас атакует " + seatName(n.intValue()) : "Вас атакуют")
+                + (чемБьют == null ? "" : ": " + чемБьют)
+                + (покому == null ? "" : " бьёт по вашему жетону «" + покому + "»");
+            List<String> чем = new ArrayList<>();
+            String зачем = null;
+            for (Choice c : options) {
+                if ("reaction_burn".equals(c.kind()) && c.payload() instanceof String id) {
+                    чем.add("«" + cardName(id) + "»");
+                    String л = String.valueOf(c.label());
+                    int у = л.indexOf(": ");
+                    if (зачем == null && у >= 0) {
+                        зачем = л.substring(у + 2);
+                    }
+                }
+            }
+            hint = "Можно сжечь из руки " + String.join(" или ", чем)
+                + (зачем == null ? "" : ": " + зачем)
+                + ". Щёлкните карту внизу или «Не отвечать»";
         } else if (onTable.keySet().stream().anyMatch(k -> k.startsWith("card:"))) {
             hint = "Щёлкните подсвеченную карту на столе внизу";
         } else if ("build_pick".equals(kind) && builtThisAction(seat)) {
@@ -4212,6 +4252,19 @@ public final class HotSeatWindow {
         if (d.context().get("source") instanceof String src && hexIds.contains(src)) {
             field.setSource(src, Theme.seat(seat));
         }
+        // ОТВЕТ КАРТОЙ: на поле видно, КТО бьёт (обводка гекса стрелка цветом
+        // атакующего) и ПО ЧЕМУ (подсветка гекса своего жетона)
+        if ("reaction".equals(kind)) {
+            Map<String, Object> cx = d.context();
+            if (cx.get("attacker_hex") instanceof String ah && cx.get("attacker") instanceof Number an) {
+                field.setSource(ah, Theme.seat(an.intValue()));
+            }
+            Object цель = cx.get("victim_hex") != null ? cx.get("victim_hex")
+                : cx.get("hex") != null ? cx.get("hex") : cx.get("target_hex");
+            if (цель instanceof String vh) {
+                field.setSelectable(java.util.Set.of(vh), h -> { });
+            }
+        }
         // РЫНОК И НАУКА — С ДОСКАМИ ПЕРЕД ГЛАЗАМИ: ящик с ними выезжает сам,
         // пока идёт решение, и уезжает, когда решение принято.
         if (SCIENCE_MARKET.contains(kind)) {
@@ -4278,6 +4331,11 @@ public final class HotSeatWindow {
             gain(p.seat, own, "container", p.containers - q.containers, "контейнер", "контейнера",
                 "контейнеров", tail);
             gain(p.seat, own, "vp", vpTotal(p) - vpTotal(q), "очко", "очка", "очков", tail);
+            // ЭНЕРГИЯ НА ЗДАНИЯХ (дизайнер 28.09: «построил станцию — не понял, что
+            // оно дало»): кубики, легшие в ячейки своих зданий, — тоже событие
+            gain(p.seat, own, "action_power", энергияНаЗданиях(now, p.seat)
+                    - энергияНаЗданиях(prev, p.seat), "кубик энергии на здания",
+                "кубика энергии на здания", "кубиков энергии на здания", tail);
             int техДо = q.tech.values().stream().mapToInt(Integer::intValue).sum();
             int техПосле = p.tech.values().stream().mapToInt(Integer::intValue).sum();
             if (техПосле > техДо) {
@@ -4307,6 +4365,17 @@ public final class HotSeatWindow {
                 }
             }
         }
+    }
+
+    /** Сколько кубиков энергии стоит в ячейках живых зданий игрока на поле. */
+    private static int энергияНаЗданиях(ReplayRecord.Snapshot s, int seat) {
+        int n = 0;
+        for (ReplayRecord.Tok t : s.tokens) {
+            if (t.building && t.alive && t.owner == seat && t.hexId != null) {
+                n += t.energyPlaced;
+            }
+        }
+        return n;
     }
 
     private void gain(int seat, boolean own, String icon, int delta, String one, String few,
