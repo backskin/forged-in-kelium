@@ -64,6 +64,8 @@ public final class BuildMenu extends JComponent {
     private int scroll;
     private int contentH;
     private final Anim anim = new Anim();
+    /** Меню открыто для решения (при уходе ещё гаснет, но уже ничего не выбирает). */
+    private boolean live;
 
     public BuildMenu() {
         setOpaque(false);
@@ -92,6 +94,9 @@ public final class BuildMenu extends JComponent {
 
             @Override
             public void mouseClicked(MouseEvent e) {
+                if (!live) {
+                    return;              // гаснущее меню прошлого решения
+                }
                 int b = buttonAt(e.getX(), e.getY());
                 if (b >= 0) {
                     buttons.get(b).onPick().run();
@@ -130,6 +135,7 @@ public final class BuildMenu extends JComponent {
         hoverRow = -1;
         hoverButton = -1;
         scroll = 0;
+        live = true;
         setVisible(true);
         // всегда ведём к «открыто»: иначе недоигранное закрытие (прошлое решение
         // только что закрыло меню) спрятало бы его уже после открытия
@@ -141,6 +147,7 @@ public final class BuildMenu extends JComponent {
     }
 
     public void close() {
+        live = false;
         if (!isVisible()) {
             return;
         }
@@ -152,7 +159,7 @@ public final class BuildMenu extends JComponent {
     }
 
     public boolean isOpen() {
-        return isVisible() && !rows.isEmpty();
+        return live && isVisible() && !rows.isEmpty();
     }
 
     /** Строки и кнопки — для прогонщиков и тестов. */
@@ -228,7 +235,7 @@ public final class BuildMenu extends JComponent {
     @Override
     public boolean contains(int x, int y) {
         // за пределами нарисованной панели мышь уходит полю
-        return isVisible() && anim.value() > 0.3 && x >= 0 && x < menuWidth() && y >= 0
+        return live && isVisible() && anim.value() > 0.3 && x >= 0 && x < menuWidth() && y >= 0
             && y < getHeight();
     }
 

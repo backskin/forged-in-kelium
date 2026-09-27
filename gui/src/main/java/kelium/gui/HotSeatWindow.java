@@ -3116,6 +3116,7 @@ public final class HotSeatWindow {
         Map.entry("assemble", "сборка: что даёт здание — войско или боеприпасы"),
         Map.entry("tuck", "подложить карту-символ"),
         Map.entry("open_container", "вскрытие контейнера"),
+        Map.entry("pick_container", "какой контейнер вскрыть"),
         Map.entry("market_rate", "курс рынка"),
         Map.entry("sci_track", "трек науки"),
         Map.entry("super_pick", "выберите супер-задание"),
@@ -4028,7 +4029,11 @@ public final class HotSeatWindow {
                 continue;
             }
             // КАРТА ПЕРЕД ИГРОКОМ — выбирается на самой карте, на столе.
-            if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)) {
+            // ВЫБОР КОНТЕЙНЕРА ПРИ ВСКРЫТИИ — в карточку вопроса: лица своих
+            // контейнеров на столе рисуются стопкой, щёлкнуть по каждому нельзя,
+            // и вопрос оставался без единой кнопки (тупик, найден прогоном 27.09)
+            if (c.payload() instanceof String id && !hexIds.contains(id) && onTableCard(id)
+                    && !"pick_container".equals(kind)) {
                 onTable.computeIfAbsent("card:" + id, k -> new ArrayList<>()).add(opt);
                 continue;
             }

@@ -129,6 +129,8 @@ public final class PublicView {
         public int ammoCap;
         public int trophyCap;
         public int storeCap;
+        /** Ячейки склада на установленных картах (карты открыты — это публично). */
+        public final Map<String, Integer> cellCards = new java.util.LinkedHashMap<>();
         /** Занятость ячеек склада: ячейка → что в ней лежит. */
         public final Map<String, String> storageCells = new LinkedHashMap<>();
         /** Жетоны модуля хранилища (какой стороной положены). */
@@ -307,6 +309,7 @@ public final class PublicView {
         st.ammoCap = p.ammoCap;
         st.trophyCap = p.trophyCap;
         st.storeCap = p.storeCap;
+        st.cellCards.putAll(p.cellCards);
         st.storageCells.putAll(p.storageCells);
         st.storageTokens.addAll(p.storageTokens);
 
@@ -525,6 +528,7 @@ public final class PublicView {
         o.put("ammoCap", st.ammoCap);
         o.put("trophyCap", st.trophyCap);
         o.put("storeCap", st.storeCap);
+        o.put("cellCards", st.cellCards);
         o.put("storageCells", st.storageCells);
         o.put("storageTokens", st.storageTokens);
         o.put("destroyedCount", st.destroyedCount);

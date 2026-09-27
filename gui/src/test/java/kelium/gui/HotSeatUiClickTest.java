@@ -284,7 +284,7 @@ class HotSeatUiClickTest {
                 }
                 Runnable r = () -> {
                     row.onPick().run();
-                    if (w.confirm.isOpen() && !w.confirm.options().isEmpty()) {
+                    if (w.confirm.isVisible() && !w.confirm.options().isEmpty()) {
                         w.confirm.options().get(0).onPick().run();
                     }
                 };
