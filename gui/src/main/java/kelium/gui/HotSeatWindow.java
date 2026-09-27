@@ -4168,6 +4168,10 @@ public final class HotSeatWindow {
             boolean multi = byHex.values().stream().anyMatch(l -> l.size() > 1);
             hint = "Щёлкните подсвеченный гекс на поле"
                 + (multi ? " — где стоит цифра, откроется список вариантов" : "");
+        } else if ("seal_move".equals(kind)) {
+            title = "Переложить глухой жетон";
+            hint = "Он встанет на ячейку другого рода войск и перекроет её. Щёлкните "
+                + "подсвеченную ячейку на планшете войск внизу";
         } else if ("objective_reward_action".equals(kind)) {
             title = "Задание выполнено — награда";
             hint = "Сыграйте одно из этих действий сейчас, сверх своих приказов";
