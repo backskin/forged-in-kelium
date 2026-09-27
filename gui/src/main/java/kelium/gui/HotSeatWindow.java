@@ -3744,6 +3744,9 @@ public final class HotSeatWindow {
                 && options.stream().map(Choice::kind).distinct().count() == 1
                 && options.stream().map(Choice::payload).distinct().count() == options.size()) {
             boolean drop = options.stream().allMatch(c -> "drop_objective".equals(c.kind()));
+            // ВСКРЫТИЕ КОНТЕЙНЕРА (27.09.2026): свои карты контейнеров — лицами,
+            // щелчок по карте вскрывает её
+            boolean контейнер = options.stream().allMatch(c -> "pick_container".equals(c.kind()));
             boolean arsenal = options.stream().anyMatch(c ->
                 kelium.report.Textures.cardFace("arsenal", (String) c.payload()) != null
                     || kelium.report.Textures.cardFace("arsenal_start", (String) c.payload()) != null
@@ -3755,14 +3758,17 @@ public final class HotSeatWindow {
                 String id = (String) options.get(i).payload();
                 int idx = i;
                 cards.add(new kelium.gui.kp.CardChoiceOverlay.Card(id, null,
-                    cardName(id), cardFullText(arsenal ? "arsenal" : "objectives", id), () -> {
+                    cardName(id), cardFullText(контейнер ? "containers"
+                        : arsenal ? "arsenal" : "objectives", id), () -> {
                         ceremony.close();
                         submit(agent, d, idx);
                     }));
             }
-            String cTitle = drop ? "Какое задание сбросить"
+            String cTitle = контейнер ? "Какой контейнер вскрыть"
+                : drop ? "Какое задание сбросить"
                 : arsenal ? "Какую карту арсенала оставить" : "Какое задание оставить";
-            String cSub = drop
+            String cSub = контейнер ? "Щёлкните карту — получите написанное, карта уйдёт в сброс"
+                : drop
                 ? "Щёлкните карту, которая уйдёт в сброс"
                     + (d.context().get("keep") instanceof Number k ? " — себе останется " + k : "")
                 : "Щёлкните карту, которую берёте; остальные уйдут в сброс";
