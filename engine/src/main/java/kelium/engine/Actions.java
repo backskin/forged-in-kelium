@@ -290,6 +290,8 @@ public final class Actions {
             case "combat" -> new CombatAction(state);
             case "market" -> new MarketAction(state);
             case "science" -> new ScienceAction(state);
+            case "extract", "power", "supply", "command", "develop" ->
+                new ForkAction(state, name);
             default -> throw new IllegalArgumentException("неизвестное действие: " + name);
         };
     }
@@ -327,6 +329,128 @@ public final class Actions {
     public static final List<String> ALL_NAMES = List.of(
         "assembly", "mining", "build", "energy_swap",
         "movement", "combat", "market", "science");
+
+    // ======================================================================
+    //  ПЯТЬ ДЕЙСТВИЙ-РАЗВИЛОК (решение дизайнера 27.09.2026, приказы 5.0.0)
+    // ======================================================================
+    //  Каждое действие — «одно из двух»: игрок в начале действия выбирает
+    //  ветку, и дальше идёт прежнее действие целиком. Ветка «построить» —
+    //  прежняя Стройка, но с набором типов зданий этого действия (и снос —
+    //  только этих типов).
+
+    /** Действия-развилки и их ветки (имена прежних действий), по порядку. */
+    public static final Map<String, List<String>> FORKS = new java.util.LinkedHashMap<>();
+
+    /** Какие здания строит ветка «построить» развилки: miner | plant | military. */
+    public static final Map<String, String> FORK_BUILD = new HashMap<>();
+
+    static {
+        FORKS.put("extract", List.of("mining", "build"));
+        FORKS.put("power", List.of("energy_swap", "build"));
+        FORKS.put("supply", List.of("assembly", "build"));
+        FORKS.put("command", List.of("movement", "combat"));
+        FORKS.put("develop", List.of("market", "science"));
+        FORK_BUILD.put("extract", "miner");
+        FORK_BUILD.put("power", "plant");
+        FORK_BUILD.put("supply", "military");
+    }
+
+    /** Имена пяти действий-развилок. */
+    public static final List<String> FORK_NAMES = List.copyOf(FORKS.keySet());
+
+    /**
+     * Имена действий с развилками, раскрытыми в их ветки (прежние действия):
+     * {@code [extract, power]} → {@code [mining, build, energy_swap]}.
+     */
+    public static List<String> expandForks(java.util.Collection<String> names) {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (String n : names) {
+            List<String> b = FORKS.get(n);
+            if (b == null) {
+                out.add(n);
+            } else {
+                out.addAll(b);
+            }
+        }
+        return new ArrayList<>(out);
+    }
+
+    /** Развилка ли это (а не прежнее действие). */
+    public static boolean isFork(String name) {
+        return name != null && FORKS.containsKey(name);
+    }
+
+    /**
+     * Можно ли ветке стройки {@code branch} ставить/сносить здание этого типа.
+     * {@code null} — ветки нет, обычная Стройка: можно всё.
+     */
+    public static boolean buildBranchAllows(String branch, BuildingType t) {
+        if (branch == null) {
+            return true;
+        }
+        return switch (branch) {
+            case "miner" -> t == BuildingType.MINER;
+            case "plant" -> t == BuildingType.POWER_PLANT;
+            case "military" -> t == BuildingType.BARRACKS || t == BuildingType.FACTORY
+                || t == BuildingType.AIRBASE || t == BuildingType.COMMAND_CENTER;
+            default -> true;
+        };
+    }
+
+    /**
+     * ДЕЙСТВИЕ-РАЗВИЛКА: первым шагом игрок выбирает ветку (решение вида
+     * {@code action_branch}, вариант — имя прежнего действия), затем
+     * выполняется прежнее действие. В {@link TurnContext#actionsPlayed}
+     * попадает имя РАЗВИЛКИ (по нему действие не повторяется в ходу), а имя
+     * выполненной ветки остаётся в {@link #branch} — движок пишет его в журнал
+     * хода и в событие действия, чтобы задания вида «сделай Бой» работали.
+     */
+    public static final class ForkAction extends Action {
+        private final String id;
+        /** Выбранная ветка — имя прежнего действия (null, пока не выбрана). */
+        public String branch;
+
+        ForkAction(GameState state, String id) {
+            super(state);
+            this.id = id;
+        }
+
+        @Override public String name() { return id; }
+        @Override public boolean implemented() { return true; }
+
+        @Override
+        public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
+            List<String> ветки = FORKS.get(id);
+            List<Choice> opts = new ArrayList<>();
+            for (String b : ветки) {
+                opts.add(new Choice("action_branch", b, b));
+            }
+            Choice ch = agent.choose(state, opts, Map.of("kind", "action_branch",
+                "action", id));
+            branch = ch == null || ch.payload() == null
+                ? ветки.get(0) : String.valueOf(ch.payload());
+            if (!ветки.contains(branch)) {
+                branch = ветки.get(0);
+            }
+            Action sub = create(branch, state);
+            String былаВетка = ctx.buildBranch;
+            if ("build".equals(branch)) {
+                ctx.buildBranch = FORK_BUILD.get(id);
+            }
+            ActionResult res;
+            try {
+                res = sub.perform(player, ctx, agent);
+            } finally {
+                ctx.buildBranch = былаВетка;
+            }
+            // Слот хода занимает РАЗВИЛКА: ветка не мешает второй развилке с
+            // той же веткой (Добыча и Питание обе могут «построить»).
+            if (ctx.actionsPlayed.remove(branch) || res.ok()) {
+                ctx.actionsPlayed.add(id);
+            }
+            return res;
+        }
+    }
 
 
     // ======================================================================
@@ -1192,6 +1316,11 @@ public final class Actions {
             surcharge -= Math.max(0, ctx.buildDiscountCoins);
             List<Map<String, Object>> menu = ctx.buildMovesOnly
                 ? new ArrayList<>() : buildable(player, surcharge, ctx.buildFree);
+            // ВЕТКА «ПОСТРОИТЬ» РАЗВИЛКИ (приказы 5.0.0): только свои типы.
+            if (ctx.buildBranch != null) {
+                menu.removeIf(m -> !buildBranchAllows(ctx.buildBranch,
+                    (BuildingType) m.get("btype")));
+            }
             // ЗДАНИЕ ЗА НАЗВАННУЮ ЦЕНУ (верх арсенала 5.0 «построй любое здание
             // за 1 монету»). Цена ЗАМЕНЯЕТ всю арифметику стройки - и печатную
             // цену, и надбавку за операцию: карта обещает ровно одну монету, и
@@ -1218,6 +1347,10 @@ public final class Actions {
             boolean переносМожно = rs.getBool("actions.build.move_enabled", true);
             List<Map<String, Object>> moveMenu = переносМожно
                 ? movable(player, ctx) : new ArrayList<>();
+            if (ctx.buildBranch != null) {
+                moveMenu.removeIf(m -> m.get("uid") instanceof Number n
+                    && !branchAllowsUid(player, ctx.buildBranch, n.intValue()));
+            }
             // ОДНА ОПЕРАЦИЯ НА ЗДАНИЕ. Уже тронутое этим действием здание из меню
             // уходит: иначе его можно переставлять и сносить по кругу.
             boolean одноНаЗдание = rs.getBool("actions.build.one_op_per_building", false);
@@ -1277,6 +1410,9 @@ public final class Actions {
             // то есть раз за партию. Ставят ЦУ заново потом спец-действием.
             boolean цуЗаЖетон = rs.getBool("actions.build.demolish_cu_gives_token", false);
             for (BuildingToken b : player.buildingsOnField()) {
+                if (!buildBranchAllows(ctx.buildBranch, b.type)) {
+                    continue;
+                }
                 if (b.type == BuildingType.COMMAND_CENTER && !цуМожноСносить) {
                     continue;
                 }
@@ -1325,7 +1461,8 @@ public final class Actions {
             // сможет включить ремонт и померить, чего игре стоит его отсутствие.
             boolean ремонтМожно = rs.getBool("actions.build.repair_enabled", false);
             for (BuildingToken b : player.buildingsOnField()) {
-                if (!ремонтМожно || b.damage <= 0) {
+                if (!ремонтМожно || b.damage <= 0
+                        || !buildBranchAllows(ctx.buildBranch, b.type)) {
                     continue;
                 }
                 int цена = printedPrice(player, b);
@@ -2066,6 +2203,15 @@ public final class Actions {
                 }
             }
             return out;
+        }
+
+        private static boolean branchAllowsUid(PlayerState player, String branch, int uid) {
+            for (BuildingToken b : player.buildings) {
+                if (b.uid == uid) {
+                    return buildBranchAllows(branch, b.type);
+                }
+            }
+            return true;
         }
 
         private boolean hasReserve(PlayerState player, BuildingType bt) {

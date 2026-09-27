@@ -437,6 +437,9 @@ public class HeuristicAgent extends Agent {
         return switch (kind) {
             case "reveal_order" -> (s, o) -> scoreReveal(s, o);
             case "action" -> (s, o) -> scoreAction(s, o);
+            // ВЕТКА ДЕЙСТВИЯ-РАЗВИЛКИ (приказы 5.0.0): вариант — имя прежнего
+            // действия, и оценивается он прежним оценщиком действия.
+            case "action_branch" -> (s, o) -> scoreAction(s, o);
             case "build_pick" -> (s, o) -> scoreBuildPick(s, o);
             case "build_hex" -> (s, o) -> scoreBuildHex(s, o, ctx);
             case "build_facing" -> (s, o) -> scoreBuildFacing(s, o, ctx);
@@ -993,7 +996,7 @@ public class HeuristicAgent extends Agent {
         Order top = Order.fromCode((String) card.get("top"));
         double val = 0;
         for (String a : Order.ORDER_ACTIONS.get(top)) {
-            val += w.getOrDefault("action." + a, 1.0);
+            val += actionWeight(a);
         }
         // ИНДИКАТОРЫ ЗАДАНИЙ (заказ дизайнера 17.08.2026, продолжение пункта 3
         // плана: «привести всё к тому, чтобы собирать войска под конкретную
@@ -1003,7 +1006,11 @@ public class HeuristicAgent extends Agent {
         // чем выполнялись (см. javadoc ObjectiveHints). Бонус считает движок,
         // а не бот: ObjectiveHints уже знает, каким действием закрывается
         // разрыв каждой карты.
-        val += objectiveActionBonus(state, Order.ORDER_ACTIONS.get(top));
+        val += objectiveActionBonus(state, kelium.engine.Actions.expandForks(
+            List.of(Order.ORDER_ACTIONS.get(top))).toArray(new String[0]));
+        // Приказы 5.0.0 оцениваются по ближайшему прежнему приказу.
+        Order верх = top;
+        top = top.legacy();
         int nUnits = me.unitsOnField().size();
         int nMil = 0;
         for (BuildingToken b : me.buildingsOnField()) {
@@ -1054,7 +1061,7 @@ public class HeuristicAgent extends Agent {
         // соперника выводится вычитанием. Отложенную вслепую карту НЕ учитываем —
         // это скрытая информация, подглядывать нельзя.
         double read = wget("read_opponent");   // 0 = не подгадывать вовсе
-        double riskTop = read * chanceSomeoneReveals(state, top);
+        double riskTop = read * chanceSomeoneReveals(state, верх);
         double perAction = val / Math.max(1, Order.ORDER_ACTIONS.get(top).length);
         val -= riskTop * perAction;                       // потеря второго действия
 
@@ -1064,7 +1071,7 @@ public class HeuristicAgent extends Agent {
             double openChance = chanceSomeoneReveals(state, bo);
             double bottomValue = 0;
             for (String a : Order.ORDER_ACTIONS.get(bo)) {
-                bottomValue += w.getOrDefault("action." + a, 1.0);
+                bottomValue += actionWeight(a);
             }
             // низ даёт ОДНО действие — берём среднюю пользу действия этого приказа
             val += read * openChance * bottomValue
@@ -1146,11 +1153,33 @@ public class HeuristicAgent extends Agent {
     }
 
     // ================= выбор действия ===================================
+    /** Вес действия; у развилки — лучшая из её веток. */
+    private double actionWeight(String a) {
+        List<String> ветки = kelium.engine.Actions.FORKS.get(a);
+        if (ветки == null) {
+            return w.getOrDefault("action." + a, 1.0);
+        }
+        double best = Double.NEGATIVE_INFINITY;
+        for (String b : ветки) {
+            best = Math.max(best, w.getOrDefault("action." + b, 1.0));
+        }
+        return best;
+    }
+
     private double scoreAction(GameState state, Choice o) {
         if ("pass".equals(o.kind())) {
             return -1.0;
         }
         String name = (String) o.payload();
+        // РАЗВИЛКА (приказы 5.0.0) стоит столько, сколько лучшая её ветка.
+        List<String> ветки = kelium.engine.Actions.FORKS.get(name);
+        if (ветки != null) {
+            double best = Double.NEGATIVE_INFINITY;
+            for (String b : ветки) {
+                best = Math.max(best, scoreAction(state, new Choice("action", b, b)));
+            }
+            return best;
+        }
         double base = w.getOrDefault("action." + name, 1.0);
         PlayerState me = state.player(seat);
         int nUnits = me.unitsOnField().size();

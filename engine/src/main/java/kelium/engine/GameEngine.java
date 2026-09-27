@@ -1121,10 +1121,20 @@ public final class GameEngine {
             java.util.Set<String> открытыДо = PrintedContainers.открытые(s);
             ActionResult res = action.perform(p, ctx, agents.get(p.seat));
             PrintedContainers.накрытия(s, p, открытыДо);
-            if (res.ok()) {
-                s.journal.onAction(p.seat, actionName, res.telemetry());
+            // РАЗВИЛКА (приказы 5.0.0): в журнал и в событие идёт ИМЯ ВЫПОЛНЕННОЙ
+            // ВЕТКИ — прежнего действия, на которое смотрят задания, отчёты и
+            // проигрыватель; имя самой развилки — в поле fork.
+            String fork = null;
+            String сыграно = actionName;
+            if (action instanceof Actions.ForkAction fa && fa.branch != null) {
+                fork = actionName;
+                сыграно = fa.branch;
             }
-            emit(ev("type", "action", "seat", p.seat, "action", actionName,
+            if (res.ok()) {
+                s.journal.onAction(p.seat, сыграно, res.telemetry());
+            }
+            emit(ev("type", "action", "seat", p.seat, "action", сыграно,
+                "fork", fork,
                 "ok", res.ok(), "detail", res.detail(), "telemetry", res.telemetry()));
             ctx.playedCount += 1;
             if (repeatable > 0) {
