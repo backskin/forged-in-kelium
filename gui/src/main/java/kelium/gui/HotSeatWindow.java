@@ -1455,6 +1455,9 @@ public final class HotSeatWindow {
         // МЕНЮ СТРОЙКИ — слева поверх поля (27.09.2026)
         buildMenu = new kelium.gui.kp.BuildMenu();
         layered.add(buildMenu, JLayeredPane.PALETTE_LAYER);
+        // ПЛАШКИ СОБЫТИЙ — поверх поля, мышь не ловят (27.09.2026)
+        toasts = new kelium.gui.kp.EventToasts();
+        layered.add(toasts, Integer.valueOf(JLayeredPane.PALETTE_LAYER + 5));
 
         layered.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -1486,6 +1489,10 @@ public final class HotSeatWindow {
         }
         // Карточка вопроса не прячется под выехавший ящик.
         field.bubbles.setDockInset(openDrawerSpan());
+        if (toasts != null) {
+            toasts.setBounds(0, 0, layered.getWidth(), layered.getHeight());
+            toasts.setOwnBottom(layered.getHeight() - zoneCover());
+        }
         if (buildMenu != null) {
             int bottom = layered.getHeight() - zoneCover();
             int left = openDrawerSpan() + Theme.px(8);
@@ -1562,6 +1569,9 @@ public final class HotSeatWindow {
     /** Кружки доступных действий над зоной игрока. */
     kelium.gui.kp.ActionStrip actionStrip;
     kelium.gui.kp.BuildMenu buildMenu;
+    kelium.gui.kp.EventToasts toasts;
+    /** Прошлый кадр, с которым сравниваются ресурсы для плашек событий. */
+    private ReplayRecord.Snapshot toastPrev;
 
     /**
      * Ширина ящика — ПО ЕГО СОДЕРЖИМОМУ, а не одна на всех. Планшету нужен
@@ -2637,6 +2647,7 @@ public final class HotSeatWindow {
             field.setRecord(r);
             sessionBound = false;
             shownFrames = 0;
+            toastPrev = null;
         }
         if (r.frames.isEmpty()) {
             return;
@@ -2655,6 +2666,12 @@ public final class HotSeatWindow {
             ReplayRecord.Frame fi = r.frames.get(i);
             if (!catchingUp && fi.log != null && !fi.log.isBlank()) {
                 feedLine(fi.seat, fi.log);
+            }
+            if (fi.snapshot != null) {
+                if (!catchingUp && toastPrev != null && toasts != null) {
+                    eventToasts(toastPrev, fi);
+                }
+                toastPrev = fi.snapshot;
             }
             trackSteps(fi);
         }
@@ -4106,6 +4123,153 @@ public final class HotSeatWindow {
             drawerCloser.stop();
             closeAutoDrawer();
         }
+    }
+
+    // ==================== ПЛАШКИ СОБЫТИЙ (27.09.2026) ====================
+
+    /**
+     * ЧТО СЛУЧИЛОСЬ МЕЖДУ ДВУМЯ КАДРАМИ — плашками: прибыль ресурсов, очков,
+     * контейнеров, шаг науки, уничтоженные жетоны, вскрытый контейнер. Причина —
+     * словами по виду кадра: действие («добыча», «стройка»), вскрытие, бой.
+     */
+    private void eventToasts(ReplayRecord.Snapshot prev, ReplayRecord.Frame f) {
+        ReplayRecord.Snapshot now = f.snapshot;
+        String why = toastReason(f);
+        // вскрытый контейнер — лицом карты
+        if ("container".equals(f.type) && now.decks != null && f.seat != null) {
+            ReplayRecord.DeckState ds = now.decks.get("containers");
+            if (ds == null) {
+                ds = now.decks.get("container");
+            }
+            String id = ds == null || ds.discard.isEmpty() ? null
+                : ds.discard.get(ds.discard.size() - 1);
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("«([^»]+)»")
+                .matcher(f.log == null ? "" : f.log);
+            String what = m.find() ? m.group(1) : null;
+            toasts.push(new kelium.gui.kp.EventToasts.Toast(
+                id != null && cardFace(id) != null ? cardFace(id)
+                    : kelium.report.Textures.icon("container"),
+                "Контейнер вскрыт" + (what == null ? "" : ": " + what)
+                    + (humansBySeat.containsKey(f.seat) ? "" : " — " + seatName(f.seat)),
+                Theme.seat(f.seat), humansBySeat.containsKey(f.seat)));
+        }
+        for (ReplayRecord.Player p : now.players) {
+            ReplayRecord.Player q = null;
+            for (ReplayRecord.Player x : prev.players) {
+                if (x.seat == p.seat) {
+                    q = x;
+                }
+            }
+            if (q == null) {
+                continue;
+            }
+            boolean own = humansBySeat.containsKey(p.seat);
+            String who = own ? "" : " · " + seatName(p.seat);
+            String tail = (why == null ? "" : " — " + why) + who;
+            gain(p.seat, own, "coin", p.coin - q.coin, "монета", "монеты", "монет", tail);
+            gain(p.seat, own, "kelium", p.kelium - q.kelium, "келемий", "келемия", "келемия", tail);
+            gain(p.seat, own, "ammo", p.ammo - q.ammo, "боеприпас", "боеприпаса", "боеприпасов",
+                tail);
+            gain(p.seat, own, "trophy", p.trophy - q.trophy, "трофей", "трофея", "трофеев", tail);
+            gain(p.seat, own, "container", p.containers - q.containers, "контейнер", "контейнера",
+                "контейнеров", tail);
+            gain(p.seat, own, "vp", vpTotal(p) - vpTotal(q), "очко", "очка", "очков", tail);
+            int техДо = q.tech.values().stream().mapToInt(Integer::intValue).sum();
+            int техПосле = p.tech.values().stream().mapToInt(Integer::intValue).sum();
+            if (техПосле > техДо) {
+                toasts.push(new kelium.gui.kp.EventToasts.Toast(
+                    kelium.report.Textures.icon("science_vp"),
+                    "Наука: шаг по треку" + (техПосле - техДо > 1 ? " ×" + (техПосле - техДо) : "")
+                        + who, Theme.seat(p.seat), own));
+            }
+        }
+        // уничтоженные жетоны — плашка тому, чей ход
+        if (f.seat != null) {
+            Map<Integer, ReplayRecord.Tok> было = new java.util.HashMap<>();
+            for (ReplayRecord.Tok t : prev.tokens) {
+                было.put(t.uid, t);
+            }
+            for (ReplayRecord.Tok t : now.tokens) {
+                ReplayRecord.Tok b = было.get(t.uid);
+                if (b != null && b.alive && b.hexId != null && !t.alive && t.owner != f.seat) {
+                    String имя = t.building ? GameRecorder.buildingName(t.type, t.level)
+                        : GameRecorder.unitName(t.type);
+                    boolean own = humansBySeat.containsKey(f.seat);
+                    toasts.push(new kelium.gui.kp.EventToasts.Toast(
+                        kelium.report.Textures.icon("punch"),
+                        "Уничтожен жетон: " + имя + " · " + seatName(t.owner)
+                            + (own ? "" : " — ход " + seatName(f.seat)),
+                        Theme.seat(f.seat), own));
+                }
+            }
+        }
+    }
+
+    private void gain(int seat, boolean own, String icon, int delta, String one, String few,
+                      String many, String tail) {
+        if (delta <= 0) {
+            return;
+        }
+        int m = delta % 100;
+        String word = m >= 11 && m <= 14 ? many
+            : switch (m % 10) {
+                case 1 -> one;
+                case 2, 3, 4 -> few;
+                default -> many;
+            };
+        toasts.push(new kelium.gui.kp.EventToasts.Toast(kelium.report.Textures.icon(icon),
+            "+" + delta + " " + word + tail, Theme.seat(seat), own));
+    }
+
+    /** Причина события словами — по виду кадра и по решению, что его вызвало. */
+    private String toastReason(ReplayRecord.Frame f) {
+        if (f.type == null) {
+            return null;
+        }
+        switch (f.type) {
+            case "action" -> {
+                java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("·\s*([А-ЯЁ]+(?: [А-ЯЁ]+)?)").matcher(f.log == null ? "" : f.log);
+                return m.find() ? m.group(1).toLowerCase(java.util.Locale.ROOT) : null;
+            }
+            case "container" -> {
+                return "контейнер";
+            }
+            case "raze_neutral" -> {
+                return "снос нейтральной постройки";
+            }
+            case "combat_hit", "damage_neutral" -> {
+                return "бой";
+            }
+            case "objective" -> {
+                return "задание выполнено";
+            }
+            case "return", "tokens_returned", "refresh" -> {
+                return "возврат";
+            }
+            default -> {
+            }
+        }
+        // промежуточный кадр — по последнему решению живого игрока
+        String kind;
+        synchronized (moves) {
+            kind = decisions.isEmpty() ? null : decisions.get(decisions.size() - 1).kind();
+        }
+        if (kind == null) {
+            return null;
+        }
+        if (kind.startsWith("build")) {
+            return "здание сработало при постройке";
+        }
+        return switch (kind) {
+            case "mine" -> "добытчик";
+            case "assemble" -> "сборка";
+            case "market", "market_rate" -> "рынок";
+            case "open_container", "spec" -> "спец-действие";
+            case "move", "maneuver_unit", "unit_sector" -> "манёвр";
+            case "attack", "combat_victim", "combat_target" -> "бой";
+            default -> kind.startsWith("sci") ? "наука" : null;
+        };
     }
 
     // ==================== МАНЁВР ПО ШАГАМ (27.09.2026) ====================
