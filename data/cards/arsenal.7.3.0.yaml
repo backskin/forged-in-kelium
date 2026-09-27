@@ -345,8 +345,8 @@ arsenal:
     label: −X монет = трофеи ⇨ Место на любом треке Науки
   bottom:
     kind: POST
-    passive: sci_exchange_pay_kelium
-    label: 'Обмены Научного отдела можешь оплачивать келемием вместо трофеев.'
+    passive: labs_kelium_trophy_swap
+    label: 'На Рынке и в Науке можешь платить трофеями вместо келемия и келемием вместо трофеев.'
 - id: a7_24
   name: Кристальные лаборатории
   kind: regular
@@ -356,8 +356,8 @@ arsenal:
     label: Пехота и техника из запаса на пустой гекс
   bottom:
     kind: POST
-    passive: sci_exchange_pay_kelium
-    label: 'Обмены Научного отдела можешь оплачивать келемием вместо трофеев.'
+    passive: labs_kelium_trophy_swap
+    label: 'На Рынке и в Науке можешь платить трофеями вместо келемия и келемием вместо трофеев.'
 - id: a7_25
   name: Военный подряд
   kind: regular

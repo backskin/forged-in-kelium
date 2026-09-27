@@ -3426,6 +3426,30 @@ public final class Actions {
             super(state);
         }
 
+        /**
+         * СКОЛЬКО КЕЛЕМИЯ ИГРОК МОЖЕТ СДАТЬ НА РЫНКЕ. С «Кристальными
+         * лабораториями» (арсенал 7.3.0) трофеи идут вместо келемия: на Рынке и
+         * в Науке это один ресурс.
+         */
+        static int келемийНаРынке(GameState s, PlayerState p) {
+            int n = p.resources.kelium();
+            if (Passives.hasPassive(s, p.seat, "labs_kelium_trophy_swap")) {
+                n += p.resources.trophy();
+            }
+            return n;
+        }
+
+        /** Заплатить келемий на рынке: сперва келемием, недостачу — трофеями (с картой). */
+        static void платитьНаРынке(GameState s, PlayerState p, int n) {
+            int кел = Math.min(n, p.resources.kelium());
+            if (кел > 0) {
+                p.resources.pay(Resource.KELIUM, кел);
+            }
+            if (n > кел) {
+                p.resources.pay(Resource.TROPHY, n - кел);
+            }
+        }
+
         @Override public String name() { return "market"; }
         @Override public Order order() { return Order.ACQUIRE; }
         @Override public boolean implemented() { return true; }
@@ -3443,7 +3467,7 @@ public final class Actions {
             // цикл вовсе. Нулевая ступень — вход в цикл: Рынок без сделки
             // приносит её монеты. 0 — прежний рынок.
             int нулевая = ((Number) rs.get("market.zero_kelium_coin", 0)).intValue();
-            if (player.resources.kelium() < 1) {
+            if (келемийНаРынке(s, player) < 1) {
                 if (нулевая > 0) {
                     player.resources.add(Resource.COIN, нулевая);
                     return ActionResult.ok("market: -0 kelium -> +" + нулевая + " coin",
@@ -3498,13 +3522,13 @@ public final class Actions {
             boolean обменРаз = Boolean.TRUE.equals(
                 rs.get("market.exchange_once_per_action", Boolean.FALSE));
             java.util.Set<String> взятыеОбмены = new java.util.HashSet<>();
-            while (player.resources.kelium() >= 1) {
+            while (келемийНаРынке(s, player) >= 1) {
                 List<Choice> opts = new ArrayList<>();
                 // ---- печатные обмены планшета рынка ----
                 if (наКоин && !(обменРаз && взятыеОбмены.contains("coin"))) {
                     opts.add(new Choice("market_rate", rate("coin", coinRate),
                         "1 КЕЛ -> " + coinRate + " МОН"));
-                    if (pairBonus > 0 && player.resources.kelium() >= 2) {
+                    if (pairBonus > 0 && келемийНаРынке(s, player) >= 2) {
                         Map<String, Object> pair = rate("coin", 2 * coinRate + pairBonus);
                         pair.put("kelium", 2);
                         opts.add(new Choice("market_rate", pair,
@@ -3609,7 +3633,7 @@ public final class Actions {
                     keliumCost = 0;
                 }
                 if (keliumCost > 0) {
-                    player.resources.pay(Resource.KELIUM, keliumCost);
+                    платитьНаРынке(s, player, keliumCost);
                 }
                 keliumSpent += keliumCost;
                 deals++;
@@ -4618,7 +4642,7 @@ public final class Actions {
             // келемия (финальный планшет 25.09.2026); келемий берут лишь треки.
             // «КРИСТАЛЬНЫЕ ЛАБОРАТОРИИ» 7.3.0: обмены можно оплачивать келемием
             boolean обменыЗаКелемий = Passives.hasPassive(state, player.seat,
-                "sci_exchange_pay_kelium");
+                "labs_kelium_trophy_swap");
             int pool = сколькоМожемЗаплатить(player)
                 - (наукаЗаКелемий() && !обменыЗаКелемий ? player.resources.kelium() : 0);
             List<Choice> opts = new ArrayList<>();

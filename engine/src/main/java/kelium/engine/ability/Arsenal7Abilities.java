@@ -64,8 +64,8 @@ public final class Arsenal7Abilities {
         // Обе проверяются в самом действии (Actions: обмены Науки, ветка
         // «Переложить энергию») — здесь способности только объявлены, чтобы
         // карта прошла проверку «у каждой карты живой код».
-        Abilities.register(new Метка("sci_exchange_pay_kelium",
-            "обмены Научного отдела можно оплатить келемием"));
+        Abilities.register(new Метка("labs_kelium_trophy_swap",
+            "на Рынке и в Науке трофеи и келемий заменяют друг друга"));
         Abilities.register(new Метка("coins_on_energy_cells",
             "монеты на свободных ячейках энергии до следующего хода"));
         Abilities.register(new InfantryIgnoresBuildings());
