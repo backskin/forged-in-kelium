@@ -459,6 +459,14 @@ CSS = r"""
   .плитка b { font: 700 10pt/1.15 "Tektur", sans-serif; color: var(--охра); margin: 0 0 1.6mm; }
   .плитка .ветка { font: 600 9pt/1.2 "Tektur Narrow", sans-serif; color: var(--чернила); }
   .плитка .или { font: 400 8pt/1.1 "Tektur Narrow", sans-serif; color: var(--серый); margin: .7mm 0; }
+
+  /* ---- раздел: заголовок группы карточек одного действия (28.09.2026) ---- */
+  .раздел { column-span: all; display: flex; align-items: center; gap: 3mm;
+    margin: 1mm 0 3mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--келемий); }
+  .раздел .и.разд { height: 11mm; margin: 0; vertical-align: 0; }
+  .раздел span { font: 700 15pt/1 "Tektur", sans-serif; color: var(--охра); }
+  .карточка ul { margin: 0 0 1.4mm; padding-left: 4mm; }
+  .карточка li { margin: 0 0 .8mm; }
 """
 
 

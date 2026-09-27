@@ -31,6 +31,35 @@ body = re.sub(r"^:просторно:\s*\n", "", body, flags=re.M)
 КАРТИНКИ = os.path.join(os.path.dirname(КОРЕНЬ_КНИГ), "data", "textures")
 
 
+def текст_карточки(строки):
+    """Текст карточки: абзацы через пустую строку; «- …» — пункт списка,
+    следующие строки без дефиса продолжают пункт."""
+    out, абзац, пункты = [], [], []
+
+    def сброс():
+        if абзац:
+            out.append("<p>" + inline(" ".join(" ".join(абзац).split())) + "</p>")
+            абзац.clear()
+        if пункты:
+            out.append("<ul>" + "".join("<li>" + inline(" ".join(x.split())) + "</li>"
+                                        for x in пункты) + "</ul>")
+            пункты.clear()
+
+    for с in строки:
+        if not с:
+            сброс()
+        elif с.startswith("- "):
+            if абзац:
+                сброс()
+            пункты.append(с[2:])
+        elif пункты:
+            пункты[-1] += " " + с
+        else:
+            абзац.append(с)
+    сброс()
+    return "".join(out)
+
+
 def картинка_текстуры(путь, ширина=360):
     """Печатная картинка компонента (data/textures/…) — встроенным PNG."""
     from PIL import Image
@@ -295,7 +324,20 @@ def blocks(md):
             cur.append('        <div class="плитки к%s" style="--плит-h:%smm">' % (колонок, иконка_мм)
                        + "".join(ячейки) + "</div>")
             continue
-        if ln.strip() == ":карточки:":
+        # РАЗДЕЛ — заголовок во всю ширину полосы без подложки: иконка действия
+        # и его имя крупно, под ним линия. Для групп карточек одного действия.
+        #   :раздел: Добыча
+        if ln.strip().startswith(":раздел:"):
+            имя = ln.strip()[len(":раздел:"):].strip()
+            з = значок(имя) or ""
+            flush()
+            res.append('      <div class="раздел">' + з.replace('class="и"', 'class="и разд"')
+                       + "<span>" + inline(имя) + "</span></div>")
+            i += 1
+            continue
+        if ln.strip().startswith(":карточки:"):
+            # «:карточки: 16» — высота картинки карточки в мм (по умолчанию 27)
+            рис_мм = ln.strip()[len(":карточки:"):].strip()
             i += 1
             карточки = []
             while i < len(lines) and lines[i].strip() != ":конец:":
@@ -312,15 +354,13 @@ def blocks(md):
             flush()
             html_к = []
             for к in карточки:
-                абзацы = [" ".join(a.split())
-                          for a in "\n".join(к["текст"]).split("\n\n") if a.strip()]
                 # карточка без картинки («картинки:» пустая) — просто блок в сетке
-                рис = ('<div class="карт-рис">'
+                рис = (('<div class="карт-рис"%s>' % (' style="height:%smm"' % рис_мм if рис_мм else ""))
                        + "".join(картинка_текстуры(r) for r in к["рис"]) + "</div>"
                        if к["рис"] else "")
                 html_к.append('<div class="блок карточка">' + рис
                               + "<h2>" + inline(к["имя"]) + "</h2>"
-                              + "".join("<p>" + inline(a) + "</p>" for a in абзацы) + "</div>")
+                              + текст_карточки(к["текст"]) + "</div>")
             res.append('      <div class="карточки">' + "".join(html_к) + "</div>")
             continue
         if ln.strip() == ":фазы:":
