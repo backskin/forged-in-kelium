@@ -41,8 +41,8 @@ import kelium.report.Textures;
  * видно сразу.
  *
  * <p><b>Масштаб честный.</b> Все размеры заданы В МИЛЛИМЕТРАХ ПЕЧАТИ: гекс 90 мм
- * по ширине, планшет войск 300×80, хранилища 156×90, планшет науки 265, рынка
- * 195, карты 56×87, 68×44 и 34×34. Поэтому на картинке компоненты соотносятся
+ * по ширине, планшет войск 284×75, хранилища 131×75, планшет науки 228×158,
+ * рынка 160×160, карты 56×87, 68×44 и 34×34. Поэтому на картинке компоненты соотносятся
  * друг с другом так же, как на настоящем столе.
  *
  * <p>Запуск:
@@ -68,7 +68,12 @@ public final class СнимокСтола {
      * 90×82 мм — это ровно описанная окружность 45 мм у гекса «плашмя вверх».
      */
     private static final double ГЕКС_R = 45.3;
-    private static final double ВОЙСКА_Ш = 300;      // печатный планшет войск
+    /**
+     * ПЛАНШЕТ ВОЙСК ПО ЭКСПОРТУ: 3354 точки при 300 dpi = 284 мм (было 300 —
+     * планшеты выходили на 6 % крупнее поля и карт; сверено 28.09.2026).
+     * Планшет хранилища идёт от него сцепкой, по отношению точек печати.
+     */
+    private static final double ВОЙСКА_Ш = 3354 / 300.0 * 25.4;
     /**
      * ОБЩИЕ ПЛАНШЕТЫ ПРИСТАВЛЯЮТСЯ К ПОЛЮ ВПРИТЫК (замысел дизайнера).
      *
@@ -200,7 +205,9 @@ public final class СнимокСтола {
         якорьТ("4", наука[0] + наука[2] * 0.5, наука[1] + наука[3] * 0.30);
         якорьТ("5", арсX - px(64), арсY);
         якорьТ("6", рынок[0] + рынок[2] * 0.40, рынок[1] + рынок[3] * 0.5);
-        якорьТ("7", задX, задY);
+        // Шаг 7 — колода ЗАДАНИЙ, первая в ряду; посередине лежат начальные
+        // задания, а они относятся к шагу 16 (поймано 28.09.2026).
+        якорьТ("7", задX - px(КАРТА_ЗАДАНИЕ_Ш + 16), задY);
 
         зонаИгрока(g, session, 0, 750, 806, 0);
         double фишX = зона0[0] + зона0[2] + px(56);
@@ -362,8 +369,14 @@ public final class СнимокСтола {
         FieldPainter.dark = false;
         FieldPainter.showCardboard = true;
         FieldPainter.showBlocks = false;
+        // ГДЕ НАРИСОВАНЫ ВОЙСКА — берём у самого рисовальщика: выноска к пехоте
+        // должна смотреть на жетон, а не на место, где он «обычно» лежит.
+        FieldPainter.unitSpots = new java.util.HashMap<>();
+        ReplayRecord.Snapshot снимок = ReplayRecord.snapshotOf(st, null);
         FieldPainter.paintField(new Java2DCanvas(gg, 1, Theme.body()), size, infos,
-            ReplayRecord.snapshotOf(st, null), 1.5 * size - minx, 1.5 * size - miny, false);
+            снимок, 1.5 * size - minx, 1.5 * size - miny, false);
+        java.util.Map<Integer, double[]> пятна = FieldPainter.unitSpots;
+        FieldPainter.unitSpots = null;
         gg.dispose();
         int x0 = px(cxМм) - w / 2;
         int y0 = px(cyМм) - h / 2;
@@ -377,7 +390,34 @@ public final class СнимокСтола {
         полеDX = dx;
         полеDY = dy;
         крайПоля(st, size);
-        якорьТ("1", px(cxМм) + w * 0.18, px(cyМм) - h * 0.06);
+        // ШАГ 1 «ПОЛЕ» — В СЕРЕДИНУ ПУСТОГО ГЕКСА у прежней точки: на стыке
+        // зарождения и нейтрала выноска читалась как выноска к постройке
+        // (28.09.2026).
+        double цельX = px(cxМм) + w * 0.18;
+        double цельY = px(cyМм) - h * 0.06;
+        java.util.Set<String> сЖетонами = new java.util.HashSet<>();
+        for (ReplayRecord.Tok тк : снимок.tokens) {
+            if (тк.hexId != null) {
+                сЖетонами.add(тк.hexId);
+            }
+        }
+        double лучший = Double.MAX_VALUE;
+        for (Hex hex : st.field.hexes.values()) {
+            int[] qr = FieldGeometry.parseQR(hex.id);
+            if (qr == null || hex.kind != kelium.core.HexKind.NORMAL || hex.hasSpawnTile()
+                    || hex.hasNeutral() || сЖетонами.contains(hex.id)) {
+                continue;
+            }
+            double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
+            double d = Math.hypot(c[0] + dx - цельX, c[1] + dy - цельY);
+            if (d < лучший) {
+                лучший = d;
+                якорьТ("1", c[0] + dx, c[1] + dy);
+            }
+        }
+        if (!ЯКОРЯ.containsKey("1")) {
+            якорьТ("1", цельX, цельY);
+        }
         for (Hex hex : st.field.hexes.values()) {
             int[] qr = FieldGeometry.parseQR(hex.id);
             if (qr == null) {
@@ -399,8 +439,10 @@ public final class СнимокСтола {
                 List<Integer> углы = hex.neutrals.get(0).corners;
                 double sx = 0;
                 double sy = 0;
-                for (int сторона : углы) {
-                    double a = Math.toRadians(FieldGeometry.edgeAngle(сторона));
+                // Это УГЛЫ гекса (60k − 90), не стороны: прежде их гнали через
+                // edgeAngle, и точка уезжала с картона на соседний сектор.
+                for (int угол : углы) {
+                    double a = Math.toRadians(60.0 * угол - 90);
                     sx += Math.cos(a);
                     sy += Math.sin(a);
                 }
@@ -409,8 +451,11 @@ public final class СнимокСтола {
                 якорьТ("3", hx + sx * сдвиг, hy + sy * сдвиг);
             }
         }
-        // ЦУ и пехота первого игрока: их видно на его стартовом гексе.
-        for (ReplayRecord.Tok тк : ReplayRecord.snapshotOf(st, null).tokens) {
+        // ЦУ и пехота первого игрока: их видно на его стартовом гексе. Точки —
+        // на самих жетонах: ЦУ по середине занятых им сторон, пехота там, где
+        // её нарисовал рисовальщик (прежде точки стояли «над» и «под» центром
+        // гекса и промахивались мимо жетонов, 28.09.2026).
+        for (ReplayRecord.Tok тк : снимок.tokens) {
             if (тк.hexId == null || тк.owner != 0) {
                 continue;
             }
@@ -420,9 +465,24 @@ public final class СнимокСтола {
             }
             double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
             if ("command_center".equals(тк.type)) {
-                якорьТ("17", c[0] + dx, c[1] + dy - size * 0.45);
-            } else if ("infantry".equals(тк.type)) {
-                якорьТ("18", c[0] + dx, c[1] + dy + size * 0.45);
+                List<Integer> стороны = new ArrayList<>();
+                for (ReplayRecord.HexState hs : снимок.hexes) {
+                    if (тк.hexId.equals(hs.id)) {
+                        for (int сторона = 0; сторона < 6; сторона++) {
+                            if (hs.sideOwner[сторона] == тк.uid) {
+                                стороны.add(сторона);
+                            }
+                        }
+                    }
+                }
+                double[] p = стороны.isEmpty()
+                    ? new double[]{c[0] + dx, c[1] + dy}
+                    : FieldGeometry.polar(c[0] + dx, c[1] + dy, size * 0.62,
+                        FieldGeometry.meanEdgeAngle(стороны));
+                якорьТ("17", p[0], p[1]);
+            } else if ("infantry".equals(тк.type) && пятна.containsKey(тк.uid)) {
+                double[] п = пятна.get(тк.uid);
+                якорьТ("18", x0 + п[0], y0 + п[1]);
             }
         }
     }
