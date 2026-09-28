@@ -18,7 +18,7 @@ figure = ns["figure"]
 КОРЕНЬ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 РАННЕР = os.path.join(КОРЕНЬ, "gui", "target", "kelium-runner.jar")
 
-for сцена, имя, ширина in (("база", "база", "86%"), ("поле", "поле-сверху", "46%")):
+for сцена, имя, ширина in (("база", "база", "80%"), ("поле", "поле-сверху", "42%")):
     png = os.path.join(D, "_%s.png" % сцена)
     subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
                     "-cp", РАННЕР, "kelium.gui.replay2.СнимокПоля", сцена, png, "190"],

@@ -63,6 +63,6 @@ d.text(((W - ш) / 2, слой.height + ПОЛЕ * 2 + 4), ТЕКСТ, font=по
 
 png = os.path.join(D, "_свалка.png")
 холст.save(png)
-figure("свалка", png, 1400, W, H, [], css_w="60%", pad="1.0mm 0 1.0mm",
+figure("свалка", png, 1400, W, H, [], css_w="54%", pad="1.0mm 0 1.0mm",
        в_колонке=True)
 print("ok", (W, H))
