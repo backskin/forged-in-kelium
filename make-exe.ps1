@@ -45,7 +45,8 @@ $apps = @(
     @{ Name = "KeliumReplay2";     Main = "kelium.gui.replay2.Replay2Gui";   Icon = "replay2";     Title = "разбор партии" },
     @{ Name = "KeliumHelp";        Main = "kelium.gui.replay2.HelpApp";      Icon = "help";        Title = "справочник" },
     @{ Name = "KeliumRunner";      Main = "kelium.gui.RunnerGui";            Icon = "runner";      Title = "прогоны" },
-    @{ Name = "KeliumConstructor"; Main = "kelium.gui.LayoutEditor";         Icon = "constructor"; Title = "конструктор" }
+    @{ Name = "KeliumConstructor"; Main = "kelium.gui.LayoutEditor";         Icon = "constructor"; Title = "конструктор" },
+    @{ Name = "Мастерская карт";   Main = "kelium.gui.cardshop.CardShop";    Icon = "constructor"; Title = "мастерская карт" }
 )
 # В раздачу не идёт: обучение ботов, архивы, заготовки художника.
 $junk = @("training", "selfplay", "genomes-archive-*", "genomes-boi2", "_archive", "tsv")

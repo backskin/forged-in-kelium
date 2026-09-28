@@ -4097,10 +4097,14 @@ public final class HotSeatWindow {
             int idx = i;
             boolean pass = "pass".equals(c.kind()) && c.payload() == null
                 || Boolean.FALSE.equals(c.payload());
-            var opt = new kelium.gui.kp.FieldBubbles.Opt(
-                SEAT_CHOICES.contains(c.kind()) && c.payload() instanceof Number who
-                    ? seatName(who.intValue())
-                    : kelium.gui.kp.ChoiceWords.label(kind, c, this::cardName),
+            String подпись = SEAT_CHOICES.contains(c.kind()) && c.payload() instanceof Number who
+                ? seatName(who.intValue())
+                : kelium.gui.kp.ChoiceWords.label(kind, c, this::cardName);
+            if (pass && "energy_place".equals(kind)
+                    && Boolean.TRUE.equals(d.context().get("on_build"))) {
+                подпись = "Оставить кубики на станции";
+            }
+            var opt = new kelium.gui.kp.FieldBubbles.Opt(подпись,
                 kelium.gui.kp.ChoiceWords.sub(kind, c), pass ? 2 : 0, () -> {
                     submit(agent, d, idx);
                 });
@@ -4260,11 +4264,24 @@ public final class HotSeatWindow {
         } else if ("energy_place".equals(kind)) {
             Object left = d.context().get("remaining");
             Object from = d.context().get("source_type");
-            title = "Куда поставить кубик"
+            Object всего = d.context().get("total");
+            // СТАНЦИЯ ПОСТРОЕНА (дизайнер 28.09): видно, что она дала и что выбор —
+            // разложить её кубики по зданиям или оставить на ней
+            boolean построена = Boolean.TRUE.equals(d.context().get("on_build"));
+            title = построена
+                ? "Энергостанция построена — даёт " + всего + " "
+                    + plural(всего instanceof Number n0 ? n0.intValue() : 0, "кубик", "кубика",
+                        "кубиков")
+                    + (left instanceof Number n && всего instanceof Number t
+                        && n.intValue() < t.intValue() ? ", осталось " + n : "")
+                : "Куда поставить кубик"
                 + ("power_plant".equals(from) ? " с энергостанции"
                     : "command_center".equals(from) ? " с ЦУ" : "")
                 + (left instanceof Number n ? " — осталось " + n : "");
-            hint = "Щёлкните здание, которое запитать, — или «Хватит»";
+            hint = построена
+                ? "Щёлкните подсвеченное здание — один кубик в его ячейку. "
+                    + "Или оставьте кубики на станции — это тоже можно"
+                : "Щёлкните здание, которое запитать, — или «Хватит»";
         }
         // ДЕЙСТВИЕ-РАЗВИЛКА (свод 1.46.0): одно из двух — кружками на полосе
         // действий и словами в карточке вопроса
@@ -4287,7 +4304,9 @@ public final class HotSeatWindow {
         field.setChoices(byHex, title, hint, dock, Theme.seat(seat));
         field.setOptSides(optSides);
         if (d.context().get("source") instanceof String src && hexIds.contains(src)) {
-            field.setSource(src, Theme.seat(seat));
+            // новая станция — обводкой цвета энергии: видно, какая дала кубики
+            field.setSource(src, Boolean.TRUE.equals(d.context().get("on_build"))
+                ? Theme.energy() : Theme.seat(seat));
         }
         // ОТВЕТ КАРТОЙ: на поле видно, КТО бьёт (обводка гекса стрелка цветом
         // атакующего) и ПО ЧЕМУ (подсветка гекса своего жетона)
@@ -4400,6 +4419,19 @@ public final class HotSeatWindow {
                 }
             }
         }
+    }
+
+    /** Число со словом в нужном падеже: 1 кубик, 2 кубика, 5 кубиков. */
+    private static String plural(int n, String one, String few, String many) {
+        int m = Math.abs(n) % 100;
+        if (m >= 11 && m <= 14) {
+            return many;
+        }
+        return switch (m % 10) {
+            case 1 -> one;
+            case 2, 3, 4 -> few;
+            default -> many;
+        };
     }
 
     /** Сколько кубиков энергии стоит в ячейках живых зданий игрока на поле. */

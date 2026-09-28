@@ -1706,7 +1706,7 @@ public final class Actions {
                     EnergySwapAction питание = new EnergySwapAction(state);
                     int кубиков = b.energyIdle;
                     b.energyIdle = 0;
-                    питание.placeCubes(player, agent, b.uid, кубиков, b);
+                    питание.placeCubes(player, agent, b.uid, кубиков, b, true);
                 }
             }
             // СТАРЫЙ РЕЖИМ: стройка на гексе СЖИГАЕТ лежащий там жетон
@@ -2581,6 +2581,16 @@ public final class Actions {
          */
         private int placeCubes(PlayerState player, Agent agent, int srcUid, int pool,
                                BuildingToken src) {
+            return placeCubes(player, agent, srcUid, pool, src, false);
+        }
+
+        /**
+         * @param onBuild кубики только что построенной станции (срабатывание при
+         *                постройке): окно говорит «станция построена и даёт N» и
+         *                предлагает оставить их на станции
+         */
+        private int placeCubes(PlayerState player, Agent agent, int srcUid, int pool,
+                               BuildingToken src, boolean onBuild) {
             int placed = 0;
             for (int i = 0; i < pool; i++) {
                 List<Choice> opts = new ArrayList<>();
@@ -2602,6 +2612,10 @@ public final class Actions {
                 Map<String, Object> вопрос = new HashMap<>();
                 вопрос.put("kind", "energy_place");
                 вопрос.put("remaining", pool - i);
+                вопрос.put("total", pool);
+                if (onBuild) {
+                    вопрос.put("on_build", true);
+                }
                 if (src != null && src.hexId != null) {
                     вопрос.put("source", src.hexId);
                     вопрос.put("source_type", src.type.code);

@@ -356,7 +356,7 @@ public final class ChoiceWords {
             case "reaction" -> "Не отвечать";
             case "maneuver_unit" -> "Без манёвра";
             case "return_unit" -> "Никого не снимать";
-            case "energy_place" -> "Хватит — остаток оставить на источнике";
+            case "energy_place" -> "Хватит — остаток оставить, где лежит";
             case "mine" -> "Пропустить добытчик";
             case "assemble" -> "Пропустить здание";
             case "build_pick" -> "Больше не строить";
