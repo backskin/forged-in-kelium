@@ -2,40 +2,41 @@ package kelium.gui.cardshop;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.function.Consumer;
 
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
-import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSpinner;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JToggleButton;
+import javax.swing.Scrollable;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
@@ -47,34 +48,43 @@ import javax.swing.text.JTextComponent;
 import net.miginfocom.swing.MigLayout;
 
 /**
- * МАСТЕРСКАЯ КАРТ (заказ дизайнера 28.09.2026): выбираешь тип карты, пишешь
- * поля — заголовок, верх, условие, награду, номер — и сразу видишь карту,
- * нарисованную на пустом шаблоне. Иконки вставляются в текст, как эмодзи:
- * палитра «Иконки» кладёт в поле {@code {номер}}. Готовая карта выпускается
- * картинкой PNG, а её описание сохраняется рядом файлом {@code .kcard}.
+ * МАСТЕРСКАЯ КАРТ (заказ дизайнера 28.09.2026): выбираешь тип карты, заполняешь
+ * разделы — верх, название и условие, награду, дополнительное, номер — и сразу
+ * видишь карту на пустом шаблоне.
  *
- * <p>Рисует тем же расположением элементов, что и рисовальщик выпусков
+ * <p>Иконки видны везде: под каждым текстовым полем — живая строка с настоящими
+ * иконками, иконки выбираются плитками с картинками. Награда — отдельный блок:
+ * вид (действие в кольце или ресурсы со счётом) и выбор (одно, одно из двух,
+ * всё вместе) — и для основной, и для усиленной награды.
+ *
+ * <p>Рисует тем же расположением, что рисовальщик выпусков
  * ({@code tools/gen_cards_from_blanks.py}).
  */
 public final class CardShop {
 
     private final CardAssets assets = new CardAssets();
     private final JFrame frame = new JFrame("Мастерская карт — Кристаллы Раздора");
-    private final JComboBox<CardSpec.Type> typeBox = new JComboBox<>(CardSpec.Type.values());
     private final JPanel form = new WidthPanel();
     private final Preview preview = new Preview();
     private final JLabel status = new JLabel(" ");
     private final Timer redraw;
-    private final Map<String, JComponent> inputs = new LinkedHashMap<>();
+    private final List<JToggleButton> typeButtons = new ArrayList<>();
     private CardSpec card = CardSpec.blank(CardSpec.Type.OBJECTIVE);
-    private JTextComponent lastText;
     private File lastFile;
     private BufferedImage lastImage;
-    private JDialog palette;
 
     public static void main(String[] args) {
         try {
-            com.formdev.flatlaf.FlatLightLaf.setup();
+            com.formdev.flatlaf.FlatDarkLaf.setup();
+            javax.swing.UIManager.put("Component.arc", 10);
+            javax.swing.UIManager.put("Button.arc", 10);
+            javax.swing.UIManager.put("TextComponent.arc", 8);
+            javax.swing.UIManager.put("Component.accentColor", Style.ACCENT);
+            javax.swing.UIManager.put("Panel.background", Style.BG);
+            // выбранное — заметно: заливка акцентом, белый текст
+            javax.swing.UIManager.put("ToggleButton.selectedBackground", Style.ACCENT);
+            javax.swing.UIManager.put("ToggleButton.selectedForeground", Color.WHITE);
+            javax.swing.UIManager.put("ToggleButton.background", Style.PANEL);
         } catch (Throwable ignored) {
             // без темы — стандартный вид Swing
         }
@@ -82,43 +92,70 @@ public final class CardShop {
     }
 
     private CardShop() {
-        redraw = new Timer(250, e -> render());
+        redraw = new Timer(220, e -> render());
         redraw.setRepeats(false);
     }
 
-    private void show() {
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
-        top.add(new JLabel("Тип карты:"));
-        typeBox.addActionListener(e -> {
-            CardSpec.Type t = (CardSpec.Type) typeBox.getSelectedItem();
-            if (t != null && t != card.type()) {
-                setCard(CardSpec.blank(t));
-            }
-        });
-        top.add(typeBox);
-        top.add(button("Новая", () -> setCard(CardSpec.blank(card.type()))));
-        top.add(button("Открыть…", this::open));
-        top.add(button("Сохранить…", this::save));
-        top.add(button("Выпустить PNG…", this::export));
-        top.add(button("Иконки…", this::showPalette));
-        top.add(button("Папка шаблонов", () -> openFolder(assets.templates)));
+    // ======================================================================
+    //  ОКНО
+    // ======================================================================
 
+    private void show() {
+        JPanel top = new JPanel(new BorderLayout());
+        top.setBackground(Style.PANEL);
+        top.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Style.LINE));
+        JPanel types = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 10));
+        types.setOpaque(false);
+        JLabel logo = new JLabel("МАСТЕРСКАЯ КАРТ");
+        logo.setFont(Style.title(20));
+        logo.setForeground(Style.INK);
+        logo.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 18));
+        types.add(logo);
+        ButtonGroup tg = new ButtonGroup();
+        for (CardSpec.Type t : CardSpec.Type.values()) {
+            JToggleButton b = new JToggleButton(t.ru);
+            b.putClientProperty("type", t);
+            b.setFocusable(false);
+            b.addActionListener(e -> {
+                if (t != card.type()) {
+                    setCard(CardSpec.blank(t));
+                }
+            });
+            tg.add(b);
+            typeButtons.add(b);
+            types.add(b);
+        }
+        top.add(types, BorderLayout.WEST);
+        JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 10));
+        acts.setOpaque(false);
+        acts.add(button("Новая", this::fresh, false));
+        acts.add(button("Открыть…", this::open, false));
+        acts.add(button("Сохранить…", this::save, false));
+        acts.add(button("Выпустить PNG", this::export, true));
+        acts.add(button("Папка шаблонов", () -> openFolder(assets.templates), false));
+        top.add(acts, BorderLayout.EAST);
+
+        form.setBackground(Style.BG);
         JScrollPane formScroll = new JScrollPane(form);
-        formScroll.getVerticalScrollBar().setUnitIncrement(16);
-        formScroll.setPreferredSize(new Dimension(560, 800));
+        formScroll.setBorder(null);
+        formScroll.getVerticalScrollBar().setUnitIncrement(20);
         formScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        formScroll.setPreferredSize(new Dimension(600, 800));
         JPanel right = new JPanel(new BorderLayout());
         right.add(preview, BorderLayout.CENTER);
-        status.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
+        status.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+        status.setOpaque(true);
+        status.setBackground(Style.PANEL);
         right.add(status, BorderLayout.SOUTH);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, formScroll, right);
-        split.setResizeWeight(0);
+        split.setBorder(null);
+        split.setDividerSize(6);
 
         frame.setLayout(new BorderLayout());
         frame.add(top, BorderLayout.NORTH);
         frame.add(split, BorderLayout.CENTER);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1400, 950);
+        frame.setSize(1500, 980);
         frame.setLocationRelativeTo(null);
         setCard(card);
         frame.setVisible(true);
@@ -129,164 +166,124 @@ public final class CardShop {
         }
     }
 
-    /** Панель формы по ширине окна прокрутки: поля не уезжают вправо, подсказки переносятся. */
-    private static final class WidthPanel extends JPanel implements javax.swing.Scrollable {
-        private static final long serialVersionUID = 1L;
-
-        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
-        @Override public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) { return 16; }
-        @Override public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) { return 200; }
-        @Override public boolean getScrollableTracksViewportWidth() { return true; }
-        @Override public boolean getScrollableTracksViewportHeight() { return false; }
-    }
-
-    private static JButton button(String text, Runnable r) {
+    private static JButton button(String text, Runnable r, boolean primary) {
         JButton b = new JButton(text);
+        b.setFocusable(false);
+        if (primary) {
+            b.setBackground(Style.ACCENT);
+            b.setForeground(Color.WHITE);
+            b.setFont(b.getFont().deriveFont(Font.BOLD));
+        }
         b.addActionListener(e -> r.run());
         return b;
     }
 
-    // ==================== форма ====================
-
-    /** Поле формы: ключ описания, подпись, вид ввода, подсказка. */
-    private record Field(String key, String label, String kind, String hint, String[] options) {
-        Field(String key, String label, String kind, String hint) {
-            this(key, label, kind, hint, null);
-        }
+    private void fresh() {
+        lastFile = null;
+        setCard(CardSpec.blank(card.type()));
     }
 
-    private static final String ICONS = "иконки в фигурных скобках: {25} — по номеру, "
-        + "{военное здание} — по имени файла; палитра «Иконки…» вставит сама";
-
-    private List<Field> fieldsOf(CardSpec.Type t) {
-        List<Field> f = new ArrayList<>();
-        if (t.layout == CardSpec.Layout.OBJECTIVE) {
-            f.add(new Field("рисунок", "Рисунок", "int",
-                "номер рисунка шаблона: 1 = файлы 2 и 3, 2 = 4 и 5 … 11 = 22 и 23"));
-            f.add(new Field("слот", "Значок слева вверху", "choice", "∞ — постоянно, ▶ — спец-действие",
-                new String[] {"∞", "▶"}));
-            f.add(new Field("верх_вид", "Верх карты", "choice",
-                "реакция — плашка боевого эффекта с заголовком; иконка — крупная иконка сверху; "
-                    + "2 max — «2 войска max»", new String[] {"реакция", "иконка", "2 max"}));
-            f.add(new Field("заголовок_верха", "Заголовок верха", "text", "для реакции: «Рикошет!»"));
-            f.add(new Field("иконка_верха", "Иконка верха", "text", "для вида «иконка»: {52}"));
-            f.add(new Field("верх", "Эффект верха", "area", "строки — как на карте; " + ICONS));
-            f.add(new Field("имя", "Название карты", "text", "своё имя карты"));
-            f.add(new Field("условие", "Условие", "area",
-                "переносится само в 4 строки; свой перенос — Enter; " + ICONS));
-            f.add(new Field("награда", "Награда", "text",
-                "1 или 2 иконки в кольцах через косую черту; 3 и больше — рядом без колец"));
-            f.add(new Field("дополнительно", "Дополнительно", "area",
-                "пусто — шаблон без полосы «дополнительно», награда ниже"));
-            f.add(new Field("доп_награда", "Доп. награда", "text",
-                "иконки в ряд: {1}{1}{1} {25}; монеты подряд — внахлёст"));
-            f.add(new Field("номер", "Номер карты", "text", "в правом нижнем углу"));
-        } else if (t.layout == CardSpec.Layout.ARSENAL) {
-            f.add(new Field("спец", "Спец-действие ▶", "bool",
-                "шаблон с кнопкой ▶ (арсенал-2); без — постоянная карта ∞ (арсенал-1)"));
-            f.add(new Field("верх", "Верх: текст", "area", "одна-две строки; " + ICONS));
-            f.add(new Field("верх_по_центру", "Верх по центру", "bool", "текст верха по центру полосы"));
-            f.add(new Field("верх_слева", "Верх: связка слева", "text",
-                "иконки и знаки перед текстом: -X {1} = {8} {75}"));
-            f.add(new Field("верх_справа", "Верх: связка справа", "text",
-                "иконки и знаки справа: {39} или {69} =1 {1}"));
-            f.add(new Field("имя", "Название карты", "text", ""));
-            f.add(new Field("низ", "Постоянный эффект", "area",
-                "по правому краю; **жирное**; " + ICONS));
-            f.add(new Field("ряд", "Ряд иконок", "text",
-                "под текстом по центру: {66} {61} + {53}; {/} перечёркивает иконку перед ним"));
-            f.add(new Field("звезда", "Звезда ★", "bool", "значок звезды слева внизу"));
-            f.add(new Field("цена", "Цена под ▶", "text", "сколько стоит спец-действие: 1"));
-            f.add(new Field("цена_иконка", "Чем платят", "text", "{1} — монеты, {3} — боеприпасы…"));
-            f.add(new Field("спец_иконка", "Иконка спец-действия", "text", "{32}"));
-            f.add(new Field("спец_знак", "Знак у иконки", "text", "=1"));
-            f.add(new Field("спец_текст", "Текст спец-действия", "area", "строками"));
-            f.add(new Field("контейнер", "Место для контейнера", "bool", "ячейка с ящиком справа"));
-            f.add(new Field("номер", "Номер карты", "text", ""));
-        }
-        return f;
-    }
+    // ======================================================================
+    //  ФОРМА
+    // ======================================================================
 
     private void setCard(CardSpec c) {
         card = c;
-        if (typeBox.getSelectedItem() != c.type()) {
-            typeBox.setSelectedItem(c.type());
+        for (JToggleButton b : typeButtons) {
+            b.setSelected(b.getClientProperty("type") == c.type());
         }
         form.removeAll();
-        inputs.clear();
-        form.setLayout(new MigLayout("wrap 2, fillx, insets 12", "[right]10[grow,fill,100::]", ""));
-        List<Field> fs = fieldsOf(c.type());
-        if (fs.isEmpty()) {
-            form.add(new JLabel("<html>Раскладку этого типа ещё не сделали.<br>Пустой шаблон кладите "
-                + "в «шаблоны карт» — «" + c.type().pattern + "».</html>"), "span 2");
-        }
-        for (Field f : fs) {
-            JLabel l = new JLabel(f.label());
-            l.setFont(l.getFont().deriveFont(Font.BOLD));
-            form.add(l, f.kind().equals("area") ? "top" : "");
-            JComponent in = input(f);
-            inputs.put(f.key(), in);
-            form.add(in);
-            if (!f.hint().isEmpty()) {
-                JTextArea h = new JTextArea(f.hint());
-                h.setEditable(false);
-                h.setFocusable(false);
-                h.setOpaque(false);
-                h.setLineWrap(true);
-                h.setWrapStyleWord(true);
-                h.setForeground(new Color(0x77, 0x77, 0x77));
-                h.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
-                form.add(h, "skip 1, wmin 10, growx");
-            }
+        form.setLayout(new MigLayout("wrap 1, fillx, insets 14 16 24 16, gapy 2", "[grow,fill]", ""));
+        switch (c.type().layout) {
+            case OBJECTIVE -> objectiveForm();
+            case ARSENAL -> arsenalForm();
+            case NONE -> form.add(note("Раскладку этого типа ещё не сделали. Пустой шаблон "
+                + "кладите в «шаблоны карт» под именем «" + c.type().pattern + "»."));
         }
         form.revalidate();
         form.repaint();
         render();
     }
 
-    private JComponent input(Field f) {
-        String v = card.text(f.key());
-        switch (f.kind()) {
-            case "bool" -> {
-                JCheckBox b = new JCheckBox();
-                b.setSelected(card.bool(f.key()));
-                b.addActionListener(e -> changed(f.key(), b.isSelected()));
-                return b;
-            }
-            case "choice" -> {
-                JComboBox<String> box = new JComboBox<>(f.options());
-                box.setSelectedItem(v.isEmpty() ? f.options()[0] : v);
-                box.addActionListener(e -> changed(f.key(), box.getSelectedItem()));
-                return box;
-            }
-            case "area" -> {
-                JTextArea a = new JTextArea(v, 3, 10);
-                a.setLineWrap(true);
-                a.setWrapStyleWord(true);
-                a.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
-                hook(a, f.key());
-                JScrollPane sp = new JScrollPane(a);
-                sp.setPreferredSize(new Dimension(120, 74));
-                return sp;
-            }
-            default -> {
-                JTextField t = new JTextField(v, 8);
-                t.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
-                hook(t, f.key());
-                return t;
-            }
-        }
+    private void objectiveForm() {
+        section("Верх карты — эффект в чужой ход или сразу");
+        form.add(field("Значок слева", segmented("слот", new String[] {"∞", "▶"},
+            new String[] {"∞ постоянный", "▶ спец-действие"})));
+        form.add(field("Вид верха", segmented("верх_вид", new String[] {"реакция", "иконка", "2 max"},
+            new String[] {"Плашка реакции", "Крупная иконка", "2 войска max"})));
+        form.add(field("Заголовок верха", text("заголовок_верха", false, "для реакции: «Рикошет!»")));
+        form.add(field("Иконка верха", iconField("иконка_верха")));
+        form.add(field("Эффект верха", text("верх", true, "строки — как на карте")));
+
+        section("Название и условие");
+        form.add(field("Рисунок шаблона", segmentedNumbers("рисунок", 11)));
+        form.add(field("Название карты", text("имя", false, "")));
+        form.add(field("Условие", text("условие", true,
+            "перенос сам — ровными строками; свой перенос — Enter")));
+
+        section("Награда");
+        form.add(new RewardEditor("награда", true));
+
+        section("Дополнительно — усиленное условие и награда");
+        form.add(field("Условие", text("дополнительно", true,
+            "пусто — шаблон без полосы «дополнительно», награда опустится ниже")));
+        form.add(new RewardEditor("доп_награда", false));
+
+        section("Номер");
+        form.add(field("Номер карты", text("номер", false, "в правом нижнем углу")));
     }
 
-    private void hook(JTextComponent t, String key) {
-        t.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent e) { changed(key, t.getText()); }
-            @Override public void removeUpdate(DocumentEvent e) { changed(key, t.getText()); }
-            @Override public void changedUpdate(DocumentEvent e) { changed(key, t.getText()); }
-        });
-        t.addFocusListener(new FocusAdapter() {
-            @Override public void focusGained(FocusEvent e) { lastText = t; }
-        });
+    private void arsenalForm() {
+        section("Кнопка слева");
+        form.add(field("Карта", segmentedBool("спец", "∞ постоянная", "▶ со спец-действием")));
+        section("Верх — разовый эффект");
+        form.add(field("Текст верха", text("верх", true, "одна-две строки")));
+        form.add(field("По центру", segmentedBool("верх_по_центру", "от иконок слева", "по центру")));
+        form.add(field("Иконки слева", text("верх_слева", false, "перед текстом: -X {1} = {8}")));
+        form.add(field("Иконки справа", text("верх_справа", false, "после текста: {39}")));
+        section("Название и постоянный эффект");
+        form.add(field("Название", text("имя", false, "")));
+        form.add(field("Эффект", text("низ", true, "**жирное** — жирным")));
+        form.add(field("Ряд иконок", text("ряд", false,
+            "под текстом по центру; {/} перечёркивает иконку перед ним")));
+        form.add(field("Звезда", segmentedBool("звезда", "нет", "★ есть")));
+        if (card.bool("спец")) {
+            section("Спец-действие ▶");
+            form.add(field("Цена", text("цена", false, "сколько стоит: 1")));
+            form.add(field("Чем платят", iconField("цена_иконка")));
+            form.add(field("Иконка", iconField("спец_иконка")));
+            form.add(field("Знак у иконки", text("спец_знак", false, "=1")));
+            form.add(field("Текст", text("спец_текст", true, "строками")));
+            form.add(field("Контейнер", segmentedBool("контейнер", "нет", "место для контейнера")));
+        }
+        section("Номер");
+        form.add(field("Номер карты", text("номер", false, "")));
+    }
+
+    private void section(String name) {
+        form.add(Style.caption(name), "gaptop 8");
+    }
+
+    private static JComponent note(String text) {
+        JTextArea a = new JTextArea(text);
+        a.setEditable(false);
+        a.setLineWrap(true);
+        a.setWrapStyleWord(true);
+        a.setOpaque(false);
+        a.setForeground(Style.INK2);
+        return a;
+    }
+
+    /** Строка формы: подпись слева, редактор справа. */
+    private JComponent field(String label, JComponent editor) {
+        JPanel p = new JPanel(new MigLayout("insets 4 0 4 0, fillx", "[130!]10[grow,fill,0::]", "[top]"));
+        p.setOpaque(false);
+        JLabel l = new JLabel(label);
+        l.setForeground(Style.INK2);
+        l.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+        p.add(l);
+        p.add(editor, "wmin 0, growx");
+        return p;
     }
 
     private void changed(String key, Object value) {
@@ -294,7 +291,388 @@ public final class CardShop {
         redraw.restart();
     }
 
-    // ==================== рисование ====================
+    /** Текстовое поле: ввод, кнопка «+ иконка» и живая строка с иконками под ним. */
+    private JComponent text(String key, boolean multiline, String hint) {
+        JPanel p = new JPanel(new MigLayout("insets 0, fillx, gapy 3, hidemode 3",
+            "[grow,fill,0::]6[]", ""));
+        p.setOpaque(false);
+        JTextComponent t;
+        JComponent view;
+        if (multiline) {
+            JTextArea a = new JTextArea(card.text(key), 2, 10);
+            a.setLineWrap(true);
+            a.setWrapStyleWord(true);
+            JScrollPane sp = new JScrollPane(a);
+            sp.setPreferredSize(new Dimension(100, 58));
+            t = a;
+            view = sp;
+        } else {
+            JTextField f = new JTextField(card.text(key), 8);
+            t = f;
+            view = f;
+        }
+        t.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
+        if (!hint.isEmpty() && t instanceof JTextField tf) {
+            tf.putClientProperty("JTextField.placeholderText", hint);
+        }
+        TextPreview pv = new TextPreview(assets);
+        pv.set(t.getText());
+        t.getDocument().addDocumentListener(new DocumentListener() {
+            void upd() {
+                changed(key, t.getText());
+                pv.set(t.getText());
+            }
+            @Override public void insertUpdate(DocumentEvent e) { upd(); }
+            @Override public void removeUpdate(DocumentEvent e) { upd(); }
+            @Override public void changedUpdate(DocumentEvent e) { upd(); }
+        });
+        JButton ic = new JButton("+ иконка");
+        ic.setFocusable(false);
+        ic.setToolTipText("вставить иконку туда, где стоит курсор");
+        ic.addActionListener(e -> IconPicker.open(frame, assets, "Вставить иконку", k -> {
+            int at = Math.max(0, Math.min(t.getCaretPosition(), t.getText().length()));
+            try {
+                t.getDocument().insertString(at, "{" + k + "}", null);
+            } catch (Exception ex) {
+                t.setText(t.getText() + "{" + k + "}");
+            }
+            t.requestFocusInWindow();
+        }));
+        p.add(view, "wmin 0, growx");
+        p.add(ic, "top, wrap");
+        p.add(pv, "span 2, growx, wmin 0");
+        if (multiline && !hint.isEmpty()) {
+            JTextArea h = new JTextArea(hint);
+            h.setEditable(false);
+            h.setFocusable(false);
+            h.setOpaque(false);
+            h.setLineWrap(true);
+            h.setWrapStyleWord(true);
+            h.setForeground(Style.INK3);
+            h.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+            p.add(h, "span 2, growx, wmin 0");
+        }
+        return p;
+    }
+
+    /** Выбор одной иконки: плитка с картинкой, щелчок — окно выбора. */
+    private JComponent iconField(String key) {
+        IconButton b = new IconButton(assets, CardAssets.tokens(card.text(key)).stream()
+            .filter(s -> s.startsWith("{")).map(s -> s.substring(1, s.length() - 1))
+            .findFirst().orElse(null));
+        b.onClick(() -> IconPicker.open(frame, assets, "Выбрать иконку", k -> {
+            b.setKey(k);
+            changed(key, "{" + k + "}");
+        }));
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        p.setOpaque(false);
+        p.add(b);
+        return p;
+    }
+
+    /** Переключатель из нескольких кнопок. */
+    private JComponent segmented(String key, String[] values, String[] labels) {
+        return segmentedOf(values, labels, card.text(key).isEmpty() ? values[0] : card.text(key),
+            v -> changed(key, v));
+    }
+
+    private JComponent segmentedBool(String key, String off, String on) {
+        return segmentedOf(new String[] {"false", "true"}, new String[] {off, on},
+            String.valueOf(card.bool(key)), v -> {
+                changed(key, Boolean.parseBoolean(v));
+                if ("спец".equals(key)) {
+                    setCard(card);          // у ▶ свой раздел полей
+                }
+            });
+    }
+
+    private JComponent segmentedNumbers(String key, int n) {
+        String[] v = new String[n];
+        for (int i = 0; i < n; i++) {
+            v[i] = String.valueOf(i + 1);
+        }
+        return segmentedOf(v, v, String.valueOf(card.integer(key, 1)),
+            s -> changed(key, Integer.parseInt(s)));
+    }
+
+    private static JComponent segmentedOf(String[] values, String[] labels, String current,
+                                          Consumer<String> on) {
+        JPanel p = new JPanel(new WrapLayout(FlowLayout.LEFT, 4, 2));
+        p.setOpaque(false);
+        ButtonGroup g = new ButtonGroup();
+        for (int i = 0; i < values.length; i++) {
+            String v = values[i];
+            JToggleButton b = new JToggleButton(labels[i]);
+            b.setFocusable(false);
+            b.setSelected(v.equals(current));
+            b.addActionListener(e -> on.accept(v));
+            g.add(b);
+            p.add(b);
+        }
+        return p;
+    }
+
+    // ======================================================================
+    //  НАГРАДА
+    // ======================================================================
+
+    /** Блок награды: вид, выбор и позиции с иконками и счётом. */
+    private final class RewardEditor extends JPanel {
+        private static final long serialVersionUID = 1L;
+        private final String key;
+        private final boolean main;
+        private final Reward r;
+        private final JPanel rows = new JPanel(new MigLayout("insets 0, gapy 4", "[]", ""));
+
+        RewardEditor(String key, boolean main) {
+            super(new MigLayout("insets 10 12 12 12, fillx, gapy 6", "[130!]10[grow,fill]", ""));
+            this.key = key;
+            this.main = main;
+            this.r = Reward.of(card.fields.get(key), main);
+            setBackground(Style.PANEL);
+            setBorder(BorderFactory.createLineBorder(Style.LINE));
+            rows.setOpaque(false);
+            rebuild();
+        }
+
+        private void rebuild() {
+            removeAll();
+            add(label("Вид награды"));
+            add(segmentedOf(new String[] {Reward.ACTION, Reward.RESOURCES},
+                new String[] {"Действие — в кольце", "Ресурсы — со счётом"}, r.kind, v -> {
+                    r.kind = v;
+                    if (Reward.ACTION.equals(v) && Reward.ALL.equals(r.choice)) {
+                        r.choice = Reward.ONE;
+                    }
+                    trim();
+                    commit();
+                    rebuild();
+                }), "wrap");
+            add(label("Сколько вариантов"));
+            String[] ch = Reward.ACTION.equals(r.kind)
+                ? new String[] {Reward.ONE, Reward.EITHER}
+                : new String[] {Reward.ONE, Reward.EITHER, Reward.ALL};
+            String[] chl = Reward.ACTION.equals(r.kind)
+                ? new String[] {"Одно действие", "Одно из двух"}
+                : new String[] {"Одно", "Одно из двух", "Всё вместе"};
+            add(segmentedOf(ch, chl, r.choice, v -> {
+                r.choice = v;
+                trim();
+                commit();
+                rebuild();
+            }), "wrap");
+            add(label(Reward.ACTION.equals(r.kind) ? "Действия" : "Что даёт"), "top");
+            rows.removeAll();
+            for (int i = 0; i < r.items.size(); i++) {
+                rows.add(itemRow(i), "wrap");
+            }
+            int limit = limit();
+            if (r.items.size() < limit) {
+                JButton add = new JButton(r.items.isEmpty() ? "+ выбрать иконку" : "+ ещё");
+                add.setFocusable(false);
+                add.addActionListener(e -> IconPicker.open(frame, assets,
+                    Reward.ACTION.equals(r.kind) ? "Какое действие" : "Какой ресурс", k -> {
+                        r.items.add(new Reward.Item(k, 1));
+                        commit();
+                        rebuild();
+                    }));
+                rows.add(add, "wrap");
+            }
+            if (!main && r.items.isEmpty()) {
+                JLabel h = new JLabel("пусто — без дополнительной награды");
+                h.setForeground(Style.INK3);
+                rows.add(h, "wrap");
+            }
+            add(rows, "wrap");
+            revalidate();
+            repaint();
+        }
+
+        private JComponent itemRow(int i) {
+            Reward.Item it = r.items.get(i);
+            JPanel p = new JPanel(new MigLayout("insets 0, gapx 8", "[][][]", "[center]"));
+            p.setOpaque(false);
+            IconButton b = new IconButton(assets, it.icon());
+            b.onClick(() -> IconPicker.open(frame, assets, "Заменить иконку", k -> {
+                r.items.set(i, new Reward.Item(k, r.items.get(i).count()));
+                commit();
+                rebuild();
+            }));
+            p.add(b);
+            if (Reward.RESOURCES.equals(r.kind)) {
+                JSpinner sp = new JSpinner(new SpinnerNumberModel(it.count(), 1, 12, 1));
+                sp.setPreferredSize(new Dimension(70, 34));
+                sp.addChangeListener(e -> {
+                    r.items.set(i, new Reward.Item(r.items.get(i).icon(), (Integer) sp.getValue()));
+                    commit();
+                });
+                JLabel x = new JLabel("×");
+                x.setForeground(Style.INK2);
+                p.add(x);
+                p.add(sp);
+            }
+            JButton del = new JButton("убрать");
+            del.setFocusable(false);
+            del.addActionListener(e -> {
+                r.items.remove(i);
+                commit();
+                rebuild();
+            });
+            p.add(del);
+            if (i == 0 && Reward.EITHER.equals(r.choice) && r.items.size() == 2) {
+                JLabel or = new JLabel("  или");
+                or.setForeground(Style.ACCENT);
+                p.add(or);
+            }
+            return p;
+        }
+
+        private int limit() {
+            return switch (r.choice) {
+                case Reward.ONE -> 1;
+                case Reward.EITHER -> 2;
+                default -> 4;
+            };
+        }
+
+        private void trim() {
+            while (r.items.size() > limit()) {
+                r.items.remove(r.items.size() - 1);
+            }
+        }
+
+        private void commit() {
+            changed(key, r.toMap());
+        }
+
+        private JLabel label(String s) {
+            JLabel l = new JLabel(s);
+            l.setForeground(Style.INK2);
+            return l;
+        }
+    }
+
+    // ======================================================================
+    //  КОМПОНЕНТЫ
+    // ======================================================================
+
+    /** Плитка-кнопка с картинкой иконки. */
+    static final class IconButton extends JButton {
+        private static final long serialVersionUID = 1L;
+        private final CardAssets a;
+
+        IconButton(CardAssets a, String key) {
+            this.a = a;
+            setFocusable(false);
+            setPreferredSize(new Dimension(64, 64));
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            setKey(key);
+        }
+
+        void setKey(String key) {
+            BufferedImage ic = key == null ? null : a.icon(CardAssets.key(key));
+            if (ic != null) {
+                setIcon(new ImageIcon(CardAssets.fit(ic, 50, 50)));
+                setText(null);
+            } else {
+                setIcon(null);
+                setText(key == null ? "выбрать" : "?" + key);
+            }
+            setToolTipText(key == null ? "выбрать иконку" : "{" + key + "} — щёлкните, чтобы заменить");
+        }
+
+        void onClick(Runnable r) {
+            addActionListener(e -> r.run());
+        }
+    }
+
+    /** Живая строка: текст поля с настоящими иконками вместо {номеров}. */
+    static final class TextPreview extends JComponent {
+        private static final long serialVersionUID = 1L;
+        private final CardAssets a;
+        private String text = "";
+
+        TextPreview(CardAssets a) {
+            this.a = a;
+        }
+
+        void set(String t) {
+            text = t == null ? "" : t;
+            setVisible(text.contains("{") || text.contains("**"));
+            revalidate();
+            repaint();
+        }
+
+        private List<String> lines() {
+            List<String> out = new ArrayList<>();
+            for (String l : text.split("\n")) {
+                out.add(l);
+            }
+            return out;
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            return new Dimension(100, 8 + lines().size() * 28);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g0) {
+            Graphics2D g = (Graphics2D) g0.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setColor(new Color(0x14171d));
+            g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+            Font f = a.font("TekturNarrow-Medium.ttf", 17);
+            Font fb = a.font("TekturNarrow-Bold.ttf", 17);
+            int y = 4;
+            for (String line : lines()) {
+                int x = 8;
+                int base = y + 20;
+                for (CardCanvas.Part p : CardCanvas.parts(line)) {
+                    if (p.kind() == 'i') {
+                        BufferedImage ic = a.icon(CardAssets.key(p.value()));
+                        if (ic != null) {
+                            BufferedImage s = CardAssets.fit(ic, 24, 24);
+                            g.drawImage(s, x, y + 2, null);
+                            x += s.getWidth() + 5;
+                        } else {
+                            g.setColor(Style.BAD);
+                            g.setFont(f);
+                            String m = "?" + p.value();
+                            g.drawString(m, x, base);
+                            x += g.getFontMetrics().stringWidth(m) + 5;
+                        }
+                    } else {
+                        g.setFont(p.kind() == 'b' ? fb : f);
+                        g.setColor(p.kind() == 'b' ? Color.WHITE : Style.INK);
+                        g.drawString(p.value(), x, base);
+                        x += g.getFontMetrics().stringWidth(p.value() + " ");
+                    }
+                }
+                y += 28;
+            }
+            g.dispose();
+        }
+    }
+
+    /** Панель формы по ширине окна прокрутки: поля не уезжают вправо. */
+    private static final class WidthPanel extends JPanel implements Scrollable {
+        private static final long serialVersionUID = 1L;
+
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) { return 20; }
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) { return 200; }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
+
+    // ======================================================================
+    //  РИСОВАНИЕ
+    // ======================================================================
 
     private void render() {
         CardSpec snapshot = new CardSpec(card.type());
@@ -320,12 +698,13 @@ public final class CardShop {
                     BufferedImage im = get();
                     if (im != null) {
                         lastImage = im;
-                        preview.set(im);
-                        status.setForeground(new Color(40, 110, 50));
-                        status.setText("Готово: " + im.getWidth() + "×" + im.getHeight()
-                            + " — шаблон «" + templateName(snapshot) + "»");
+                        preview.set(im, false);
+                        status.setForeground(Style.GOOD);
+                        status.setText("Готово · " + im.getWidth() + "×" + im.getHeight()
+                            + " · шаблон «" + templateName(snapshot) + "»");
                     } else {
-                        status.setForeground(new Color(170, 30, 30));
+                        preview.set(lastImage, true);
+                        status.setForeground(Style.BAD);
                         status.setText(problem);
                     }
                 } catch (Exception e) {
@@ -343,107 +722,49 @@ public final class CardShop {
         return t.templateFile(c.bool("спец") ? 2 : 1, false);
     }
 
-    /** Предпросмотр: карта вписана в панель, без искажений. */
+    /** Предпросмотр: карта вписана в панель; если не нарисовалась — прежняя, приглушённо. */
     private static final class Preview extends JComponent {
         private static final long serialVersionUID = 1L;
         private BufferedImage im;
+        private boolean stale;
 
-        void set(BufferedImage im) {
+        void set(BufferedImage im, boolean stale) {
             this.im = im;
+            this.stale = stale;
             repaint();
         }
 
         @Override
         protected void paintComponent(Graphics g0) {
-            Graphics2D g = (Graphics2D) g0;
-            g.setColor(new Color(0x2b2f36));
+            Graphics2D g = (Graphics2D) g0.create();
+            g.setColor(new Color(0x15181e));
             g.fillRect(0, 0, getWidth(), getHeight());
             if (im == null) {
+                g.dispose();
                 return;
             }
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                 RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            double k = Math.min((getWidth() - 40.0) / im.getWidth(),
-                (getHeight() - 40.0) / im.getHeight());
-            k = Math.min(k, 1.5);
+            double k = Math.min((getWidth() - 48.0) / im.getWidth(),
+                (getHeight() - 48.0) / im.getHeight());
+            k = Math.min(k, 1.4);
             int w = (int) (im.getWidth() * k);
             int h = (int) (im.getHeight() * k);
-            g.drawImage(im, (getWidth() - w) / 2, (getHeight() - h) / 2, w, h, null);
-        }
-    }
-
-    // ==================== палитра иконок ====================
-
-    private void showPalette() {
-        if (palette == null) {
-            palette = new JDialog(frame, "Иконки — щёлкните, чтобы вставить в поле", false);
-            JTextField filter = new JTextField();
-            JPanel grid = new JPanel(new GridLayout(0, 8, 4, 4));
-            Map<String, File> all = assets.iconFiles();
-            List<JButton> buttons = new ArrayList<>();
-            for (var e : all.entrySet()) {
-                String key = e.getKey();
-                BufferedImage ic = assets.icon(key);
-                JButton b = new JButton(key.length() > 14 ? key.substring(0, 13) + "…" : key);
-                if (ic != null) {
-                    b.setIcon(new ImageIcon(CardAssets.fit(ic, 56, 56)));
-                }
-                b.setToolTipText("{" + key + "}");
-                b.setVerticalTextPosition(JLabel.BOTTOM);
-                b.setHorizontalTextPosition(JLabel.CENTER);
-                b.setFont(b.getFont().deriveFont(10f));
-                b.addActionListener(ev -> insert("{" + key + "}"));
-                b.putClientProperty("key", key);
-                buttons.add(b);
-                grid.add(b);
+            int x = (getWidth() - w) / 2;
+            int y = (getHeight() - h) / 2;
+            g.setColor(new Color(0, 0, 0, 120));
+            g.fillRoundRect(x + 6, y + 10, w, h, 24, 24);
+            if (stale) {
+                g.setComposite(java.awt.AlphaComposite.SrcOver.derive(0.35f));
             }
-            filter.getDocument().addDocumentListener(new DocumentListener() {
-                void apply() {
-                    String q = filter.getText().trim().toLowerCase();
-                    for (JButton b : buttons) {
-                        b.setVisible(q.isEmpty()
-                            || String.valueOf(b.getClientProperty("key")).toLowerCase().contains(q));
-                    }
-                    grid.revalidate();
-                }
-                @Override public void insertUpdate(DocumentEvent e) { apply(); }
-                @Override public void removeUpdate(DocumentEvent e) { apply(); }
-                @Override public void changedUpdate(DocumentEvent e) { apply(); }
-            });
-            JPanel p = new JPanel(new BorderLayout(6, 6));
-            JPanel head = new JPanel(new BorderLayout(6, 6));
-            head.add(new JLabel("Найти:"), BorderLayout.WEST);
-            head.add(filter, BorderLayout.CENTER);
-            head.setBorder(BorderFactory.createEmptyBorder(8, 8, 0, 8));
-            p.add(head, BorderLayout.NORTH);
-            JScrollPane sp = new JScrollPane(grid);
-            sp.getVerticalScrollBar().setUnitIncrement(24);
-            p.add(sp, BorderLayout.CENTER);
-            palette.setContentPane(p);
-            palette.setSize(820, 640);
-            palette.setLocationRelativeTo(frame);
+            g.drawImage(im, x, y, w, h, null);
+            g.dispose();
         }
-        palette.setVisible(true);
     }
 
-    /** Вставить фишку в поле, где стоял курсор. */
-    private void insert(String token) {
-        JTextComponent t = lastText;
-        if (t == null) {
-            status.setText("Сначала щёлкните в поле, куда вставить иконку");
-            return;
-        }
-        int at = Math.max(0, Math.min(t.getCaretPosition(), t.getText().length()));
-        try {
-            t.getDocument().insertString(at, token, null);
-            t.setCaretPosition(at + token.length());
-        } catch (Exception ignored) {
-            t.setText(t.getText() + token);
-        }
-        t.requestFocusInWindow();
-    }
-
-    // ==================== файлы ====================
+    // ======================================================================
+    //  ФАЙЛЫ
+    // ======================================================================
 
     private File workFolder() {
         File f = new File(assets.common, "мастерская карт");
@@ -495,9 +816,9 @@ public final class CardShop {
             JOptionPane.showMessageDialog(frame, "Карта не нарисовалась — см. строку внизу");
             return;
         }
-        JFileChooser ch = new JFileChooser(lastFile != null ? lastFile.getParentFile() : workFolder());
-        ch.setSelectedFile(new File(lastFile != null ? lastFile.getParentFile() : workFolder(),
-            baseName() + ".png"));
+        File dir = lastFile != null ? lastFile.getParentFile() : workFolder();
+        JFileChooser ch = new JFileChooser(dir);
+        ch.setSelectedFile(new File(dir, baseName() + ".png"));
         if (ch.showSaveDialog(frame) != JFileChooser.APPROVE_OPTION) {
             return;
         }
@@ -511,6 +832,7 @@ public final class CardShop {
             File spec = new File(f.getParentFile(), f.getName().replaceAll("\\.png$", ".kcard"));
             card.save(spec);
             lastFile = spec;
+            status.setForeground(Style.GOOD);
             status.setText("Выпущено: " + f.getName() + " (и описание .kcard рядом)");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(frame, "Не выпустилось: " + e.getMessage());

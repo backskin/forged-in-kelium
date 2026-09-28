@@ -143,9 +143,19 @@ public final class CardSpec {
             f.put("верх", "Получи 2 {3} боеприпаса, если\nкто-либо атакует твой жетон");
             f.put("имя", "Новое задание");
             f.put("условие", "Имей на поле 2 своих добытчика с полной энергией");
-            f.put("награда", "{34} {32}");
+            Reward r = new Reward();
+            r.kind = Reward.ACTION;
+            r.choice = Reward.EITHER;
+            r.items.add(new Reward.Item("34", 1));
+            r.items.add(new Reward.Item("32", 1));
+            f.put("награда", r.toMap());
             f.put("дополнительно", "на разных гексах.");
-            f.put("доп_награда", "{1}{1} {25}");
+            Reward d = new Reward();
+            d.kind = Reward.RESOURCES;
+            d.choice = Reward.ALL;
+            d.items.add(new Reward.Item("1", 2));
+            d.items.add(new Reward.Item("25", 1));
+            f.put("доп_награда", d.toMap());
             f.put("номер", 1);
         } else if (t.layout == Layout.ARSENAL) {
             f.put("спец", false);
