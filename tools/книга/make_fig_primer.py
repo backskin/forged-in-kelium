@@ -10,7 +10,7 @@ ns = {"__file__": os.path.join(D, "figs.py")}
 exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# планшет войск")[0], ns)
 figure = ns["figure"]
 
-КОРЕНЬ = os.path.join("C:", os.sep, "shared", "forged-in-kelium")
+КОРЕНЬ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 РАННЕР = os.path.join(КОРЕНЬ, "gui", "target", "kelium-runner.jar")
 png = os.path.join(D, "_пример-хода.png")
 subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",

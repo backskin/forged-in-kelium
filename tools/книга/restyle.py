@@ -157,8 +157,6 @@ CSS = r"""
   }
   .колонцифра span { display: inline-block; background: var(--чернила); padding: .9mm 3.8mm .75mm;
     clip-path: polygon(1.6mm 0, 100% 0, calc(100% - 1.6mm) 100%, 0 100%); }
-  .подготовка.левая-подг .колонцифра { text-align: left; left: 13mm; }
-  .подготовка.правая-подг .колонцифра { text-align: right; right: 13mm; }
 
   /* ПОДЛОЖКА ПОД ТЕКСТОМ. Три правила, все три — просьба дизайнера
      14.09.2026: воздух от края текста, одинаковые поля слева и справа (никаких
@@ -215,6 +213,7 @@ CSS = r"""
   /* ---- таблицы ---- */
   table { width: 100%; border-collapse: collapse; font: 10pt/1.3 "Tektur Narrow", "Tektur", sans-serif; background: rgba(255,255,255,.55);
     outline: .18mm solid var(--кант); }
+  table + p { margin-top: 1.6mm; }
   th { background: var(--келемий); color: #fff; font-weight: 700; text-align: left; padding: 1.3mm 1.8mm; text-transform: uppercase; letter-spacing: .04em; font-size: 8.6pt; }
   th:first-child { padding-left: 2.6mm; }
   td:first-child:has(.ико) { white-space: nowrap; }
@@ -446,6 +445,28 @@ CSS = r"""
   .цвета { display: flex; gap: 2.5mm; align-items: center; margin: 0 0 2mm; }
   .цвета span { width: 5mm; height: 5mm; border-radius: 1mm; display: inline-block;
     outline: .2mm solid rgba(0,0,0,.35); }
+
+  /* ---- плитки действий-развилок (28.09.2026) ---- */
+  .плитки { display: grid; gap: 3mm; margin: 2mm 0 0; }
+  .плитки.к5 { grid-template-columns: repeat(5, 1fr); }
+  .плитки.к4 { grid-template-columns: repeat(4, 1fr); }
+  .плитки.к3 { grid-template-columns: repeat(3, 1fr); }
+  .плитки.к2 { grid-template-columns: repeat(2, 1fr); }
+  .плитка { display: flex; flex-direction: column; align-items: center; text-align: center;
+    background: rgba(255, 255, 255, .45); outline: .18mm solid var(--кант); padding: 2.4mm 1.6mm 2.6mm; }
+  .плитка .и.плит { height: var(--плит-h, 14mm); margin: 0 0 1.4mm; vertical-align: 0; }
+  .плитка b { font: 700 10pt/1.15 "Tektur", sans-serif; color: var(--охра); margin: 0 0 1.6mm; }
+  .плитка .ветка { font: 600 9pt/1.2 "Tektur Narrow", sans-serif; color: var(--чернила); }
+  .плитка .или { font: 400 8pt/1.1 "Tektur Narrow", sans-serif; color: var(--серый); margin: .7mm 0; }
+
+  /* ---- раздел: заголовок группы карточек одного действия (28.09.2026) ---- */
+  .раздел { column-span: all; display: flex; align-items: center; gap: 3mm;
+    margin: 1mm 0 3mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--келемий); }
+  .раздел .и.разд { height: 11mm; margin: 0; vertical-align: 0; }
+  .раздел span { font: 700 15pt/1 "Tektur", sans-serif; color: var(--охра); }
+  .карточка ul { margin: 0 0 1.4mm; padding-left: 4mm; }
+  .карточка li { margin: 0 0 .8mm; }
+  .карточка ol { margin: 0 0 1.4mm; padding-left: 5mm; }
 """
 
 

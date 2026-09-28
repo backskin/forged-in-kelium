@@ -16,7 +16,7 @@ exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# пл
 figure = ns["figure"]
 
 ТОКЕНЫ = r"C:\shared\forged-in-kelium\data\textures\token"
-КОРЕНЬ = os.path.join("C:", os.sep, "shared", "forged-in-kelium")
+КОРЕНЬ = os.path.dirname(os.path.dirname(D))
 РАННЕР = os.path.join(КОРЕНЬ, "gui", "target", "kelium-runner.jar")
 ШРИФТ = r"C:\Windows\Fonts\TekturNarrow-Bold.ttf"
 
@@ -66,5 +66,5 @@ canvas.save(png)
 vw, vh = canvas.size
 print("холст", canvas.size)
 
-figure("войска", png, 1800, vw, vh, [], css_w="73%", pad="0.4mm 0 0.9mm")
+figure("войска", png, 1800, vw, vh, [], css_w="66%", pad="0.4mm 0 0.9mm")
 print("ok")
