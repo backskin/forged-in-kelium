@@ -77,34 +77,13 @@ public final class CardRender {
         k.text(name, f, 615 * 2, 284 * 2, 'r', CardCanvas.WHITE, RED_STROKE, 4 * 2);
         plates(k, c.text("условие"), 344, 53, 35, 627, 4);
         int shift = hasDop ? 0 : 127;
-        List<String> reward = new ArrayList<>();
-        for (String t : CardAssets.tokens(c.text("награда"))) {
-            if (t.startsWith("{")) {
-                reward.add(t.substring(1, t.length() - 1));
-            }
-        }
-        if (reward.size() >= 3) {
-            // три и больше — рядом без колец (как «3 спец-действия»)
-            double step = 60;
-            double x0 = 500 - step * (reward.size() - 1) / 2;
-            for (int i = 0; i < reward.size(); i++) {
-                k.put(reward.get(i), x0 + i * step, 614 + shift, 84, 84);
-            }
-        } else {
-            double[] at = reward.size() == 2 ? new double[] {424, 574} : new double[] {500};
-            for (int i = 0; i < reward.size(); i++) {
-                double cy = 614 + shift;
-                k.put("24", at[i], cy, 110, 110);
-                k.put(reward.get(i), at[i], cy - 2, 104, 104);
-            }
-            if (reward.size() == 2) {
-                slash(k, shift);
-            }
-        }
+        // ОСНОВНАЯ НАГРАДА — блок «вид / выбор / позиции» (см. Reward)
+        Reward.of(c.fields.get("награда"), true).draw(k, 500, 614 + shift, 270, 110);
         if (hasDop) {
             plates(k, dop, 767, 51, 33.4, 626, 2);
         }
-        bonusRow(k, c.text("доп_награда"));
+        // УСИЛЕННАЯ (дополнительная) НАГРАДА — такой же блок, в нижней плашке
+        Reward.of(c.fields.get("доп_награда"), false).draw(k, 393, 932, 300, 100);
         String num = c.text("номер");
         if (num.matches("\\d")) {
             num = "0" + num;

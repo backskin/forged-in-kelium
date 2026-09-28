@@ -3169,7 +3169,7 @@ public final class HotSeatWindow {
     private static final Map<String, String> KIND_LABELS = Map.ofEntries(
         Map.entry("action", "выберите действие"),
         Map.entry("action_branch", "одно из двух"),
-        Map.entry("spec", "СПЕЦ-действие"),
+        Map.entry("spec", "действия сыграны: спец-действие или конец хода"),
         Map.entry("reveal_order", "выберите карту круга"),
         Map.entry("blind_discard", "отложите приказ — место для трофеев"),
         Map.entry("build_pick", "что построить"),
@@ -3225,7 +3225,7 @@ public final class HotSeatWindow {
         Map.entry("keep_objective", "какое задание оставить"),
         Map.entry("objective_keep", "какое задание оставить"),
         Map.entry("arsenal_draw2", "какую карту арсенала оставить"),
-        Map.entry("mass_open", "вскрытие находок"),
+        Map.entry("mass_open", "вскрыть контейнер или карту арсенала"),
         Map.entry("cu_hex", "где поставить центр управления"),
         Map.entry("cu_sides", "поворот центра управления"),
         Map.entry("cu_token_to", "кому отдать жетон уничтожения ЦУ"),
@@ -3928,7 +3928,7 @@ public final class HotSeatWindow {
                 int idx = e.getValue();
                 String nm = e.getKey();
                 strip.add(new kelium.gui.kp.ActionStrip.Item(nm,
-                    ActionBar.ACTIONS.getOrDefault(nm, nm), null, () -> {
+                    ActionBar.ACTIONS.getOrDefault(nm, nm), ActionBar.forkSub(nm), () -> {
                         if (!kelium.core.UndoableAgent.SAFE_ACTIONS.contains(nm)) {
                             pendingBakeName = ActionBar.ACTIONS.getOrDefault(nm, nm);
                         }
@@ -3945,11 +3945,31 @@ public final class HotSeatWindow {
             actionStrip.show(d.context().get("remaining") instanceof Number rn2
                 ? "Ваш ход — действий: " + rn2 : "Ваш ход", strip, Theme.seat(seat));
             if (конецХода) {
-                field.clearChoices();
+                // ДЕЙСТВИЯ СЫГРАНЫ — что осталось, словами (обход 28.09)
+                long можно = options.stream().filter(c -> !"pass".equals(c.kind())
+                    && !"action".equals(c.kind())).count();
+                field.setChoices(null, "Действия приказа сыграны",
+                    можно > 0 ? "Можно ещё одно спец-действие — кнопка «Спец-действие» внизу покажет, что именно "
+                        + "(вариантов: " + можно + "). Или «Завершить ход» — ход перейдёт дальше"
+                        : "Больше ничего сделать нельзя — «Завершить ход»",
+                    new ArrayList<>(), Theme.seat(seat));
             } else {
-                field.setChoices(null, "Ваш ход: выберите действие",
-                    anySpec ? "Действие или спец-действие — на кружках внизу поля"
-                        : "Действие — на кружках внизу поля", offCard, Theme.seat(seat));
+                // ЧТО ДЕЛАТЬ В ЭТОМ ХОДУ — целиком, для игрока, который забыл
+                List<String> имена = new ArrayList<>();
+                for (String nm : avail.keySet()) {
+                    имена.add(ActionBar.ACTIONS.getOrDefault(nm, nm));
+                }
+                String приказ = orderCat == null ? null
+                    : GameRecorder.orderName(orderCat).toUpperCase(java.util.Locale.ROOT);
+                String заголовок = (приказ == null ? "Ваш ход" : "Приказ " + приказ)
+                    + (имена.isEmpty() ? "" : ": " + String.join(" и ", имена));
+                String подсказка = (имена.size() > 1
+                    ? "Сыграйте действия в любом порядке — кружком внизу поля. "
+                    : имена.size() == 1 ? "Осталось одно действие — кружок внизу поля. " : "")
+                    + "Каждое действие — одно из двух, выбор будет следующим шагом."
+                    + (anySpec ? " Ещё можно одно спец-действие." : "")
+                    + " Закончили — «Завершить ход».";
+                field.setChoices(null, заголовок, подсказка, offCard, Theme.seat(seat));
             }
         } else {
             actionBar.idle("не сейчас");
@@ -4258,9 +4278,10 @@ public final class HotSeatWindow {
                 + "каждый жетон ходит один раз";
         }
         if ("energy_activation".equals(kind)) {
-            title = "Переложить энергию: выберите источник";
-            hint = "Щёлкните энергостанцию или ЦУ на поле: раздать с неё кубики "
-                + "или забрать все обратно — или «Больше не перекладывать»";
+            title = "Переложить энергию: щёлкните станцию или ЦУ";
+            hint = "Кубики энергии источника можно забрать обратно на него и раздать заново "
+                + "по своим зданиям — запитанное здание работает в своём действии. "
+                + "Подсвеченный источник — на поле; хватит — «Больше не перекладывать»";
         } else if ("energy_place".equals(kind)) {
             Object left = d.context().get("remaining");
             Object from = d.context().get("source_type");
@@ -4293,8 +4314,12 @@ public final class HotSeatWindow {
             for (int i = 0; i < options.size(); i++) {
                 Choice c = options.get(i);
                 int idx = i;
-                ветки.add(new kelium.gui.kp.ActionStrip.Item(
-                    c.payload() instanceof String b ? b : null,
+                // ветка «построить» — иконкой развилки со зданием, как на картах
+                String знак = c.payload() instanceof String b
+                    ? ("build".equals(b) && !"build".equals(kelium.engine.Actions
+                        .buildBranchCode(развилка)) ? kelium.engine.Actions.buildBranchCode(развилка) : b)
+                    : null;
+                ветки.add(new kelium.gui.kp.ActionStrip.Item(знак,
                     kelium.gui.kp.ChoiceWords.label(kind, c, this::cardName),
                     kelium.gui.kp.ChoiceWords.sub(kind, c), () -> submit(agent, d, idx)));
             }
@@ -4344,6 +4369,31 @@ public final class HotSeatWindow {
      * словами по виду кадра: действие («добыча», «стройка»), вскрытие, бой.
      */
     private void eventToasts(ReplayRecord.Snapshot prev, ReplayRecord.Frame f) {
+        int былоПлашек = toasts.textsForTest().size();
+        eventToasts0(prev, f);
+        // ДЕЙСТВИЕ ПРОШЛО ВПУСТУЮ — сказать почему (обход 28.09: «выбрал Науку —
+        // и ничего; что случилось?»)
+        if ("action".equals(f.type) && f.seat != null && humansBySeat.containsKey(f.seat)
+                && toasts.textsForTest().size() == былоПлашек) {
+            String why = toastReason(f);
+            String почему = why == null ? null : switch (why) {
+                case "наука" -> "нет трофеев на шаг трека";
+                case "рынок" -> "нет келемия на обмен";
+                case "добыча", "добыть" -> "добытчики не достали до келемия";
+                case "выпуск" -> "нет запитанных военных зданий";
+                case "манёвр" -> "никто не сдвинулся";
+                case "бой" -> "атаки не было";
+                case "переложить энергию", "питание" -> "энергия не сдвинулась";
+                default -> null;
+            };
+            if (почему != null) {
+                toasts.push(new kelium.gui.kp.EventToasts.Toast(null,
+                    cap(why) + ": впустую — " + почему, Theme.seat(f.seat), true));
+            }
+        }
+    }
+
+    private void eventToasts0(ReplayRecord.Snapshot prev, ReplayRecord.Frame f) {
         ReplayRecord.Snapshot now = f.snapshot;
         String why = toastReason(f);
         // вскрытый контейнер — лицом карты
@@ -4503,11 +4553,26 @@ public final class HotSeatWindow {
         }
         // промежуточный кадр — по последнему решению живого игрока
         String kind;
+        String метка;
         synchronized (moves) {
             kind = decisions.isEmpty() ? null : decisions.get(decisions.size() - 1).kind();
+            метка = decisions.isEmpty() ? null : decisions.get(decisions.size() - 1).label();
         }
         if (kind == null) {
             return null;
+        }
+        // СПЕЦ-ДЕЙСТВИЕ ИЗ МЕНЮ ХОДА — его словами: «плашка приказа», «задание»…
+        if (метка != null && метка.startsWith("СПЕЦ")) {
+            if (метка.contains("Плашка приказа")) {
+                return "плашка приказа";
+            }
+            if (метка.contains("Выполнить")) {
+                return "задание выполнено";
+            }
+            if (метка.contains("Сжечь")) {
+                return "карта сожжена";
+            }
+            return "спец-действие";
         }
         if (kind.startsWith("build")) {
             return "здание сработало при постройке";

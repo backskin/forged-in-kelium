@@ -149,8 +149,8 @@ public final class EventToasts extends JComponent {
         if (own) {
             int bottom = ownBottom > 0 ? ownBottom : getHeight() - Theme.px(160);
             int w = Theme.px(640);
-            return new java.awt.Rectangle((getWidth() - w) / 2, bottom - Theme.px(10) - span, w,
-                span);
+            return new java.awt.Rectangle(getWidth() - w - Theme.px(10), bottom - Theme.px(10) - span,
+                w, span);
         }
         int w = Theme.px(460);
         return new java.awt.Rectangle(getWidth() - w - Theme.px(10), 0, w, span);
@@ -230,12 +230,12 @@ public final class EventToasts extends JComponent {
     private void paintToast(Graphics2D g0, Toast t, int slot, double a, double lift, double grow) {
         Graphics2D g = (Graphics2D) g0.create();
         boolean own = t.own();
-        Font f = Theme.font(own ? 17 : 13, Font.BOLD);
+        Font f = Theme.font(own ? 15 : 13, Font.BOLD);
         g.setFont(f);
         FontMetrics fm = g.getFontMetrics();
-        int img = own ? Theme.px(46) : Theme.px(30);
+        int img = own ? Theme.px(38) : Theme.px(30);
         int pad = own ? Theme.px(12) : Theme.px(8);
-        int textW = Math.min(fm.stringWidth(t.text()), Theme.px(own ? 520 : 360));
+        int textW = Math.min(fm.stringWidth(t.text()), Theme.px(own ? 420 : 360));
         String text = FieldBubbles.clip(fm, t.text(), textW);
         int w = pad * 3 + img + textW;
         int h = img + pad * 2;
@@ -243,8 +243,10 @@ public final class EventToasts extends JComponent {
         int x;
         int y;
         if (own) {
+            // СВОИ — СПРАВА ВНИЗУ, а не посреди поля (обход 28.09): по центру они
+            // закрывали гексы, на которых как раз надо выбирать
             int bottom = ownBottom > 0 ? ownBottom : getHeight() - Theme.px(160);
-            x = (getWidth() - w) / 2;
+            x = getWidth() - w - Theme.px(24);
             y = bottom - Theme.px(24) - h - slot * (h + gap);
         } else {
             x = getWidth() - w - Theme.px(24);

@@ -90,17 +90,36 @@ public final class ActionBar extends JPanel {
         };
     }
 
+    /** Из чего выбирает развилка — подпись под её кружком. */
+    public static String forkSub(String fork) {
+        return switch (fork == null ? "" : fork) {
+            case "extract" -> "добыть или построить добытчик";
+            case "power" -> "энергия или энергостанция";
+            case "supply" -> "выпуск или военное здание";
+            case "command" -> "манёвр или бой";
+            case "develop" -> "рынок или наука";
+            default -> null;
+        };
+    }
+
     /** Что делает ветка — подпись под кнопкой. */
     public static String branchSub(String fork, String branch) {
         return switch (branch == null ? "" : branch) {
             // одно здание своего вида или снос одного; ЦУ веткой не строится
-            case "build" -> "supply".equals(fork) ? "казарма, завод или авиабаза"
-                : "одно здание или снос";
-            case "mining" -> "добытчики добывают";
-            case "energy_swap" -> "кубики энергии";
+            // ЧТО ДЕЛАЕТ ВЕТКА — словами, которые понятны без памяти правил
+            case "build" -> switch (fork == null ? "" : fork) {
+                case "extract" -> "1 добытчик — сразу добудет";
+                case "power" -> "1 станция — сразу даст энергию";
+                case "supply" -> "1 военное здание — сразу выпуск";
+                default -> "одно здание или снос";
+            };
+            case "mining" -> "добытчики дают келемий";
+            case "energy_swap" -> "снять и разложить энергию";
             case "assembly" -> "войска или боеприпасы";
-            case "movement" -> "вывести и ввести";
-            case "combat" -> "по гексу цели";
+            case "movement" -> "вывести и ввести войска";
+            case "combat" -> "атака по соседнему гексу";
+            case "market" -> "обмен келемия и сделки";
+            case "science" -> "шаг по треку или обмен";
             default -> null;
         };
     }

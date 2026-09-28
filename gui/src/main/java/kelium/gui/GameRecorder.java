@@ -1530,6 +1530,11 @@ public final class GameRecorder {
     }
 
     /** Полное русское название рода войск. */
+    /** Приказ словами по коду категории: settle → «Освоить». */
+    public static String orderName(String code) {
+        return ReplayText.ORDERS.getOrDefault(code, code);
+    }
+
     public static String unitName(String typeCode) {
         return kelium.report.Labels.unitName(typeCode);
     }

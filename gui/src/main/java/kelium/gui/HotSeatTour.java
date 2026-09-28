@@ -58,7 +58,9 @@ public final class HotSeatTour {
         long deadline = System.currentTimeMillis() + Long.getLong("tour.ms", 900_000L);
         try (PrintWriter log = new PrintWriter(new File(out, "опись.txt"),
                 StandardCharsets.UTF_8)) {
-            while (!win.finishedForTest() && System.currentTimeMillis() < deadline) {
+            int предел = Integer.getInteger("tour.max", Integer.MAX_VALUE);
+            while (!win.finishedForTest() && System.currentTimeMillis() < deadline
+                    && answered < предел) {
                 var agent = win.humansBySeat.get(0);
                 InteractiveAgent.PendingDecision d = agent == null ? null : agent.pending();
                 if (d == null) {

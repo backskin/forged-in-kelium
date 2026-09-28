@@ -398,7 +398,7 @@ public final class ChoiceWords {
                 String raw = c.label() == null ? String.valueOf(c.payload()) : c.label();
                 Matcher open = OPEN_ONE.matcher(raw);
                 if (open.find()) {
-                    yield "Вскрыть одну находку (контейнеров " + open.group(1)
+                    yield "Вскрыть контейнер или карту арсенала (контейнеров " + open.group(1)
                         + ", арсенала " + open.group(2) + ")";
                 }
                 yield tidy(raw);
