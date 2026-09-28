@@ -254,8 +254,17 @@ public final class GameEngine {
             s.round = rnd;
             int firstCircle = 1;
             if (rnd > startRound || freshRound) {
-                refresh(rnd);
-                blindDiscard();
+                // ПОРЯДОК ОБНОВЛЕНИЯ: свалка — первым шагом, до новой карты
+                // рынка (дизайнер 28.09.2026, ключ rounds.scrapyard_first). Так
+                // первый раунд — это «только шаг 1», а свалку выбирают, не зная
+                // следующей карты рынка.
+                if (rs().getBool("rounds.scrapyard_first", false)) {
+                    blindDiscard();
+                    refresh(rnd);
+                } else {
+                    refresh(rnd);
+                    blindDiscard();
+                }
             } else {
                 firstCircle = startCircle;
             }
@@ -2544,7 +2553,10 @@ public final class GameEngine {
         // одного. Предела руки в середине раунда нет — он проверяется только здесь.
         int limit = rs.getInt("rounds.objective_hand_limit");
         boolean доПредела = rs.getBool("return_step.refill_objectives_to_limit", true);
-        for (PlayerState p : s.players) {
+        // ДОБОРА ЗАДАНИЙ В ВОЗВРАЩЕНИИ НЕТ ВОВСЕ (дизайнер 28.09.2026): карты
+        // заданий не сбрасывают и не добирают, шага «Задания» нет.
+        boolean добор = rs.getBool("return_step.refill_objectives", true);
+        for (PlayerState p : добор ? s.players : java.util.List.<PlayerState>of()) {
             // Пассив objective_hand_plus1 (стартовая карта «Штаб связи»):
             // лимит руки заданий для пополнения +1.
             int myLimit = limit
