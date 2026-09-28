@@ -215,6 +215,7 @@ CSS = r"""
   /* ---- таблицы ---- */
   table { width: 100%; border-collapse: collapse; font: 10pt/1.3 "Tektur Narrow", "Tektur", sans-serif; background: rgba(255,255,255,.55);
     outline: .18mm solid var(--кант); }
+  table + p { margin-top: 1.6mm; }
   th { background: var(--келемий); color: #fff; font-weight: 700; text-align: left; padding: 1.3mm 1.8mm; text-transform: uppercase; letter-spacing: .04em; font-size: 8.6pt; }
   th:first-child { padding-left: 2.6mm; }
   td:first-child:has(.ико) { white-space: nowrap; }

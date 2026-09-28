@@ -1030,8 +1030,23 @@ public final class FieldPainter {
         Zones zones = found == null ? Zones.of("", null)
             : Zones.of(found.key(), Textures.folder());
         if (tex != null) {
-            drawTexture(c, tex, sh, cx, cy, face - sh.outward(),
-                FieldGeometry.seatScale(sh, size));
+            // ТОЛЩИНА КАРТОНА И У ЗДАНИЙ (дизайнер 28.09.2026: здание плоское,
+            // а должно быть объёмным, как пехота, техника и вышка) — тот же
+            // бортик цветом обводки места, протянутый вниз-вправо.
+            double k = FieldGeometry.seatScale(sh, size);
+            java.awt.image.BufferedImage бортик = ТеньЖетона.силуэт(tex,
+                FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(seat)]);
+            if (бортик != null) {
+                double perPixel = sh.vbW() / tex.getWidth();
+                double d = sh.vbW() * k * TOKEN_LIFT;
+                int шагов = ТеньЖетона.шагов(d * Math.sqrt(2));
+                for (int i = шагов; i >= 1; i--) {
+                    double t = d * i / шагов;
+                    c.image(бортик, cx + t, cy + t, face - sh.outward(), k * perPixel,
+                        sh.hexCx() / perPixel, sh.hexCy() / perPixel);
+                }
+            }
+            drawTexture(c, tex, sh, cx, cy, face - sh.outward(), k);
         } else {
             // ОБВОДКА ПОЖИРНЕЕ и темнее самого жетона — силуэт перестаёт сливаться
             // с подкраской гекса (просьба дизайнера 13.08.2026).
@@ -1820,14 +1835,16 @@ public final class FieldPainter {
             // настоящие картинки жетонов.
             java.awt.image.BufferedImage airTex = Textures.unit(u.type, u.owner);
             if (airTex != null) {
-                drawUnitTexture(c, airTex, sh, new double[]{ax, ay}, 0, size * 0.40);
+                // с толщиной картона, как у наземных жетонов (дизайнер 28.09.2026)
+                drawUnitTexture(c, airTex, sh, new double[]{ax, ay}, 0, FieldGeometry.unitWidth(u.type, 1, size),
+                    FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)]);
             } else {
-                c.shape(sh, ax, ay, 0, size * 0.40 / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
+                c.shape(sh, ax, ay, 0, FieldGeometry.unitWidth(u.type, 1, size) / sh.vbW(), sh.vbW() / 2, sh.vbH() / 2,
                     tone(FieldGeometry.SEAT_TOKEN[FieldGeometry.seatColor(u.owner)]),
                     FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)], TOKEN_STROKE);
             }
             paintHpPipsAt(c, size, u.hp, u.damage, ax, ay - size * 0.20, 0);
-            double aw = size * 0.40;
+            double aw = FieldGeometry.unitWidth(u.type, 1, size);
             spot(u, ax, ay, aw, airTex != null ? aw * airTex.getHeight() / (double) airTex.getWidth()
                 : aw * sh.vbH() / sh.vbW(), 0);
             airDrawn++;
@@ -1916,7 +1933,7 @@ public final class FieldPainter {
             } else {
                 pos = FieldGeometry.polar(cx, cy, size * 0.28,
                     60.0 * overflow - 30 + FieldGeometry.TILT);
-                double w = FieldGeometry.unitWidth(u.type, 1, size) * 0.9;
+                double w = FieldGeometry.unitWidth(u.type, 1, size);
                 if (tex != null) {
                     drawUnitTexture(c, tex, sh, pos, 0, w,
                         FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(u.owner)]);

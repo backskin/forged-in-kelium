@@ -21,7 +21,8 @@ exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# пл
 
 PNG = os.path.join(D, "стол.png")
 ТОЧКИ = os.path.join(D, "стол-якоря.txt")
-КНИГА = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*\вёрстка\Книга правил.html")[0]
+КНИГА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(D)), "rules",
+                               "Книга правил*", "вёрстка", "Книга правил.html"))[0]
 
 # ---- геометрия разворота, миллиметры страницы 220×220 ----
 #

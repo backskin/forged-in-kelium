@@ -16,7 +16,7 @@ exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# пл
 figure = ns["figure"]
 
 ТОКЕНЫ = r"C:\shared\forged-in-kelium\data\textures\token"
-КОРЕНЬ = os.path.join("C:", os.sep, "shared", "forged-in-kelium")
+КОРЕНЬ = os.path.dirname(os.path.dirname(D))
 РАННЕР = os.path.join(КОРЕНЬ, "gui", "target", "kelium-runner.jar")
 ШРИФТ = r"C:\Windows\Fonts\TekturNarrow-Bold.ttf"
 
