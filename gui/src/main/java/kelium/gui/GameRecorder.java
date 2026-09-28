@@ -387,7 +387,11 @@ public final class GameRecorder {
             // «human» — не бот из справочника, а живое место цифровой версии:
             // без этого в планшетах игрока красовалось сырое «human» (блокер
             // приёмки: отладка на экране игрока).
-            rec.seatLabels.add("human".equals(id) ? "Игрок " + (seat + 1) : botLabel(id));
+            // БОТЫ ЗА ЖИВЫМ СТОЛОМ — ЛЮДИ С ИМЕНАМИ (дизайнер 28.09.2026), а в
+            // прогонах «бот против бота» для замеров — их типы, по ним и ищут
+            boolean живой = seatIds.contains("human");
+            rec.seatLabels.add("human".equals(id) ? "Игрок " + (seat + 1)
+                : живой ? BotNames.of(seed, seat) : botLabel(id));
             rec.sides.add(state.player(seat).board.troop.side);
         }
         fillTableAndField(rec, cfg, state);

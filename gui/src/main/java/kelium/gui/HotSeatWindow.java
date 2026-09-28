@@ -1408,8 +1408,10 @@ public final class HotSeatWindow {
     private String seatName(int seat) {
         String spec = seatSpecs.get(seat);
         String net = kelium.gui.net.NetSeats.label(spec, seat);
+        // бот за столом — человек с именем, а не тип «Каратель · новичок»
+        // (дизайнер 28.09.2026); имя то же, что в записи партии (GameRecorder)
         return "human".equals(spec) ? "Игрок " + (seat + 1)
-            : net != null ? net : kelium.agents.BotCatalog.label(spec);
+            : net != null ? net : BotNames.of(options.seed(), seat);
     }
 
     private JComponent buildCenter() {
