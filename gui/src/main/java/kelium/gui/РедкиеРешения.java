@@ -136,6 +136,30 @@ final class РедкиеРешения {
                 opts.add(new Choice("energy_or_modules", "energy_swap", "Смена энергии"));
                 opts.add(new Choice("energy_or_modules", "modules", "Смена модулей на планшете"));
             }
+            case "sci_track" -> {
+                // Actions (наука): «<трек> -> шаг N (цена K)» по трём трекам
+                for (String track : List.of("left", "middle", "right")) {
+                    opts.add(new Choice("sci_track", new Object[]{track, 1},
+                        track + " -> шаг 1 (цена 2)"));
+                }
+                opts.add(new Choice("pass", null, "stop science"));
+            }
+            case "sci_exchange" -> {
+                // Actions.maybeExchange: печатные обмены планшета науки
+                Map<String, Object> карта = new HashMap<>();
+                карта.put("id", "draw_arsenal");
+                карта.put("give", 1);
+                opts.add(new Choice("sci_exchange", карта, "1 trophy -> draw 2 arsenal, keep 1"));
+                Map<String, Object> позолота = new HashMap<>();
+                позолота.put("id", "gild");
+                позолота.put("give", 2);
+                opts.add(new Choice("sci_exchange", позолота, "2 trophy -> gild a module"));
+                Map<String, Object> модуль = new HashMap<>();
+                модуль.put("id", "move_module");
+                модуль.put("give", 1);
+                opts.add(new Choice("sci_exchange", модуль, "1 trophy -> move a module"));
+                opts.add(new Choice("pass", null, "без обмена"));
+            }
             case "exchange_where" -> {
                 opts.add(new Choice("exchange_where", "science", "обмен в Науке (без шага трека)"));
                 opts.add(new Choice("exchange_where", "market", "обмен на Рынке (без карты)"));

@@ -14,6 +14,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.JComponent;
 import javax.swing.Timer;
@@ -91,6 +92,27 @@ public final class EventToasts extends JComponent {
         return out;
     }
 
+    /**
+     * ЧУЖИЕ ПЛАШКИ — ПРОЧЬ, КОГДА ВОПРОС ВАМ (28.09.2026): плашки хода соперника
+     * закрывали кнопки ответа на атаку. Показанные уходят сразу, ждущие не
+     * показываются; всё это есть в журнале партии.
+     */
+    public void hurryOthers() {
+        waiting.removeIf(t -> !t.own());
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < shown.size(); i++) {
+            if (!shown.get(i).own()) {
+                long age = now - started.get(i);
+                if (age < IN_MS + HOLD_MS) {
+                    started.set(i, now - IN_MS - HOLD_MS);
+                }
+            }
+        }
+        if (!shown.isEmpty() && !tick.isRunning()) {
+            tick.start();
+        }
+    }
+
     /** Сейчас что-то показано или ждёт. */
     public boolean busy() {
         return !shown.isEmpty() || !waiting.isEmpty();
@@ -100,6 +122,8 @@ public final class EventToasts extends JComponent {
         long now = System.currentTimeMillis();
         for (int i = shown.size() - 1; i >= 0; i--) {
             if (now - started.get(i) > IN_MS + HOLD_MS + OUT_MS) {
+                sprites.remove(shown.get(i));
+                spriteSize.remove(shown.get(i));
                 shown.remove(i);
                 started.remove(i);
             }
@@ -227,18 +251,65 @@ public final class EventToasts extends JComponent {
         return t * t * (3 - 2 * t);
     }
 
-    private void paintToast(Graphics2D g0, Toast t, int slot, double a, double lift, double grow) {
-        Graphics2D g = (Graphics2D) g0.create();
+    /**
+     * ПЛАШКА — ГОТОВОЙ КАРТИНКОЙ (28.09.2026, «игра тормозит»): текст, лицо
+     * карты и рамка рисуются один раз при появлении, а на тактах анимации
+     * картинка только сдвигается и тает. Раньше всё это считалось заново
+     * каждые 25 мс для каждой плашки.
+     */
+    private final Map<Toast, BufferedImage> sprites = new java.util.IdentityHashMap<>();
+    private final Map<Toast, int[]> spriteSize = new java.util.IdentityHashMap<>();
+
+    private BufferedImage sprite(Graphics2D ref, Toast t, double dpr) {
+        BufferedImage got = sprites.get(t);
+        if (got != null) {
+            return got;
+        }
         boolean own = t.own();
         Font f = Theme.font(own ? 15 : 13, Font.BOLD);
-        g.setFont(f);
-        FontMetrics fm = g.getFontMetrics();
+        FontMetrics fm = getFontMetrics(f);
         int img = own ? Theme.px(38) : Theme.px(30);
         int pad = own ? Theme.px(12) : Theme.px(8);
         int textW = Math.min(fm.stringWidth(t.text()), Theme.px(own ? 420 : 360));
         String text = FieldBubbles.clip(fm, t.text(), textW);
         int w = pad * 3 + img + textW;
         int h = img + pad * 2;
+        BufferedImage out = new BufferedImage((int) Math.ceil((w + 4) * dpr),
+            (int) Math.ceil((h + 6) * dpr), BufferedImage.TYPE_INT_ARGB_PRE);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHints(ref.getRenderingHints());
+        g.scale(dpr, dpr);
+        g.setFont(f);
+        RoundRectangle2D box = new RoundRectangle2D.Double(0, 0, w, h, h * 0.5, h * 0.5);
+        g.setColor(new Color(0, 0, 0, 70));
+        g.fill(new RoundRectangle2D.Double(2, 4, w, h, h * 0.5, h * 0.5));
+        g.setColor(Theme.alpha(Theme.bg(), own ? 0.84 : 0.78));
+        g.fill(box);
+        Color seat = t.seat() == null ? Theme.accent() : t.seat();
+        g.setColor(Theme.alpha(seat, 0.95));
+        g.setStroke(new BasicStroke(Theme.pxf(own ? 2.2 : 1.6)));
+        g.draw(box);
+        if (t.img() != null) {
+            double k = Math.min(img / (double) t.img().getWidth(), img / (double) t.img().getHeight());
+            int dw = (int) Math.round(t.img().getWidth() * k);
+            int dh = (int) Math.round(t.img().getHeight() * k);
+            kelium.report.Mips.draw(g, t.img(), pad + (img - dw) / 2, pad + (img - dh) / 2, dw, dh);
+        }
+        g.setColor(Color.WHITE);
+        g.drawString(text, pad * 2 + img, (h + fm.getAscent() - fm.getDescent()) / 2);
+        g.dispose();
+        sprites.put(t, out);
+        spriteSize.put(t, new int[]{w, h});
+        return out;
+    }
+
+    private void paintToast(Graphics2D g0, Toast t, int slot, double a, double lift, double grow) {
+        Graphics2D g = (Graphics2D) g0.create();
+        boolean own = t.own();
+        double dpr = Math.max(1.0, g0.getTransform().getScaleX());
+        BufferedImage spr = sprite(g0, t, dpr);
+        int w = spriteSize.get(t)[0];
+        int h = spriteSize.get(t)[1];
         int gap = Theme.px(8);
         int x;
         int y;
@@ -259,24 +330,7 @@ public final class EventToasts extends JComponent {
         g.scale(grow, grow);
         g.translate(-cx, -cy);
         g.setComposite(AlphaComposite.SrcOver.derive((float) Math.max(0, Math.min(1, a))));
-        RoundRectangle2D box = new RoundRectangle2D.Double(x, y, w, h, h * 0.5, h * 0.5);
-        g.setColor(new Color(0, 0, 0, 70));
-        g.fill(new RoundRectangle2D.Double(x + 2, y + 4, w, h, h * 0.5, h * 0.5));
-        g.setColor(Theme.alpha(Theme.bg(), own ? 0.84 : 0.78));
-        g.fill(box);
-        Color seat = t.seat() == null ? Theme.accent() : t.seat();
-        g.setColor(Theme.alpha(seat, 0.95));
-        g.setStroke(new BasicStroke(Theme.pxf(own ? 2.2 : 1.6)));
-        g.draw(box);
-        if (t.img() != null) {
-            double k = Math.min(img / (double) t.img().getWidth(), img / (double) t.img().getHeight());
-            int dw = (int) Math.round(t.img().getWidth() * k);
-            int dh = (int) Math.round(t.img().getHeight() * k);
-            kelium.report.Mips.draw(g, t.img(), x + pad + (img - dw) / 2, y + pad + (img - dh) / 2,
-                dw, dh);
-        }
-        g.setColor(Color.WHITE);
-        g.drawString(text, x + pad * 2 + img, y + (h + fm.getAscent() - fm.getDescent()) / 2);
+        g.drawImage(spr, x, y, w + 4, h + 6, null);
         g.dispose();
     }
 }

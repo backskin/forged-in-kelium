@@ -293,6 +293,42 @@ public final class HotSeatWindow {
         Thread engine = new Thread(this::runGame, "hotseat-engine");
         engine.setDaemon(true);
         engine.start();
+        Thread warm = new Thread(HotSeatWindow::warmTextures, "kelium-warm");
+        warm.setDaemon(true);
+        warm.setPriority(Thread.MIN_PRIORITY);
+        warm.start();
+    }
+
+    private static boolean warmListHook;
+
+    /**
+     * РАЗОГРЕВ КАРТИНОК (28.09.2026: «игра дико тормозит»). Картинка грузится с
+     * диска при первом показе, и в потоке окна это давало зависания до 1,6 с.
+     * Отдельный поток заранее грузит всё, что игре обычно нужно, строит
+     * уменьшенные копии и тени жетонов всех четырёх красок; при выходе список
+     * понадобившихся картинок дописывается для следующего запуска.
+     */
+    private static void warmTextures() {
+        synchronized (HotSeatWindow.class) {
+            if (!warmListHook) {
+                warmListHook = true;
+                Runtime.getRuntime().addShutdownHook(new Thread(() ->
+                    kelium.report.Textures.saveUsedKeys(kelium.report.Textures.warmListLocal())));
+            }
+        }
+        for (String key : kelium.report.Textures.warmKeys()) {
+            java.awt.image.BufferedImage img = kelium.report.Textures.warm(key);
+            if (img == null) {
+                continue;
+            }
+            kelium.report.Mips.warm(img);
+            // жетоны (ключ без подпапки) рисуются с бортиком цвета места
+            if (!key.contains("/")) {
+                for (String stroke : kelium.report.FieldGeometry.SEAT_STROKE) {
+                    kelium.report.ТеньЖетона.силуэт(img, stroke);
+                }
+            }
+        }
     }
 
     /**
@@ -728,6 +764,16 @@ public final class HotSeatWindow {
 
     /** Для снимков: открыть ящик и, если это памятка, листнуть на страницу. */
     void openDrawerForTest(String name, int memoPage) {
+        // латинские имена — кириллица в аргументах из Git Bash доходит искажённой
+        name = switch (name) {
+            case "science" -> "Научный отдел";
+            case "market" -> "Рынок";
+            case "memo" -> "Памятка";
+            default -> name;
+        };
+        if (!drawers.containsKey(name)) {
+            return;
+        }
         toggleDrawer(name);
         if (memo != null && "Памятка".equals(name)) {
             memo.flip(memoPage - 1);
@@ -1458,6 +1504,10 @@ public final class HotSeatWindow {
         // ПЛАШКИ СОБЫТИЙ — поверх поля, мышь не ловят (27.09.2026)
         toasts = new kelium.gui.kp.EventToasts();
         layered.add(toasts, Integer.valueOf(JLayeredPane.PALETTE_LAYER + 5));
+        // СЦЕНА ПЛАНШЕТА — поверх поля и плашек: когда доска спереди, плашки
+        // событий не должны ложиться на её кнопки (28.09.2026)
+        boardStage = new kelium.gui.kp.BoardStage();
+        layered.add(boardStage, Integer.valueOf(JLayeredPane.PALETTE_LAYER + 7));
 
         layered.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -1489,6 +1539,10 @@ public final class HotSeatWindow {
         }
         // Карточка вопроса не прячется под выехавший ящик.
         field.bubbles.setDockInset(openDrawerSpan());
+        if (boardStage != null) {
+            boardStage.setBounds(0, 0, layered.getWidth(),
+                Math.max(Theme.px(200), layered.getHeight() - zoneCover()));
+        }
         if (toasts != null) {
             toasts.setBounds(0, 0, layered.getWidth(), layered.getHeight());
             // плашки встают НАД полосой кружков действий, а не поверх неё: иначе
@@ -1617,7 +1671,90 @@ public final class HotSeatWindow {
         promptSlide.play(1, 150, v -> layoutPrompt(), null);
     }
 
+    /** Сцена планшета: доска крупно поверх поля (решения Рынка и Науки, просмотр). */
+    kelium.gui.kp.BoardStage boardStage;
+    /** Какая кнопка открыла просмотр на сцене. */
+    private String stageName;
+
+    /** Кнопки слева, которые открывают доску на сцене, а не ящик с подложкой. */
+    private static final java.util.Set<String> STAGE_DRAWERS =
+        java.util.Set.of("Научный отдел", "Рынок", "Памятка");
+
+    /** Доски для сцены по имени кнопки. */
+    private List<kelium.gui.kp.BoardStage.Board> stageBoards(String name) {
+        List<kelium.gui.kp.BoardStage.Board> out = new ArrayList<>();
+        switch (name) {
+            case "Научный отдел" -> {
+                var art = kelium.report.Textures.board("science");
+                if (art != null) {
+                    out.add(new kelium.gui.kp.BoardStage.Board(art.getWidth(), art.getHeight(),
+                        (g, x, y, w, h) -> scienceBoard.paintBoard(g, "science", x, y, w, h)));
+                }
+            }
+            case "Рынок" -> {
+                var art = kelium.report.Textures.board("market");
+                if (art != null) {
+                    out.add(new kelium.gui.kp.BoardStage.Board(art.getWidth(), art.getHeight(),
+                        (g, x, y, w, h) -> marketBoard.paintBoard(g, "market", x, y, w, h)));
+                }
+            }
+            default -> {
+                for (int i = 1; i <= 8; i++) {
+                    var page = kelium.report.Textures.memoPage(i);
+                    if (page == null) {
+                        break;
+                    }
+                    out.add(kelium.gui.kp.BoardStage.image(page));
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Открыть или закрыть просмотр доски на сцене по кнопке слева. */
+    private void toggleStage(String name) {
+        if (boardStage.deciding()) {
+            return;      // во время решения доска и так спереди
+        }
+        boolean same = boardStage.browsing() && name.equals(stageName);
+        for (Map.Entry<String, KpTab> e : drawerTabs.entrySet()) {
+            e.getValue().setSelected(!same && e.getKey().equals(name));
+        }
+        if (same) {
+            boardStage.close();
+            return;
+        }
+        List<kelium.gui.kp.BoardStage.Board> bs = stageBoards(name);
+        if (bs.isEmpty()) {
+            return;
+        }
+        stageName = name;
+        boardStage.browse(bs, name, () -> {
+            KpTab t = drawerTabs.get(name);
+            if (t != null) {
+                t.setSelected(false);
+            }
+        });
+    }
+
     private void toggleDrawer(String name) {
+        // ДОСКИ — НА СЦЕНЕ, БЕЗ ПОДЛОЖКИ (дизайнер 28.09.2026: «планшеты сбоку
+        // по кнопкам выезжали бы целиком чисто планшеты поверх поля»)
+        if (STAGE_DRAWERS.contains(name) && boardStage != null && !stageBoards(name).isEmpty()) {
+            if (openDrawer != null) {
+                String open = null;
+                for (Map.Entry<String, JComponent> e : drawers.entrySet()) {
+                    if (e.getValue() == openDrawer) {
+                        open = e.getKey();
+                    }
+                }
+                if (open != null && !STAGE_DRAWERS.contains(open)) {
+                    toggleDrawer(open);
+                }
+            }
+            toggleStage(name);
+            return;
+        }
         JComponent target = drawers.get(name);
         boolean closing = openDrawer == target;
         // ПАМЯТКУ ЧИТАЮТ ВО ВСЮ ВЫСОТУ: стол игрока на это время уезжает вниз и
@@ -3618,6 +3755,31 @@ public final class HotSeatWindow {
         return String.join(" · ", parts);
     }
 
+    /**
+     * ВЕРХНЯЯ СТРОКА — ЧТО ПРОИСХОДИТ, А НЕ ВИД РЕШЕНИЯ (дизайнер 28.09.2026:
+     * «меня атаковал бот, а игра говорит „ответ картой“ — на что ответ?»).
+     * Вопрос в чужой ход называет, чей это ход и почему спрашивают вас; атака —
+     * кто атакует.
+     */
+    private String headline(int seat, String kind, InteractiveAgent.PendingDecision d) {
+        String игрок = humansBySeat.size() > 1 ? " (Игрок " + (seat + 1) + ")" : "";
+        if ("reaction".equals(kind)) {
+            Object кто = d.context().get("attacker");
+            return (кто instanceof Number n ? "ВАС АТАКУЕТ " + seatName(n.intValue()) : "ВАС АТАКУЮТ")
+                + игрок + " — ответить картой или нет";
+        }
+        Integer active = null;
+        if (rec != null && !rec.frames.isEmpty()) {
+            ReplayRecord.Snapshot s = rec.frames.get(rec.frames.size() - 1).snapshot;
+            active = s == null ? null : s.active;
+        }
+        if (active != null && active != seat && !humansBySeat.containsKey(active)) {
+            return "ХОД: " + seatName(active) + " — решение за вами" + игрок + ": "
+                + kindLabel(kind);
+        }
+        return "ВАШ ХОД — Игрок " + (seat + 1) + ": " + kindLabel(kind);
+    }
+
     private void showDecisionNow(int seat, InteractiveAgent.PendingDecision d) {
         viewedSeat = seat;
         if (stepsCaption != null) {
@@ -3633,6 +3795,11 @@ public final class HotSeatWindow {
 
         String kind = String.valueOf(d.context().get("kind"));
         pendingKind = kind;
+        // вопрос не про планшет (например, карты заданий после сделки рынка) —
+        // сцена уезжает сразу, её кнопки больше ничего не решают
+        if (boardStage != null && boardStage.deciding() && !STAGE_KINDS.contains(kind)) {
+            boardStage.close();
+        }
         // жетоны модулей в подписях — словами по библиотеке этой партии
         GameState st = d.state();
         kelium.gui.kp.ChoiceWords.moduleWords = id -> moduleRu(st, id);
@@ -3648,9 +3815,11 @@ public final class HotSeatWindow {
         refreshCardMenus();
         String title = "Игрок " + (seat + 1) + " — " + kindLabel(kind);
 
-        turnLabel.setText("ВАШ ХОД — Игрок " + (seat + 1) + ": "
-            + kindLabel(kind));
+        turnLabel.setText(headline(seat, kind, d));
         turnLabel.setForeground(barInk(seat));
+        if (toasts != null) {
+            toasts.hurryOthers();
+        }
 
         // «Завершить ход» = вариант "пас" точки вида action.
         int passIdx = -1;
@@ -4088,8 +4257,128 @@ public final class HotSeatWindow {
     private static final java.util.Set<String> SEAT_CHOICES = java.util.Set.of(
         "cu_token_to", "steal_objectives", "steal_from", "steal_arsenal");
 
+    /** Решения, которые показываются планшетом на сцене. */
+    private static final java.util.Set<String> STAGE_KINDS =
+        java.util.Set.of("market", "sci_track", "sci_exchange", "sci_pay_kelium");
+
+    /**
+     * РЫНОК И НАУКА — ПЛАНШЕТОМ СПЕРЕДИ (дизайнер 28.09.2026: «действия рынка и
+     * науки — целиком отрисовка впереди планшета, где можно выбрать, на что
+     * тратить ресурс»). Доска крупно поверх затенённого поля, варианты —
+     * кнопками рядом и подсвеченными местами на самой доске.
+     */
+    private boolean showBoardDecision(int seat, String kind, kelium.core.UndoableAgent agent,
+                                      List<Choice> options, InteractiveAgent.PendingDecision d) {
+        boolean market = "market".equals(kind);
+        List<kelium.gui.kp.BoardStage.Board> bs = stageBoards(market ? "Рынок" : "Научный отдел");
+        if (bs.isEmpty()) {
+            return false;
+        }
+        // сколько чего у игрока — чем он платит
+        ReplayRecord.Player me = null;
+        if (rec != null && !rec.frames.isEmpty()) {
+            for (ReplayRecord.Player p : rec.frames.get(rec.frames.size() - 1).snapshot.players) {
+                if (p.seat == seat) {
+                    me = p;
+                }
+            }
+        }
+        String title;
+        String hint;
+        if (market) {
+            title = "Рынок: на что потратить келемий";
+            hint = (me == null ? "" : "У вас келемия: " + me.kelium + ", монет: " + me.coin + ". ")
+                + "Наведите на вариант — его место подсветится на планшете. Щёлкните место "
+                + "или кнопку справа; «Хватит торговать» — закончить.";
+        } else if ("sci_track".equals(kind)) {
+            title = "Наука: на какой трек шагнуть";
+            hint = (me == null ? "" : "У вас трофеев: " + me.trophy + ". ")
+                + "Подсвечена ячейка, куда встанет ваш кубик. Щёлкните её или кнопку справа.";
+        } else if ("sci_exchange".equals(kind)) {
+            title = "Наука: обмен трофеев";
+            hint = (me == null ? "" : "У вас трофеев: " + me.trophy + ". ")
+                + "Обмен — вместо шага по треку или вместе с ним, как напечатано на планшете. "
+                + "«Закончить с наукой» — больше не менять.";
+        } else {
+            title = "Наука: чем доплатить";
+            hint = "Карта арсенала разрешает платить келемием вместо трофеев — выберите сколько.";
+        }
+        List<kelium.gui.kp.BoardStage.Opt> opts = new ArrayList<>();
+        for (int i = 0; i < options.size(); i++) {
+            Choice c = options.get(i);
+            int idx = i;
+            boolean pass = "pass".equals(c.kind()) && c.payload() == null
+                || Boolean.FALSE.equals(c.payload());
+            opts.add(new kelium.gui.kp.BoardStage.Opt(
+                kelium.gui.kp.ChoiceWords.label(kind, c, this::cardName),
+                pass ? null : kelium.gui.kp.ChoiceWords.sub(kind, c), 0,
+                pass ? null : boardSpot(kind, c), pass ? 2 : 0,
+                () -> submit(agent, d, idx)));
+        }
+        // пока решение на сцене — поле без своих вопросов
+        field.setChoices(null, null, null, null, Theme.seat(seat));
+        setTableChoices(new LinkedHashMap<>(), Theme.seat(seat));
+        boardStage.decide(bs, title, hint, opts, Theme.seat(seat));
+        return true;
+    }
+
+    /**
+     * МЕСТО ВАРИАНТА НА ПЕЧАТНОЙ ДОСКЕ — в пикселях картинки (сняты по
+     * board/market.png 1890×1890 и board/science.png 2693×1866 28.09.2026).
+     * null — у варианта нет своего места на доске (обмен с карты арсенала).
+     */
+    private java.awt.Shape boardSpot(String kind, Choice c) {
+        Object p = c.payload();
+        if ("market_rate".equals(c.kind()) && p instanceof Map<?, ?> m) {
+            String what = String.valueOf(m.get("what"));
+            int кел = m.get("kelium") instanceof Number n ? n.intValue() : 1;
+            if ("coin".equals(what)) {
+                // курс «−1 келемий : 3 монеты» и «−2 : 7» — столбцы верхней полосы
+                return кел >= 2 ? kelium.gui.kp.BoardStage.box(1480, 190, 320, 300)
+                    : kelium.gui.kp.BoardStage.box(1220, 190, 250, 300);
+            }
+            if ("objective_cards".equals(what)) {
+                return kelium.gui.kp.BoardStage.box(994, 1280, 876, 380);
+            }
+            return null;
+        }
+        if ("market_refresh".equals(c.kind())) {
+            return kelium.gui.kp.BoardStage.box(225, 725, 190, 390);
+        }
+        if ("market_offer".equals(c.kind()) && p instanceof Map<?, ?> m) {
+            int[] slot = kelium.gui.replay2.BoardAnchors.marketCard();
+            if (slot == null) {
+                return null;
+            }
+            boolean left = "left".equals(String.valueOf(m.get("side")));
+            int half = slot[2] / 2;
+            return kelium.gui.kp.BoardStage.box(left ? slot[0] : slot[0] + half, slot[1],
+                half, slot[3]);
+        }
+        if ("sci_track".equals(c.kind()) && p instanceof Object[] arr && arr.length >= 2
+                && arr[1] instanceof Number to) {
+            return scienceBoard.scienceStepArea(String.valueOf(arr[0]), to.intValue());
+        }
+        if ("sci_exchange".equals(c.kind()) && p instanceof Map<?, ?> m) {
+            return switch (String.valueOf(m.get("id"))) {
+                case "gild" -> kelium.gui.kp.BoardStage.box(900, 300, 362, 350);
+                case "draw_arsenal" -> kelium.gui.kp.BoardStage.box(1419, 300, 356, 350);
+                case "move_module" -> kelium.gui.kp.BoardStage.box(1075, 712, 575, 150);
+                default -> null;
+            };
+        }
+        return null;
+    }
+
     private void routeOnField(int seat, String kind, kelium.core.UndoableAgent agent,
                               List<Choice> options, InteractiveAgent.PendingDecision d) {
+        if (STAGE_KINDS.contains(kind) && boardStage != null
+                && showBoardDecision(seat, kind, agent, options, d)) {
+            return;
+        }
+        if (boardStage != null && boardStage.deciding()) {
+            boardStage.close();
+        }
         if ("build_pick".equals(kind) && buildMenu != null) {
             showBuildMenu(seat, agent, options, d);
             return;
@@ -4167,6 +4456,25 @@ public final class HotSeatWindow {
                 onTable.computeIfAbsent("card:" + id, k -> new ArrayList<>()).add(opt);
                 continue;
             }
+            // КУБИК НА ХРАНИЛИЩЕ — каждый кубик этого ресурса, по его форме и
+            // на его месте (дизайнер 28.09.2026), а не весь планшет рамкой
+            if (!pass && ("storage_discard".equals(kind) || "storage_burn_choice".equals(kind))
+                    && c.payload() instanceof kelium.core.Resource r && table != null) {
+                char код = r == kelium.core.Resource.KELIUM ? 'K'
+                    : r == kelium.core.Resource.TROPHY ? 'D' : 'A';
+                List<String> ячейки = new ArrayList<>();
+                for (String k : table.spotKeys("cell:")) {
+                    if (k.endsWith(":1:" + код)) {
+                        ячейки.add(k);
+                    }
+                }
+                if (!ячейки.isEmpty()) {
+                    for (String k : ячейки) {
+                        onTable.computeIfAbsent(k, x -> new ArrayList<>()).add(opt);
+                    }
+                    continue;
+                }
+            }
             // ДЕТАЛЬ ПЛАНШЕТА — жетон здания, ячейка модуля, хранилище.
             String boardKey = pass ? null : boardKeyOf(kind, c);
             if (boardKey != null) {
@@ -4242,9 +4550,12 @@ public final class HotSeatWindow {
                     }
                 }
             }
-            hint = (что.isEmpty() ? "" : что + ". ")
-                + "Можно ответить картой " + String.join(" или ", чем)
-                + " — кнопки на атакованном гексе";
+            // ЧТО ПРОИСХОДИТ, ЧЕМ ОТВЕТИТЬ И ЧТО БУДЕТ — целиком (дизайнер
+            // 28.09.2026: «не вижу и не могу прочитать, на что реакция»)
+            hint = (что.isEmpty() ? "Ваш жетон атакуют" : что) + " (стрелка на поле). "
+                + "Ответ: сжечь " + String.join(" или ", чем) + " — "
+                + (зачем == null ? "её верхний эффект" : зачем) + ". "
+                + "«Не отвечать» — атака пройдёт, карта останется в руке.";
         } else if (onTable.keySet().stream().anyMatch(k -> k.startsWith("card:"))) {
             hint = "Щёлкните подсвеченную карту на столе внизу";
         } else if ("build_pick".equals(kind) && builtThisAction(seat)) {
@@ -4270,6 +4581,39 @@ public final class HotSeatWindow {
             title = "Выпуск: что даёт здание";
             hint = "Запитанное здание даёт войско своего рода ИЛИ боеприпасы — выберите "
                 + "у здания на поле; «Пропустить здание» — ничего";
+        }
+        // ЧТО ПРОИСХОДИТ И ЧТО БУДЕТ — словами у каждого вопроса на поле
+        // (дизайнер 28.09.2026: игрок, отошедший от стола, должен сразу понять,
+        // что делать и зачем); текст — по памятке действий
+        if ("build_hex".equals(kind)) {
+            Object bt = d.context().get("btype");
+            String здание = bt == null ? "здание"
+                : GameRecorder.buildingName(String.valueOf(bt).toLowerCase(java.util.Locale.ROOT), null);
+            title = "Построить: " + здание + " — куда поставить";
+            hint = "Подсвечены гексы, куда его можно поставить: где уже стоит ваше здание или "
+                + "за его свободной стенкой. Новое здание сразу сработает — без энергии.";
+        } else if ("mine".equals(kind)) {
+            title = "Добыча: что взять этим добытчиком";
+            hint = "Запитанный добытчик берёт келемий с соседнего гекса зарождения или контейнер "
+                + "со своего гекса, если тот открыт. Щёлкните подсвеченный гекс — "
+                + "или «Пропустить добытчик».";
+        } else if ("combat_target".equals(kind)) {
+            int бпр = -1;
+            if (rec != null && !rec.frames.isEmpty()) {
+                for (ReplayRecord.Player p : rec.frames.get(rec.frames.size() - 1).snapshot.players) {
+                    if (p.seat == seat) {
+                        бпр = p.ammo;
+                    }
+                }
+            }
+            title = "Бой: выберите гекс-цель";
+            hint = "Ваши войска с соседних гексов бьют по жетонам на нём: одна атака — "
+                + "1 боеприпас" + (бпр >= 0 ? " (у вас " + бпр + ")" : "")
+                + ". Здания закрывают войска от наземных атак. Щёлкните подсвеченный гекс.";
+        } else if ("mass_open".equals(kind)) {
+            hint = "Спец-действие: вскрыть свой контейнер — получить, что на нём, — или поставить "
+                + "карту арсенала на планшет. Щёлкните подсвеченную карту на столе внизу — "
+                + "или «Не вскрывать».";
         }
         if ("maneuver_hex".equals(kind)) {
             // МАНЁВР ПО ШАГАМ (27.09.2026): правило главы 7 — словами на экране
@@ -4343,6 +4687,15 @@ public final class HotSeatWindow {
                 field.setAttack(ah, цель instanceof String vh ? vh : null,
                     Theme.seat(an.intValue()));
             }
+            // лицо карты ответа — в карточке вопроса: верх-реакцию видно целиком
+            List<java.awt.image.BufferedImage> лица = new ArrayList<>();
+            for (Choice c : options) {
+                if ("reaction_burn".equals(c.kind()) && c.payload() instanceof String id
+                        && cardFace(id) != null) {
+                    лица.add(cardFace(id));
+                }
+            }
+            field.setDockImages(лица);
         }
         // РЫНОК И НАУКА — С ДОСКАМИ ПЕРЕД ГЛАЗАМИ: ящик с ними выезжает сам,
         // пока идёт решение, и уезжает, когда решение принято.
@@ -5308,6 +5661,9 @@ public final class HotSeatWindow {
     private void clearDecision() {
         confirm.close();
         ceremony.close();
+        if (boardStage != null && boardStage.deciding()) {
+            boardStage.closeSoon();
+        }
         cardMenu.close();
         specMenuOptions = null;
         specMenuAgent = null;

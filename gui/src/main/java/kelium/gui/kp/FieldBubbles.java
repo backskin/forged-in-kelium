@@ -75,6 +75,7 @@ public final class FieldBubbles {
         this.seatColor = seatColor == null ? Theme.accent() : seatColor;
         this.openHex = null;
         this.hover = null;
+        this.dockImages = List.of();
         // Одна цель с несколькими вариантами — пузырь открыт сразу: щёлкать по
         // гексу, чтобы увидеть единственный список, незачем.
         if (this.byHex.size() == 1) {
@@ -87,6 +88,18 @@ public final class FieldBubbles {
 
     public void clear() {
         set(null, null, null, null, null);
+        dockImages = List.of();
+    }
+
+    /**
+     * КАРТИНКИ В КАРТОЧКЕ ВОПРОСА (28.09.2026): лица карт, о которых вопрос, —
+     * например карта, которой можно ответить на атаку. Игрок читает её верх
+     * прямо в вопросе, не ища карту в руке.
+     */
+    private List<java.awt.image.BufferedImage> dockImages = List.of();
+
+    public void setDockImages(List<java.awt.image.BufferedImage> images) {
+        this.dockImages = images == null ? List.of() : List.copyOf(images);
     }
 
     /** Слева поле закрыто ящиком на столько точек — карточка вопроса правее. */
@@ -336,8 +349,10 @@ public final class FieldBubbles {
         int textMax = maxW - pad * 2 - Theme.px(8);
         // заголовок и подсказка переносятся по словам, а не срезаются: сбоку
         // карточка узкая
-        List<String> titleLines = title == null ? List.of("") : wrap(tm, title, textMax, 2);
-        List<String> hintLines = hint == null ? List.of() : wrap(hm, hint, textMax, 3);
+        // подсказка — целиком: обрезанная многоточием («кнопки на атакованн…»)
+        // оставляла игрока без ответа, что происходит (дизайнер 28.09.2026)
+        List<String> titleLines = title == null ? List.of("") : wrap(tm, title, textMax, 3);
+        List<String> hintLines = hint == null ? List.of() : wrap(hm, hint, textMax, 10);
         int textW = 0;
         for (String l : titleLines) {
             textW = Math.max(textW, tm.stringWidth(l));
@@ -347,8 +362,20 @@ public final class FieldBubbles {
             textW = Math.max(textW, hm.stringWidth(l));
         }
         int hintH = hintLines.size() * hm.getHeight();
-        int cardW = Math.min(maxW, Math.max(textW, widest) + pad * 2 + Theme.px(8));
-        int cardH = pad + titleH + hintH
+        // ряд картинок под подсказкой: высота — как у карты, читаемой без увеличения
+        int imgH = dockImages.isEmpty() ? 0 : Theme.px(240);
+        int imgsW = 0;
+        for (java.awt.image.BufferedImage im : dockImages) {
+            imgsW += (int) Math.round(imgH * im.getWidth() / (double) im.getHeight()) + gap;
+        }
+        imgsW = Math.max(0, imgsW - gap);
+        if (imgsW > maxW - pad * 2 && imgsW > 0) {
+            imgH = (int) Math.round(imgH * (maxW - pad * 2) / (double) imgsW);
+            imgsW = maxW - pad * 2;
+        }
+        int imgBlock = imgH == 0 ? 0 : Theme.px(10) + imgH;
+        int cardW = Math.min(maxW, Math.max(Math.max(textW, widest), imgsW) + pad * 2 + Theme.px(8));
+        int cardH = pad + titleH + hintH + imgBlock
             + (rows.isEmpty() ? 0 : Theme.px(8) + rows.size() * chipH + (rows.size() - 1) * gap)
             + pad;
         int x = сбоку ? Theme.px(10) : Math.max(dockInset + Theme.px(10),
@@ -370,7 +397,16 @@ public final class FieldBubbles {
         for (int i = 0; i < hintLines.size(); i++) {
             g.drawString(hintLines.get(i), x + pad + Theme.px(6), hy + hm.getHeight() * (i + 1));
         }
-        int cy = y + pad + titleH + hintH + Theme.px(8);
+        if (imgH > 0) {
+            int ix = x + (cardW - imgsW) / 2;
+            int iy = y + pad + titleH + hintH + Theme.px(10);
+            for (java.awt.image.BufferedImage im : dockImages) {
+                int iw = (int) Math.round(imgH * im.getWidth() / (double) im.getHeight());
+                kelium.report.Mips.draw(g, im, ix, iy, iw, imgH);
+                ix += iw + gap;
+            }
+        }
+        int cy = y + pad + titleH + hintH + imgBlock + Theme.px(8);
         for (List<Integer> r : rows) {
             int rw = 0;
             for (int i : r) {

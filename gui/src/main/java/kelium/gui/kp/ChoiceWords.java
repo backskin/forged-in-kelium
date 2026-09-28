@@ -293,6 +293,21 @@ public final class ChoiceWords {
         };
     }
 
+    /** «3 МОН» → «3 монеты»: число и слово по числу. */
+    private static String согласовать(String s, String code, String one, String few, String many) {
+        Matcher m = Pattern.compile("(\\d+)\\s*" + code + "(?![А-ЯЁа-яёA-Za-z])").matcher(s);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            int n = Integer.parseInt(m.group(1));
+            int n100 = n % 100;
+            int n10 = n % 10;
+            String w = n100 >= 11 && n100 <= 14 ? many : n10 == 1 ? one : n10 >= 2 && n10 <= 4 ? few : many;
+            m.appendReplacement(out, Matcher.quoteReplacement(n + " " + w));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
     /** «запитать barracks монетами (2 МОН …» — здание и цена. */
     private static final Pattern PAY_POWER = Pattern.compile("запитать (\\S+) монетами \\((\\d+)");
 
@@ -471,7 +486,12 @@ public final class ChoiceWords {
         String s = AT_HEX.matcher(raw).replaceAll("");
         // жетоны модулей «R30-1», «C30-12» — служебные номера
         s = s.replaceAll("\\b[RC]\\d+-\\d+\\b", "модуль");
-        s = s.replace("->", "→").replace("КЕЛ", "келемий").replace("МОН", "монет");
+        s = s.replace("->", "→");
+        // число с согласованием: «1 келемий → 3 монеты», «2 келемия → 7 монет»
+        s = согласовать(s, "КЕЛ", "келемий", "келемия", "келемия");
+        s = согласовать(s, "МОН", "монета", "монеты", "монет");
+        s = согласовать(s, "БПР", "боеприпас", "боеприпаса", "боеприпасов");
+        s = s.replace("КЕЛ", "келемий").replace("МОН", "монет");
         // «miner L1», «power_plantL3» — здание с уровнем
         Matcher lv = LEVELED.matcher(s);
         StringBuilder lb = new StringBuilder();
