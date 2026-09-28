@@ -66,5 +66,5 @@ canvas.save(png)
 vw, vh = canvas.size
 print("холст", canvas.size)
 
-figure("войска", png, 1800, vw, vh, [], css_w="73%", pad="0.4mm 0 0.9mm")
+figure("войска", png, 1800, vw, vh, [], css_w="66%", pad="0.4mm 0 0.9mm")
 print("ok")

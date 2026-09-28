@@ -29,7 +29,7 @@ figure, скруглить = ns["figure"], ns["скруглить"]
 КШ = 700
 КВ = round(КШ * 1028 / 661)
 ПОЛЕ = 40
-подпись = ImageFont.truetype(ШРИФТ, 54)
+подпись = ImageFont.truetype(ШРИФТ, 92)
 ТЕКСТ = "свалка"
 
 # СВАЛКА ЛЕЖИТ ГОРИЗОНТАЛЬНО. Карта приказов на столе кладётся набок
@@ -50,7 +50,7 @@ for файл, доля, cx, cy, угол in ЖЕТОНЫ:
 
 мерка = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
 W = max(слой.width + ПОЛЕ * 2, round(мерка.textlength(ТЕКСТ, font=подпись)) + 40)
-H = слой.height + ПОЛЕ * 2 + 74
+H = слой.height + ПОЛЕ * 2 + 120
 холст = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 тень = Image.new("RGBA", (слой.width, слой.height), (0, 0, 0, 0))
 ЛЕВО = (W - слой.width) // 2
