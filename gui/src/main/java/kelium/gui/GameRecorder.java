@@ -261,6 +261,14 @@ public final class GameRecorder {
             cfg.scenarioId, cfg.cuFacing);
         if (seatColors != null) {
             rec.seatColors.addAll(seatColors);
+            // лидер нации — по настоящему цвету места, известному только здесь
+            for (int seat = 0; seat < rec.seatIds.size() && seat < seatColors.size(); seat++) {
+                String id = rec.seatIds.get(seat);
+                if (rec.seatIds.contains("human") && !"human".equals(id)
+                        && seatColors.get(seat) != null) {
+                    rec.seatLabels.set(seat, BotNames.of(seed, seat, seatColors.get(seat)));
+                }
+            }
         }
         rememberExpansions(rec);
 
@@ -391,7 +399,7 @@ public final class GameRecorder {
             // прогонах «бот против бота» для замеров — их типы, по ним и ищут
             boolean живой = seatIds.contains("human");
             rec.seatLabels.add("human".equals(id) ? "Игрок " + (seat + 1)
-                : живой ? BotNames.of(seed, seat) : botLabel(id));
+                : живой ? BotNames.of(seed, seat, seat) : botLabel(id));
             rec.sides.add(state.player(seat).board.troop.side);
         }
         fillTableAndField(rec, cfg, state);

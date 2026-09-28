@@ -1411,7 +1411,10 @@ public final class HotSeatWindow {
         // бот за столом — человек с именем, а не тип «Каратель · новичок»
         // (дизайнер 28.09.2026); имя то же, что в записи партии (GameRecorder)
         return "human".equals(spec) ? "Игрок " + (seat + 1)
-            : net != null ? net : BotNames.of(options.seed(), seat);
+            : net != null ? net : BotNames.of(options.seed(), seat,
+                options.seatColors() != null && seat < options.seatColors().size()
+                    && options.seatColors().get(seat) != null
+                    ? options.seatColors().get(seat) : seat);
     }
 
     private JComponent buildCenter() {
