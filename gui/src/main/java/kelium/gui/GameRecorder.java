@@ -1457,6 +1457,18 @@ public final class GameRecorder {
                 if ("no affordable step".equals(m.group(1))) {
                     return "на шаг по треку не хватает трофеев";
                 }
+                // ТОЛЬКО ОБМЕНЫ, БЕЗ ШАГА ТРЕКА: движок пишет коды обменов
+                // через «+» («exchange trophy_to_ammo+draw_arsenal:a7_3»).
+                if (m.group(1).startsWith("exchange ")) {
+                    StringBuilder обмены = new StringBuilder();
+                    for (String id : m.group(1).substring("exchange ".length()).split("\\+")) {
+                        if (обмены.length() > 0) {
+                            обмены.append(", ");
+                        }
+                        обмены.append(scienceExchange(id));
+                    }
+                    return "наука: обмен — " + обмены;
+                }
                 return "наука: " + m.group(1)
                     .replace("left", "левый трек").replace("middle", "средний трек")
                     .replace("right", "правый трек").replace("->", "→ шаг ");
@@ -1465,6 +1477,19 @@ public final class GameRecorder {
                 case "built nothing" -> "ничего не построено";
                 case "combat: no battle" -> "боя не вышло — бить некого";
                 default -> s;
+            };
+        }
+
+        /** Обмен Научного отдела словами по коду из движка. */
+        private static String scienceExchange(String id) {
+            String код = id.contains(":") ? id.substring(0, id.indexOf(':')) : id;
+            return switch (код) {
+                case "trophy_to_coin" -> "трофеи на монеты";
+                case "trophy_to_ammo" -> "трофеи на боеприпасы";
+                case "draw_arsenal" -> "взята карта арсенала";
+                case "gild" -> "модуль позолочен";
+                case "move_module" -> "модуль переставлен";
+                default -> "обмен трофеев";
             };
         }
 

@@ -220,6 +220,8 @@ public final class RuleWords {
             case "energy.plant_off_cell_gives" ->
                 "сколько энергии даёт станция ВНЕ жёлтой ячейки (на ней — номинал уровня)";
             case "rounds.order_hand_size" -> "приказов в руке";
+            case "rounds.scrapyard_first" ->
+                "свалка — первый шаг Обновления, до новой карты рынка";
             case "rounds.objective_hand_limit" -> "предел заданий в руке";
             case "rounds.blind_discard_choice" ->
                 "отложенный приказ игрок выбирает сам, а не наугад";
@@ -481,6 +483,8 @@ public final class RuleWords {
                 "уничтоженные жетоны возвращаются в запас";
             case "return_step.refill_objectives_to_limit" ->
                 "задания добираются до предела руки";
+            case "return_step.refill_objectives" ->
+                "шаг «Задания» в Возвращении: карты заданий добираются";
             case "return_step.trophy_to_upgrade_exchange_enabled" ->
                 "трофеи можно обменять на улучшение";
 
