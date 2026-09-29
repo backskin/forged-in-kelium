@@ -1174,19 +1174,38 @@ public final class NetHost {
     }
 
     private static int addressRank(String a) {
-        if (a.startsWith("192.168.") || a.startsWith("26.") || a.startsWith("100.")) {
+        // ИГРАЕМ ЧЕРЕЗ RADMIN (решение Влада 26.09.2026): его адрес — первым, в
+        // кнопку «Скопировать»; домашняя сеть — следом (друг за стенкой)
+        if (a.startsWith("26.") || a.startsWith("100.")) {
             return 0;
         }
-        if (a.startsWith("10.")) {
+        if (a.startsWith("192.168.")) {
             return 1;
+        }
+        if (a.startsWith("10.")) {
+            return 2;
         }
         String[] p = a.split("\\.");
         if (p.length == 4 && "172".equals(p[0])) {
             int b = Integer.parseInt(p[1]);
             if (b >= 16 && b <= 31) {
-                return 3;
+                return 4;
             }
         }
-        return 2;
+        return 3;
+    }
+
+    /** Какая это сеть — подпись к адресу для друзей. */
+    public static String networkOf(String address) {
+        if (address.startsWith("26.")) {
+            return "Radmin VPN";
+        }
+        if (address.startsWith("100.")) {
+            return "Tailscale";
+        }
+        if (address.startsWith("192.168.") || address.startsWith("10.")) {
+            return "домашняя сеть";
+        }
+        return "другая сеть";
     }
 }

@@ -224,10 +224,14 @@ public final class LobbyWindow {
             full.add(a + ":" + p);
         }
         copyText = full.get(0);
-        addressLine.setText("Адрес для друзей: " + full.get(0));
-        otherAddresses.setText(full.size() < 2 ? " "
-            : "другие адреса этого компьютера (другая сеть, Radmin/ZeroTier): "
-                + String.join(" · ", full.subList(1, full.size())));
+        addressLine.setText("Адрес для друзей: " + full.get(0) + "  (" + NetHost.networkOf(addrs.get(0))
+            + ")");
+        List<String> other = new ArrayList<>();
+        for (int i = 1; i < full.size(); i++) {
+            other.add(full.get(i) + " (" + NetHost.networkOf(addrs.get(i)) + ")");
+        }
+        otherAddresses.setText(other.isEmpty() ? " "
+            : "другие адреса этого компьютера: " + String.join(" · ", other));
         renderLobby(h.lobbyMessage());
     }
 
