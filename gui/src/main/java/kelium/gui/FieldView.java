@@ -1448,6 +1448,13 @@ public final class FieldView extends JComponent {
             g.setFont(font.deriveFont(champ ? Font.BOLD : Font.PLAIN, champ ? 15f : 13f));
             g.setColor(ink);
             String name = record.playerName(p.seat).replaceAll("(Игрок \\d+) · \\1", "$1");
+            // ЖИВОЙ СТОЛ — ИМЕНА, А НЕ НОМЕРА (29.09.2026): у мест партии с живым
+            // игроком подписи — «Влад», «Воевода Гордей»; номер места перед ними
+            // лишний. В прогонах «бот против бота» подпись — тип бота, и «Игрок N»
+            // остаётся, чтобы различать двух одинаковых
+            if (record.seatIds.contains("human") && p.seat < record.seatLabels.size()) {
+                name = record.seatLabels.get(p.seat);
+            }
             g.drawString(clip(g, name, nameRoom), nameX, ry + h / 2 + 5);
 
             g.setFont(font.deriveFont(Font.BOLD, champ ? 19f : 15f));

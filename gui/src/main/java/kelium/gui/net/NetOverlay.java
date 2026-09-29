@@ -35,10 +35,10 @@ import kelium.gui.replay2.Theme;
  * перехватчик окна. Исключение — то, что разрешено {@link #allow} (чат:
  * пока ждём, поговорить можно).
  */
-final class NetOverlay extends JComponent {
+public final class NetOverlay extends JComponent {
 
     /** Кнопка карточки. {@code active} — выбранный сейчас вариант («ждём»). */
-    record Action(String title, String sub, Runnable run, boolean primary, boolean active) {
+    public record Action(String title, String sub, Runnable run, boolean primary, boolean active) {
     }
 
     private final JFrame frame;
@@ -49,7 +49,7 @@ final class NetOverlay extends JComponent {
     private final List<Component> allowed = new ArrayList<>();
     private final KeyEventDispatcher keys;
 
-    NetOverlay(JFrame frame) {
+    public NetOverlay(JFrame frame) {
         this.frame = frame;
         setOpaque(false);
         setVisible(false);
@@ -112,12 +112,12 @@ final class NetOverlay extends JComponent {
     }
 
     /** Не гасить под шторкой этот компонент (чат). */
-    void allow(Component c) {
+    public void allow(Component c) {
         allowed.add(c);
     }
 
     /** Показать (или обновить) карточку. Поток интерфейса. */
-    void display(String head, String body, List<Action> actions) {
+    public void display(String head, String body, List<Action> actions) {
         title.setText(head);
         text.setText(body);
         buttons.removeAll();
@@ -138,17 +138,17 @@ final class NetOverlay extends JComponent {
     }
 
     /** Убрать шторку. Поток интерфейса. */
-    void dismiss() {
+    public void dismiss() {
         setVisible(false);
     }
 
     /** Показана ли шторка (для тестов). */
-    boolean shown() {
+    public boolean shown() {
         return isVisible();
     }
 
     /** Заголовок карточки (для тестов). */
-    String titleText() {
+    public String titleText() {
         return title.getText();
     }
 

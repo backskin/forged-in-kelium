@@ -482,9 +482,16 @@ public final class Textures {
             root = Textures.root;
         }
         // Ключ может нести подпапку: «field/hex» ищется в field/, остальное в token/.
-        Path file = key.contains("/")
-            ? root.resolve(key.replace('/', java.io.File.separatorChar) + ".png")
-            : root.resolve("token").resolve(key + ".png");
+        // ЗАКРЫТАЯ КАРТА В СЕТИ (29.09.2026) приходит другу как «?» — такого
+        // файла нет и быть не может, а знак недопустим в пути Windows.
+        Path file;
+        try {
+            file = key.contains("/")
+                ? root.resolve(key.replace('/', java.io.File.separatorChar) + ".png")
+                : root.resolve("token").resolve(key + ".png");
+        } catch (java.nio.file.InvalidPathException неФайл) {
+            return null;
+        }
         if (!Files.isReadable(file)) {
             // Сохранение в BMP дизайнеру тоже разрешено — читаем и его
             Path bmp = Path.of(file.toString().replaceAll("\\.png$", ".bmp"));

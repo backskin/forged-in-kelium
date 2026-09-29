@@ -704,6 +704,10 @@ public final class NetHost {
             if (hex != null) {
                 o.put("hex", hex);        // вариант выбирается щелчком по гексу
             }
+            // ДЛЯ ОКНА ПАРТИИ У ДРУГА (29.09.2026): данные варианта с типами и
+            // подпись движка — окно раскладывает вопрос по ним так же, как у хоста
+            o.put("raw", c.label());
+            o.put("p", Payloads.enc(c.payload()));
             opts.add(o);
         }
         Map<String, Object> facing = facingOf(kind, options, context);
@@ -716,7 +720,8 @@ public final class NetHost {
         return msg(NetProtocol.DECIDE, "seq", seq, "kind", kind,
             "prompt", HotSeatWindow.kindLabel(kind), "round", state.round, "circle", state.circle,
             "undo", undoTargets(seat, state.round, state.circle).size(),
-            "options", opts, "facing", facing, "view", view);
+            "options", opts, "facing", facing, "view", view,
+            "context", Payloads.encContext(context));
     }
 
     /**
@@ -1044,8 +1049,13 @@ public final class NetHost {
             NetChatDock chat = new NetChatDock(frame, this::say);
             overlay.allow(chat);
             // снизу окна партии — стол игрока: чат встаёт над ним, в угол поля
+            // (с 26.09 стол — зона, выезжающая поверх поля, а не половина
+            // разделителя: ищем её по имени, иначе чат ложился на карты заданий)
+            java.awt.Component zone = named(frame.getContentPane(), "kelium.zone");
             javax.swing.JSplitPane split = findSplit(frame.getContentPane());
-            if (split != null && split.getBottomComponent() != null) {
+            if (zone != null) {
+                chat.anchorAbove(zone);
+            } else if (split != null && split.getBottomComponent() != null) {
                 chat.anchorAbove(split.getBottomComponent());
             }
             for (String line : chatLog()) {
@@ -1065,6 +1075,22 @@ public final class NetHost {
             });
             render.run();
         });
+    }
+
+    /** Компонент окна с этим именем; null — нет такого. */
+    private static java.awt.Component named(java.awt.Container c, String name) {
+        for (java.awt.Component k : c.getComponents()) {
+            if (name.equals(k.getName())) {
+                return k;
+            }
+            if (k instanceof java.awt.Container cc) {
+                java.awt.Component in = named(cc, name);
+                if (in != null) {
+                    return in;
+                }
+            }
+        }
+        return null;
     }
 
     /** Разделитель «поле / стол игрока» в окне партии; null — нет такого. */

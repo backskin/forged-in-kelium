@@ -65,7 +65,8 @@ public final class LobbyWindow {
     private KpButton mainBtn;
     private boolean myReady;
     private volatile Map<String, Object> lastLobby;
-    private volatile NetClientWindow game;
+    /** Партия друга — в настоящем окне партии (29.09.2026; прежде прототип). */
+    private volatile RemoteGame game;
 
     private LobbyWindow(HotSeatWindow.Options table, JFrame menu) {
         this.table = table;
@@ -250,7 +251,7 @@ public final class LobbyWindow {
 
             @Override
             public void reject(String reason) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.rejected(reason);      // посреди партии: место отдано боту
                     return;
@@ -274,15 +275,15 @@ public final class LobbyWindow {
             @Override
             public void chat(String from, String text) {
                 SwingUtilities.invokeLater(() -> addChat(from + ": " + text));
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
-                    g.chat(from + ": " + text);
+                    g.chatLine(from + ": " + text);
                 }
             }
 
             @Override
             public void paused(int seat, String name, boolean waiting) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.paused(seat, name, waiting);
                 }
@@ -290,7 +291,7 @@ public final class LobbyWindow {
 
             @Override
             public void resumed(int seat, String how) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.resumed(seat, how);
                 }
@@ -298,7 +299,7 @@ public final class LobbyWindow {
 
             @Override
             public void closed() {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.closed();
                 }
@@ -306,9 +307,9 @@ public final class LobbyWindow {
 
             @Override
             public void start(int seat, List<String> names) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g == null) {
-                    g = new NetClientWindow(client, seat, names, LobbyWindow.this::backFromGame);
+                    g = new RemoteGame(client, seat, names, LobbyWindow.this::backFromGame);
                     game = g;
                     g.show();
                     SwingUtilities.invokeLater(() -> {
@@ -322,7 +323,7 @@ public final class LobbyWindow {
 
             @Override
             public void record(ReplayRecord part, boolean reset, int from) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.record(part, reset, from);
                 }
@@ -330,7 +331,7 @@ public final class LobbyWindow {
 
             @Override
             public void decide(Map<String, Object> q) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.decide(q);
                 }
@@ -338,7 +339,7 @@ public final class LobbyWindow {
 
             @Override
             public void over(Map<String, Object> r) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.over(r);
                 }
@@ -351,7 +352,7 @@ public final class LobbyWindow {
 
             @Override
             public void disconnected() {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.disconnected();
                 } else {
