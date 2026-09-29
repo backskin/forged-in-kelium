@@ -234,6 +234,8 @@ public final class HotSeatWindow {
     private int mySeat = -1;
     private volatile GameConfig cfg;
     private volatile GameState liveState;
+    /** Запись, у которой места уже подписаны именами сетевой партии. */
+    private volatile ReplayRecord labelledRec;
     private boolean sessionBound;
     private String lastFeedText;
     volatile ReplayRecord rec;
@@ -1415,6 +1417,11 @@ public final class HotSeatWindow {
     private String seatName(int seat) {
         String spec = seatSpecs.get(seat);
         String net = kelium.gui.net.NetSeats.label(spec, seat);
+        // сетевая партия — имена лобби и лидеры, одинаковые у хоста и у друзей
+        String party = kelium.gui.net.NetSeats.partyName(seat);
+        if (party != null) {
+            return party;
+        }
         // бот за столом — человек с именем, а не тип «Каратель · новичок»
         // (дизайнер 28.09.2026); имя то же, что в записи партии (GameRecorder)
         return "human".equals(spec) ? "Игрок " + (seat + 1)
@@ -2444,6 +2451,14 @@ public final class HotSeatWindow {
                         // Прогон отменён откатом: новых кадров от него не
                         // надо, и дальше он доигрывать не должен.
                         throw new kelium.core.GameAborted("прогон отменён откатом");
+                    }
+                    // СЕТЕВАЯ ПАРТИЯ: в записи — имена лобби и лидеры наций, а не
+                    // «Игрок N»: по записи подписывают места окно друга и разбор
+                    if (r != labelledRec && kelium.gui.net.NetSeats.partyName(0) != null) {
+                        for (int s = 0; s < r.seatLabels.size(); s++) {
+                            r.seatLabels.set(s, seatName(s));
+                        }
+                        labelledRec = r;
                     }
                     kelium.gui.net.NetSeats.frame(r);     // кадры — сетевым местам
                     // ОДНО ОБНОВЛЕНИЕ В ОЧЕРЕДИ, А НЕ ПО ОДНОМУ НА СОБЫТИЕ

@@ -526,9 +526,24 @@ public final class NetHost {
     private Map<String, Object> startMessage(int seat) {
         List<Object> names = new ArrayList<>();
         for (Seat s : seats) {
-            names.add(s.name == null ? "Место " + (s.index + 1) : s.name);
+            names.add(partyName(s.index));
         }
         return msg(NetProtocol.START, "seat", seat, "players", seats.length, "names", names);
+    }
+
+    /**
+     * ИМЯ МЕСТА В ПАРТИИ: бот — лидер нации по цвету места (как в окне партии
+     * хоста, {@code BotNames}); в лобби у бота по-прежнему тип — там его выбирают.
+     */
+    String partyName(int seat) {
+        Seat s = seats[seat];
+        if (s.kind == Kind.BOT) {
+            List<Integer> colors = table.seatColors();
+            int color = colors != null && seat < colors.size() && colors.get(seat) != null
+                ? colors.get(seat) : seat;
+            return kelium.gui.BotNames.of(table.seed(), seat, color);
+        }
+        return s.name == null ? "Место " + (seat + 1) : s.name;
     }
 
     /** Агент сетевого места (после {@link #begin}); null — место не сетевое. */
