@@ -82,6 +82,10 @@ static class Launcher
             bool dev = Directory.Exists(DevData)
                 && Environment.GetEnvironmentVariable("KELIUM_PACKS") != "1";
             StringBuilder args = new StringBuilder();
+            // ПАМЯТЬ — ДО ПОЛОВИНЫ ОПЕРАТИВКИ (29.09.2026): живых данных партии
+            // ~0,9 ГБ (печатные картинки в полном разрешении), а по умолчанию Java
+            // берёт четверть — на машине с 4 ГБ это 1 ГБ, и игре тесно.
+            args.Append("-XX:MaxRAMPercentage=50 ");
             if (dev)
             {
                 args.Append(Q("-Dkelium.data=" + DevData)).Append(' ');

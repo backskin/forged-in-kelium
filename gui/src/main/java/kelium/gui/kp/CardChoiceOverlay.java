@@ -277,6 +277,35 @@ public final class CardChoiceOverlay extends JComponent {
         g.dispose();
     }
 
+    /** Лица карт, сжатые и скруглённые под размер раскладки. */
+    private final java.util.Map<java.awt.image.BufferedImage, java.awt.image.BufferedImage> sprites =
+        new java.util.IdentityHashMap<>();
+
+    private java.awt.image.BufferedImage sprite(java.awt.image.BufferedImage img, int w, int h,
+                                                double dpr) {
+        int pw = (int) Math.round(w * dpr);
+        int ph = (int) Math.round(h * dpr);
+        java.awt.image.BufferedImage got = sprites.get(img);
+        if (got != null && got.getWidth() == pw && got.getHeight() == ph) {
+            return got;
+        }
+        if (sprites.size() > 24) {
+            sprites.clear();
+        }
+        java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(pw, ph,
+            java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE);
+        java.awt.Graphics2D gg = out.createGraphics();
+        gg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        gg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        gg.setClip(new java.awt.geom.RoundRectangle2D.Double(0, 0, pw, ph,
+            Theme.px(10) * dpr, Theme.px(10) * dpr));
+        kelium.report.Mips.draw(gg, img, 0, 0, pw, ph);
+        gg.dispose();
+        sprites.put(img, out);
+        return out;
+    }
+
     private void paintCard(Graphics2D g, int i, int slide) {
         Rectangle r = cardRect(i);
         r.y += slide;
@@ -285,14 +314,17 @@ public final class CardChoiceOverlay extends JComponent {
         g.fillRoundRect(r.x + 3, r.y + 5, r.width, r.height, Theme.px(10), Theme.px(10));
         java.awt.image.BufferedImage img = art.apply(c.id());
         if (img != null) {
-            // ПЕЧАТНОЕ ЛИЦО КАРТЫ — есть картинка, рисуем её (25.09.2026)
-            java.awt.Shape clip = g.getClip();
-            g.clip(new java.awt.geom.RoundRectangle2D.Double(r.x, r.y, r.width, r.height,
-                Theme.px(10), Theme.px(10)));
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g.drawImage(img, r.x, r.y, r.width, r.height, null);
-            g.setClip(clip);
+            // ПЕЧАТНОЕ ЛИЦО КАРТЫ — готовой картинкой под этот размер (29.09.2026:
+            // сжатие с бикубикой через скруглённую маску на каждом кадре давало
+            // ~2 ГБ мусора за партию и дёргало сборку мусора)
+            double dpr = Math.max(1.0, g.getTransform().getScaleX());
+            java.awt.image.BufferedImage spr = sprite(img, r.width, r.height, dpr);
+            java.awt.geom.AffineTransform was = g.getTransform();
+            java.awt.geom.Point2D at = was.transform(new java.awt.geom.Point2D.Double(r.x, r.y), null);
+            g.setTransform(java.awt.geom.AffineTransform.getTranslateInstance(
+                Math.round(at.getX()), Math.round(at.getY())));
+            g.drawImage(spr, 0, 0, null);
+            g.setTransform(was);
         } else if (c.face() != null) {
             OrderCardFace.paint(g, c.face(), r.x, r.y, r.width, r.height, false);
         } else {

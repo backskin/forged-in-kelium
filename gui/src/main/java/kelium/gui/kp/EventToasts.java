@@ -98,10 +98,23 @@ public final class EventToasts extends JComponent {
      * показываются; всё это есть в журнале партии.
      */
     public void hurryOthers() {
-        waiting.removeIf(t -> !t.own());
+        hurry(false);
+    }
+
+    /**
+     * ВСЕ ПЛАШКИ — ПРОЧЬ (29.09.2026): свои плашки ложились на кнопки ответа на
+     * атаку и на заголовок раскладки карт. Когда вопрос висит на поле или
+     * раскладкой, уходят и свои; их текст остаётся в журнале.
+     */
+    public void hurryAll() {
+        hurry(true);
+    }
+
+    private void hurry(boolean own) {
+        waiting.removeIf(t -> own || !t.own());
         long now = System.currentTimeMillis();
         for (int i = 0; i < shown.size(); i++) {
-            if (!shown.get(i).own()) {
+            if (own || !shown.get(i).own()) {
                 long age = now - started.get(i);
                 if (age < IN_MS + HOLD_MS) {
                     started.set(i, now - IN_MS - HOLD_MS);
