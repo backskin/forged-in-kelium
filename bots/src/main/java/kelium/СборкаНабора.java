@@ -67,32 +67,59 @@ public final class СборкаНабора {
         for (Map<String, Object> а : арсенал) {
             арсеналПоId.put(String.valueOf(а.get("id")), а);
         }
-        List<String> строки = Files.readAllLines(папка.resolve("прогон.md"), StandardCharsets.UTF_8);
-        List<Мера> меры = new ArrayList<>();
+        // ВСЕ ФАЙЛЫ ПРОГОНОВ (прогон.md, прогон2.md…) складываются: суммы
+        // восстанавливаются из средних и числа выполнений.
+        Map<String, double[]> суммы = new LinkedHashMap<>();   // вРуке, выполнено, раунд, отрывВ, отрывН
+        Map<String, String> тексты = new HashMap<>();
         Map<String, int[]> срабатывания = new HashMap<>();
         Map<String, Integer> пары = new HashMap<>();
-        int раздел = 0;
-        for (String с : строки) {
-            if (с.startsWith("# Прогон бульона — задания")) {
-                раздел = 1;
-            } else if (с.startsWith("# Прогон бульона — арсенал")) {
-                раздел = 2;
-            } else if (с.startsWith("# Пары")) {
-                раздел = 3;
-            }
-            if (!с.startsWith("| ") || с.startsWith("| id") || с.startsWith("| пара")) {
-                continue;
-            }
-            String[] ч = с.split("\\|");
-            if (раздел == 1 && ч.length >= 9) {
-                меры.add(new Мера(ч[1].trim(), ч[2].trim(), целое(ч[3]), целое(ч[4]), дробь(ч[5]),
-                    дробь(ч[6]), дробь(ч[7]), дробь(ч[8])));
-            } else if (раздел == 2 && ч.length >= 5) {
-                срабатывания.put(ч[1].trim(), new int[]{целое(ч[3]), целое(ч[4])});
-            } else if (раздел == 3 && ч.length >= 3) {
-                пары.put(ч[1].trim(), целое(ч[2]));
+        List<Path> файлы = new ArrayList<>();
+        try (var поток = Files.list(папка)) {
+            поток.filter(ф -> ф.getFileName().toString().startsWith("прогон")
+                && ф.getFileName().toString().endsWith(".md")).sorted().forEach(файлы::add);
+        }
+        for (Path ф : файлы) {
+            int раздел = 0;
+            for (String с : Files.readAllLines(ф, StandardCharsets.UTF_8)) {
+                if (с.startsWith("# Прогон бульона — задания")) {
+                    раздел = 1;
+                } else if (с.startsWith("# Прогон бульона — арсенал")) {
+                    раздел = 2;
+                } else if (с.startsWith("# Пары")) {
+                    раздел = 3;
+                }
+                if (!с.startsWith("| ") || с.startsWith("| id") || с.startsWith("| пара")) {
+                    continue;
+                }
+                String[] ч = с.split("\\|");
+                if (раздел == 1 && ч.length >= 9) {
+                    String id = ч[1].trim();
+                    int вРуке = целое(ч[3]);
+                    int выполнено = целое(ч[4]);
+                    double[] s = суммы.computeIfAbsent(id, k -> new double[5]);
+                    s[0] += вРуке;
+                    s[1] += выполнено;
+                    s[2] += дробь(ч[6]) * выполнено;
+                    s[3] += дробь(ч[7]) * выполнено;
+                    s[4] += дробь(ч[8]) * (вРуке - выполнено);
+                    тексты.put(id, ч[2].trim());
+                } else if (раздел == 2 && ч.length >= 5) {
+                    int[] x = срабатывания.computeIfAbsent(ч[1].trim(), k -> new int[2]);
+                    x[0] += целое(ч[3]);
+                    x[1] += целое(ч[4]);
+                } else if (раздел == 3 && ч.length >= 3) {
+                    пары.merge(ч[1].trim(), целое(ч[2]), Integer::sum);
+                }
             }
         }
+        List<Мера> меры = new ArrayList<>();
+        for (var e : суммы.entrySet()) {
+            double[] s = e.getValue();
+            меры.add(new Мера(e.getKey(), тексты.get(e.getKey()), (int) s[0], (int) s[1],
+                s[0] == 0 ? 0 : s[1] / s[0], s[1] == 0 ? 0 : s[2] / s[1], s[1] == 0 ? 0 : s[3] / s[1],
+                s[0] == s[1] ? 0 : s[4] / (s[0] - s[1])));
+        }
+        System.out.println("файлов прогона: " + файлы.size());
 
         // ---------------- задания ----------------
         Map<String, List<Мера>> поРазвилке = new LinkedHashMap<>();

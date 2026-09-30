@@ -69,6 +69,8 @@ public final class ПрогонБульона {
     }
 
     static final Map<String, Счёт> СЧЁТ = new ConcurrentHashMap<>();
+    /** Имя файла итогов в папке бульона. */
+    static String ИТОГ = "прогон.md";
     static final Map<String, Integer> ПАРЫ = new ConcurrentHashMap<>();
 
     @SuppressWarnings("unchecked")
@@ -76,6 +78,10 @@ public final class ПрогонБульона {
         int партий = args.length > 0 ? Integer.parseInt(args[0]) : 200;
         int потоков = args.length > 1 ? Integer.parseInt(args[1]) : 2;
         Path папка = Path.of(args.length > 2 ? args[2] : "design-docs/фигуры/бульон");
+        // второй и следующие прогоны — на других раздачах и в свой файл;
+        // сборка набора складывает все файлы прогон*.md
+        long базаСидов = args.length > 3 ? Long.parseLong(args[3]) : 9_000_000L;
+        ИТОГ = args.length > 4 ? args[4] : "прогон.md";
         org.yaml.snakeyaml.LoaderOptions lo = new org.yaml.snakeyaml.LoaderOptions();
         lo.setMaxAliasesForCollections(Integer.MAX_VALUE);
         org.yaml.snakeyaml.Yaml y = new org.yaml.snakeyaml.Yaml(lo);
@@ -99,7 +105,7 @@ public final class ПрогонБульона {
         AtomicInteger сделано = new AtomicInteger();
         long t0 = System.currentTimeMillis();
         for (int g = 0; g < партий; g++) {
-            final long seed = 9_000_000L + g;
+            final long seed = базаСидов + g;
             ff.add(пул.submit(() -> {
                 партия(seed, задания, арсенал, верхиАрсенала, база, основаЗаданий, основаАрсенала);
                 int n = сделано.incrementAndGet();
@@ -283,7 +289,7 @@ public final class ПрогонБульона {
         ПАРЫ.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(60)
             .forEach(e -> sb.append("| ").append(e.getKey()).append(" | ").append(e.getValue())
                 .append(" |\n"));
-        Files.writeString(папка.resolve("прогон.md"), sb.toString(), StandardCharsets.UTF_8);
-        System.out.println("записано: " + папка.resolve("прогон.md"));
+        Files.writeString(папка.resolve(ИТОГ), sb.toString(), StandardCharsets.UTF_8);
+        System.out.println("записано: " + папка.resolve(ИТОГ));
     }
 }
