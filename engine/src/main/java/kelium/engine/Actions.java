@@ -116,22 +116,20 @@ public final class Actions {
         if (h == null) {
             return false;
         }
+        int[] load = groundLoad(state, hexId, -1);
         if (unit == UnitType.AIRCRAFT) {
             // У авиации свой сектор Неба: он не спорит с наземными ячейками,
             // спорит только с ЧУЖОЙ авиацией на этом же гексе.
             return roomForUnit(state, hexId, UnitType.AIRCRAFT, seat)
-                && h.fitsWithRepack(fp, groundLoad(state, hexId, -1)[0],
-                    groundLoad(state, hexId, -1)[1]);
+                && h.fitsWithRepack(fp, load[0], load[1], load[2]);
         }
         if (unit == UnitType.TOWER) {
             // Вышка ставится в ЛЮБОМ гексе зоны стройки, не обязательно в этом.
-            return h.fitsWithRepack(fp, groundLoad(state, hexId, -1)[0],
-                groundLoad(state, hexId, -1)[1]);
+            return h.fitsWithRepack(fp, load[0], load[1], load[2]);
         }
-        int[] load = groundLoad(state, hexId, -1);
         int vehicles = load[0] + (unit == UnitType.VEHICLE ? 1 : 0);
         int singles = load[1] + (unit == UnitType.VEHICLE ? 0 : 1);
-        return h.fitsWithRepack(fp, vehicles, singles);
+        return h.fitsWithRepack(fp, vehicles, singles, load[2]);
     }
 
     /**
@@ -1250,7 +1248,7 @@ public final class Actions {
             return Placement.skyOpen(state, hexId, seat, -1);
         }
         int[] load = groundLoad(state, hexId, -1);
-        return h.fitsWithRepack(t == UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
+        return h.fitsWithRepack(t == UnitType.VEHICLE ? 2 : 1, load[0], load[1], load[2]);
     }
 
     // ======================================================================
@@ -1600,8 +1598,9 @@ public final class Actions {
             for (String hid : buildSpots(player, btype)) {
                 // здание жёсткое, но войска на гексе НЕЖЁСТКИЕ: строить можно,
                 // если ПЕРЕУПАКОВКОЙ войск освобождается след из fp смежных ячеек
+                // (по своду 1.46.0 войска держат секторы — след только на свободных)
                 int[] ld = groundLoad(state, hid, -1);
-                if (state.field.get(hid).chooseFootprint(fp, ld[0], ld[1]) != null) {
+                if (state.field.get(hid).chooseFootprint(fp, ld[0], ld[1], ld[2]) != null) {
                     candidates.add(hid);
                 }
             }
@@ -1756,13 +1755,13 @@ public final class Actions {
             int[] load = groundLoad(state, hexId, -1);
             List<List<Integer>> variants = new ArrayList<>();
             for (int start = 0; start < 6; start++) {
-                List<Integer> run = h.footprintAt(start, fp, load[0], load[1]);
+                List<Integer> run = h.footprintAt(start, fp, load[0], load[1], load[2]);
                 if (run != null) {
                     variants.add(run);
                 }
             }
             if (variants.isEmpty()) {
-                return h.chooseFootprint(fp, load[0], load[1]);
+                return h.chooseFootprint(fp, load[0], load[1], load[2]);
             }
             if (variants.size() == 1) {
                 return variants.get(0);
@@ -2067,7 +2066,7 @@ public final class Actions {
                     continue;
                 }
                 int[] ld = groundLoad(state, hid, -1);
-                if (state.field.get(hid).chooseFootprint(fp, ld[0], ld[1]) != null) {
+                if (state.field.get(hid).chooseFootprint(fp, ld[0], ld[1], ld[2]) != null) {
                     candidates.add(hid);
                 }
             }
@@ -2075,9 +2074,14 @@ public final class Actions {
                 // Ставить некуда — возвращаем здание туда, где стояло: ход не
                 // состоялся, а не «здание пропало».
                 b.hexId = fromHex;
+                int[] ldBack = groundLoad(state, fromHex, -1);
                 List<Integer> back = state.field.get(fromHex)
-                    .chooseFootprint(fp, groundLoad(state, fromHex, -1)[0],
-                        groundLoad(state, fromHex, -1)[1]);
+                    .chooseFootprint(fp, ldBack[0], ldBack[1], ldBack[2]);
+                if (back == null) {
+                    // выселенное войско могло встать на след самого здания;
+                    // перенос не состоялся — здание встаёт на место в любом случае
+                    back = state.field.get(fromHex).chooseFootprint(fp, ldBack[0], ldBack[1]);
+                }
                 if (back != null) {
                     state.field.get(fromHex).occupySides(b.uid, back);
                 }
@@ -3282,9 +3286,10 @@ public final class Actions {
             // УМНАЯ проверка стоянки: войска НЕ приколочены к ячейкам — считаем,
             // влезет ли новичок, если стоящие переупакуются (правило дизайнера).
             // Технике нужна пара СМЕЖНЫХ ячеек; жёсткие только здания/нейтралы.
+            // По своду 1.46.0 войска держат секторы — новичку только свободные.
             int[] load = groundLoad(state, hexId, unit.uid);
             return h.fitsWithRepack(unit.type == UnitType.VEHICLE ? 2 : 1,
-                load[0], load[1]);
+                load[0], load[1], load[2]);
         }
 
     }

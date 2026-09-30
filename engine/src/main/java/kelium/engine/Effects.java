@@ -2265,7 +2265,7 @@ public final class Effects {
             }
             int fp = Actions.buildingFootprint(b.type);
             int[] ld = Actions.groundLoad(s, target, -1);
-            List<Integer> sides = s.field.get(target).chooseFootprint(fp, ld[0], ld[1]);
+            List<Integer> sides = s.field.get(target).chooseFootprint(fp, ld[0], ld[1], ld[2]);
             if (sides == null) {
                 continue;               // физически не влезло — остаётся на месте
             }

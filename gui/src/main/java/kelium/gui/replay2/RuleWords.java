@@ -179,6 +179,8 @@ public final class RuleWords {
             case "setup.start_kelium" -> "келемий на старте, по местам";
             case "setup.start_ammo" -> "боеприпасы на старте";
             case "setup.start_containers" -> "карты контейнера на старте";
+            case "setup.start_arsenal_installed" ->
+                "начальный арсенал открывают на подготовке: верх — стартовые ресурсы";
 
             // ---------- Экономика ----------
             case "economy.coins_per_vp" -> "монет за одно победное очко";
@@ -323,6 +325,8 @@ public final class RuleWords {
                 "в небе гекса сколько угодно авиации, но одного игрока";
             case "field.enemy_units_block_build" ->
                 "чужие войска на гексе не дают строить, сносить и выводить нанятых";
+            case "field.units_hold_sectors" ->
+                "войско держит свой сектор, как здание: внутри гекса ничто не сдвигается";
 
             // ---------- Центр управления ----------
             case "command_center.build_price_coins" -> "цена постройки центра управления";

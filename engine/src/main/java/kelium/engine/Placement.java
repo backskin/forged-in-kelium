@@ -249,7 +249,8 @@ public final class Placement {
             return skyOpen(state, hexId, player.seat, -1);
         }
         int[] load = groundLoad(state, hexId, -1);
-        return h.fitsWithRepack(t == kelium.core.UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
+        return h.fitsWithRepack(t == kelium.core.UnitType.VEHICLE ? 2 : 1,
+            load[0], load[1], load[2]);
     }
 
     /**
@@ -342,7 +343,7 @@ public final class Placement {
         int fits = 0;
         for (int i = 0; i < можно; i++) {
             int fp = t == kelium.core.UnitType.VEHICLE ? 2 : 1;
-            if (!h.fitsWithRepack(fp, veh, single)) {
+            if (!h.fitsWithRepack(fp, veh, single, load[2])) {
                 break;
             }
             if (fp == 2) {
@@ -375,12 +376,38 @@ public final class Placement {
     }
 
     /**
-     * Наземная нагрузка гекса войсками (все игроки): [техника, одиночные].
+     * ДЕРЖАТ ЛИ ВОЙСКА СВОИ СЕКТОРЫ (дизайнер 30.09.2026): войско занимает
+     * сектор так же, как здание, и внутри гекса ничто не сдвигается.
+     * Ключ свода {@code field.units_hold_sectors}; в своде 1.45.0 его нет —
+     * там войска по-прежнему переупаковываются.
+     */
+    public static boolean unitsHoldSectors(GameState state) {
+        return Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                .get("field.units_hold_sectors", Boolean.FALSE));
+    }
+
+    /**
+     * Наземная нагрузка гекса войсками (все игроки): [техника, одиночные, маска].
      * excludeUid — жетон, который сейчас входит/выходит (не считать), -1 = никто.
-     * Техника занимает 2 смежные ячейки, одиночные (пехота/вышка) — одну;
-     * конкретные позиции не считаются — войска переупаковываются (нежёсткие).
+     * Техника занимает 2 смежные ячейки, одиночные (пехота/вышка) — одну.
+     *
+     * <p>По своду 1.45.0 конкретные позиции не считаются — войска
+     * переупаковываются, маска ноль. По правилу «жетоны держат секторы»
+     * ({@link #unitsHoldSectors}) счётчики ноль, а маска — секторы, на которых
+     * войска стоят: их не занять ни зданию, ни другому войску.
      */
     public static int[] groundLoad(GameState state, String hexId, int excludeUid) {
+        if (unitsHoldSectors(state)) {
+            int held = 0;
+            for (var e : СекторыВойск.разложить(state, hexId).entrySet()) {
+                if (e.getKey() != excludeUid) {
+                    for (int i : e.getValue()) {
+                        held |= 1 << i;
+                    }
+                }
+            }
+            return new int[]{0, 0, held};
+        }
         int veh = 0;
         int single = 0;
         for (PlayerState p : state.players) {
@@ -400,6 +427,6 @@ public final class Placement {
                 }
             }
         }
-        return new int[]{veh, single};
+        return new int[]{veh, single, 0};
     }
 }

@@ -955,20 +955,8 @@ public class HeuristicAgent extends Agent {
             if (h == null) {
                 continue;
             }
-            int veh = 0;
-            int single = 0;
-            for (PlayerState p : state.players) {
-                for (UnitToken u : p.unitsOnField()) {
-                    if (hid.equals(u.hexId) && u.type != UnitType.AIRCRAFT) {
-                        if (u.type == UnitType.VEHICLE) {
-                            veh++;
-                        } else {
-                            single++;
-                        }
-                    }
-                }
-            }
-            if (h.fitsWithRepack(1, veh, single)) {
+            int[] ld = kelium.engine.Placement.groundLoad(state, hid, -1);
+            if (h.fitsWithRepack(1, ld[0], ld[1], ld[2])) {
                 return true;
             }
         }

@@ -88,10 +88,14 @@ class ArsenalSevenOneAbilitiesTest {
         }
         assertEquals(7, начальные.size());
         int розданных = 0;
+        // по своду 1.46.0 начальную открывают на подготовке — она уже
+        // установлена, а не в руке (решение дизайнера 30.09.2026)
         for (PlayerState p : s.players) {
-            for (String c : p.arsenalHand) {
-                if (начальные.contains(c)) {
-                    розданных++;
+            for (List<String> где : List.of(p.arsenalHand, p.arsenalInstalled)) {
+                for (String c : где) {
+                    if (начальные.contains(c)) {
+                        розданных++;
+                    }
                 }
             }
         }
