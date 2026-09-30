@@ -130,6 +130,9 @@ public final class ЦиклСтратега {
         }
         Сеть лучшаяСеть = лучшая >= 0 ? Сеть.загрузить(ПАПКА.resolve("value_" + лучшая + ".bin"))
             : null;
+        if (лучшаяСеть != null) {
+            выложить(лучшаяСеть, доляЛучшей);
+        }
         int последнее = -1;
         while (Files.exists(ПАПКА.resolve("value_" + (последнее + 1) + ".bin"))) {
             последнее++;
@@ -208,6 +211,7 @@ public final class ЦиклСтратега {
                 доляЛучшей = доля;
                 Files.writeString(ПАПКА.resolve("лучшая.txt"),
                     пок + " " + String.format(java.util.Locale.ROOT, "%.2f", доля));
+                выложить(кандидат, доля);
             }
             String с = String.format(java.util.Locale.ROOT,
                 "| %d | %s | %.0f%% | %.2f | %.2f | %.2f | %.2f | %+.2f ± %.2f | %.0f%% | %s | %s | %.2f |%n",
@@ -218,6 +222,25 @@ public final class ЦиклСтратега {
                 (System.currentTimeMillis() - t0) / 3_600_000.0);
             Files.writeString(отчёт, с, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
             out.print("ОТЧЁТ " + с);
+        }
+    }
+
+    /**
+     * Выложить лучшую сеть в память ботов — оттуда её берёт игра (уровень
+     * «стратег», {@link kelium.agents.ОбученныйСтратег}).
+     */
+    private static void выложить(Сеть сеть, double доля) {
+        try {
+            Path ф = kelium.agents.ОбученныйСтратег.файл();
+            Files.createDirectories(ф.toAbsolutePath().getParent());
+            Path tmp = ф.resolveSibling(ф.getFileName() + ".tmp");
+            сеть.сохранить(tmp);
+            Files.writeString(kelium.agents.ОбученныйСтратег.файлДоли(),
+                String.format(java.util.Locale.ROOT, "%.2f", доля));
+            Files.move(tmp, ф, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            out.println("  лучшая сеть выложена в игру: " + ф);
+        } catch (Exception e) {
+            out.println("  не выложил сеть в игру: " + e.getMessage());
         }
     }
 

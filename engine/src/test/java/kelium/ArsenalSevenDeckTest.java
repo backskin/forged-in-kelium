@@ -54,7 +54,7 @@ class ArsenalSevenDeckTest {
 
     @Test
     void действующийСводБерётНабор71ИЧетвёртыйСупер() {
-        assertEquals("7.3.0", arsenal().version);   // 7.3 — комплект «пять развилок», 27.09
+        assertEquals("7.4.0", arsenal().version);   // 7.4 — «пять развилок» без «Сдачи тары», 30.09
         assertEquals("4.0.0", cfg().content.get("super_arsenal").version);
     }
 
@@ -63,7 +63,8 @@ class ArsenalSevenDeckTest {
         // 7.1.0 (25.09.2026): печатные №1…32 и заполненная заготовка №33;
         // начальные — печатные №1…6 и заполненная заготовка №7.
         assertEquals(33, вид("regular").size(), "обычных карт — №1…33");
-        assertEquals(7, вид("starting").size(), "начальных — №1…7");
+        // 7.4.0 (30.09.2026): «Сдача тары» убрана — контейнеры на старте непредсказуемы
+        assertEquals(6, вид("starting").size(), "начальных — №1…6");
     }
 
     @Test

@@ -86,7 +86,8 @@ class ArsenalSevenOneAbilitiesTest {
                 начальные.add(String.valueOf(e.get("id")));
             }
         }
-        assertEquals(7, начальные.size());
+        // 7.4.0: шесть — «Сдача тары» убрана (контейнеры на старте непредсказуемы)
+        assertEquals(6, начальные.size());
         int розданных = 0;
         // по своду 1.46.0 начальную открывают на подготовке — она уже
         // установлена, а не в руке (решение дизайнера 30.09.2026)
@@ -128,35 +129,6 @@ class ArsenalSevenOneAbilitiesTest {
         assertFalse(варианты(s, 0, "spec_swap_ground_unit").isEmpty(), "две монеты — предложено");
     }
 
-    @Test
-    void сдачаТарыДаётМонетуЗаВскрытыйКонтейнер() {
-        for (boolean сКартой : new boolean[]{false, true}) {
-            GameState s = стол(83L);
-            PlayerState p = s.player(0);
-            p.arsenalHand.clear();
-            p.arsenalInstalled.clear();
-            if (сКартой) {
-                p.arsenalInstalled.add("bs72_7");
-            }
-            p.containers = 1;
-            List<Map<String, Object>> события = new ArrayList<>();
-            GameEngine e = new GameEngine(s, агенты(), события::add);
-            int монетДо = p.resources.coin();
-            вскрыть(e, p);
-            Map<String, Object> контейнер = null;
-            for (Map<String, Object> ev : события) {
-                if ("container".equals(ev.get("type"))) {
-                    контейнер = ev;
-                }
-            }
-            assertNotNull(контейнер, "контейнер не вскрылся");
-            Map<?, ?> got = (Map<?, ?>) контейнер.get("got");
-            int монетНаКарте = got.get("coin") instanceof Number n ? n.intValue() : 0;
-            assertEquals(монетДо + монетНаКарте + (сКартой ? 1 : 0), p.resources.coin(),
-                сКартой ? "с «Сдачей тары» — монета сверх контейнера"
-                        : "без карты — ровно то, что на контейнере");
-        }
-    }
 
     /** Вскрыть один контейнер закрытым методом движка (он и есть правило). */
     private static void вскрыть(GameEngine e, PlayerState p) {
