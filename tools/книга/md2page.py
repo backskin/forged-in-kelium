@@ -240,12 +240,20 @@ def blocks(md):
             while i < len(lines) and lines[i].startswith(">"):
                 q.append(lines[i][1:].strip())
                 i += 1
+            # РИСУНОК ВНУТРИ ПРИМЕРА: строка «> [[имя]]» кладёт рисунок в ту же
+            # рамку под текстом — пример и его картинка читаются одним куском.
+            рис = [x[2:-2] for x in q if re.fullmatch(r"\[\[[^\]]+\]\]", x)]
+            q = [x for x in q if x and not re.fullmatch(r"\[\[[^\]]+\]\]", x)]
             qt = " ".join(q)
             m = re.match(r"\*\*(.+?)\*\*\s*(.*)", qt)
             label, rest = (m.group(1).rstrip("."), m.group(2)) if m else ("Пример", qt)
             вид = {"Важно!": " важно", "Важно": " важно", "Совет": " совет"}.get(label, "")
             res.append(f'      <div class="пример{вид}">\n        <span class="метка">{inline(label)}</span>\n'
-                       f"        <p>{inline(rest)}</p>\n      </div>")
+                       f"        <p>{inline(rest)}</p>\n"
+                       + "".join(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                   "_" + r + ".svg"), encoding="utf-8").read()
+                                 for r in рис)
+                       + "      </div>")
             continue
         # ТРИ ФАЗЫ РАУНДА — сетка из трёх колонок (CSS .фазы). В разметке:
         #   :фазы:
