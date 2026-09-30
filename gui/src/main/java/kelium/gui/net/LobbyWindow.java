@@ -82,6 +82,36 @@ public final class LobbyWindow {
         SwingUtilities.invokeLater(() -> new LobbyWindow(table, menu).start());
     }
 
+    /**
+     * ПРОДОЛЖИТЬ СЕТЕВУЮ ПАРТИЮ ИЗ СОХРАНЕНИЯ (29.09.2026). Стол — как в
+     * сохранении; места друзей ({@code net:N}) снова открыты, друзья входят,
+     * и после «Начать» окно хоста доигрывает записанные решения до места
+     * сохранения — у друзей оно подтягивается само, как при переподключении.
+     */
+    public static void openContinued(kelium.gui.GameSave save, JFrame menu) {
+        HotSeatWindow.Options o = save.options;
+        List<String> specs = new ArrayList<>();
+        for (String s : o.seatSpecs()) {
+            specs.add(s.startsWith(NetSeats.PREFIX) ? "human" : s);
+        }
+        HotSeatWindow.Options table = new HotSeatWindow.Options(o.rulesetId(), o.players(), o.seed(),
+            specs, o.scenarioId(), o.scenarioFile(), o.cuFacing(), o.seatColors(), o.startCoins(),
+            o.startKelium(), o.startAmmo(), o.prepRound(), o.marketCards());
+        SwingUtilities.invokeLater(() -> {
+            LobbyWindow w = new LobbyWindow(table, menu);
+            w.continued = save;
+            w.start();
+        });
+    }
+
+    /** Не null — стол продолжает эту сохранённую партию. */
+    private kelium.gui.GameSave continued;
+
+    /** Есть ли в сохранении сетевые места (продолжать — через сетевой стол). */
+    public static boolean isNetSave(kelium.gui.GameSave save) {
+        return save.options.seatSpecs().stream().anyMatch(s -> s.startsWith(NetSeats.PREFIX));
+    }
+
     public static void main(String[] args) {
         Theme.useGameScale();
         open(null, null);
@@ -146,7 +176,9 @@ public final class LobbyWindow {
         create.add(multiline(table == null
             ? "Стол собирается в «Штабе»: закройте это окно, выберите число мест, правила "
                 + "и поле, затем снова «По сети»."
-            : tableWords(table)), "growx, wrap");
+            : (continued == null ? "" : "ПРОДОЛЖЕНИЕ сохранённой партии «" + continued.name
+                + "» — " + continued.describe() + ". Друзья входят заново, партия доиграется "
+                + "до места сохранения. ") + tableWords(table)), "growx, wrap");
         KpButton go = new KpButton("Создать стол", "друзья войдут по адресу", null).primary(true);
         go.setPreferredSize(new Dimension(Theme.px(260), Theme.px(48)));
         go.setState(table == null ? KpButton.State.DISABLED : KpButton.State.AVAILABLE);
@@ -473,7 +505,14 @@ public final class LobbyWindow {
             }
             mainBtn.setTexts("Партия идёт", "окно лобби — связь и чат; закрыть — закрыть стол");
             mainBtn.setState(KpButton.State.DISABLED);
-            HotSeatWindow.open(o);
+            if (continued != null) {
+                // та же лента решений, места — как в лобби сейчас
+                kelium.gui.GameSave c = continued;
+                HotSeatWindow.open(new kelium.gui.GameSave(c.name, o, c.moves, c.rulesetId,
+                    c.contentVersions, c.saved, c.round, c.circle));
+            } else {
+                HotSeatWindow.open(o);
+            }
         } else if (client != null) {
             myReady = !myReady;
             client.ready(myReady);

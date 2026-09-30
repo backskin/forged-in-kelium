@@ -280,11 +280,15 @@ public final class HotSeatWindow {
      * месте сохранения возвращается к живой игре.
      */
     public static void open(GameSave save) {
-        SwingUtilities.invokeLater(() -> {
-            HotSeatWindow w = new HotSeatWindow(save.options);
-            w.replay.addAll(save.moves);
-            w.start();
-        });
+        SwingUtilities.invokeLater(() -> startSaved(save));
+    }
+
+    /** Открыть сохранённую партию и вернуть окно (на потоке окна; для проверок). */
+    static HotSeatWindow startSaved(GameSave save) {
+        HotSeatWindow w = new HotSeatWindow(save.options);
+        w.replay.addAll(save.moves);
+        w.start();
+        return w;
     }
 
     void start() {
