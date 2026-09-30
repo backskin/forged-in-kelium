@@ -346,6 +346,13 @@ if ($want -contains "exe") {
 # туда кладутся запускатели и паки. Пак копируется, только если изменился;
 # список паков — последним, чтобы друзья не увидели список раньше паков.
 $publishCfg = Join-Path $PSScriptRoot "publish-dir.txt"
+# Яндекс.Диск держит файл, пока его загружает, — копируем с повторами.
+function Copy-Stubborn([string]$from, [string]$to) {
+    for ($i = 0; $i -lt 60; $i++) {
+        try { Copy-Item -Force $from $to; return } catch { Start-Sleep -Seconds 2 }
+    }
+    throw "Файл занят другим процессом: $to"
+}
 if (Test-Path $publishCfg) {
     $pub = (Get-Content $publishCfg -Raw -Encoding UTF8).Trim()
     if ($pub) {
@@ -356,17 +363,17 @@ if (Test-Path $publishCfg) {
             $dstSha = if (Test-Path "$dst.sha") { (Get-Content "$dst.sha" -Raw).Trim() } else { "" }
             if ($dstSha -ne $sha -or -not (Test-Path $dst)) {
                 Write-Output "выкладка: $p.pak"
-                Copy-Item -Force "$packsOut\$p.pak" $dst
-                Copy-Item -Force "$packsOut\$p.pak.sha" "$dst.sha"
+                Copy-Stubborn "$packsOut\$p.pak" $dst
+                Copy-Stubborn "$packsOut\$p.pak.sha" "$dst.sha"
             }
         }
         if (Test-Path "$packsOut\update.txt") {
-            Copy-Item -Force "$packsOut\update.txt" "$pub\packs\update.txt"
+            Copy-Stubborn "$packsOut\update.txt" "$pub\packs\update.txt"
         }
         foreach ($app in $apps) {
-            Copy-Item -Force "dist\$($app.Name).exe" "$pub\"
+            Copy-Stubborn "dist\$($app.Name).exe" "$pub\$($app.Name).exe"
         }
-        Copy-Item -Force "$packsOut\packs.txt" "$pub\packs\packs.txt"
+        Copy-Stubborn "$packsOut\packs.txt" "$pub\packs\packs.txt"
         Write-Output "раздача выложена: $pub"
     }
 }
