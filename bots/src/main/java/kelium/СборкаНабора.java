@@ -128,7 +128,13 @@ public final class СборкаНабора {
         }
         List<Мера> годные = new ArrayList<>();
         for (Мера м : меры) {
-            if (м.вРуке() >= МИН_В_РУКЕ && м.доля() >= ДОЛЯ_МИН && м.доля() <= ДОЛЯ_МАКС) {
+            boolean связочное = СВЯЗОЧНЫЕ.contains(узел(заданиеПоId.get(м.id())));
+            // СВЯЗОЧНЫЕ задания («выполни вторым», «третьим спец-действием», «обе
+            // ветки») прогон мерил с ровной наградой без спец-действий — без них
+            // второе задание за ход почти невыполнимо. В наборе награды дают 2–3
+            // спец-действия, поэтому их порог ниже: лишь бы вообще выполнялись.
+            double мин = связочное ? Math.min(ДОЛЯ_МИН, 0.02) : ДОЛЯ_МИН;
+            if (м.вРуке() >= МИН_В_РУКЕ && м.доля() >= мин && м.доля() <= ДОЛЯ_МАКС) {
                 годные.add(м);
                 String р = развилкаТребования(заданиеПоId.get(м.id()));
                 поРазвилке.getOrDefault(р, поРазвилке.get("command")).add(м);
@@ -137,12 +143,50 @@ public final class СборкаНабора {
         List<Мера> набор = new ArrayList<>();
         int наРазвилку = ЗАДАНИЙ / поРазвилке.size();
         for (var e : поРазвилке.entrySet()) {
-            List<Мера> список = e.getValue();
-            // разброс трудности: по порядку доли выполнения, берём равномерно
-            список.sort(Comparator.comparingDouble(Мера::доля));
-            int n = Math.min(наРазвилку, список.size());
-            for (int i = 0; i < n; i++) {
-                набор.add(список.get((int) Math.round(i * (список.size() - 1) / Math.max(1.0, n - 1))));
+            // ОДНА КАРТА НА СЕМЕЙСТВО (вид требования + кто): «2 / 3 / 4 своих
+            // здания» — одно и то же задание с разным числом. Из семейства берём
+            // вариант средней трудности (доля ближе к трети); семейства — по
+            // очереди видов узлов, чтобы в развилке были разные задачи.
+            Map<String, Мера> лучшее = new LinkedHashMap<>();
+            for (Мера м : e.getValue()) {
+                String семья = семейство(заданиеПоId.get(м.id()));
+                Мера был = лучшее.get(семья);
+                if (был == null || Math.abs(м.доля() - 0.33) < Math.abs(был.доля() - 0.33)) {
+                    лучшее.put(семья, м);
+                }
+            }
+            Map<String, List<Мера>> поУзлу = new LinkedHashMap<>();
+            for (Мера м : лучшее.values()) {
+                поУзлу.computeIfAbsent(узел(заданиеПоId.get(м.id())), k -> new ArrayList<>()).add(м);
+            }
+            for (List<Мера> л : поУзлу.values()) {
+                л.sort(Comparator.comparingDouble(м -> Math.abs(м.доля() - 0.33)));
+            }
+            int взято = 0;
+            for (int круг = 0; взято < наРазвилку && круг < 10; круг++) {
+                for (List<Мера> л : поУзлу.values()) {
+                    if (круг < л.size() && взято < наРазвилку) {
+                        набор.add(л.get(круг));
+                        взято++;
+                    }
+                }
+            }
+            // МЕСТ ОСТАЛОСЬ — второй вариант семейства (другая ступень или
+            // состояние), самый далёкий по трудности от уже взятого.
+            if (взято < наРазвилку) {
+                List<Мера> остальные = new ArrayList<>(e.getValue());
+                остальные.removeAll(набор);
+                остальные.sort(Comparator.comparingDouble(м -> Math.abs(м.доля() - 0.33)));
+                java.util.Set<String> вторые = new java.util.HashSet<>();
+                for (Мера м : остальные) {
+                    if (взято >= наРазвилку) {
+                        break;
+                    }
+                    if (вторые.add(семейство(заданиеПоId.get(м.id())))) {
+                        набор.add(м);
+                        взято++;
+                    }
+                }
             }
         }
         // связки: пары, выполненные в одном ходу, — обе карты в набор, если годны
@@ -181,8 +225,11 @@ public final class СборкаНабора {
         }
         List<Map.Entry<String, int[]>> сработавшие = new ArrayList<>(срабатывания.entrySet());
         сработавшие.removeIf(e -> !ПРОБА && (e.getValue()[0] < 2 || e.getValue()[1] == 0));
-        сработавшие.sort((a, b) -> Double.compare(
-            b.getValue()[1] / (double) b.getValue()[0], a.getValue()[1] / (double) a.getValue()[0]));
+        // ПОРЯДОК — ОТ УМЕРЕННЫХ К КАПЕЛЬНЫМ. Карта, что срабатывает по 8–11 раз
+        // за партию «за любую ветку», — пассивный доход, а не связка; ближе к
+        // началу — те, что срабатывают 2–5 раз: их надо устроить.
+        сработавшие.sort(Comparator.comparingDouble(e -> Math.abs(e.getValue()[1]
+            / (double) Math.max(1, e.getValue()[0]) - 3.5)));
         for (var e : сработавшие) {
             Map<String, Object> а = арсеналПоId.get(e.getKey());
             if (а != null) {
@@ -190,23 +237,39 @@ public final class СборкаНабора {
             }
         }
         List<String> арсНабор = new ArrayList<>();
+        java.util.Set<String> семьиАрс = new java.util.HashSet<>();
         int редких = 0;
-        int наКорзину = АРСЕНАЛА / 5;
+        // сначала редкие (спец-действие, карта): их 4–6 на колоду — связки
+        // случаются, когда такая карта выпала, а не каждый ход
+        for (var e : сработавшие) {
+            Map<String, Object> а = арсеналПоId.get(e.getKey());
+            if (а == null || !редкое(а) || редких >= РЕДКИХ) {
+                continue;
+            }
+            if (семьиАрс.add(семействоАрсенала(а))) {
+                арсНабор.add(e.getKey());
+                редких++;
+            }
+        }
+        int наКорзину = (АРСЕНАЛА - редких) / арсПоРазвилке.size() + 1;
+        // не больше трёх карт с одним видом эффекта в корзине развилки: шесть
+        // «сними урон» — скучная колода
+        Map<String, Integer> видов = new HashMap<>();
         for (var e : арсПоРазвилке.entrySet()) {
             int взято = 0;
             for (String id : e.getValue()) {
                 if (взято >= наКорзину || арсНабор.size() >= АРСЕНАЛА) {
                     break;
                 }
-                boolean редкое = редкое(арсеналПоId.get(id));
-                if (редкое && редких >= РЕДКИХ) {
+                Map<String, Object> а = арсеналПоId.get(id);
+                String вид = e.getKey() + ":" + видЭффекта(а);
+                if (редкое(а) || арсНабор.contains(id) || видов.getOrDefault(вид, 0) >= 3
+                        || !семьиАрс.add(семействоАрсенала(а))) {
                     continue;
                 }
                 арсНабор.add(id);
+                видов.merge(вид, 1, Integer::sum);
                 взято++;
-                if (редкое) {
-                    редких++;
-                }
             }
         }
         sb.append("\n## Арсенал\n\n| id | развилка | срабатывание | срабатываний на установку |\n"
@@ -567,6 +630,52 @@ public final class СборкаНабора {
             case "уничтожил", "потерял" -> "command";
             default -> "карты";
         };
+    }
+
+    /** Узлы, которые спрашивают о картах хода, — связки. */
+    static final java.util.Set<String> СВЯЗОЧНЫЕ = java.util.Set.of("очередь_задания", "очередь_спец",
+        "обе_ветки", "сожги", "установи", "ветки");
+
+    @SuppressWarnings("unchecked")
+    static String узел(Map<String, Object> з) {
+        return з != null && з.get("требование") instanceof Map<?, ?> т
+            ? String.valueOf(((Map<String, Object>) т).get("узел")) : "";
+    }
+
+    /** Семейство задания: вид требования и кто — без числа. */
+    @SuppressWarnings("unchecked")
+    static String семейство(Map<String, Object> з) {
+        Map<String, Object> т = (Map<String, Object>) з.get("требование");
+        String узел = String.valueOf(т.get("узел"));
+        return switch (узел) {
+            case "жетоны" -> узел + ":" + ((Map<String, Object>) т.get("группа")).get("кто");
+            case "рядом" -> узел + ":" + ((Map<String, Object>) т.get("а")).get("кто") + ":"
+                + ((Map<String, Object>) т.get("б")).get("кто");
+            case "ресурс" -> узел + ":" + т.get("ресурс");
+            case "свалка" -> узел + ":" + ((Map<String, Object>) т.get("группа")).get("кто");
+            case "уничтожь" -> узел + ":" + ((Map<String, Object>) т.get("цель")).get("кто") + ":" + т.get("кем");
+            case "построй" -> узел + ":" + т.get("вид");
+            case "обе_ветки" -> узел + ":" + т.get("развилка");
+            case "ветки" -> узел + ":" + т.get("ветки");
+            default -> узел;
+        };
+    }
+
+    /** Семейство карты арсенала: событие и вид эффекта (ресурс) — без предела. */
+    @SuppressWarnings("unchecked")
+    static String семействоАрсенала(Map<String, Object> а) {
+        Map<String, Object> низ = (Map<String, Object>) а.get("низ");
+        Map<String, Object> эф = (Map<String, Object>) низ.get("эффект");
+        Map<String, Object> п = эф.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        return String.valueOf(низ.get("когда")) + "|" + эф.get("effect") + "|" + new java.util.TreeSet<>(п.keySet());
+    }
+
+    /** Вид эффекта карты арсенала: монеты, боеприпас, ремонт, ветка… */
+    @SuppressWarnings("unchecked")
+    static String видЭффекта(Map<String, Object> а) {
+        Map<String, Object> эф = (Map<String, Object>) ((Map<String, Object>) а.get("низ")).get("эффект");
+        Map<String, Object> п = эф.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        return эф.get("effect") + "|" + new java.util.TreeSet<>(п.keySet());
     }
 
     /** Спец-действие или карта — редкая, сильная шестерёнка связок. */
