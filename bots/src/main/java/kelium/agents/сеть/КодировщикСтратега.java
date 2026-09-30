@@ -108,6 +108,25 @@ public final class КодировщикСтратега {
         Object id = card.get("passive");
         if (id == null && card.get("bottom") instanceof Map<?, ?> bm) {
             id = ((Map<String, Object>) bm).get("passive");
+            // СРАБАТЫВАНИЕ ДАННЫМИ (Карты 2.0): кода способности нет — узкое
+            // место берётся прямо из эффекта низа, сила — из предела за ход.
+            if (id == null && bm.get("эффект") instanceof Map<?, ?> эф) {
+                int предел = bm.get("предел") instanceof Number n ? n.intValue() : 1;
+                Map<?, ?> п = эф.get("params") instanceof Map<?, ?> m ? m : Map.of();
+                switch (String.valueOf(эф.get("effect"))) {
+                    case "спец", "free_action" -> силы[Hint.Bottleneck.ACTIONS.ordinal()] += предел;
+                    case "gain" -> {
+                        силы[Hint.Bottleneck.COINS.ordinal()] += предел * число(п, "coin");
+                        силы[Hint.Bottleneck.AMMO.ordinal()] += предел * число(п, "ammo");
+                        силы[Hint.Bottleneck.KELIUM.ordinal()] += предел * число(п, "kelium");
+                        силы[Hint.Bottleneck.TROPHY.ordinal()] += предел * число(п, "trophy");
+                        силы[Hint.Bottleneck.ACTIONS.ordinal()] += предел * число(п, "objective_cards");
+                    }
+                    case "heal_one" -> силы[Hint.Bottleneck.DEFENCE.ordinal()] += предел;
+                    default -> { }
+                }
+                return;
+            }
         }
         Ability a = Abilities.byId(id == null ? null : id.toString());
         if (a == null) {
@@ -123,6 +142,10 @@ public final class КодировщикСтратега {
             return;
         }
         силы[h.relieves().ordinal()] += (float) Math.max(0, Math.min(5, h.strength()));
+    }
+
+    private static int число(Map<?, ?> m, String ключ) {
+        return m.get(ключ) instanceof Number n ? n.intValue() : 0;
     }
 
     /** Все узкие места по порядку — для подписей в отчётах. */

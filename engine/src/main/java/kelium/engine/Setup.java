@@ -929,6 +929,14 @@ public final class Setup {
                         // должно быть — отсев по «нереализованной пассивке» здесь
                         // выбросил бы совершенно рабочую карту.
                         bad = null;
+                    } else if (bottom != null && bottom.get("когда") instanceof Map<?, ?>) {
+                        // СРАБАТЫВАНИЕ ДАННЫМИ (Карты 2.0): способности-кода нет и
+                        // не нужно — жив ли низ, решает его эффект.
+                        Object эф = bottom.get("эффект") instanceof Map<?, ?> em ? em.get("effect") : null;
+                        if (эф == null || !("спец".equals(эф)
+                                || Effects.isImplemented(String.valueOf(эф)))) {
+                            bad = "trigger effect " + эф;
+                        }
                     } else if (bottom != null
                             && !Passives.isImplemented((String) bottom.get("passive"))) {
                         bad = "passive " + bottom.get("passive");
