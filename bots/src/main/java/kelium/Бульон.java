@@ -314,6 +314,27 @@ public final class Бульон {
         o.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
         o.setAllowUnicode(true);
         o.setWidth(120);
-        return new org.yaml.snakeyaml.Yaml(o).dump(записи);
+        // Без общих ссылок: одна и та же запись («когда», «группа») в разных
+        // картах иначе пишется якорем, и файл нечитаем обычным разборщиком.
+        return new org.yaml.snakeyaml.Yaml(o).dump(копия(записи));
+    }
+
+    /** Глубокая копия списков и записей — у каждой карты свои объекты. */
+    private static Object копия(Object x) {
+        if (x instanceof Map<?, ?> m) {
+            Map<Object, Object> out = new LinkedHashMap<>();
+            for (var e : m.entrySet()) {
+                out.put(e.getKey(), копия(e.getValue()));
+            }
+            return out;
+        }
+        if (x instanceof List<?> l) {
+            List<Object> out = new ArrayList<>();
+            for (Object v : l) {
+                out.add(копия(v));
+            }
+            return out;
+        }
+        return x;
     }
 }
