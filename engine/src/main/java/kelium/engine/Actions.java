@@ -1430,9 +1430,11 @@ public final class Actions {
                     return запасной != null && тронутые.contains(запасной.uid);
                 });
             }
-            if (menu.isEmpty() && moveMenu.isEmpty()) {
-                return null;
-            }
+            // ПУСТОЕ МЕНЮ ПОСТРОЙКИ — ЕЩЁ НЕ ПАС: снос монет не требует, наоборот,
+            // даёт их. Прежде при «строить не на что» операция кончалась здесь,
+            // и без денег нельзя было и снести своё здание (поймано 30.09.2026,
+            // когда стартовые монеты ушли на верх начального арсенала). Пусто
+            // ли всё меню, решается ниже, когда собран и снос.
             List<Choice> opts = new ArrayList<>();
             for (Map<String, Object> spec : menu) {
                 opts.add(new Choice("build_pick", spec, (String) spec.get("label")));
@@ -1540,6 +1542,9 @@ public final class Actions {
                 чинить.put("label", "починить " + b.type.code + "@" + b.hexId
                     + " (урон " + b.damage + ", " + цена + " мон)");
                 opts.add(new Choice("repair_pick", чинить, (String) чинить.get("label")));
+            }
+            if (opts.isEmpty()) {
+                return null;                        // ни поставить, ни снести
             }
             opts.add(new Choice("pass", null, "stop building"));
             // ВЕТКА — в точку решения: интерфейс называет меню её именем

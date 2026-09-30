@@ -21,6 +21,7 @@ import kelium.core.TechBoard;
 import kelium.core.TokenStats;
 import kelium.core.UnitToken;
 import kelium.core.UnitType;
+import kelium.dataio.Ctx;
 import kelium.dataio.GameConfig;
 import kelium.rules.Ruleset;
 
@@ -868,7 +869,39 @@ public final class Setup {
                 // каталога нет — режим включён зря; играем без карт
             }
         }
+        установитьНачальныйАрсенал(s, ruleset);
         return s;
+    }
+
+    /**
+     * НАЧАЛЬНЫЙ АРСЕНАЛ ОТКРЫВАЮТ НА ПОДГОТОВКЕ (решение дизайнера 30.09.2026,
+     * книга гл. 3, шаг 13): карту не держат в руке, а сразу устанавливают.
+     * Игрок получает набор с её верха — это и есть его стартовые ресурсы
+     * (монет и келемия по своду при этом 0) — и её постоянную способность.
+     * Включается ключом {@code setup.start_arsenal_installed}; без него карта,
+     * как прежде, лежит в руке арсенала до установки спец-действием.
+     */
+    @SuppressWarnings("unchecked")
+    static void установитьНачальныйАрсенал(GameState s, Ruleset ruleset) {
+        if (!ruleset.getBool("setup.start_arsenal_installed", false)) {
+            return;
+        }
+        for (PlayerState p : s.players) {
+            for (String cid : new ArrayList<>(p.arsenalHand)) {
+                Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+                if (card == null || !"starting".equals(card.get("kind"))) {
+                    continue;
+                }
+                p.arsenalHand.remove(cid);
+                p.arsenalInstalled.add(cid);
+                Map<String, Object> top = GameEngine.стартовыйНабор(s, cid);
+                if (top != null) {
+                    Map<String, Object> params = top.get("params") instanceof Map<?, ?> m
+                        ? (Map<String, Object>) m : Map.of();
+                    Effects.apply(String.valueOf(top.get("effect")), s, p.seat, params);
+                }
+            }
+        }
     }
 
     /**
