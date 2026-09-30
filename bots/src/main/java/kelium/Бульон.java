@@ -101,7 +101,7 @@ public final class Бульон {
         // ЖЕТОНЫ НА ПОЛЕ
         for (String кто : List.of("ДОБЫТЧИК", "ЭНЕРГОСТАНЦИЯ", "ВОЕННОЕ", "ЗДАНИЕ")) {
             for (String сост : new String[]{null, "ЗАПИТАН"}) {
-                for (int n = 2; n <= 4; n++) {
+                for (int n = 2; n <= Math.min(4, kelium.cards.язык.Кто.valueOf(кто).наибольшее()); n++) {
                     out.add(Map.of("узел", "жетоны", "группа", группа(кто, true, сост), "сколько", n,
                         "разных_гексов", false));
                 }

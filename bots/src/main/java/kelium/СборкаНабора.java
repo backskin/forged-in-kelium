@@ -39,9 +39,11 @@ public final class СборкаНабора {
     private СборкаНабора() {
     }
 
-    static final int МИН_В_РУКЕ = 6;
-    static final double ДОЛЯ_МИН = 0.08;
-    static final double ДОЛЯ_МАКС = 0.85;
+    /** Пробный режим (-Dkelium.набор.проба=true): пороги сняты — только проверка пути. */
+    static final boolean ПРОБА = Boolean.getBoolean("kelium.набор.проба");
+    static final int МИН_В_РУКЕ = ПРОБА ? 1 : 6;
+    static final double ДОЛЯ_МИН = ПРОБА ? 0.0 : 0.08;
+    static final double ДОЛЯ_МАКС = ПРОБА ? 1.0 : 0.85;
     static final int ЗАДАНИЙ = 40;
     static final int АРСЕНАЛА = 33;
     static final int РЕДКИХ = 6;
@@ -151,7 +153,7 @@ public final class СборкаНабора {
             арсПоРазвилке.put(р, new ArrayList<>());
         }
         List<Map.Entry<String, int[]>> сработавшие = new ArrayList<>(срабатывания.entrySet());
-        сработавшие.removeIf(e -> e.getValue()[0] < 2 || e.getValue()[1] == 0);
+        сработавшие.removeIf(e -> !ПРОБА && (e.getValue()[0] < 2 || e.getValue()[1] == 0));
         сработавшие.sort((a, b) -> Double.compare(
             b.getValue()[1] / (double) b.getValue()[0], a.getValue()[1] / (double) a.getValue()[0]));
         for (var e : сработавшие) {
@@ -236,20 +238,29 @@ public final class СборкаНабора {
             String соседняя = КРУГ.get((КРУГ.indexOf(р) + 1) % КРУГ.size());
             List<String> свои = веткиРазвилки(р);
             List<String> чужие = веткиРазвилки(соседняя);
+            // НАГРАДЫ ПО ТРУДНОСТИ (дизайнер 30.09.2026). Выполнение задания —
+            // по-прежнему спец-действие; награда же может вернуть их два-три,
+            // и выполненное задание оплачивает следующее задание или утиль
+            // арсенала — это и есть связка за ход.
             Map<String, Object> награда = new LinkedHashMap<>();
             награда.put("действие", свои.get(номер % 2) + "|" + чужие.get((номер / 2) % 2));
-            if (м.доля() < 0.25) {
-                награда.put("спецДействий", 1);
-            } else if (м.доля() < 0.5) {
-                награда.put("монеты", 2);
-            }
             Map<String, Object> язык = new LinkedHashMap<>();
             язык.put("имя", имя(т));
             язык.put("требование", т);
             Map<String, Object> усиление = ступеньВыше(т);
             if (усиление != null) {
+                // основное — ветка; усиление — 2 спец-действия (трудному 3) и карта арсенала
                 язык.put("усиление", усиление);
-                язык.put("сверх", Map.of("картыАрсенала", 1));
+                язык.put("сверх", Map.of("спецДействий", м.доля() < 0.25 ? 3 : 2, "картыАрсенала", 1));
+            } else if (м.доля() >= 0.5) {
+                награда.put("монеты", 2);
+            } else if (м.доля() >= 0.25) {
+                награда.put("спецДействий", 2);
+            } else if (м.доля() >= 0.12) {
+                награда.put("спецДействий", 2);
+                награда.put("монеты", 2);
+            } else {
+                награда.put("спецДействий", 3);
             }
             язык.put("награда", награда);
             язык.put("верх", верхРазвилки(р, номер));
@@ -276,7 +287,7 @@ public final class СборкаНабора {
             Map<String, Object> а = арсеналПоId.get(id);
             Map<String, Object> e = new LinkedHashMap<>();
             e.put("id", String.format("a8_%02d", номер));
-            e.put("name", "Связка " + номер);
+            e.put("name", имяСрабатывания(а));
             e.put("kind", "regular");
             e.put("значок", развилкаСрабатывания(а));
             e.put("top", старыеВерхи.get((номер - 1) % старыеВерхи.size()));
@@ -324,6 +335,45 @@ public final class СборкаНабора {
             арсенал.size());
     }
 
+    /** Имя карты арсенала по сути: «Рынок → монета», «Уничтожил → спец-действие». */
+    @SuppressWarnings("unchecked")
+    private static String имяСрабатывания(Map<String, Object> а) {
+        Map<String, Object> низ = (Map<String, Object>) а.get("низ");
+        Map<String, Object> когда = (Map<String, Object>) низ.get("когда");
+        Map<String, Object> эф = (Map<String, Object>) низ.get("эффект");
+        String что = String.valueOf(когда.get("событие"));
+        String событие = switch (что) {
+            case "ветка" -> kelium.cards.язык.Требование.ветка(String.valueOf(когда.get("ветка")))
+                .replace("«", "").replace("»", "");
+            case "развилка" -> switch (String.valueOf(когда.get("развилка"))) {
+                case "extract" -> "Добыча";
+                case "power" -> "Питание";
+                case "supply" -> "Снабжение";
+                case "command" -> "Командование";
+                default -> "Развитие";
+            };
+            case "задание" -> "Задание";
+            case "сжёг" -> "Сжёг карту";
+            case "установил" -> "Установил";
+            case "уничтожил" -> "Уничтожил";
+            case "потерял" -> "Потеря";
+            case "совпадение" -> "Совпадение";
+            case "низ" -> "Нижний приказ";
+            default -> что;
+        };
+        Map<String, Object> п = эф.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        String итог = switch (String.valueOf(эф.get("effect"))) {
+            case "спец" -> "спец-действие";
+            case "heal_one" -> "ремонт";
+            case "free_action" -> kelium.cards.язык.Требование.ветка(String.valueOf(п.get("action")))
+                .replace("«", "").replace("»", "");
+            default -> п.containsKey("coin") ? "монеты" : п.containsKey("ammo") ? "боеприпас"
+                : п.containsKey("kelium") ? "келемий" : п.containsKey("trophy") ? "трофей"
+                : п.containsKey("objective_cards") ? "задание" : "добро";
+        };
+        return событие + " → " + итог;
+    }
+
     /** Имя карты — строго по сути требования, без придуманных слов. */
     @SuppressWarnings("unchecked")
     private static String имя(Map<String, Object> т) {
@@ -354,16 +404,47 @@ public final class СборкаНабора {
         return к.charAt(0) + к.substring(1).toLowerCase().replace('_', ' ');
     }
 
-    /** Усиление — то же требование на ступень выше; где ступени нет — без усиления. */
-    private static Map<String, Object> ступеньВыше(Map<String, Object> т) {
-        for (String ключ : List.of("сколько", "гексов")) {
-            if (т.get(ключ) instanceof Number n) {
-                Map<String, Object> у = new LinkedHashMap<>(т);
-                у.put(ключ, n.intValue() + 1);
-                return у;
+    /**
+     * Усиление — то же требование на ступень выше, если такая ступень вообще
+     * бывает: жетонов у игрока не больше, чем в его запасе (книга, гл. 4),
+     * ячеек арсенала три. Ресурсы, найм и стройка за ход без усиления: их
+     * потолок задают хранилище и число веток, и ступень выше могла бы оказаться
+     * невыполнимой.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> ступеньВыше(Map<String, Object> т) {
+        String узел = String.valueOf(т.get("узел"));
+        int предел;
+        String ключ;
+        switch (узел) {
+            case "жетоны" -> {
+                ключ = "сколько";
+                предел = kelium.cards.язык.Кто.valueOf(String.valueOf(
+                    ((Map<String, Object>) т.get("группа")).get("кто"))).наибольшее();
+            }
+            case "рядом" -> {
+                ключ = "гексов";
+                предел = Math.min(3, kelium.cards.язык.Кто.valueOf(String.valueOf(
+                    ((Map<String, Object>) т.get("а")).get("кто"))).наибольшее());
+            }
+            case "арсенал" -> {
+                ключ = "сколько";
+                предел = 3;
+            }
+            case "свалка", "уничтожь" -> {
+                ключ = "сколько";
+                предел = 3;
+            }
+            default -> {
+                return null;
             }
         }
-        return null;
+        if (!(т.get(ключ) instanceof Number n) || n.intValue() + 1 > предел) {
+            return null;
+        }
+        Map<String, Object> у = new LinkedHashMap<>(т);
+        у.put(ключ, n.intValue() + 1);
+        return у;
     }
 
     /** Печатный утиль по развилке карты. */
@@ -395,15 +476,18 @@ public final class СборкаНабора {
         return x;
     }
 
-    /** Награда по трудности: чем реже выполняют, тем жирнее — вплоть до спец-действия. */
+    /** Награда по трудности (без усиления): чем реже выполняют, тем больше спец-действий. */
     static String награда(double доля) {
         if (доля >= 0.5) {
-            return "ветка на выбор";
-        }
-        if (доля >= 0.25) {
             return "ветка на выбор и 2 монеты";
         }
-        return "ветка на выбор и спец-действие";
+        if (доля >= 0.25) {
+            return "ветка на выбор и 2 спец-действия";
+        }
+        if (доля >= 0.12) {
+            return "ветка на выбор, 2 спец-действия и 2 монеты";
+        }
+        return "ветка на выбор и 3 спец-действия";
     }
 
     /** Развилка требования: действием закрывают — его развилка; состояния — по роду. */

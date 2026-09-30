@@ -104,9 +104,11 @@ public final class ЧерновыеЛица {
         int h = 933;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = кисть(img);
+        // Запись каталога движок переписывает выгрузкой карты, и значка в ней
+        // нет — его знает сама карта языка.
         String значок = e.get("значок") != null ? String.valueOf(e.get("значок"))
-            : e.get("язык") instanceof Map<?, ?> я && я.get("значок") != null
-                ? String.valueOf(я.get("значок")) : null;
+            : kelium.engine.cards.CardRegistry.objective(String.valueOf(e.get("id")))
+                instanceof kelium.cards.objectives.ЗаданиеИзЯзыка з ? з.значок() : null;
         Color ц = цвет(значок);
         фон(g, w, h, ц);
         int y = 24;
@@ -136,15 +138,15 @@ public final class ЧерновыеЛица {
         // награда
         String награда = словаНаграды(e.get("base_reward"));
         g.setColor(new Color(255, 255, 255, 225));
-        g.fill(new RoundRectangle2D.Double(24, y, w - 48, 110, 30, 30));
+        g.fill(new RoundRectangle2D.Double(24, y, w - 48, 150, 30, 30));
         g.setColor(ц);
         g.setStroke(new BasicStroke(4f));
-        g.draw(new RoundRectangle2D.Double(24, y, w - 48, 110, 30, 30));
+        g.draw(new RoundRectangle2D.Double(24, y, w - 48, 150, 30, 30));
         g.setColor(ТЕКСТ);
         g.setFont(new Font("SansSerif", Font.BOLD, 26));
         g.drawString("Награда:", 44, y + 40);
-        абзац(g, награда, new Font("SansSerif", Font.PLAIN, 26), 44, y + 50, w - 90, 2);
-        y += 136;
+        абзац(g, награда, new Font("SansSerif", Font.PLAIN, 25), 44, y + 50, w - 90, 3);
+        y += 176;
         // дополнительно
         if (e.get("enhanced") instanceof Map<?, ?> en && en.get("условие") != null) {
             g.setColor(ц);
