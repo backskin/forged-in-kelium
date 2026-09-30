@@ -736,12 +736,8 @@ public final class СнимокСтола {
             MarkIcons.paint(g, "COIN", x + (i % 3) * px(17), y + (i / 3) * px(17),
                 px(15), null);
         }
-        for (int i = 0; i < p.kelium; i++) {
-            MarkIcons.paint(g, "KELIUM", x + px(56), y + i * px(15), px(13), null);
-        }
-        for (int i = 0; i < p.ammo; i++) {
-            MarkIcons.paint(g, "AMMO", x + px(76), y + i * px(15), px(13), null);
-        }
+        // Келемий и боеприпасы лежат в ячейках хранилища — их рисует печатная
+        // сцепка. Второй раз у монет их не кладём (книга, гл. 3, шаг 13).
     }
 
     /** Отношение ширины сцепки к ширине одного планшета войск. */
