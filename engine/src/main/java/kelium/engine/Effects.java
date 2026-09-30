@@ -490,6 +490,22 @@ public final class Effects {
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
             tj.onAction(seat, name, res.telemetry());
         }
+        // ВЕТКА С КАРТЫ — ТОЖЕ СОБЫТИЕ «сыграна ветка» (Карты 2.0, 30.09.2026):
+        // «каждый раз, когда играешь ветку …» считает и ветки с карт, иначе
+        // награда задания не могла бы запустить установленный арсенал.
+        if (s.публикатор != null && res != null) {
+            Map<String, Object> ev = new HashMap<>();
+            ev.put("type", "action");
+            ev.put("seat", seat);
+            boolean стройка = name.startsWith("build_");
+            ev.put("action", стройка ? "build" : name);
+            ev.put("fork", Срабатывания.развилка(name));
+            ev.put("ok", res.ok());
+            ev.put("free", true);
+            ev.put("detail", res.detail());
+            ev.put("telemetry", res.telemetry());
+            s.публикатор.accept(ev);
+        }
         got.put("ran", res != null && res.ok());
         if (res != null) {
             got.put("detail", res.detail());

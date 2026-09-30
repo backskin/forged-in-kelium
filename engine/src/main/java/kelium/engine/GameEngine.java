@@ -175,6 +175,9 @@ public final class GameEngine {
         for (Agent a : agents) {
             a.observePublicEvent(event);
         }
+        // СРАБАТЫВАНИЯ КАРТ «каждый раз, когда …» (Карты 2.0) — после того, как
+        // событие увидели запись и игроки: в записи причина идёт раньше следствия.
+        Срабатывания.раздать(state, event);
     }
 
     private static Map<String, Object> ev(Object... kv) {
@@ -237,7 +240,10 @@ public final class GameEngine {
     public Map<String, Object> resume() {
         GameState s = state;
         maxRounds = roundLimit;
-        bindResume(s, agents, onEvent == null ? null : this::emit);
+        // Всегда через emit движка, даже без наблюдателя: события боя и веток с
+        // карт запускают срабатывания карт (Карты 2.0) — это правила, и повтор
+        // позиции обязан играть их так же, как настоящая партия.
+        bindResume(s, agents, this::emit);
         loop(Math.max(1, s.round), Math.max(1, s.circle), false);
         return finishAndScore();
     }
@@ -2699,6 +2705,7 @@ public final class GameEngine {
         state.combat = new CombatResolver(state, onEvent == null ? e -> { } : onEvent)
             .bindAgents(agents);
         state.agents = agents;
+        state.публикатор = onEvent;
     }
 
     /** Привязать без наблюдателя событий — для тестов и пробников. */
@@ -2719,6 +2726,7 @@ public final class GameEngine {
         state.combat = new CombatResolver(state, onEvent == null ? e -> { } : onEvent)
             .bindAgents(agents);
         state.agents = agents;
+        state.публикатор = onEvent;
     }
 
     /** Удобная обёртка: создать движок и прогнать партию, вернув итог. */

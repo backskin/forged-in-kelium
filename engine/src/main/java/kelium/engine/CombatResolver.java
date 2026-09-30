@@ -1261,7 +1261,7 @@ public final class CombatResolver {
                     Passives.effectiveHp(s, victim),
                     s.player(owner).unitsOnField().size(), p.unitsOnField().size(),
                     s.player(owner).resources.kelium(), p.resources.kelium(),
-                    уСтартового));
+                    уСтартового, unit.type.code, row, unit.hexId, target));
             }
             // ТРОФЕИ убитого — в событие: без этого поля трофейную
             // экономику нечем мерить, а она половина смысла боя. Ценность

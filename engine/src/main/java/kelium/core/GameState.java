@@ -138,6 +138,15 @@ public final class GameState {
      */
     public java.util.function.Consumer<GameState> circleStartHook = null;
 
+    /**
+     * КУДА ПУБЛИКОВАТЬ СОБЫТИЯ ИЗ ГЛУБИНЫ ПРАВИЛ (Карты 2.0, 30.09.2026).
+     * Ветка, сыгранная с карты, идёт мимо главного цикла движка — без этого
+     * поля о ней не узнали бы ни запись партии, ни карты «каждый раз, когда
+     * играешь ветку …». Ставится при привязке агентов, в копии НЕ переносится;
+     * {@code null} — наблюдателя нет (тесты, пробники).
+     */
+    public java.util.function.Consumer<java.util.Map<String, Object>> публикатор = null;
+
     public GameState(Object config, List<PlayerState> players, Field field,
                      TokenStats tokenStats, TechBoard tech,
                      Map<String, Deck> decks, Random rng, int firstPlayer) {

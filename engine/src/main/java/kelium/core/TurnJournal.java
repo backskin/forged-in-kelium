@@ -526,13 +526,29 @@ public final class TurnJournal {
      * @param victimKelium  сколько келемия было у хозяина жетона
      * @param myKelium      сколько келемия было у бьющего
      * @param atStartSpawn  добытчик, примыкавший к СТАРТОВОМУ зарождению
+     * @param кем           род войска, которое уничтожило ({@code infantry}…);
+     *                      {@code null} — не войском (эффект карты)
+     * @param атака         {@code universal} / {@code specialized}; {@code null} —
+     *                      не атакой
+     * @param откуда        гекс, с которого била атака; {@code null} — не атакой
+     * @param где           гекс, на котором стоял уничтоженный жетон
      */
     public record Убитый(int owner, String kind, boolean building, int hp,
                          int victimUnits, int myUnits, int victimKelium, int myKelium,
-                         boolean atStartSpawn) {
+                         boolean atStartSpawn, String кем, String атака, String откуда,
+                         String где) {
     }
 
     private final TurnFacts[] perSeat;
+
+    /**
+     * НОМЕР ХОДА В ПАРТИИ — растёт с каждым {@link #startTurn}. По нему
+     * срабатывания карт «не больше N раз за ход» знают, что ход сменился, в
+     * том числе когда карта срабатывает в чужой ход (Карты 2.0, 30.09.2026).
+     */
+    private int номерХода = 0;
+    /** Сколько раз сработала каждая карта в текущем ходу: «место:карта» → раз. */
+    private final Map<String, Integer> срабатывания = new HashMap<>();
 
     public TurnJournal(int numPlayers) {
         perSeat = new TurnFacts[numPlayers];
@@ -547,12 +563,26 @@ public final class TurnJournal {
         for (int i = 0; i < perSeat.length; i++) {
             j.perSeat[i].copyFrom(perSeat[i]);
         }
+        j.номерХода = номерХода;
+        j.срабатывания.putAll(срабатывания);
         return j;
     }
 
     /** Начать ход места: обнулить его запись. */
     public void startTurn(int seat) {
         perSeat[seat].reset();
+        номерХода++;
+        срабатывания.clear();
+    }
+
+    /** Сколько раз карта {@code карта} игрока {@code место} уже сработала в этот ход. */
+    public int срабатываний(int место, String карта) {
+        return срабатывания.getOrDefault(место + ":" + карта, 0);
+    }
+
+    /** Отметить ещё одно срабатывание карты в этот ход. */
+    public void отметитьСрабатывание(int место, String карта) {
+        срабатывания.merge(место + ":" + карта, 1, Integer::sum);
     }
 
     /** Факты текущего хода указанного места. */
