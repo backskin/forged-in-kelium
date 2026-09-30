@@ -93,6 +93,8 @@ public final class СнимокСтола {
     private static final double[] РЫНОК_ЛЕВАЯ = {540, 945};
     private static final double КАРТА_ЗАДАНИЕ_Ш = 56;   // 56×87
     private static final double КАРТА_АРСЕНАЛ_Ш = 68;   // 68×44
+    /** Зазор от низа сцепки до руки приказов, мм: под планшетом лежит арсенал. */
+    private static final double ОТСТУП_РУКИ = 38;
     private static final double КАРТА_КОНТЕЙНЕР_Ш = 34; // 34×34
     private static final double КАРТА_РЫНКА_Ш = 87;    // 87×56, лежит боком
 
@@ -694,10 +696,14 @@ public final class СнимокСтола {
         качество(t);
         t.translate(px(cx), px(cy));
         t.rotate(Math.toRadians(угол));
+        // НАЧАЛЬНЫЙ АРСЕНАЛ (подготовка, шаг 13; дизайнер 30.09.2026): карту
+        // открывают и сразу устанавливают в первую ячейку под планшетом войск.
+        // Её верх («получи при установке») уходит под планшет — поэтому карта
+        // кладётся ДО сцепки, и планшет её накрывает.
+        int[] арс = начальныйАрсенал(t, seat, холст.getWidth(), холст.getHeight());
         положить(t, холст, -холст.getWidth() / 2, -холст.getHeight() / 2,
             холст.getWidth(), холст.getHeight(), 2.6);
         рукаПриказов(t, seat, холст.getHeight());
-        ресурсыИгрока(t, session, seat, холст.getWidth(), холст.getHeight());
         t.dispose();
 
         // ЯКОРЯ ЛИЧНОЙ ЗОНЫ снимаются с ближнего игрока: он смотрит на нас, и
@@ -709,35 +715,37 @@ public final class СнимокСтола {
                 холст.getWidth(), холст.getHeight()};
             якорьТ("11", лx + холст.getWidth() * 0.14, лy + холст.getHeight() * 0.62);
             якорьТ("12", лx + холст.getWidth() * 0.13, лy + холст.getHeight() * 0.035);
-            якорьТ("13", px(cx) + холст.getWidth() * 0.60, лy + холст.getHeight() * 1.02);
+            if (арс != null) {
+                якорьТ("13", px(cx) + арс[0] + арс[2] * 0.5, px(cy) + арс[1] + арс[3] * 0.78);
+            }
             якорьТ("14", лx + холст.getWidth() * 0.965, лy + холст.getHeight() * 0.74);
             якорьТ("15", px(cx) - px(КАРТА_ЗАДАНИЕ_Ш) * 0.9,
-                px(cy) + холст.getHeight() / 2.0 + px(14) + px(КАРТА_ЗАДАНИЕ_Ш) * 0.78);
+                px(cy) + холст.getHeight() / 2.0 + px(ОТСТУП_РУКИ) + px(КАРТА_ЗАДАНИЕ_Ш) * 0.78);
             якорьТ("16", px(cx) + px(КАРТА_ЗАДАНИЕ_Ш) * 2.3,
-                px(cy) + холст.getHeight() / 2.0 + px(14) + px(КАРТА_ЗАДАНИЕ_Ш) * 0.78);
+                px(cy) + холст.getHeight() / 2.0 + px(ОТСТУП_РУКИ) + px(КАРТА_ЗАДАНИЕ_Ш) * 0.78);
         }
     }
 
     /**
-     * СТАРТОВЫЕ РЕСУРСЫ ИГРОКА (подготовка, шаг 13) — монетами и кубиками рядом
-     * с его планшетом, как они и лежат у руки. Сколько чего, спрашивается у
-     * движка, а не пишется сюда числом.
+     * НАЧАЛЬНЫЙ АРСЕНАЛ ИГРОКА (подготовка, шаг 13) — лицом вверх в первой
+     * ячейке под планшетом войск. Планшет войск — правая часть сцепки, ячейка
+     * для карт — у его левого края. Возвращает {x, y, ш, в} карты в осях зоны
+     * (начало — центр сцепки). Стартовых монет у руки нет: стартовые ресурсы —
+     * верх этой карты.
      */
-    private static void ресурсыИгрока(Graphics2D g, Session session, int seat,
-                                      int ширина, int высота) {
-        var f = session.frame();
-        if (f == null || f.snapshot == null || seat >= f.snapshot.players.size()) {
-            return;
+    private static int[] начальныйАрсенал(Graphics2D g, int seat, int ширина, int высота) {
+        BufferedImage карта = Textures.card("arsenal_start/bs72_" + (seat % 7 + 1),
+            "deck_arsenal_start");
+        if (карта == null) {
+            return null;
         }
-        ReplayRecord.Player p = f.snapshot.players.get(seat);
-        double x = ширина / 2.0 + px(26);
-        double y = высота / 2.0 + px(16);
-        for (int i = 0; i < p.coin; i++) {
-            MarkIcons.paint(g, "COIN", x + (i % 3) * px(17), y + (i / 3) * px(17),
-                px(15), null);
-        }
-        // Келемий и боеприпасы лежат в ячейках хранилища — их рисует печатная
-        // сцепка. Второй раз у монет их не кладём (книга, гл. 3, шаг 13).
+        int w = px(КАРТА_АРСЕНАЛ_Ш);
+        int h = (int) Math.round(w * карта.getHeight() / (double) карта.getWidth());
+        double левыйКрайВойск = ширина / 2.0 - px(ВОЙСКА_Ш);
+        int x = (int) Math.round(левыйКрайВойск + px(ВОЙСКА_Ш) * 0.22 - w / 2.0);
+        int y = высота / 2 - px(15);
+        положить(g, карта, x, y, w, h, 1.4);
+        return new int[]{x, y, w, h};
     }
 
     /** Отношение ширины сцепки к ширине одного планшета войск. */
@@ -763,7 +771,7 @@ public final class СнимокСтола {
         }
         int w = px(КАРТА_ЗАДАНИЕ_Ш);
         int h = (int) Math.round(w * back.getHeight() / (double) back.getWidth());
-        int y = высотаСцепки / 2 + px(14) + h / 2;
+        int y = высотаСцепки / 2 + px(ОТСТУП_РУКИ) + h / 2;
         double шаг = w * 0.66;
         for (int i = 0; i < 5; i++) {
             Graphics2D c = (Graphics2D) g.create();
@@ -931,8 +939,18 @@ public final class СнимокСтола {
             Math.min(255, (int) Math.round(c.getBlue() * k)));
     }
 
-    /** Фишка первого игрока — круглый жетон со звездой. */
+    /**
+     * Фишка первого игрока — та же фигурка «#1», что в наборе иконок игры
+     * (icons/first_player.png): её рисунок и лежит на столе (дизайнер 30.09.2026).
+     */
     private static void фишкаПервогоТ(Graphics2D g, double cx, double cy) {
+        BufferedImage фишка = Textures.icon("first_player");
+        if (фишка != null) {
+            int h = px(40);
+            int w = (int) Math.round(h * фишка.getWidth() / (double) фишка.getHeight());
+            положить(g, фишка, (int) Math.round(cx - w / 2.0), (int) Math.round(cy - h / 2.0), w, h, 1.6);
+            return;
+        }
         double d = 44;
         Ellipse2D e = new Ellipse2D.Double(cx - px(d) / 2.0, cy - px(d) / 2.0,
             px(d), px(d));

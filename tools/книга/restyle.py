@@ -275,7 +275,9 @@ CSS = r"""
     margin-right: 1mm; vertical-align: middle; }
   .схема .номер-круг { fill: var(--келемий); stroke: #fff; stroke-width: .5; }
   .схема .номер-текст { fill: #fff; font: 700 4.2px "Tektur Narrow", sans-serif; text-anchor: middle; dominant-baseline: central; }
-  .схема .выноска { fill: none; stroke: var(--келемий); stroke-width: .45; }
+  .схема .выноска { fill: none; stroke: var(--келемий); stroke-width: .55; stroke-linejoin: round; }
+  .схема .выноска-фон { fill: none; stroke: #F7F1E1; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; opacity: .9; }
+  .схема .точка-фон { fill: #F7F1E1; opacity: .9; }
   .схема .точка-выноски { fill: var(--келемий); }
   .схема .макет { fill: rgba(255,255,255,.55); stroke: var(--пример-кант); stroke-width: .35; stroke-dasharray: 1.2 .8; }
   .схема .подпись { fill: var(--чернила); font: 3.6px "Tektur Narrow", sans-serif; text-anchor: middle; }
