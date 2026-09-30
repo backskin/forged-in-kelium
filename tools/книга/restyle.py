@@ -300,6 +300,35 @@ CSS = r"""
   .пример.совет::before { background: var(--совет); }
   .пример.совет .метка { background: var(--келемий); }
 
+  /* ЦИКЛ РАУНДА: три фазы столбцами, стрелки между ними, возврат снизу. */
+  .цикл { column-span: all; break-inside: avoid; margin: 0 0 3mm; }
+  .цикл-ряд { display: grid; grid-template-columns: 1fr 5mm 1fr 5mm 1fr; align-items: stretch; }
+  .фаза { display: flex; flex-direction: column; background: var(--подложка);
+    outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: СКОС28; }
+  .фаза header { display: flex; align-items: center; gap: 2.6mm; background: var(--келемий);
+    color: #fff; padding: 1.8mm 3mm 1.8mm 2.4mm; min-height: 12mm; }
+  .фаза .ф-н { flex: none; width: 10.8mm; height: 12.5mm; filter: drop-shadow(0 .3mm .5mm rgba(0,0,0,.35)); }
+  .фаза header b { display: block; font: 800 13.5pt/1.05 "Tektur", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+  .фаза header i { display: block; font: 500 8.8pt/1.2 "Tektur", sans-serif; font-style: normal; color: #CFE8C9; margin-top: .6mm; }
+  .ф-тело { padding: 2.2mm 2.8mm 2.6mm; display: flex; flex-direction: column; gap: 1.8mm; }
+  .ф-тело p { margin: 0; font-size: 9.2pt; line-height: 1.27; }
+  .ф-шаг { display: flow-root; }
+  .ф-шаг .ф-и { float: left; width: 8.4mm; height: 8.4mm; object-fit: contain; margin: .3mm 2mm .6mm 0; }
+  .ф-шаг .ф-и.ф-карта { width: auto; height: 12mm; border-radius: .8mm; box-shadow: 0 .3mm .8mm rgba(0,0,0,.35); }
+  .ф-тело { flex: 1; }
+  .ф-низ { margin-top: auto; padding-top: 2mm; text-align: center; }
+  .ф-низ img { max-width: 88%; max-height: 30mm; }
+  .ф-стрелка { position: relative; }
+  .ф-стрелка::before { content: ""; position: absolute; left: .5mm; right: .5mm; top: 3.8mm; height: 4.6mm;
+    background: var(--охра); clip-path: polygon(0 28%, 55% 28%, 55% 0, 100% 50%, 55% 100%, 55% 72%, 0 72%); }
+  .цикл-возврат { position: relative; height: 7mm; margin: 0 16.67%; border: .8mm solid var(--охра);
+    border-top: 0; border-radius: 0 0 3mm 3mm; }
+  .цикл-возврат::before { content: ""; position: absolute; left: -2.6mm; top: -2.4mm; width: 4.4mm; height: 3.6mm;
+    background: var(--охра); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .цикл-возврат span { position: absolute; left: 50%; bottom: -2.8mm; transform: translateX(-50%);
+    background: var(--охра); color: #fff; font: 700 8.6pt/1 "Tektur", sans-serif; text-transform: uppercase;
+    letter-spacing: .06em; padding: 1.2mm 3mm; white-space: nowrap; clip-path: СКОС2; }
+
   .фазы { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin: 0 0 3mm;
     column-span: all; break-inside: avoid; }
   .фазы > div { position: relative; background: var(--подложка); border-top: 1mm solid var(--келемий); padding: 1.8mm 2.4mm;

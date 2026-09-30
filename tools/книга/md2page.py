@@ -149,6 +149,31 @@ def ячейка_с_иконкой(текст):
             + "<b>" + inline(m.group(2)) + "</b></span>")
 
 
+def гекс_номер(номер):
+    """Римская цифра фазы в светлом гексе — картинкой. Текстом цифра склеивалась
+    при разборе PDF с заголовком соседнего столбца (ложное «наложение»)."""
+    from PIL import Image, ImageDraw, ImageFont
+    import math
+    ш, в = 208, 240
+    im = Image.new("RGBA", (ш, в), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    def гекс(отступ):
+        cx, cy, r = ш / 2, в / 2, в / 2 - отступ
+        return [(cx + r * math.cos(math.radians(a)), cy + r * math.sin(math.radians(a)))
+                for a in (-90, -30, 30, 90, 150, 210)]
+    d.polygon(гекс(0), fill=(107, 68, 19, 255))          # охряной кант
+    d.polygon(гекс(12), fill=(247, 241, 225, 255))       # светлое поле
+    d.polygon(гекс(24), outline=(24, 108, 36, 255), width=5)
+    шрифт = ImageFont.truetype(r"C:\Windows\Fonts\Tektur-ExtraBold.ttf"
+                               if os.path.exists(r"C:\Windows\Fonts\Tektur-ExtraBold.ttf")
+                               else r"C:\Windows\Fonts\TekturNarrow-Bold.ttf", 96)
+    d.text((ш / 2, в / 2 + 4), номер, font=шрифт, fill=(24, 108, 36, 255), anchor="mm")
+    буфер = io.BytesIO()
+    im.save(буфер, "PNG", optimize=True)
+    return ('<img class="ф-н" src="data:image/png;base64,%s" alt="">'
+            % base64.b64encode(буфер.getvalue()).decode())
+
+
 def inline(s):
     s = html.escape(s, quote=False)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
@@ -376,6 +401,66 @@ def blocks(md):
                               + "<h2>" + inline(к["имя"]) + "</h2>"
                               + текст_карточки(к["текст"]) + "</div>")
             res.append('      <div class="карточки">' + "".join(html_к) + "</div>")
+            continue
+        # ЦИКЛ РАУНДА — три фазы в три столбца, читаются слева направо;
+        # между столбцами короткие стрелки, под ними стрелка возврата от
+        # последней фазы к первой (дизайнер 30.09.2026). В разметке:
+        #   :цикл: подпись стрелки возврата
+        #   # I | Обновление | в начале раунда
+        #   абзац
+        #
+        #   [иконка: рынок] **2. Рынок.** текст шага
+        #   :конец:
+        if ln.strip().startswith(":цикл:"):
+            подпись = ln.strip()[len(":цикл:"):].strip()
+            i += 1
+            фазы = []
+            while i < len(lines) and lines[i].strip() != ":конец:":
+                t = lines[i].rstrip()
+                if t.startswith("# "):
+                    номер, имя, когда = [x.strip() for x in t[2:].split("|")]
+                    фазы.append({"н": номер, "имя": имя, "когда": когда, "абз": [[]]})
+                elif not t.strip():
+                    фазы[-1]["абз"].append([])
+                else:
+                    фазы[-1]["абз"][-1].append(t.strip())
+                i += 1
+            i += 1
+            flush()
+            куски = []
+            for k, ф in enumerate(фазы):
+                тело = []
+                for абз in ф["абз"]:
+                    if not абз:
+                        continue
+                    текст = " ".join(абз)
+                    # «[[имя]]» — картинка _имя.png внизу столбца фазы
+                    мк = re.fullmatch(r"\[\[([^\]]+)\]\]", текст)
+                    if мк:
+                        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                               "_" + мк.group(1) + ".png"), "rb") as f:
+                            тело.append('<div class="ф-низ"><img src="data:image/png;base64,%s" alt=""></div>'
+                                        % base64.b64encode(f.read()).decode())
+                        continue
+                    m = re.match(r"\[иконка:\s*([^\]]+)\]\s*(.*)", текст)
+                    # Значок шага — иконка из экспорта или, если имя с «/»,
+                    # текстура компонента (карта приказа лицом или рубашкой).
+                    if m and "/" in m.group(1):
+                        з = картинка_текстуры(m.group(1).strip(), 160).replace("<img", '<img class="ф-и ф-карта"', 1)
+                    else:
+                        з = значок(m.group(1)).replace('class="и"', 'class="ф-и"') if m and значок(m.group(1)) else None
+                    if з:
+                        тело.append('<div class="ф-шаг">' + з + "<p>" + inline(m.group(2)) + "</p></div>")
+                    else:
+                        тело.append("<p>" + inline(текст) + "</p>")
+                куски.append('<section class="фаза"><header>' + гекс_номер(ф["н"])
+                             + '<div><b>' + inline(ф["имя"]) + "</b><i>" + inline(ф["когда"])
+                             + '</i></div></header><div class="ф-тело">' + "".join(тело) + "</div></section>")
+                if k < len(фазы) - 1:
+                    куски.append('<div class="ф-стрелка"></div>')
+            res.append('      <div class="цикл"><div class="цикл-ряд">' + "".join(куски)
+                       + '</div><div class="цикл-возврат"><span>' + inline(подпись)
+                       + "</span></div></div>")
             continue
         if ln.strip() == ":фазы:":
             i += 1
