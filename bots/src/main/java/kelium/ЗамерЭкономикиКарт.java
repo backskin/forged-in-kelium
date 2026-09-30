@@ -17,6 +17,9 @@ import kelium.agents.ОбученныйСтратег;
 import kelium.agents.сеть.Сеть;
 import kelium.core.Agent;
 import kelium.core.GameState;
+import kelium.dataio.ContentLibrary;
+import kelium.dataio.ContentSet;
+import kelium.dataio.GameConfig;
 import kelium.dataio.Вариант;
 import kelium.engine.GameEngine;
 import kelium.engine.LayoutLibrary;
@@ -25,14 +28,23 @@ import kelium.engine.Setup;
 
 /**
  * ЭКОНОМИКА КАРТ (Карты 2.0, 30.09.2026) — сколько карт реально играется за
- * партию и что меняют ручки правил, от которых зависит поток карт.
+ * партию и что меняют рычаги, от которых зависит поток карт.
  *
  * <p>Замер прогона бульона: карт арсенала ставят меньше одной на игрока за
  * партию. С таким потоком карты не могут быть главной частью игры, как бы
- * хороши они ни были. Этот стенд играет ОДНИ И ТЕ ЖЕ раздачи при нескольких
- * вариантах правил (стратеги, одна и та же сеть) и меряет: выполненные
- * задания и установленный арсенал на игрока, ходы, где сыграно две карты и
- * больше (связка за ход), срабатывания, длину партии и разброс очков.
+ * хороши они ни были.
+ *
+ * <p>РЫЧАГИ — САМИ КАРТЫ, НЕ ПРАВИЛА. «Выполнение задания без спец-действия»
+ * дизайнер закрыл 23.09.2026 как бездну (бесконечный ход), поэтому здесь его
+ * нет. Проверяется то, что предложил сам дизайнер 30.09: награда-спец-
+ * действие за задание и карта арсенала за усиленное задание — связки
+ * случаются, когда выпали нужные карты, а не каждый ход. Два спец-действия
+ * за ход — только для сравнения, это правило целиком.
+ *
+ * <p>Партии — одни и те же раздачи во всех вариантах, стратеги с одной сетью
+ * (читается один раз в начале). Меры: выполненные задания и установленный
+ * арсенал на игрока, ходы с двумя картами и больше (связка за ход),
+ * срабатывания, спец-действия, длина партии и разброс очков.
  *
  * <p>Запуск: {@code kelium.ЗамерЭкономикиКарт [партий на вариант] [потоков]}.
  */
@@ -41,13 +53,17 @@ public final class ЗамерЭкономикиКарт {
     private ЗамерЭкономикиКарт() {
     }
 
-    private static final List<Вариант> ВАРИАНТЫ = List.of(
-        Вариант.обычный("как сейчас"),
-        Вариант.разобрать("задание без спец-действия;правило=objectives.play_is_free_action=true"),
-        Вариант.разобрать("два спец-действия за ход;правило=actions.spec_per_turn=2"),
-        Вариант.разобрать("рука заданий 3;правило=rounds.objective_hand_limit=3"),
-        Вариант.разобрать("задание без спец-действия и рука 3;"
-            + "правило=objectives.play_is_free_action=true;правило=rounds.objective_hand_limit=3"));
+    /** Вариант: имя, правки свода, правки наград заданий. */
+    record ВариантКарт(String имя, Вариант правила, int спецЗаЗадание, int арсеналЗаУсиление) {
+    }
+
+    private static final List<ВариантКарт> ВАРИАНТЫ = List.of(
+        new ВариантКарт("как сейчас", Вариант.обычный("как сейчас"), 0, 0),
+        new ВариантКарт("два спец-действия за ход (правило, для сравнения)",
+            Вариант.разобрать("два спец;правило=actions.spec_per_turn=2"), 0, 0),
+        new ВариантКарт("задание даёт ещё спец-действие", Вариант.обычный("спец"), 1, 0),
+        new ВариантКарт("усиленное задание даёт карту арсенала", Вариант.обычный("арсенал"), 0, 1),
+        new ВариантКарт("и спец-действие, и карта арсенала", Вариант.обычный("оба"), 1, 1));
 
     /** Итог одной партии одного варианта. */
     record Итог(double заданий, double арсенала, double связокЗаХод, double срабатываний,
@@ -62,17 +78,18 @@ public final class ЗамерЭкономикиКарт {
             потоков, сеть != null ? "обученный" : "без сети");
         ExecutorService пул = Executors.newFixedThreadPool(потоков);
         Map<String, List<Future<Итог>>> ff = new LinkedHashMap<>();
-        for (Вариант в : ВАРИАНТЫ) {
+        for (ВариантКарт в : ВАРИАНТЫ) {
             List<Future<Итог>> список = new ArrayList<>();
             for (int g = 0; g < партий; g++) {
                 final long seed = 8_300_000L + g;
-                список.add(пул.submit(() -> в.применить(() -> партия(seed, сеть))));
+                список.add(пул.submit(() -> в.правила().применить(() -> партия(seed, сеть, в))));
             }
             ff.put(в.имя(), список);
         }
-        StringBuilder sb = new StringBuilder("# Экономика карт — варианты правил на одних раздачах\n\n"
+        StringBuilder sb = new StringBuilder("# Экономика карт — рычаги потока карт на одних раздачах\n\n"
             + "Стратеги (одна сеть), " + партий + " раздач на вариант. Всё — средние на игрока за"
-            + " партию, кроме раундов и разброса очков (лучший минус худший).\n\n"
+            + " партию, кроме раундов и разброса очков (лучший минус худший). «Задание без"
+            + " спец-действия» не проверяется: закрыто дизайнером 23.09 как бездна.\n\n"
             + "| вариант | заданий выполнено | арсенала установлено | ходов со связкой (2+ карты)"
             + " | срабатываний | спец-действий | раундов | разброс очков |\n"
             + "|---|---|---|---|---|---|---|---|\n");
@@ -100,6 +117,7 @@ public final class ЗамерЭкономикиКарт {
             sb.append(String.format(java.util.Locale.ROOT,
                 "| %s | %.2f | %.2f | %.2f | %.2f | %.1f | %.1f | %.1f |%n", e.getKey(), сумма[0] / n,
                 сумма[1] / n, сумма[2] / n, сумма[3] / n, сумма[4] / n, сумма[5] / n, сумма[6] / n));
+            System.out.println("  вариант готов: " + e.getKey());
         }
         пул.shutdown();
         Path out = Path.of("design-docs/фигуры/экономика карт.md");
@@ -107,8 +125,49 @@ public final class ЗамерЭкономикиКарт {
         System.out.println(sb);
     }
 
-    private static Итог партия(long seed, Сеть сеть) {
-        GameState s = Setup.buildGame(LayoutLibrary.configFor(4, seed));
+    /**
+     * Настройка партии с правкой наград: каждой обычной карте задания — ещё
+     * {@code спец} спец-действий в награду, и {@code арсенал} карт арсенала в
+     * усиленную. Записи копируются: общий кэш настроек не трогается.
+     */
+    @SuppressWarnings("unchecked")
+    private static GameConfig настройка(long seed, ВариантКарт в) {
+        GameConfig база = LayoutLibrary.configFor(4, seed);
+        if (в.спецЗаЗадание() == 0 && в.арсеналЗаУсиление() == 0) {
+            return база;
+        }
+        ContentSet задания = база.content.get("objectives");
+        List<Map<String, Object>> копии = new ArrayList<>();
+        for (Map<String, Object> e : задания.entries) {
+            Map<String, Object> к = new LinkedHashMap<>(e);
+            if ("regular".equals(e.get("kind"))) {
+                if (в.спецЗаЗадание() > 0) {
+                    Map<String, Object> н = e.get("base_reward") instanceof Map<?, ?> m
+                        ? new LinkedHashMap<>((Map<String, Object>) m) : new LinkedHashMap<>();
+                    н.merge("spec_actions", в.спецЗаЗадание(),
+                        (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
+                    к.put("base_reward", н);
+                }
+                if (в.арсеналЗаУсиление() > 0 && e.get("enhanced") != null) {
+                    Map<String, Object> с = e.get("special_reward") instanceof Map<?, ?> m
+                        ? new LinkedHashMap<>((Map<String, Object>) m) : new LinkedHashMap<>();
+                    с.merge("arsenal", в.арсеналЗаУсиление(),
+                        (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
+                    к.put("special_reward", с);
+                }
+            }
+            копии.add(к);
+        }
+        Map<String, ContentSet> наборы = new LinkedHashMap<>(база.content.sets);
+        наборы.put("objectives", new ContentSet("objectives", задания.version, копии, задания.raw,
+            задания.sourcePath));
+        GameConfig cfg = new GameConfig(база.ruleset, new ContentLibrary(наборы), 4, seed,
+            база.dataRoot, база.boardSides);
+        return LayoutLibrary.configFor(cfg, 4, seed);
+    }
+
+    private static Итог партия(long seed, Сеть сеть, ВариантКарт в) {
+        GameState s = Setup.buildGame(настройка(seed, в));
         List<Agent> agents = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
             agents.add(ЦиклСтратега.стратег(Bots.ROSTER_4.get(i), i, new Random(seed * 31 + i), сеть,
@@ -123,21 +182,21 @@ public final class ЗамерЭкономикиКарт {
         GameEngine.playGame(s, agents, ev -> {
             String тип = String.valueOf(ev.get("type"));
             Object место = ev.get("seat");
+            String ход = s.round + ":" + s.circle + ":" + место;
             switch (тип) {
                 case "objective" -> {
                     заданий[0]++;
-                    карт.merge(s.round + ":" + s.circle + ":" + место, 1, Integer::sum);
+                    карт.merge(ход, 1, Integer::sum);
                 }
                 case "arsenal" -> {
                     if ("install".equals(ev.get("mode"))) {
                         арсенала[0]++;
-                        карт.merge(s.round + ":" + s.circle + ":" + место, 1, Integer::sum);
+                        карт.merge(ход, 1, Integer::sum);
                     } else if ("burn".equals(ev.get("mode"))) {
-                        карт.merge(s.round + ":" + s.circle + ":" + место, 1, Integer::sum);
+                        карт.merge(ход, 1, Integer::sum);
                     }
                 }
-                case "objective_burn" -> карт.merge(s.round + ":" + s.circle + ":" + место, 1,
-                    Integer::sum);
+                case "objective_burn" -> карт.merge(ход, 1, Integer::sum);
                 case "card_trigger" -> срабатываний[0]++;
                 case "turn_end" -> {
                     if (место instanceof Integer m && s.journal != null) {
