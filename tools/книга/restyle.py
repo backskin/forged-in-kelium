@@ -306,7 +306,7 @@ CSS = r"""
   .фаза { display: flex; flex-direction: column; background: var(--подложка);
     outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: СКОС28; }
   .фаза header { display: flex; align-items: center; gap: 2.6mm; background: var(--келемий);
-    color: #fff; padding: 1.8mm 3mm 1.8mm 2.4mm; min-height: 12mm; }
+    color: #fff; padding: 0 3mm 0 2.4mm; height: 16mm; box-sizing: border-box; }
   .фаза .ф-н { flex: none; width: 10.8mm; height: 12.5mm; filter: drop-shadow(0 .3mm .5mm rgba(0,0,0,.35)); }
   .фаза header b { display: block; font: 800 13.5pt/1.05 "Tektur", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
   .фаза header i { display: block; font: 500 8.8pt/1.2 "Tektur", sans-serif; font-style: normal; color: #CFE8C9; margin-top: .6mm; }
@@ -319,8 +319,12 @@ CSS = r"""
   .ф-низ { margin-top: auto; padding-top: 2mm; text-align: center; }
   .ф-низ img { max-width: 88%; max-height: 30mm; }
   .ф-стрелка { position: relative; }
-  .ф-стрелка::before { content: ""; position: absolute; left: .5mm; right: .5mm; top: 3.8mm; height: 4.6mm;
-    background: var(--охра); clip-path: polygon(0 28%, 55% 28%, 55% 0, 100% 50%, 55% 100%, 55% 72%, 0 72%); }
+  /* Стрелка между фазами — клин во всю высоту зелёной шапки: шапка фазы
+     словно указывает на следующую. Внутри охряной шеврон. */
+  .ф-стрелка::before { content: ""; position: absolute; left: 0; width: 100%; top: 0; height: 16mm;
+    background: var(--келемий); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  .ф-стрелка::after { content: ""; position: absolute; left: .2mm; width: 2.6mm; top: 5.2mm; height: 5.6mm;
+    background: var(--охра); clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
   .цикл-возврат { position: relative; height: 7mm; margin: 0 16.67%; border: .8mm solid var(--охра);
     border-top: 0; border-radius: 0 0 3mm 3mm; }
   .цикл-возврат::before { content: ""; position: absolute; left: -2.6mm; top: -2.4mm; width: 4.4mm; height: 3.6mm;
