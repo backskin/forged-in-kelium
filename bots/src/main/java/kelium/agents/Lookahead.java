@@ -334,6 +334,18 @@ public final class Lookahead {
      */
     public static double playOut(GameState s, int seat, Genome mine, Genome others,
                                  ForcedAgent.Forced forced, int horizon, long seed) {
+        return playOut(s, seat, mine, others, forced, horizon, seed, null, 1.0);
+    }
+
+    /**
+     * То же, но оборванный на горизонте просчёт судит {@code обученная} оценка
+     * позиции (если задана), а не формула {@link #horizonScore}. Доигранная до
+     * конца партия — всегда настоящим итогом.
+     */
+    public static double playOut(GameState s, int seat, Genome mine, Genome others,
+                                 ForcedAgent.Forced forced, int horizon, long seed,
+                                 java.util.function.ToDoubleBiFunction<GameState, Integer> обученная,
+                                 double доляСети) {
         GameState c = s.deepCopy(seed);
         List<Agent> agents = modelAgents(c, seat, mine, others, seed);
         if (forced != null) {
@@ -354,6 +366,14 @@ public final class Lookahead {
         // Доиграли до конца — судим настоящим итогом; оборвали на горизонте —
         // по положению, иначе просчёт вперёд остаётся таким же жадным (см.
         // horizonScore).
+        if (обученная != null) {
+            if (!truncated || c.finished) {
+                return finalScore(c, seat);
+            }
+            double сеть = обученная.applyAsDouble(c, seat);
+            return доляСети >= 1.0 ? сеть
+                : доляСети * сеть + (1 - доляСети) * horizonScore(c, seat, mine);
+        }
         return truncated ? horizonScore(c, seat, mine) : finalScore(c, seat);
     }
 }
