@@ -10,7 +10,6 @@ import java.util.Set;
 
 import kelium.core.BuildingToken;
 import kelium.core.GameState;
-import kelium.core.Hex;
 import kelium.core.Token;
 
 /**
@@ -34,25 +33,7 @@ public final class Chains {
      * сторону той же грани.
      */
     public static boolean abutsAcrossWall(GameState s, BuildingToken a, BuildingToken b) {
-        Hex ha = s.field.get(a.hexId);
-        Hex hb = s.field.get(b.hexId);
-        if (ha == null || hb == null) {
-            return false;
-        }
-        for (int side = 0; side < 6; side++) {
-            Integer owner = ha.sideOwner[side];
-            if (owner == null || owner != a.uid) {
-                continue;
-            }
-            if (!b.hexId.equals(ha.neighborBySide[side])) {
-                continue;
-            }
-            Integer opp = hb.sideOwner[(side + 3) % 6];
-            if (opp != null && opp == b.uid) {
-                return true;
-            }
-        }
-        return false;
+        return Соседство.примыкают(s, a, b);
     }
 
     /** Размер наибольшей связной компоненты в готовом графе смежности. */
