@@ -441,7 +441,15 @@ def blocks(md):
                 rows.append([c.strip() for c in lines[i].strip("|").split("|")])
                 i += 1
             head, data = rows[0], [r for r in rows[1:] if not set("".join(r)) <= set("-: ")]
-            t = ['        <table>', "          <tr>" + "".join(f"<th>{inline(h.capitalize())}</th>" for h in head) + "</tr>"]
+            t = ['        <table>']
+            # ШИРИНЫ СТОЛБЦОВ — по числу дефисов в строке-разделителе:
+            # «|--|---|-----|» даёт 20 %, 30 %, 50 %. Одинаковые — без ширин.
+            раздел = next((r for r in rows[1:2] if set("".join(r)) <= set("-: ")), None)
+            if раздел and len({len(c.strip(":")) for c in раздел}) > 1:
+                весь = sum(len(c.strip(":")) for c in раздел)
+                t.append("          <colgroup>" + "".join(
+                    f'<col style="width:{100 * len(c.strip(":")) / весь:.0f}%">' for c in раздел) + "</colgroup>")
+            t.append("          <tr>" + "".join(f"<th>{inline(h.capitalize())}</th>" for h in head) + "</tr>")
             for r in data:
                 t.append("          <tr>" + "".join(
                     "<td>%s</td>" % (ячейка_с_иконкой(c) or inline(c)) for c in r)
