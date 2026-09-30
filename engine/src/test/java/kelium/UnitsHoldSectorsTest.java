@@ -87,7 +87,10 @@ class UnitsHoldSectorsTest {
         assertEquals(List.of(1), СекторыВойск.секторыЖетона(s, u));
     }
 
-    /** Жетон без выбора закрепляется там, куда его положила раскладка. */
+    /**
+     * Жетон без выбора закрепляет движок — там, куда его положила раскладка.
+     * Сам запрос раскладки стол не меняет.
+     */
     @Test
     void unpinnedUnitGetsPinned() {
         GameState s = Fix.game("1.46.0", 2, 7L);
@@ -95,6 +98,8 @@ class UnitsHoldSectorsTest {
         UnitToken u = Fix.unit(s, 0, UnitType.VEHICLE, h.id);
         List<Integer> first = СекторыВойск.секторыЖетона(s, u);
         assertNotNull(first);
+        assertEquals(null, u.chosenSides(), "запрос не закрепляет");
+        СекторыВойск.закрепитьВсе(s);
         assertEquals(first, u.chosenSides());
     }
 

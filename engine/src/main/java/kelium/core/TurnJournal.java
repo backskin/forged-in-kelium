@@ -390,11 +390,29 @@ public final class TurnJournal {
             minKillAmmoCost = o.minKillAmmoCost;
             movedAndKilledSameUnit = o.movedAndKilledSameUnit;
             killsByMovedUnit.clear();
-            destroyedOwners.clear();
-            destroyedPoweredEconomy = false;
-            destroyedLeaderBuilding = false;
-            damagedLeader = false;
             killsByMovedUnit.putAll(o.killsByMovedUnit);
+            // ПОЛНАЯ КОПИЯ (30.09.2026): копия стола обязана видеть те же факты
+            // хода, что партия (прибор kelium.ПроверкаПовтора).
+            orderBlocked = o.orderBlocked;
+            blockBypassGrants = o.blockBypassGrants;
+            retaliationSincePrevTurn = o.retaliationSincePrevTurn;
+            lostSincePrevTurn = o.lostSincePrevTurn;
+            destroyedOwners.clear();
+            destroyedOwners.addAll(o.destroyedOwners);
+            destroyedPoweredEconomy = o.destroyedPoweredEconomy;
+            destroyedLeaderBuilding = o.destroyedLeaderBuilding;
+            damagedLeader = o.damagedLeader;
+            destroyedOnHex.clear();
+            destroyedOnHex.putAll(o.destroyedOnHex);
+            destroyedPlantLevels.clear();
+            destroyedPlantLevels.addAll(o.destroyedPlantLevels);
+            victimUnitsAtHit.clear();
+            victimUnitsAtHit.putAll(o.victimUnitsAtHit);
+            myUnitsAtHit.clear();
+            myUnitsAtHit.putAll(o.myUnitsAtHit);
+            containersTaken = o.containersTaken;
+            destroyedFullMinerAtKelium = o.destroyedFullMinerAtKelium;
+            sacrificedStrikeGroup = o.sacrificedStrikeGroup;
             enemyBuildingHits = o.enemyBuildingHits;
             maxDestroyedHp = o.maxDestroyedHp;
             enemyBuildingsDamaged.clear();

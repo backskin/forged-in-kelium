@@ -57,6 +57,7 @@ public final class Срабатывания {
      * с приказа считаются одинаково.
      */
     public static void учесть(GameState s, Map<String, Object> e) {
+        СекторыВойск.закрепитьВсе(s);
         if (s.journal == null || e == null || !(e.get("seat") instanceof Integer место)
                 || место < 0 || место >= s.numPlayers()) {
             return;

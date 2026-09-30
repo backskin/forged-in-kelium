@@ -114,10 +114,10 @@ public final class СекторыВойск {
             }
             итог.put(u.uid, выбор);
         }
-        // ЖЕТОНЫ ДЕРЖАТ СЕКТОРЫ (свод 1.46.0): сектор, найденный жетону без
-        // выбора, за ним и закрепляется — иначе раскладка поехала бы, когда
-        // рядом встанет свой жетон или на гекс придёт здание.
-        boolean держат = Placement.unitsHoldSectors(s);
+        // Раскладка — ЗАПРОС и стол не меняет: закрепляет секторы только движок
+        // ({@link #закрепитьВсе}) в своих точках. Если бы закреплял запрос, стол
+        // зависел бы от того, что спросил бот, и повтор партии расходился бы с
+        // ней (прибор kelium.ПроверкаПовтора, 30.09.2026).
         for (UnitToken u : сами) {
             List<Integer> место = найтиМесто(s, h, свободно, u);
             if (место == null) {
@@ -127,11 +127,41 @@ public final class СекторыВойск {
                 свободно[i] = false;
             }
             итог.put(u.uid, место);
-            if (держат) {
-                u.chooseSides(место);
-            }
         }
         return итог;
+    }
+
+    /**
+     * ЖЕТОНЫ ДЕРЖАТ СЕКТОРЫ (свод 1.46.0): войско, вставшее без выбора,
+     * закрепляется на том секторе, куда его кладёт раскладка, — иначе раскладка
+     * поехала бы, когда рядом встанет свой жетон или на гекс придёт здание.
+     * Зовёт движок на каждом событии партии — в одних и тех же точках и в
+     * партии, и в её повторе.
+     */
+    public static void закрепитьВсе(GameState s) {
+        if (!Placement.unitsHoldSectors(s)) {
+            return;
+        }
+        java.util.Set<String> гексы = new java.util.LinkedHashSet<>();
+        for (PlayerState p : s.players) {
+            for (UnitToken u : p.units) {
+                if (u.hexId != null && u.alive() && !u.inside() && секторов(u.type) > 0
+                        && u.chosenSides() == null) {
+                    гексы.add(u.hexId);
+                }
+            }
+        }
+        for (String hex : гексы) {
+            for (var e : разложить(s, hex).entrySet()) {
+                for (PlayerState p : s.players) {
+                    for (UnitToken u : p.units) {
+                        if (u.uid == e.getKey() && u.chosenSides() == null) {
+                            u.chooseSides(e.getValue());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /** Войско, стоящее на секторе {@code side} гекса, или null. */
