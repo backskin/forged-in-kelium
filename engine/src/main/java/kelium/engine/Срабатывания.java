@@ -51,6 +51,39 @@ public final class Срабатывания {
         "action", "objective", "objective_burn", "arsenal", "container");
 
     /**
+     * УЧЕСТЬ СОБЫТИЕ В ЖУРНАЛЕ ХОДА — то, о чём спрашивают требования-связки:
+     * ветки хода, выполненные, сожжённые и установленные карты, вскрытые
+     * контейнеры. Один источник — поток событий, поэтому ветка с карты и ветка
+     * с приказа считаются одинаково.
+     */
+    public static void учесть(GameState s, Map<String, Object> e) {
+        if (s.journal == null || e == null || !(e.get("seat") instanceof Integer место)
+                || место < 0 || место >= s.numPlayers()) {
+            return;
+        }
+        var ф = s.journal.of(место);
+        switch (String.valueOf(e.get("type"))) {
+            case "action" -> {
+                if (Boolean.TRUE.equals(e.get("ok"))) {
+                    ф.веткиХода.add(ветка(e));
+                }
+            }
+            case "objective" -> ф.заданийВыполнено++;
+            case "objective_burn" -> ф.картСожжено++;
+            case "arsenal" -> {
+                if ("burn".equals(e.get("mode"))) {
+                    ф.картСожжено++;
+                } else if ("install".equals(e.get("mode"))) {
+                    ф.картУстановлено++;
+                }
+            }
+            case "container" -> ф.контейнеровВскрыто++;
+            default -> {
+            }
+        }
+    }
+
+    /**
      * Раздать событие картам всех игроков. Зовётся из {@code GameEngine.emit}
      * для каждого события партии.
      */

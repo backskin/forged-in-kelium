@@ -68,7 +68,17 @@ public final class TurnContext implements kelium.core.TurnUndo {
             throw new IllegalStateException("превышен лимит SPEC-действий");
         }
         specUsed++;
+        if (факты != null) {
+            факты.спецИспользовано++;
+        }
     }
+
+    /**
+     * ФАКТЫ ХОДА В ЖУРНАЛЕ — туда же пишется число потраченных спец-действий,
+     * чтобы требование «в этот ход используй третье спец-действие» видело его
+     * (Карты 2.0). Ставит движок при начале хода; {@code null} — вне хода.
+     */
+    public kelium.core.TurnJournal.TurnFacts факты = null;
 
     /**
      * Наценка за СЛЕДУЮЩУЮ операцию {@code action} по расписанию вида [0,1,2,3];
