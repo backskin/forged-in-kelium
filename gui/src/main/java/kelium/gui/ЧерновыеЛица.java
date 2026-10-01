@@ -197,7 +197,11 @@ public final class ЧерновыеЛица {
         String имя = String.valueOf(e.getOrDefault("name", e.get("id")));
         g.drawString(имя, (w - g.getFontMetrics().stringWidth(имя)) / 2, 147);
         g.setColor(ТЕКСТ);
-        String описание = String.valueOf(e.getOrDefault("описание", ""));
+        // низ — текст срабатывания (утиль уже напечатан наверху, в описании он
+        // повторяется: «Утиль: …. Установка: …»)
+        String описание = e.get("bottom") instanceof Map<?, ?> низ && низ.get("когда") != null
+            ? kelium.cards.язык.Срабатывание.текст(низ)
+            : String.valueOf(e.getOrDefault("описание", ""));
         абзац(g, описание, new Font("SansSerif", Font.PLAIN, 25), 32, 180, w - 64, 5);
         g.setColor(ц);
         g.setFont(new Font("SansSerif", Font.BOLD, 20));

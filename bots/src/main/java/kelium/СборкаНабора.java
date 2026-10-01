@@ -505,6 +505,7 @@ public final class СборкаНабора {
             арсенал.add(e);
             номер++;
         }
+        подобратьУтили(арсенал, старыеВерхи);
         for (Map<String, Object> e : (List<Map<String, Object>>) старыйАрсенал.get("arsenal")) {
             if ("starting".equals(e.get("kind"))) {
                 арсенал.add(e);
@@ -673,6 +674,60 @@ public final class СборкаНабора {
             case "потрать" -> "Потрать келемий" + число;
             default -> узел;
         };
+    }
+
+    /**
+     * ПАРА «ВЕРХ + НИЗ» С УМЫСЛОМ (01.10.2026). Проверка 300 раздач: судьбу карты
+     * решает утиль — «2 боеприпаса», «Построй любое здание за 1 монету» сжигали в
+     * 90–95% случаев, «Удали у врага арсенал» — в 3%. По кругу половина карт выбора
+     * не задавала. Самые сжигаемые утили — картам с сильным низом (прокачка,
+     * спец-действие, карта задания, плата келемием): сжечь или поставить — мука.
+     * Доли сожжений — бульон/утили — доля сожжений.txt; нет файла — по кругу.
+     */
+    @SuppressWarnings("unchecked")
+    static void подобратьУтили(List<Map<String, Object>> арсенал, List<Map<String, Object>> верхи)
+            throws Exception {
+        Path файл = Path.of("design-docs/фигуры/бульон/утили — доля сожжений.txt");
+        if (!Files.exists(файл)) {
+            return;
+        }
+        Map<String, Double> доля = new HashMap<>();
+        for (String с : Files.readAllLines(файл, StandardCharsets.UTF_8)) {
+            String[] ч = с.split("\t", 2);
+            if (ч.length == 2 && !с.startsWith("#")) {
+                доля.put(ч[1].trim(), Double.parseDouble(ч[0].trim()));
+            }
+        }
+        // утили по убыванию «сжигаемости», с повторами, по одному на карту
+        List<Map<String, Object>> поСиле = new ArrayList<>();
+        for (int i = 0; поСиле.size() < арсенал.size(); i++) {
+            поСиле.add(верхи.get(i % верхи.size()));
+        }
+        поСиле.sort((a, b) -> Double.compare(доля.getOrDefault(String.valueOf(b.get("label")), 0.3),
+            доля.getOrDefault(String.valueOf(a.get("label")), 0.3)));
+        List<Map<String, Object>> сильные = new ArrayList<>();
+        List<Map<String, Object>> обычные = new ArrayList<>();
+        for (Map<String, Object> e : арсенал) {
+            Map<String, Object> низ = (Map<String, Object>) e.get("bottom");
+            Map<String, Object> обёртка = Map.of("низ", низ);
+            boolean сильная = низ.get("плата") != null || редкое(обёртка)
+                || низ.get("когда") instanceof Map<?, ?> к && "ход".equals(к.get("событие"));
+            (сильная ? сильные : обычные).add(e);
+        }
+        int i = 0;
+        for (Map<String, Object> e : сильные) {
+            e.put("top", поСиле.get(i++));
+        }
+        for (Map<String, Object> e : обычные) {
+            e.put("top", поСиле.get(i++));
+        }
+        for (Map<String, Object> e : арсенал) {
+            Map<String, Object> верх = (Map<String, Object>) e.get("top");
+            Map<String, Object> низ = (Map<String, Object>) e.get("bottom");
+            e.put("описание", "Утиль: " + верх.get("label") + ". Установка: "
+                + kelium.cards.язык.Срабатывание.текст(низ));
+        }
+        System.out.println("утили подобраны: сильных низов " + сильные.size() + ", обычных " + обычные.size());
     }
 
     /** «Второе», «Третье» — для имени карты (именительный, средний род). */
