@@ -65,7 +65,7 @@ public final class Срабатывания {
         var ф = s.journal.of(место);
         switch (String.valueOf(e.get("type"))) {
             case "action" -> {
-                if (Boolean.TRUE.equals(e.get("ok"))) {
+                if (сыграна(s, e)) {
                     ф.веткиХода.add(ветка(e));
                 }
             }
@@ -212,9 +212,9 @@ public final class Срабатывания {
         boolean своё = место instanceof Integer m && m == владелец;
         String что = String.valueOf(когда.get("событие"));
         return switch (что) {
-            case "ветка" -> своё && "action".equals(тип) && Boolean.TRUE.equals(e.get("ok"))
+            case "ветка" -> своё && "action".equals(тип) && сыграна(s, e)
                 && String.valueOf(когда.get("ветка")).equals(ветка(e));
-            case "развилка" -> своё && "action".equals(тип) && Boolean.TRUE.equals(e.get("ok"))
+            case "развилка" -> своё && "action".equals(тип) && сыграна(s, e)
                 && String.valueOf(когда.get("развилка")).equals(развилка(ветка(e)));
             case "задание" -> своё && "objective".equals(тип);
             case "сжёг" -> своё && ("objective_burn".equals(тип)
@@ -232,6 +232,53 @@ public final class Срабатывания {
                 && Boolean.TRUE.equals(e.get("bottom_open"));
             default -> false;
         };
+    }
+
+    /**
+     * ВЕТКА СЫГРАНА, ЕСЛИ ОНА ЧТО-ТО СДЕЛАЛА (01.10.2026, ключ
+     * {@code cards.branch_must_act}). Движок считает «Бой» без единого выстрела
+     * удавшимся действием, и «каждый раз, когда играешь ветку «Бой», — спец-действие»
+     * платило за пустой бой; так же «Добыть» без добычи и «Манёвр» без шага.
+     * Замер 01.10: около четырёх сухих боёв за партию на игрока. Что сделала
+     * ветка — по её телеметрии; ветка без телеметрии считается сыгранной.
+     */
+    public static boolean сыграна(GameState s, Map<String, Object> e) {
+        if (!Boolean.TRUE.equals(e.get("ok"))) {
+            return false;
+        }
+        if (!kelium.dataio.Ctx.rules(s).getBool("cards.branch_must_act", false)
+                || !(e.get("telemetry") instanceof Map<?, ?> t) || t.isEmpty()) {
+            return true;
+        }
+        String в = ветка(e);
+        if (в == null) {
+            return true;
+        }
+        return switch (в) {
+            case "combat" -> больше(t, "battle");
+            case "mining" -> больше(t, "kelium", "containers", "super_kelium");
+            case "assembly" -> больше(t, "units", "ammo");
+            case "movement", "maneuver" -> больше(t, "moves");
+            case "energy_swap" -> больше(t, "energy_placed", "energy_taken", "activations");
+            case "market" -> больше(t, "deals", "coin", "ammo", "objective_cards", "energy_bought")
+                || Boolean.TRUE.equals(t.get("card_offer"));
+            case "science" -> больше(t, "steps", "trophy_spent");
+            default -> !в.startsWith("build") || больше(t, "ops");
+        };
+    }
+
+    /** Есть ли среди известных полей телеметрии хоть одно больше нуля. */
+    private static boolean больше(Map<?, ?> t, String... ключи) {
+        boolean есть = false;
+        for (String к : ключи) {
+            if (t.containsKey(к)) {
+                есть = true;
+                if (t.get(к) instanceof Number n && n.doubleValue() > 0) {
+                    return true;
+                }
+            }
+        }
+        return !есть;      // ни одного известного поля — судить не по чему
     }
 
     /** Фильтр жертвы: building / unit / род войска / род здания. */
