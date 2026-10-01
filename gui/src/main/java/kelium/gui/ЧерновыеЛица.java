@@ -279,6 +279,9 @@ public final class ЧерновыеЛица {
         if (m.get("objective_card") instanceof Number n) {
             части.add(n + " карта задания");
         }
+        if (m.get("module") != null) {
+            части.add("attack".equals(String.valueOf(m.get("module"))) ? "модуль боя" : "модуль сборки");
+        }
         return части.isEmpty() ? String.valueOf(m) : String.join(" и ", части);
     }
 
