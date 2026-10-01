@@ -270,6 +270,9 @@ public final class ЧерновыеЛица {
         if (m.get("coin") instanceof Number n) {
             части.add(n + " мон.");
         }
+        if (m.get("trophy") instanceof Number n) {
+            части.add(n.intValue() == 1 ? "трофей" : n + " трофея");
+        }
         if (m.get("spec_actions") instanceof Number n) {
             части.add(n.intValue() == 1 ? "спец-действие" : n + " спец-действия");
         }
