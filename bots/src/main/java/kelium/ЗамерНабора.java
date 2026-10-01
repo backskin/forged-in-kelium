@@ -165,8 +165,10 @@ public final class ЗамерНабора {
         int всего = 0;
         for (Map<String, Object> e : GameConfig.buildCached(свод, 4, 1L, null, null)
                 .content.get("objectives").entries) {
-            if (e.get("язык") instanceof Map<?, ?> я && я.get("значок") != null) {
-                out.merge(String.valueOf(я.get("значок")), 1.0, Double::sum);
+            // значок знает сама карта языка: запись колоды движок переписывает без него
+            if (CardRegistry.objective(String.valueOf(e.get("id")))
+                    instanceof kelium.cards.objectives.ЗаданиеИзЯзыка з && з.значок() != null) {
+                out.merge(з.значок(), 1.0, Double::sum);
                 всего++;
             }
         }
