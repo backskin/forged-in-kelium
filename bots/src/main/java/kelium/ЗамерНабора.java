@@ -45,7 +45,8 @@ public final class ЗамерНабора {
     }
 
     record Итог(double заданий, double арсенала, double связок, double срабатываний,
-                String дорогаПобедителя, double урона, double уничтожено, boolean воинПобедил) {
+                String дорогаПобедителя, double урона, double уничтожено, boolean воинПобедил,
+                double сухихБоёв, double сухихБезБоеприпасов) {
     }
 
     public static void main(String[] args) throws Exception {
@@ -68,10 +69,11 @@ public final class ЗамерНабора {
             + партий + " раздач на свод, стратеги с одной сетью. Дорога победителя — развилка"
             + " большинства выполненных им заданий.\n\n| свод | заданий на игрока | арсенала на игрока"
             + " | ходов со связкой на игрока | срабатываний на игрока | урона нанесено на игрока"
-            + " | уничтожено жетонов на игрока | победил самый воинственный | дороги победителей |\n"
-            + "|---|---|---|---|---|---|---|---|---|\n");
+            + " | уничтожено жетонов на игрока | победил самый воинственный"
+            + " | сухих боёв на игрока (без боеприпасов) | дороги победителей |\n"
+            + "|---|---|---|---|---|---|---|---|---|---|\n");
         for (var e : ff.entrySet()) {
-            double[] с = new double[7];
+            double[] с = new double[9];
             Map<String, Integer> дороги = new java.util.TreeMap<>();
             int n = 0;
             for (Future<Итог> f : e.getValue()) {
@@ -89,6 +91,8 @@ public final class ЗамерНабора {
                 с[4] += и.урона();
                 с[5] += и.уничтожено();
                 с[6] += и.воинПобедил() ? 1 : 0;
+                с[7] += и.сухихБоёв();
+                с[8] += и.сухихБезБоеприпасов();
                 дороги.merge(и.дорогаПобедителя(), 1, Integer::sum);
                 n++;
             }
@@ -98,9 +102,9 @@ public final class ЗамерНабора {
                 д.append(x.getKey()).append(' ').append(Math.round(100.0 * x.getValue() / n)).append("% ");
             }
             sb.append(String.format(java.util.Locale.ROOT,
-                "| %s | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f | %.0f%% | %s |%n",
+                "| %s | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f | %.0f%% | %.2f (%.2f) | %s |%n",
                 e.getKey(), с[0] / n, с[1] / n, с[2] / n, с[3] / n, с[4] / n, с[5] / n,
-                100 * с[6] / n, д.toString().trim()));
+                100 * с[6] / n, с[7] / n, с[8] / n, д.toString().trim()));
         }
         пул.shutdown();
         // у каждого набора сводов свой файл: два замера разом не затирают друг друга
@@ -127,11 +131,18 @@ public final class ЗамерНабора {
         int[] урона = new int[1];
         int[] уничтожено = new int[1];
         int[] убийств = new int[4];
+        int[] сухих = new int[2];      // боёв без единого попадания; из них — без боеприпасов
         GameEngine.playGame(s, agents, ev -> {
             String тип = String.valueOf(ev.get("type"));
             Object место = ev.get("seat");
             String ход = s.round + ":" + s.circle + ":" + место;
             switch (тип) {
+                case "combat_dry" -> {
+                    сухих[0]++;
+                    if ("нет боеприпасов".equals(ev.get("reason"))) {
+                        сухих[1]++;
+                    }
+                }
                 case "combat_hit" -> {
                     урона[0]++;
                     if (Boolean.TRUE.equals(ev.get("destroyed"))) {
@@ -146,9 +157,17 @@ public final class ЗамерНабора {
                     карт.merge(ход, 1, Integer::sum);
                     if (место instanceof Integer m) {
                         ObjectiveCard oc = CardRegistry.objective(String.valueOf(ev.get("card")));
-                        String действие = oc == null ? null : oc.suggestedAction(new EngineCardContext(s, m));
-                        String р = действие == null ? "прочее"
-                            : String.valueOf(kelium.engine.Срабатывания.развилка(действие));
+                        // ДОРОГА — ЗНАЧОК РАЗВИЛКИ НА КАРТЕ. У карт языка подсказки
+                        // действия для состояний нет (90% уходило в «прочее»), а у
+                        // старых она почти всегда «Добыть» — мерило врало в обе стороны.
+                        String р;
+                        if (oc instanceof kelium.cards.objectives.ЗаданиеИзЯзыка з && з.значок() != null) {
+                            р = з.значок();
+                        } else {
+                            String действие = oc == null ? null : oc.suggestedAction(new EngineCardContext(s, m));
+                            р = действие == null ? "прочее"
+                                : String.valueOf(kelium.engine.Срабатывания.развилка(действие));
+                        }
                         дороги.computeIfAbsent(m, x -> new HashMap<>()).merge(р, 1, Integer::sum);
                     }
                 }
@@ -190,6 +209,6 @@ public final class ЗамерНабора {
         }
         boolean воинПобедил = воин >= 0 && s.winner != null && s.winner == воин;
         return new Итог(заданий[0] / 4.0, арсенала[0] / 4.0, связок / 4.0, срабатываний[0] / 4.0, дорога,
-            урона[0] / 4.0, уничтожено[0] / 4.0, воинПобедил);
+            урона[0] / 4.0, уничтожено[0] / 4.0, воинПобедил, сухих[0] / 4.0, сухих[1] / 4.0);
     }
 }
