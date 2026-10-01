@@ -59,6 +59,11 @@ public final class HotSeatTour {
         try (PrintWriter log = new PrintWriter(new File(out, "опись.txt"),
                 StandardCharsets.UTF_8)) {
             int предел = Integer.getInteger("tour.max", Integer.MAX_VALUE);
+            // ПОДКЛАДКА (01.10.2026): -Dtour.arsenal=<карта> -Dtour.kelium=N — перед
+            // первым решением карта встаёт на планшет живого игрока, келемий — в
+            // хранилище. Без неё вопрос карты с платой за случайную партию не всплывал.
+            String подложить = System.getProperty("tour.arsenal");
+            boolean подложено = подложить == null;
             while (!win.finishedForTest() && System.currentTimeMillis() < deadline
                     && answered < предел) {
                 var agent = win.humansBySeat.get(0);
@@ -72,6 +77,16 @@ public final class HotSeatTour {
                 SwingUtilities.invokeAndWait(() -> { });
                 if (agent.pending() != d) {
                     continue;
+                }
+                if (!подложено) {
+                    подложено = true;
+                    kelium.core.GameState живая = win.liveStateForTest();
+                    if (живая != null) {
+                        kelium.core.PlayerState я = живая.player(0);
+                        я.arsenalInstalled.add(подложить);
+                        я.resources.add(kelium.core.Resource.KELIUM, Integer.getInteger("tour.kelium", 2));
+                        log.println("подложено: " + подложить + ", келемий " + я.resources.kelium());
+                    }
                 }
                 String k = String.valueOf(d.context().get("kind"));
                 if (d.context().get("reaction") != null) {
@@ -114,6 +129,12 @@ public final class HotSeatTour {
 
     /** Чаще играет, чем пасует: иначе до войны и реакций дело не доходит. */
     private static int pick(Random rnd, List<Choice> options) {
+        // на вопрос о плате — платить: иначе за картой нечего смотреть дальше
+        for (int i = 0; i < options.size(); i++) {
+            if ("trigger_pay".equals(options.get(i).kind())) {
+                return i;
+            }
+        }
         List<Integer> plays = new ArrayList<>();
         for (int i = 0; i < options.size(); i++) {
             if (options.get(i).payload() != null) {

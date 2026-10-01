@@ -342,7 +342,9 @@ public final class Срабатывания {
             case "mining" -> больше(t, "kelium", "containers", "super_kelium");
             case "assembly" -> больше(t, "units", "ammo");
             case "movement", "maneuver" -> больше(t, "moves");
-            case "energy_swap" -> больше(t, "energy_placed", "energy_taken", "activations");
+            // по раскладу на столе: снял кубик и положил туда же — не в счёт
+            case "energy_swap" -> t.containsKey("energy_moved") ? больше(t, "energy_moved")
+                : больше(t, "energy_placed", "energy_taken", "activations");
             case "market" -> больше(t, "deals", "coin", "ammo", "objective_cards", "energy_bought")
                 || Boolean.TRUE.equals(t.get("card_offer"));
             case "science" -> больше(t, "steps", "trophy_spent");

@@ -841,6 +841,9 @@ public final class GameRecorder {
             f.circle = state.circle;
             f.seat = event.get("seat") instanceof Number n ? n.intValue() : null;
             f.log = text.describe(event, state);
+            if ("action".equals(f.type) && Boolean.TRUE.equals(event.get("ok"))) {
+                f.впустую = !kelium.engine.Срабатывания.сделала(event);
+            }
             f.combat = "combat_hit".equals(f.type) || "raze_neutral".equals(f.type)
                 || "damage_neutral".equals(f.type);
             f.thoughts.addAll(pending);

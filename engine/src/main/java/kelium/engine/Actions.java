@@ -2354,6 +2354,29 @@ public final class Actions {
 
         @Override
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
+            // СДВИНУЛАСЬ ЛИ ЭНЕРГИЯ (01.10.2026): снять кубик и положить его туда
+            // же — перекладка впустую, хотя «положено» и «снято» не нули. Сравниваем
+            // расклад до и после; пишем в телеметрию energy_moved.
+            Map<Integer, Integer> раскладДо = расклад(player);
+            ActionResult итог = performInner(player, ctx, agent);
+            if (итог.ok() && итог.telemetry() != null) {
+                Map<String, Object> tel = new HashMap<>(итог.telemetry());
+                tel.put("energy_moved", раскладДо.equals(расклад(player)) ? 0 : 1);
+                return ActionResult.ok(итог.detail(), tel);
+            }
+            return итог;
+        }
+
+        /** Кубики энергии на каждом своём здании: лежащие и простаивающие. */
+        private static Map<Integer, Integer> расклад(PlayerState player) {
+            Map<Integer, Integer> out = new HashMap<>();
+            for (BuildingToken b : player.buildingsOnField()) {
+                out.put(b.uid, b.energyPlaced * 100 + b.energyIdle);
+            }
+            return out;
+        }
+
+        private ActionResult performInner(PlayerState player, TurnContext ctx, Agent agent) {
             // ПРАВИЛО 04.09.2026. Выбора гекса больше нет. Активируй каждый свой
             // ИСТОЧНИК не больше одного раза за действие, и каждая активация —
             // одно из двух:

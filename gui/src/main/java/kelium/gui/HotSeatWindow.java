@@ -620,6 +620,11 @@ public final class HotSeatWindow {
     }
 
     /** Окно партии (для прогонщиков). */
+    /** Живая партия — для обхода, который подкладывает игроку карты (HotSeatTour). */
+    GameState liveStateForTest() {
+        return liveState;
+    }
+
     public JFrame frameForTest() {
         return frame;
     }
@@ -5192,6 +5197,17 @@ public final class HotSeatWindow {
         if ("action".equals(f.type) && f.seat != null && humansBySeat.containsKey(f.seat)
                 && toasts.textsForTest().size() == былоПлашек) {
             String why = toastReason(f);
+            // ПЕРЕКЛАДКА ЭНЕРГИИ ПЛАШЕК НЕ ДАЁТ: ресурс не прибывает, кубик лишь
+            // переезжает. Пустой её считаем, только если на столе не сдвинулся ни
+            // один кубик (обход 01.10.2026: «впустую» при переехавшей энергии).
+            if (("переложить энергию".equals(why) || "питание".equals(why))
+                    && энергияСдвинулась(prev, f.snapshot)) {
+                why = null;
+            }
+            // суд движка важнее плашек: ветка сделала дело — «впустую» не пишем
+            if (Boolean.FALSE.equals(f.впустую)) {
+                why = null;
+            }
             String почему = why == null ? null : switch (why) {
                 case "наука" -> "нет трофеев на шаг трека";
                 case "рынок" -> "нет келемия на обмен";
@@ -5207,6 +5223,25 @@ public final class HotSeatWindow {
                     cap(why) + ": впустую — " + почему, Theme.seat(f.seat), true));
             }
         }
+    }
+
+    /** Изменилось ли у какого-нибудь здания число кубиков энергии (лежащих или простаивающих). */
+    private static boolean энергияСдвинулась(ReplayRecord.Snapshot было, ReplayRecord.Snapshot стало) {
+        if (было == null || стало == null) {
+            return false;
+        }
+        Map<Integer, Integer> до = new java.util.HashMap<>();
+        for (ReplayRecord.Tok t : было.tokens) {
+            if (t.building) {
+                до.put(t.uid, t.energyPlaced * 100 + t.energyIdle);
+            }
+        }
+        for (ReplayRecord.Tok t : стало.tokens) {
+            if (t.building && !Integer.valueOf(t.energyPlaced * 100 + t.energyIdle).equals(до.get(t.uid))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void eventToasts0(ReplayRecord.Snapshot prev, ReplayRecord.Frame f) {
