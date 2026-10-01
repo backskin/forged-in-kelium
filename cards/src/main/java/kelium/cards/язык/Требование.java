@@ -656,6 +656,87 @@ public interface Требование {
         }
     }
 
+    /** Келемий, добытый в этот ход (ветка «Добыть»). */
+    record Добудь(int сколько) implements Требование {
+        @Override public boolean выполнено(CardContext ctx) {
+            return ход(ctx).keliumMined >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(ход(ctx).keliumMined, сколько);
+        }
+
+        @Override public String суть() {
+            return "добудь " + сколько + " келемия";
+        }
+
+        @Override public boolean происшествие() {
+            return true;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "добудь", "сколько", сколько);
+        }
+
+        @Override public String действие() {
+            return "mining";
+        }
+    }
+
+    /** Свои здания, на которые в этот ход лёг кубик энергии (перекладка или стройка энергостанции). */
+    record Запитай(int сколько) implements Требование {
+        @Override public boolean выполнено(CardContext ctx) {
+            return ход(ctx).energySwapSources.size() >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(ход(ctx).energySwapSources.size(), сколько);
+        }
+
+        @Override public String суть() {
+            return "запитай " + числом(сколько, "своё здание", "своих здания", "своих зданий");
+        }
+
+        @Override public boolean происшествие() {
+            return true;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "запитай", "сколько", сколько);
+        }
+
+        @Override public String действие() {
+            return "energy_swap";
+        }
+    }
+
+    /** Боеприпасы, выпущенные в этот ход (ветка «Выпустить»). */
+    record Выпусти(int сколько) implements Требование {
+        @Override public boolean выполнено(CardContext ctx) {
+            return ход(ctx).ammoProduced >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(ход(ctx).ammoProduced, сколько);
+        }
+
+        @Override public String суть() {
+            return "выпусти " + числом(сколько, "боеприпас", "боеприпаса", "боеприпасов");
+        }
+
+        @Override public boolean происшествие() {
+            return true;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "выпусти", "сколько", сколько);
+        }
+
+        @Override public String действие() {
+            return "assembly";
+        }
+    }
+
     /** Все части сразу. Происшествие, если хоть одна часть — происшествие. */
     record И(List<Требование> части) implements Требование {
         @Override public boolean выполнено(CardContext ctx) {
@@ -741,6 +822,9 @@ public interface Требование {
             case "построй" -> new Построй(m.get("вид") == null ? null : String.valueOf(m.get("вид")),
                 число(m, "сколько", 1));
             case "найми" -> new Найми(число(m, "сколько", 1));
+            case "добудь" -> new Добудь(число(m, "сколько", 1));
+            case "запитай" -> new Запитай(число(m, "сколько", 1));
+            case "выпусти" -> new Выпусти(число(m, "сколько", 1));
             case "и" -> {
                 List<Требование> ч = new ArrayList<>();
                 if (m.get("части") instanceof List<?> l) {

@@ -88,7 +88,7 @@ public final class ЧерновыеЛица {
         }
         for (Map<String, Object> e : cfg.content.get("arsenal").entries) {
             String id = String.valueOf(e.get("id"));
-            if (!id.startsWith("a8_")) {
+            if (!id.startsWith("a8_") && !id.startsWith("bs80_")) {
                 continue;
             }
             Path ф = корень.resolve("arsenal").resolve(id + ".png");

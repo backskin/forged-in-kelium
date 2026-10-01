@@ -134,7 +134,8 @@ public final class СборкаНабора {
             // второе задание за ход почти невыполнимо. В наборе награды дают 2–3
             // спец-действия, поэтому их порог ниже: лишь бы вообще выполнялись.
             double мин = связочное ? Math.min(ДОЛЯ_МИН, 0.02) : ДОЛЯ_МИН;
-            if (м.вРуке() >= МИН_В_РУКЕ && м.доля() >= мин && м.доля() <= ДОЛЯ_МАКС) {
+            if (м.вРуке() >= МИН_В_РУКЕ && м.доля() >= мин && м.доля() <= ДОЛЯ_МАКС
+                    && !однимДействием(заданиеПоId.get(м.id()))) {
                 годные.add(м);
                 String р = развилкаТребования(заданиеПоId.get(м.id()));
                 поРазвилке.getOrDefault(р, поРазвилке.get("command")).add(м);
@@ -171,23 +172,13 @@ public final class СборкаНабора {
                     }
                 }
             }
-            // МЕСТ ОСТАЛОСЬ — второй вариант семейства (другая ступень или
-            // состояние), самый далёкий по трудности от уже взятого.
-            if (взято < наРазвилку) {
-                List<Мера> остальные = new ArrayList<>(e.getValue());
-                остальные.removeAll(набор);
-                остальные.sort(Comparator.comparingDouble(м -> Math.abs(м.доля() - 0.33)));
-                java.util.Set<String> вторые = new java.util.HashSet<>();
-                for (Мера м : остальные) {
-                    if (взято >= наРазвилку) {
-                        break;
-                    }
-                    if (вторые.add(семейство(заданиеПоId.get(м.id())))) {
-                        набор.add(м);
-                        взято++;
-                    }
-                }
-            }
+            // МЕСТ ОСТАЛОСЬ — пусть остаются. Второй вариант семейства («3
+            // энергостанции» рядом с «2 энергостанциями») повторяет усиление
+            // той же карты: колода выходит длиннее, а не разнообразнее (01.10).
+        }
+        java.util.Set<String> семьиНабора = new java.util.HashSet<>();
+        for (Мера м : набор) {
+            семьиНабора.add(семейство(заданиеПоId.get(м.id())));
         }
         // связки: пары, выполненные в одном ходу, — обе карты в набор, если годны
         List<String> связки = new ArrayList<>();
@@ -197,7 +188,8 @@ public final class СборкаНабора {
                 связки.add(ab[0] + " + " + ab[1] + " (" + e.getValue() + ")");
                 for (String id : ab) {
                     годные.stream().filter(м -> м.id().equals(id)).findFirst().ifPresent(м -> {
-                        if (!набор.contains(м) && набор.size() < ЗАДАНИЙ + 6) {
+                        if (!набор.contains(м) && набор.size() < ЗАДАНИЙ + 6
+                                && семьиНабора.add(семейство(заданиеПоId.get(м.id())))) {
                             набор.add(м);
                         }
                     });
@@ -225,6 +217,11 @@ public final class СборкаНабора {
         }
         List<Map.Entry<String, int[]>> сработавшие = new ArrayList<>(срабатывания.entrySet());
         сработавшие.removeIf(e -> !ПРОБА && (e.getValue()[0] < 2 || e.getValue()[1] == 0));
+        // ПАССИВНЫЙ РУЧЕЁК НЕ БЕРЁМ (заказ Влада 30.09.2026: «карты не сыплются
+        // сами»). «Когда у тебя открыт нижний приказ» — не поступок, а состояние:
+        // карта платит каждый ход, где низ выпал, и игроку нечего устраивать.
+        сработавшие.removeIf(e -> арсеналПоId.get(e.getKey()) != null
+            && пассивное(арсеналПоId.get(e.getKey())));
         // ПОРЯДОК — ОТ УМЕРЕННЫХ К КАПЕЛЬНЫМ. Карта, что срабатывает по 8–11 раз
         // за партию «за любую ветку», — пассивный доход, а не связка; ближе к
         // началу — те, что срабатывают 2–5 раз: их надо устроить.
@@ -286,7 +283,7 @@ public final class СборкаНабора {
         Files.writeString(папка.resolve("набор — черновик.md"), sb.toString(), StandardCharsets.UTF_8);
         System.out.println(sb.substring(sb.lastIndexOf("Годных")));
         if (args.length > 1 && "--выгрузить".equals(args[1])) {
-            выгрузить(набор, заданиеПоId, арсНабор, арсеналПоId);
+            выгрузить(набор, заданиеПоId, арсНабор, арсеналПоId, начальные(сработавшие, арсНабор, арсеналПоId));
         }
     }
 
@@ -314,7 +311,8 @@ public final class СборкаНабора {
      */
     @SuppressWarnings("unchecked")
     static void выгрузить(List<Мера> набор, Map<String, Map<String, Object>> заданиеПоId,
-                          List<String> арсНабор, Map<String, Map<String, Object>> арсеналПоId)
+                          List<String> арсНабор, Map<String, Map<String, Object>> арсеналПоId,
+                          List<String> новыеНачальные)
             throws Exception {
         org.yaml.snakeyaml.Yaml y = new org.yaml.snakeyaml.Yaml();
         Map<String, Object> старыеЗадания = y.load(Files.readString(Path.of("data/cards/objectives.1.20.0.yaml")));
@@ -390,6 +388,29 @@ public final class СборкаНабора {
             if ("starting".equals(e.get("kind"))) {
                 арсенал.add(e);
             }
+        }
+        // ДВЕ НОВЫЕ НАЧАЛЬНЫЕ (01.10.2026): после снятия «Сдачи тары» их было 6,
+        // в запасе на четверых — две. Верх — стартовый набор ценой как у
+        // прочих (два ресурса), низ — срабатывание на слой карт из бульона.
+        List<Map<String, Object>> наборыВерха = List.of(
+            Map.of("coin", 1, "objective_cards", 1, "kit", true),
+            Map.of("kelium", 1, "ammo", 1, "kit", true));
+        List<String> подписиВерха = List.of("1 монета и 1 карта задания", "1 келемий и 1 боеприпас");
+        for (int i = 0; i < новыеНачальные.size() && i < наборыВерха.size(); i++) {
+            Map<String, Object> а = арсеналПоId.get(новыеНачальные.get(i));
+            Map<String, Object> верх = new LinkedHashMap<>();
+            верх.put("effect", "gain");
+            верх.put("params", наборыВерха.get(i));
+            верх.put("label", подписиВерха.get(i));
+            Map<String, Object> e = new LinkedHashMap<>();
+            e.put("id", "bs80_" + (i + 1));
+            e.put("name", имяСрабатывания(а));
+            e.put("kind", "starting");
+            e.put("top", верх);
+            e.put("bottom", а.get("низ"));
+            e.put("описание", "Утиль: " + подписиВерха.get(i) + ". Установка: " + а.get("текст"));
+            арсенал.add(e);
+            System.out.println("начальная bs80_" + (i + 1) + ": " + а.get("текст"));
         }
         org.yaml.snakeyaml.DumperOptions o = new org.yaml.snakeyaml.DumperOptions();
         o.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
@@ -485,6 +506,9 @@ public final class СборкаНабора {
             case "уничтожь" -> "Уничтожь" + число;
             case "построй" -> "Построй" + число;
             case "найми" -> "Найми" + число;
+            case "добудь" -> "Добудь" + число;
+            case "запитай" -> "Запитай" + число;
+            case "выпусти" -> "Выпусти" + число;
             default -> узел;
         };
     }
@@ -594,7 +618,18 @@ public final class СборкаНабора {
                 List<?> в = (List<?>) м.get("ветки");
                 yield kelium.engine.Срабатывания.развилка(String.valueOf(в.get(0)));
             }
-            case "уничтожь", "свалка", "рядом" -> "command";
+            case "уничтожь", "свалка" -> "command";
+            // рядом с врагом — развилка того, что ставишь сам: энергостанцию у
+            // вражеского здания строят Энергией, войска ведут Командованием
+            case "рядом" -> switch (String.valueOf(((Map<String, Object>) м.get("а")).get("кто"))) {
+                case "ДОБЫТЧИК" -> "extract";
+                case "ЭНЕРГОСТАНЦИЯ" -> "power";
+                case "ВОЕННОЕ", "КАЗАРМА", "ЗАВОД", "АВИАБАЗА" -> "supply";
+                default -> "command";
+            };
+            case "добудь" -> "extract";
+            case "запитай" -> "power";
+            case "выпусти" -> "supply";
             case "построй" -> {
                 Object вид = м.get("вид");
                 yield вид == null || "miner".equals(вид) ? "extract" : "plant".equals(вид) ? "power"
@@ -648,7 +683,10 @@ public final class СборкаНабора {
         Map<String, Object> т = (Map<String, Object>) з.get("требование");
         String узел = String.valueOf(т.get("узел"));
         return switch (узел) {
-            case "жетоны" -> узел + ":" + ((Map<String, Object>) т.get("группа")).get("кто");
+            // состояние — часть задачи: «3 добытчика» — стройка, «2 запитанных
+            // добытчика» — энергия к ним; это разные карты
+            case "жетоны" -> узел + ":" + ((Map<String, Object>) т.get("группа")).get("кто") + ":"
+                + ((Map<String, Object>) т.get("группа")).get("сост");
             case "рядом" -> узел + ":" + ((Map<String, Object>) т.get("а")).get("кто") + ":"
                 + ((Map<String, Object>) т.get("б")).get("кто");
             case "ресурс" -> узел + ":" + т.get("ресурс");
@@ -686,6 +724,67 @@ public final class СборкаНабора {
         String имя = String.valueOf(эф.get("effect"));
         return имя.equals("спец") || (эф.get("params") instanceof Map<?, ?> п
             && п.containsKey("objective_cards"));
+    }
+
+    /**
+     * Задание, что закрывается ОДНИМ действием с пустого места («В ЭТОТ ХОД
+     * построй здание»): дизайнер исключил такие ещё в каталоге 10.0 (17.08.2026).
+     * С наградой-веткой оно к тому же кормит само себя.
+     */
+    @SuppressWarnings("unchecked")
+    static boolean однимДействием(Map<String, Object> з) {
+        if (з == null || !(з.get("требование") instanceof Map<?, ?> м)) {
+            return false;
+        }
+        Map<String, Object> т = (Map<String, Object>) м;
+        String у = String.valueOf(т.get("узел"));
+        int сколько = т.get("сколько") instanceof Number n ? n.intValue() : 1;
+        return (у.equals("построй") || у.equals("найми")) && сколько <= 1;
+    }
+
+    /** Срабатывание на состояние (открыт нижний приказ), а не на поступок игрока. */
+    @SuppressWarnings("unchecked")
+    static boolean пассивное(Map<String, Object> а) {
+        Map<String, Object> когда = (Map<String, Object>) ((Map<String, Object>) а.get("низ")).get("когда");
+        return когда != null && "низ".equals(String.valueOf(когда.get("событие")));
+    }
+
+    /**
+     * Две новые начальные карты: по одному срабатыванию на «выполнил задание» и
+     * «установил карту арсенала», эффект — ресурс (не спец-действие: начальная
+     * достаётся случайно, сильную шестерёнку одному игроку не дарим). Из
+     * годных берётся самое частое на установку, не взятое в колоду.
+     */
+    @SuppressWarnings("unchecked")
+    static List<String> начальные(List<Map.Entry<String, int[]>> сработавшие, List<String> арсНабор,
+                                  Map<String, Map<String, Object>> арсеналПоId) {
+        List<String> итог = new ArrayList<>();
+        for (String событие : List.of("задание", "установил")) {
+            String лучший = null;
+            double частота = -1;
+            for (var e : сработавшие) {
+                Map<String, Object> а = арсеналПоId.get(e.getKey());
+                if (а == null || арсНабор.contains(e.getKey()) || e.getValue()[0] < 4) {
+                    continue;
+                }
+                Map<String, Object> низ = (Map<String, Object>) а.get("низ");
+                Map<String, Object> когда = (Map<String, Object>) низ.get("когда");
+                Map<String, Object> эф = (Map<String, Object>) низ.get("эффект");
+                if (!событие.equals(String.valueOf(когда.get("событие"))) || когда.size() > 1
+                        || !"gain".equals(эф.get("effect")) || редкое(а)) {
+                    continue;
+                }
+                double ч = e.getValue()[1] / (double) e.getValue()[0];
+                if (ч > частота) {
+                    частота = ч;
+                    лучший = e.getKey();
+                }
+            }
+            if (лучший != null) {
+                итог.add(лучший);
+            }
+        }
+        return итог;
     }
 
     private static int целое(String s) {
