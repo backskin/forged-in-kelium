@@ -433,18 +433,43 @@ public final class ChoiceWords {
             case "special", "specialized" -> "спец-атака";
             default -> "атака";
         };
-        String tcat = Boolean.TRUE.equals(payload.get("neutral")) ? "снести нейтральную постройку"
-            : switch (String.valueOf(payload.get("tcat"))) {
-                case "infantry" -> "по пехоте";
-                case "vehicle" -> "по технике";
-                case "aircraft" -> "по авиации";
-                case "units" -> "по войскам";
-                case "buildings_towers" -> "по зданиям и вышкам";
-                case "any" -> "по любой цели";
-                default -> "";
-            };
+        String tcat;
+        if (Boolean.TRUE.equals(payload.get("neutral"))) {
+            tcat = "снести нейтральную постройку";
+        } else if (payload.get("split") instanceof List<?> все && все.size() >= 4) {
+            tcat = "по любой цели";
+        } else {
+            // у золотого модуля боя целей две: «по пехоте и технике»
+            List<String> цели = new java.util.ArrayList<>();
+            Object вторая = payload.get("tcat2");
+            if (payload.get("split") instanceof List<?> пара && пара.size() == 2) {
+                вторая = пара.get(1);
+            }
+            for (Object код : new Object[]{payload.get("tcat"), вторая}) {
+                String слово = целиДат(String.valueOf(код));
+                if (код != null && !слово.isEmpty() && !цели.contains(слово)) {
+                    цели.add(слово);
+                }
+            }
+            tcat = цели.isEmpty() ? "" : "по " + String.join(" и ", цели);
+        }
+        String урон = payload.get("damage") instanceof Number n && n.intValue() > 1
+            ? " · " + n.intValue() + " урона" : "";
         String head = unit.isEmpty() ? "Атака" : cap(unit);
-        return head + " · " + row + (tcat.isEmpty() ? "" : " → " + tcat);
+        return head + " · " + row + (tcat.isEmpty() ? "" : " → " + tcat) + урон;
+    }
+
+    /** Цель атаки в дательном падеже: «пехоте», «зданиям и вышкам». */
+    private static String целиДат(String код) {
+        return switch (код) {
+            case "infantry" -> "пехоте";
+            case "vehicle" -> "технике";
+            case "aircraft" -> "авиации";
+            case "units" -> "войскам";
+            case "buildings_towers" -> "зданиям и вышкам";
+            case "any" -> "любой цели";
+            default -> "";
+        };
     }
 
     /** Английские фразы движка, которые доходят до игрока, — по-русски. */

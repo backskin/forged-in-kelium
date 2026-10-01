@@ -1214,7 +1214,9 @@ public final class CombatResolver {
             }
             boolean оплачено = false;
             usedRows.add(key);
+            int номерУдара = 0;
             for (List<Target> кат : удары) {
+            номерУдара++;
             // K4: жертву выбирает ИГРОК (поимённо): важно для добивания раненых
             // и выбора, ЧЕЙ жетон бить (кто получит ответку).
             List<Token> victims = new ArrayList<>();
@@ -1238,8 +1240,15 @@ public final class CombatResolver {
                         victimLabel(t) + " игрока " + t.owner()
                         + " (урон " + damageOf(t) + "/" + Passives.effectiveHp(s, t) + ")"));
                 }
-                Choice vpick = agent.choose(s, vopts,
-                    Map.of("kind", "combat_victim", "target", target));
+                // при делимом уроне окно пишет, какой это кубик урона из скольких
+                Map<String, Object> вопрос = new HashMap<>();
+                вопрос.put("kind", "combat_victim");
+                вопрос.put("target", target);
+                if (pl.get("split") != null) {
+                    вопрос.put("blow", номерУдара);
+                    вопрос.put("blows", удары.size());
+                }
+                Choice vpick = agent.choose(s, vopts, вопрос);
                 victim = (Token) vpick.payload();
             }
             if (victim == null) {

@@ -3848,7 +3848,7 @@ public final class HotSeatWindow {
         return switch (kind) {
             case "reveal_order" -> "вскрываем приказ круга";
             case "blind_discard" -> "отложите приказ под уничтоженные жетоны";
-            case "combat_victim", "neutral_victim" -> "по вам ударили — выберите жертву";
+            case "combat_victim", "neutral_victim" -> "бой: выберите, кого поразить";
             case "action" -> "ваш ход";
             default -> KIND_LABELS.getOrDefault(kind, "ваш ход");
         };
@@ -6070,7 +6070,9 @@ public final class HotSeatWindow {
         String title = switch (kind) {
             case "attack" -> "Бой — атака" + (target == null ? "" : " по гексу " + target);
             case "combat_victim" -> "Кого поразить"
-                + (target == null ? "" : " в гексе " + target);
+                + (target == null ? "" : " в гексе " + target)
+                + (d.context().get("blows") instanceof Number n && n.intValue() > 1
+                    ? " — урон " + d.context().get("blow") + " из " + n : "");
             default -> "Какой нейтрал" + (target == null ? "" : " в гексе " + target);
         };
         String warn = "attack".equals(kind) && agent.canUndo()
