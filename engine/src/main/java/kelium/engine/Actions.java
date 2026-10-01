@@ -635,10 +635,18 @@ public final class Actions {
             // чем двумя зданиями»; в обычной Добыче предела нет.
             int пределДобытчиков = ctx.objectLimit(name());
             int отработали = 0;
+            // ПОЧЕМУ ДОБЫЧА ПУСТАЯ (замер 01.10.2026: треть «Добыть» не даёт
+            // ничего) — счёт причин по добытчикам, в телеметрию
+            int добытчиков = 0;
+            int безЭнергии = 0;
+            int безКелемия = 0;
+            int пропущено = 0;
+            int складПолон = 0;
             for (BuildingToken b : player.buildingsOnField()) {
                 if (b.type != BuildingType.MINER) {
                     continue;
                 }
+                добытчиков++;
                 if (отработали >= пределДобытчиков) {
                     break;
                 }
@@ -656,6 +664,7 @@ public final class Actions {
                     if (ctx.freeMinerMoves > 0) {
                         ctx.freeMinerMoves--;
                     } else {
+                        безЭнергии++;
                         continue;
                     }
                 }
@@ -691,6 +700,7 @@ public final class Actions {
                     opts.add(new Choice("mine", "container", "take container @" + contHex));
                 }
                 if (opts.isEmpty()) {
+                    безКелемия++;
                     continue;   // ни келемия рядом, ни открытого контейнера
                 }
                 // СРАБАТЫВАНИЕ ПРИ ПОСТРОЙКЕ — БЕЗ ПРОПУСКА (решение дизайнера
@@ -703,12 +713,17 @@ public final class Actions {
                 Choice pick = приПостройке && opts.size() == 1 ? opts.get(0)
                     : agent.choose(s, opts, Map.of("kind", "mine"));
                 if (pick.payload() == null) {
+                    пропущено++;
                     continue;   // добытчик пропущен
                 }
                 takeContainerOnly = "container".equals(pick.payload());
                 отработали++;
                 if (!takeContainerOnly) {
-                    gainedK += mineFromMiner(s, player, b, grid);
+                    int добыто = mineFromMiner(s, player, b, grid);
+                    if (добыто == 0) {
+                        складПолон++;
+                    }
+                    gainedK += добыто;
                     if (both) {
                         gainedC += Storage.addContainersCapped(s, player, 1,
                             "Добыча: выработал тайл");
@@ -755,6 +770,11 @@ public final class Actions {
             tel.put("power_coins", paid[0]);
             tel.put("power_offers", paid[1]);
             tel.put("containers", gainedC);
+            tel.put("miners", добытчиков);
+            tel.put("miners_unpowered", безЭнергии);
+            tel.put("miners_no_kelium", безКелемия);
+            tel.put("miners_skipped", пропущено);
+            tel.put("miners_storage_full", складПолон);
             return ActionResult.ok("mined " + gainedK + " kelium, " + gainedC + " containers", tel);
         }
 

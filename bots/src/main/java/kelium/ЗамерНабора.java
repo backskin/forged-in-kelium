@@ -126,8 +126,10 @@ public final class ЗамерНабора {
             int пусто = 0;
             StringBuilder р = new StringBuilder();
             for (var в : e.getValue().entrySet()) {
-                всего += в.getValue()[0];
-                пусто += в.getValue()[1];
+                if (!в.getKey().contains("·")) {     // «mining·причина» — разбивка, не в итог
+                    всего += в.getValue()[0];
+                    пусто += в.getValue()[1];
+                }
                 р.append(String.format(java.util.Locale.ROOT, "%s %.2f/%.2f; ", в.getKey(),
                     в.getValue()[1] / (4.0 * партий), в.getValue()[0] / (4.0 * партий)));
             }
@@ -141,6 +143,31 @@ public final class ЗамерНабора {
         Files.writeString(Path.of("design-docs/фигуры").resolve(файл), sb.toString(),
             StandardCharsets.UTF_8);
         System.out.println(sb);
+    }
+
+    /** Главная причина пустой «Добыть» — по телеметрии действия. */
+    private static String причинаПустойДобычи(Map<?, ?> t) {
+        int добытчиков = число(t, "miners");
+        if (добытчиков == 0) {
+            return "нет добытчиков";
+        }
+        if (число(t, "miners_storage_full") > 0) {
+            return "склад полон";
+        }
+        if (число(t, "miners_unpowered") >= добытчиков) {
+            return "все без энергии";
+        }
+        if (число(t, "miners_no_kelium") > 0) {
+            return "рядом нет келемия";
+        }
+        if (число(t, "miners_skipped") > 0) {
+            return "пропустил";
+        }
+        return "прочее";
+    }
+
+    private static int число(Map<?, ?> t, String ключ) {
+        return t.get(ключ) instanceof Number n ? n.intValue() : 0;
     }
 
     private static Итог партия(String свод, long seed, Сеть сеть) {
@@ -186,6 +213,9 @@ public final class ЗамерНабора {
                         x[0]++;
                         if (!kelium.engine.Срабатывания.сделала(ev)) {
                             x[1]++;
+                            if ("mining".equals(ev.get("action")) && ev.get("telemetry") instanceof Map<?, ?> t) {
+                                ветки.computeIfAbsent("mining·" + причинаПустойДобычи(t), k -> new int[2])[1]++;
+                            }
                         }
                     }
                     if (место instanceof Integer m && m >= 0 && m < 4 && "combat".equals(ev.get("action"))
