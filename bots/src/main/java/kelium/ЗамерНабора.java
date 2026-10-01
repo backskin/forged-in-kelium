@@ -47,7 +47,7 @@ public final class ЗамерНабора {
     record Итог(double заданий, double арсенала, double связок, double срабатываний,
                 String дорогаПобедителя, double урона, double уничтожено, boolean воинПобедил,
                 double сухихБоёв, double сухихБезБоеприпасов, double сухихСКарты,
-                double уронаЗолотом, double уронаСупер) {
+                double уронаЗолотом, double уронаСупер, Map<String, int[]> ветки) {
     }
 
     public static void main(String[] args) throws Exception {
@@ -73,6 +73,7 @@ public final class ЗамерНабора {
             + " | уничтожено жетонов на игрока | победил самый воинственный"
             + " | сухих боёв на игрока (без боеприпасов / с карты) | дороги победителей |\n"
             + "|---|---|---|---|---|---|---|---|---|---|\n");
+        Map<String, Map<String, int[]>> пустые = new LinkedHashMap<>();
         for (var e : ff.entrySet()) {
             double[] с = new double[12];
             Map<String, Integer> дороги = new java.util.TreeMap<>();
@@ -97,6 +98,12 @@ public final class ЗамерНабора {
                 с[9] += и.сухихСКарты();
                 с[10] += и.уронаЗолотом();
                 с[11] += и.уронаСупер();
+                for (var в : и.ветки().entrySet()) {
+                    int[] x = пустые.computeIfAbsent(e.getKey(), k -> new java.util.TreeMap<>())
+                        .computeIfAbsent(в.getKey(), k -> new int[2]);
+                    x[0] += в.getValue()[0];
+                    x[1] += в.getValue()[1];
+                }
                 дороги.merge(и.дорогаПобедителя(), 1, Integer::sum);
                 n++;
             }
@@ -111,6 +118,23 @@ public final class ЗамерНабора {
                 100 * с[6] / n, с[7] / n, с[8] / n, с[9] / n, д.toString().trim()));
         }
         пул.shutdown();
+        // ПУСТЫЕ ВЕТКИ: игрок выбрал ветку с приказа, а она ничего не сделала —
+        // «выбрал действие, а сделать нечего» (Влад, 01.10.2026)
+        sb.append("\n## Пустые ветки с приказа (впустую / сыграно, на игрока за партию)\n\n");
+        for (var e : пустые.entrySet()) {
+            int всего = 0;
+            int пусто = 0;
+            StringBuilder р = new StringBuilder();
+            for (var в : e.getValue().entrySet()) {
+                всего += в.getValue()[0];
+                пусто += в.getValue()[1];
+                р.append(String.format(java.util.Locale.ROOT, "%s %.2f/%.2f; ", в.getKey(),
+                    в.getValue()[1] / (4.0 * партий), в.getValue()[0] / (4.0 * партий)));
+            }
+            sb.append(String.format(java.util.Locale.ROOT, "- **%s**: впустую %.2f из %.2f (%.0f%%) — %s%n",
+                e.getKey(), пусто / (4.0 * партий), всего / (4.0 * партий),
+                всего == 0 ? 0.0 : 100.0 * пусто / всего, р.toString().trim()));
+        }
         // у каждого набора сводов свой файл: два замера разом не затирают друг друга
         String файл = своды.equals(List.of("1.46.0", "1.47.0")) ? "проверка набора.md"
             : "проверка набора (" + String.join(" ", своды) + ").md";
@@ -138,6 +162,7 @@ public final class ЗамерНабора {
         int[] сухих = new int[3];      // боёв без попадания; из них без боеприпасов; из всех — с карты
         boolean[] сухойЖдёт = new boolean[4];
         int[] особых = new int[2];     // урон с золотого модуля боя; урон супер-войска
+        Map<String, int[]> ветки = new java.util.TreeMap<>();   // ветка → {сыграно с приказа, из них впустую}
         GameEngine.playGame(s, agents, ev -> {
             String тип = String.valueOf(ev.get("type"));
             Object место = ev.get("seat");
@@ -155,6 +180,14 @@ public final class ЗамерНабора {
                 // событие ветки приходит ПОСЛЕ боя: тогда и видно, чей был сухой бой —
                 // с карты (free) или выбранный игроком
                 case "action" -> {
+                    // ПУСТЫЕ ВЕТКИ С ПРИКАЗА: игрок выбрал ветку, а она ничего не сделала
+                    if (!Boolean.TRUE.equals(ev.get("free")) && Boolean.TRUE.equals(ev.get("ok"))) {
+                        int[] x = ветки.computeIfAbsent(kelium.engine.Срабатывания.ветка(ev), k -> new int[2]);
+                        x[0]++;
+                        if (!kelium.engine.Срабатывания.сделала(ev)) {
+                            x[1]++;
+                        }
+                    }
                     if (место instanceof Integer m && m >= 0 && m < 4 && "combat".equals(ev.get("action"))
                             && сухойЖдёт[m]) {
                         if (Boolean.TRUE.equals(ev.get("free"))) {
@@ -236,6 +269,6 @@ public final class ЗамерНабора {
         boolean воинПобедил = воин >= 0 && s.winner != null && s.winner == воин;
         return new Итог(заданий[0] / 4.0, арсенала[0] / 4.0, связок / 4.0, срабатываний[0] / 4.0, дорога,
             урона[0] / 4.0, уничтожено[0] / 4.0, воинПобедил, сухих[0] / 4.0, сухих[1] / 4.0,
-            сухих[2] / 4.0, особых[0] / 4.0, особых[1] / 4.0);
+            сухих[2] / 4.0, особых[0] / 4.0, особых[1] / 4.0, ветки);
     }
 }

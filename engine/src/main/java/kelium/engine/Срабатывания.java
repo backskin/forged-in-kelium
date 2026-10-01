@@ -246,8 +246,15 @@ public final class Срабатывания {
         if (!Boolean.TRUE.equals(e.get("ok"))) {
             return false;
         }
-        if (!kelium.dataio.Ctx.rules(s).getBool("cards.branch_must_act", false)
-                || !(e.get("telemetry") instanceof Map<?, ?> t) || t.isEmpty()) {
+        return !kelium.dataio.Ctx.rules(s).getBool("cards.branch_must_act", false) || сделала(e);
+    }
+
+    /** Сделала ли ветка хоть что-то — по телеметрии, без оглядки на свод (для замеров). */
+    public static boolean сделала(Map<String, Object> e) {
+        if (!Boolean.TRUE.equals(e.get("ok"))) {
+            return false;
+        }
+        if (!(e.get("telemetry") instanceof Map<?, ?> t) || t.isEmpty()) {
             return true;
         }
         String в = ветка(e);
