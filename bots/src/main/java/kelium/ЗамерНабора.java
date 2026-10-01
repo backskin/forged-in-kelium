@@ -62,7 +62,8 @@ public final class ЗамерНабора {
         for (String свод : своды) {
             List<Future<Итог>> список = new ArrayList<>();
             for (int g = 0; g < партий; g++) {
-                final long seed = 8_700_000L + g;
+                // -Dkelium.замер.сид — другие раздачи: отличить шум от сдвига
+                final long seed = Long.getLong("kelium.замер.сид", 8_700_000L) + g;
                 список.add(пул.submit(() -> партия(свод, seed, сеть)));
             }
             ff.put(свод, список);
