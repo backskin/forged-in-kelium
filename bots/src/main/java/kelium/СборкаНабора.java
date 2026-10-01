@@ -277,10 +277,19 @@ public final class СборкаНабора {
                 }
             }
         }
+        int[] грабежей = {0};
         for (var e : арсПоРазвилке.entrySet()) {
             for (String id : e.getValue()) {
                 Map<String, Object> а = арсеналПоId.get(id);
+                // грабёж — не больше двух на колоду: шесть «забери у врага» из 33
+                // превращали игру в мелкую делёжку, кого обобрать (01.10.2026)
+                if (грабёж(а) && грабежей[0] >= 2) {
+                    continue;
+                }
                 if (поступок(а) && !редкое(а) && семьиАрс.add(семействоАрсенала(а))) {
+                    if (грабёж(а)) {
+                        грабежей[0]++;
+                    }
                     арсНабор.add(id);
                     видов.merge(e.getKey() + ":" + видЭффекта(а), 1, Integer::sum);
                     видов.merge(e.getKey() + ":" + ((Map<String, Object>) а.get("низ")).get("когда"), 1,
@@ -309,8 +318,12 @@ public final class СборкаНабора {
                 if (редкое(а) || арсНабор.contains(id) || видов.getOrDefault(вид, 0) >= 3
                         || видов.getOrDefault(повод, 0) >= 2
                         || сПлатой
+                        || (грабёж(а) && грабежей[0] >= 2)
                         || семьиАрс.contains(семействоАрсенала(а))) {
                     continue;
+                }
+                if (грабёж(а)) {
+                    грабежей[0]++;
                 }
                 семьиАрс.add(семействоАрсенала(а));
                 арсНабор.add(id);
@@ -579,10 +592,24 @@ public final class СборкаНабора {
             } + число;
             case "арсенал" -> "Арсенал" + число;
             case "свалка" -> "Свалка" + число;
-            case "ветки" -> "Две ветки";
-            case "обе_ветки" -> "Обе ветки";
-            case "очередь_задания" -> "Задание подряд";
-            case "очередь_спец" -> "Спец-действие подряд";
+            // имя называет то, что на карте: «Бой и Наука», а не «Две ветки»
+            case "ветки" -> {
+                List<String> слова = new ArrayList<>();
+                for (Object в : (List<?>) т.get("ветки")) {
+                    слова.add(kelium.cards.язык.Требование.ветка(String.valueOf(в))
+                        .replace("«", "").replace("»", ""));
+                }
+                yield String.join(" и ", слова);
+            }
+            case "обе_ветки" -> "Обе ветки " + switch (String.valueOf(т.get("развилка"))) {
+                case "extract" -> "Добычи";
+                case "power" -> "Питания";
+                case "supply" -> "Снабжения";
+                case "command" -> "Командования";
+                default -> "Развития";
+            };
+            case "очередь_задания" -> порядковоеИм(т.get("k")) + " задание за ход";
+            case "очередь_спец" -> порядковоеИм(т.get("k")) + " спец-действие";
             case "сожги" -> "Сожги" + число;
             case "установи" -> "Установи";
             case "уничтожь" -> {
@@ -597,6 +624,17 @@ public final class СборкаНабора {
             case "выпусти" -> "Выпусти" + число;
             case "потрать" -> "Потрать келемий" + число;
             default -> узел;
+        };
+    }
+
+    /** «Второе», «Третье» — для имени карты (именительный, средний род). */
+    private static String порядковоеИм(Object k) {
+        int n = k instanceof Number x ? x.intValue() : 2;
+        return switch (n) {
+            case 2 -> "Второе";
+            case 3 -> "Третье";
+            case 4 -> "Четвёртое";
+            default -> n + "-е";
         };
     }
 
@@ -825,6 +863,13 @@ public final class СборкаНабора {
         Map<String, Object> эф = (Map<String, Object>) ((Map<String, Object>) а.get("низ")).get("эффект");
         return java.util.Set.of("move_unit", "place_damage", "steal_resource")
             .contains(String.valueOf(эф.get("effect")));
+    }
+
+    /** «Забери у одного врага …» — грабёж. */
+    @SuppressWarnings("unchecked")
+    static boolean грабёж(Map<String, Object> а) {
+        Map<String, Object> эф = (Map<String, Object>) ((Map<String, Object>) а.get("низ")).get("эффект");
+        return "steal_resource".equals(String.valueOf(эф.get("effect")));
     }
 
     /** Спец-действие или карта — редкая, сильная шестерёнка связок. */
