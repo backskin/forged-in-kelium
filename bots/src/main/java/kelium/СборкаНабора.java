@@ -41,6 +41,8 @@ public final class СборкаНабора {
 
     /** Пробный режим (-Dkelium.набор.проба=true): пороги сняты — только проверка пути. */
     static final boolean ПРОБА = Boolean.getBoolean("kelium.набор.проба");
+    /** Карт прокачки «каждый ход — ещё одно спец-действие» в арсенале. */
+    static final int ПРОКАЧКА = Integer.getInteger("kelium.набор.прокачка", 2);
     /** Задания Командования дают трофей в основной награде (опыт 01.10.2026). */
     static final boolean ВОЙНА_ТРОФЕЕМ = !"false".equals(System.getProperty("kelium.набор.трофей", "true"));
     /** Трудные задания дают карту арсенала в основной награде (опыт 01.10.2026). */
@@ -467,6 +469,26 @@ public final class СборкаНабора {
             арсенал.add(e);
             номер++;
         }
+        // ПРОКАЧКА СПЕЦ-ДЕЙСТВИЯ (решение Влада 01.10.2026): «2 спец-действия —
+        // только прокачкой через арсенал или наградой». Установленная карта даёт
+        // ещё одно спец-действие каждый ход. Не из бульона — по замыслу; число —
+        // -Dkelium.набор.прокачка (0 — без них, для сравнения).
+        Map<String, Object> низПрокачки = new LinkedHashMap<>();
+        низПрокачки.put("когда", Map.of("событие", "ход"));
+        низПрокачки.put("эффект", Map.of("effect", "спец", "params", Map.of("n", 1)));
+        низПрокачки.put("предел", 1);
+        for (int i = 0; i < ПРОКАЧКА; i++) {
+            Map<String, Object> e = new LinkedHashMap<>();
+            e.put("id", String.format("a8_%02d", номер));
+            e.put("name", "Каждый ход → спец-действие");
+            e.put("kind", "regular");
+            e.put("значок", "карты");
+            e.put("top", старыеВерхи.get((номер - 1) % старыеВерхи.size()));
+            e.put("bottom", низПрокачки);
+            e.put("описание", kelium.cards.язык.Срабатывание.текст(низПрокачки));
+            арсенал.add(e);
+            номер++;
+        }
         for (Map<String, Object> e : (List<Map<String, Object>>) старыйАрсенал.get("arsenal")) {
             if ("starting".equals(e.get("kind"))) {
                 арсенал.add(e);
@@ -553,6 +575,7 @@ public final class СборкаНабора {
             case "потерял" -> "Потеря";
             case "совпадение" -> "Совпадение";
             case "низ" -> "Нижний приказ";
+            case "ход" -> "Каждый ход";
             default -> что;
         };
         Map<String, Object> п = эф.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();

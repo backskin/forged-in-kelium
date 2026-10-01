@@ -669,6 +669,43 @@ arsenal:
         trophy: 1
     предел: 1
   описание: Каждый раз, когда играешь ветку «Выпустить», получи 1 трофей. Не больше 1 раза за ход.
+- id: a8_34
+  name: Каждый ход → спец-действие
+  kind: regular
+  значок: карты
+  top:
+    effect: gild_module
+    params:
+      price: 1
+      pay: kelium
+    label: −1 келемий ⇨ Улучши модуль
+  bottom:
+    когда:
+      событие: ход
+    эффект:
+      params:
+        n: 1
+      effect: спец
+    предел: 1
+  описание: Каждый раз, когда начинаешь свой ход, получи ещё одно спец-действие. Не больше 1 раза за ход.
+- id: a8_35
+  name: Каждый ход → спец-действие
+  kind: regular
+  значок: карты
+  top:
+    effect: free_action
+    params:
+      action: combat
+    label: Действие «Бой»
+  bottom:
+    когда:
+      событие: ход
+    эффект:
+      params:
+        n: 1
+      effect: спец
+    предел: 1
+  описание: Каждый раз, когда начинаешь свой ход, получи ещё одно спец-действие. Не больше 1 раза за ход.
 - id: bs72_1
   name: Полевой генератор
   kind: starting
@@ -772,9 +809,9 @@ arsenal:
   top:
     effect: gain
     params:
-      coin: 1
       objective_cards: 1
       kit: true
+      coin: 1
     label: 1 монета и 1 карта задания
   bottom:
     когда:
@@ -792,9 +829,9 @@ arsenal:
   top:
     effect: gain
     params:
+      kit: true
       ammo: 1
       kelium: 1
-      kit: true
     label: 1 келемий и 1 боеприпас
   bottom:
     когда:

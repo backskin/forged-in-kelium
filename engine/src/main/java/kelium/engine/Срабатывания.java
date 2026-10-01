@@ -306,6 +306,9 @@ public final class Срабатывания {
                 && Boolean.TRUE.equals(e.get("coincided"));
             case "низ" -> своё && "turn_orders".equals(тип)
                 && Boolean.TRUE.equals(e.get("bottom_open"));
+            // ПРОКАЧКА (решение Влада 01.10.2026): «второе спец-действие — только
+            // прокачкой через арсенал». Начало своего хода — событие приказа хода.
+            case "ход" -> своё && "turn_orders".equals(тип);
             default -> false;
         };
     }
