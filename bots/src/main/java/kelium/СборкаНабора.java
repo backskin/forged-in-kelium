@@ -42,7 +42,7 @@ public final class СборкаНабора {
     /** Пробный режим (-Dkelium.набор.проба=true): пороги сняты — только проверка пути. */
     static final boolean ПРОБА = Boolean.getBoolean("kelium.набор.проба");
     /** Карт прокачки «каждый ход — ещё одно спец-действие» в арсенале. */
-    static final int ПРОКАЧКА = Integer.getInteger("kelium.набор.прокачка", 2);
+    static final int ПРОКАЧКА = Integer.getInteger("kelium.набор.прокачка", 4);
     /** Задания Командования дают трофей в основной награде (опыт 01.10.2026). */
     static final boolean ВОЙНА_ТРОФЕЕМ = !"false".equals(System.getProperty("kelium.набор.трофей", "true"));
     /** Трудные задания дают карту арсенала в основной награде (опыт 01.10.2026). */
