@@ -140,8 +140,8 @@ public final class ЗамерНабора {
             int пусто = 0;
             StringBuilder р = new StringBuilder();
             for (var в : e.getValue().entrySet()) {
-                if (в.getKey().startsWith("дорога·")) {
-                    continue;                       // доли побед дорог — отдельным разделом
+                if (в.getKey().startsWith("дорога·") || в.getKey().startsWith("карта·")) {
+                    continue;                       // доли побед — отдельными разделами
                 }
                 if (!в.getKey().contains("·")) {     // «mining·причина» — разбивка, не в итог
                     всего += в.getValue()[0];
@@ -166,6 +166,31 @@ public final class ЗамерНабора {
                 }
             }
             sb.append("- **").append(e.getKey()).append("**: ").append(р.toString().trim()).append('\n');
+        }
+        // КАРТЫ АРСЕНАЛА: сколько раз поставлены и доля побед поставивших (ровно 25%).
+        // Слишком сильная карта видна сразу; слишком слабая — малой долей или тем,
+        // что её почти не ставят.
+        sb.append("\n## Карты арсенала: поставлено раз и доля побед поставивших\n\n");
+        for (var e : пустые.entrySet()) {
+            List<Map.Entry<String, int[]>> карты = new ArrayList<>();
+            for (var в : e.getValue().entrySet()) {
+                if (в.getKey().startsWith("карта·")) {
+                    карты.add(в);
+                }
+            }
+            карты.sort((a, b) -> Double.compare((double) b.getValue()[1] / Math.max(1, b.getValue()[0]),
+                (double) a.getValue()[1] / Math.max(1, a.getValue()[0])));
+            sb.append("**").append(e.getKey()).append("**\n\n| карта | поставлено | побед |\n|---|---|---|\n");
+            var колода = GameConfig.buildCached(e.getKey(), 4, 1L, null, null).content.get("arsenal");
+            for (var в : карты) {
+                String id = в.getKey().substring("карта·".length());
+                Map<String, Object> карта = колода.find(id);
+                String имя = карта == null ? id : id + " " + карта.get("name");
+                int[] x = в.getValue();
+                sb.append(String.format(java.util.Locale.ROOT, "| %s | %d | %.0f%% |%n", имя, x[0],
+                    100.0 * x[1] / Math.max(1, x[0])));
+            }
+            sb.append('\n');
         }
         // у каждого набора сводов свой файл: два замера разом не затирают друг друга
         String файл = своды.equals(List.of("1.46.0", "1.47.0")) ? "проверка набора.md"
@@ -240,6 +265,11 @@ public final class ЗамерНабора {
         boolean[] сухойЖдёт = new boolean[4];
         int[] особых = new int[2];     // урон с золотого модуля боя; урон супер-войска
         Map<String, int[]> ветки = new java.util.TreeMap<>();   // ветка → {сыграно с приказа, из них впустую}
+        // какие карты арсенала поставил каждый игрок — для доли побед по карте
+        List<java.util.Set<String>> поставил = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            поставил.add(new java.util.HashSet<>());
+        }
         GameEngine.playGame(s, agents, ev -> {
             String тип = String.valueOf(ev.get("type"));
             Object место = ev.get("seat");
@@ -315,6 +345,9 @@ public final class ЗамерНабора {
                         карт.merge(ход, 1, Integer::sum);
                         if ("install".equals(ev.get("mode"))) {
                             арсенала[0]++;
+                            if (место instanceof Integer m && m >= 0 && m < 4) {
+                                поставил.get(m).add(String.valueOf(ev.get("card")));
+                            }
                         }
                     }
                 }
@@ -346,6 +379,16 @@ public final class ЗамерНабора {
         if (s.winner != null && дороги.get(s.winner) != null) {
             дорога = дороги.get(s.winner).entrySet().stream()
                 .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("без заданий");
+        }
+        // ДОЛЯ ПОБЕД ПО КАРТЕ АРСЕНАЛА: кто её поставил и победил ли (ключ «карта·id»)
+        for (int место = 0; место < 4; место++) {
+            for (String id : поставил.get(место)) {
+                int[] x = ветки.computeIfAbsent("карта·" + id, k -> new int[2]);
+                x[0]++;
+                if (s.winner != null && s.winner == место) {
+                    x[1]++;
+                }
+            }
         }
         // ДОЛЯ ПОБЕД ДОРОГИ (01.10.2026): дорога каждого игрока, победил ли он.
         // Лёгкие задания развилки набирают все, и «дорога победителя» тянется к
