@@ -204,6 +204,10 @@ public final class Бульон {
             out.add(Map.of("узел", "запитай", "сколько", n));
             out.add(Map.of("узел", "выпусти", "сколько", n));
         }
+        // ТРАТА КЕЛЕМИЯ (01.10.2026): Рынок или плата карт
+        for (int n = 1; n <= 3; n++) {
+            out.add(Map.of("узел", "потрать", "сколько", n));
+        }
         return out;
     }
 
@@ -335,6 +339,47 @@ public final class Бульон {
             for (Map<String, Object> эф : поступки) {
                 Map<String, Object> низ = new LinkedHashMap<>();
                 низ.put("когда", когда);
+                низ.put("эффект", эф);
+                низ.put("предел", 1);
+                Map<String, Object> запись = new LinkedHashMap<>();
+                запись.put("id", "t_" + номер++);
+                запись.put("текст", Срабатывание.текст(низ));
+                запись.put("низ", низ);
+                out.add(запись);
+            }
+        }
+        // ПЛАТА КЕЛЕМИЕМ (01.10.2026, заказ Влада): келемий выходил с поля в одну
+        // дверь — на Рынок, и Добыча проигрывала (замер: 8–15% побед). Карты «можешь
+        // заплатить 1 келемий: …» дают ему вторую дверь. Тоже В КОНЕЦ.
+        List<Map<String, Object>> заКелемий = new ArrayList<>();
+        заКелемий.add(Map.of("effect", "спец", "params", Map.of("n", 1)));
+        заКелемий.add(Map.of("effect", "gain", "params", Map.of("coin", 3)));
+        заКелемий.add(Map.of("effect", "gain", "params", Map.of("ammo", 2)));
+        заКелемий.add(Map.of("effect", "gain", "params", Map.of("trophy", 1)));
+        заКелемий.add(Map.of("effect", "gain", "params", Map.of("objective_cards", 1)));
+        заКелемий.add(Map.of("effect", "place_damage", "params", Map.of()));
+        заКелемий.add(Map.of("effect", "move_unit", "params", Map.of("hexes", 1)));
+        for (String в : ВЕТКИ) {
+            заКелемий.add(Map.of("effect", "free_action", "params", Map.of("action", в)));
+        }
+        for (Map<String, Object> когда : события) {
+            String что = String.valueOf(когда.get("событие"));
+            if (!List.of("ветка", "развилка", "задание", "сжёг", "установил").contains(что)) {
+                continue;   // плата — только после действия, не посреди боя и не в чужой ход
+            }
+            for (Map<String, Object> эф : заКелемий) {
+                // ветка за ветку той же развилки — слишком близко к «сыграй дважды»
+                if ("free_action".equals(эф.get("effect"))) {
+                    String за = String.valueOf(((Map<?, ?>) эф.get("params")).get("action"));
+                    String р = что.equals("ветка") ? развилка(String.valueOf(когда.get("ветка")))
+                        : что.equals("развилка") ? String.valueOf(когда.get("развилка")) : null;
+                    if (р != null && р.equals(развилка(за))) {
+                        continue;
+                    }
+                }
+                Map<String, Object> низ = new LinkedHashMap<>();
+                низ.put("когда", когда);
+                низ.put("плата", Map.of("kelium", 1));
                 низ.put("эффект", эф);
                 низ.put("предел", 1);
                 Map<String, Object> запись = new LinkedHashMap<>();

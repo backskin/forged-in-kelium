@@ -252,6 +252,20 @@ public final class СборкаНабора {
         // правило — передвинь войско, нанеси урон, забери ресурс. Без них арсенал
         // выходил сплошь «ветка → ресурс». Берётся самая умеренная по частоте.
         Map<String, Integer> видов = new HashMap<>();
+        // ПЛАТА КЕЛЕМИЕМ В КАЖДОЙ РАЗВИЛКЕ (01.10.2026, заказ Влада): по карте
+        // «можешь заплатить 1 келемий: …» — вторая дверь келемию кроме Рынка
+        for (var e : арсПоРазвилке.entrySet()) {
+            for (String id : e.getValue()) {
+                Map<String, Object> а = арсеналПоId.get(id);
+                if (а.get("низ") instanceof Map<?, ?> н && н.get("плата") != null
+                        && семьиАрс.add(семействоАрсенала(а))) {
+                    арсНабор.add(id);
+                    видов.merge(e.getKey() + ":" + ((Map<String, Object>) а.get("низ")).get("когда"), 1,
+                        Integer::sum);
+                    break;
+                }
+            }
+        }
         for (var e : арсПоРазвилке.entrySet()) {
             for (String id : e.getValue()) {
                 Map<String, Object> а = арсеналПоId.get(id);
@@ -510,7 +524,7 @@ public final class СборкаНабора {
                 : п.containsKey("kelium") ? "келемий" : п.containsKey("trophy") ? "трофей"
                 : п.containsKey("objective_cards") ? "задание" : "добро";
         };
-        return событие + " → " + итог;
+        return событие + (низ.get("плата") != null ? " + келемий" : "") + " → " + итог;
     }
 
     /** Имя карты — строго по сути требования, без придуманных слов. */
@@ -555,6 +569,7 @@ public final class СборкаНабора {
             case "добудь" -> "Добудь" + число;
             case "запитай" -> "Запитай" + число;
             case "выпусти" -> "Выпусти" + число;
+            case "потрать" -> "Потрать келемий" + число;
             default -> узел;
         };
     }
@@ -688,6 +703,8 @@ public final class СборкаНабора {
             case "добудь" -> "extract";
             case "запитай" -> "power";
             case "выпусти" -> "supply";
+            // трата келемия — задача добытчика: кто добыл, тот и тратит
+            case "потрать" -> "extract";
             case "построй" -> {
                 Object вид = м.get("вид");
                 yield вид == null || "miner".equals(вид) ? "extract" : "plant".equals(вид) ? "power"
@@ -764,7 +781,8 @@ public final class СборкаНабора {
         Map<String, Object> низ = (Map<String, Object>) а.get("низ");
         Map<String, Object> эф = (Map<String, Object>) низ.get("эффект");
         Map<String, Object> п = эф.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-        return String.valueOf(низ.get("когда")) + "|" + эф.get("effect") + "|" + new java.util.TreeSet<>(п.keySet());
+        return String.valueOf(низ.get("когда")) + "|" + эф.get("effect") + "|" + new java.util.TreeSet<>(п.keySet())
+            + (низ.get("плата") != null ? "|плата" : "");
     }
 
     /** Вид эффекта карты арсенала: монеты, боеприпас, ремонт, ветка… */

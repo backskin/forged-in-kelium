@@ -710,6 +710,33 @@ public interface Требование {
         }
     }
 
+    /** Келемий, потраченный в этот ход: Рынок и плата карт (01.10.2026). */
+    record Потрать(int сколько) implements Требование {
+        @Override public boolean выполнено(CardContext ctx) {
+            return ход(ctx).келемияПотрачено >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(ход(ctx).келемияПотрачено, сколько);
+        }
+
+        @Override public String суть() {
+            return "потрать " + сколько + (сколько == 1 ? " келемий" : " келемия");
+        }
+
+        @Override public boolean происшествие() {
+            return true;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "потрать", "сколько", сколько);
+        }
+
+        @Override public String действие() {
+            return "market";
+        }
+    }
+
     /** Боеприпасы, выпущенные в этот ход (ветка «Выпустить»). */
     record Выпусти(int сколько) implements Требование {
         @Override public boolean выполнено(CardContext ctx) {
@@ -825,6 +852,7 @@ public interface Требование {
             case "добудь" -> new Добудь(число(m, "сколько", 1));
             case "запитай" -> new Запитай(число(m, "сколько", 1));
             case "выпусти" -> new Выпусти(число(m, "сколько", 1));
+            case "потрать" -> new Потрать(число(m, "сколько", 1));
             case "и" -> {
                 List<Требование> ч = new ArrayList<>();
                 if (m.get("части") instanceof List<?> l) {

@@ -68,6 +68,9 @@ public final class Срабатывания {
                 if (сыграна(s, e)) {
                     ф.веткиХода.add(ветка(e));
                 }
+                if (e.get("telemetry") instanceof Map<?, ?> t && t.get("kelium_spent") instanceof Number n) {
+                    ф.келемияПотрачено += n.intValue();
+                }
             }
             case "objective" -> ф.заданийВыполнено++;
             case "objective_burn" -> ф.картСожжено++;
@@ -115,9 +118,17 @@ public final class Срабатывания {
                         continue;
                     }
                     String имя = String.valueOf(эф.get("effect"));
-                    if (!ПОСЛЕ_ДЕЙСТВИЯ.contains(String.valueOf(событие.get("type")))
-                            && !БЕЗОПАСНЫЕ.contains(имя)) {
+                    boolean послеДействия = ПОСЛЕ_ДЕЙСТВИЯ.contains(String.valueOf(событие.get("type")));
+                    if (!послеДействия && !БЕЗОПАСНЫЕ.contains(имя)) {
                         continue;   // ветку посреди боя не играют — карта так не собирается
+                    }
+                    // ПЛАТА (01.10.2026): «можешь заплатить 1 келемий: …». Келемий
+                    // выходил с поля в одну дверь — на Рынок; карты с платой дают
+                    // ему вторую. Вопрос — только после действия, не между выстрелами.
+                    if (низ.get("плата") instanceof Map<?, ?> плата) {
+                        if (!послеДействия || !заплатил(s, p, плата, эф)) {
+                            continue;
+                        }
                     }
                     s.journal.отметитьСрабатывание(p.seat, cid);
                     Map<String, Object> итог = исполнить(s, p.seat, имя, параметры(эф));
@@ -136,6 +147,60 @@ public final class Срабатывания {
         } finally {
             г[0]--;
         }
+    }
+
+    /**
+     * Спросить игрока, платит ли он за срабатывание, и списать плату. Нечем
+     * платить — карта молчит без вопроса. Отказ не тратит предела карты за ход.
+     */
+    private static boolean заплатил(GameState s, PlayerState p, Map<?, ?> плата, Map<?, ?> эф) {
+        Map<kelium.core.Resource, Integer> цена = new java.util.EnumMap<>(kelium.core.Resource.class);
+        for (var e : плата.entrySet()) {
+            if (e.getValue() instanceof Number n && n.intValue() > 0) {
+                цена.put(kelium.core.Resource.fromCode(String.valueOf(e.getKey())), n.intValue());
+            }
+        }
+        for (var e : цена.entrySet()) {
+            if (!p.resources.canPay(e.getKey(), e.getValue())) {
+                return false;
+            }
+        }
+        kelium.core.Agent agent = s.agents == null || p.seat >= s.agents.size() ? null : s.agents.get(p.seat);
+        if (agent != null) {
+            List<kelium.core.Choice> opts = List.of(
+                new kelium.core.Choice("trigger_pay", Boolean.TRUE, "заплатить: " + словаПлаты(цена)),
+                new kelium.core.Choice("pass", null, "не платить"));
+            Map<String, Object> вопрос = new HashMap<>();
+            вопрос.put("kind", "trigger_pay");
+            вопрос.put("effect", String.valueOf(эф.get("effect")));
+            kelium.core.Choice ответ = agent.choose(s, opts, вопрос);
+            if (ответ == null || ответ.payload() == null) {
+                return false;
+            }
+        }
+        for (var e : цена.entrySet()) {
+            p.resources.pay(e.getKey(), e.getValue());
+            if (e.getKey() == kelium.core.Resource.KELIUM) {
+                s.journal.of(p.seat).келемияПотрачено += e.getValue();
+            }
+        }
+        return true;
+    }
+
+    private static String словаПлаты(Map<kelium.core.Resource, Integer> цена) {
+        List<String> части = new java.util.ArrayList<>();
+        for (var e : цена.entrySet()) {
+            int n = e.getValue();
+            boolean одна = n % 10 == 1 && n % 100 != 11;
+            boolean две = n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
+            части.add(n + " " + switch (e.getKey()) {
+                case KELIUM -> одна ? "келемий" : "келемия";
+                case COIN -> одна ? "монету" : две ? "монеты" : "монет";
+                case AMMO -> одна ? "боеприпас" : две ? "боеприпаса" : "боеприпасов";
+                case TROPHY -> одна ? "трофей" : две ? "трофея" : "трофеев";
+            });
+        }
+        return String.join(" и ", части);
     }
 
     @SuppressWarnings("unchecked")
