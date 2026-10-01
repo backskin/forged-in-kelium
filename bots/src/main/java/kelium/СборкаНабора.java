@@ -248,10 +248,25 @@ public final class СборкаНабора {
                 редких++;
             }
         }
+        // ПОСТУПОК В КАЖДОЙ РАЗВИЛКЕ (01.10.2026): по одной карте, что меняет
+        // правило — передвинь войско, нанеси урон, забери ресурс. Без них арсенал
+        // выходил сплошь «ветка → ресурс». Берётся самая умеренная по частоте.
+        Map<String, Integer> видов = new HashMap<>();
+        for (var e : арсПоРазвилке.entrySet()) {
+            for (String id : e.getValue()) {
+                Map<String, Object> а = арсеналПоId.get(id);
+                if (поступок(а) && !редкое(а) && семьиАрс.add(семействоАрсенала(а))) {
+                    арсНабор.add(id);
+                    видов.merge(e.getKey() + ":" + видЭффекта(а), 1, Integer::sum);
+                    видов.merge(e.getKey() + ":" + ((Map<String, Object>) а.get("низ")).get("когда"), 1,
+                        Integer::sum);
+                    break;
+                }
+            }
+        }
         int наКорзину = (АРСЕНАЛА - редких) / арсПоРазвилке.size() + 1;
         // не больше трёх карт с одним видом эффекта в корзине развилки: шесть
         // «сними урон» — скучная колода
-        Map<String, Integer> видов = new HashMap<>();
         for (var e : арсПоРазвилке.entrySet()) {
             int взято = 0;
             for (String id : e.getValue()) {
@@ -482,6 +497,13 @@ public final class СборкаНабора {
         String итог = switch (String.valueOf(эф.get("effect"))) {
             case "спец" -> "спец-действие";
             case "heal_one" -> "ремонт";
+            case "move_unit" -> "шаг войска";
+            case "place_damage" -> "урон врагу";
+            case "steal_resource" -> switch (String.valueOf(п.get("resource"))) {
+                case "coin" -> "монета врага";
+                case "ammo" -> "боеприпас врага";
+                default -> "келемий врага";
+            };
             case "free_action" -> kelium.cards.язык.Требование.ветка(String.valueOf(п.get("action")))
                 .replace("«", "").replace("»", "");
             default -> п.containsKey("coin") ? "монеты" : п.containsKey("ammo") ? "боеприпас"
@@ -751,6 +773,14 @@ public final class СборкаНабора {
         Map<String, Object> эф = (Map<String, Object>) ((Map<String, Object>) а.get("низ")).get("эффект");
         Map<String, Object> п = эф.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
         return эф.get("effect") + "|" + new java.util.TreeSet<>(п.keySet());
+    }
+
+    /** Эффект-поступок, меняющий правило: передвинь войско, нанеси урон, забери ресурс. */
+    @SuppressWarnings("unchecked")
+    static boolean поступок(Map<String, Object> а) {
+        Map<String, Object> эф = (Map<String, Object>) ((Map<String, Object>) а.get("низ")).get("эффект");
+        return java.util.Set.of("move_unit", "place_damage", "steal_resource")
+            .contains(String.valueOf(эф.get("effect")));
     }
 
     /** Спец-действие или карта — редкая, сильная шестерёнка связок. */

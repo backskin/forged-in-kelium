@@ -6,15 +6,53 @@ meta:
   id: 8.0.0
 arsenal:
 - id: a8_01
-  name: Построить энергостанцию → спец-действие
+  name: Бой → спец-действие
   kind: regular
-  значок: power
+  значок: command
   top:
     effect: gild_module
     params:
       price: 1
       pay: kelium
     label: −1 келемий ⇨ Улучши модуль
+  bottom:
+    когда:
+      ветка: combat
+      событие: ветка
+    эффект:
+      effect: спец
+      params:
+        n: 1
+    предел: 1
+  описание: Каждый раз, когда играешь ветку «Бой», получи ещё одно спец-действие. Не больше 1 раза за ход.
+- id: a8_02
+  name: Уничтожил → спец-действие
+  kind: regular
+  значок: command
+  top:
+    effect: free_action
+    params:
+      action: combat
+    label: Действие «Бой»
+  bottom:
+    когда:
+      событие: уничтожил
+    эффект:
+      effect: спец
+      params:
+        n: 1
+    предел: 1
+  описание: Каждый раз, когда уничтожаешь жетон врага, получи ещё одно спец-действие. Не больше 1 раза за ход.
+- id: a8_03
+  name: Построить энергостанцию → спец-действие
+  kind: regular
+  значок: power
+  top:
+    effect: grab_first_player
+    params:
+      now: true
+      steal_coin: 1
+    label: Забери у 1-го игрока его жетон и монету
   bottom:
     когда:
       ветка: build_plant
@@ -26,15 +64,17 @@ arsenal:
     предел: 1
   описание: Каждый раз, когда играешь ветку «Построить энергостанцию», получи ещё одно спец-действие. Не больше 1 раза за
     ход.
-- id: a8_02
+- id: a8_04
   name: Сжёг карту → спец-действие
   kind: regular
   значок: карты
   top:
-    effect: free_action
+    effect: landing
     params:
-      action: combat
-    label: Действие «Бой»
+      same_hex: true
+      count: 2
+      where: any_free_hex
+    label: 2 разных войска из запаса на любой гекс
   bottom:
     когда:
       событие: сжёг
@@ -44,16 +84,15 @@ arsenal:
         n: 1
     предел: 1
   описание: Каждый раз, когда сжигаешь карту, получи ещё одно спец-действие. Не больше 1 раза за ход.
-- id: a8_03
+- id: a8_05
   name: Рынок → спец-действие
   kind: regular
   значок: develop
   top:
-    effect: grab_first_player
+    effect: gain
     params:
-      now: true
-      steal_coin: 1
-    label: Забери у 1-го игрока его жетон и монету
+      ammo: 2
+    label: 2 боеприпаса
   bottom:
     когда:
       ветка: market
@@ -64,45 +103,6 @@ arsenal:
         n: 1
     предел: 1
   описание: Каждый раз, когда играешь ветку «Рынок», получи ещё одно спец-действие. Не больше 1 раза за ход.
-- id: a8_04
-  name: Бой → спец-действие
-  kind: regular
-  значок: command
-  top:
-    effect: landing
-    params:
-      same_hex: true
-      count: 2
-      where: any_free_hex
-    label: 2 разных войска из запаса на любой гекс
-  bottom:
-    когда:
-      ветка: combat
-      событие: ветка
-    эффект:
-      effect: спец
-      params:
-        n: 1
-    предел: 1
-  описание: Каждый раз, когда играешь ветку «Бой», получи ещё одно спец-действие. Не больше 1 раза за ход.
-- id: a8_05
-  name: Совпадение → спец-действие
-  kind: regular
-  значок: карты
-  top:
-    effect: gain
-    params:
-      ammo: 2
-    label: 2 боеприпаса
-  bottom:
-    когда:
-      событие: совпадение
-    эффект:
-      effect: спец
-      params:
-        n: 1
-    предел: 1
-  описание: Каждый раз, когда твой приказ совпадает с чужим, получи ещё одно спец-действие. Не больше 1 раза за ход.
 - id: a8_06
   name: Выпустить → спец-действие
   kind: regular
@@ -123,7 +123,7 @@ arsenal:
     предел: 1
   описание: Каждый раз, когда играешь ветку «Выпустить», получи ещё одно спец-действие. Не больше 1 раза за ход.
 - id: a8_07
-  name: Построить добытчик → келемий
+  name: Построить добытчик → келемий врага
   kind: regular
   значок: extract
   top:
@@ -138,15 +138,16 @@ arsenal:
       ветка: build_miner
       событие: ветка
     эффект:
-      effect: gain
       params:
-        kelium: 1
+        resource: kelium
+        max: 1
+      effect: steal_resource
     предел: 1
-  описание: Каждый раз, когда играешь ветку «Построить добытчик», получи 1 келемий. Не больше 1 раза за ход.
+  описание: Каждый раз, когда играешь ветку «Построить добытчик», забери у одного врага 1 келемий. Не больше 1 раза за ход.
 - id: a8_08
-  name: Построить добытчик → монеты
+  name: Построить энергостанцию → шаг войска
   kind: regular
-  значок: extract
+  значок: power
   top:
     effect: free_action
     params:
@@ -156,22 +157,121 @@ arsenal:
     label: Построй 1 любое здание за 1 монету
   bottom:
     когда:
+      ветка: build_plant
+      событие: ветка
+    эффект:
+      params:
+        hexes: 1
+      effect: move_unit
+    предел: 1
+  описание: Каждый раз, когда играешь ветку «Построить энергостанцию», передвинь своё войско на соседний гекс. Не больше 1
+    раза за ход.
+- id: a8_09
+  name: Построить военное здание → шаг войска
+  kind: regular
+  значок: supply
+  top:
+    effect: steal_arsenal_card
+    params: {}
+    label: Забери закрытый арсенал у врага
+  bottom:
+    когда:
+      ветка: build_military
+      событие: ветка
+    эффект:
+      params:
+        hexes: 1
+      effect: move_unit
+    предел: 1
+  описание: Каждый раз, когда играешь ветку «Построить военное здание», передвинь своё войско на соседний гекс. Не больше
+    1 раза за ход.
+- id: a8_10
+  name: Бой → келемий врага
+  kind: regular
+  значок: command
+  top:
+    effect: gain
+    params:
+      coin: 3
+    label: 3 монеты
+  bottom:
+    когда:
+      ветка: combat
+      событие: ветка
+    эффект:
+      params:
+        resource: kelium
+        max: 1
+      effect: steal_resource
+    предел: 1
+  описание: Каждый раз, когда играешь ветку «Бой», забери у одного врага 1 келемий. Не больше 1 раза за ход.
+- id: a8_11
+  name: Наука → монета врага
+  kind: regular
+  значок: develop
+  top:
+    effect: swap_order_card
+    params: {}
+    label: Замени карту приказа с руки на одну из сброса
+  bottom:
+    когда:
+      ветка: science
+      событие: ветка
+    эффект:
+      params:
+        resource: coin
+        max: 1
+      effect: steal_resource
+    предел: 1
+  описание: Каждый раз, когда играешь ветку «Наука», забери у одного врага 1 монету. Не больше 1 раза за ход.
+- id: a8_12
+  name: Сжёг карту → боеприпас врага
+  kind: regular
+  значок: карты
+  top:
+    effect: free_action
+    params:
+      action: build
+      ops: 1
+      fixed_price: 1
+    label: Построй 1 любое здание за 1 монету
+  bottom:
+    когда:
+      событие: сжёг
+    эффект:
+      params:
+        resource: ammo
+        max: 1
+      effect: steal_resource
+    предел: 1
+  описание: Каждый раз, когда сжигаешь карту, забери у одного врага 1 боеприпас. Не больше 1 раза за ход.
+- id: a8_13
+  name: Построить добытчик → келемий
+  kind: regular
+  значок: extract
+  top:
+    effect: discard_enemy_arsenal
+    params: {}
+    label: Удали у врага установленный арсенал
+  bottom:
+    когда:
       ветка: build_miner
       событие: ветка
     эффект:
       effect: gain
       params:
-        coin: 1
-    предел: 2
-  описание: Каждый раз, когда играешь ветку «Построить добытчик», получи 1 монету. Не больше 2 раз за ход.
-- id: a8_09
+        kelium: 1
+    предел: 1
+  описание: Каждый раз, когда играешь ветку «Построить добытчик», получи 1 келемий. Не больше 1 раза за ход.
+- id: a8_14
   name: Добыть → ремонт
   kind: regular
   значок: extract
   top:
-    effect: steal_arsenal_card
-    params: {}
-    label: Забери закрытый арсенал у врага
+    effect: free_action
+    params:
+      action: assembly
+    label: Действие «Выпустить»
   bottom:
     когда:
       ветка: mining
@@ -181,15 +281,15 @@ arsenal:
       params: {}
     предел: 1
   описание: Каждый раз, когда играешь ветку «Добыть», сними 1 урон со своего жетона. Не больше 1 раза за ход.
-- id: a8_10
-  name: Добыть → келемий
+- id: a8_15
+  name: Добыть → трофей
   kind: regular
   значок: extract
   top:
-    effect: gain
+    effect: free_action
     params:
-      coin: 3
-    label: 3 монеты
+      action: assembly
+    label: Действие «Выпустить»
   bottom:
     когда:
       ветка: mining
@@ -197,10 +297,10 @@ arsenal:
     эффект:
       effect: gain
       params:
-        kelium: 1
-    предел: 2
-  описание: Каждый раз, когда играешь ветку «Добыть», получи 1 келемий. Не больше 2 раз за ход.
-- id: a8_11
+        trophy: 1
+    предел: 1
+  описание: Каждый раз, когда играешь ветку «Добыть», получи 1 трофей. Не больше 1 раза за ход.
+- id: a8_16
   name: Добыча → боеприпас
   kind: regular
   значок: extract
@@ -218,17 +318,36 @@ arsenal:
         ammo: 1
     предел: 1
   описание: Каждый раз, когда играешь любую ветку Добычи, получи 1 боеприпас. Не больше 1 раза за ход.
-- id: a8_12
+- id: a8_17
+  name: Добыча → монеты
+  kind: regular
+  значок: extract
+  top:
+    effect: free_action
+    params:
+      action: science
+      pay_with_coin: true
+    label: −X монет = трофеи ⇨ Место на любом треке Науки
+  bottom:
+    когда:
+      развилка: extract
+      событие: развилка
+    эффект:
+      effect: gain
+      params:
+        coin: 1
+    предел: 2
+  описание: Каждый раз, когда играешь любую ветку Добычи, получи 1 монету. Не больше 2 раз за ход.
+- id: a8_18
   name: Питание → ремонт
   kind: regular
   значок: power
   top:
     effect: free_action
     params:
-      action: build
-      ops: 1
-      fixed_price: 1
-    label: Построй 1 любое здание за 1 монету
+      action: market
+      free_deals: 1
+    label: 1 предложение Рынка за 1 келемий (из запаса)
   bottom:
     когда:
       развилка: power
@@ -238,14 +357,16 @@ arsenal:
       params: {}
     предел: 1
   описание: Каждый раз, когда играешь любую ветку Питания, сними 1 урон со своего жетона. Не больше 1 раза за ход.
-- id: a8_13
+- id: a8_19
   name: Построить энергостанцию → боеприпас
   kind: regular
   значок: power
   top:
-    effect: discard_enemy_arsenal
-    params: {}
-    label: Удали у врага установленный арсенал
+    effect: grab_first_player
+    params:
+      now: true
+      steal_coin: 1
+    label: Забери у 1-го игрока его жетон и монету
   bottom:
     когда:
       ветка: build_plant
@@ -256,34 +377,14 @@ arsenal:
         ammo: 1
     предел: 1
   описание: Каждый раз, когда играешь ветку «Построить энергостанцию», получи 1 боеприпас. Не больше 1 раза за ход.
-- id: a8_14
-  name: Построить энергостанцию → монеты
+- id: a8_20
+  name: Переложить энергию → боеприпас
   kind: regular
   значок: power
   top:
-    effect: free_action
-    params:
-      action: assembly
-    label: Действие «Выпустить»
-  bottom:
-    когда:
-      ветка: build_plant
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        coin: 1
-    предел: 2
-  описание: Каждый раз, когда играешь ветку «Построить энергостанцию», получи 1 монету. Не больше 2 раз за ход.
-- id: a8_15
-  name: Переложить энергию → трофей
-  kind: regular
-  значок: power
-  top:
-    effect: free_action
-    params:
-      action: assembly
-    label: Действие «Выпустить»
+    effect: steal_arsenal_card
+    params: {}
+    label: Забери закрытый арсенал у врага
   bottom:
     когда:
       ветка: energy_swap
@@ -291,17 +392,23 @@ arsenal:
     эффект:
       effect: gain
       params:
-        trophy: 1
-    предел: 1
-  описание: Каждый раз, когда играешь ветку «Переложить энергию», получи 1 трофей. Не больше 1 раза за ход.
-- id: a8_16
+        ammo: 1
+    предел: 2
+  описание: Каждый раз, когда играешь ветку «Переложить энергию», получи 1 боеприпас. Не больше 2 раз за ход.
+- id: a8_21
   name: Переложить энергию → келемий
   kind: regular
   значок: power
   top:
-    effect: swap_order_card
-    params: {}
-    label: Замени карту приказа с руки на одну из сброса
+    effect: landing
+    params:
+      same_hex: true
+      types:
+      - infantry
+      - vehicle
+      where: empty_hex
+      count: 2
+    label: Пехота и техника из запаса на пустой гекс
   bottom:
     когда:
       ветка: energy_swap
@@ -312,7 +419,25 @@ arsenal:
         kelium: 1
     предел: 2
   описание: Каждый раз, когда играешь ветку «Переложить энергию», получи 1 келемий. Не больше 2 раз за ход.
-- id: a8_17
+- id: a8_22
+  name: Питание → боеприпас
+  kind: regular
+  значок: power
+  top:
+    effect: discard_enemy_arsenal
+    params: {}
+    label: Удали у врага установленный арсенал
+  bottom:
+    когда:
+      развилка: power
+      событие: развилка
+    эффект:
+      effect: gain
+      params:
+        ammo: 1
+    предел: 1
+  описание: Каждый раз, когда играешь любую ветку Питания, получи 1 боеприпас. Не больше 1 раза за ход.
+- id: a8_23
   name: Выпустить → боеприпас
   kind: regular
   значок: supply
@@ -332,66 +457,8 @@ arsenal:
         ammo: 1
     предел: 2
   описание: Каждый раз, когда играешь ветку «Выпустить», получи 1 боеприпас. Не больше 2 раз за ход.
-- id: a8_18
-  name: Выпустить → монеты
-  kind: regular
-  значок: supply
-  top:
-    effect: free_action
-    params:
-      action: market
-      free_deals: 1
-    label: 1 предложение Рынка за 1 келемий (из запаса)
-  bottom:
-    когда:
-      ветка: assembly
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        coin: 2
-    предел: 1
-  описание: Каждый раз, когда играешь ветку «Выпустить», получи 2 монеты. Не больше 1 раза за ход.
-- id: a8_19
-  name: Построить военное здание → боеприпас
-  kind: regular
-  значок: supply
-  top:
-    effect: grab_first_player
-    params:
-      now: true
-      steal_coin: 1
-    label: Забери у 1-го игрока его жетон и монету
-  bottom:
-    когда:
-      ветка: build_military
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        ammo: 1
-    предел: 1
-  описание: Каждый раз, когда играешь ветку «Построить военное здание», получи 1 боеприпас. Не больше 1 раза за ход.
-- id: a8_20
-  name: Построить военное здание → келемий
-  kind: regular
-  значок: supply
-  top:
-    effect: steal_arsenal_card
-    params: {}
-    label: Забери закрытый арсенал у врага
-  bottom:
-    когда:
-      ветка: build_military
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        kelium: 1
-    предел: 2
-  описание: Каждый раз, когда играешь ветку «Построить военное здание», получи 1 келемий. Не больше 2 раз за ход.
-- id: a8_21
-  name: Снабжение → боеприпас
+- id: a8_24
+  name: Снабжение → боеприпас врага
   kind: regular
   значок: supply
   top:
@@ -409,39 +476,78 @@ arsenal:
       развилка: supply
       событие: развилка
     эффект:
+      params:
+        resource: ammo
+        max: 1
+      effect: steal_resource
+    предел: 1
+  описание: Каждый раз, когда играешь любую ветку Снабжения, забери у одного врага 1 боеприпас. Не больше 1 раза за ход.
+- id: a8_25
+  name: Построить военное здание → монеты
+  kind: regular
+  значок: supply
+  top:
+    effect: steal_objective_cards
+    params:
+      count: 2
+    label: Забери до 2 карт заданий у врага
+  bottom:
+    когда:
+      ветка: build_military
+      событие: ветка
+    эффект:
+      effect: gain
+      params:
+        coin: 2
+    предел: 2
+  описание: Каждый раз, когда играешь ветку «Построить военное здание», получи 2 монеты. Не больше 2 раз за ход.
+- id: a8_26
+  name: Выпустить → ремонт
+  kind: regular
+  значок: supply
+  top:
+    effect: market_card_from_discard
+    params: {}
+    label: 1 Предложение карты Рынка из сброса
+  bottom:
+    когда:
+      ветка: assembly
+      событие: ветка
+    эффект:
+      effect: heal_one
+      params: {}
+    предел: 2
+  описание: Каждый раз, когда играешь ветку «Выпустить», сними 1 урон со своего жетона. Не больше 2 раз за ход.
+- id: a8_27
+  name: Снабжение → боеприпас
+  kind: regular
+  значок: supply
+  top:
+    effect: free_action
+    params:
+      action: build
+      ops: 1
+      fixed_price: 1
+    label: Построй 1 любое здание за 1 монету
+  bottom:
+    когда:
+      развилка: supply
+      событие: развилка
+    эффект:
       effect: gain
       params:
         ammo: 1
     предел: 1
   описание: Каждый раз, когда играешь любую ветку Снабжения, получи 1 боеприпас. Не больше 1 раза за ход.
-- id: a8_22
-  name: Манёвр → боеприпас
-  kind: regular
-  значок: command
-  top:
-    effect: discard_enemy_arsenal
-    params: {}
-    label: Удали у врага установленный арсенал
-  bottom:
-    когда:
-      ветка: movement
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        ammo: 1
-    предел: 2
-  описание: Каждый раз, когда играешь ветку «Манёвр», получи 1 боеприпас. Не больше 2 раз за ход.
-- id: a8_23
+- id: a8_28
   name: Бой → ремонт
   kind: regular
   значок: command
   top:
-    effect: free_action
+    effect: gain
     params:
-      action: science
-      pay_with_coin: true
-    label: −X монет = трофеи ⇨ Место на любом треке Науки
+      coin: 3
+    label: 3 монеты
   bottom:
     когда:
       ветка: combat
@@ -451,31 +557,8 @@ arsenal:
       params: {}
     предел: 1
   описание: Каждый раз, когда играешь ветку «Бой», сними 1 урон со своего жетона. Не больше 1 раза за ход.
-- id: a8_24
+- id: a8_29
   name: Уничтожил → боеприпас
-  kind: regular
-  значок: command
-  top:
-    effect: landing
-    params:
-      same_hex: true
-      types:
-      - infantry
-      - vehicle
-      where: empty_hex
-      count: 2
-    label: Пехота и техника из запаса на пустой гекс
-  bottom:
-    когда:
-      событие: уничтожил
-    эффект:
-      effect: gain
-      params:
-        ammo: 1
-    предел: 1
-  описание: Каждый раз, когда уничтожаешь жетон врага, получи 1 боеприпас. Не больше 1 раза за ход.
-- id: a8_25
-  name: Уничтожил → монеты
   kind: regular
   значок: command
   top:
@@ -489,17 +572,59 @@ arsenal:
     эффект:
       effect: gain
       params:
+        ammo: 1
+    предел: 1
+  описание: Каждый раз, когда уничтожаешь жетон врага, получи 1 боеприпас. Не больше 1 раза за ход.
+- id: a8_30
+  name: Уничтожил → монеты
+  kind: regular
+  значок: command
+  top:
+    effect: free_action
+    params:
+      action: mining
+      buildings: 1
+      kelium: 1
+    label: 1 келемий + добыча 1 добытчиком
+  bottom:
+    когда:
+      событие: уничтожил
+    эффект:
+      effect: gain
+      params:
         coin: 1
     предел: 2
   описание: Каждый раз, когда уничтожаешь жетон врага, получи 1 монету. Не больше 2 раз за ход.
-- id: a8_26
+- id: a8_31
+  name: Командование → боеприпас врага
+  kind: regular
+  значок: command
+  top:
+    effect: free_action
+    params:
+      action: combat
+    label: Действие «Бой»
+  bottom:
+    когда:
+      развилка: command
+      событие: развилка
+    эффект:
+      params:
+        resource: ammo
+        max: 1
+      effect: steal_resource
+    предел: 1
+  описание: Каждый раз, когда играешь любую ветку Командования, забери у одного врага 1 боеприпас. Не больше 1 раза за ход.
+- id: a8_32
   name: Манёвр → монеты
   kind: regular
   значок: command
   top:
-    effect: market_card_from_discard
-    params: {}
-    label: 1 Предложение карты Рынка из сброса
+    effect: free_action
+    params:
+      action: market
+      free_deals: 1
+    label: 1 предложение Рынка за 1 келемий (из запаса)
   bottom:
     когда:
       ветка: movement
@@ -510,127 +635,10 @@ arsenal:
         coin: 1
     предел: 1
   описание: Каждый раз, когда играешь ветку «Манёвр», получи 1 монету. Не больше 1 раза за ход.
-- id: a8_27
-  name: Рынок → келемий
-  kind: regular
-  значок: develop
-  top:
-    effect: free_action
-    params:
-      action: build
-      ops: 1
-      fixed_price: 1
-    label: Построй 1 любое здание за 1 монету
-  bottom:
-    когда:
-      ветка: market
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        kelium: 1
-    предел: 1
-  описание: Каждый раз, когда играешь ветку «Рынок», получи 1 келемий. Не больше 1 раза за ход.
-- id: a8_28
-  name: Наука → трофей
-  kind: regular
-  значок: develop
-  top:
-    effect: gain
-    params:
-      coin: 3
-    label: 3 монеты
-  bottom:
-    когда:
-      ветка: science
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        trophy: 1
-    предел: 1
-  описание: Каждый раз, когда играешь ветку «Наука», получи 1 трофей. Не больше 1 раза за ход.
-- id: a8_29
-  name: Наука → боеприпас
-  kind: regular
-  значок: develop
-  top:
-    effect: steal_objective_cards
-    params:
-      count: 2
-    label: Забери до 2 карт заданий у врага
-  bottom:
-    когда:
-      ветка: science
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        ammo: 1
-    предел: 1
-  описание: Каждый раз, когда играешь ветку «Наука», получи 1 боеприпас. Не больше 1 раза за ход.
-- id: a8_30
-  name: Рынок → монеты
-  kind: regular
-  значок: develop
-  top:
-    effect: free_action
-    params:
-      action: mining
-      buildings: 1
-      kelium: 1
-    label: 1 келемий + добыча 1 добытчиком
-  bottom:
-    когда:
-      ветка: market
-      событие: ветка
-    эффект:
-      effect: gain
-      params:
-        coin: 1
-    предел: 1
-  описание: Каждый раз, когда играешь ветку «Рынок», получи 1 монету. Не больше 1 раза за ход.
-- id: a8_31
-  name: Развитие → ремонт
-  kind: regular
-  значок: develop
-  top:
-    effect: free_action
-    params:
-      action: combat
-    label: Действие «Бой»
-  bottom:
-    когда:
-      развилка: develop
-      событие: развилка
-    эффект:
-      effect: heal_one
-      params: {}
-    предел: 1
-  описание: Каждый раз, когда играешь любую ветку Развития, сними 1 урон со своего жетона. Не больше 1 раза за ход.
-- id: a8_32
-  name: Сжёг карту → Выпустить
-  kind: regular
-  значок: карты
-  top:
-    effect: free_action
-    params:
-      action: market
-      free_deals: 1
-    label: 1 предложение Рынка за 1 келемий (из запаса)
-  bottom:
-    когда:
-      событие: сжёг
-    эффект:
-      effect: free_action
-      params:
-        action: assembly
-    предел: 1
-  описание: Каждый раз, когда сжигаешь карту, сыграй ветку «Выпустить». Не больше 1 раза за ход.
 - id: a8_33
-  name: Совпадение → ремонт
+  name: Рынок → ремонт
   kind: regular
-  значок: карты
+  значок: develop
   top:
     effect: free_action
     params:
@@ -638,12 +646,13 @@ arsenal:
     label: Действие «Манёвр»
   bottom:
     когда:
-      событие: совпадение
+      ветка: market
+      событие: ветка
     эффект:
       effect: heal_one
       params: {}
     предел: 2
-  описание: Каждый раз, когда твой приказ совпадает с чужим, сними 1 урон со своего жетона. Не больше 2 раз за ход.
+  описание: Каждый раз, когда играешь ветку «Рынок», сними 1 урон со своего жетона. Не больше 2 раз за ход.
 - id: bs72_1
   name: Полевой генератор
   kind: starting
@@ -767,9 +776,9 @@ arsenal:
   top:
     effect: gain
     params:
+      ammo: 1
       kelium: 1
       kit: true
-      ammo: 1
     label: 1 келемий и 1 боеприпас
   bottom:
     когда:
