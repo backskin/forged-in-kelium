@@ -139,6 +139,9 @@ public final class ЗамерНабора {
             int пусто = 0;
             StringBuilder р = new StringBuilder();
             for (var в : e.getValue().entrySet()) {
+                if (в.getKey().startsWith("дорога·")) {
+                    continue;                       // доли побед дорог — отдельным разделом
+                }
                 if (!в.getKey().contains("·")) {     // «mining·причина» — разбивка, не в итог
                     всего += в.getValue()[0];
                     пусто += в.getValue()[1];
@@ -149,6 +152,19 @@ public final class ЗамерНабора {
             sb.append(String.format(java.util.Locale.ROOT, "- **%s**: впустую %.2f из %.2f (%.0f%%) — %s%n",
                 e.getKey(), пусто / (4.0 * партий), всего / (4.0 * партий),
                 всего == 0 ? 0.0 : 100.0 * пусто / всего, р.toString().trim()));
+        }
+        sb.append("\n## Доля побед дороги (побед / игроков этой дороги; ровно — 25%)\n\n");
+        for (var e : пустые.entrySet()) {
+            StringBuilder р = new StringBuilder();
+            for (var в : e.getValue().entrySet()) {
+                if (в.getKey().startsWith("дорога·")) {
+                    int[] x = в.getValue();
+                    р.append(String.format(java.util.Locale.ROOT, "%s %.0f%% (%d из %d); ",
+                        в.getKey().substring("дорога·".length()), x[0] == 0 ? 0.0 : 100.0 * x[1] / x[0],
+                        x[1], x[0]));
+                }
+            }
+            sb.append("- **").append(e.getKey()).append("**: ").append(р.toString().trim()).append('\n');
         }
         // у каждого набора сводов свой файл: два замера разом не затирают друг друга
         String файл = своды.equals(List.of("1.46.0", "1.47.0")) ? "проверка набора.md"
@@ -329,6 +345,19 @@ public final class ЗамерНабора {
         if (s.winner != null && дороги.get(s.winner) != null) {
             дорога = дороги.get(s.winner).entrySet().stream()
                 .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("без заданий");
+        }
+        // ДОЛЯ ПОБЕД ДОРОГИ (01.10.2026): дорога каждого игрока, победил ли он.
+        // Лёгкие задания развилки набирают все, и «дорога победителя» тянется к
+        // ней без силы; честно — побед дорогой на всех игроков этой дороги (25% — ровно).
+        for (int место = 0; место < 4; место++) {
+            String д = дороги.get(место) == null ? "без заданий"
+                : дороги.get(место).entrySet().stream().max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey).orElse("без заданий");
+            int[] x = ветки.computeIfAbsent("дорога·" + д, k -> new int[2]);
+            x[0]++;
+            if (s.winner != null && s.winner == место) {
+                x[1]++;
+            }
         }
         // самый воинственный — больше всех уничтожил; при равенстве — никто
         int воин = -1;
