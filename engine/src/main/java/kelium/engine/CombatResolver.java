@@ -1382,7 +1382,8 @@ public final class CombatResolver {
                 "attacker", unit.type.code + "." + row, "victim_owner", owner,
                 "victim", victimLabel(victim), "destroyed", destroyed, "ammo", ammo,
                 "trophy", destroyed ? victim.trophyValue() : 0,
-                "base_ammo", pl.getOrDefault("base_ammo", ammo));
+                "base_ammo", pl.getOrDefault("base_ammo", ammo),
+                "gold", pl.get("tcat2") != null || pl.get("split") != null);
             if (destroyed) {
                 killsThisBattle++;
                 // ЭВАКУАЦИЯ ТРОФЕЕВ спрашивается ПЕРЕД уничтожением: после него
