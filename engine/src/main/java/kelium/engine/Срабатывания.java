@@ -126,7 +126,7 @@ public final class Срабатывания {
                     // выходил с поля в одну дверь — на Рынок; карты с платой дают
                     // ему вторую. Вопрос — только после действия, не между выстрелами.
                     if (низ.get("плата") instanceof Map<?, ?> плата) {
-                        if (!послеДействия || !заплатил(s, p, плата, эф)) {
+                        if (!послеДействия || !заплатил(s, p, плата, эф, cid)) {
                             continue;
                         }
                     }
@@ -153,7 +153,8 @@ public final class Срабатывания {
      * Спросить игрока, платит ли он за срабатывание, и списать плату. Нечем
      * платить — карта молчит без вопроса. Отказ не тратит предела карты за ход.
      */
-    private static boolean заплатил(GameState s, PlayerState p, Map<?, ?> плата, Map<?, ?> эф) {
+    private static boolean заплатил(GameState s, PlayerState p, Map<?, ?> плата, Map<?, ?> эф,
+                                    String cid) {
         Map<kelium.core.Resource, Integer> цена = new java.util.EnumMap<>(kelium.core.Resource.class);
         for (var e : плата.entrySet()) {
             if (e.getValue() instanceof Number n && n.intValue() > 0) {
@@ -167,11 +168,21 @@ public final class Срабатывания {
         }
         kelium.core.Agent agent = s.agents == null || p.seat >= s.agents.size() ? null : s.agents.get(p.seat);
         if (agent != null) {
+            // на кнопке — какая карта и что она даст: игрок решает, видя цену и товар
+            String имяКарты = null;
+            try {
+                Map<String, Object> карта = kelium.dataio.Ctx.cards(s, "arsenal").find(cid);
+                имяКарты = карта == null ? null : String.valueOf(карта.get("name"));
+            } catch (RuntimeException нетКолоды) {
+                // без имени — только цена
+            }
             List<kelium.core.Choice> opts = List.of(
-                new kelium.core.Choice("trigger_pay", Boolean.TRUE, "заплатить: " + словаПлаты(цена)),
-                new kelium.core.Choice("pass", null, "не платить"));
+                new kelium.core.Choice("trigger_pay", Boolean.TRUE, "Заплатить " + словаПлаты(цена)
+                    + (имяКарты == null ? "" : " — «" + имяКарты + "»")),
+                new kelium.core.Choice("pass", null, "Не платить"));
             Map<String, Object> вопрос = new HashMap<>();
             вопрос.put("kind", "trigger_pay");
+            вопрос.put("card", cid);
             вопрос.put("effect", String.valueOf(эф.get("effect")));
             kelium.core.Choice ответ = agent.choose(s, opts, вопрос);
             if (ответ == null || ответ.payload() == null) {

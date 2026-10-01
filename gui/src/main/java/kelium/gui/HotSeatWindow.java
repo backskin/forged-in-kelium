@@ -3728,6 +3728,7 @@ public final class HotSeatWindow {
         Map.entry("combat_source", "откуда атаковать"),
         Map.entry("combat_target", "цель атаки"),
         Map.entry("combat_victim", "кого поразить"),
+        Map.entry("trigger_pay", "карта арсенала: заплатить келемий?"),
         Map.entry("neutral_victim", "какой нейтрал атаковать"),
         Map.entry("attack", "атака"),
         Map.entry("mine", "добыча: что взять"),
