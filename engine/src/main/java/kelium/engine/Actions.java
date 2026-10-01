@@ -660,12 +660,20 @@ public final class Actions {
                 // добытчиков работают в эту Добычу БЕЗ энергии. Все запитанные
                 // работают и так — «ещё один» может значить только этот, иначе
                 // прибавка была бы пустой.
+                // ВАРИАНТ ДЛЯ ЗАМЕРА (01.10.2026, mining.unpowered_yield): добытчик
+                // без энергии всё же добывает столько келемия (запитанный — по
+                // уровню). Две трети пустых «Добыть» — оттого, что все добытчики
+                // без энергии. 0 — прежнее правило: без энергии не работает.
+                int безЭнергииДобывает = 0;
                 if (!ctx.allPowered && !effectivelyPowered(s, player, b, agent, paid)) {
                     if (ctx.freeMinerMoves > 0) {
                         ctx.freeMinerMoves--;
                     } else {
                         безЭнергии++;
-                        continue;
+                        безЭнергииДобывает = kelium.dataio.Ctx.rules(s).getInt("mining.unpowered_yield", 0);
+                        if (безЭнергииДобывает <= 0) {
+                            continue;
+                        }
                     }
                 }
                 String grid = adjacentGridWithKelium(b);
@@ -719,7 +727,9 @@ public final class Actions {
                 takeContainerOnly = "container".equals(pick.payload());
                 отработали++;
                 if (!takeContainerOnly) {
-                    int добыто = mineFromMiner(s, player, b, grid);
+                    int добыто = безЭнергииДобывает > 0 && grid != null
+                        ? mineFlatFromTile(s, player, grid, безЭнергииДобывает)
+                        : mineFromMiner(s, player, b, grid);
                     if (добыто == 0) {
                         складПолон++;
                     }
