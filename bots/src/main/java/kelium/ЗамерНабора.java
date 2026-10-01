@@ -110,9 +110,20 @@ public final class ЗамерНабора {
                 n++;
             }
             n = Math.max(1, n);
+            // ДОРОГА С ПОПРАВКОЙ НА КОЛОДУ (01.10.2026): дорога — значок большинства
+            // выполненных заданий, и развилка с 9 картами в колоде «побеждает» чаще
+            // развилки с 4 без всякой силы. В скобках — доля побед на долю карт
+            // этой развилки в колоде: 1 — честно, больше — сильнее колоды.
+            Map<String, Double> колода = долиКолоды(e.getKey());
             StringBuilder д = new StringBuilder();
             for (var x : дороги.entrySet()) {
-                д.append(x.getKey()).append(' ').append(Math.round(100.0 * x.getValue() / n)).append("% ");
+                double доля = (double) x.getValue() / n;
+                Double вКолоде = колода.get(x.getKey());
+                д.append(x.getKey()).append(' ').append(Math.round(100.0 * доля)).append('%');
+                if (вКолоде != null && вКолоде > 0) {
+                    д.append(String.format(java.util.Locale.ROOT, " (×%.1f)", доля / вКолоде));
+                }
+                д.append(' ');
             }
             sb.append(String.format(java.util.Locale.ROOT,
                 "| %s | %.2f | %.2f | %.2f (%.2f) | %.2f | %.2f (%.2f / %.2f) | %.2f | %.0f%% | %.2f (%.2f / %.2f) | %s |%n",
@@ -145,6 +156,23 @@ public final class ЗамерНабора {
         Files.writeString(Path.of("design-docs/фигуры").resolve(файл), sb.toString(),
             StandardCharsets.UTF_8);
         System.out.println(sb);
+    }
+
+    /** Доля обычных заданий колоды по значку развилки (только карты языка). */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Double> долиКолоды(String свод) {
+        Map<String, Double> out = new java.util.TreeMap<>();
+        int всего = 0;
+        for (Map<String, Object> e : GameConfig.buildCached(свод, 4, 1L, null, null)
+                .content.get("objectives").entries) {
+            if (e.get("язык") instanceof Map<?, ?> я && я.get("значок") != null) {
+                out.merge(String.valueOf(я.get("значок")), 1.0, Double::sum);
+                всего++;
+            }
+        }
+        final int всегоКарт = всего;
+        out.replaceAll((k, v) -> всегоКарт == 0 ? 0 : v / всегоКарт);
+        return out;
     }
 
     /** Главная причина пустой «Добыть» — по телеметрии действия. */
