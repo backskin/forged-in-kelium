@@ -316,6 +316,34 @@ public final class Бульон {
                 }
             }
         }
+        // ЭФФЕКТЫ, МЕНЯЮЩИЕ ПРАВИЛО (01.10.2026): «ветка → ресурс» — потолок
+        // прежнего словаря, арсенал выходил плоским. Дописаны В КОНЦЕ: номера
+        // прежних срабатываний (и счёт прогонов по ним) не сдвигаются. Посреди
+        // боя они не играют (Срабатывания.БЕЗОПАСНЫЕ), поэтому «уничтожил» и
+        // «потерял» (чужой ход) их не получают.
+        List<Map<String, Object>> поступки = List.of(
+            Map.of("effect", "move_unit", "params", Map.of("hexes", 1)),
+            Map.of("effect", "place_damage", "params", Map.of()),
+            Map.of("effect", "steal_resource", "params", Map.of("resource", "kelium", "max", 1)),
+            Map.of("effect", "steal_resource", "params", Map.of("resource", "coin", "max", 1)),
+            Map.of("effect", "steal_resource", "params", Map.of("resource", "ammo", "max", 1)));
+        for (Map<String, Object> когда : события) {
+            String что = String.valueOf(когда.get("событие"));
+            if (что.equals("уничтожил") || что.equals("потерял") || что.equals("низ")) {
+                continue;
+            }
+            for (Map<String, Object> эф : поступки) {
+                Map<String, Object> низ = new LinkedHashMap<>();
+                низ.put("когда", когда);
+                низ.put("эффект", эф);
+                низ.put("предел", 1);
+                Map<String, Object> запись = new LinkedHashMap<>();
+                запись.put("id", "t_" + номер++);
+                запись.put("текст", Срабатывание.текст(низ));
+                запись.put("низ", низ);
+                out.add(запись);
+            }
+        }
         return out;
     }
 

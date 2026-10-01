@@ -498,9 +498,23 @@ public final class СборкаНабора {
         Object n = т.getOrDefault("сколько", т.getOrDefault("гексов", т.get("k")));
         String число = n == null ? "" : " ×" + n;
         return switch (узел) {
-            case "жетоны" -> кто((Map<String, Object>) т.get("группа")) + число;
-            case "рядом" -> кто((Map<String, Object>) т.get("а")) + " у врага" + число;
-            case "ресурс" -> "Запас" + число;
+            // «Запитанный добытчик ×2» и «Добытчик ×3» — разные карты, имя их различает
+            case "жетоны" -> {
+                Map<String, Object> г = (Map<String, Object>) т.get("группа");
+                String к = кто(г);
+                yield "ЗАПИТАН".equals(String.valueOf(г.get("сост")))
+                    ? запитанный(String.valueOf(г.get("кто"))) + " " + к.toLowerCase() + число
+                    : к + число;
+            }
+            // на карте «на соседнем гексе», а «у врага» читалось как «на гексе врага»
+            case "рядом" -> кто((Map<String, Object>) т.get("а")) + " рядом с врагом" + число;
+            case "ресурс" -> switch (String.valueOf(т.get("ресурс"))) {
+                case "COIN" -> "Монеты";
+                case "KELIUM" -> "Келемий";
+                case "TROPHY" -> "Трофеи";
+                case "AMMO" -> "Боеприпасы";
+                default -> "Запас";
+            } + число;
             case "арсенал" -> "Арсенал" + число;
             case "свалка" -> "Свалка" + число;
             case "ветки" -> "Две ветки";
@@ -509,7 +523,11 @@ public final class СборкаНабора {
             case "очередь_спец" -> "Спец-действие подряд";
             case "сожги" -> "Сожги" + число;
             case "установи" -> "Установи";
-            case "уничтожь" -> "Уничтожь" + число;
+            case "уничтожь" -> {
+                String цель = String.valueOf(((Map<String, Object>) т.get("цель")).get("кто"));
+                yield "Уничтожь " + (цель.equals("ЖЕТОН") ? "жетон" : цель.equals("ЗДАНИЕ") ? "здание"
+                    : цель.equals("ВОЙСКО") ? "войско" : цель.toLowerCase().replace('_', ' ')) + число;
+            }
             case "построй" -> "Построй" + число;
             case "найми" -> "Найми" + число;
             case "добудь" -> "Добудь" + число;
@@ -519,8 +537,20 @@ public final class СборкаНабора {
         };
     }
 
+    /** «Запитанный / запитанная / запитанное» — по роду жетона. */
+    private static String запитанный(String кто) {
+        return switch (кто) {
+            case "ЭНЕРГОСТАНЦИЯ", "КАЗАРМА", "АВИАБАЗА" -> "Запитанная";
+            case "ЗДАНИЕ", "ВОЕННОЕ" -> "Запитанное";
+            default -> "Запитанный";
+        };
+    }
+
     private static String кто(Map<String, Object> г) {
         String к = String.valueOf(г.get("кто"));
+        if (к.equals("ВОЕННОЕ")) {
+            return "Военное здание";
+        }
         return к.charAt(0) + к.substring(1).toLowerCase().replace('_', ' ');
     }
 

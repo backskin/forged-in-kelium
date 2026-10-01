@@ -70,6 +70,16 @@ public final class Срабатывание {
             case "free_action" -> "сыграй ветку " + Требование.ветка(String.valueOf(п.get("action")));
             case "heal_one" -> "сними 1 урон со своего жетона";
             case "gain" -> "получи " + добро(п);
+            // ЭФФЕКТЫ, МЕНЯЮЩИЕ ПРАВИЛО (01.10.2026): не ресурс, а поступок вне
+            // очереди — движок их уже знает (Effects.moveUnit, placeDamage,
+            // stealResource)
+            case "move_unit" -> "передвинь своё войско на соседний гекс";
+            case "place_damage" -> "нанеси 1 урон жетону врага на гексе со своим войском или соседнем с ним";
+            case "steal_resource" -> "забери у одного врага " + switch (String.valueOf(п.get("resource"))) {
+                case "coin" -> "1 монету";
+                case "ammo" -> "1 боеприпас";
+                default -> "1 келемий";
+            };
             default -> имя;
         };
     }
