@@ -140,7 +140,8 @@ public final class ЗамерНабора {
             int пусто = 0;
             StringBuilder р = new StringBuilder();
             for (var в : e.getValue().entrySet()) {
-                if (в.getKey().startsWith("дорога·") || в.getKey().startsWith("карта·")) {
+                if (в.getKey().startsWith("дорога·") || в.getKey().startsWith("карта·")
+                        || в.getKey().startsWith("сжёг·")) {
                     continue;                       // доли побед — отдельными разделами
                 }
                 if (!в.getKey().contains("·")) {     // «mining·причина» — разбивка, не в итог
@@ -180,15 +181,18 @@ public final class ЗамерНабора {
             }
             карты.sort((a, b) -> Double.compare((double) b.getValue()[1] / Math.max(1, b.getValue()[0]),
                 (double) a.getValue()[1] / Math.max(1, a.getValue()[0])));
-            sb.append("**").append(e.getKey()).append("**\n\n| карта | поставлено | побед |\n|---|---|---|\n");
+            sb.append("**").append(e.getKey())
+                .append("**\n\n| карта | утиль | поставлено | сожжено | побед поставивших |\n|---|---|---|---|---|\n");
             var колода = GameConfig.buildCached(e.getKey(), 4, 1L, null, null).content.get("arsenal");
             for (var в : карты) {
                 String id = в.getKey().substring("карта·".length());
                 Map<String, Object> карта = колода.find(id);
                 String имя = карта == null ? id : id + " " + карта.get("name");
                 int[] x = в.getValue();
-                sb.append(String.format(java.util.Locale.ROOT, "| %s | %d | %.0f%% |%n", имя, x[0],
-                    100.0 * x[1] / Math.max(1, x[0])));
+                int[] сж = e.getValue().getOrDefault("сжёг·" + id, new int[2]);
+                Object утиль = карта == null || !(карта.get("top") instanceof Map<?, ?> т) ? "" : т.get("label");
+                sb.append(String.format(java.util.Locale.ROOT, "| %s | %s | %d | %d | %.0f%% |%n", имя, утиль,
+                    x[0], сж[0], 100.0 * x[1] / Math.max(1, x[0])));
             }
             sb.append('\n');
         }
@@ -348,6 +352,9 @@ public final class ЗамерНабора {
                             if (место instanceof Integer m && m >= 0 && m < 4) {
                                 поставил.get(m).add(String.valueOf(ev.get("card")));
                             }
+                        } else {
+                            // сожжена ради утиля — судьбу карты решает и верх
+                            ветки.computeIfAbsent("сжёг·" + ev.get("card"), k -> new int[2])[0]++;
                         }
                     }
                 }
