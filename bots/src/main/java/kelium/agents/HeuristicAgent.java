@@ -1273,9 +1273,12 @@ public class HeuristicAgent extends Agent {
             return contRoom ? base : 0.2;
         }
         if ("market".equals(name)) {
-            // Продавать нечего — рынок пустой ход. Келемий нужен ЛЮБОЙ сделке.
+            // БЕЗ КЕЛЕМИЯ РЫНОК НЕ ПУСТОЙ (свод 1.46+, market.zero_kelium_coin):
+            // нулевая ступень обмена даёт монету. Прежде здесь стояло 0,15 — ниже
+            // пустой Науки (0,1 у неё, но она бывала оценена выше по пулу), и бот
+            // выбирал Науку, которая ничего не делала (замер 01.10.2026).
             if (me.resources.kelium() <= 0) {
-                return 0.15;
+                return Ctx.rules(state).getInt("market.zero_kelium_coin", 0) > 0 ? 0.5 : 0.15;
             }
             // чем острее нужда в деньгах/патронах, тем ценнее размен
             double need = (me.resources.coin() <= 2 ? 2.5 : 0.0)
@@ -1286,7 +1289,10 @@ public class HeuristicAgent extends Agent {
         // Тогда поднимаем её высоко: треки — крупный источник ПО (до 7 за трек).
         if ("science".equals(name)) {
             int pool = trophyPool(me);
-            if (pool <= 0 || !hasAffordableTechStep(state, me, pool)) {
+            // кубиков в личном запасе нет — шаг не встанет, сколько ни плати
+            boolean кубиковНет = Ctx.rules(state).getBool("tech.cubes_are_permanent", false)
+                && me.techCubesLeft <= 0;
+            if (pool <= 0 || кубиковНет || !hasAffordableTechStep(state, me, pool)) {
                 return 0.1;
             }
             // ЦЕПОЧКА ВОЙНЫ: захваченные жетоны на месте уничтоженных жетонов ВЕРНУТСЯ
