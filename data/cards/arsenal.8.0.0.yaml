@@ -783,8 +783,8 @@ arsenal:
     effect: gain
     params:
       objective_cards: 1
-      coin: 1
       kit: true
+      coin: 1
     label: 1 монета и 1 карта задания
   bottom:
     когда:
@@ -803,8 +803,8 @@ arsenal:
     effect: gain
     params:
       kelium: 1
-      ammo: 1
       kit: true
+      ammo: 1
     label: 1 келемий и 1 боеприпас
   bottom:
     когда:
