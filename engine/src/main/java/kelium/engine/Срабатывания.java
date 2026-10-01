@@ -347,7 +347,9 @@ public final class Срабатывания {
                 : больше(t, "energy_placed", "energy_taken", "activations");
             case "market" -> больше(t, "deals", "coin", "ammo", "objective_cards", "energy_bought")
                 || Boolean.TRUE.equals(t.get("card_offer"));
-            case "science" -> больше(t, "steps", "trophy_spent");
+            // обмен науки (трофей на монету, перенос модуля) пишется строкой — он
+            // тоже дело, даже без шага по треку
+            case "science" -> больше(t, "steps", "trophy_spent") || t.get("exchange") != null;
             default -> !в.startsWith("build") || больше(t, "ops");
         };
     }

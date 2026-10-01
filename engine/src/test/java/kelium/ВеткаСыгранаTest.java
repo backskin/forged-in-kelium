@@ -39,6 +39,9 @@ class ВеткаСыгранаTest {
             assertTrue(Срабатывания.сыграна(s, ветка("combat", "battle", 1)), "бой с выстрелом");
             assertFalse(Срабатывания.сыграна(s, ветка("mining", "kelium", 0)), "добыча без келемия");
             assertTrue(Срабатывания.сыграна(s, ветка("mining", "kelium", 2)), "добыча с келемием");
+            Map<String, Object> обмен = ветка("science", "steps", 0);
+            обмен.put("telemetry", Map.of("steps", 0, "trophy_spent", 0, "exchange", "coin"));
+            assertTrue(Срабатывания.сыграна(s, обмен), "наука с одним обменом — не пустая");
         } finally {
             rs.override("cards.branch_must_act", было);
         }
