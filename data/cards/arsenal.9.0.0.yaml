@@ -2,8 +2,8 @@
 # собран kelium.СборкаНабора из бульона. Начальные — как в 8.0.0.
 # CONTENT: arsenal  version 9.0.0
 meta:
-  id: 9.0.0
   type: arsenal
+  id: 9.0.0
 arsenal:
 - id: a9_01
   name: Питание → спец-действие
