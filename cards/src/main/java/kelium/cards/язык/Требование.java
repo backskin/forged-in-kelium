@@ -848,6 +848,126 @@ public interface Требование {
         }
     }
 
+    // ==================================================================
+    //  РАЗВИТИЕ И СНАБЖЕНИЕ (02.10.2026): у этих развилок в бульоне было мало
+    //  своих задач — колоде в 50 карт не хватало кандидатов
+    // ==================================================================
+
+    /** «имей кубики науки на 2 треках на ступени 2 или выше». */
+    record Треки(int треков, int ступень) implements Требование {
+        private int есть(CardContext ctx) {
+            int n = 0;
+            for (int шаг : ctx.state().player(ctx.seat()).techSteps.values()) {
+                if (шаг >= ступень) {
+                    n++;
+                }
+            }
+            return n;
+        }
+
+        @Override public boolean выполнено(CardContext ctx) {
+            return есть(ctx) >= треков;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(есть(ctx), треков);
+        }
+
+        @Override public String суть() {
+            return "имей кубики науки на " + треков + (треков == 1 ? " треке" : " треках")
+                + (ступень <= 1 ? "" : " на ступени " + ступень + " или выше");
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "треки", "треков", треков, "ступень", ступень);
+        }
+
+        @Override public String действие() {
+            return "science";
+        }
+    }
+
+    /** «имей на планшете войск 3 модуля» / «2 золотых модуля». */
+    record Модули(int сколько, boolean золотых) implements Требование {
+        private int есть(CardContext ctx) {
+            PlayerState p = ctx.state().player(ctx.seat());
+            if (золотых) {
+                return p.goldModules;
+            }
+            int n = 0;
+            for (Map<String, Object> pl : p.redPlacements.values()) {
+                if (!Boolean.TRUE.equals(pl.get("blocks"))) {
+                    n++;
+                }
+            }
+            return n + p.bluePlacements.size();
+        }
+
+        @Override public boolean выполнено(CardContext ctx) {
+            return есть(ctx) >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(есть(ctx), сколько);
+        }
+
+        @Override public String суть() {
+            return "имей на планшете войск " + числом(сколько, золотых ? "золотой модуль" : "модуль",
+                золотых ? "золотых модуля" : "модуля", золотых ? "золотых модулей" : "модулей");
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "модули", "сколько", сколько, "золотых", золотых);
+        }
+
+        @Override public String действие() {
+            return "science";
+        }
+    }
+
+    /** «имей на поле войска 3 разных родов». */
+    record Рода(int сколько) implements Требование {
+        private int есть(CardContext ctx) {
+            Set<kelium.core.UnitType> рода = new HashSet<>();
+            for (var u : ctx.state().player(ctx.seat()).unitsOnField()) {
+                рода.add(u.type);
+            }
+            return рода.size();
+        }
+
+        @Override public boolean выполнено(CardContext ctx) {
+            return есть(ctx) >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(есть(ctx), сколько);
+        }
+
+        @Override public String суть() {
+            return "имей на поле свои войска " + сколько + " разных родов";
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "рода", "сколько", сколько);
+        }
+
+        @Override public String действие() {
+            return "assembly";
+        }
+    }
+
     /** «найми 2 войска». */
     record Найми(int сколько) implements Требование {
         @Override public boolean выполнено(CardContext ctx) {
@@ -1005,7 +1125,12 @@ public interface Требование {
         @Override public String суть() {
             List<String> слова = new ArrayList<>();
             for (Требование т : части) {
-                слова.add(т.суть());
+                String с = т.суть();
+                // «имей 2 боеприпаса и 3 войска на поле» — «имей» один раз
+                if (!слова.isEmpty() && с.startsWith("имей ") && слова.get(0).startsWith("имей ")) {
+                    с = с.substring("имей ".length());
+                }
+                слова.add(с);
             }
             return String.join(" и ", слова);
         }
@@ -1078,6 +1203,9 @@ public interface Требование {
             case "все_запитаны" -> new ВсеЗапитаны(Кто.valueOf(String.valueOf(m.get("кто"))),
                 число(m, "не_меньше", 2));
             case "построй_крупно" -> new ПостройКрупно(число(m, "сколько", 1));
+            case "треки" -> new Треки(число(m, "треков", 2), число(m, "ступень", 1));
+            case "модули" -> new Модули(число(m, "сколько", 2), Boolean.TRUE.equals(m.get("золотых")));
+            case "рода" -> new Рода(число(m, "сколько", 3));
             case "и" -> {
                 List<Требование> ч = new ArrayList<>();
                 if (m.get("части") instanceof List<?> l) {

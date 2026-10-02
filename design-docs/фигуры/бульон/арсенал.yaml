@@ -5355,8 +5355,8 @@
       ветка: mining
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_499
@@ -5367,8 +5367,8 @@
       ветка: mining
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_500
@@ -5379,8 +5379,8 @@
       ветка: mining
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_501
@@ -5414,8 +5414,8 @@
       ветка: build_miner
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_504
@@ -5426,8 +5426,8 @@
       ветка: build_miner
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_505
@@ -5438,8 +5438,8 @@
       ветка: build_miner
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_506
@@ -5473,8 +5473,8 @@
       ветка: energy_swap
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_509
@@ -5485,8 +5485,8 @@
       ветка: energy_swap
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_510
@@ -5497,8 +5497,8 @@
       ветка: energy_swap
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_511
@@ -5532,8 +5532,8 @@
       ветка: build_plant
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_514
@@ -5544,8 +5544,8 @@
       ветка: build_plant
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_515
@@ -5557,8 +5557,8 @@
       ветка: build_plant
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_516
@@ -5591,8 +5591,8 @@
       ветка: assembly
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_519
@@ -5603,8 +5603,8 @@
       ветка: assembly
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_520
@@ -5615,8 +5615,8 @@
       ветка: assembly
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_521
@@ -5651,8 +5651,8 @@
       ветка: build_military
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_524
@@ -5663,8 +5663,8 @@
       ветка: build_military
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_525
@@ -5676,8 +5676,8 @@
       ветка: build_military
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_526
@@ -5710,8 +5710,8 @@
       ветка: movement
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_529
@@ -5722,8 +5722,8 @@
       ветка: movement
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_530
@@ -5734,8 +5734,8 @@
       ветка: movement
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_531
@@ -5768,8 +5768,8 @@
       ветка: combat
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_534
@@ -5780,8 +5780,8 @@
       ветка: combat
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_535
@@ -5792,8 +5792,8 @@
       ветка: combat
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_536
@@ -5826,8 +5826,8 @@
       ветка: market
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_539
@@ -5838,8 +5838,8 @@
       ветка: market
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_540
@@ -5850,8 +5850,8 @@
       ветка: market
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_541
@@ -5884,8 +5884,8 @@
       ветка: science
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_544
@@ -5896,8 +5896,8 @@
       ветка: science
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_545
@@ -5908,8 +5908,8 @@
       ветка: science
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_546
@@ -5942,8 +5942,8 @@
       развилка: extract
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_549
@@ -5954,8 +5954,8 @@
       развилка: extract
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_550
@@ -5966,8 +5966,8 @@
       развилка: extract
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_551
@@ -6000,8 +6000,8 @@
       развилка: power
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_554
@@ -6012,8 +6012,8 @@
       развилка: power
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_555
@@ -6024,8 +6024,8 @@
       развилка: power
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_556
@@ -6058,8 +6058,8 @@
       развилка: supply
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_559
@@ -6070,8 +6070,8 @@
       развилка: supply
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_560
@@ -6082,8 +6082,8 @@
       развилка: supply
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_561
@@ -6116,8 +6116,8 @@
       развилка: command
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_564
@@ -6128,8 +6128,8 @@
       развилка: command
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_565
@@ -6140,8 +6140,8 @@
       развилка: command
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_566
@@ -6174,8 +6174,8 @@
       развилка: develop
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_569
@@ -6186,8 +6186,8 @@
       развилка: develop
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_570
@@ -6198,8 +6198,8 @@
       развилка: develop
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_571
@@ -6229,8 +6229,8 @@
       событие: задание
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_574
@@ -6240,8 +6240,8 @@
       событие: задание
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_575
@@ -6251,8 +6251,8 @@
       событие: задание
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_576
@@ -6282,8 +6282,8 @@
       событие: сжёг
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_579
@@ -6293,8 +6293,8 @@
       событие: сжёг
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_580
@@ -6304,8 +6304,8 @@
       событие: сжёг
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_581
@@ -6335,8 +6335,8 @@
       событие: установил
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_584
@@ -6346,8 +6346,8 @@
       событие: установил
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_585
@@ -6357,8 +6357,8 @@
       событие: установил
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_586
@@ -6388,8 +6388,8 @@
       событие: совпадение
     эффект:
       params:
-        resource: kelium
         max: 1
+        resource: kelium
       effect: steal_resource
     предел: 1
 - id: t_589
@@ -6399,8 +6399,8 @@
       событие: совпадение
     эффект:
       params:
-        resource: coin
         max: 1
+        resource: coin
       effect: steal_resource
     предел: 1
 - id: t_590
@@ -6410,8 +6410,8 @@
       событие: совпадение
     эффект:
       params:
-        resource: ammo
         max: 1
+        resource: ammo
       effect: steal_resource
     предел: 1
 - id: t_591
@@ -10173,8 +10173,8 @@
       ветка: mining
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -10187,8 +10187,8 @@
       ветка: mining
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -10201,8 +10201,8 @@
       ветка: mining
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -10215,8 +10215,8 @@
       ветка: mining
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -10229,8 +10229,8 @@
       ветка: mining
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -10243,8 +10243,8 @@
       ветка: mining
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -10270,8 +10270,8 @@
       ветка: mining
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -10284,14 +10284,14 @@
       ветка: mining
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_876
-  текст: Каждый раз, когда играешь ветку «Добыть», можешь заменить свой добытчик на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Добыть», замени свой добытчик на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10303,8 +10303,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_877
-  текст: Каждый раз, когда играешь ветку «Добыть», можешь заменить свою энергостанцию на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Добыть», замени свою энергостанцию на поле жетоном на уровень выше из запаса за
+    1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10316,8 +10316,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_878
-  текст: Каждый раз, когда играешь ветку «Добыть», можешь заменить свой добытчик или энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Добыть», замени свой добытчик или энергостанцию на поле жетоном на уровень выше
+    из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10340,8 +10340,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_880
-  текст: 'Каждый раз, когда играешь ветку «Добыть», можешь заплатить 1 келемий: можешь заменить свой добытчик или энергостанцию
-    на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Добыть», можешь заплатить 1 келемий: замени свой добытчик или энергостанцию на
+    поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -10363,8 +10363,8 @@
       ветка: build_miner
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -10377,8 +10377,8 @@
       ветка: build_miner
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -10391,8 +10391,8 @@
       ветка: build_miner
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -10405,8 +10405,8 @@
       ветка: build_miner
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -10419,8 +10419,8 @@
       ветка: build_miner
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -10433,8 +10433,8 @@
       ветка: build_miner
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -10460,8 +10460,8 @@
       ветка: build_miner
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -10474,14 +10474,14 @@
       ветка: build_miner
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_890
-  текст: Каждый раз, когда играешь ветку «Построить добытчик», можешь заменить свой добытчик на поле жетоном на уровень выше
-    из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить добытчик», замени свой добытчик на поле жетоном на уровень выше из запаса
+    за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10493,8 +10493,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_891
-  текст: Каждый раз, когда играешь ветку «Построить добытчик», можешь заменить свою энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить добытчик», замени свою энергостанцию на поле жетоном на уровень выше из
+    запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10506,8 +10506,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_892
-  текст: Каждый раз, когда играешь ветку «Построить добытчик», можешь заменить свой добытчик или энергостанцию на поле жетоном
-    на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить добытчик», замени свой добытчик или энергостанцию на поле жетоном на уровень
+    выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10530,8 +10530,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_894
-  текст: 'Каждый раз, когда играешь ветку «Построить добытчик», можешь заплатить 1 келемий: можешь заменить свой добытчик
-    или энергостанцию на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Построить добытчик», можешь заплатить 1 келемий: замени свой добытчик или энергостанцию
+    на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -10553,8 +10553,8 @@
       ветка: energy_swap
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -10567,8 +10567,8 @@
       ветка: energy_swap
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -10581,8 +10581,8 @@
       ветка: energy_swap
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -10595,8 +10595,8 @@
       ветка: energy_swap
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -10609,8 +10609,8 @@
       ветка: energy_swap
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -10623,8 +10623,8 @@
       ветка: energy_swap
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -10650,8 +10650,8 @@
       ветка: energy_swap
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -10664,14 +10664,14 @@
       ветка: energy_swap
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_904
-  текст: Каждый раз, когда играешь ветку «Переложить энергию», можешь заменить свой добытчик на поле жетоном на уровень выше
-    из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Переложить энергию», замени свой добытчик на поле жетоном на уровень выше из запаса
+    за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10683,8 +10683,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_905
-  текст: Каждый раз, когда играешь ветку «Переложить энергию», можешь заменить свою энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Переложить энергию», замени свою энергостанцию на поле жетоном на уровень выше из
+    запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10696,8 +10696,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_906
-  текст: Каждый раз, когда играешь ветку «Переложить энергию», можешь заменить свой добытчик или энергостанцию на поле жетоном
-    на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Переложить энергию», замени свой добытчик или энергостанцию на поле жетоном на уровень
+    выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10720,8 +10720,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_908
-  текст: 'Каждый раз, когда играешь ветку «Переложить энергию», можешь заплатить 1 келемий: можешь заменить свой добытчик
-    или энергостанцию на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Переложить энергию», можешь заплатить 1 келемий: замени свой добытчик или энергостанцию
+    на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -10743,8 +10743,8 @@
       ветка: build_plant
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -10757,8 +10757,8 @@
       ветка: build_plant
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -10771,8 +10771,8 @@
       ветка: build_plant
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -10785,8 +10785,8 @@
       ветка: build_plant
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -10799,8 +10799,8 @@
       ветка: build_plant
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -10813,8 +10813,8 @@
       ветка: build_plant
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -10840,8 +10840,8 @@
       ветка: build_plant
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -10854,14 +10854,14 @@
       ветка: build_plant
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_918
-  текст: Каждый раз, когда играешь ветку «Построить энергостанцию», можешь заменить свой добытчик на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить энергостанцию», замени свой добытчик на поле жетоном на уровень выше из
+    запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10873,8 +10873,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_919
-  текст: Каждый раз, когда играешь ветку «Построить энергостанцию», можешь заменить свою энергостанцию на поле жетоном на
-    уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить энергостанцию», замени свою энергостанцию на поле жетоном на уровень выше
+    из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10886,8 +10886,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_920
-  текст: Каждый раз, когда играешь ветку «Построить энергостанцию», можешь заменить свой добытчик или энергостанцию на поле
-    жетоном на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить энергостанцию», замени свой добытчик или энергостанцию на поле жетоном
+    на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -10910,8 +10910,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_922
-  текст: 'Каждый раз, когда играешь ветку «Построить энергостанцию», можешь заплатить 1 келемий: можешь заменить свой добытчик
-    или энергостанцию на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Построить энергостанцию», можешь заплатить 1 келемий: замени свой добытчик или
+    энергостанцию на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -10933,8 +10933,8 @@
       ветка: assembly
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -10947,8 +10947,8 @@
       ветка: assembly
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -10961,8 +10961,8 @@
       ветка: assembly
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -10975,8 +10975,8 @@
       ветка: assembly
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -10989,8 +10989,8 @@
       ветка: assembly
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -11003,8 +11003,8 @@
       ветка: assembly
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -11030,8 +11030,8 @@
       ветка: assembly
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -11044,14 +11044,14 @@
       ветка: assembly
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_932
-  текст: Каждый раз, когда играешь ветку «Выпустить», можешь заменить свой добытчик на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Выпустить», замени свой добытчик на поле жетоном на уровень выше из запаса за 1
+    монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11063,8 +11063,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_933
-  текст: Каждый раз, когда играешь ветку «Выпустить», можешь заменить свою энергостанцию на поле жетоном на уровень выше из
-    запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Выпустить», замени свою энергостанцию на поле жетоном на уровень выше из запаса
+    за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11076,8 +11076,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_934
-  текст: Каждый раз, когда играешь ветку «Выпустить», можешь заменить свой добытчик или энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Выпустить», замени свой добытчик или энергостанцию на поле жетоном на уровень выше
+    из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11100,7 +11100,7 @@
       effect: permanent_energy
     предел: 1
 - id: t_936
-  текст: 'Каждый раз, когда играешь ветку «Выпустить», можешь заплатить 1 келемий: можешь заменить свой добытчик или энергостанцию
+  текст: 'Каждый раз, когда играешь ветку «Выпустить», можешь заплатить 1 келемий: замени свой добытчик или энергостанцию
     на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
@@ -11123,8 +11123,8 @@
       ветка: build_military
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -11137,8 +11137,8 @@
       ветка: build_military
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -11151,8 +11151,8 @@
       ветка: build_military
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -11165,8 +11165,8 @@
       ветка: build_military
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -11179,8 +11179,8 @@
       ветка: build_military
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -11193,8 +11193,8 @@
       ветка: build_military
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -11220,8 +11220,8 @@
       ветка: build_military
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -11234,14 +11234,14 @@
       ветка: build_military
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_946
-  текст: Каждый раз, когда играешь ветку «Построить военное здание», можешь заменить свой добытчик на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить военное здание», замени свой добытчик на поле жетоном на уровень выше
+    из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11253,8 +11253,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_947
-  текст: Каждый раз, когда играешь ветку «Построить военное здание», можешь заменить свою энергостанцию на поле жетоном на
-    уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить военное здание», замени свою энергостанцию на поле жетоном на уровень
+    выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11266,8 +11266,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_948
-  текст: Каждый раз, когда играешь ветку «Построить военное здание», можешь заменить свой добытчик или энергостанцию на поле
-    жетоном на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Построить военное здание», замени свой добытчик или энергостанцию на поле жетоном
+    на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11290,8 +11290,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_950
-  текст: 'Каждый раз, когда играешь ветку «Построить военное здание», можешь заплатить 1 келемий: можешь заменить свой добытчик
-    или энергостанцию на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Построить военное здание», можешь заплатить 1 келемий: замени свой добытчик или
+    энергостанцию на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -11313,8 +11313,8 @@
       ветка: movement
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -11327,8 +11327,8 @@
       ветка: movement
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -11341,8 +11341,8 @@
       ветка: movement
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -11355,8 +11355,8 @@
       ветка: movement
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -11369,8 +11369,8 @@
       ветка: movement
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -11383,8 +11383,8 @@
       ветка: movement
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -11410,8 +11410,8 @@
       ветка: movement
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -11424,14 +11424,14 @@
       ветка: movement
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_960
-  текст: Каждый раз, когда играешь ветку «Манёвр», можешь заменить свой добытчик на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Манёвр», замени свой добытчик на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11443,8 +11443,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_961
-  текст: Каждый раз, когда играешь ветку «Манёвр», можешь заменить свою энергостанцию на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Манёвр», замени свою энергостанцию на поле жетоном на уровень выше из запаса за
+    1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11456,8 +11456,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_962
-  текст: Каждый раз, когда играешь ветку «Манёвр», можешь заменить свой добытчик или энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Манёвр», замени свой добытчик или энергостанцию на поле жетоном на уровень выше
+    из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11480,8 +11480,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_964
-  текст: 'Каждый раз, когда играешь ветку «Манёвр», можешь заплатить 1 келемий: можешь заменить свой добытчик или энергостанцию
-    на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Манёвр», можешь заплатить 1 келемий: замени свой добытчик или энергостанцию на
+    поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -11503,8 +11503,8 @@
       ветка: combat
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -11517,8 +11517,8 @@
       ветка: combat
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -11531,8 +11531,8 @@
       ветка: combat
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -11545,8 +11545,8 @@
       ветка: combat
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -11559,8 +11559,8 @@
       ветка: combat
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -11573,8 +11573,8 @@
       ветка: combat
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -11600,8 +11600,8 @@
       ветка: combat
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -11614,14 +11614,14 @@
       ветка: combat
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_974
-  текст: Каждый раз, когда играешь ветку «Бой», можешь заменить свой добытчик на поле жетоном на уровень выше из запаса за
-    1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Бой», замени свой добытчик на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11633,8 +11633,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_975
-  текст: Каждый раз, когда играешь ветку «Бой», можешь заменить свою энергостанцию на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Бой», замени свою энергостанцию на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11646,8 +11646,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_976
-  текст: Каждый раз, когда играешь ветку «Бой», можешь заменить свой добытчик или энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Бой», замени свой добытчик или энергостанцию на поле жетоном на уровень выше из
+    запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11670,8 +11670,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_978
-  текст: 'Каждый раз, когда играешь ветку «Бой», можешь заплатить 1 келемий: можешь заменить свой добытчик или энергостанцию
-    на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Бой», можешь заплатить 1 келемий: замени свой добытчик или энергостанцию на поле
+    жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -11693,8 +11693,8 @@
       ветка: market
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -11707,8 +11707,8 @@
       ветка: market
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -11721,8 +11721,8 @@
       ветка: market
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -11735,8 +11735,8 @@
       ветка: market
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -11749,8 +11749,8 @@
       ветка: market
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -11763,8 +11763,8 @@
       ветка: market
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -11790,8 +11790,8 @@
       ветка: market
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -11804,14 +11804,14 @@
       ветка: market
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_988
-  текст: Каждый раз, когда играешь ветку «Рынок», можешь заменить свой добытчик на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Рынок», замени свой добытчик на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11823,8 +11823,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_989
-  текст: Каждый раз, когда играешь ветку «Рынок», можешь заменить свою энергостанцию на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Рынок», замени свою энергостанцию на поле жетоном на уровень выше из запаса за 1
+    монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11836,8 +11836,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_990
-  текст: Каждый раз, когда играешь ветку «Рынок», можешь заменить свой добытчик или энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Рынок», замени свой добытчик или энергостанцию на поле жетоном на уровень выше из
+    запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -11860,8 +11860,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_992
-  текст: 'Каждый раз, когда играешь ветку «Рынок», можешь заплатить 1 келемий: можешь заменить свой добытчик или энергостанцию
-    на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Рынок», можешь заплатить 1 келемий: замени свой добытчик или энергостанцию на поле
+    жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -11883,8 +11883,8 @@
       ветка: science
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -11897,8 +11897,8 @@
       ветка: science
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -11911,8 +11911,8 @@
       ветка: science
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -11925,8 +11925,8 @@
       ветка: science
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -11939,8 +11939,8 @@
       ветка: science
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -11953,8 +11953,8 @@
       ветка: science
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -11980,8 +11980,8 @@
       ветка: science
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -11994,14 +11994,14 @@
       ветка: science
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_1002
-  текст: Каждый раз, когда играешь ветку «Наука», можешь заменить свой добытчик на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Наука», замени свой добытчик на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -12013,8 +12013,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1003
-  текст: Каждый раз, когда играешь ветку «Наука», можешь заменить свою энергостанцию на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Наука», замени свою энергостанцию на поле жетоном на уровень выше из запаса за 1
+    монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -12026,8 +12026,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1004
-  текст: Каждый раз, когда играешь ветку «Наука», можешь заменить свой добытчик или энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда играешь ветку «Наука», замени свой добытчик или энергостанцию на поле жетоном на уровень выше из
+    запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ветка
@@ -12050,8 +12050,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_1006
-  текст: 'Каждый раз, когда играешь ветку «Наука», можешь заплатить 1 келемий: можешь заменить свой добытчик или энергостанцию
-    на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда играешь ветку «Наука», можешь заплатить 1 келемий: замени свой добытчик или энергостанцию на поле
+    жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: ветка
@@ -12072,8 +12072,8 @@
       событие: задание
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -12085,8 +12085,8 @@
       событие: задание
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -12098,8 +12098,8 @@
       событие: задание
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -12111,8 +12111,8 @@
       событие: задание
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -12124,8 +12124,8 @@
       событие: задание
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -12137,8 +12137,8 @@
       событие: задание
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -12162,8 +12162,8 @@
       событие: задание
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -12175,14 +12175,14 @@
       событие: задание
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_1016
-  текст: Каждый раз, когда выполняешь задание, можешь заменить свой добытчик на поле жетоном на уровень выше из запаса за
-    1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда выполняешь задание, замени свой добытчик на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: задание
@@ -12193,8 +12193,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1017
-  текст: Каждый раз, когда выполняешь задание, можешь заменить свою энергостанцию на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда выполняешь задание, замени свою энергостанцию на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: задание
@@ -12205,8 +12205,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1018
-  текст: Каждый раз, когда выполняешь задание, можешь заменить свой добытчик или энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда выполняешь задание, замени свой добытчик или энергостанцию на поле жетоном на уровень выше из запаса
+    за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: задание
@@ -12227,8 +12227,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_1020
-  текст: 'Каждый раз, когда выполняешь задание, можешь заплатить 1 келемий: можешь заменить свой добытчик или энергостанцию
-    на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда выполняешь задание, можешь заплатить 1 келемий: замени свой добытчик или энергостанцию на поле
+    жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: задание
@@ -12248,8 +12248,8 @@
       событие: установил
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -12261,8 +12261,8 @@
       событие: установил
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -12274,8 +12274,8 @@
       событие: установил
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -12287,8 +12287,8 @@
       событие: установил
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -12300,8 +12300,8 @@
       событие: установил
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -12313,8 +12313,8 @@
       событие: установил
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -12338,8 +12338,8 @@
       событие: установил
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -12351,14 +12351,14 @@
       событие: установил
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_1030
-  текст: Каждый раз, когда устанавливаешь карту арсенала, можешь заменить свой добытчик на поле жетоном на уровень выше из
-    запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда устанавливаешь карту арсенала, замени свой добытчик на поле жетоном на уровень выше из запаса за
+    1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: установил
@@ -12369,8 +12369,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1031
-  текст: Каждый раз, когда устанавливаешь карту арсенала, можешь заменить свою энергостанцию на поле жетоном на уровень выше
-    из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда устанавливаешь карту арсенала, замени свою энергостанцию на поле жетоном на уровень выше из запаса
+    за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: установил
@@ -12381,8 +12381,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1032
-  текст: Каждый раз, когда устанавливаешь карту арсенала, можешь заменить свой добытчик или энергостанцию на поле жетоном
-    на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда устанавливаешь карту арсенала, замени свой добытчик или энергостанцию на поле жетоном на уровень
+    выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: установил
@@ -12393,8 +12393,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1033
-  текст: Каждый раз, когда устанавливаешь карту арсенала, можешь заменить свой добытчик или энергостанцию на поле жетоном
-    на уровень выше из запаса. Не больше 1 раза за ход.
+  текст: Каждый раз, когда устанавливаешь карту арсенала, замени свой добытчик или энергостанцию на поле жетоном на уровень
+    выше из запаса. Не больше 1 раза за ход.
   низ:
     когда:
       событие: установил
@@ -12415,7 +12415,7 @@
       effect: permanent_energy
     предел: 1
 - id: t_1035
-  текст: 'Каждый раз, когда устанавливаешь карту арсенала, можешь заплатить 1 келемий: можешь заменить свой добытчик или энергостанцию
+  текст: 'Каждый раз, когда устанавливаешь карту арсенала, можешь заплатить 1 келемий: замени свой добытчик или энергостанцию
     на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
@@ -12436,8 +12436,8 @@
       событие: ход
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -12449,8 +12449,8 @@
       событие: ход
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -12462,8 +12462,8 @@
       событие: ход
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -12475,8 +12475,8 @@
       событие: ход
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -12488,8 +12488,8 @@
       событие: ход
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -12501,14 +12501,14 @@
       событие: ход
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
 - id: t_1042
-  текст: Каждый раз, когда начинаешь свой ход, можешь заменить свой добытчик на поле жетоном на уровень выше из запаса за
-    1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда начинаешь свой ход, замени свой добытчик на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: ход
@@ -12519,8 +12519,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1043
-  текст: Каждый раз, когда начинаешь свой ход, можешь заменить свою энергостанцию на поле жетоном на уровень выше из запаса
-    за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда начинаешь свой ход, замени свою энергостанцию на поле жетоном на уровень выше из запаса за 1 монету.
+    Не больше 1 раза за ход.
   низ:
     когда:
       событие: ход
@@ -12531,8 +12531,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1044
-  текст: Каждый раз, когда начинаешь свой ход, можешь заменить свой добытчик или энергостанцию на поле жетоном на уровень
-    выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда начинаешь свой ход, замени свой добытчик или энергостанцию на поле жетоном на уровень выше из запаса
+    за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: ход
@@ -12560,8 +12560,8 @@
       событие: построил_крупно
     эффект:
       params:
-        per: own_powered_miner
         coin: 1
+        per: own_powered_miner
         max: 3
       effect: gain_per
     предел: 1
@@ -12573,8 +12573,8 @@
       событие: построил_крупно
     эффект:
       params:
-        per: own_powered_miner
         kelium: 1
+        per: own_powered_miner
         max: 2
       effect: gain_per
     предел: 1
@@ -12586,8 +12586,8 @@
       событие: построил_крупно
     эффект:
       params:
-        per: own_powered_plant
         coin: 1
+        per: own_powered_plant
         max: 3
       effect: gain_per
     предел: 1
@@ -12599,8 +12599,8 @@
       событие: построил_крупно
     эффект:
       params:
-        per: own_powered_plant
         kelium: 1
+        per: own_powered_plant
         max: 2
       effect: gain_per
     предел: 1
@@ -12612,8 +12612,8 @@
       событие: построил_крупно
     эффект:
       params:
-        per: own_powered_building
         coin: 1
+        per: own_powered_building
         max: 3
       effect: gain_per
     предел: 1
@@ -12625,8 +12625,8 @@
       событие: построил_крупно
     эффект:
       params:
-        per: own_powered_building
         kelium: 1
+        per: own_powered_building
         max: 2
       effect: gain_per
     предел: 1
@@ -12650,8 +12650,8 @@
       событие: построил_крупно
     эффект:
       params:
-        per: top_plant_level
         ammo: 1
+        per: top_plant_level
         max: 3
       effect: gain_per
     предел: 1
@@ -12663,14 +12663,14 @@
       событие: построил_крупно
     эффект:
       params:
-        per: miner_levels
         coin: 1
+        per: miner_levels
         max: 4
       effect: gain_per
     предел: 1
 - id: t_1055
-  текст: Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, можешь заменить свой добытчик на поле
-    жетоном на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, замени свой добытчик на поле жетоном на
+    уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: построил_крупно
@@ -12681,8 +12681,8 @@
       effect: upgrade_building
     предел: 1
 - id: t_1056
-  текст: Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, можешь заменить свою энергостанцию на
-    поле жетоном на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
+  текст: Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, замени свою энергостанцию на поле жетоном
+    на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
       событие: построил_крупно
@@ -12693,7 +12693,7 @@
       effect: upgrade_building
     предел: 1
 - id: t_1057
-  текст: Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, можешь заменить свой добытчик или энергостанцию
+  текст: Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, замени свой добытчик или энергостанцию
     на поле жетоном на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.
   низ:
     когда:
@@ -12705,7 +12705,7 @@
       effect: upgrade_building
     предел: 1
 - id: t_1058
-  текст: Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, можешь заменить свой добытчик или энергостанцию
+  текст: Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, замени свой добытчик или энергостанцию
     на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.
   низ:
     когда:
@@ -12727,8 +12727,8 @@
       effect: permanent_energy
     предел: 1
 - id: t_1060
-  текст: 'Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, можешь заплатить 1 келемий: можешь заменить
-    свой добытчик или энергостанцию на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
+  текст: 'Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, можешь заплатить 1 келемий: замени свой
+    добытчик или энергостанцию на поле жетоном на уровень выше из запаса. Не больше 1 раза за ход.'
   низ:
     когда:
       событие: построил_крупно
