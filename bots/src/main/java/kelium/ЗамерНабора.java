@@ -144,7 +144,7 @@ public final class ЗамерНабора {
                 if (в.getKey().startsWith("дорога·") || в.getKey().startsWith("карта·")
                         || в.getKey().startsWith("сжёг·") || в.getKey().startsWith("фракция")
                         || в.getKey().startsWith("бот·") || в.getKey().startsWith("место·")
-                        || в.getKey().startsWith("очки·")) {
+                        || в.getKey().startsWith("очки·") || в.getKey().startsWith("победитель·")) {
                     continue;                       // доли побед — отдельными разделами
                 }
                 if (!в.getKey().contains("·")) {     // «mining·причина» — разбивка, не в итог
@@ -187,7 +187,21 @@ public final class ЗамерНабора {
                         (double) о[0] / Math.max(1, о[1])));
                 }
             }
-            sb.append('\n');
+            // пары «дорога + фракция» победителя, частые сверху (критерий 10: ни одна > 10%)
+            List<Map.Entry<String, int[]>> пары = new ArrayList<>();
+            for (var в : e.getValue().entrySet()) {
+                if (в.getKey().startsWith("победитель·")) {
+                    пары.add(в);
+                }
+            }
+            пары.sort((a, b) -> b.getValue()[0] - a.getValue()[0]);
+            sb.append("\nПобедитель «дорога · фракция», частые: ");
+            for (int i = 0; i < Math.min(6, пары.size()); i++) {
+                sb.append(String.format(java.util.Locale.ROOT, "%s %.0f%%; ",
+                    пары.get(i).getKey().substring("победитель·".length()),
+                    100.0 * пары.get(i).getValue()[0] / Math.max(1, партий)));
+            }
+            sb.append("\n\n");
         }
         // КАРТЫ АРСЕНАЛА: сколько раз поставлены и доля побед поставивших (ровно 25%).
         // Слишком сильная карта видна сразу; слишком слабая — малой долей или тем,
@@ -465,6 +479,10 @@ public final class ЗамерНабора {
             }
         }
         boolean воинПобедил = воин >= 0 && s.winner != null && s.winner == воин;
+        // РАЗНООБРАЗИЕ ПАРТИЙ (критерий 10): пара «дорога + фракция» победителя
+        if (s.winner != null && s.winner >= 0 && s.winner < 4) {
+            ветки.computeIfAbsent("победитель·" + дорога + "·" + цвета.get(s.winner), k -> new int[2])[0]++;
+        }
         // ФРАКЦИЯ, БОТ, МЕСТО: сыграно и побед ({0, 1}); очки — «очки·…» {сумма, партий}
         for (int место = 0; место < 4; место++) {
             boolean победил = s.winner != null && s.winner == место;

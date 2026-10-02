@@ -55,8 +55,18 @@ public final class СборкаНабора {
     // ПОРОВНУ НА РАЗВИЛКУ (01.10.2026): не больше 6 заданий на развилку. При 8 у
     // Командования выходило 9 карт, у Добычи и Питания по 4 — и «дорога победителя»
     // тянулась к развилке с большей колодой без всякой её силы.
-    static final int ЗАДАНИЙ = 30;
-    static final int АРСЕНАЛА = 33;
+    // РАЗМЕРЫ КОЛОД (решение Влада 02.10.2026): заданий 50, арсенала 40 — из
+    // них 36 из бульона и 4 карты прокачки; начальных заданий 12, начального
+    // арсенала 8 (как есть).
+    static final int ЗАДАНИЙ = Integer.getInteger("kelium.набор.заданий", 50);
+    static final int АРСЕНАЛА = Integer.getInteger("kelium.набор.арсенала", 36);
+    /** Версии выгрузки: задания, арсенал, свод — и свод, от которого он сделан. */
+    static final String ВЕРСИЯ_ЗАДАНИЙ = System.getProperty("kelium.набор.версия_заданий", "3.0.0");
+    static final String ВЕРСИЯ_АРСЕНАЛА = System.getProperty("kelium.набор.версия_арсенала", "9.0.0");
+    static final String СВОД = System.getProperty("kelium.набор.свод", "1.50.0");
+    static final String СВОД_ОСНОВА = System.getProperty("kelium.набор.основа", "1.49.0");
+    /** Сколько карт заданий получает свободный утиль «∞ +1 спец-действие». */
+    static final int СВОБОДНЫХ_СПЕЦ = Integer.getInteger("kelium.набор.свободных_спец", 3);
     static final int РЕДКИХ = 6;
 
     record Мера(String id, String текст, int вРуке, int выполнено, double доля, double раунд,
@@ -398,8 +408,13 @@ public final class СборкаНабора {
                           List<String> новыеНачальные)
             throws Exception {
         org.yaml.snakeyaml.Yaml y = new org.yaml.snakeyaml.Yaml();
-        Map<String, Object> старыеЗадания = y.load(Files.readString(Path.of("data/cards/objectives.1.20.0.yaml")));
+        Map<String, Object> старыеЗадания = y.load(Files.readString(Path.of("data/cards/objectives.2.1.0.yaml")));
+        // верхи арсенала — утили 7.4.0 (их доли сожжений измерены); начальные — 8.0.0
         Map<String, Object> старыйАрсенал = y.load(Files.readString(Path.of("data/cards/arsenal.7.4.0.yaml")));
+        Map<String, Object> начальныйАрсенал = y.load(Files.readString(Path.of("data/cards/arsenal.8.0.0.yaml")));
+        String пз = "z" + ВЕРСИЯ_ЗАДАНИЙ.charAt(0) + "_";
+        String па = "a" + ВЕРСИЯ_АРСЕНАЛА.charAt(0) + "_";
+        int свободныхСпец = 0;
         List<Map<String, Object>> задания = new ArrayList<>();
         int номер = 1;
         for (Мера м : набор) {
@@ -452,10 +467,19 @@ public final class СборкаНабора {
                 награда.put("трофеи", 1);
             }
             язык.put("награда", награда);
-            язык.put("верх", верхРазвилки(р, номер));
+            // СВОБОДНЫЙ УТИЛЬ «∞ +1 СПЕЦ-ДЕЙСТВИЕ» (решение Влада 02.10.2026) — только
+            // картам, в наградах которых спец-действий нет: иначе верх и низ одно и то же
+            boolean спецВНаградах = награда.containsKey("спецДействий")
+                || (язык.get("сверх") instanceof Map<?, ?> св && св.containsKey("спецДействий"));
+            if (!спецВНаградах && свободныхСпец < СВОБОДНЫХ_СПЕЦ) {
+                язык.put("верх", "СПЕЦ_ДЕЙСТВИЯ");
+                свободныхСпец++;
+            } else {
+                язык.put("верх", верхРазвилки(р, номер));
+            }
             язык.put("значок", р);
             Map<String, Object> e = new LinkedHashMap<>();
-            e.put("id", String.format("z2_%02d", номер++));
+            e.put("id", String.format(пз + "%02d", номер++));
             e.put("язык", язык);
             задания.add(e);
         }
@@ -475,7 +499,7 @@ public final class СборкаНабора {
         for (String id : арсНабор) {
             Map<String, Object> а = арсеналПоId.get(id);
             Map<String, Object> e = new LinkedHashMap<>();
-            e.put("id", String.format("a8_%02d", номер));
+            e.put("id", String.format(па + "%02d", номер));
             e.put("name", имяСрабатывания(а));
             e.put("kind", "regular");
             e.put("значок", развилкаСрабатывания(а));
@@ -495,7 +519,7 @@ public final class СборкаНабора {
         низПрокачки.put("предел", 1);
         for (int i = 0; i < ПРОКАЧКА; i++) {
             Map<String, Object> e = new LinkedHashMap<>();
-            e.put("id", String.format("a8_%02d", номер));
+            e.put("id", String.format(па + "%02d", номер));
             e.put("name", "Каждый ход → спец-действие");
             e.put("kind", "regular");
             e.put("значок", "карты");
@@ -506,10 +530,16 @@ public final class СборкаНабора {
             номер++;
         }
         подобратьУтили(арсенал, старыеВерхи);
-        for (Map<String, Object> e : (List<Map<String, Object>>) старыйАрсенал.get("arsenal")) {
+        // НАЧАЛЬНЫЙ АРСЕНАЛ — 8 карт 8.0.0 (решение Влада 02.10.2026: начальных 8)
+        int начальных = 0;
+        for (Map<String, Object> e : (List<Map<String, Object>>) начальныйАрсенал.get("arsenal")) {
             if ("starting".equals(e.get("kind"))) {
                 арсенал.add(e);
+                начальных++;
             }
+        }
+        if (начальных >= 8) {
+            новыеНачальные = List.of();
         }
         // ДВЕ НОВЫЕ НАЧАЛЬНЫЕ (01.10.2026): после снятия «Сдачи тары» их было 6,
         // в запасе на четверых — две. Верх — стартовый набор ценой как у
@@ -540,32 +570,39 @@ public final class СборкаНабора {
         o.setWidth(120);
         org.yaml.snakeyaml.Yaml д = new org.yaml.snakeyaml.Yaml(o);
         Map<String, Object> фЗ = new LinkedHashMap<>();
-        фЗ.put("meta", Map.of("id", "2.0.0", "type", "objectives"));
+        фЗ.put("meta", Map.of("id", ВЕРСИЯ_ЗАДАНИЙ, "type", "objectives"));
         фЗ.put("objectives", задания);
-        Files.writeString(Path.of("data/cards/objectives.2.0.0.yaml"),
-            "# 2.0.0 (Карты 2.0): задания языком карт, собраны kelium.СборкаНабора из бульона\n"
-                + "# по мере живых партий стратегов. Начальные — как в 1.20.0.\n"
-                + "# CONTENT: objectives  version 2.0.0\n" + д.dump(копияБезЯкорей(фЗ)),
+        Files.writeString(Path.of("data/cards/objectives." + ВЕРСИЯ_ЗАДАНИЙ + ".yaml"),
+            "# " + ВЕРСИЯ_ЗАДАНИЙ + ": задания языком карт, собраны kelium.СборкаНабора из бульона\n"
+                + "# по мере живых партий стратегов (энергия и уровни зданий — с 02.10.2026).\n"
+                + "# Начальные — как в 2.1.0.\n"
+                + "# CONTENT: objectives  version " + ВЕРСИЯ_ЗАДАНИЙ + "\n" + д.dump(копияБезЯкорей(фЗ)),
             StandardCharsets.UTF_8);
         Map<String, Object> фА = new LinkedHashMap<>();
-        фА.put("meta", Map.of("id", "8.0.0", "type", "arsenal"));
+        фА.put("meta", Map.of("id", ВЕРСИЯ_АРСЕНАЛА, "type", "arsenal"));
         фА.put("arsenal", арсенал);
-        Files.writeString(Path.of("data/cards/arsenal.8.0.0.yaml"),
-            "# 8.0.0 (Карты 2.0): низ — срабатывания данными, верх — утили арсенала 7.4.0;\n"
-                + "# собран kelium.СборкаНабора из бульона. Начальные — как в 7.4.0.\n"
-                + "# CONTENT: arsenal  version 8.0.0\n" + д.dump(копияБезЯкорей(фА)),
+        Files.writeString(Path.of("data/cards/arsenal." + ВЕРСИЯ_АРСЕНАЛА + ".yaml"),
+            "# " + ВЕРСИЯ_АРСЕНАЛА + ": низ — срабатывания данными, верх — утили арсенала 7.4.0;\n"
+                + "# собран kelium.СборкаНабора из бульона. Начальные — как в 8.0.0.\n"
+                + "# CONTENT: arsenal  version " + ВЕРСИЯ_АРСЕНАЛА + "\n" + д.dump(копияБезЯкорей(фА)),
             StandardCharsets.UTF_8);
-        String свод = Files.readString(Path.of("data/rulesets/1.46.0.yaml"), StandardCharsets.UTF_8)
-            .replaceFirst("(?m)^  id: 1\\.46\\.0", "  id: 1.47.0")
-            .replaceFirst("(?m)^  objectives: 1\\.20\\.0.*$",
-                "  objectives: 2.0.0             # КАРТЫ 2.0 (30.09.2026): задания языком карт из бульона")
-            .replaceFirst("(?m)^  arsenal: 7\\.4\\.0.*$",
-                "  arsenal: 8.0.0                # КАРТЫ 2.0 (30.09.2026): срабатывания данными из бульона");
-        Files.writeString(Path.of("data/rulesets/1.47.0.yaml"),
-            "# 1.47.0 (30.09.2026): как 1.46.0, колоды Карт 2.0 — задания 2.0.0 и арсенал 8.0.0.\n" + свод,
+        String основа = Files.readString(Path.of("data/rulesets/" + СВОД_ОСНОВА + ".yaml"),
             StandardCharsets.UTF_8);
-        System.out.printf("выгружено: заданий %d, арсенала %d, свод 1.47.0%n", задания.size(),
-            арсенал.size());
+        String свод = основа
+            .replaceFirst("(?m)^  id: " + java.util.regex.Pattern.quote(СВОД_ОСНОВА), "  id: " + СВОД)
+            .replaceFirst("(?m)^  objectives: \\d+\\.\\d+\\.\\d+.*$",
+                "  objectives: " + ВЕРСИЯ_ЗАДАНИЙ + "             # собраны из бульона")
+            .replaceFirst("(?m)^  arsenal: \\d+\\.\\d+\\.\\d+.*$",
+                "  arsenal: " + ВЕРСИЯ_АРСЕНАЛА + "                # собран из бульона")
+            // супер-арсенал 8 карт (решение Влада 02.10.2026): 4 супер-войска и 4 способности
+            .replaceFirst("(?m)^  super_arsenal: 4\\.0\\.0.*$",
+                "  super_arsenal: 4.1.0          # 4.1 (02.10.2026): 8 карт — без «Баллистического расчёта»");
+        Files.writeString(Path.of("data/rulesets/" + СВОД + ".yaml"),
+            "# " + СВОД + ": как " + СВОД_ОСНОВА + ", колоды из бульона — задания " + ВЕРСИЯ_ЗАДАНИЙ
+                + " и арсенал " + ВЕРСИЯ_АРСЕНАЛА + ".\n" + свод,
+            StandardCharsets.UTF_8);
+        System.out.printf("выгружено: заданий %d, арсенала %d, свод %s%n", задания.size(),
+            арсенал.size(), СВОД);
     }
 
     /** Имя карты арсенала по сути: «Рынок → монета», «Уничтожил → спец-действие». */
@@ -593,6 +630,7 @@ public final class СборкаНабора {
             case "совпадение" -> "Совпадение";
             case "низ" -> "Нижний приказ";
             case "ход" -> "Каждый ход";
+            case "построил_крупно" -> "Крупная постройка";
             default -> что;
         };
         Map<String, Object> п = эф.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
@@ -608,6 +646,11 @@ public final class СборкаНабора {
             };
             case "free_action" -> kelium.cards.язык.Требование.ветка(String.valueOf(п.get("action")))
                 .replace("«", "").replace("»", "");
+            case "upgrade_building" -> "уровень выше";
+            case "permanent_energy" -> "кубик энергии";
+            case "gain_per" -> (п.containsKey("coin") ? "монеты" : п.containsKey("kelium") ? "келемий"
+                : "боеприпасы") + (String.valueOf(п.get("per")).startsWith("own_powered") ? " за запитанные"
+                : " за уровни");
             default -> п.containsKey("coin") ? "монеты" : п.containsKey("ammo") ? "боеприпас"
                 : п.containsKey("kelium") ? "келемий" : п.containsKey("trophy") ? "трофей"
                 : п.containsKey("objective_cards") ? "задание" : "добро";
@@ -672,6 +715,13 @@ public final class СборкаНабора {
             case "запитай" -> "Запитай" + число;
             case "выпусти" -> "Выпусти" + число;
             case "потрать" -> "Потрать келемий" + число;
+            case "уровни" -> ("plant".equals(т.get("вид")) ? "Уровни станций"
+                : "miner".equals(т.get("вид")) ? "Уровни добытчиков" : "Уровни хозяйства") + " " + т.get("сумма") + "+";
+            case "разные_уровни" -> ("plant".equals(т.get("вид")) ? "Лестница станций"
+                : "miner".equals(т.get("вид")) ? "Лестница добытчиков" : "Лестница хозяйства") + число;
+            case "энергия" -> "Энергия в ячейках" + число;
+            case "все_запитаны" -> "Всё запитано";
+            case "построй_крупно" -> "Крупная постройка";
             default -> узел;
         };
     }
@@ -869,6 +919,9 @@ public final class СборкаНабора {
             };
             case "добудь" -> "extract";
             case "запитай" -> "power";
+            // ЭНЕРГИЯ И УРОВНИ (02.10.2026)
+            case "уровни", "разные_уровни" -> "plant".equals(м.get("вид")) ? "power" : "extract";
+            case "энергия", "все_запитаны", "построй_крупно" -> "power";
             case "выпусти" -> "supply";
             // трата келемия — задача добытчика: кто добыл, тот и тратит
             case "потрать" -> "extract";
@@ -905,6 +958,7 @@ public final class СборкаНабора {
             case "ветка" -> kelium.engine.Срабатывания.развилка(String.valueOf(когда.get("ветка")));
             case "развилка" -> String.valueOf(когда.get("развилка"));
             case "уничтожил", "потерял" -> "command";
+            case "построил_крупно" -> "extract";
             default -> "карты";
         };
     }
@@ -936,6 +990,8 @@ public final class СборкаНабора {
             case "свалка" -> узел + ":" + ((Map<String, Object>) т.get("группа")).get("кто");
             case "уничтожь" -> узел + ":" + ((Map<String, Object>) т.get("цель")).get("кто") + ":" + т.get("кем");
             case "построй" -> узел + ":" + т.get("вид");
+            case "уровни", "разные_уровни" -> узел + ":" + т.get("вид");
+            case "все_запитаны" -> узел + ":" + т.get("кто");
             case "обе_ветки" -> узел + ":" + т.get("развилка");
             case "ветки" -> узел + ":" + т.get("ветки");
             default -> узел;

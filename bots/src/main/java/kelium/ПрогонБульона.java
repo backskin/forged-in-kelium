@@ -127,6 +127,31 @@ public final class ПрогонБульона {
         записать(папка, задания, арсенал);
     }
 
+    /**
+     * ВЫБОРКА С УПОРОМ НА НОВЫХ КАНДИДАТОВ: если задан порог номера, половина
+     * колоды — из кандидатов с номером не меньше порога (их ещё не мерили),
+     * остальное — из всех. Порог −1 — обычная выборка.
+     */
+    private static List<Integer> сНовыми(List<Map<String, Object>> все, int сколько, String приставка,
+                                         int порог, Random r) {
+        if (порог < 0) {
+            return выборка(все.size(), сколько, r);
+        }
+        List<Integer> новые = new ArrayList<>();
+        List<Integer> прочие = new ArrayList<>();
+        for (int i = 0; i < все.size(); i++) {
+            int номер = Integer.parseInt(String.valueOf(все.get(i).get("id")).substring(приставка.length()));
+            (номер >= порог ? новые : прочие).add(i);
+        }
+        java.util.Collections.shuffle(новые, r);
+        java.util.Collections.shuffle(прочие, r);
+        List<Integer> out = new ArrayList<>(новые.subList(0, Math.min(новые.size(), сколько / 2)));
+        for (int i = 0; out.size() < сколько && i < прочие.size(); i++) {
+            out.add(прочие.get(i));
+        }
+        return out;
+    }
+
     /** Запись кандидата-задания для колоды: язык + ровная награда + утиль. */
     private static Map<String, Object> заданиеВКолоду(Map<String, Object> к) {
         String id = String.valueOf(к.get("id"));
@@ -171,7 +196,7 @@ public final class ПрогонБульона {
                 колодаЗ.add(new LinkedHashMap<>(e));
             }
         }
-        for (int i : выборка(задания.size(), 40, r)) {
+        for (int i : сНовыми(задания, 40, "g_", Integer.getInteger("kelium.бульон.новые_задания", -1), r)) {
             колодаЗ.add(заданиеВКолоду(задания.get(i)));
         }
         List<Map<String, Object>> колодаА = new ArrayList<>();
@@ -180,7 +205,7 @@ public final class ПрогонБульона {
                 колодаА.add(new LinkedHashMap<>(e));
             }
         }
-        for (int i : выборка(арсенал.size(), 33, r)) {
+        for (int i : сНовыми(арсенал, 33, "t_", Integer.getInteger("kelium.бульон.новый_арсенал", -1), r)) {
             колодаА.add(арсеналВКолоду(арсенал.get(i), верхи));
         }
         CardRegistry.bindAll("objectives", колодаЗ);
@@ -189,8 +214,12 @@ public final class ПрогонБульона {
             основаЗаданий.raw, основаЗаданий.sourcePath));
         наборы.put("arsenal", new ContentSet("arsenal", основаАрсенала.version, колодаА,
             основаАрсенала.raw, основаАрсенала.sourcePath));
+        // ФРАКЦИИ ПО КРУГУ МЕСТ (02.10.2026), как в ЗамерНабора: трудность карты
+        // не должна зависеть от того, что место 1 всегда синее
+        List<String> цвета = new ArrayList<>(ЗамерНабора.ЦВЕТА);
+        java.util.Collections.rotate(цвета, (int) Math.floorMod(seed, 4L));
         GameConfig cfg = new GameConfig(база.ruleset, new ContentLibrary(наборы), 4, seed,
-            база.dataRoot, база.boardSides);
+            база.dataRoot, цвета);
         GameState s = Setup.buildGame(LayoutLibrary.configFor(cfg, 4, seed));
         List<Agent> agents = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
