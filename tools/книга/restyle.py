@@ -275,7 +275,9 @@ CSS = r"""
     margin-right: 1mm; vertical-align: middle; }
   .схема .номер-круг { fill: var(--келемий); stroke: #fff; stroke-width: .5; }
   .схема .номер-текст { fill: #fff; font: 700 4.2px "Tektur Narrow", sans-serif; text-anchor: middle; dominant-baseline: central; }
-  .схема .выноска { fill: none; stroke: var(--келемий); stroke-width: .45; }
+  .схема .выноска { fill: none; stroke: var(--келемий); stroke-width: .55; stroke-linejoin: round; }
+  .схема .выноска-фон { fill: none; stroke: #F7F1E1; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; opacity: .9; }
+  .схема .точка-фон { fill: #F7F1E1; opacity: .9; }
   .схема .точка-выноски { fill: var(--келемий); }
   .схема .макет { fill: rgba(255,255,255,.55); stroke: var(--пример-кант); stroke-width: .35; stroke-dasharray: 1.2 .8; }
   .схема .подпись { fill: var(--чернила); font: 3.6px "Tektur Narrow", sans-serif; text-anchor: middle; }
@@ -299,6 +301,39 @@ CSS = r"""
   .пример.совет { background: var(--келемий); }
   .пример.совет::before { background: var(--совет); }
   .пример.совет .метка { background: var(--келемий); }
+
+  /* ЦИКЛ РАУНДА: три фазы столбцами, стрелки между ними, возврат снизу. */
+  .цикл { column-span: all; break-inside: avoid; margin: 0 0 3mm; }
+  .цикл-ряд { display: grid; grid-template-columns: 1fr 5mm 1fr 5mm 1fr; align-items: stretch; }
+  .фаза { display: flex; flex-direction: column; background: var(--подложка);
+    outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: СКОС28; }
+  .фаза header { display: flex; align-items: center; gap: 2.6mm; background: var(--келемий);
+    color: #fff; padding: 0 3mm 0 2.4mm; height: 16mm; box-sizing: border-box; }
+  .фаза .ф-н { flex: none; width: 10.8mm; height: 12.5mm; filter: drop-shadow(0 .3mm .5mm rgba(0,0,0,.35)); }
+  .фаза header b { display: block; font: 800 13.5pt/1.05 "Tektur", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+  .фаза header i { display: block; font: 500 8.8pt/1.2 "Tektur", sans-serif; font-style: normal; color: #CFE8C9; margin-top: .6mm; }
+  .ф-тело { padding: 2.2mm 2.8mm 2.6mm; display: flex; flex-direction: column; gap: 1.8mm; }
+  .ф-тело p { margin: 0; font-size: 9.2pt; line-height: 1.27; }
+  .ф-шаг { display: flow-root; }
+  .ф-шаг .ф-и { float: left; width: 8.4mm; height: 8.4mm; object-fit: contain; margin: .3mm 2mm .6mm 0; }
+  .ф-шаг .ф-и.ф-карта { width: auto; height: 12mm; border-radius: .8mm; box-shadow: 0 .3mm .8mm rgba(0,0,0,.35); }
+  .ф-тело { flex: 1; }
+  .ф-низ { margin-top: auto; padding-top: 2mm; text-align: center; }
+  .ф-низ img { max-width: 88%; max-height: 30mm; }
+  .ф-стрелка { position: relative; }
+  /* Стрелка между фазами — клин во всю высоту зелёной шапки: шапка фазы
+     словно указывает на следующую. Внутри охряной шеврон. */
+  .ф-стрелка::before { content: ""; position: absolute; left: 0; width: 100%; top: 0; height: 16mm;
+    background: var(--келемий); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  .ф-стрелка::after { content: ""; position: absolute; left: .2mm; width: 2.6mm; top: 5.2mm; height: 5.6mm;
+    background: var(--охра); clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
+  .цикл-возврат { position: relative; height: 7mm; margin: 0 16.67%; border: .8mm solid var(--охра);
+    border-top: 0; border-radius: 0 0 3mm 3mm; }
+  .цикл-возврат::before { content: ""; position: absolute; left: -2.6mm; top: -2.4mm; width: 4.4mm; height: 3.6mm;
+    background: var(--охра); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .цикл-возврат span { position: absolute; left: 50%; bottom: -2.8mm; transform: translateX(-50%);
+    background: var(--охра); color: #fff; font: 700 8.6pt/1 "Tektur", sans-serif; text-transform: uppercase;
+    letter-spacing: .06em; padding: 1.2mm 3mm; white-space: nowrap; clip-path: СКОС2; }
 
   .фазы { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin: 0 0 3mm;
     column-span: all; break-inside: avoid; }

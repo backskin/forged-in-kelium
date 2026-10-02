@@ -19,9 +19,9 @@ figure = ns["figure"]
 png = os.path.join(D, "_бой.png")
 
 subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
-                "-cp", РАННЕР, "kelium.gui.replay2.СнимокБоя", png, "160"],
+                "-cp", РАННЕР, "kelium.gui.replay2.СнимокБоя", png, "320"],
                check=True, capture_output=True, cwd=КОРЕНЬ)
 
 vw, vh = Image.open(png).size
-figure("бой", png, 1400, vw, vh, [], css_w="56%", pad="1.0mm 0 0.8mm", в_колонке=True)
+figure("бой", png, 1400, vw, vh, [], css_w="58%", pad="1.0mm 0 0.8mm", в_колонке=True)
 print("ok", (vw, vh))
