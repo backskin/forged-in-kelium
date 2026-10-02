@@ -1560,7 +1560,7 @@ public final class Effects {
      */
     static Map<String, Object> gildModule(GameState s, int seat, Map<String, Object> p) {
         PlayerState pl = s.player(seat);
-        if (!Modules.canGild(pl)) {
+        if (!Modules.canGild(s, pl)) {
             return Map.of("gilded", 0, "reason", "все разложенные жетоны уже золотые");
         }
         Resource pay;

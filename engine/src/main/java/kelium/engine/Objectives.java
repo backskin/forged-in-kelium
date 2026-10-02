@@ -677,7 +677,7 @@ public final class Objectives {
                     int ячеек = Ctx.rules(s).get("storage.module_slots", null)
                         instanceof Number сколько ? сколько.intValue() : 3;
                     if (p.storageTokens.size() < ячеек) {
-                        p.storageTokens.add("+1_universal_cell");
+                        ЖетоныХранилища.положить(s, p, ЖетоныХранилища.ЯЧЕЙКА);
                         into.put("storage_token", 1);
                     }
                 }

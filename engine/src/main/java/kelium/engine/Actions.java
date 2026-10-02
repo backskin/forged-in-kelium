@@ -4458,7 +4458,7 @@ public final class Actions {
                                 "permanent energy cube"));
                         Choice pick = agent.choose(state, opts,
                             Map.of("kind", "storage_side"));
-                        player.storageTokens.add(String.valueOf(pick.payload()));
+                        ЖетоныХранилища.положить(state, player, String.valueOf(pick.payload()));
                     }
                 }
             }
@@ -4805,7 +4805,7 @@ public final class Actions {
             // нет, остаётся прежняя тройка — числа сыгранных партий не должны
             // меняться задним числом.
             int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();
-            if (позолота && pool >= gildCost && Modules.canGild(player)) {
+            if (позолота && pool >= gildCost && Modules.canGild(state, player)) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "gild");
                 ex.put("give", gildCost);

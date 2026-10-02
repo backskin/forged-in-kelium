@@ -1656,11 +1656,7 @@ public class HeuristicAgent extends Agent {
                 demand += b.energySlots;
             }
         }
-        for (String tok : me.storageTokens) {
-            if ("+1_energy".equals(tok)) {
-                supply += 1;
-            }
-        }
+        supply += kelium.engine.ЖетоныХранилища.энергииЦу(me);
         return supply - demand;
     }
 

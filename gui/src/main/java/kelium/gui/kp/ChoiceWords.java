@@ -233,8 +233,12 @@ public final class ChoiceWords {
                 return specWords(c, cardName);
             }
             case "storage_side" -> {
-                return String.valueOf(p).contains("energy") ? "Постоянный кубик энергии"
-                    : "Универсальная ячейка склада";
+                return String.valueOf(p).contains("energy") ? "Жетон энергии: +1 кубик энергии ЦУ"
+                    : "Жетон ячейки: +1 ячейка склада";
+            }
+            case "gild_storage" -> {
+                // жетоны хранилища 2.0 (02.10.2026): payload — номер жетона
+                return "Улучшить жетон хранилища";
             }
             case "build_pick" -> {
                 if (p instanceof Map<?, ?> m && m.get("btype") != null) {

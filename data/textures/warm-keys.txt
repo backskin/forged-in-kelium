@@ -115,9 +115,6 @@ field/spawn_flipped
 field/spawn_start
 field/spawn_start_flipped
 icons/action_assembly
-icons/action_build_military
-icons/action_build_miner
-icons/action_build_plant
 icons/action_combat
 icons/action_command
 icons/action_develop

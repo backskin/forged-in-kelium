@@ -38,6 +38,8 @@ public final class RuleWords {
             case "containers" -> "Контейнеры";
             case "containers_storage" -> "Где держат контейнеры";
             case "storage" -> "Планшет хранилища";
+            case "cards" -> "Карты: срабатывания и ветки";
+            case "mining" -> "Добыча";
             case "symbols" -> "Символы супер-заданий";
             case "contested_cards" -> "Спорные карты";
             case "market" -> "Рынок";
@@ -385,6 +387,10 @@ public final class RuleWords {
                 "ячеек хранилища, открытых всегда (на печати планшета — одна)";
             case "storage.module_slots" ->
                 "ячеек под жетон модуля хранилища на планшете";
+            case "storage.gild_tokens" ->
+                "жетоны хранилища улучшаются позолотой, как модули";
+            case "storage.cell_star_when_empty" ->
+                "обычная сторона ячейки хранилища даёт звезду, если ячейка пуста";
 
             case "actions.assembly.ammo_base" ->
                 "сколько боеприпасов даёт здание за Снаряжение";

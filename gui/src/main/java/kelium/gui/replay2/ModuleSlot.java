@@ -259,13 +259,22 @@ final class ModuleSlot {
         // и «склад» со звездой в ячейке), и на печатном месте лежит именно она.
         // Торца нет: место напечатано на планшете, жетон в него вставлен.
         boolean energy = token.contains("energy");
+        // ЗОЛОТАЯ СТОРОНА (жетоны хранилища 2.0, 02.10.2026) — тот же знак,
+        // что у золотых модулей: кайма и уголок поверх печати жетона
+        boolean gold = kelium.engine.ЖетоныХранилища.золотой(token);
         java.awt.image.BufferedImage art = kelium.report.ModuleArt.store(energy);
         if (art != null && kelium.report.ModuleArt.paint(
                 g, art, null, x, y, side, side, false)) {
+            if (gold) {
+                paintGildMark(g, x, y, side, side * 0.2);
+            }
             return;
         }
         // Печати нет — прежний рисованный вид: круглый жетон в квадратном месте.
         paintPlace(g, x, y, side);
+        if (gold) {
+            paintGildMark(g, x, y, side, side * 0.2);
+        }
         double d = side * 0.70;
         double cx = x + side / 2;
         double cy = y + side / 2;
@@ -281,9 +290,16 @@ final class ModuleSlot {
         if (token == null || token.isBlank()) {
             return "место под жетон хранилища пусто";
         }
-        return token.contains("energy")
-            ? "жетон хранилища, сторона ЭНЕРГИЯ — вечный универсальный кубик энергии"
-            : "жетон хранилища, сторона СКЛАД — ещё одна универсальная ячейка";
+        boolean gold = kelium.engine.ЖетоныХранилища.золотой(token);
+        if (token.contains("energy")) {
+            return gold
+                ? "жетон хранилища ЭНЕРГИЯ, улучшенная сторона — +2 энергии ЦУ и звезда"
+                : "жетон хранилища ЭНЕРГИЯ — +1 энергия ЦУ";
+        }
+        return gold
+            ? "жетон хранилища ЯЧЕЙКА, улучшенная сторона — ячейка, звезда и ещё одно "
+                + "спец-действие в каждом ходу"
+            : "жетон хранилища ЯЧЕЙКА — ещё одна универсальная ячейка";
     }
 
     /**

@@ -916,6 +916,9 @@ public final class GameEngine {
             .of(s, seat, kelium.engine.ability.Hook.ORDER_SPEC_COUNT)
             .base(Math.max(rs.getInt("actions.spec_per_turn"), Passives.specActions(s, seat)))
             .ask());
+        // ЗОЛОТАЯ ЯЧЕЙКА ХРАНИЛИЩА (жетоны 2.0, 02.10.2026): постоянная
+        // пассивка — ещё одно спец-действие в каждом своём ходу.
+        specLimit += ЖетоныХранилища.спецДействий(s.player(seat));
         specLimit = Math.max(0, specLimit - specPenalty);
         // «ШТАБНАЯ ДИРЕКТИВА» (супер-арсенал 4.0.0, печать 25.09.2026): «За
         // совпадение нижнего приказа ты получаешь ещё 1 спец. действие». Нижний
