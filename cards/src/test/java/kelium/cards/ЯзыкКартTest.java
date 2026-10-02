@@ -29,6 +29,12 @@ import kelium.engine.cards.ObjectiveCard;
  */
 class ЯзыкКартTest {
 
+    /** Тестовые карты не остаются в общем реестре — другие тесты модуля его читают. */
+    @org.junit.jupiter.api.AfterAll
+    static void убратьТестовыеКарты() {
+        CardRegistry.reset();
+    }
+
     private static Map<String, Object> запись(String id, Map<String, Object> язык) {
         Map<String, Object> e = new LinkedHashMap<>();
         e.put("id", id);

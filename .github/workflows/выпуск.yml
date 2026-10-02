@@ -1,0 +1,46 @@
+# ВЫПУСК ИГРЫ ПО ТЕГУ (02.10.2026).
+#
+# Тег вида v1.50.0 → GitHub собирает игру, гоняет ВСЕ тесты (окно игры — под
+# виртуальным экраном Xvfb), проверяет собранный архив партиями ботов
+# (kelium.ПробаВыпуска) и публикует выпуск с архивом. Хоть одна проверка
+# красная — выпуск не публикуется.
+#
+# Заметки к выпуску — docs/выпуски/<тег>.md, если есть.
+name: Выпуск
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  выпуск:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Xvfb, zip, rsync
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb zip rsync
+      - name: Сборка, все тесты, проба архива
+        run: bash tools/собрать-выпуск.sh "${GITHUB_REF_NAME}"
+      - name: Заметки к выпуску
+        id: notes
+        run: |
+          f="docs/выпуски/${GITHUB_REF_NAME}.md"
+          if [ -f "$f" ]; then echo "path=$f" >> "$GITHUB_OUTPUT"; else echo "path=" >> "$GITHUB_OUTPUT"; fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          body_path: ${{ steps.notes.outputs.path }}
+          # архивный выпуск не становится «последним»
+          make_latest: ${{ contains(github.ref_name, 'archive') && 'false' || 'true' }}
