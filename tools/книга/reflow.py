@@ -11,7 +11,7 @@ import sys
 import time
 
 D = os.path.dirname(os.path.abspath(__file__))
-DIR = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*")[0]
+DIR = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*"))[0]
 HTML = os.path.join(DIR, "вёрстка", "Книга правил.html")
 md = os.path.join(DIR, sys.argv[1])
 

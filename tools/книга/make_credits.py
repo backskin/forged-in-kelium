@@ -11,7 +11,7 @@ import io
 import os
 
 D = os.path.dirname(os.path.abspath(__file__))
-КНИГА = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*\вёрстка\Книга правил.html")[0]
+КНИГА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*", "вёрстка", "Книга правил.html"))[0]
 МАРКЕР = "<!-- ============ СОЗДАТЕЛИ ИГРЫ ============ -->"
 # Задняя обложка своей шапки-комментария не имеет — ищем её по самой странице.
 ЗАД = '<p class="подпись-разворота">Задняя сторона обложки · памятка</p>' 

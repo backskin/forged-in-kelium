@@ -90,6 +90,20 @@ public final class ЗаданиеИзЯзыка extends ЗаданиеВКоде
         return усиление != null && требование.выполнено(ctx) && усиление.выполнено(ctx);
     }
 
+    /**
+     * ЧЕГО НЕ ХВАТАЕТ — словами карты. Прежде у карт языка этого не было вовсе
+     * (пустая строка по умолчанию): подсказка в окне и договор карт молчали.
+     */
+    @Override
+    public String needed(CardContext ctx) {
+        if (требование.выполнено(ctx)) {
+            return усиление != null && !усиление.выполнено(ctx)
+                ? "выполнено; дополнительно — " + усиление.суть() : "готово";
+        }
+        return требование.текст() + String.format(" (пройдено %d%%)",
+            Math.round(100 * Math.max(0, Math.min(1, требование.близость(ctx)))));
+    }
+
     @Override
     public double progress(CardContext ctx) {
         return Math.max(0, Math.min(1, требование.близость(ctx)));

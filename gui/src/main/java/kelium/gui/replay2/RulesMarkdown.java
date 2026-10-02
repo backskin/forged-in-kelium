@@ -385,8 +385,16 @@ public final class RulesMarkdown {
 
         private int quote(String[] lines, int i) {
             List<String> q = new ArrayList<>();
+            // РИСУНОК ВНУТРИ ВРЕЗКИ («> [[энергия-уничтожение]]», книга гл. 6):
+            // в тексте врезки метка протекала скобками — рисуется после неё
+            List<String> рисунки = new ArrayList<>();
             while (i < lines.length && lines[i].startsWith(">")) {
-                q.add(lines[i].substring(1).trim());
+                String строка = lines[i].substring(1).trim();
+                if (строка.matches("\\[\\[[^\\]]+\\]\\]")) {
+                    рисунки.add(строка.substring(2, строка.length() - 2).trim());
+                } else {
+                    q.add(строка);
+                }
                 i++;
             }
             String text = String.join(" ", q).trim();
@@ -408,6 +416,9 @@ public final class RulesMarkdown {
                 .append("'>").append(esc(label.toUpperCase(Locale.ROOT))).append("</div>")
                 .append("<div style='margin-top:2px'>").append(inline(rest)).append("</div>")
                 .append("</td></tr></table>");
+            for (String р : рисунки) {
+                figure(р);
+            }
             return i;
         }
 

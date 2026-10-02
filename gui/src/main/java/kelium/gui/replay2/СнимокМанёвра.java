@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,23 +24,13 @@ import kelium.report.ReplayRecord;
 import kelium.report.Textures;
 
 /**
- * МАНЁВР ОДНИМ КАДРОМ — куда жетон уходит и куда ему хода нет.
+ * МАНЁВР ОДНИМ КАДРОМ — пример к главе 8 (замечание дизайнера 02.10.2026:
+ * «нет вообще примера движения»).
  *
- * <p>Дизайнер 16.09.2026: «нет примера манёвра, пример боя лежит под текстом
- * манёвра», и отдельно — «добавь стрелки на каждой картинке, показывающие ГДЕ
- * и с чем что происходит». Здесь три стрелки на четырёх гексах:
- * <ul>
- *   <li>пехота со скоростью 1 уходит на соседний гекс, где стоят чужие
- *       наземные войска, — им это не мешает;</li>
- *   <li>авиация со скоростью 2 перелетает этот гекс насквозь;</li>
- *   <li>наземному хода нет в гекс, где в небе стоит чужая авиация —
- *       стрелка перечёркнута.</li>
- * </ul>
- *
- * <p>Поле рисует {@link FieldPainter} — тот же, что и настоящую партию.
- * Координаты середин стрелок печатаются в stdout строками «МЕТКА буква x y»,
- * чтобы сборщик рисунка поставил выноски ровно на них, а не по угаданным
- * числам.
+ * <p>Выбран один гекс (пунктир). С него сначала уходит пехота, потом на него
+ * приходят техника с соседнего гекса и пехота издалека — в обход гекса, где
+ * стоят чужие войска: сквозь них наземные войска не проходят. Вышка остаётся:
+ * её скорость 0.
  *
  * <p>Запуск: {@code java -cp gui/target/kelium-runner.jar
  * kelium.gui.replay2.СнимокМанёвра <куда.png> [радиус гекса]}
@@ -49,13 +40,12 @@ public final class СнимокМанёвра {
     private СнимокМанёвра() {
     }
 
-    private static final int[][] КЛЕТКИ = {{0, 0}, {1, 0}, {2, 0}, {1, -1}};
+    /** Выбранный гекс и гексы вокруг: откуда приходят и куда уходят. */
+    private static final int[] ЦЕЛЬ = {0, 0};
+    private static final int[][] КЛЕТКИ = {{0, 0}, {-1, 1}, {0, -1}, {1, -1}, {2, -1}, {1, 0}};
+    private static final Color ХОД = new Color(0x1F5FA8);
 
     private static int uid = 1;
-
-    /** Смещение обрезки прозрачных полей — вычитается из координат выносок. */
-    private static int срезX;
-    private static int срезY;
 
     private static ReplayRecord.Tok жетон(String тип, int seat, String hex) {
         ReplayRecord.Tok t = new ReplayRecord.Tok();
@@ -69,7 +59,7 @@ public final class СнимокМанёвра {
 
     public static void main(String[] args) throws Exception {
         Theme.apply(false);
-        Path out = Path.of(args.length > 0 ? args[0] : "manoeuvre.png");
+        Path out = Path.of(args.length > 0 ? args[0] : "манёвр.png");
         double size = args.length > 1 ? Double.parseDouble(args[1]) : 150;
         Textures.useFolder(GameConfig.resolveDataRoot(null).resolve("textures"));
 
@@ -80,22 +70,22 @@ public final class СнимокМанёвра {
             состояния.put(h.id, h);
         }
         List<ReplayRecord.Tok> жетоны = new ArrayList<>();
+        // Выбранный гекс: наша вышка (остаётся) и пехота (уходит).
+        жетоны.add(жетон("tower", 0, "h0_0"));
+        // Пехота, которая уйдёт, — нарисована уже на новом месте.
+        жетоны.add(жетон("infantry", 0, "h-1_1"));
+        // Пришедшие: техника с соседнего гекса и пехота через гекс.
+        жетоны.add(жетон("vehicle", 0, "h0_0"));
         жетоны.add(жетон("infantry", 0, "h0_0"));
-        жетоны.add(жетон("aircraft", 0, "h0_0"));
-        // ЧУЖОЙ ПЕХОТЫ НА ПУТИ НЕТ. Сначала она тут стояла, и подпись обещала,
-        // что наземные друг другу не мешают, — а правило обратное: чужие войска
-        // гекс ЗАПИРАЮТ (глава 4, Placement.enemyUnitsLockHex). Картинка учила
-        // ходу, которого в игре нет. Осталась только чужая авиация в небе —
-        // ровно тот случай, ради которого перечёркнутая стрелка и нарисована.
-        жетоны.add(жетон("aircraft", 1, "h1_-1"));
-
+        // Чужая пехота закрывает короткий путь.
+        жетоны.add(жетон("infantry", 1, "h1_0"));
         BufferedImage img = нарисовать(size, состояния, жетоны);
         Path dir = out.toAbsolutePath().getParent();
         if (dir != null) {
             Files.createDirectories(dir);
         }
         ImageIO.write(img, "png", out.toFile());
-        System.out.println("[maneuver] " + out.toAbsolutePath() + " "
+        System.out.println("[манёвр] " + out.toAbsolutePath() + " "
             + img.getWidth() + "x" + img.getHeight());
     }
 
@@ -150,106 +140,116 @@ public final class СнимокМанёвра {
                 состояния.get(id), свои, cx0 + c[0], cy0 + c[1], false, соседи);
         }
 
-        double[] старт = FieldGeometry.hexCenter(0, 0, size);
-        double[] рядом = FieldGeometry.hexCenter(1, 0, size);
-        double[] далеко = FieldGeometry.hexCenter(2, 0, size);
-        double[] небо = FieldGeometry.hexCenter(1, -1, size);
-        // ПЕХОТА и АВИАЦИЯ идут из одного гекса в ОДНУ сторону: прямые стрелки
-        // легли бы одна на другую и обе стали бы нечитаемы. Поэтому дальняя
-        // (авиация, скорость 2) выгнута дугой в сторону, а ближняя идёт прямо.
-        double[] метА = стрелка(g, cx0 + старт[0], cy0 + старт[1],
-            cx0 + рядом[0], cy0 + рядом[1], size, new Color(0x2E7D32), false, 0);
-        double[] метБ = стрелка(g, cx0 + старт[0], cy0 + старт[1],
-            cx0 + далеко[0], cy0 + далеко[1], size, new Color(0x1565C0), false,
-            size * 0.78);
-        double[] метВ = стрелка(g, cx0 + старт[0], cy0 + старт[1],
-            cx0 + небо[0], cy0 + небо[1], size, new Color(0xB03A2E), true, 0);
+        double[] цель = FieldGeometry.hexCenter(ЦЕЛЬ[0], ЦЕЛЬ[1], size);
+        обвести(g, cx0 + цель[0], cy0 + цель[1], size);
+        // 1 — пехота уходит; 2 — техника приходит с соседнего; 3 — пехота в обход
+        путь(g, cx0, cy0, size, new int[][]{{0, 0}, {-1, 1}}, "1");
+        путь(g, cx0, cy0, size, new int[][]{{0, -1}, {0, 0}}, "2");
+        путь(g, cx0, cy0, size, new int[][]{{2, -1}, {1, -1}, {0, 0}}, "3");
         g.dispose();
-        BufferedImage готово = обрезать(img);
-        System.out.println("MARK A " + Math.round(метА[0] - срезX)
-            + " " + Math.round(метА[1] - срезY));
-        System.out.println("MARK B " + Math.round(метБ[0] - срезX)
-            + " " + Math.round(метБ[1] - срезY));
-        System.out.println("MARK V " + Math.round(метВ[0] - срезX)
-            + " " + Math.round(метВ[1] - срезY));
-        return готово;
+        return обрезать(img);
+    }
+
+    /** Пунктирная обводка ВЫБРАННОГО гекса. */
+    private static void обвести(Graphics2D g, double cx, double cy, double size) {
+        Path2D шестиугольник = new Path2D.Double();
+        for (int i = 0; i < 6; i++) {
+            double a = Math.toRadians(60.0 * i);
+            double x = cx + size * 0.94 * Math.cos(a);
+            double y = cy + size * 0.94 * Math.sin(a);
+            if (i == 0) {
+                шестиугольник.moveTo(x, y);
+            } else {
+                шестиугольник.lineTo(x, y);
+            }
+        }
+        шестиугольник.closePath();
+        g.setStroke(new BasicStroke((float) (size * 0.055), BasicStroke.CAP_BUTT,
+            BasicStroke.JOIN_ROUND, 10f,
+            new float[]{(float) (size * 0.17), (float) (size * 0.11)}, 0f));
+        g.setColor(ХОД);
+        g.draw(шестиугольник);
     }
 
     /**
-     * Стрелка манёвра. Возвращает точку своей середины — на неё встанет выноска.
-     *
-     * @param перечёркнута крест поверх середины: этого хода нет
-     * @param прогиб насколько вынести дугу в сторону от прямой; 0 — прямая
+     * Путь жетона по центрам гексов: ломаная, на конце — стрелка, у начала —
+     * номер шага (порядок из правил: сначала вывести, потом ввести).
      */
-    private static double[] стрелка(Graphics2D g, double x0, double y0,
-            double x1, double y1, double size, Color цвет, boolean перечёркнута,
-            double прогиб) {
-        double dx = x1 - x0;
-        double dy = y1 - y0;
+    private static void путь(Graphics2D g, double cx0, double cy0, double size,
+            int[][] гексы, String номер) {
+        double[][] т = new double[гексы.length][];
+        for (int i = 0; i < гексы.length; i++) {
+            double[] c = FieldGeometry.hexCenter(гексы[i][0], гексы[i][1], size);
+            т[i] = new double[]{cx0 + c[0], cy0 + c[1]};
+        }
+        // концы отодвинуты от центров, чтобы не закрывать жетоны
+        double отступ = size * 0.42;
+        double[] a = сдвиг(т[0], т[1], отступ);
+        double[] z = сдвиг(т[т.length - 1], т[т.length - 2], отступ);
+        Path2D линия = new Path2D.Double();
+        линия.moveTo(a[0], a[1]);
+        for (int i = 1; i < т.length - 1; i++) {
+            линия.lineTo(т[i][0], т[i][1]);
+        }
+        double[] пред = т[т.length - 2];
+        double dx = z[0] - (т.length > 2 ? пред[0] : a[0]);
+        double dy = z[1] - (т.length > 2 ? пред[1] : a[1]);
         double len = Math.hypot(dx, dy);
-        double отступ = size * 0.52;
-        double ax = x0 + dx / len * отступ;
-        double ay = y0 + dy / len * отступ;
-        double bx = x1 - dx / len * отступ;
-        double by = y1 - dy / len * отступ;
-        // Точка изгиба — на перпендикуляре к середине отрезка.
-        double mx = (ax + bx) / 2 - dy / len * прогиб;
-        double my = (ay + by) / 2 + dx / len * прогиб;
-        g.setStroke(new BasicStroke((float) (size * 0.07), BasicStroke.CAP_ROUND,
+        double ux = dx / len;
+        double uy = dy / len;
+        double остриё = size * 0.26;
+        линия.lineTo(z[0] - ux * остриё * 0.5, z[1] - uy * остриё * 0.5);
+        g.setStroke(new BasicStroke((float) (size * 0.075), BasicStroke.CAP_ROUND,
             BasicStroke.JOIN_ROUND));
-        g.setColor(цвет);
-        java.awt.geom.QuadCurve2D дуга =
-            new java.awt.geom.QuadCurve2D.Double(ax, ay, mx * 2 - (ax + bx) / 2,
-                my * 2 - (ay + by) / 2, bx, by);
-        g.draw(дуга);
-        double остриё = size * 0.24;
-        // Острие смотрит по касательной в конце дуги, а не по хорде.
-        double угол = Math.atan2(by - my, bx - mx);
-        if (!перечёркнута) {
-            for (int знак = -1; знак <= 1; знак += 2) {
-                double a = угол + знак * Math.toRadians(26);
-                g.drawLine((int) Math.round(bx), (int) Math.round(by),
-                    (int) Math.round(bx - остриё * Math.cos(a)),
-                    (int) Math.round(by - остриё * Math.sin(a)));
-            }
-        }
-        if (перечёркнута) {
-            // КРЕСТ СТОИТ НА КОНЦЕ, А НЕ ПОСЕРЕДИНЕ: посередине он съедал саму
-            // стрелку, и от неё на рисунке не оставалось ничего, кроме креста.
-            double к = size * 0.13;
-            g.setStroke(new BasicStroke((float) (size * 0.085), BasicStroke.CAP_ROUND,
-                BasicStroke.JOIN_ROUND));
-            g.drawLine((int) Math.round(bx - к), (int) Math.round(by - к),
-                (int) Math.round(bx + к), (int) Math.round(by + к));
-            g.drawLine((int) Math.round(bx - к), (int) Math.round(by + к),
-                (int) Math.round(bx + к), (int) Math.round(by - к));
-        }
-        return new double[]{mx, my};
+        g.setColor(ХОД);
+        g.draw(линия);
+        Path2D нос = new Path2D.Double();
+        нос.moveTo(z[0], z[1]);
+        нос.lineTo(z[0] - ux * остриё + uy * остриё * 0.55, z[1] - uy * остриё - ux * остриё * 0.55);
+        нос.lineTo(z[0] - ux * остриё - uy * остриё * 0.55, z[1] - uy * остриё + ux * остриё * 0.55);
+        нос.closePath();
+        g.fill(нос);
+        // номер шага — кружок у начала пути
+        double r = size * 0.15;
+        g.setColor(ХОД);
+        g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - r, a[1] - r, 2 * r, 2 * r));
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Tektur Narrow", Font.BOLD, (int) Math.round(size * 0.22)));
+        java.awt.FontMetrics fm = g.getFontMetrics();
+        g.drawString(номер, (float) (a[0] - fm.stringWidth(номер) / 2.0),
+            (float) (a[1] + fm.getAscent() / 2.0 - fm.getDescent() / 2.0));
     }
 
-    /** Обрезать прозрачные поля; смещение запоминается для координат выносок. */
-    private static BufferedImage обрезать(BufferedImage src) {
-        int x0 = src.getWidth();
-        int y0 = src.getHeight();
-        int x1 = -1;
-        int y1 = -1;
-        for (int y = 0; y < src.getHeight(); y++) {
-            for (int x = 0; x < src.getWidth(); x++) {
-                if ((src.getRGB(x, y) >>> 24) != 0) {
+    private static double[] сдвиг(double[] от, double[] к, double на) {
+        double dx = к[0] - от[0];
+        double dy = к[1] - от[1];
+        double len = Math.hypot(dx, dy);
+        return new double[]{от[0] + dx / len * на, от[1] + dy / len * на};
+    }
+
+    private static BufferedImage обрезать(BufferedImage im) {
+        int x0 = im.getWidth();
+        int y0 = im.getHeight();
+        int x1 = 0;
+        int y1 = 0;
+        for (int y = 0; y < im.getHeight(); y++) {
+            for (int x = 0; x < im.getWidth(); x++) {
+                if ((im.getRGB(x, y) >>> 24) > 8) {
                     x0 = Math.min(x0, x);
-                    y0 = Math.min(y0, y);
                     x1 = Math.max(x1, x);
+                    y0 = Math.min(y0, y);
                     y1 = Math.max(y1, y);
                 }
             }
         }
-        if (x1 < 0) {
-            срезX = 0;
-            срезY = 0;
-            return src;
+        if (x1 <= x0 || y1 <= y0) {
+            return im;
         }
-        срезX = x0;
-        срезY = y0;
-        return src.getSubimage(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+        int поле = 8;
+        x0 = Math.max(0, x0 - поле);
+        y0 = Math.max(0, y0 - поле);
+        x1 = Math.min(im.getWidth() - 1, x1 + поле);
+        y1 = Math.min(im.getHeight() - 1, y1 + поле);
+        return im.getSubimage(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
     }
 }

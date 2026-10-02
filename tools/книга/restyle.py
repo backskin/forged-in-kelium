@@ -22,7 +22,7 @@ import os
 import re
 
 D = os.path.dirname(os.path.abspath(__file__))
-КНИГА = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*\вёрстка\Книга правил.html")[0]
+КНИГА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*", "вёрстка", "Книга правил.html"))[0]
 
 
 # ---------------------------------------------------------------- кайма
@@ -424,6 +424,17 @@ CSS = r"""
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
+     рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
+  .блок.пара { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    column-gap: 5mm; align-items: start; }
+  .блок.пара > h2 { grid-column: 1 / -1; }
+  .блок.пара .половина > h3 { margin-top: 0; }
+  .блок.пара .пара-ряд { display: grid; grid-template-columns: 46% 1fr; column-gap: 2.6mm;
+    align-items: start; }
+  .блок.пара .пара-ряд .рисунок-в-колонке { padding: 0 !important; margin: 0; }
+  .блок.пара .пара-ряд .рис { width: 100% !important; }
+  .блок.пара .пара-ряд p { margin-top: 0; }
   .блок.надвое .половина > *:first-child { margin-top: 0; }
   .блок.надвое .половина > ul, .блок.надвое .половина > ol { margin-top: 0; }
   .блок.легенда h3 { column-span: all; }

@@ -16,8 +16,8 @@ import os
 from PIL import Image
 
 D = os.path.dirname(os.path.abspath(__file__))
-КНИГА = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*\вёрстка\Книга правил.html")[0]
-КАРТИНКА = r"C:\shared\forged-in-kelium\rules\иллюстрации\мир.jpg"
+КНИГА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*", "вёрстка", "Книга правил.html"))[0]
+КАРТИНКА = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "иллюстрации", "мир.jpg")
 
 ТЕКСТ = """
       <p>В недалёком будущем люди расселились по Солнечной системе. Одни живут

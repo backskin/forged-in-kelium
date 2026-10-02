@@ -29,13 +29,13 @@ import re
 from PIL import Image
 
 D = os.path.dirname(os.path.abspath(__file__))
-КОРЕНЬ_ИКОНОК = os.path.join("C:", os.sep, "shared", "forged-in-kelium", "rules")
+КОРЕНЬ_ИКОНОК = os.path.join(os.path.dirname(os.path.dirname(D)), "rules")
 ПАПКИ = [
     os.path.join(КОРЕНЬ_ИКОНОК, "иконки-экспорт"),
     os.path.join(КОРЕНЬ_ИКОНОК, "иконки"),
     os.path.join(D, "icons"),
 ]
-КНИГА = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*\вёрстка\Книга правил.html")[0]
+КНИГА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*", "вёрстка", "Книга правил.html"))[0]
 МАРКЕР = "<!-- ============ ЗАДНЯЯ ОБЛОЖКА ============ -->"
 
 
@@ -58,7 +58,7 @@ def b64(name, h=None):
 
 def и(name):
     """Значок в строке текста — ростом со строчную, строку не раздвигает."""
-    return f'<img class="и" src="{b64(name, 120)}" alt="">'
+    return f'<img class="и" src="{b64(name, 256)}" alt="">'
 
 
 # ---------------------------------------------------------------- тексты
@@ -129,11 +129,10 @@ def и(name):
 <h2>Победные очки <span class="зв">{и('по')} = 1 очко</span></h2>
 <ul class="две-кол">
 <li><b>Треки</b> — 1 · 2 · 3 · 5 за ступень с кубиком</li>
-<li><b>Установленный арсенал и супер-арсенал</b> — {и('по')}</li>
+<li><b>Установленный арсенал, супер-арсенал</b> — по {и('по')}</li>
 <li><b>Супер-задания</b> — {и('по')} за условия карты</li>
-<li><b>Золотые модули</b> — по 1</li>
+<li><b>Золотые модули и жетоны</b> — по 1</li>
 <li><b>Забранный модуль блокировки боя</b> — 3</li>
-<li><b>Модуль хранилища</b> — 1 за пустую ячейку</li>
 </ul>
 <p class="прим ничья">Ничья: больше гексов с жетонами → трофеев → келемия; иначе победу делят.</p>
 """
@@ -233,7 +232,10 @@ CSS = r"""
   .задняя ol > li::before { content: counter(шаг); position: absolute; left: 0; top: 0;
     font: 700 8pt/1.32 "Tektur", sans-serif; color: var(--охра); }
 
-  .задняя .фаза { font: 700 7.6pt/1.2 "Tektur", sans-serif; color: var(--келемий); text-transform: uppercase;
+  /* .фаза в книге — карточка фазы (флекс, подложка, срезанные углы); в памятке
+     это строка-заголовок, и книжный стиль сплющивал её номер (02.10.2026). */
+  .задняя .фаза { display: block; background: none; outline: 0; clip-path: none;
+    font: 700 7.6pt/1.2 "Tektur", sans-serif; color: var(--келемий); text-transform: uppercase;
     letter-spacing: .05em; margin: 2.4mm 0 1mm; }
   .задняя h2 + .фаза { margin-top: 0; }
   .задняя .фаза b { color: var(--охра); display: inline-block; min-width: 6.4mm; }
@@ -242,7 +244,7 @@ CSS = r"""
   .задняя .флаги > li::before { display: none; }
 
   .стр.обложка.задняя img { width: auto; height: auto; display: inline-block; object-fit: contain; }
-  .стр.обложка.задняя .и { height: 3.1mm; width: auto; vertical-align: -.75mm; margin: 0 .15mm; }
+  .стр.обложка.задняя .и { height: 3.9mm; width: auto; vertical-align: -1mm; margin: 0 .15mm; }
 
   /* ПЯТЬ ДЕЙСТВИЙ: значок и имя | ветка | или | ветка; пять «или» стоят
      одним столбцом и сами читаются как «одно из двух». */
@@ -274,7 +276,11 @@ CSS = r"""
 
 def main():
     t = io.open(КНИГА, encoding="utf-8").read()
-    фон = re.search(r'\.стр\.фон1 \{ background-image: url\("([^"]+)"\)', t).group(1)
+    # фон: из прежней задней обложки (после выноса картинок там ссылка на илл/),
+    # иначе — с первой полосы
+    m = (re.search(r'\.стр\.обложка\.задняя \{[^}]*?url\("([^"]+)"\)', t)
+         or re.search(r'\.стр\.фон1 \{ background-image: url\("([^"]+)"\)', t))
+    фон = m.group(1)
     i = t.index(".стр:not(.обложка)::after {")
     сетка = t[t.index("{", i) + 1:t.index("}", i)].strip()
     css = CSS.replace("ФОН", фон).replace("СЕТКА", сетка)
