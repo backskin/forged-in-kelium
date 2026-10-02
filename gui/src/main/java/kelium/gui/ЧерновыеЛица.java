@@ -73,13 +73,18 @@ public final class ЧерновыеЛица {
 
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
-        String свод = args.length > 0 ? args[0] : "1.47.0";
+        String свод = args.length > 0 ? args[0] : "1.50.0";
         GameConfig cfg = GameConfig.build(свод, 4, 1L, null, null);
         Path корень = GameConfig.texturesRoot().resolve("card");
         int n = 0;
+        // ЛЮБОЙ НАБОР, НЕ ТОЛЬКО z2_/a8_ (02.10.2026): набор 3.0 (z3_, a9_) остался
+        // без лиц — генератор знал номера одного набора, и на своде 1.50.0 игрок
+        // видел пустые плашки. Лицо рисуется любому заданию языка карт и любой
+        // карте арсенала со срабатыванием данными.
         for (Map<String, Object> e : cfg.content.get("objectives").entries) {
             String id = String.valueOf(e.get("id"));
-            if (!id.startsWith("z2_")) {
+            if (!(kelium.engine.cards.CardRegistry.objective(id)
+                    instanceof kelium.cards.objectives.ЗаданиеИзЯзыка)) {
                 continue;
             }
             Path ф = корень.resolve("objective").resolve(id + ".png");
@@ -88,7 +93,8 @@ public final class ЧерновыеЛица {
         }
         for (Map<String, Object> e : cfg.content.get("arsenal").entries) {
             String id = String.valueOf(e.get("id"));
-            if (!id.startsWith("a8_") && !id.startsWith("bs80_")) {
+            boolean данными = e.get("bottom") instanceof Map<?, ?> низ && низ.get("когда") != null;
+            if (!данными) {
                 continue;
             }
             Path ф = корень.resolve("arsenal").resolve(id + ".png");
