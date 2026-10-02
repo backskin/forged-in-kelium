@@ -204,6 +204,7 @@ public final class GameEngine {
         offerSealChoice();
         offerSuperPick();
         offerStartObjectivePick();
+        offerStartArsenalPick();
         loop(1, 1, true);
         return finishAndScore();
     }
@@ -222,6 +223,7 @@ public final class GameEngine {
         bind(s, agents, this::emit);
         emit(ev("type", "game_start", "players", s.numPlayers(), "ruleset", rs().id));
         dealStart();
+        offerStartArsenalPick();
         loop(1, 1, true);
     }
 
@@ -1942,6 +1944,36 @@ public final class GameEngine {
             p.superObjectives.add(chosen);
             emit(ev("type", "super_pick", "seat", p.seat, "card", chosen,
                 "offered", new ArrayList<>(p.superObjectiveOffer)));
+        }
+    }
+
+    /**
+     * ВЫБОР НАЧАЛЬНОГО АРСЕНАЛА (решение Влада 02.10.2026, ключ
+     * {@code setup.start_arsenal_offer}): игроку на подготовке раздали две карты
+     * из восьми; одну он оставляет — она встаёт на планшет и даёт стартовый
+     * набор с верха, — вторая уходит в коробку, в колоду арсенала не идёт: у
+     * начальных своя рубашка.
+     */
+    private void offerStartArsenalPick() {
+        GameState s = state;
+        for (PlayerState p : s.players) {
+            if (p.startArsenalOffer.isEmpty()) {
+                continue;
+            }
+            List<Choice> opts = new ArrayList<>();
+            for (String cid : p.startArsenalOffer) {
+                Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+                String label = card == null ? cid : String.valueOf(card.get("name"));
+                opts.add(new Choice("start_arsenal_pick", cid, label));
+            }
+            Choice ch = opts.size() == 1 ? opts.get(0)
+                : agents.get(p.seat).choose(s, opts, ev("kind", "start_arsenal_pick", "seat", p.seat));
+            String chosen = ch != null && ch.payload() instanceof String cid ? cid
+                : p.startArsenalOffer.get(0);
+            List<String> предложено = new ArrayList<>(p.startArsenalOffer);
+            p.startArsenalOffer.clear();
+            Setup.поставитьНачальную(s, p, chosen);
+            emit(ev("type", "start_arsenal_pick", "seat", p.seat, "card", chosen, "offered", предложено));
         }
     }
 

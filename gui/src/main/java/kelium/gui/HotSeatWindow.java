@@ -3745,6 +3745,7 @@ public final class HotSeatWindow {
         Map.entry("sci_track", "трек науки"),
         Map.entry("super_pick", "выберите супер-задание"),
         Map.entry("start_objective_pick", "стартовое задание"),
+        Map.entry("start_arsenal_pick", "начальный арсенал: какую карту оставить"),
         // все прочие точки решения движка — чтобы в шапке и в карточке вопроса
         // не всплывали внутренние коды (замер 25.09.2026: 46 видов за 6 партий)
         Map.entry("market", "рынок: сделка"),
@@ -4377,6 +4378,8 @@ public final class HotSeatWindow {
                 : drop
                 ? "Щёлкните карту, которая уйдёт в сброс"
                     + (d.context().get("keep") instanceof Number k ? " — себе останется " + k : "")
+                : "start_arsenal_pick".equals(kind)
+                ? "Щёлкните карту, которую ставите; вторая уйдёт в коробку"
                 : "Щёлкните карту, которую берёте; остальные уйдут в сброс";
             hurryToasts();
             ceremony.open(cTitle, cSub, cards);

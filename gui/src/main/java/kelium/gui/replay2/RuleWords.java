@@ -181,6 +181,8 @@ public final class RuleWords {
             case "setup.start_kelium" -> "келемий на старте, по местам";
             case "setup.start_ammo" -> "боеприпасы на старте";
             case "setup.start_containers" -> "карты контейнера на старте";
+            case "setup.start_arsenal_offer" ->
+                "начальный арсенал: столько карт наугад, одну оставить, остальные в коробку";
             case "setup.start_arsenal_installed" ->
                 "начальный арсенал открывают на подготовке: верх — стартовые ресурсы";
 

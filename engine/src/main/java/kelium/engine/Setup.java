@@ -776,9 +776,27 @@ public final class Setup {
             }
         }
         Collections.shuffle(startingArsenal, rng);
-        for (int seat = 0; seat < players.size() && seat < startingArsenal.size(); seat++) {
-            String cid = startingArsenal.get(seat);
-            players.get(seat).arsenalHand.add(cid);
+        // ДВЕ НА ВЫБОР (решение Влада 02.10.2026, setup.start_arsenal_offer): каждому
+        // по N карт наугад; какую оставить, движок спросит первым делом партии
+        // (GameEngine.offerStartArsenalPick), остальные — в коробку. Карт на всех
+        // не хватает — поровну, сколько выходит, но не меньше одной.
+        int наВыбор = Math.max(1, ((Number) ruleset.get("setup.start_arsenal_offer", 1)).intValue());
+        if (наВыбор >= 2) {
+            int поКарт = Math.max(1, Math.min(наВыбор, startingArsenal.size() / Math.max(1, players.size())));
+            int at = 0;
+            for (PlayerState ps : players) {
+                for (int k = 0; k < поКарт && at < startingArsenal.size(); k++, at++) {
+                    ps.startArsenalOffer.add(startingArsenal.get(at));
+                }
+                if (ps.startArsenalOffer.size() == 1) {
+                    ps.arsenalHand.add(ps.startArsenalOffer.remove(0));   // выбора нет
+                }
+            }
+        } else {
+            for (int seat = 0; seat < players.size() && seat < startingArsenal.size(); seat++) {
+                String cid = startingArsenal.get(seat);
+                players.get(seat).arsenalHand.add(cid);
+            }
         }
         // НЕРОЗДАННЫЕ НАЧАЛЬНЫЕ — В КОРОБКУ, А НЕ В ОБЩУЮ КОЛОДУ. У начального
         // арсенала своя рубашка («Начальный арсенал»), и за столом его остаток
@@ -893,14 +911,27 @@ public final class Setup {
                     continue;
                 }
                 p.arsenalHand.remove(cid);
-                p.arsenalInstalled.add(cid);
-                Map<String, Object> top = GameEngine.стартовыйНабор(s, cid);
-                if (top != null) {
-                    Map<String, Object> params = top.get("params") instanceof Map<?, ?> m
-                        ? (Map<String, Object>) m : Map.of();
-                    Effects.apply(String.valueOf(top.get("effect")), s, p.seat, params);
-                }
+                поставитьНачальную(s, p, cid);
             }
+        }
+    }
+
+    /**
+     * Поставить начальную карту арсенала: на планшет и стартовый набор с её верха.
+     * Без {@code setup.start_arsenal_installed} — в руку, как прежде.
+     */
+    @SuppressWarnings("unchecked")
+    static void поставитьНачальную(GameState s, PlayerState p, String cid) {
+        if (!Ctx.rules(s).getBool("setup.start_arsenal_installed", false)) {
+            p.arsenalHand.add(cid);
+            return;
+        }
+        p.arsenalInstalled.add(cid);
+        Map<String, Object> top = GameEngine.стартовыйНабор(s, cid);
+        if (top != null) {
+            Map<String, Object> params = top.get("params") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : Map.of();
+            Effects.apply(String.valueOf(top.get("effect")), s, p.seat, params);
         }
     }
 
