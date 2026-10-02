@@ -58,7 +58,7 @@ public final class TopValue {
             case "grab_first_player" -> ctx.state().firstPlayer == ctx.seat() ? 0.1 : 0.6;
             case "market_card_from_discard" -> ctx.have(Resource.KELIUM) > 0 ? 0.5 : 0.05;
             case "unlimited_spec" -> 0.3 + 0.5 * давление(ctx, Hint.Bottleneck.ACTIONS);
-            case "spec_actions" -> 0.4 + 0.5 * давление(ctx, Hint.Bottleneck.ACTIONS);
+            case "spec_actions" -> 0.25 + 0.4 * давление(ctx, Hint.Bottleneck.ACTIONS);
             case "swap_order_card" -> 0.45;
             case "heal_one", "heal_all_own", "heal_hex" -> ранены(ctx) ? 0.6 : 0.05;
             case "move_unit" -> ctx.me().unitsOnField().isEmpty() ? 0.05 : 0.45;

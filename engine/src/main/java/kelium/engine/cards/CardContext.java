@@ -206,7 +206,7 @@ public interface CardContext {
     boolean healHex();
 
     /**
-     * ЕЩЁ {@code n} СПЕЦ-ДЕЙСТВИЙ ДО КОНЦА ХОДА — утиль «∞ +2 спец-действия»
+     * ЕЩЁ {@code n} СПЕЦ-ДЕЙСТВИЙ ДО КОНЦА ХОДА — утиль «∞ +1 спец-действие»
      * (решение Влада 02.10.2026).
      */
     boolean specActions(int n);

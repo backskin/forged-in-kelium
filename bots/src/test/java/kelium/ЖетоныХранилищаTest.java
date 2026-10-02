@@ -29,7 +29,7 @@ import kelium.engine.ЖетоныХранилища;
 import kelium.engine.cards.EngineCardContext;
 
 /**
- * ЖЕТОНЫ ХРАНИЛИЩА 2.0 И УТИЛЬ «∞ +2 СПЕЦ-ДЕЙСТВИЯ» (решения Влада 02.10.2026,
+ * ЖЕТОНЫ ХРАНИЛИЩА 2.0 И УТИЛЬ «∞ +1 СПЕЦ-ДЕЙСТВИЕ» (решения Влада 02.10.2026,
  * свод 1.49.0).
  */
 class ЖетоныХранилищаTest {
@@ -130,12 +130,12 @@ class ЖетоныХранилищаTest {
             Map<String, Object> карта = kelium.dataio.Ctx.cards(s, "objectives").find(id);
             assertNotNull(карта, id);
             assertTrue(карта.get("top") instanceof Map<?, ?> верх
-                && "spec_actions".equals(верх.get("effect")), id + ": верх «+2 спец-действия»");
+                && "spec_actions".equals(верх.get("effect")), id + ": верх «+1 спец-действие»");
             assertTrue(GameEngine.верхСвободный(s, id), id + ": верх свободный (∞)");
         }
         s.journal = new TurnJournal(2);
         s.journal.startTurn(0);
         assertTrue(Утиль.СПЕЦ_ДЕЙСТВИЯ.сыграть(new EngineCardContext(s, 0)));
-        assertEquals(2, s.journal.of(0).specBonus);
+        assertEquals(1, s.journal.of(0).specBonus);
     }
 }
