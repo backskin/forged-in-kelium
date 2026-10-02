@@ -14,7 +14,7 @@
 #   4. Пакует dist/<имя>.zip.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ИМЯ="${1:?имя выпуска, например v1.50.0}"
+NAME="${1:?имя выпуска, например v1.50.0}"
 export LANG=C.UTF-8 LC_ALL=C.UTF-8
 if [ "${2:-}" != "--без-тестов" ]; then
   if [ -z "${DISPLAY:-}" ] && command -v xvfb-run >/dev/null; then
@@ -25,8 +25,8 @@ if [ "${2:-}" != "--без-тестов" ]; then
 else
   mvn -B -q -DskipTests install
 fi
-D="dist/$ИМЯ"
-rm -rf "$D" "dist/$ИМЯ.zip"
+D="dist/$NAME"
+rm -rf "$D" "dist/$NAME.zip"
 mkdir -p "$D"
 cp gui/target/kelium-runner.jar "$D/"
 # data без рабочих хвостов: самоигра, черновые прогоны и журналы в выпуск не идут
@@ -45,7 +45,7 @@ exec java -Dfile.encoding=UTF-8 -Dkelium.data="$PWD/data" -cp kelium-runner.jar 
 SH
 chmod +x "$D/играть.sh"
 cat > "$D/ПРОЧТИ.txt" <<TXT
-Кристаллы Раздора («Всход») — выпуск $ИМЯ
+Кристаллы Раздора («Всход») — выпуск $NAME
 
 Нужна Java 21 или новее (https://adoptium.net).
 Windows: двойной щелчок по «Играть.bat».
@@ -57,5 +57,5 @@ TXT
 # проба: партия ботов из собранного архива
 ( cd "$D" && java -Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dkelium.data="$PWD/data" \
     -cp kelium-runner.jar kelium.ПробаВыпуска )
-( cd dist && zip -qr "$ИМЯ.zip" "$ИМЯ" )
-echo "выпуск готов: dist/$ИМЯ.zip ($(du -h "dist/$ИМЯ.zip" | cut -f1))"
+( cd dist && zip -qr "$NAME.zip" "$NAME" )
+echo "выпуск готов: dist/$NAME.zip ($(du -h "dist/$NAME.zip" | cut -f1))"
