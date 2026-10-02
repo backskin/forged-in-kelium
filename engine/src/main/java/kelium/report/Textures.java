@@ -178,6 +178,39 @@ public final class Textures {
      * спец-действие, жетон первого игрока, рода войск. {@code null} — иконки
      * нет, рисуется прежний значок.
      */
+    private static final java.util.Map<String, BufferedImage> СОСТАВНЫЕ =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Значок ветки «Построить …»: значок её развилки и знак стройки поверх, в
+     * правом нижнем углу на ~55% стороны. {@code null} — нет одной из картинок.
+     */
+    private static BufferedImage значокСтройки(String name) {
+        String развилка = switch (name.substring("action_build_".length())) {
+            case "miner" -> "extract";
+            case "plant" -> "power";
+            case "military" -> "supply";
+            default -> null;
+        };
+        BufferedImage знак = find(List.of("icons/build_mode"));
+        BufferedImage основа = развилка == null ? null : icon("action_" + развилка);
+        if (знак == null || основа == null) {
+            return null;
+        }
+        int w = основа.getWidth();
+        int h = основа.getHeight();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = out.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+            java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+        g.drawImage(основа, 0, 0, null);
+        int s = (int) Math.round(Math.min(w, h) * 0.55);
+        g.drawImage(знак, w - s, h - s, s, s, null);
+        g.dispose();
+        return out;
+    }
+
     public static BufferedImage icon(String name) {
         if (name == null) {
             return null;
@@ -185,10 +218,15 @@ public final class Textures {
         // ДЕЙСТВИЯ-РАЗВИЛКИ свода 1.46.0 своих иконок пока не имеют (дизайнер
         // нарисует позже): берётся иконка первой ветки. Появится свой файл —
         // он и будет взят.
-        // ВЕТКИ «ПОСТРОИТЬ …» — ОДИН ЗНАЧОК СТРОЙКИ (решение Влада 02.10.2026):
-        // составные картинки «значок развилки + здание» сняты; рисуется
-        // icons/action_build.png — его дизайнер заменит своей иконкой Стройки.
+        // ВЕТКИ «ПОСТРОИТЬ …» — ЗНАЧОК ДЕЙСТВИЯ С КРАНОМ (решение Влада 02.10.2026,
+        // «все иконки-80 — иконка стройки, вставляй её поверх иконки действия»):
+        // значок развилки ветки, в правом нижнем углу — жёлтый знак стройки
+        // (icons/build_mode.png). Без знака — прежний один значок action_build.
         if (name.startsWith("action_build_")) {
+            BufferedImage составной = СОСТАВНЫЕ.computeIfAbsent(name, Textures::значокСтройки);
+            if (составной != null) {
+                return составной;
+            }
             name = "action_build";
         }
         BufferedImage своя = find(List.of("icons/" + name));

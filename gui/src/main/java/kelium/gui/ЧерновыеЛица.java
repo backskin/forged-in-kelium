@@ -126,7 +126,18 @@ public final class ЧерновыеЛица {
             g.fill(new RoundRectangle2D.Double(20, y, w - 40, 150, 26, 26));
             g.setColor(ТЕКСТ);
             g.setFont(new Font("SansSerif", Font.BOLD, 22));
-            g.drawString("сжечь:", 40, y + 34);
+            // РЕАКЦИЯ НА ЧУЖОЕ ДЕЙСТВИЕ — значок «все иконки-72» (Влад 02.10.2026):
+            // такой верх сжигают не в свой ход, а в ответ на чужое действие
+            boolean реакция = e.get("top") instanceof Map<?, ?> т
+                && kelium.engine.Реакции.ЭФФЕКТ.equals(String.valueOf(т.get("effect")));
+            java.awt.image.BufferedImage значокРеакции = реакция
+                ? kelium.report.Textures.icon("reaction") : null;
+            if (значокРеакции != null) {
+                g.drawImage(значокРеакции, 32, y + 2, 52, 52, null);
+                g.drawString("реакция:", 92, y + 34);
+            } else {
+                g.drawString("сжечь:", 40, y + 34);
+            }
             y = абзац(g, верх, new Font("SansSerif", Font.BOLD, 26), 40, y + 44, w - 80, 3) + 20;
             y = Math.max(y, 200);
         }
