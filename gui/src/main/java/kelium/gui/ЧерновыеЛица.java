@@ -76,6 +76,13 @@ public final class ЧерновыеЛица {
         String свод = args.length > 0 ? args[0] : "1.50.0";
         GameConfig cfg = GameConfig.build(свод, 4, 1L, null, null);
         Path корень = GameConfig.texturesRoot().resolve("card");
+        // ВЫГРУЗКА ДЛЯ НАСТОЯЩЕГО ГЕНЕРАТОРА (02.10.2026): лица карт рисует
+        // tools/gen_cards_from_blanks.py на шаблонах дизайнера; условия карт языка
+        // собирает Java — сюда пишется всё, что ему нужно, в JSON.
+        if (args.length > 2 && "--для-генератора".equals(args[1])) {
+            выгрузитьДляГенератора(cfg, Path.of(args[2]));
+            return;
+        }
         int n = 0;
         // ЛЮБОЙ НАБОР, НЕ ТОЛЬКО z2_/a8_ (02.10.2026): набор 3.0 (z3_, a9_) остался
         // без лиц — генератор знал номера одного набора, и на своде 1.50.0 игрок
@@ -88,6 +95,9 @@ public final class ЧерновыеЛица {
                 continue;
             }
             Path ф = корень.resolve("objective").resolve(id + ".png");
+            if (java.nio.file.Files.exists(ф)) {
+                continue;   // лицо уже нарисовано генератором на шаблонах (tools/gen_cards_lang.py)
+            }
             ImageIO.write(задание(e), "png", ф.toFile());
             n++;
         }
@@ -98,10 +108,64 @@ public final class ЧерновыеЛица {
                 continue;
             }
             Path ф = корень.resolve("arsenal").resolve(id + ".png");
+            if (java.nio.file.Files.exists(ф)) {
+                continue;   // лицо уже нарисовано генератором на шаблонах (tools/gen_cards_lang.py)
+            }
             ImageIO.write(арсенал(e), "png", ф.toFile());
             n++;
         }
         System.out.println("черновых лиц: " + n + " → " + корень);
+    }
+
+    /**
+     * Задания языка карт — в JSON для генератора лиц: имя, значок, текст условия
+     * и усиления, награды, верх (метка, эффект, параметры, имя утиля).
+     */
+    @SuppressWarnings("unchecked")
+    static void выгрузитьДляГенератора(GameConfig cfg, Path файл) throws Exception {
+        List<Map<String, Object>> карты = new java.util.ArrayList<>();
+        for (Map<String, Object> e : cfg.content.get("objectives").entries) {
+            String id = String.valueOf(e.get("id"));
+            if (!(kelium.engine.cards.CardRegistry.objective(id)
+                    instanceof kelium.cards.objectives.ЗаданиеИзЯзыка з)) {
+                continue;
+            }
+            Map<String, Object> к = new java.util.LinkedHashMap<>();
+            к.put("id", id);
+            к.put("имя", e.getOrDefault("name", id));
+            к.put("значок", з.значок());
+            к.put("условие", e.get("requirement") instanceof Map<?, ?> r ? r.get("условие") : null);
+            к.put("дополнительно", e.get("enhanced") instanceof Map<?, ?> en ? en.get("условие") : null);
+            к.put("награда", e.get("base_reward"));
+            к.put("доп_награда", e.get("special_reward"));
+            к.put("верх", e.get("top"));
+            к.put("утиль", e.get("язык") instanceof Map<?, ?> я ? я.get("верх") : null);
+            карты.add(к);
+        }
+        // арсенал со срабатыванием данными: утиль (верх) и текст установки (низ)
+        List<Map<String, Object>> арсенал = new java.util.ArrayList<>();
+        for (Map<String, Object> e : cfg.content.get("arsenal").entries) {
+            if (!(e.get("bottom") instanceof Map<?, ?> низ && низ.get("когда") != null)) {
+                continue;
+            }
+            Map<String, Object> к = new java.util.LinkedHashMap<>();
+            к.put("id", String.valueOf(e.get("id")));
+            к.put("имя", e.getOrDefault("name", e.get("id")));
+            к.put("значок", e.get("значок"));
+            к.put("верх", e.get("top"));
+            к.put("низ", kelium.cards.язык.Срабатывание.текст(низ));
+            к.put("плата", низ.get("плата"));
+            арсенал.add(к);
+        }
+        Map<String, Object> всё = new java.util.LinkedHashMap<>();
+        всё.put("задания", карты);
+        всё.put("арсенал", арсенал);
+        org.yaml.snakeyaml.DumperOptions o = new org.yaml.snakeyaml.DumperOptions();
+        o.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+        o.setAllowUnicode(true);
+        java.nio.file.Files.writeString(файл, new org.yaml.snakeyaml.Yaml(o).dump(всё),
+            java.nio.charset.StandardCharsets.UTF_8);
+        System.out.println("для генератора: заданий " + карты.size() + ", арсенала " + арсенал.size() + " → " + файл);
     }
 
     @SuppressWarnings("unchecked")
