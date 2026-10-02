@@ -16,7 +16,7 @@ import re
 import sys
 
 КОРЕНЬ_КНИГ = os.path.dirname(glob.glob(
-    r"C:\shared\forged-in-kelium\rules\Книга правил*")[0])
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*"))[0])
 
 src, first, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 text = open(src, encoding="utf-8").read()
@@ -113,7 +113,9 @@ def значок(имя):
         return None
     from PIL import Image
     im = Image.open(путь).convert("RGBA")
-    ш = 96
+    # 256 точек: в строке значок 4–5 мм, при печати это ~1300 dpi с запасом
+    # на крупные значки действий (15 мм). 96 было мыльно (дизайнер, 02.10.2026).
+    ш = min(256, im.width)
     im = im.resize((ш, max(1, round(im.height * ш / im.width))), Image.LANCZOS)
     буфер = io.BytesIO()
     im.save(буфер, "PNG", optimize=True)
@@ -164,9 +166,11 @@ def гекс_номер(номер):
     d.polygon(гекс(0), fill=(107, 68, 19, 255))          # охряной кант
     d.polygon(гекс(12), fill=(247, 241, 225, 255))       # светлое поле
     d.polygon(гекс(24), outline=(24, 108, 36, 255), width=5)
-    шрифт = ImageFont.truetype(r"C:\Windows\Fonts\Tektur-ExtraBold.ttf"
-                               if os.path.exists(r"C:\Windows\Fonts\Tektur-ExtraBold.ttf")
-                               else r"C:\Windows\Fonts\TekturNarrow-Bold.ttf", 96)
+    шрифт = ImageFont.truetype(next(п for п in (
+        r"C:\Windows\Fonts\Tektur-ExtraBold.ttf",
+        os.path.expanduser("~/.fonts/Tektur-Black.ttf"),
+        os.path.expanduser("~/.fonts/Tektur-Bold.ttf"),
+        r"C:\Windows\Fonts\TekturNarrow-Bold.ttf") if os.path.exists(п)), 96)
     d.text((ш / 2, в / 2 + 4), номер, font=шрифт, fill=(24, 108, 36, 255), anchor="mm")
     буфер = io.BytesIO()
     im.save(буфер, "PNG", optimize=True)
@@ -201,11 +205,33 @@ def blocks(md):
     """md-кусок -> список html-блоков (каждый .блок / .пример / .заглушка)."""
     res, cur = [], []
     надвое = [False]
+    пара = [False]
     вовсю = [False]
     крупно = [False]
 
     def flush():
         if not cur:
+            return
+        if пара[0]:
+            # ПАРА ПРИМЕРОВ: шапка h2, дальше два куска по «### …»; в каждом
+            # рисунок слева и текст справа (раздел :пара:, 02.10.2026).
+            шапка, куски = [], []
+            for ч in cur:
+                if "<h2>" in ч:
+                    шапка.append(ч)
+                elif "<h3>" in ч:
+                    куски.append(([ч], [], []))
+                elif куски and ('class="рисунок' in ч or 'class="рис"' in ч):
+                    куски[-1][1].append(ч)
+                elif куски:
+                    куски[-1][2].append(ч)
+            res.append('      <div class="блок пара">\n' + "\n".join(шапка) + "".join(
+                '\n        <div class="половина">\n' + "\n".join(з)
+                + '\n        <div class="пара-ряд"><div>' + "\n".join(р)
+                + "</div><div>" + "\n".join(т) + "</div></div>\n        </div>"
+                for з, р, т in куски) + "\n      </div>")
+            пара[0] = False
+            cur.clear()
             return
         if надвое[0]:
             # БЛОК НА ВСЮ ШИРИНУ, РАЗДЕЛЁННЫЙ ПОПОЛАМ: слева рисунки с
@@ -254,7 +280,7 @@ def blocks(md):
             i += 1
             continue
         if ln.startswith("### "):
-            if not (len(cur) == 1 and cur[0].lstrip().startswith("<h2>")):
+            if not пара[0] and not (len(cur) == 1 and cur[0].lstrip().startswith("<h2>")):
                 flush()
             cur.append(f"        <h3>{inline(ln[4:])}</h3>")
             i += 1
@@ -289,6 +315,11 @@ def blocks(md):
         # :надвое: — раздел идёт блоком во всю ширину: рисунки слева, текст справа.
         if ln.strip() == ":надвое:":
             надвое[0] = True
+            i += 1
+            continue
+        # :пара: — два примера рядом (### заголовок, [[рисунок]], текст — дважды).
+        if ln.strip() == ":пара:":
+            пара[0] = True
             i += 1
             continue
         # :крупно: — блок набирается на ступень крупнее обычного.
