@@ -89,6 +89,10 @@ public final class ЗамерНабора {
                     System.out.println("  партия сорвалась: " + ex.getCause());
                     continue;
                 }
+                // ХОД ЗАМЕРА В ОКНЕ (Влад 01.10: «было видно прогресс») — каждые 10 партий
+                if ((n + 1) % 10 == 0 || n + 1 == e.getValue().size()) {
+                    System.out.printf("  %s: партий %d из %d%n", e.getKey(), n + 1, e.getValue().size());
+                }
                 с[0] += и.заданий();
                 с[1] += и.арсенала();
                 с[2] += и.связок();
