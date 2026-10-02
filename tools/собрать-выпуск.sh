@@ -30,7 +30,8 @@ rm -rf "$D" "dist/$NAME.zip"
 mkdir -p "$D"
 cp gui/target/kelium-runner.jar "$D/"
 # data без рабочих хвостов: самоигра, черновые прогоны и журналы в выпуск не идут
-rsync -a --exclude 'selfplay/' --exclude '*.log' --exclude '_archive/' data/ "$D/data/"
+mkdir -p "$D/data"
+tar -C data --exclude='./selfplay' --exclude='*.log' --exclude='_archive' -cf - . | tar -C "$D/data" -xf -
 cat > "$D/Играть.bat" <<'BAT'
 @echo off
 chcp 65001 >nul

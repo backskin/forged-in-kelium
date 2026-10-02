@@ -29,8 +29,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Xvfb, zip, rsync
-        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb zip rsync
+      - name: Xvfb, zip
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb zip
       - name: Сборка, все тесты, проба архива
         run: bash tools/собрать-выпуск.sh "${GITHUB_REF_NAME}"
       - name: Заметки к выпуску
