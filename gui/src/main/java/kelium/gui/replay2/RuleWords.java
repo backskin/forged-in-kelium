@@ -387,6 +387,8 @@ public final class RuleWords {
                 "ячеек хранилища, открытых всегда (на печати планшета — одна)";
             case "storage.module_slots" ->
                 "ячеек под жетон модуля хранилища на планшете";
+            case "actions.build.branch_demolish_before_build" ->
+                "в ветке «построить» сначала снеси сколько угодно своих зданий её вида, потом поставь одно";
             case "storage.gild_tokens" ->
                 "жетоны хранилища улучшаются позолотой, как модули";
             case "storage.cell_star_when_empty" ->

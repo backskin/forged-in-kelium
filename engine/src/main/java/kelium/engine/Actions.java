@@ -1291,6 +1291,9 @@ public final class Actions {
             super(state);
         }
 
+        /** Ветка «построить» со сносом перед стройкой — на время одного perform. */
+        private boolean сносДоСтройки;
+
         @Override public String name() { return "build"; }
         @Override public Order order() { return Order.PLACE; }
         @Override public boolean implemented() { return true; }
@@ -1309,6 +1312,13 @@ public final class Actions {
             if (ctx.buildBranch != null) {
                 opLimit = Math.min(opLimit, 1);
             }
+            // СНОС ПЕРЕД СТРОЙКОЙ (решение Влада 02.10.2026, свод
+            // actions.build.branch_demolish_before_build): в ветке «построить»
+            // сначала можно снести сколько угодно своих зданий её вида (каждое
+            // даёт монету), потом поставить одно — в том числе только что
+            // снесённое. Переезд здания получается сам собой.
+            сносДоСтройки = ctx.buildBranch != null
+                && rs.getBool("actions.build.branch_demolish_before_build", false);
             // ОДНА ОПЕРАЦИЯ НА ОДНО ЗДАНИЕ ЗА ДЕЙСТВИЕ (заказ дизайнера
             // 25.08.2026, ключ actions.build.one_op_per_building). Иначе то же
             // здание можно поставить и тут же снять, доя монету за снос.
@@ -1334,12 +1344,15 @@ public final class Actions {
             // Это то же по природе ограничение, что ячейки предложений рынка —
             // нехватка РАЗНЫХ возможностей, а не потолок количества: она видна
             // на столе и не требует счёта.
+            int поставлено = 0;
             while (true) {
-                if (ops >= opLimit) {
+                if (сносДоСтройки ? поставлено >= opLimit : ops >= opLimit) {
                     break;
                 }
+                int былоПоставлено = поставленные.size();
                 ActionResult one = performOneOp(player, ctx, agent, тронутые, поставленные,
                     снесённые);
+                поставлено += поставленные.size() - былоПоставлено;
                 if (one == null) {
                     break;   // пас или ничего доступного
                 }
@@ -1452,11 +1465,15 @@ public final class Actions {
                 // каждым зданием за действие делается одно — поставить или
                 // снести). Снесённый жетон вернулся в запас, и постройка взяла бы
                 // именно его — значит, это то же здание во второй операции.
-                menu.removeIf(m -> {
-                    BuildingToken запасной = reserveToken(player, (BuildingType) m.get("btype"),
-                        (Integer) m.get("level"));
-                    return запасной != null && тронутые.contains(запасной.uid);
-                });
+                // СНОС ПЕРЕД СТРОЙКОЙ (02.10.2026): снесённое в этой ветке ставить
+                // заново можно — это и есть переезд здания.
+                if (!сносДоСтройки) {
+                    menu.removeIf(m -> {
+                        BuildingToken запасной = reserveToken(player,
+                            (BuildingType) m.get("btype"), (Integer) m.get("level"));
+                        return запасной != null && тронутые.contains(запасной.uid);
+                    });
+                }
             }
             // ПУСТОЕ МЕНЮ ПОСТРОЙКИ — ЕЩЁ НЕ ПАС: снос монет не требует, наоборот,
             // даёт их. Прежде при «строить не на что» операция кончалась здесь,

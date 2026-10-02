@@ -34,6 +34,17 @@ import kelium.engine.cards.EngineCardContext;
  */
 class ЖетоныХранилищаTest {
 
+    /**
+     * Свод 1.49.0 привязывает свои карты к общему реестру; другие тесты модуля
+     * ждут в нём колоду свода по умолчанию — возвращаем её.
+     */
+    @org.junit.jupiter.api.AfterAll
+    static void вернутьКолодуПоУмолчанию() {
+        kelium.engine.cards.CardRegistry.reset();
+        kelium.engine.Setup.buildGame(kelium.dataio.GameConfig.buildCached(
+            kelium.dataio.GameConfig.DEFAULT_RULESET, 4, 1L, null, null));
+    }
+
     private static GameState партия(String свод) {
         return Setup.buildGame(GameConfig.buildCached(свод, 2, 7L, null, null));
     }
