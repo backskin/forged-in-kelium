@@ -629,6 +629,225 @@ public interface Требование {
         }
     }
 
+    // ==================================================================
+    //  ЭНЕРГИЯ И УРОВНИ ЗДАНИЙ (заказ Влада 02.10.2026: «раскрыть возможности
+    //  энергии и энергостанций; сыграть на том, что у добытчиков и
+    //  энергостанций есть уровни — по базовым правилам это ни на что не влияет»)
+    // ==================================================================
+
+    /** Свои хозяйственные здания вида ({@code miner}, {@code plant} или оба) на поле. */
+    static List<kelium.core.BuildingToken> хозяйство(CardContext ctx, String вид) {
+        List<kelium.core.BuildingToken> out = new ArrayList<>();
+        for (var b : ctx.state().player(ctx.seat()).buildingsOnField()) {
+            boolean добытчик = b.type == kelium.core.BuildingType.MINER;
+            boolean станция = b.type == kelium.core.BuildingType.POWER_PLANT;
+            if ((вид == null && (добытчик || станция)) || ("miner".equals(вид) && добытчик)
+                    || ("plant".equals(вид) && станция)) {
+                out.add(b);
+            }
+        }
+        return out;
+    }
+
+    /** «добытчики», «энергостанции» или «добытчики и энергостанции». */
+    static String хозяйствоСловом(String вид) {
+        return вид == null ? "добытчики и энергостанции"
+            : "miner".equals(вид) ? "добытчики" : "энергостанции";
+    }
+
+    /** «имей на поле свои добытчики с суммой уровней 6 или больше». */
+    record Уровни(String вид, int сумма) implements Требование {
+        private int есть(CardContext ctx) {
+            int n = 0;
+            for (var b : хозяйство(ctx, вид)) {
+                n += b.level == null ? 1 : b.level;
+            }
+            return n;
+        }
+
+        @Override public boolean выполнено(CardContext ctx) {
+            return есть(ctx) >= сумма;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(есть(ctx), сумма);
+        }
+
+        @Override public String суть() {
+            return "имей на поле свои " + хозяйствоСловом(вид) + " с суммой уровней " + сумма
+                + " или больше";
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("узел", "уровни");
+            if (вид != null) {
+                m.put("вид", вид);
+            }
+            m.put("сумма", сумма);
+            return m;
+        }
+
+        @Override public String действие() {
+            return "plant".equals(вид) ? "build_plant" : "build_miner";
+        }
+    }
+
+    /** «имей на поле свои добытчики 3 разных уровней». */
+    record РазныеУровни(String вид, int сколько) implements Требование {
+        private int есть(CardContext ctx) {
+            Set<Integer> уровни = new HashSet<>();
+            for (var b : хозяйство(ctx, вид)) {
+                уровни.add(b.level == null ? 1 : b.level);
+            }
+            return уровни.size();
+        }
+
+        @Override public boolean выполнено(CardContext ctx) {
+            return есть(ctx) >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(есть(ctx), сколько);
+        }
+
+        @Override public String суть() {
+            return "имей на поле свои " + хозяйствоСловом(вид) + " " + сколько + " разных уровней";
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("узел", "разные_уровни");
+            if (вид != null) {
+                m.put("вид", вид);
+            }
+            m.put("сколько", сколько);
+            return m;
+        }
+
+        @Override public String действие() {
+            return "plant".equals(вид) ? "build_plant" : "build_miner";
+        }
+    }
+
+    /** «имей на своих зданиях 6 кубиков энергии» — кубики в ячейках потребителей. */
+    record Энергия(int сколько) implements Требование {
+        private int есть(CardContext ctx) {
+            int n = 0;
+            for (var b : ctx.state().player(ctx.seat()).buildingsOnField()) {
+                n += b.energyPlaced;
+            }
+            return n;
+        }
+
+        @Override public boolean выполнено(CardContext ctx) {
+            return есть(ctx) >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(есть(ctx), сколько);
+        }
+
+        @Override public String суть() {
+            return "имей в ячейках своих зданий " + числом(сколько, "кубик энергии",
+                "кубика энергии", "кубиков энергии");
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "энергия", "сколько", сколько);
+        }
+
+        @Override public String действие() {
+            return "energy_swap";
+        }
+    }
+
+    /** «имей запитанными все свои военные здания — не меньше 2». */
+    record ВсеЗапитаны(Кто кто, int неМеньше) implements Требование {
+        private int[] есть(CardContext ctx) {
+            int всего = 0;
+            int запитано = 0;
+            for (var b : ctx.state().player(ctx.seat()).buildingsOnField()) {
+                if (b.type == kelium.core.BuildingType.COMMAND_CENTER || !кто.подходит(b)
+                        || b.energySlots <= 0) {
+                    continue;
+                }
+                всего++;
+                if (b.powered()) {
+                    запитано++;
+                }
+            }
+            return new int[]{всего, запитано};
+        }
+
+        @Override public boolean выполнено(CardContext ctx) {
+            int[] x = есть(ctx);
+            return x[0] >= неМеньше && x[1] == x[0];
+        }
+
+        @Override public double близость(CardContext ctx) {
+            int[] x = есть(ctx);
+            return Math.min(доля(x[0], неМеньше), x[0] == 0 ? 0 : (double) x[1] / x[0]);
+        }
+
+        @Override public String суть() {
+            return "имей на поле не меньше " + неМеньше + " своих " + кто.родМн
+                + ", и все они запитаны";
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "все_запитаны", "кто", кто.name(), "не_меньше", неМеньше);
+        }
+
+        @Override public String действие() {
+            return "energy_swap";
+        }
+    }
+
+    /** «построй добытчик или энергостанцию 3-го уровня или выше». */
+    record ПостройКрупно(int сколько) implements Требование {
+        @Override public boolean выполнено(CardContext ctx) {
+            return ход(ctx).builtBigEconomyHexes.size() >= сколько;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(ход(ctx).builtBigEconomyHexes.size(), сколько);
+        }
+
+        @Override public String суть() {
+            return "построй " + (сколько == 1 ? "добытчик или энергостанцию"
+                : сколько + " добытчика или энергостанции") + " 3-го уровня или выше";
+        }
+
+        @Override public boolean происшествие() {
+            return true;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "построй_крупно", "сколько", сколько);
+        }
+
+        @Override public String действие() {
+            return "build_miner";
+        }
+    }
+
     /** «найми 2 войска». */
     record Найми(int сколько) implements Требование {
         @Override public boolean выполнено(CardContext ctx) {
@@ -853,6 +1072,12 @@ public interface Требование {
             case "запитай" -> new Запитай(число(m, "сколько", 1));
             case "выпусти" -> new Выпусти(число(m, "сколько", 1));
             case "потрать" -> new Потрать(число(m, "сколько", 1));
+            case "уровни" -> new Уровни(вид(m), число(m, "сумма", 6));
+            case "разные_уровни" -> new РазныеУровни(вид(m), число(m, "сколько", 3));
+            case "энергия" -> new Энергия(число(m, "сколько", 4));
+            case "все_запитаны" -> new ВсеЗапитаны(Кто.valueOf(String.valueOf(m.get("кто"))),
+                число(m, "не_меньше", 2));
+            case "построй_крупно" -> new ПостройКрупно(число(m, "сколько", 1));
             case "и" -> {
                 List<Требование> ч = new ArrayList<>();
                 if (m.get("части") instanceof List<?> l) {
@@ -864,6 +1089,10 @@ public interface Требование {
             }
             default -> throw new IllegalArgumentException("неизвестный узел требования: " + узел);
         };
+    }
+
+    private static String вид(Map<?, ?> m) {
+        return m.get("вид") == null ? null : String.valueOf(m.get("вид"));
     }
 
     private static int число(Map<?, ?> m, String ключ, int поУмолчанию) {

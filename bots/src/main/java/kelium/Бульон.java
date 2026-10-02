@@ -75,6 +75,11 @@ public final class Бульон {
             номер++;
         }
         List<Map<String, Object>> арсенал = срабатывания();
+        // НОМЕРА УСТОЙЧИВЫ (02.10.2026): прогоны пишут меру кандидата по его
+        // номеру, и номер не должен съехать, когда словарь растёт или правило
+        // перестаёт порождать старого кандидата. Прежний номер — по содержанию.
+        задания = прежниеНомера(папка.resolve("задания.yaml"), задания, "требование", "g_");
+        арсенал = прежниеНомера(папка.resolve("арсенал.yaml"), арсенал, "низ", "t_");
         Files.writeString(папка.resolve("задания.yaml"), yaml(задания), StandardCharsets.UTF_8);
         Files.writeString(папка.resolve("арсенал.yaml"), yaml(арсенал), StandardCharsets.UTF_8);
         System.out.printf("требований в бульоне: %d (отсеяно: форма %d, даром на старте %d)%n",
@@ -207,6 +212,44 @@ public final class Бульон {
         // ТРАТА КЕЛЕМИЯ (01.10.2026): Рынок или плата карт
         for (int n = 1; n <= 3; n++) {
             out.add(Map.of("узел", "потрать", "сколько", n));
+        }
+        // ЭНЕРГИЯ И УРОВНИ ЗДАНИЙ (заказ Влада 02.10.2026): уровни добытчиков и
+        // станций по базовым правилам ни на что не влияют — карты дают им дело.
+        // В КОНЕЦ, номера прежних требований не сдвигаются.
+        for (String вид : new String[]{"miner", "plant", null}) {
+            for (int сумма : вид == null ? new int[]{6, 8, 10} : new int[]{4, 6, 8}) {
+                Map<String, Object> у = new LinkedHashMap<>();
+                у.put("узел", "уровни");
+                if (вид != null) {
+                    у.put("вид", вид);
+                }
+                у.put("сумма", сумма);
+                out.add(у);
+            }
+            for (int n = 2; n <= 3; n++) {
+                Map<String, Object> у = new LinkedHashMap<>();
+                у.put("узел", "разные_уровни");
+                if (вид != null) {
+                    у.put("вид", вид);
+                }
+                у.put("сколько", n);
+                out.add(у);
+            }
+        }
+        for (int n : new int[]{4, 6, 8}) {
+            out.add(Map.of("узел", "энергия", "сколько", n));
+        }
+        for (String кто : List.of("ВОЕННОЕ", "ДОБЫТЧИК", "ЗДАНИЕ")) {
+            for (int n = 2; n <= 3; n++) {
+                out.add(Map.of("узел", "все_запитаны", "кто", кто, "не_меньше", n));
+            }
+        }
+        out.add(Map.of("узел", "построй_крупно", "сколько", 1));
+        for (String кто : List.of("ДОБЫТЧИК", "ЭНЕРГОСТАНЦИЯ")) {
+            for (int n = 1; n <= 2; n++) {
+                out.add(Map.of("узел", "жетоны", "группа", группа(кто, true, "КРУПНЫЙ"), "сколько", n,
+                    "разных_гексов", false));
+            }
         }
         return out;
     }
@@ -389,7 +432,123 @@ public final class Бульон {
                 out.add(запись);
             }
         }
+        // ЭНЕРГИЯ И УРОВНИ (заказ Влада 02.10.2026): доход по запитанным зданиям и
+        // по уровням, подъём уровня здания, кубик энергии из запаса. В КОНЕЦ.
+        List<Map<String, Object>> хозяйство = new ArrayList<>();
+        for (String per : List.of("own_powered_miner", "own_powered_plant", "own_powered_building")) {
+            хозяйство.add(Map.of("effect", "gain_per", "params", Map.of("per", per, "coin", 1, "max", 3)));
+            хозяйство.add(Map.of("effect", "gain_per", "params", Map.of("per", per, "kelium", 1, "max", 2)));
+        }
+        хозяйство.add(Map.of("effect", "gain_per", "params", Map.of("per", "top_miner_level", "coin", 1)));
+        хозяйство.add(Map.of("effect", "gain_per", "params", Map.of("per", "top_plant_level", "ammo", 1, "max", 3)));
+        хозяйство.add(Map.of("effect", "gain_per", "params", Map.of("per", "miner_levels", "coin", 1, "max", 4)));
+        for (String вид : List.of("miner", "plant", "any")) {
+            хозяйство.add(Map.of("effect", "upgrade_building", "params", Map.of("type", вид, "cost", 1)));
+        }
+        хозяйство.add(Map.of("effect", "upgrade_building", "params", Map.of("type", "any", "cost", 0)));
+        хозяйство.add(Map.of("effect", "permanent_energy", "params", Map.of()));
+        List<Map<String, Object>> поводы = new ArrayList<>();
+        for (String в : ВЕТКИ) {
+            поводы.add(Map.of("событие", "ветка", "ветка", в));
+        }
+        for (String с : List.of("задание", "установил", "ход", "построил_крупно")) {
+            поводы.add(Map.of("событие", с));
+        }
+        for (Map<String, Object> когда : поводы) {
+            boolean каждыйХод = "ход".equals(когда.get("событие"));
+            for (Map<String, Object> эф : хозяйство) {
+                boolean подъём = "upgrade_building".equals(эф.get("effect"));
+                // даровой подъём — только за редкое событие
+                if (подъём && ((Map<?, ?>) эф.get("params")).get("cost") instanceof Number c
+                        && c.intValue() == 0 && !"построил_крупно".equals(когда.get("событие"))
+                        && !"установил".equals(когда.get("событие"))) {
+                    continue;
+                }
+                // доход каждый ход — только по запитанным и не больше двух
+                if (каждыйХод && "gain_per".equals(эф.get("effect"))
+                        && !String.valueOf(((Map<?, ?>) эф.get("params")).get("per")).startsWith("own_powered")) {
+                    continue;
+                }
+                Map<String, Object> низ = new LinkedHashMap<>();
+                низ.put("когда", когда);
+                низ.put("эффект", эф);
+                низ.put("предел", 1);
+                Map<String, Object> запись = new LinkedHashMap<>();
+                запись.put("id", "t_" + номер++);
+                запись.put("текст", Срабатывание.текст(низ));
+                запись.put("низ", низ);
+                out.add(запись);
+            }
+            // КЕЛЕМИЙ В УРОВЕНЬ: «можешь заплатить 1 келемий: подними уровень» —
+            // третья дверь келемию с поля, после Рынка и платы за действие
+            if (!каждыйХод) {
+                Map<String, Object> низ = new LinkedHashMap<>();
+                низ.put("когда", когда);
+                низ.put("плата", Map.of("kelium", 1));
+                низ.put("эффект", Map.of("effect", "upgrade_building", "params", Map.of("type", "any", "cost", 0)));
+                низ.put("предел", 1);
+                Map<String, Object> запись = new LinkedHashMap<>();
+                запись.put("id", "t_" + номер++);
+                запись.put("текст", Срабатывание.текст(низ));
+                запись.put("низ", низ);
+                out.add(запись);
+            }
+        }
         return out;
+    }
+
+    /**
+     * Номера кандидатов по прежнему файлу: тот же {@code ключ} (требование или
+     * низ) — тот же номер; новый кандидат — следующий после наибольшего.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> прежниеНомера(Path файл, List<Map<String, Object>> записи,
+                                                          String ключ, String приставка) throws Exception {
+        Map<String, String> было = new java.util.HashMap<>();
+        int наибольший = -1;
+        if (Files.exists(файл)) {
+            Object x = new org.yaml.snakeyaml.Yaml().load(Files.readString(файл, StandardCharsets.UTF_8));
+            for (Map<String, Object> e : (List<Map<String, Object>>) x) {
+                String id = String.valueOf(e.get("id"));
+                было.put(канон(e.get(ключ)), id);
+                наибольший = Math.max(наибольший, Integer.parseInt(id.substring(приставка.length())));
+            }
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> e : записи) {
+            String id = было.get(канон(e.get(ключ)));
+            if (id == null) {
+                id = приставка + (++наибольший);
+            }
+            Map<String, Object> к = new LinkedHashMap<>();
+            к.put("id", id);
+            for (var x : e.entrySet()) {
+                if (!"id".equals(x.getKey())) {
+                    к.put(x.getKey(), x.getValue());
+                }
+            }
+            out.add(к);
+        }
+        return out;
+    }
+
+    /** Запись строкой с полями по алфавиту — Map.of порядка не держит. */
+    private static String канон(Object x) {
+        if (x instanceof Map<?, ?> m) {
+            java.util.TreeMap<String, String> t = new java.util.TreeMap<>();
+            for (var e : m.entrySet()) {
+                t.put(String.valueOf(e.getKey()), канон(e.getValue()));
+            }
+            return t.toString();
+        }
+        if (x instanceof List<?> l) {
+            List<String> out = new ArrayList<>();
+            for (Object v : l) {
+                out.add(канон(v));
+            }
+            return out.toString();
+        }
+        return String.valueOf(x);
     }
 
     private static String yaml(List<Map<String, Object>> записи) {

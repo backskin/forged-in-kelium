@@ -58,6 +58,7 @@ public final class Срабатывание {
             case "совпадение" -> "твой приказ совпадает с чужим";
             case "низ" -> "у тебя открыт нижний приказ";
             case "ход" -> "начинаешь свой ход";
+            case "построил_крупно" -> "строишь добытчик или энергостанцию 3-го уровня или выше";
             default -> что;
         };
     }
@@ -84,7 +85,55 @@ public final class Срабатывание {
                 case "ammo" -> "1 боеприпас";
                 default -> "1 келемий";
             };
+            // ЭНЕРГИЯ И УРОВНИ (02.10.2026)
+            case "gain_per" -> "получи " + поОдному(п) + " " + заКаждый(String.valueOf(п.get("per")))
+                + (п.get("max") instanceof Number m ? " (не больше " + m.intValue() + ")" : "");
+            case "upgrade_building" -> {
+                int цена = п.get("cost") instanceof Number c ? c.intValue() : 1;
+                String что = switch (String.valueOf(п.get("type"))) {
+                    case "miner" -> "свой добытчик";
+                    case "plant" -> "свою энергостанцию";
+                    default -> "свой добытчик или энергостанцию";
+                };
+                yield "замени " + что + " на поле жетоном на уровень выше из запаса"
+                    + (цена == 0 ? "" : " за " + Требование.числом(цена, "монету", "монеты", "монет"));
+            }
+            case "permanent_energy" -> "положи кубик энергии из общего запаса в свободную ячейку своего здания";
             default -> имя;
+        };
+    }
+
+    /** «по монете», «по боеприпасу» — добро эффекта gain_per (по одному за счёт). */
+    private static String поОдному(Map<?, ?> п) {
+        List<String> части = new ArrayList<>();
+        if (п.get("coin") instanceof Number) {
+            части.add("по монете");
+        }
+        if (п.get("ammo") instanceof Number) {
+            части.add("по боеприпасу");
+        }
+        if (п.get("kelium") instanceof Number) {
+            части.add("по келемию");
+        }
+        if (п.get("trophy") instanceof Number) {
+            части.add("по трофею");
+        }
+        return String.join(" и ", части);
+    }
+
+    /** «за каждый свой запитанный добытчик» — счёт эффекта gain_per. */
+    private static String заКаждый(String per) {
+        return switch (per) {
+            case "own_powered_miner" -> "за каждый свой запитанный добытчик";
+            case "own_powered_plant" -> "за каждую свою запитанную энергостанцию";
+            case "own_powered_building" -> "за каждое своё запитанное здание";
+            case "miner_levels" -> "за каждый уровень своих добытчиков на поле";
+            case "plant_levels" -> "за каждый уровень своих энергостанций на поле";
+            case "top_miner_level" -> "за каждый уровень своего старшего добытчика";
+            case "top_plant_level" -> "за каждый уровень своей старшей энергостанции";
+            case "own_military_building" -> "за каждое своё военное здание";
+            case "own_economy_building" -> "за каждый свой добытчик и энергостанцию";
+            default -> "за каждое своё войско на поле";
         };
     }
 

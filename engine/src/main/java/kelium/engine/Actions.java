@@ -1345,6 +1345,10 @@ public final class Actions {
             // нехватка РАЗНЫХ возможностей, а не потолок количества: она видна
             // на столе и не требует счёта.
             int поставлено = 0;
+            // КРУПНАЯ ПОСТРОЙКА (02.10.2026): событие «построил добытчик или
+            // энергостанцию 3-го уровня или выше» для срабатываний арсенала
+            int крупныхДо = journal(state) == null ? 0
+                : journal(state).of(player.seat).builtBigEconomyHexes.size();
             while (true) {
                 if (сносДоСтройки ? поставлено >= opLimit : ops >= opLimit) {
                     break;
@@ -1378,6 +1382,10 @@ public final class Actions {
             tel.put("ops", ops);
             tel.put("coin_spent", coinsSpent);
             tel.put("coins_left", player.resources.coin());
+            if (journal(state) != null) {
+                tel.put("big_built", journal(state).of(player.seat).builtBigEconomyHexes.size()
+                    - крупныхДо);
+            }
             return ActionResult.ok(detail.toString().trim(), tel);
         }
 

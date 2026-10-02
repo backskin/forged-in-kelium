@@ -64,7 +64,8 @@ public final class ЗамерНабора {
             for (int g = 0; g < партий; g++) {
                 // -Dkelium.замер.сид — другие раздачи: отличить шум от сдвига
                 final long seed = Long.getLong("kelium.замер.сид", 8_700_000L) + g;
-                список.add(пул.submit(() -> партия(свод, seed, сеть)));
+                final int номер = g;
+                список.add(пул.submit(() -> партия(свод, seed, сеть, номер)));
             }
             ff.put(свод, список);
         }
@@ -141,7 +142,9 @@ public final class ЗамерНабора {
             StringBuilder р = new StringBuilder();
             for (var в : e.getValue().entrySet()) {
                 if (в.getKey().startsWith("дорога·") || в.getKey().startsWith("карта·")
-                        || в.getKey().startsWith("сжёг·")) {
+                        || в.getKey().startsWith("сжёг·") || в.getKey().startsWith("фракция")
+                        || в.getKey().startsWith("бот·") || в.getKey().startsWith("место·")
+                        || в.getKey().startsWith("очки·")) {
                     continue;                       // доли побед — отдельными разделами
                 }
                 if (!в.getKey().contains("·")) {     // «mining·причина» — разбивка, не в итог
@@ -167,6 +170,24 @@ public final class ЗамерНабора {
                 }
             }
             sb.append("- **").append(e.getKey()).append("**: ").append(р.toString().trim()).append('\n');
+        }
+        // ФРАКЦИИ, БОТЫ, МЕСТА (02.10.2026): доля побед (ровно — 25%) и средние очки
+        sb.append("\n## Фракции, боты, места: доля побед (ровно 25%) и средние очки\n\n");
+        for (var e : пустые.entrySet()) {
+            sb.append("**").append(e.getKey()).append("**\n\n| срез | сыграно | побед | очки |\n|---|---|---|---|\n");
+            for (String приставка : List.of("фракция·", "бот·", "место·", "фракция×бот·")) {
+                for (var в : e.getValue().entrySet()) {
+                    if (!в.getKey().startsWith(приставка)) {
+                        continue;
+                    }
+                    int[] x = в.getValue();
+                    int[] о = e.getValue().getOrDefault("очки·" + в.getKey(), new int[2]);
+                    sb.append(String.format(java.util.Locale.ROOT, "| %s | %d | %.0f%% | %.1f |%n",
+                        в.getKey(), x[0], 100.0 * x[1] / Math.max(1, x[0]),
+                        (double) о[0] / Math.max(1, о[1])));
+                }
+            }
+            sb.append('\n');
         }
         // КАРТЫ АРСЕНАЛА: сколько раз поставлены и доля побед поставивших (ровно 25%).
         // Слишком сильная карта видна сразу; слишком слабая — малой долей или тем,
@@ -248,12 +269,33 @@ public final class ЗамерНабора {
         return t.get(ключ) instanceof Number n ? n.intValue() : 0;
     }
 
-    private static Итог партия(String свод, long seed, Сеть сеть) {
+    /** Цвета планшетов войск в порядке свода (место 1 — первый). */
+    static final List<String> ЦВЕТА = List.of("blue", "red", "green", "yellow");
+
+    private static Итог партия(String свод, long seed, Сеть сеть, int номер) {
         GameConfig база = GameConfig.buildCached(свод, 4, seed, null, null);
-        GameState s = Setup.buildGame(LayoutLibrary.configFor(база, 4, seed));
+        GameConfig cfg = LayoutLibrary.configFor(база, 4, seed);
+        // ФРАКЦИИ — ПЕРЕМЕННАЯ ЗАМЕРА (заказ Влада 02.10.2026). Прежде место 1
+        // всегда играло синими строителем, место 4 — жёлтыми карателем, и сила
+        // фракции была неотделима от характера бота и очереди хода. Теперь цвет
+        // сдвигается по кругу с каждой раздачей, характер бота — своим сдвигом
+        // раз в четыре раздачи: за 16 раздач каждая фракция играет за каждого
+        // бота и с каждого места. -Dkelium.замер.фракции=нет — как прежде.
+        boolean крутить = !"нет".equals(System.getProperty("kelium.замер.фракции", "да"));
+        List<String> цвета = new ArrayList<>(ЦВЕТА);
+        List<String> боты = new ArrayList<>(Bots.ROSTER_4);
+        if (крутить) {
+            java.util.Collections.rotate(цвета, номер % 4);
+            java.util.Collections.rotate(боты, (номер / 4) % 4);
+            GameConfig было = cfg;
+            cfg = new GameConfig(было.ruleset, было.content, 4, seed, было.dataRoot, цвета,
+                было.scenarioId, было.cuFacing, было.scenarioFile);
+            cfg.tokenStatsOverride = было.tokenStatsOverride;
+        }
+        GameState s = Setup.buildGame(cfg);
         List<Agent> agents = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
-            agents.add(ЦиклСтратега.стратег(Bots.ROSTER_4.get(i), i, new Random(seed * 31 + i), сеть,
+            agents.add(ЦиклСтратега.стратег(боты.get(i), i, new Random(seed * 31 + i), сеть,
                 сеть == null ? 0 : 1.0));
         }
         int[] заданий = new int[1];
@@ -423,6 +465,21 @@ public final class ЗамерНабора {
             }
         }
         boolean воинПобедил = воин >= 0 && s.winner != null && s.winner == воин;
+        // ФРАКЦИЯ, БОТ, МЕСТО: сыграно и побед ({0, 1}); очки — «очки·…» {сумма, партий}
+        for (int место = 0; место < 4; место++) {
+            boolean победил = s.winner != null && s.winner == место;
+            int очки = kelium.engine.Scoring.scorePlayer(s, место).values().stream()
+                .mapToInt(Integer::intValue).sum();
+            for (String ключ : List.of("фракция·" + цвета.get(место), "бот·" + боты.get(место),
+                    "место·" + (место + 1), "фракция×бот·" + цвета.get(место) + "·" + боты.get(место))) {
+                int[] x = ветки.computeIfAbsent(ключ, k -> new int[2]);
+                x[0]++;
+                x[1] += победил ? 1 : 0;
+                int[] о = ветки.computeIfAbsent("очки·" + ключ, k -> new int[2]);
+                о[0] += очки;
+                о[1]++;
+            }
+        }
         return new Итог(заданий[0] / 4.0, арсенала[0] / 4.0, связок / 4.0, срабатываний[0] / 4.0, дорога,
             урона[0] / 4.0, уничтожено[0] / 4.0, воинПобедил, сухих[0] / 4.0, сухих[1] / 4.0,
             сухих[2] / 4.0, особых[0] / 4.0, особых[1] / 4.0, ветки, связокПолных / 4.0);
