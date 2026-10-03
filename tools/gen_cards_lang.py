@@ -26,7 +26,7 @@ import gen_cards_from_blanks as G  # noqa: E402
 
 K = G.K
 ROOT = G.ROOT
-СТРОЙКА = 80            # «все иконки-80» — знак стройки
+СТРОЙКА = 32            # «все иконки-32» — знак стройки (выгрузка 03.10.2026)
 
 
 def иконка_ветки(код, сторона):
@@ -150,7 +150,7 @@ def лицо(к, номер):
     карта = dict(верх_карты(к.get('верх')), id=к['id'], номер=номер, шаблон=шаблон,
                  имя=к['имя'], семейство=к['имя'], условие=str(к.get('условие') or ''),
                  дополнительно=доп)
-    im = G.крупно(os.path.join(G.ЗАДАНИЯ_ШАБЛ, 'задания-шаблоны-%d.png' % шаблон))
+    im = G.шаблон_задания(шаблон)
     G.верх_задания(im, карта)
     d = ImageDraw.Draw(im)
     имя = карта['имя']
@@ -183,12 +183,17 @@ def лицо(к, номер):
 # ---------------------------------------------------------------------------
 #  АРСЕНАЛ: верх — утиль, низ — срабатывание установленной карты (шаблон ∞)
 # ---------------------------------------------------------------------------
-G.ИА.update({'mining': 34, 'ammo': 3, 'trophy': 9, 'movement': 35, 'combat': 36,
-             'arsenal': 14, 'gild': 43, 'troops': 49})
-ИКОНКА_УТИЛЯ = {'landing': 'troops_plus', 'gild_module': 'gild', 'grab_first_player': 'coin',
-                'three_spec_actions': 'spec', 'steal_objective_cards': 'arsenal',
-                'steal_arsenal_card': 'arsenal', 'discard_enemy_arsenal': 'arsenal',
-                'swap_order_card': 'order', 'market_card_from_discard': 'market'}
+G.ИА.update({'mining': 36, 'ammo': 3, 'trophy': 9, 'movement': 38, 'combat': 39,
+             'arsenal': 15, 'gild': 48, 'troops': 54,
+             # нарисованы дизайнером под утили арсенала (выгрузка 03.10.2026)
+             'grab_first': 86, 'kel_mining': 87, 'hire_two': 88, 'spec3': 89,
+             'build_coin': 90, 'steal_arsenal': 91, 'discard_arsenal': 93,
+             'steal_objective': 94, 'market_card': 95, 'market_one': 96, 'heal': 98})
+ИКОНКА_УТИЛЯ = {'landing': 'hire_two', 'gild_module': 'gild', 'grab_first_player': 'grab_first',
+                'three_spec_actions': 'spec3', 'steal_objective_cards': 'steal_objective',
+                'steal_arsenal_card': 'steal_arsenal', 'discard_enemy_arsenal': 'discard_arsenal',
+                'swap_order_card': 'order', 'market_card_from_discard': 'market_card',
+                'heal_hex': 'heal'}
 ДЕЙСТВИЕ_А = {'mining': 'mining', 'build': 'buildings', 'combat': 'combat',
               'assembly': 'assembly', 'movement': 'movement', 'market': 'market',
               'science': 'science', 'energy_swap': 'swap'}
@@ -200,6 +205,14 @@ G.ИА.update({'mining': 34, 'ammo': 3, 'trophy': 9, 'movement': 35, 'combat': 3
 def иконка_утиля(верх):
     эф, п = верх.get('effect'), верх.get('params') or {}
     if эф == 'free_action':
+        # утили со своей иконкой дизайнера: «1 келемий + добыча», «здание за
+        # 1 монету», «предложение Рынка за 1 келемий»
+        if п.get('action') == 'mining' and п.get('kelium'):
+            return 'kel_mining'
+        if п.get('action') == 'build' and п.get('cost') is not None or 'за 1 монету' in str(верх.get('label')):
+            return 'build_coin'
+        if п.get('action') == 'market' and 'за 1' in str(верх.get('label')):
+            return 'market_one'
         return ДЕЙСТВИЕ_А.get(п.get('action'), 'spec')
     if эф == 'gain':
         return 'ammo' if 'ammo' in п else ('kel' if 'kelium' in п else 'coin')

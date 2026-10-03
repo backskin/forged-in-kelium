@@ -190,7 +190,7 @@ public final class ЧерновыеЛица {
             g.fill(new RoundRectangle2D.Double(20, y, w - 40, 150, 26, 26));
             g.setColor(ТЕКСТ);
             g.setFont(new Font("SansSerif", Font.BOLD, 22));
-            // РЕАКЦИЯ НА ЧУЖОЕ ДЕЙСТВИЕ — значок «все иконки-72» (Влад 02.10.2026):
+            // РЕАКЦИЯ НА ЧУЖОЕ ДЕЙСТВИЕ — значок «все иконки-72» (Влад 02.10.2026; с выгрузки 03.10 — «все иконки-78»):
             // такой верх сжигают не в свой ход, а в ответ на чужое действие
             boolean реакция = e.get("top") instanceof Map<?, ?> т
                 && kelium.engine.Реакции.ЭФФЕКТ.equals(String.valueOf(т.get("effect")));
