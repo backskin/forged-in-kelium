@@ -1165,6 +1165,129 @@ public interface Требование {
         }
     }
 
+    /**
+     * УЗОР ИЗ СЕКТОРОВ (дизайнер 03.10.2026): на карте нарисованы гексы, в
+     * них закрашены секторы — их надо занять своими жетонами, любыми (здания,
+     * войска). Узор можно ПОВОРАЧИВАТЬ, ОТРАЖАТЬ НЕЛЬЗЯ: карту за столом крутят,
+     * но не переворачивают лицом вниз.
+     *
+     * <p>Гекс узла задан путём от опорного гекса (номера сторон, как
+     * {@code Hex.neighborBySide}), секторы — номерами сторон 0..5 этого гекса.
+     * Поворот на 60° — прибавка единицы ко всем номерам, и пути, и секторов;
+     * отражение потребовало бы смены направления обхода, его нет намеренно.
+     */
+    record Узор(List<int[]> пути, List<int[]> секторы, String имя) implements Требование {
+        /** Сколько секторов узла занято лучшим положением; -1 — узор не ложится нигде. */
+        private int лучшее(CardContext ctx) {
+            GameState s = ctx.state();
+            Set<Integer> мои = new HashSet<>();
+            for (Token t : жетоны(s, ctx.seat(), true)) {
+                мои.add(t.uid());
+            }
+            int best = -1;
+            // опора — любой гекс поля: узел может начинаться с гекса, где жетона ещё нет
+            for (String опора : s.field.hexes.keySet()) {
+                for (int поворот = 0; поворот < 6; поворот++) {
+                    int n = занято(s, опора, поворот, мои);
+                    if (n > best) {
+                        best = n;
+                    }
+                }
+            }
+            return best;
+        }
+
+        private int занято(GameState s, String опора, int поворот, Set<Integer> мои) {
+            int n = 0;
+            for (int i = 0; i < пути.size(); i++) {
+                String cur = опора;
+                for (int side : пути.get(i)) {
+                    kelium.core.Hex h = s.field.get(cur);
+                    cur = h == null ? null : h.neighborBySide[Math.floorMod(side + поворот, 6)];
+                    if (cur == null) {
+                        return -1;      // узор свисает за край поля
+                    }
+                }
+                kelium.core.Hex h = s.field.get(cur);
+                for (int сектор : секторы.get(i)) {
+                    Integer uid = h.sideOwner[Math.floorMod(сектор + поворот, 6)];
+                    if (uid != null && мои.contains(uid)) {
+                        n++;
+                    }
+                }
+            }
+            return n;
+        }
+
+        int всего() {
+            int n = 0;
+            for (int[] с : секторы) {
+                n += с.length;
+            }
+            return n;
+        }
+
+        @Override public boolean выполнено(CardContext ctx) {
+            return лучшее(ctx) >= всего();
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return доля(Math.max(0, лучшее(ctx)), всего());
+        }
+
+        @Override public String суть() {
+            return "займи своими жетонами закрашенные секторы";
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            List<Object> клетки = new ArrayList<>();
+            for (int i = 0; i < пути.size(); i++) {
+                List<Integer> путь = new ArrayList<>();
+                for (int x : пути.get(i)) {
+                    путь.add(x);
+                }
+                List<Integer> сек = new ArrayList<>();
+                for (int x : секторы.get(i)) {
+                    сек.add(x);
+                }
+                клетки.add(Map.of("путь", путь, "секторы", сек));
+            }
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("узел", "узор");
+            m.put("клетки", клетки);
+            m.put("имя", имя);
+            return m;
+        }
+
+        static Узор из(Map<?, ?> m) {
+            List<int[]> пути = new ArrayList<>();
+            List<int[]> секторы = new ArrayList<>();
+            if (m.get("клетки") instanceof List<?> l) {
+                for (Object o : l) {
+                    Map<?, ?> к = (Map<?, ?>) o;
+                    пути.add(целые(к.get("путь")));
+                    секторы.add(целые(к.get("секторы")));
+                }
+            }
+            return new Узор(пути, секторы, m.get("имя") == null ? "узор" : String.valueOf(m.get("имя")));
+        }
+
+        private static int[] целые(Object o) {
+            if (!(o instanceof List<?> l)) {
+                return new int[0];
+            }
+            int[] out = new int[l.size()];
+            for (int i = 0; i < out.length; i++) {
+                out[i] = ((Number) l.get(i)).intValue();
+            }
+            return out;
+        }
+    }
+
     /** Все части сразу. Происшествие, если хоть одна часть — происшествие. */
     record И(List<Требование> части) implements Требование {
         @Override public boolean выполнено(CardContext ctx) {
@@ -1269,6 +1392,7 @@ public interface Требование {
             case "треки" -> new Треки(число(m, "треков", 2), число(m, "ступень", 1));
             case "модули" -> new Модули(число(m, "сколько", 2), Boolean.TRUE.equals(m.get("золотых")));
             case "рода" -> new Рода(число(m, "сколько", 3));
+            case "узор" -> Узор.из(m);
             case "и" -> {
                 List<Требование> ч = new ArrayList<>();
                 if (m.get("части") instanceof List<?> l) {
