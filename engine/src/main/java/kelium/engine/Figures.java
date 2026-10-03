@@ -189,7 +189,8 @@ public final class Figures {
      *
      * <p>Запись узора — как у узла языка карт «узор»: {@code клетки: [{путь:
      * [стороны…], секторы: [0..5]}]}. Поворот на 60° — прибавка к номерам и
-     * сторон пути, и секторов; отражения нет.
+     * сторон пути, и секторов; отражения нет. Своя авиация в центре гекса —
+     * джокер: закрывает один любой недостающий сектор своего гекса.
      */
     public static int sectorsBest(GameState s, int seat, Map<?, ?> узор) {
         List<int[]> пути = new ArrayList<>();
@@ -210,13 +211,17 @@ public final class Figures {
         for (BuildingToken b : p.buildingsOnField()) {
             мои.add(b.uid);
         }
+        Set<String> авиация = new java.util.HashSet<>();
         for (UnitToken u : p.unitsOnField()) {
             мои.add(u.uid);
+            if (u.type == kelium.core.UnitType.AIRCRAFT && u.hexId != null) {
+                авиация.add(u.hexId);
+            }
         }
         int best = -1;
         for (String опора : s.field.hexes.keySet()) {
             for (int поворот = 0; поворот < 6; поворот++) {
-                int n = sectorsAt(s, опора, поворот, пути, секторы, мои);
+                int n = sectorsAt(s, опора, поворот, пути, секторы, мои, авиация);
                 best = Math.max(best, n);
             }
         }
@@ -243,7 +248,7 @@ public final class Figures {
     }
 
     private static int sectorsAt(GameState s, String опора, int поворот, List<int[]> пути,
-                                 List<int[]> секторы, Set<Integer> мои) {
+                                 List<int[]> секторы, Set<Integer> мои, Set<String> авиация) {
         int n = 0;
         for (int i = 0; i < пути.size(); i++) {
             String cur = опора;
@@ -255,12 +260,19 @@ public final class Figures {
                 }
             }
             Hex h = s.field.get(cur);
+            int занято = 0;
             for (int сектор : секторы.get(i)) {
                 Integer uid = h.sideOwner[Math.floorMod(сектор + поворот, 6)];
                 if (uid != null && мои.contains(uid)) {
-                    n++;
+                    занято++;
                 }
             }
+            // АВИАЦИЯ — ДЖОКЕР (дизайнер 03.10.2026): своя авиация в центре гекса
+            // закрывает собой один любой недостающий сектор этого гекса, не больше одного
+            if (занято < секторы.get(i).length && авиация.contains(h.id)) {
+                занято++;
+            }
+            n += занято;
         }
         return n;
     }

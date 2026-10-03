@@ -67,6 +67,7 @@ public final class CardShop {
     private final JPanel form = new WidthPanel();
     private final Preview preview = new Preview();
     private final JLabel status = new JLabel(" ");
+    private JScrollPane formScroll;
     private final Timer redraw;
     private final List<JToggleButton> typeButtons = new ArrayList<>();
     private CardSpec card = CardSpec.blank(CardSpec.Type.OBJECTIVE);
@@ -104,7 +105,7 @@ public final class CardShop {
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Style.PANEL);
         top.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Style.LINE));
-        JPanel types = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 10));
+        JPanel types = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 10));
         types.setOpaque(false);
         JLabel logo = new JLabel("МАСТЕРСКАЯ КАРТ");
         logo.setFont(Style.title(20));
@@ -125,18 +126,19 @@ public final class CardShop {
             typeButtons.add(b);
             types.add(b);
         }
-        top.add(types, BorderLayout.WEST);
+        top.add(types, BorderLayout.CENTER);
         JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 10));
         acts.setOpaque(false);
         acts.add(button("Новая", this::fresh, false));
         acts.add(button("Открыть…", this::open, false));
         acts.add(button("Сохранить…", this::save, false));
         acts.add(button("Выпустить PNG", this::export, true));
+        acts.add(button("В игру…", this::toGame, false));
         acts.add(button("Папка шаблонов", () -> openFolder(assets.templates), false));
         top.add(acts, BorderLayout.EAST);
 
         form.setBackground(Style.BG);
-        JScrollPane formScroll = new JScrollPane(form);
+        formScroll = new JScrollPane(form);
         formScroll.setBorder(null);
         formScroll.getVerticalScrollBar().setUnitIncrement(20);
         formScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -202,6 +204,9 @@ public final class CardShop {
         }
         form.revalidate();
         form.repaint();
+        if (formScroll != null) {
+            SwingUtilities.invokeLater(() -> formScroll.getVerticalScrollBar().setValue(0));
+        }
         render();
     }
 
@@ -234,6 +239,11 @@ public final class CardShop {
             form.add(new RewardEditor("доп_награда", false));
         }
 
+        section("Для игры — что делает верх");
+        form.add(field("Утиль", utilCombo()));
+        form.add(note("В колоду игры задание выгружается с фигурой: фигура — его требование. "
+            + "Награда берётся по иконкам награды."));
+
         section("Номер");
         form.add(field("Номер карты", text("номер", false, "в правом нижнем углу")));
     }
@@ -264,8 +274,140 @@ public final class CardShop {
             form.add(field("Текст", text("спец_текст", true, "строками")));
             form.add(field("Контейнер", segmentedBool("контейнер", "нет", "место для контейнера")));
         }
+        section("Для игры — свойство");
+        form.add(field("Когда", whenEditor("свойство_когда")));
+        form.add(field("Что даёт", effectEditor("свойство_эффект")));
+        form.add(field("Раз за ход", segmentedOf(new String[] {"1", "2", "3"},
+            new String[] {"не больше 1", "не больше 2", "не больше 3"},
+            String.valueOf(card.integer("свойство_предел", 1)),
+            v -> changed("свойство_предел", Integer.parseInt(v)))));
+        JButton print = new JButton("Напечатать текст свойства из этих данных");
+        print.setFocusable(false);
+        print.addActionListener(e -> {
+            card.fields.put("низ", kelium.cards.язык.Срабатывание.текст(GameEntry.bottom(card)));
+            setCard(card);
+        });
+        form.add(field("", print));
+        section("Для игры — верх (утиль)");
+        form.add(field("Что даёт", effectEditor("верх_эффект")));
+
         section("Номер");
         form.add(field("Номер карты", text("номер", false, "")));
+    }
+
+    /** Выбор из списка [код, подпись]; хранится код. */
+    private javax.swing.JComboBox<String> combo(String[][] items, String current,
+                                                Consumer<String> on) {
+        javax.swing.JComboBox<String> cb = new javax.swing.JComboBox<>();
+        int sel = 0;
+        for (int i = 0; i < items.length; i++) {
+            cb.addItem(items[i][1]);
+            if (items[i][0].equals(current)) {
+                sel = i;
+            }
+        }
+        cb.setSelectedIndex(sel);
+        cb.addActionListener(e -> on.accept(items[cb.getSelectedIndex()][0]));
+        return cb;
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String, Object> sub(String key) {
+        Object v = card.fields.get(key);
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        if (v instanceof java.util.Map<?, ?> mm) {
+            m.putAll((java.util.Map<String, Object>) mm);
+        }
+        return m;
+    }
+
+    private void subPut(String key, String k, Object v) {
+        java.util.Map<String, Object> m = sub(key);
+        m.put(k, v);
+        changed(key, m);
+    }
+
+    /** Событие свойства: что случилось, и для ветки/развилки — какая. */
+    private JComponent whenEditor(String key) {
+        java.util.Map<String, Object> m = sub(key);
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        p.setOpaque(false);
+        String ev = String.valueOf(m.getOrDefault("событие", "ход"));
+        p.add(combo(GameEntry.EVENTS, ev, v -> {
+            subPut(key, "событие", v);
+            setCard(card);
+        }));
+        if ("ветка".equals(ev)) {
+            p.add(combo(GameEntry.BRANCHES, String.valueOf(m.getOrDefault("ветка", "mining")),
+                v -> subPut(key, "ветка", v)));
+        } else if ("развилка".equals(ev)) {
+            p.add(combo(GameEntry.FORKS, String.valueOf(m.getOrDefault("развилка", "extract")),
+                v -> subPut(key, "развилка", v)));
+        }
+        if (card.fields.get(key) == null) {
+            card.fields.put(key, new java.util.LinkedHashMap<>(java.util.Map.of("событие", ev)));
+        }
+        return p;
+    }
+
+    /** Эффект: что и сколько (для «сыграй ветку» — какую). */
+    private JComponent effectEditor(String key) {
+        java.util.Map<String, Object> m = sub(key);
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        p.setOpaque(false);
+        String what = String.valueOf(m.getOrDefault("что", "спец"));
+        p.add(combo(GameEntry.EFFECTS, what, v -> {
+            subPut(key, "что", v);
+            setCard(card);
+        }));
+        boolean counted = java.util.Set.of("спец", "coin", "ammo", "kelium", "trophy").contains(what);
+        if (counted) {
+            JSpinner sp = new JSpinner(new SpinnerNumberModel(
+                m.get("сколько") instanceof Number n ? n.intValue() : 1, 1, 6, 1));
+            sp.setPreferredSize(new Dimension(64, 30));
+            sp.addChangeListener(e -> subPut(key, "сколько", (Integer) sp.getValue()));
+            p.add(sp);
+        }
+        if ("free_action".equals(what)) {
+            p.add(combo(GameEntry.BRANCHES, String.valueOf(m.getOrDefault("ветка", "mining")),
+                v -> subPut(key, "ветка", v)));
+        }
+        if (card.fields.get(key) == null) {
+            card.fields.put(key, new java.util.LinkedHashMap<>(java.util.Map.of("что", what)));
+        }
+        return p;
+    }
+
+    /** Утиль задания для игры — из утилей языка карт. */
+    private JComponent utilCombo() {
+        kelium.cards.objectives.Утиль[] all = kelium.cards.objectives.Утиль.values();
+        String[][] items = new String[all.length + 1][];
+        items[0] = new String[] {"", "— не выбран —"};
+        for (int i = 0; i < all.length; i++) {
+            items[i + 1] = new String[] {all[i].name(), all[i].метка()};
+        }
+        return combo(items, card.text("утиль"), v -> changed("утиль", v));
+    }
+
+    /** Выгрузить все карты папки мастерской в колоды игры. */
+    private void toGame() {
+        try {
+            ВыгрузкаВИгру.Итог и = ВыгрузкаВИгру.выгрузить(workFolder(), workFolder());
+            StringBuilder sb = new StringBuilder("Выгружено: заданий " + и.заданий() + ", арсенала "
+                + и.арсенала() + "\n" + и.задания() + "\n" + и.арсенал());
+            if (!и.замечания().isEmpty()) {
+                sb.append("\n\nЗамечания:");
+                for (String з : и.замечания().subList(0, Math.min(25, и.замечания().size()))) {
+                    sb.append("\n• ").append(з);
+                }
+            }
+            JTextArea a = new JTextArea(sb.toString(), 16, 70);
+            a.setEditable(false);
+            JOptionPane.showMessageDialog(frame, new JScrollPane(a), "В игру",
+                JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(frame, "Не выгрузилось: " + e);
+        }
     }
 
     /** Выбор рисунка шаблона — если у типа их несколько. */

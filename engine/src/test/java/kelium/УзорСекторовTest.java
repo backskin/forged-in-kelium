@@ -134,4 +134,39 @@ class УзорСекторовTest {
         }
         assertFalse(Figures.sectorsSatisfied(s, 0, у), "узор из чужих жетонов не мой");
     }
+
+    @Test
+    void авиацияЗакрываетОдинСекторСвоегоГекса() {
+        GameState s = Fix.game(4, 31337L);
+        Map<String, Object> у = узор(0, false);
+        assertTrue(выложить(s, у));
+        // снять один жетон опорного гекса (там два сектора) и поставить туда авиацию
+        UnitToken снятый = null;
+        Hex опора = null;
+        for (UnitToken u : s.player(0).units) {
+            Hex h = s.field.get(u.hexId);
+            if (u.uid >= 9100 && h != null && h.groundTokens.size() >= 2) {
+                снятый = u;
+                опора = h;
+                break;
+            }
+        }
+        assertTrue(снятый != null, "на опорном гексе два жетона");
+        опора.freeSidesByToken(снятый.uid);
+        s.player(0).units.remove(снятый);
+        assertFalse(Figures.sectorsSatisfied(s, 0, у), "без жетона узор не выложен");
+        UnitToken air = new UnitToken(UnitType.AIRCRAFT, 0, 1, 9900);
+        air.setHexId(опора.id);
+        s.player(0).units.add(air);
+        опора.airToken = 9900;
+        assertTrue(Figures.sectorsSatisfied(s, 0, у), "авиация закрыла недостающий сектор");
+        // второй недостающий сектор того же гекса авиация уже не закроет
+        for (UnitToken u : new ArrayList<>(s.player(0).units)) {
+            if (u.uid >= 9100 && u.uid < 9900 && опора.id.equals(u.hexId)) {
+                опора.freeSidesByToken(u.uid);
+                s.player(0).units.remove(u);
+            }
+        }
+        assertFalse(Figures.sectorsSatisfied(s, 0, у), "одна авиация — один сектор");
+    }
 }
