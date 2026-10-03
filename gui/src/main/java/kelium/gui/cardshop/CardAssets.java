@@ -120,6 +120,31 @@ public final class CardAssets {
         return im;
     }
 
+    /** Шаблон слоями: фон и поверх подложка (любой из двух может отсутствовать). */
+    public BufferedImage layered(String bg, String over) {
+        String key = bg + "|" + over;
+        if (templateCache.containsKey(key)) {
+            return templateCache.get(key);
+        }
+        BufferedImage b = bg == null ? null : template(bg);
+        BufferedImage o = over == null ? null : template(over);
+        BufferedImage out = null;
+        if (b != null || o != null) {
+            BufferedImage base = b != null ? b : o;
+            out = new BufferedImage(base.getWidth(), base.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = out.createGraphics();
+            if (b != null) {
+                g.drawImage(b, 0, 0, null);
+            }
+            if (o != null) {
+                g.drawImage(o, 0, 0, null);
+            }
+            g.dispose();
+        }
+        templateCache.put(key, out);
+        return out;
+    }
+
     public boolean hasTemplate(String file) {
         return template(file) != null;
     }
@@ -207,20 +232,21 @@ public final class CardAssets {
     public static final Map<String, String> ALIAS = new HashMap<>();
     static {
         String[][] a = {
+            // номера выгрузки 03.10.2026
             {"coin", "1"}, {"монета", "1"}, {"ammo", "3"}, {"боеприпас", "3"}, {"kel", "5"},
             {"келемий", "5"}, {"gear", "8"}, {"trophy", "9"}, {"трофей", "9"}, {"box", "13"},
-            {"контейнер", "13"}, {"arsenal", "14"}, {"star", "21"}, {"heart", "22"},
-            {"ring", "24"}, {"spec", "25"}, {"спец", "25"}, {"inf", "27"}, {"cell", "28"},
-            {"swap", "32"}, {"питание", "32"}, {"assembly", "33"}, {"mining", "34"},
-            {"добыча", "34"}, {"movement", "35"}, {"combat", "36"}, {"бой", "36"},
-            {"market", "37"}, {"рынок", "37"}, {"science", "38"}, {"наука", "38"},
-            {"order", "39"}, {"mod_attack", "40"}, {"mod_assembly", "41"}, {"gild", "43"},
-            {"troops", "49"}, {"modules_move", "52"}, {"troops_plus", "63"},
-            {"buildings", "69"}, {"arrow", "75"}, {"container_cell", "79"},
-            {"supply", "действие — снабжение"}, {"снабжение", "действие — снабжение"},
-            {"command", "действие — командование"}, {"командование", "действие — командование"},
-            {"develop", "действие — развитие"}, {"развитие", "действие — развитие"},
-            {"military", "военное здание"},
+            {"контейнер", "13"}, {"arsenal", "15"}, {"star", "22"}, {"heart", "23"},
+            {"ring", "25"}, {"spec", "26"}, {"спец", "26"}, {"inf", "28"}, {"cell", "29"},
+            {"military", "30"}, {"build_mode", "32"}, {"стройка", "32"},
+            {"swap", "34"}, {"питание", "34"}, {"assembly", "35"}, {"снабжение", "35"},
+            {"supply", "35"}, {"mining", "36"}, {"добыча", "36"}, {"command", "37"},
+            {"командование", "37"}, {"movement", "38"}, {"combat", "39"}, {"бой", "39"},
+            {"develop", "40"}, {"развитие", "40"}, {"market", "41"}, {"рынок", "41"},
+            {"science", "42"}, {"наука", "42"}, {"science_track", "43"}, {"order", "44"},
+            {"mod_attack", "45"}, {"mod_assembly", "46"}, {"gild", "48"}, {"troops", "54"},
+            {"modules_move", "57"}, {"troops_plus", "69"}, {"buildings", "75"},
+            {"reaction", "78"}, {"реакция", "78"}, {"arrow", "81"}, {"container_cell", "85"},
+            {"приказ", "92"},
         };
         for (String[] p : a) {
             ALIAS.put(p[0], p[1]);

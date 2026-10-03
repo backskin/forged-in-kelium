@@ -125,7 +125,7 @@ public final class Reward {
             }
             double x = cx - total / 2 + ring / 2;
             for (int i = 0; i < n; i++) {
-                k.put("24", x, cy, ring, ring);
+                k.put("25", x, cy, ring, ring);
                 k.put(items.get(i).icon(), x, cy - ring * 0.02, ring * 0.945, ring * 0.945);
                 if (either && i == 0) {
                     slash(k, x + ring / 2 + gap / 2, cy, ring);

@@ -197,8 +197,8 @@ public final class CardShop {
         switch (c.type().layout) {
             case OBJECTIVE -> objectiveForm();
             case ARSENAL -> arsenalForm();
-            case NONE -> form.add(note("Раскладку этого типа ещё не сделали. Пустой шаблон "
-                + "кладите в «шаблоны карт» под именем «" + c.type().pattern + "»."));
+            case MARKET -> marketForm();
+            case CONTAINER -> containerForm();
         }
         form.revalidate();
         form.repaint();
@@ -216,18 +216,23 @@ public final class CardShop {
         form.add(field("Эффект верха", text("верх", true, "строки — как на карте")));
 
         section("Название и условие");
-        form.add(field("Рисунок шаблона", segmentedNumbers("рисунок", 11)));
+        art();
         form.add(field("Название карты", text("имя", false, "")));
         form.add(field("Условие", text("условие", true,
-            "перенос сам — ровными строками; свой перенос — Enter")));
+            "перенос сам — ровными строками; свой перенос — Enter. С фигурой можно оставить "
+                + "пустым — напечатается «Займи своими жетонами закрашенные секторы»")));
+        section("Фигура — закрашенные секторы надо занять своими жетонами");
+        form.add(figure("фигура"));
 
         section("Награда");
         form.add(new RewardEditor("награда", true));
 
-        section("Дополнительно — усиленное условие и награда");
-        form.add(field("Условие", text("дополнительно", true,
-            "пусто — шаблон без полосы «дополнительно», награда опустится ниже")));
-        form.add(new RewardEditor("доп_награда", false));
+        if (card.type() != CardSpec.Type.OBJECTIVE_START) {
+            section("Дополнительно — усиленное условие и награда");
+            form.add(field("Условие", text("дополнительно", true,
+                "пусто — шаблон без полосы «дополнительно», награда опустится ниже")));
+            form.add(new RewardEditor("доп_награда", false));
+        }
 
         section("Номер");
         form.add(field("Номер карты", text("номер", false, "в правом нижнем углу")));
@@ -242,8 +247,11 @@ public final class CardShop {
         form.add(field("Иконки слева", text("верх_слева", false, "перед текстом: -X {1} = {8}")));
         form.add(field("Иконки справа", text("верх_справа", false, "после текста: {39}")));
         section("Название и постоянный эффект");
+        art();
         form.add(field("Название", text("имя", false, "")));
         form.add(field("Эффект", text("низ", true, "**жирное** — жирным")));
+        section("Фигура — свойство работает, пока на поле есть такая фигура");
+        form.add(figure("фигура"));
         form.add(field("Ряд иконок", text("ряд", false,
             "под текстом по центру; {/} перечёркивает иконку перед ним")));
         form.add(field("Звезда", segmentedBool("звезда", "нет", "★ есть")));
@@ -258,6 +266,47 @@ public final class CardShop {
         }
         section("Номер");
         form.add(field("Номер карты", text("номер", false, "")));
+    }
+
+    /** Выбор рисунка шаблона — если у типа их несколько. */
+    private void art() {
+        int n = card.type().arts();
+        if (n > 1) {
+            form.add(field("Рисунок шаблона", segmentedNumbers("рисунок", n)));
+        }
+    }
+
+    private void marketForm() {
+        section("Рынок — два предложения");
+        art();
+        form.add(field("Слева", text("слева", true, "строками: «Выполни» / «Манёвр»")));
+        form.add(field("Иконка слева", text("иконка_слева", false, "{38}")));
+        form.add(field("Справа", text("справа", true, "строками")));
+        form.add(field("Иконка справа", text("иконка_справа", false, "{34}")));
+        section("Номер");
+        form.add(field("Номер карты", text("номер", false, "")));
+    }
+
+    private void containerForm() {
+        section("Контейнер");
+        form.add(field("Буква", text("буква", false, "А, Б, В… — слева сверху")));
+        form.add(field("Число", text("число", false, "справа сверху")));
+        form.add(field("Иконка", text("иконка", false, "одна или несколько: {1}{1}")));
+        form.add(field("Название", text("имя", true, "одна-две строки")));
+    }
+
+    /** Редактор фигуры; рядом с фигурой карта хранит и её узел для игры («язык»). */
+    private JComponent figure(String key) {
+        return new FigureEditor(Figure.of(card.fields.get(key)), f -> {
+            if (f.isEmpty()) {
+                card.fields.remove(key);
+                card.fields.remove("язык_фигуры");
+                redraw.restart();
+            } else {
+                card.fields.put("язык_фигуры", f.node(card.text("имя")));
+                changed(key, f.toList());
+            }
+        });
     }
 
     private void section(String name) {
@@ -716,10 +765,12 @@ public final class CardShop {
 
     private static String templateName(CardSpec c) {
         CardSpec.Type t = c.type();
-        if (t.layout == CardSpec.Layout.OBJECTIVE) {
-            return t.templateFile(c.integer("рисунок", 1), !c.text("дополнительно").isBlank());
+        if (t.wholeFile() != null) {
+            return t.wholeFile();
         }
-        return t.templateFile(c.bool("спец") ? 2 : 1, false);
+        boolean alt = t.layout == CardSpec.Layout.OBJECTIVE ? !c.text("дополнительно").isBlank()
+            : c.bool("спец");
+        return t.bgFile(c.integer("рисунок", 1)) + " + " + t.overFile(alt);
     }
 
     /** Предпросмотр: карта вписана в панель; если не нарисовалась — прежняя, приглушённо. */

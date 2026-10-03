@@ -110,6 +110,12 @@ public final class Срабатывания {
                     if (!подходит(s, p.seat, когда, событие)) {
                         continue;
                     }
+                    // УСЛОВИЕ-ФИГУРА (дизайнер 03.10.2026): «если на поле есть эта
+                    // фигура» — свойство работает, только пока узор выложен
+                    if (низ.get("если") instanceof Map<?, ?> узор
+                            && !Figures.sectorsSatisfied(s, p.seat, узор)) {
+                        continue;
+                    }
                     int предел = низ.get("предел") instanceof Number n ? n.intValue() : 1;
                     if (s.journal.срабатываний(p.seat, cid) >= предел) {
                         continue;

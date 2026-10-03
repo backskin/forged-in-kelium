@@ -1177,46 +1177,9 @@ public interface Требование {
      * отражение потребовало бы смены направления обхода, его нет намеренно.
      */
     record Узор(List<int[]> пути, List<int[]> секторы, String имя) implements Требование {
-        /** Сколько секторов узла занято лучшим положением; -1 — узор не ложится нигде. */
+        /** Сколько секторов занято лучшим положением; -1 — узор не ложится нигде. */
         private int лучшее(CardContext ctx) {
-            GameState s = ctx.state();
-            Set<Integer> мои = new HashSet<>();
-            for (Token t : жетоны(s, ctx.seat(), true)) {
-                мои.add(t.uid());
-            }
-            int best = -1;
-            // опора — любой гекс поля: узел может начинаться с гекса, где жетона ещё нет
-            for (String опора : s.field.hexes.keySet()) {
-                for (int поворот = 0; поворот < 6; поворот++) {
-                    int n = занято(s, опора, поворот, мои);
-                    if (n > best) {
-                        best = n;
-                    }
-                }
-            }
-            return best;
-        }
-
-        private int занято(GameState s, String опора, int поворот, Set<Integer> мои) {
-            int n = 0;
-            for (int i = 0; i < пути.size(); i++) {
-                String cur = опора;
-                for (int side : пути.get(i)) {
-                    kelium.core.Hex h = s.field.get(cur);
-                    cur = h == null ? null : h.neighborBySide[Math.floorMod(side + поворот, 6)];
-                    if (cur == null) {
-                        return -1;      // узор свисает за край поля
-                    }
-                }
-                kelium.core.Hex h = s.field.get(cur);
-                for (int сектор : секторы.get(i)) {
-                    Integer uid = h.sideOwner[Math.floorMod(сектор + поворот, 6)];
-                    if (uid != null && мои.contains(uid)) {
-                        n++;
-                    }
-                }
-            }
-            return n;
+            return kelium.engine.Figures.sectorsBest(ctx.state(), ctx.seat(), запись());
         }
 
         int всего() {

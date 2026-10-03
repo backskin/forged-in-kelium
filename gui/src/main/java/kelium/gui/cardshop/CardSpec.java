@@ -19,39 +19,71 @@ import org.yaml.snakeyaml.Yaml;
 public final class CardSpec {
 
     /** Раскладка — как рисовать; тип — какой шаблон брать. */
-    public enum Layout { OBJECTIVE, ARSENAL, NONE }
+    public enum Layout { OBJECTIVE, ARSENAL, MARKET, CONTAINER }
 
-    /** Типы карт мастерской и их пустые шаблоны в папке «шаблоны карт». */
+    /**
+     * Типы карт мастерской. ШАБЛОНЫ СЛОЯМИ (выгрузка дизайнера 03.10.2026):
+     * иллюстрация из «шаблоны карт/фоны», поверх — плашки из «шаблоны
+     * карт/подложка». {@code bg} — имя фона с %d (номер рисунка) или без,
+     * {@code from..to} — номера рисунков, {@code over} / {@code overAlt} —
+     * подложка: у задания без/с «дополнительно», у арсенала ∞ / ▶.
+     */
     public enum Type {
-        OBJECTIVE("Задание", Layout.OBJECTIVE, "задания-шаблоны-%d.png"),
-        OBJECTIVE_START("Задание начальное", Layout.OBJECTIVE, "задания-начальные-шаблоны-%d.png"),
-        OBJECTIVE_SUPER("Задание супер", Layout.OBJECTIVE, "задания-супер-шаблоны-%d.png"),
-        ARSENAL("Арсенал", Layout.ARSENAL, "арсенал-%d.png"),
-        ARSENAL_START("Арсенал начальный", Layout.ARSENAL, "арсенал-начальный-%d.png"),
-        ARSENAL_SUPER("Арсенал супер", Layout.ARSENAL, "арсенал-супер-%d.png"),
-        MARKET("Рынок", Layout.NONE, "карта-рынка-шаблон.png");
+        OBJECTIVE("Задание", Layout.OBJECTIVE, "задания-шаблоны-%d.png", 4, 14,
+            "задания-шаблон.png", "задания-шаблон-с-доп.png"),
+        OBJECTIVE_START("Задание начальное", Layout.OBJECTIVE, "Задания начальные шаблоны.png", 1, 1,
+            "Задания начальные шаблоны.png", "Задания начальные шаблоны.png"),
+        ARSENAL("Арсенал", Layout.ARSENAL, "арсенал-шаблоны-%d.png", 4, 17,
+            "арсенал-шаблоны-2.png", "арсенал-шаблоны-3.png"),
+        ARSENAL_START("Арсенал начальный", Layout.ARSENAL, "арсенал-начальный.png", 1, 1,
+            "арсенал-начальный-2.png", "арсенал-начальный-1.png"),
+        ARSENAL_SUPER("Арсенал супер", Layout.ARSENAL, "арсенал-супер-шаблоны-%d.png", 3, 6,
+            "арсенал-супер-шаблоны-1.png", "арсенал-супер-шаблоны-2.png"),
+        MARKET("Рынок", Layout.MARKET, "рынок-шаблоны-%d.png", 2, 10,
+            "рынок-шаблоны.png", "рынок-шаблоны.png"),
+        CONTAINER("Контейнер", Layout.CONTAINER, null, 1, 1, null, null);
 
         public final String ru;
         public final Layout layout;
-        public final String pattern;
+        public final String bg;
+        public final int from;
+        public final int to;
+        public final String over;
+        public final String overAlt;
 
-        Type(String ru, Layout layout, String pattern) {
+        Type(String ru, Layout layout, String bg, int from, int to, String over, String overAlt) {
             this.ru = ru;
             this.layout = layout;
-            this.pattern = pattern;
+            this.bg = bg;
+            this.from = from;
+            this.to = to;
+            this.over = over;
+            this.overAlt = overAlt;
         }
 
-        /**
-         * Имя файла шаблона. У заданий рисунки идут парами: чётный номер — с
-         * полосой «дополнительно», нечётный — без неё (рисунок 1 = файлы 2 и 3).
-         * У арсенала: 1 — ∞, 2 — ▶.
-         */
-        public String templateFile(int art, boolean withDop) {
-            if (layout == Layout.OBJECTIVE) {
-                int n = art * 2 + (withDop ? 0 : 1);
-                return String.format(pattern, n);
+        /** Сколько рисунков у типа. */
+        public int arts() {
+            return to - from + 1;
+        }
+
+        /** Файл фона для рисунка art (1..arts()); null — у типа фон один с подложкой. */
+        public String bgFile(int art) {
+            if (bg == null) {
+                return null;
             }
-            return pattern.contains("%d") ? String.format(pattern, art) : pattern;
+            int a = Math.max(1, Math.min(arts(), art));
+            return "фоны/" + (bg.contains("%d") ? String.format(bg, from + a - 1) : bg);
+        }
+
+        /** Файл подложки: alt — у задания «с дополнительно», у арсенала ▶. */
+        public String overFile(boolean alt) {
+            String o = alt ? overAlt : over;
+            return o == null ? null : "подложка/" + o;
+        }
+
+        /** Шаблон целиком — для типа без слоёв (контейнер). */
+        public String wholeFile() {
+            return this == CONTAINER ? "контейнер.png" : null;
         }
 
         public static Type of(String ru) {
@@ -73,6 +105,7 @@ public final class CardSpec {
 
     public CardSpec(Type t) {
         fields.put("тип", t.ru);
+        fields.put("иконки", IconNumbers.VERSION);
     }
 
     public Type type() {
@@ -124,9 +157,11 @@ public final class CardSpec {
         Object raw = new Yaml().load(Files.readString(f.toPath(), StandardCharsets.UTF_8));
         Map<String, Object> m = raw instanceof Map<?, ?> mm ? (Map<String, Object>) mm : Map.of();
         CardSpec c = new CardSpec(Type.of(String.valueOf(m.getOrDefault("тип", "Задание"))));
+        c.fields.remove("иконки");
         for (var e : m.entrySet()) {
             c.fields.put(e.getKey(), e.getValue());
         }
+        IconNumbers.migrate(c);     // карта до выгрузки 03.10.2026 — на новые номера
         return c;
     }
 
@@ -139,22 +174,22 @@ public final class CardSpec {
             f.put("слот", "∞");
             f.put("верх_вид", "реакция");
             f.put("заголовок_верха", "Закрома");
-            f.put("иконка_верха", "{52}");
+            f.put("иконка_верха", "{57}");
             f.put("верх", "Получи 2 {3} боеприпаса, если\nкто-либо атакует твой жетон");
             f.put("имя", "Новое задание");
             f.put("условие", "Имей на поле 2 своих добытчика с полной энергией");
             Reward r = new Reward();
             r.kind = Reward.ACTION;
             r.choice = Reward.EITHER;
+            r.items.add(new Reward.Item("36", 1));
             r.items.add(new Reward.Item("34", 1));
-            r.items.add(new Reward.Item("32", 1));
             f.put("награда", r.toMap());
             f.put("дополнительно", "на разных гексах.");
             Reward d = new Reward();
             d.kind = Reward.RESOURCES;
             d.choice = Reward.ALL;
             d.items.add(new Reward.Item("1", 2));
-            d.items.add(new Reward.Item("25", 1));
+            d.items.add(new Reward.Item("26", 1));
             f.put("доп_награда", d.toMap());
             f.put("номер", 1);
         } else if (t.layout == Layout.ARSENAL) {
@@ -162,19 +197,31 @@ public final class CardSpec {
             f.put("верх", "Замени карту приказа\nс руки на одну из сброса");
             f.put("верх_по_центру", false);
             f.put("верх_слева", "");
-            f.put("верх_справа", "{39}");
+            f.put("верх_справа", "{44}");
             f.put("имя", "Новая карта");
-            f.put("низ", "Если в этот ход у тебя **совпадение** приказов, получи ещё одно {25} "
+            f.put("низ", "Если в этот ход у тебя **совпадение** приказов, получи ещё одно {26} "
                 + "спец-действие.");
             f.put("ряд", "");
             f.put("звезда", false);
             f.put("цена", "1");
             f.put("цена_иконка", "{1}");
-            f.put("спец_иконка", "{32}");
+            f.put("спец_иконка", "{34}");
             f.put("спец_знак", "=1");
             f.put("спец_текст", "перемести\n1 кубик\nэнергии");
             f.put("контейнер", true);
             f.put("номер", 1);
+        } else if (t.layout == Layout.MARKET) {
+            f.put("рисунок", 1);
+            f.put("слева", "Выполни\n«Манёвр»");
+            f.put("иконка_слева", "{38}");
+            f.put("справа", "Выполни\n«Питание»");
+            f.put("иконка_справа", "{34}");
+            f.put("номер", 1);
+        } else if (t.layout == Layout.CONTAINER) {
+            f.put("буква", "А");
+            f.put("число", "3");
+            f.put("иконка", "{1}{1}");
+            f.put("имя", "спрятанная\nналичность");
         }
         return c;
     }
