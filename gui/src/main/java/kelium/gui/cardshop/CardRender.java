@@ -40,6 +40,7 @@ public final class CardRender {
             case MARKET -> market(a, c);
             case CONTAINER -> container(a, c);
             case HEX -> spawnHex(a, c);
+            case ORDER -> order(a, c);
         };
     }
 
@@ -53,7 +54,9 @@ public final class CardRender {
             }
             return im;
         }
-        String bg = t.bgFile(c.integer("рисунок", 1));
+        // ЛЮБОЙ ФОН (дизайнер 03.10.2026: «чтобы все были доступны фоны»):
+        // выбранный файл фона перекрывает рисунок по номеру
+        String bg = c.text("фон").isBlank() ? t.bgFile(c.integer("рисунок", 1)) : c.text("фон");
         String over = t.overFile(alt);
         BufferedImage im = a.layered(bg, over);
         if (im == null || a.template(over) == null) {
@@ -850,6 +853,83 @@ public final class CardRender {
             }
             x += w + gap;
         }
+    }
+
+    // ======================================================================
+    //  ПРИКАЗ (661×1028): название, два верхних кольца с подписями, плашка,
+    //  полоса нижнего приказа и два нижних кольца — как tools/gen_orders_5.py
+    // ======================================================================
+    static final Color O_SIGN = new Color(47, 58, 52);
+    static final Color O_TITLE = new Color(246, 243, 238);
+    static final Color O_STROKE = new Color(78, 52, 42);
+
+    static BufferedImage order(CardAssets a, CardSpec c) {
+        String file = "карты-приказов-" + (c.text("цвет").isBlank() ? "красный" : c.text("цвет"))
+            + ".png";
+        BufferedImage tpl = a.template(file);
+        if (tpl == null) {
+            throw new Problem("Нет шаблона «" + file + "» в папке «" + a.templates + "»");
+        }
+        CardCanvas k = new CardCanvas(a, tpl);
+        title(k, c.text("имя"), 340, 68, 520, 52, null);
+        ring(k, c.text("верх_слева"), 168, 339, 78);
+        ring(k, c.text("верх_справа"), 491, 340, 78);
+        sign(k, c.text("подпись_слева"), 168, 339 + 112, 300, 46);
+        sign(k, c.text("подпись_справа"), 491, 340 + 112, 300, 46);
+        List<String> pl = CardAssets.tokens(c.text("плашка"));
+        if (!pl.isEmpty()) {
+            k.g.setColor(new Color(255, 255, 255, 120));
+            k.g.fill(new RoundRectangle2D.Double(140 * 2, 518 * 2, 380 * 2, 76 * 2, 76 * 2, 76 * 2));
+            centreChips(k, pl, 330, 556, 66, 50);
+        }
+        title(k, c.text("низ_имя"), 400, 680, 430, 50, O_STROKE);
+        ring(k, c.text("низ_слева"), 177, 803, 61);
+        ring(k, c.text("низ_справа"), 482, 803, 61);
+        sign(k, c.text("низ_подпись_слева"), 177, 803 + 90, 290, 44);
+        sign(k, c.text("низ_подпись_справа"), 482, 803 + 90, 290, 44);
+        return k.finish();
+    }
+
+    /** Название приказа: сверху светлое, внизу — с толстой коричневой обводкой. */
+    static void title(CardCanvas k, String text, double cx, double cy, double maxW, double px,
+                      Color stroke) {
+        if (text.isBlank()) {
+            return;
+        }
+        Font f = k.font("TekturNarrow-Bold.ttf", px);
+        while (k.len(text, f) > maxW * 2 && px > 24) {
+            px -= 1;
+            f = k.font("TekturNarrow-Bold.ttf", px);
+        }
+        k.text(text, f, cx * 2, cy * 2, 'm', O_TITLE, stroke, stroke == null ? 0 : Math.max(2, px / 14) * 2);
+    }
+
+    /** Иконки в кольце: одна — крупно, две — по диагонали. */
+    static void ring(CardCanvas k, String text, double cx, double cy, double r) {
+        List<String> keys = new ArrayList<>();
+        for (String t : CardAssets.tokens(text)) {
+            if (t.startsWith("{")) {
+                keys.add(t.substring(1, t.length() - 1));
+            }
+        }
+        if (keys.size() == 1) {
+            k.put(keys.get(0), cx, cy, r * 2.05, r * 2.05);
+        } else if (keys.size() >= 2) {
+            k.put(keys.get(0), cx - r * 0.42, cy - r * 0.40, r * 1.25, r * 1.25);
+            k.put(keys.get(1), cx + r * 0.42, cy + r * 0.38, r * 1.25, r * 1.25);
+        }
+    }
+
+    static void sign(CardCanvas k, String text, double cx, double y, double maxW, double px) {
+        if (text.isBlank()) {
+            return;
+        }
+        Font f = k.font("TekturNarrow-Regular.ttf", px);
+        while (k.len(text, f) > maxW * 2 && px > 12) {
+            px -= 1;
+            f = k.font("TekturNarrow-Regular.ttf", px);
+        }
+        k.text(text, f, cx * 2, y * 2, 'm', O_SIGN, null, 0);
     }
 
     static String str(Map<String, Object> m, String k) {

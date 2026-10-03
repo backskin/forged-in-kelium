@@ -203,6 +203,7 @@ public final class CardShop {
             case MARKET -> marketForm();
             case CONTAINER -> containerForm();
             case HEX -> hexForm();
+            case ORDER -> orderForm();
         }
         form.revalidate();
         form.repaint();
@@ -412,12 +413,56 @@ public final class CardShop {
         }
     }
 
-    /** Выбор рисунка шаблона — если у типа их несколько. */
+    /** Выбор рисунка шаблона — если у типа их несколько — и любого фона того же размера. */
     private void art() {
         int n = card.type().arts();
         if (n > 1) {
             form.add(field("Рисунок шаблона", segmentedNumbers("рисунок", n)));
         }
+        form.add(field("Любой фон", backgroundCombo()));
+    }
+
+    /** Все фоны папки «фоны» размера этой карты; «по рисунку» — номер выше. */
+    private JComponent backgroundCombo() {
+        int[] wh = switch (card.type().layout) {
+            case ARSENAL -> new int[] {803, 520};
+            case MARKET -> new int[] {1028, 661};
+            default -> new int[] {661, 1028};
+        };
+        List<String> all = assets.backgrounds(wh[0], wh[1]);
+        String[][] items = new String[all.size() + 2][];
+        items[0] = new String[] {"", "— по номеру рисунка —"};
+        items[1] = new String[] {"белый", "белый, без рисунка"};
+        for (int i = 0; i < all.size(); i++) {
+            items[i + 2] = new String[] {all.get(i), all.get(i).substring("фоны/".length())};
+        }
+        return combo(items, card.text("фон"), v -> {
+            if (v.isEmpty()) {
+                card.fields.remove("фон");
+                redraw.restart();
+            } else {
+                changed("фон", v);
+            }
+        });
+    }
+
+    private void orderForm() {
+        section("Приказ");
+        form.add(field("Цвет", segmented("цвет", new String[] {"красный", "синий", "зеленый", "желтый"},
+            new String[] {"красный", "синий", "зелёный", "жёлтый"})));
+        form.add(field("Название", text("имя", false, "ОСВОИТЬ")));
+        section("Верхний приказ — два действия");
+        form.add(field("Слева", text("верх_слева", false, "одна иконка или две: {36}")));
+        form.add(field("Подпись", text("подпись_слева", false, "добыча")));
+        form.add(field("Справа", text("верх_справа", false, "{34}")));
+        form.add(field("Подпись", text("подпись_справа", false, "питание")));
+        form.add(field("Плашка", text("плашка", false, "спец-плашка: {26} : {1}{1}; пусто — без плашки")));
+        section("Нижний приказ");
+        form.add(field("Название", text("низ_имя", false, "НАСТУПАТЬ")));
+        form.add(field("Слева", text("низ_слева", false, "{35}")));
+        form.add(field("Подпись", text("низ_подпись_слева", false, "снабжение")));
+        form.add(field("Справа", text("низ_справа", false, "{37}")));
+        form.add(field("Подпись", text("низ_подпись_справа", false, "командование")));
     }
 
     private void marketForm() {
@@ -946,6 +991,12 @@ public final class CardShop {
         CardSpec.Type t = c.type();
         if (t.wholeFile() != null) {
             return t.wholeFile();
+        }
+        if (!c.text("фон").isBlank()) {
+            return c.text("фон") + " + подложка типа";
+        }
+        if (t.layout == CardSpec.Layout.ORDER) {
+            return "карты-приказов-" + c.text("цвет") + ".png";
         }
         if (t.layout == CardSpec.Layout.HEX) {
             return t.hexFile("рыжая".equals(c.text("сторона")), c.integer("рисунок", 1));

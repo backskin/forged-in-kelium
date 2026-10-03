@@ -19,7 +19,7 @@ import org.yaml.snakeyaml.Yaml;
 public final class CardSpec {
 
     /** Раскладка — как рисовать; тип — какой шаблон брать. */
-    public enum Layout { OBJECTIVE, ARSENAL, MARKET, CONTAINER, HEX }
+    public enum Layout { OBJECTIVE, ARSENAL, MARKET, CONTAINER, HEX, ORDER }
 
     /**
      * Типы карт мастерской. ШАБЛОНЫ СЛОЯМИ (выгрузка дизайнера 03.10.2026):
@@ -42,7 +42,8 @@ public final class CardSpec {
         MARKET("Рынок", Layout.MARKET, "рынок-шаблоны-%d.png", 2, 10,
             "рынок-шаблоны.png", "рынок-шаблоны.png"),
         CONTAINER("Контейнер", Layout.CONTAINER, null, 1, 1, null, null),
-        SPAWN_HEX("Гекс зарождения", Layout.HEX, null, 1, 2, null, null);
+        SPAWN_HEX("Гекс зарождения", Layout.HEX, null, 1, 2, null, null),
+        ORDER("Приказ", Layout.ORDER, null, 1, 1, null, null);
 
         public final String ru;
         public final Layout layout;
@@ -234,6 +235,19 @@ public final class CardSpec {
             f.put("число", "3");
             f.put("ярлык", "0 {5} ?");
             f.put("ряд", "+ {9} → {52}");
+        } else if (t.layout == Layout.ORDER) {
+            f.put("цвет", "красный");
+            f.put("имя", "ОСВОИТЬ");
+            f.put("верх_слева", "{36}");
+            f.put("подпись_слева", "добыча");
+            f.put("верх_справа", "{34}");
+            f.put("подпись_справа", "питание");
+            f.put("плашка", "{26} : {1}{1}");
+            f.put("низ_имя", "НАСТУПАТЬ");
+            f.put("низ_слева", "{35}");
+            f.put("низ_подпись_слева", "снабжение");
+            f.put("низ_справа", "{37}");
+            f.put("низ_подпись_справа", "командование");
         } else if (t.layout == Layout.CONTAINER) {
             f.put("буква", "А");
             f.put("число", "3");

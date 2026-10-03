@@ -120,6 +120,55 @@ public final class CardAssets {
         return im;
     }
 
+    /**
+     * ВСЕ ФОНЫ папки «шаблоны карт/фоны» нужного размера — любой рисунок можно
+     * взять для любой карты того же размера (имя файла — от папки шаблонов).
+     */
+    public List<String> backgrounds(int w, int h) {
+        List<String> out = new ArrayList<>();
+        File[] fs = new File(templates, "фоны").listFiles((d, n) -> n.toLowerCase().endsWith(".png"));
+        if (fs == null) {
+            return out;
+        }
+        java.util.Arrays.sort(fs, (a, b) -> natural(a.getName(), b.getName()));
+        for (File f : fs) {
+            try (javax.imageio.stream.ImageInputStream in = ImageIO.createImageInputStream(f)) {
+                java.util.Iterator<javax.imageio.ImageReader> it = ImageIO.getImageReaders(in);
+                if (!it.hasNext()) {
+                    continue;
+                }
+                javax.imageio.ImageReader r = it.next();
+                r.setInput(in);
+                // задания-шаблоны-2/3 — прежние белые шаблоны с плашками: поверх
+                // подложки плашки двоились бы; белый фон даёт пункт «белый»
+                boolean old = f.getName().matches("задания-шаблоны-[23][.]png");
+                if (!old && r.getWidth(0) == w && r.getHeight(0) == h) {
+                    out.add("фоны/" + f.getName());
+                }
+                r.dispose();
+            } catch (Exception e) {
+                // нечитаемый файл — пропустить
+            }
+        }
+        return out;
+    }
+
+    /** Сравнение имён с числами по-человечески: «-2» раньше «-10». */
+    static int natural(String a, String b) {
+        String pa = a.replaceAll("\\d+", "");
+        String pb = b.replaceAll("\\d+", "");
+        int c = pa.compareTo(pb);
+        if (c != 0) {
+            return c;
+        }
+        String na = a.replaceAll("\\D+", "");
+        String nb = b.replaceAll("\\D+", "");
+        if (!na.isEmpty() && !nb.isEmpty() && na.length() < 10 && nb.length() < 10) {
+            return Integer.compare(Integer.parseInt(na), Integer.parseInt(nb));
+        }
+        return a.compareTo(b);
+    }
+
     /** Рубашка типа карты из «экспорт-рубашки»; null — нет файла. */
     public BufferedImage back(CardSpec.Type t) {
         String f = switch (t) {
@@ -131,6 +180,7 @@ public final class CardAssets {
             case MARKET -> "Карты рынка.png";
             case CONTAINER -> "контейнеры.png";
             case SPAWN_HEX -> null;
+            case ORDER -> "карты-приказов-new-21.png";
         };
         if (f == null) {
             return null;
@@ -145,6 +195,19 @@ public final class CardAssets {
 
     /** Шаблон слоями: фон и поверх подложка (любой из двух может отсутствовать). */
     public BufferedImage layered(String bg, String over) {
+        if ("белый".equals(bg)) {
+            BufferedImage o = over == null ? null : template(over);
+            if (o == null) {
+                return null;
+            }
+            BufferedImage out = new BufferedImage(o.getWidth(), o.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = out.createGraphics();
+            g.setColor(java.awt.Color.WHITE);
+            g.fillRect(0, 0, o.getWidth(), o.getHeight());
+            g.drawImage(o, 0, 0, null);
+            g.dispose();
+            return out;
+        }
         String key = bg + "|" + over;
         if (templateCache.containsKey(key)) {
             return templateCache.get(key);
