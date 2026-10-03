@@ -201,6 +201,7 @@ public final class CardShop {
             case ARSENAL -> arsenalForm();
             case MARKET -> marketForm();
             case CONTAINER -> containerForm();
+            case HEX -> hexForm();
         }
         form.revalidate();
         form.repaint();
@@ -427,6 +428,17 @@ public final class CardShop {
         form.add(field("Иконка справа", text("иконка_справа", false, "{34}")));
         section("Номер");
         form.add(field("Номер карты", text("номер", false, "")));
+    }
+
+    private void hexForm() {
+        section("Жетон гекса зарождения");
+        form.add(field("Сторона", segmented("сторона", new String[] {"зелёная", "рыжая"},
+            new String[] {"зелёная рамка", "рыжая рамка"})));
+        form.add(field("Рисунок", segmentedNumbers("рисунок", 2)));
+        form.add(field("Start", segmentedBool("старт", "нет", "надпись Start")));
+        form.add(field("Число", text("число", false, "крупно справа от гекса с кубами")));
+        form.add(field("Ярлык", text("ярлык", false, "над плашкой: 0 {5} ?")));
+        form.add(field("Ряд", text("ряд", false, "в плашке: + {9} → {52}  (→ рисуется стрелкой)")));
     }
 
     private void containerForm() {
@@ -909,6 +921,9 @@ public final class CardShop {
         CardSpec.Type t = c.type();
         if (t.wholeFile() != null) {
             return t.wholeFile();
+        }
+        if (t.layout == CardSpec.Layout.HEX) {
+            return t.hexFile("рыжая".equals(c.text("сторона")), c.integer("рисунок", 1));
         }
         boolean alt = t.layout == CardSpec.Layout.OBJECTIVE ? !c.text("дополнительно").isBlank()
             : c.bool("спец");

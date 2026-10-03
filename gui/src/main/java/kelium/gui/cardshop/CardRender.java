@@ -39,6 +39,7 @@ public final class CardRender {
             case ARSENAL -> arsenal(a, c);
             case MARKET -> market(a, c);
             case CONTAINER -> container(a, c);
+            case HEX -> spawnHex(a, c);
         };
     }
 
@@ -773,6 +774,82 @@ public final class CardRender {
             k.text(name.get(i), f, 201 * 2, y * 2, 'm', C_TEXT, CardCanvas.WHITE, 3 * 2);
         }
         return k.finish();
+    }
+
+    // ======================================================================
+    //  ЖЕТОН ГЕКСА ЗАРОЖДЕНИЯ (1030×927): «Start», гекс с кубами и число,
+    //  внизу ярлык «0 {5} ?» и ряд «чем платят → что делают с гексом»
+    // ======================================================================
+    static final Color HEX_INK = new Color(48, 52, 58);
+
+    static BufferedImage spawnHex(CardAssets a, CardSpec c) {
+        boolean orange = "рыжая".equals(c.text("сторона"));
+        String file = c.type().hexFile(orange, c.integer("рисунок", 1));
+        BufferedImage tpl = a.template(file);
+        if (tpl == null) {
+            throw new Problem("Нет шаблона «" + file + "» в папке «" + a.templates + "»");
+        }
+        CardCanvas k = new CardCanvas(a, tpl);
+        if (c.bool("старт")) {
+            Font big = k.font("Tektur-Bold.ttf", 110);
+            Font small = k.font("Tektur-Bold.ttf", 64);
+            double w = k.len("S", big) + k.len("tart", small);
+            double x = 516 * 2 - w / 2;
+            k.text("S", big, x, 100 * 2, 'l', CardCanvas.WHITE, HEX_INK, 5 * 2);
+            k.text("tart", small, x + k.len("S", big) - 4, 114 * 2, 'l', CardCanvas.WHITE, HEX_INK,
+                4 * 2);
+        }
+        k.put("51", 420, 456, 160, 150);
+        k.text(c.text("число"), k.font("Tektur-Bold.ttf", 232), 606 * 2, 462 * 2, 'm',
+            CardCanvas.WHITE, HEX_INK, 7 * 2);
+        centreChips(k, CardAssets.tokens(c.text("ярлык")), 516, 694, 56, 60);
+        centreChips(k, CardAssets.tokens(c.text("ряд")), 516, 810, 120, 70);
+        return k.finish();
+    }
+
+    /** Связка фишек по центру: иконки, слова и стрелка «→». */
+    static void centreChips(CardCanvas k, List<String> toks, double cx, double cy, double size,
+                            double px) {
+        if (toks.isEmpty()) {
+            return;
+        }
+        Font f = k.font("Tektur-Bold.ttf", px);
+        List<Double> ws = new ArrayList<>();
+        for (String t : toks) {
+            if (t.startsWith("{")) {
+                BufferedImage ic = k.icon(t.substring(1, t.length() - 1));
+                ws.add(ic == null ? size : CardAssets.fit(ic, size, size).getWidth() * 1.0);
+            } else if ("→".equals(t) || "->".equals(t)) {
+                ws.add(size * 0.6);
+            } else {
+                ws.add(k.len(t, f) / 2);
+            }
+        }
+        double gap = size * 0.12;
+        double total = ws.stream().mapToDouble(Double::doubleValue).sum() + gap * (toks.size() - 1);
+        double x = cx - total / 2;
+        for (int i = 0; i < toks.size(); i++) {
+            String t = toks.get(i);
+            double w = ws.get(i);
+            if (t.startsWith("{")) {
+                k.put(t.substring(1, t.length() - 1), x + w / 2, cy, size, size);
+            } else if ("→".equals(t) || "->".equals(t)) {
+                double y = cy * 2;
+                k.g.setColor(HEX_INK);
+                k.g.setStroke(new BasicStroke((float) (size * 0.045 * 2), BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND));
+                k.g.draw(new Line2D.Double((x + w * 0.1) * 2, y, (x + w * 0.85) * 2, y));
+                java.awt.geom.Path2D head = new java.awt.geom.Path2D.Double();
+                head.moveTo((x + w * 0.95) * 2, y);
+                head.lineTo((x + w * 0.7) * 2, y - size * 0.13 * 2);
+                head.lineTo((x + w * 0.7) * 2, y + size * 0.13 * 2);
+                head.closePath();
+                k.g.fill(head);
+            } else {
+                k.text(t, f, (x + w / 2) * 2, cy * 2, 'm', CardCanvas.WHITE, HEX_INK, 4 * 2);
+            }
+            x += w + gap;
+        }
     }
 
     static String str(Map<String, Object> m, String k) {

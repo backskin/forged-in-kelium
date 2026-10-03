@@ -19,7 +19,7 @@ import org.yaml.snakeyaml.Yaml;
 public final class CardSpec {
 
     /** Раскладка — как рисовать; тип — какой шаблон брать. */
-    public enum Layout { OBJECTIVE, ARSENAL, MARKET, CONTAINER }
+    public enum Layout { OBJECTIVE, ARSENAL, MARKET, CONTAINER, HEX }
 
     /**
      * Типы карт мастерской. ШАБЛОНЫ СЛОЯМИ (выгрузка дизайнера 03.10.2026):
@@ -41,7 +41,8 @@ public final class CardSpec {
             "арсенал-супер-шаблоны-1.png", "арсенал-супер-шаблоны-2.png"),
         MARKET("Рынок", Layout.MARKET, "рынок-шаблоны-%d.png", 2, 10,
             "рынок-шаблоны.png", "рынок-шаблоны.png"),
-        CONTAINER("Контейнер", Layout.CONTAINER, null, 1, 1, null, null);
+        CONTAINER("Контейнер", Layout.CONTAINER, null, 1, 1, null, null),
+        SPAWN_HEX("Гекс зарождения", Layout.HEX, null, 1, 2, null, null);
 
         public final String ru;
         public final Layout layout;
@@ -84,6 +85,15 @@ public final class CardSpec {
         /** Шаблон целиком — для типа без слоёв (контейнер). */
         public String wholeFile() {
             return this == CONTAINER ? "контейнер.png" : null;
+        }
+
+        /**
+         * Жетон гекса зарождения: две стороны — зелёная рамка (шаблоны 1, 2) и
+         * рыжая (3, 4); у каждой стороны два рисунка.
+         */
+        public String hexFile(boolean orange, int art) {
+            int a = Math.max(1, Math.min(2, art));
+            return "Жетон гекса зарождения-" + ((orange ? 2 : 0) + a) + ".png";
         }
 
         public static Type of(String ru) {
@@ -217,6 +227,13 @@ public final class CardSpec {
             f.put("справа", "Выполни\n«Питание»");
             f.put("иконка_справа", "{34}");
             f.put("номер", 1);
+        } else if (t.layout == Layout.HEX) {
+            f.put("сторона", "зелёная");
+            f.put("рисунок", 2);
+            f.put("старт", true);
+            f.put("число", "3");
+            f.put("ярлык", "0 {5} ?");
+            f.put("ряд", "+ {9} → {52}");
         } else if (t.layout == Layout.CONTAINER) {
             f.put("буква", "А");
             f.put("число", "3");
