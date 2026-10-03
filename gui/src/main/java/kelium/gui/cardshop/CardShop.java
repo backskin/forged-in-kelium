@@ -72,6 +72,10 @@ public final class CardShop {
     private final List<JToggleButton> typeButtons = new ArrayList<>();
     private CardSpec card = CardSpec.blank(CardSpec.Type.OBJECTIVE);
     private File lastFile;
+    private Library lib;
+    private CatalogPanel catalog;
+    private int index = -1;
+    private final Timer autosave = new Timer(1200, e -> saveLibrary());
     private BufferedImage lastImage;
 
     public static void main(String[] args) {
@@ -117,11 +121,7 @@ public final class CardShop {
             JToggleButton b = new JToggleButton(t.ru);
             b.putClientProperty("type", t);
             b.setFocusable(false);
-            b.addActionListener(e -> {
-                if (t != card.type()) {
-                    setCard(CardSpec.blank(t));
-                }
-            });
+            b.addActionListener(e -> openType(t));
             tg.add(b);
             typeButtons.add(b);
             types.add(b);
@@ -129,13 +129,14 @@ public final class CardShop {
         top.add(types, BorderLayout.CENTER);
         JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 10));
         acts.setOpaque(false);
-        acts.add(button("Новая", this::fresh, false));
-        acts.add(button("Открыть…", this::open, false));
-        acts.add(button("Сохранить…", this::save, false));
+        acts.add(button("Импорт .kcard…", this::open, false));
+        acts.add(button("Сохранить .kcard…", this::save, false));
         acts.add(button("Выпустить PNG", this::export, true));
+        acts.add(button("Выпустить все", this::exportAll, false));
         acts.add(button("В игру…", this::toGame, false));
         acts.add(button("Рубашка", this::toggleBack, false));
         acts.add(button("Папка шаблонов", () -> openFolder(assets.templates), false));
+        acts.add(button("Папка библиотеки", () -> openFolder(lib.folder()), false));
         top.add(acts, BorderLayout.EAST);
 
         form.setBackground(Style.BG);
@@ -150,7 +151,51 @@ public final class CardShop {
         status.setOpaque(true);
         status.setBackground(Style.PANEL);
         right.add(status, BorderLayout.SOUTH);
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, formScroll, right);
+        JSplitPane edit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, formScroll, right);
+        edit.setBorder(null);
+        edit.setDividerSize(6);
+        lib = new Library(workFolder());
+        lib.seedFrom(new File(workFolder(), "выпуск 27.09.2026"));
+        catalog = new CatalogPanel(assets, new CatalogPanel.Actions() {
+            @Override public void select(int i) {
+                pick(i);
+            }
+
+            @Override public void addEnd() {
+                insertAt(lib.list(card.type()).size(), CardSpec.blank(card.type()));
+            }
+
+            @Override public void insertAfter(int i) {
+                insertAt(i < 0 ? lib.list(card.type()).size() : i + 1, CardSpec.blank(card.type()));
+            }
+
+            @Override public void duplicate(int i) {
+                if (i < 0) {
+                    return;
+                }
+                CardSpec src = lib.list(card.type()).get(i);
+                CardSpec copy = new CardSpec(src.type());
+                copy.fields.putAll(deepCopy(src.fields));
+                insertAt(i + 1, copy);
+            }
+
+            @Override public void delete(int i) {
+                deleteAt(i);
+            }
+
+            @Override public void move(int i, int d) {
+                CardSpec.Type t = card.type();
+                if (i < 0 || i + d < 0 || i + d >= lib.list(t).size()) {
+                    return;
+                }
+                lib.move(t, i, i + d);
+                index = i + d;
+                saveLibrary();
+                catalog.show(t, lib.list(t), index);
+                setCard(lib.list(t).get(index));
+            }
+        });
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, catalog, edit);
         split.setBorder(null);
         split.setDividerSize(6);
 
@@ -158,9 +203,9 @@ public final class CardShop {
         frame.add(top, BorderLayout.NORTH);
         frame.add(split, BorderLayout.CENTER);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1500, 980);
+        frame.setSize(1760, 1000);
         frame.setLocationRelativeTo(null);
-        setCard(card);
+        openType(CardSpec.Type.OBJECTIVE);
         frame.setVisible(true);
         if (!assets.icons.isDirectory()) {
             JOptionPane.showMessageDialog(frame, "Не нашёл папку иконок:\n" + assets.icons
@@ -179,6 +224,113 @@ public final class CardShop {
         }
         b.addActionListener(e -> r.run());
         return b;
+    }
+
+    // ======================================================================
+    //  БИБЛИОТЕКА: каталог карт каждого типа, автонумерация по месту
+    // ======================================================================
+
+    /** Перейти в каталог типа: первая карта, пустой каталог — с одной новой картой. */
+    private void openType(CardSpec.Type t) {
+        saveLibrary();
+        java.util.List<CardSpec> l = lib.list(t);
+        if (l.isEmpty()) {
+            lib.insert(t, 0, CardSpec.blank(t));
+        }
+        index = 0;
+        catalog.show(t, l, index);
+        setCard(l.get(index));
+    }
+
+    private void pick(int i) {
+        java.util.List<CardSpec> l = lib.list(card.type());
+        if (i >= 0 && i < l.size() && l.get(i) != card) {
+            index = i;
+            setCard(l.get(i));
+        }
+    }
+
+    private void insertAt(int at, CardSpec c) {
+        CardSpec.Type t = c.type();
+        lib.insert(t, at, c);
+        index = Math.max(0, Math.min(at, lib.list(t).size() - 1));
+        saveLibrary(t);
+        catalog.show(t, lib.list(t), index);
+        setCard(lib.list(t).get(index));
+    }
+
+    private void deleteAt(int i) {
+        CardSpec.Type t = card.type();
+        java.util.List<CardSpec> l = lib.list(t);
+        if (i < 0 || i >= l.size()) {
+            return;
+        }
+        String name = l.get(i).text("имя").isBlank() ? "№ " + (i + 1) : l.get(i).text("имя");
+        if (JOptionPane.showConfirmDialog(frame, "Удалить карту «" + name + "»?", "Удалить",
+                JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        lib.remove(t, i);
+        if (l.isEmpty()) {
+            lib.insert(t, 0, CardSpec.blank(t));
+        }
+        index = Math.min(i, l.size() - 1);
+        saveLibrary(t);
+        catalog.show(t, l, index);
+        setCard(l.get(index));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.Map<String, Object> deepCopy(java.util.Map<String, Object> m) {
+        Object o = new org.yaml.snakeyaml.Yaml().load(new org.yaml.snakeyaml.Yaml().dump(m));
+        return (java.util.Map<String, Object>) o;
+    }
+
+    private void saveLibrary() {
+        if (lib != null && card != null) {
+            saveLibrary(card.type());
+        }
+    }
+
+    private void saveLibrary(CardSpec.Type t) {
+        autosave.stop();
+        try {
+            lib.save(t);
+        } catch (Exception e) {
+            status.setForeground(Style.BAD);
+            status.setText("Каталог не сохранился: " + e.getMessage());
+        }
+    }
+
+    /** Номер карты — её место в каталоге. */
+    private JComponent numberInfo() {
+        JLabel l = new JLabel("№ " + (index + 1) + " — ставится сам по месту в каталоге");
+        l.setForeground(Style.INK2);
+        return l;
+    }
+
+    /** Все карты каталога — картинками в папку «библиотека/<тип>». */
+    private void exportAll() {
+        CardSpec.Type t = card.type();
+        File dir = new File(lib.folder(), t.ru);
+        dir.mkdirs();
+        int n = 0;
+        java.util.List<String> bad = new ArrayList<>();
+        java.util.List<CardSpec> l = lib.list(t);
+        for (int i = 0; i < l.size(); i++) {
+            CardSpec c = l.get(i);
+            String nm = c.text("имя").replaceAll("[\\\\/:*?\"<>|\n]", " ").trim();
+            File f = new File(dir, String.format("%02d", i + 1) + (nm.isEmpty() ? "" : " — " + nm) + ".png");
+            try {
+                ImageIO.write(CardRender.render(assets, c), "png", f);
+                n++;
+            } catch (Exception e) {
+                bad.add("№ " + (i + 1) + ": " + e.getMessage());
+            }
+        }
+        status.setForeground(bad.isEmpty() ? Style.GOOD : Style.BAD);
+        status.setText("Выпущено " + n + " из " + l.size() + " → " + dir
+            + (bad.isEmpty() ? "" : " · не нарисовались: " + String.join("; ", bad)));
     }
 
     private void fresh() {
@@ -204,6 +356,7 @@ public final class CardShop {
             case CONTAINER -> containerForm();
             case HEX -> hexForm();
             case ORDER -> orderForm();
+            case SUPER_OBJECTIVE -> superObjectiveForm();
         }
         form.revalidate();
         form.repaint();
@@ -217,11 +370,27 @@ public final class CardShop {
         section("Верх карты — эффект в чужой ход или сразу");
         form.add(field("Значок слева", segmented("слот", new String[] {"∞", "▶"},
             new String[] {"∞ постоянный", "▶ спец-действие"})));
-        form.add(field("Вид верха", segmented("верх_вид", new String[] {"реакция", "иконка", "2 max"},
-            new String[] {"Плашка реакции", "Крупная иконка", "2 войска max"})));
-        form.add(field("Заголовок верха", text("заголовок_верха", false, "для реакции: «Рикошет!»")));
-        form.add(field("Иконка верха", iconField("иконка_верха")));
-        form.add(field("Эффект верха", text("верх", true, "строки — как на карте")));
+        String kind = card.text("верх_вид");
+        if ("иконка".equals(kind) || "2 max".equals(kind) || kind.isBlank()) {
+            // прежние виды — теперь ряд иконок
+            card.fields.put("иконки_верха", CardRender.topIcons(card));
+            card.fields.put("верх_вид", "иконки");
+            kind = "иконки";
+        }
+        form.add(field("Вид верха", segmentedOf(new String[] {"иконки", "текст", "реакция"},
+            new String[] {"Иконки и текст", "Только текст", "Плашка реакции"}, kind, v -> {
+                changed("верх_вид", v);
+                setCard(card);
+            })));
+        if ("реакция".equals(kind)) {
+            form.add(field("Заголовок верха", text("заголовок_верха", false, "для реакции: «Рикошет!»")));
+        }
+        if ("иконки".equals(kind)) {
+            form.add(field("Иконки верха", text("иконки_верха", false,
+                "по центру, на всю высоту: {36} / {34}   или   {66} 2 {54} max")));
+        }
+        form.add(field("Текст верха", text("верх", true, "свой перенос — Enter; без переноса — "
+            + "ровными строками; занимает остаток зоны")));
 
         section("Название и условие");
         art();
@@ -248,17 +417,20 @@ public final class CardShop {
             + "Награда берётся по иконкам награды."));
 
         section("Номер");
-        form.add(field("Номер карты", text("номер", false, "в правом нижнем углу")));
+        form.add(field("Номер карты", numberInfo()));
     }
 
     private void arsenalForm() {
         section("Кнопка слева");
         form.add(field("Карта", segmentedBool("спец", "∞ постоянная", "▶ со спец-действием")));
+        boolean sup = card.type() == CardSpec.Type.ARSENAL_SUPER;
+        if (!sup) {
         section("Верх — разовый эффект");
         form.add(field("Текст верха", text("верх", true, "одна-две строки")));
         form.add(field("По центру", segmentedBool("верх_по_центру", "от иконок слева", "по центру")));
         form.add(field("Иконки слева", text("верх_слева", false, "перед текстом: -X {1} = {8}")));
-        form.add(field("Иконки справа", text("верх_справа", false, "после текста: {39}")));
+        form.add(field("Иконки справа", text("верх_справа", false, "после текста: {44}")));
+        }
         section("Название и постоянный эффект");
         art();
         form.add(field("Название", text("имя", false, "")));
@@ -291,11 +463,13 @@ public final class CardShop {
             setCard(card);
         });
         form.add(field("", print));
-        section("Для игры — верх (утиль)");
-        form.add(field("Что даёт", effectEditor("верх_эффект")));
+        if (!sup) {
+            section("Для игры — верх (утиль)");
+            form.add(field("Что даёт", effectEditor("верх_эффект")));
+        }
 
         section("Номер");
-        form.add(field("Номер карты", text("номер", false, "")));
+        form.add(field("Номер карты", numberInfo()));
     }
 
     /** Выбор из списка [код, подпись]; хранится код. */
@@ -395,7 +569,8 @@ public final class CardShop {
     /** Выгрузить все карты папки мастерской в колоды игры. */
     private void toGame() {
         try {
-            ВыгрузкаВИгру.Итог и = ВыгрузкаВИгру.выгрузить(workFolder(), workFolder());
+            saveLibrary();
+            ВыгрузкаВИгру.Итог и = ВыгрузкаВИгру.выгрузить(lib.all(), workFolder());
             StringBuilder sb = new StringBuilder("Выгружено: заданий " + и.заданий() + ", арсенала "
                 + и.арсенала() + "\n" + и.задания() + "\n" + и.арсенал());
             if (!и.замечания().isEmpty()) {
@@ -427,6 +602,7 @@ public final class CardShop {
         int[] wh = switch (card.type().layout) {
             case ARSENAL -> new int[] {803, 520};
             case MARKET -> new int[] {1028, 661};
+
             default -> new int[] {661, 1028};
         };
         List<String> all = assets.backgrounds(wh[0], wh[1]);
@@ -444,6 +620,17 @@ public final class CardShop {
                 changed("фон", v);
             }
         });
+    }
+
+    private void superObjectiveForm() {
+        section("Супер-задание — две ступени награды");
+        art();
+        form.add(field("За ★", text("условие", true, "под плашкой «Награда: по ★»; строками")));
+        form.add(field("За ★★", text("условие_2", true, "под плашкой «Награда: по ★★»; строками")));
+        section("Фигура — под второй ступенью (если нужна)");
+        form.add(figure("фигура"));
+        section("Номер");
+        form.add(field("Номер карты", numberInfo()));
     }
 
     private void orderForm() {
@@ -473,7 +660,7 @@ public final class CardShop {
         form.add(field("Справа", text("справа", true, "строками")));
         form.add(field("Иконка справа", text("иконка_справа", false, "{34}")));
         section("Номер");
-        form.add(field("Номер карты", text("номер", false, "")));
+        form.add(field("Номер карты", numberInfo()));
     }
 
     private void hexForm() {
@@ -538,6 +725,10 @@ public final class CardShop {
     private void changed(String key, Object value) {
         card.fields.put(key, value);
         redraw.restart();
+        autosave.restart();
+        if (catalog != null) {
+            catalog.refresh(card);
+        }
     }
 
     /** Текстовое поле: ввод, кнопка «+ иконка» и живая строка с иконками под ним. */
@@ -1064,7 +1255,11 @@ public final class CardShop {
         }
         try {
             lastFile = ch.getSelectedFile();
-            setCard(CardSpec.load(lastFile));
+            CardSpec c = CardSpec.load(lastFile);
+            if (c.type() != card.type()) {
+                openType(c.type());
+            }
+            insertAt(index + 1, c);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(frame, "Не открылось: " + e.getMessage());
         }

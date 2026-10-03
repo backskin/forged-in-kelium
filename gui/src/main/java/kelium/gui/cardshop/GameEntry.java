@@ -199,9 +199,11 @@ public final class GameEntry {
         e.put("id", id);
         e.put("name", c.text("имя"));
         e.put("kind", c.type() == CardSpec.Type.ARSENAL_START ? "starting" : "regular");
-        Map<String, Object> top = effect(c.fields.get("верх_эффект"));
-        top.put("label", c.text("верх").replace("\n", " "));
-        e.put("top", top);
+        if (c.type() != CardSpec.Type.ARSENAL_SUPER) {      // у супер-арсенала утиля нет
+            Map<String, Object> top = effect(c.fields.get("верх_эффект"));
+            top.put("label", c.text("верх").replace("\n", " "));
+            e.put("top", top);
+        }
         if (c.fields.get("свойство_эффект") == null) {
             warn.add("свойство для игры не задано — карта будет без срабатывания");
         } else {

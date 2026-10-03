@@ -19,7 +19,7 @@ import org.yaml.snakeyaml.Yaml;
 public final class CardSpec {
 
     /** Раскладка — как рисовать; тип — какой шаблон брать. */
-    public enum Layout { OBJECTIVE, ARSENAL, MARKET, CONTAINER, HEX, ORDER }
+    public enum Layout { OBJECTIVE, ARSENAL, MARKET, CONTAINER, HEX, ORDER, SUPER_OBJECTIVE }
 
     /**
      * Типы карт мастерской. ШАБЛОНЫ СЛОЯМИ (выгрузка дизайнера 03.10.2026):
@@ -33,6 +33,8 @@ public final class CardSpec {
             "задания-шаблон.png", "задания-шаблон-с-доп.png"),
         OBJECTIVE_START("Задание начальное", Layout.OBJECTIVE, "Задания начальные шаблоны.png", 1, 1,
             "Задания начальные шаблоны.png", "Задания начальные шаблоны.png"),
+        OBJECTIVE_SUPER("Задание супер", Layout.SUPER_OBJECTIVE, "задания супер шаблоны-%d.png", 3, 6,
+            "задания супер шаблоны.png", "задания супер шаблоны.png"),
         ARSENAL("Арсенал", Layout.ARSENAL, "арсенал-шаблоны-%d.png", 4, 17,
             "арсенал-шаблоны-2.png", "арсенал-шаблоны-3.png"),
         ARSENAL_START("Арсенал начальный", Layout.ARSENAL, "арсенал-начальный.png", 1, 1,
@@ -185,7 +187,7 @@ public final class CardSpec {
             f.put("слот", "∞");
             f.put("верх_вид", "реакция");
             f.put("заголовок_верха", "Закрома");
-            f.put("иконка_верха", "{57}");
+            f.put("иконки_верха", "");
             f.put("верх", "Получи 2 {3} боеприпаса, если\nкто-либо атакует твой жетон");
             f.put("имя", "Новое задание");
             f.put("условие", "Имей на поле 2 своих добытчика с полной энергией");
@@ -235,6 +237,11 @@ public final class CardSpec {
             f.put("число", "3");
             f.put("ярлык", "0 {5} ?");
             f.put("ряд", "+ {9} → {52}");
+        } else if (t.layout == Layout.SUPER_OBJECTIVE) {
+            f.put("рисунок", 1);
+            f.put("условие", "за каждые 3 своих\nздания на поле");
+            f.put("условие_2", "за каждое своё\nздание на гексе\nс чужим зданием");
+            f.put("номер", 1);
         } else if (t.layout == Layout.ORDER) {
             f.put("цвет", "красный");
             f.put("имя", "ОСВОИТЬ");

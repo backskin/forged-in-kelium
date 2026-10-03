@@ -181,6 +181,7 @@ public final class CardAssets {
             case CONTAINER -> "контейнеры.png";
             case SPAWN_HEX -> null;
             case ORDER -> "карты-приказов-new-21.png";
+            case OBJECTIVE_SUPER -> "задания супер.png";
         };
         if (f == null) {
             return null;

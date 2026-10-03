@@ -31,11 +31,31 @@ public final class ВыгрузкаВИгру {
     public static Итог выгрузить(File папка, File куда) throws Exception {
         List<File> файлы = new ArrayList<>();
         собрать(папка, файлы);
+        List<CardSpec> карты = new ArrayList<>();
+        List<String> имена = new ArrayList<>();
+        for (File f : файлы) {
+            карты.add(CardSpec.load(f));
+            имена.add(f.getName());
+        }
+        return выгрузить(карты, имена, куда);
+    }
+
+    /** Карты библиотеки мастерской → колоды игры. */
+    public static Итог выгрузить(List<CardSpec> карты, File куда) throws Exception {
+        List<String> имена = new ArrayList<>();
+        for (CardSpec c : карты) {
+            имена.add(c.type().ru + " № " + c.text("номер") + " «" + c.text("имя") + "»");
+        }
+        return выгрузить(карты, имена, куда);
+    }
+
+    private static Итог выгрузить(List<CardSpec> карты, List<String> имена, File куда) throws Exception {
         List<Object> obj = new ArrayList<>();
         List<Object> ars = new ArrayList<>();
         List<String> замечания = new ArrayList<>();
-        for (File f : файлы) {
-            CardSpec c = CardSpec.load(f);
+        for (int k = 0; k < карты.size(); k++) {
+            CardSpec c = карты.get(k);
+            String имя = имена.get(k);
             List<String> warn = new ArrayList<>();
             String номер = c.text("номер").isBlank() ? String.valueOf(obj.size() + ars.size() + 1)
                 : c.text("номер");
@@ -53,7 +73,7 @@ public final class ВыгрузкаВИгру {
                 default -> warn.add("тип «" + c.type().ru + "» в колоды пока не выгружается");
             }
             for (String w : warn) {
-                замечания.add(f.getName() + ": " + w);
+                замечания.add(имя + ": " + w);
             }
         }
         куда.mkdirs();

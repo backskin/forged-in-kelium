@@ -41,6 +41,7 @@ public final class CardRender {
             case CONTAINER -> container(a, c);
             case HEX -> spawnHex(a, c);
             case ORDER -> order(a, c);
+            case SUPER_OBJECTIVE -> superObjective(a, c);
         };
     }
 
@@ -171,23 +172,43 @@ public final class CardRender {
             px = n <= 2 ? 36 : 34;
             step = n <= 2 ? 40 : 44;
             yc = n <= 2 ? 170 : 181;
-        } else if ("2 max".equals(kind)) {
-            k.put("66", 235, 78, 150, 110);
-            Font f2 = k.font(F_TOP_B, 70);
-            k.text("2", f2, 356 * 2, 80 * 2, 'm', CardCanvas.WHITE, SLATE, 4 * 2);
-            k.put("54", 422, 80, 72, 58);
-            k.text("max", f2, 522 * 2, 80 * 2, 'm', CardCanvas.WHITE, SLATE, 4 * 2);
-            px = 34;
-            step = 40;
-            yc = 194;
         } else {
-            String ic = c.text("иконка_верха");
-            List<String> t = CardAssets.tokens(ic);
-            String key = t.isEmpty() ? "57" : t.get(0).replaceAll("[{}]", "");
-            k.put(key, 358, 80, 200, 136);
-            px = 34;
-            step = 40;
-            yc = 194;
+            // ИКОНКИ И ТЕКСТ / ТОЛЬКО ТЕКСТ (дизайнер 03.10.2026): ряд иконок
+            // по центру зоны занимает всю высоту, что осталась от текста; без
+            // иконок текст встаёт на всю зону, по центру и вширь, и ввысь
+            List<String> icons = CardAssets.tokens(topIcons(c));
+            boolean textOnly = "текст".equals(kind) || icons.isEmpty();
+            double zoneTop = 12;
+            double zoneBottom = 240;
+            String raw = c.text("верх");
+            double tpx = textOnly ? 46 : 34;
+            List<String> tl;
+            while (true) {
+                tl = topLines(k, raw, tpx, 480);
+                double h = tl.size() * tpx * 1.18;
+                double room = textOnly ? zoneBottom - zoneTop : (zoneBottom - zoneTop) * 0.55;
+                if (tl != null && h <= room || tpx <= 22) {
+                    break;
+                }
+                tpx -= 1;
+            }
+            double tstep = tpx * 1.18;
+            double textH = tl.size() * tstep;
+            Font tf = k.font(F_TOP, tpx);
+            final double tp = tpx;
+            double ty0;
+            if (textOnly) {
+                ty0 = (zoneTop + zoneBottom) / 2 - textH / 2 + tstep / 2;
+            } else {
+                double iconH = Math.min(150, zoneBottom - zoneTop - textH - 8);
+                topChips(k, icons, 375, zoneTop + iconH / 2, iconH, 480);
+                ty0 = zoneTop + iconH + 8 + tstep / 2;
+            }
+            for (int i = 0; i < tl.size(); i++) {
+                k.line(tl.get(i), tf, tf, 375, ty0 + i * tstep, 'm', CardCanvas.WHITE, SLATE, 3,
+                    (tok, p) -> topIcon(k, tok, tp), tpx, true);
+            }
+            return;
         }
         Font f = k.font(F_TOP, px);
         final double pxF = px;
@@ -196,6 +217,119 @@ public final class CardRender {
             k.line(lines.get(i), f, f, 375, y, 'm', CardCanvas.WHITE, SLATE, 3,
                 (tok, p) -> topIcon(k, tok, pxF), px, true);
         }
+    }
+
+    /** Ряд иконок верха; карты прежнего вида («крупная иконка», «2 max») — тем же рядом. */
+    static String topIcons(CardSpec c) {
+        String kind = c.text("верх_вид");
+        if (!c.text("иконки_верха").isBlank() || "иконки".equals(kind) || "текст".equals(kind)) {
+            return c.text("иконки_верха");
+        }
+        if ("2 max".equals(kind)) {
+            return "{66} 2 {54} max";
+        }
+        String ic = c.text("иконка_верха");
+        return ic.isBlank() ? "" : ic;
+    }
+
+    /** Строки верха: свои переносы — как есть; одна строка — ровными строками по ширине. */
+    static List<String> topLines(CardCanvas k, String text, double px, double width) {
+        List<String> out = new ArrayList<>();
+        if (text.isBlank()) {
+            return out;
+        }
+        if (text.contains("\n")) {
+            for (String l : text.split("\n")) {
+                if (!l.isBlank()) {
+                    out.add(l.trim());
+                }
+            }
+            return out;
+        }
+        Font f = k.font(F_TOP, px);
+        String[] w = text.trim().split("\\s+");
+        for (int lines = 1; lines <= 6; lines++) {
+            // жадно в lines строк примерно равной длины
+            double total = k.len(text.trim(), f);
+            double target = total / lines;
+            List<String> res = new ArrayList<>();
+            StringBuilder cur = new StringBuilder();
+            boolean ok = true;
+            for (String word : w) {
+                String next = cur.length() == 0 ? word : cur + " " + word;
+                if (cur.length() > 0 && k.len(next, f) > Math.max(target * 1.15, 1) * 1.0
+                        && res.size() < lines - 1) {
+                    res.add(cur.toString());
+                    cur = new StringBuilder(word);
+                } else {
+                    cur = new StringBuilder(next);
+                }
+            }
+            res.add(cur.toString());
+            for (String r : res) {
+                if (k.len(r, f) > width * 2) {
+                    ok = false;
+                }
+            }
+            if (ok) {
+                return res;
+            }
+        }
+        out.add(text.trim());
+        return out;
+    }
+
+    /**
+     * Ряд верха по центру: иконки высотой size, «/» — косая черта, как в
+     * награде, слова — белые с тёмной обводкой; ряд сжимается, если шире width.
+     */
+    static void topChips(CardCanvas k, List<String> toks, double cx, double cy, double size,
+                         double width) {
+        while (true) {
+            double total = 0;
+            for (String t : toks) {
+                total += chipW(k, t, size) + size * 0.12;
+            }
+            total -= size * 0.12;
+            if (total <= width || size < 30) {
+                double x = cx - total / 2;
+                for (String t : toks) {
+                    double w = chipW(k, t, size);
+                    if (t.startsWith("{")) {
+                        k.put(t.substring(1, t.length() - 1), x + w / 2, cy, size, size);
+                    } else if ("/".equals(t)) {
+                        double h = size * 0.42;
+                        k.g.setStroke(new BasicStroke((float) (size * 0.1 * 2), BasicStroke.CAP_BUTT,
+                            BasicStroke.JOIN_MITER));
+                        k.g.setColor(new Color(40, 30, 30));
+                        k.g.draw(new Line2D.Double((x + w / 2 + h * 0.25) * 2, (cy - h) * 2,
+                            (x + w / 2 - h * 0.25) * 2, (cy + h) * 2));
+                        k.g.setStroke(new BasicStroke((float) (size * 0.064 * 2), BasicStroke.CAP_BUTT,
+                            BasicStroke.JOIN_MITER));
+                        k.g.setColor(new Color(214, 60, 44));
+                        k.g.draw(new Line2D.Double((x + w / 2 + h * 0.25) * 2, (cy - h + 3) * 2,
+                            (x + w / 2 - h * 0.25) * 2, (cy + h - 3) * 2));
+                    } else {
+                        k.text(t, k.font(F_TOP_B, size * 0.62), (x + w / 2) * 2, cy * 2, 'm',
+                            CardCanvas.WHITE, SLATE, 4 * 2);
+                    }
+                    x += w + size * 0.12;
+                }
+                return;
+            }
+            size *= 0.94;
+        }
+    }
+
+    static double chipW(CardCanvas k, String t, double size) {
+        if (t.startsWith("{")) {
+            BufferedImage ic = k.icon(t.substring(1, t.length() - 1));
+            return ic == null ? size : CardAssets.fit(ic, size, size).getWidth();
+        }
+        if ("/".equals(t)) {
+            return size * 0.35;
+        }
+        return k.len(t, k.font(F_TOP_B, size * 0.62)) / 2;
     }
 
     /** Иконка в тексте верха: войска шире, иконка зданий — с обводкой цвета текста. */
@@ -237,7 +371,7 @@ public final class CardRender {
         }
         Font f = k.font(F_COND, px);
         final double pxF = px;
-        k.g.setColor(new Color(255, 255, 255, 185));
+        k.g.setColor(new Color(255, 255, 255, 38));
         for (int i = 0; i < lines.size(); i++) {
             double w = k.line(lines.get(i), f, f, 0, 0, 'm', ink, CardCanvas.WHITE, 0,
                 (t, p) -> condIcon(k, t, pxF), px, false);
@@ -381,7 +515,12 @@ public final class CardRender {
         boolean spec = c.bool("спец");
         Theme th = theme(c.type());
         CardCanvas k = new CardCanvas(a, template(a, c, spec));
-        arsenalTop(k, c);
+        // СУПЕР-АРСЕНАЛ БЕЗ УТИЛЯ (дизайнер 03.10.2026): только заголовок — на
+        // верхней полосе — и свойство, поднятое на освободившееся место
+        boolean sup = c.type() == CardSpec.Type.ARSENAL_SUPER;
+        if (!sup) {
+            arsenalTop(k, c);
+        }
         if (spec) {
             if (c.bool("контейнер")) {
                 containerCell(k);
@@ -418,22 +557,24 @@ public final class CardRender {
             px -= 1;
             fn = k.font("TekturNarrow-Bold.ttf", px);
         }
-        k.text(name, fn, 745 * 2, 175 * 2, 'r', CardCanvas.WHITE, th.stroke(), 4 * 2);
+        k.text(name, fn, 745 * 2, (sup ? 56 : 175) * 2, 'r', CardCanvas.WHITE, th.stroke(), 4 * 2);
         String low = c.text("низ");
         Figure fig = Figure.of(c.fields.get("фигура"));
         boolean withFig = !fig.isEmpty() && !(spec && c.bool("контейнер"));
         if (withFig) {
             // ФИГУРА — условие свойства: слева в поле текста, текст правее
-            fig.draw(k.g, 262 * 2, 352 * 2, 170 * 2, 230 * 2, th.stroke(), new Color(40, 50, 55));
+            fig.draw(k.g, 262 * 2, (sup ? 290 : 352) * 2, 170 * 2, (sup ? 320 : 230) * 2, th.stroke(),
+                new Color(40, 50, 55));
         }
         if (!low.isBlank()) {
             // длинный текст не мельчит, а занимает поле шире — как на печати
             double rightX = spec && c.bool("контейнер") ? 322 : 749;
             double leftX = withFig ? 360 : spec && c.bool("контейнер") ? 150 : 190;
-            if (lowSize(k, low, 44, leftX, rightX) < 40) {
+            double topY = sup ? 110 : 222;
+            if (lowSize(k, low, 44, leftX, rightX, topY) < 40) {
                 leftX = Math.min(leftX, 150);
             }
-            arsenalLow(k, low, 44, leftX, rightX, th.text());
+            arsenalLow(k, low, 44, leftX, rightX, th.text(), topY);
         }
         iconRow(k, c.text("ряд"));
         if (c.bool("звезда")) {
@@ -532,7 +673,8 @@ public final class CardRender {
     }
 
     /** Каким кеглем встанет постоянный эффект в этих границах. */
-    static double lowSize(CardCanvas k, String text, double px, double leftX, double rightX) {
+    static double lowSize(CardCanvas k, String text, double px, double leftX, double rightX,
+                          double topY) {
         while (px > 26) {
             Font f = k.font("TekturNarrow-Medium.ttf", px);
             Font fb = k.font("TekturNarrow-Bold.ttf", px);
@@ -540,7 +682,7 @@ public final class CardRender {
             for (String para : text.split("\n")) {
                 n += wrapGreedy(k, para, f, fb, px, (rightX - leftX) * 2).size();
             }
-            if (n * px * 1.28 <= 478 - 222) {
+            if (n * px * 1.28 <= 478 - topY) {
                 return px;
             }
             px -= 1;
@@ -550,8 +692,7 @@ public final class CardRender {
 
     /** Постоянный эффект: по правому краю, **жирное**, иконки в строке, свой перенос. */
     static void arsenalLow(CardCanvas k, String text, double px, double leftX, double rightX,
-                           Color ink) {
-        double top = 222;
+                           Color ink, double top) {
         double bottom = 478;
         List<String> lines;
         double step;
@@ -732,7 +873,7 @@ public final class CardRender {
         double w = k.line(text, f, f, 0, 0, 'm', M_TEXT, CardCanvas.WHITE, 0,
             (t, p) -> condIcon(k, t, 40), 40, false);
         double x0 = ax == 'l' ? x : x - w;
-        k.g.setColor(new Color(255, 255, 255, 190));
+        k.g.setColor(new Color(255, 255, 255, 38));
         k.g.fill(new java.awt.geom.Rectangle2D.Double((x0 - 8) * 2, (y - 24) * 2, (w + 16) * 2, 48 * 2));
         k.line(text, f, f, x, y, ax, M_TEXT, CardCanvas.WHITE, 0, (t, p) -> condIcon(k, t, 40), 40, true);
     }
@@ -930,6 +1071,47 @@ public final class CardRender {
             f = k.font("TekturNarrow-Regular.ttf", px);
         }
         k.text(text, f, cx * 2, y * 2, 'm', O_SIGN, null, 0);
+    }
+
+    // ======================================================================
+    //  СУПЕР-ЗАДАНИЕ (661×1028): в подложке две плашки «Награда: по ★» и
+    //  «по ★★»; под каждой — условие по центру на светлых плашках
+    // ======================================================================
+    static final Color S_TEXT = new Color(66, 52, 12);
+    static final Color S_NUMBER = new Color(150, 122, 30);
+
+    static BufferedImage superObjective(CardAssets a, CardSpec c) {
+        CardCanvas k = new CardCanvas(a, template(a, c, false));
+        centredPlates(k, c.lines("условие"), 251, 55, 40);
+        List<String> second = c.lines("условие_2");
+        centredPlates(k, second, 678, 55, 40);
+        Figure fig = Figure.of(c.fields.get("фигура"));
+        if (!fig.isEmpty()) {
+            double top = 678 + second.size() * 55 - 10;
+            fig.draw(k.g, 380 * 2, (top + 960) / 2 * 2, 420 * 2, (960 - top) * 2,
+                new Color(196, 160, 40), new Color(60, 50, 20));
+        }
+        String num = c.text("номер");
+        if (num.matches("[0-9]")) {
+            num = "0" + num;
+        }
+        k.text(num, k.font("Tektur-Bold.ttf", 30), 641 * 2, 993 * 2, 'r', S_NUMBER, null, 0);
+        return k.finish();
+    }
+
+    /** Строки по центру белого поля на светлых плашках. */
+    static void centredPlates(CardCanvas k, List<String> lines, double y0, double step, double px) {
+        Font f = k.font("Tektur-Medium.ttf", px);
+        for (int i = 0; i < lines.size(); i++) {
+            double y = y0 + i * step;
+            double w = k.line(lines.get(i), f, f, 0, 0, 'm', S_TEXT, CardCanvas.WHITE, 0,
+                (t, p) -> condIcon(k, t, px), px, false);
+            k.g.setColor(new Color(255, 255, 255, 38));
+            k.g.fill(new java.awt.geom.Rectangle2D.Double((368 - w / 2 - 10) * 2, (y - 24) * 2,
+                (w + 20) * 2, 48 * 2));
+            k.line(lines.get(i), f, f, 368, y, 'm', S_TEXT, CardCanvas.WHITE, 0,
+                (t, p) -> condIcon(k, t, px), px, true);
+        }
     }
 
     static String str(Map<String, Object> m, String k) {
