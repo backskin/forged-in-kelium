@@ -205,8 +205,14 @@ public final class ChoiceWords {
             }
             case "assemble" -> {
                 if (p instanceof Map<?, ?> m) {
-                    return "ammo".equals(m.get("kind")) ? "Взять боеприпасы"
-                        : "Выпустить: " + unitRu(after(raw, "->"));
+                    // действия здания словами печати (Влад 03.10.2026): «произвести
+                    // боеприпасы» (иконка 62) и «нанять» (иконка 63)
+                    String род = m.get("unit") == null ? "" : unitRu(String.valueOf(m.get("unit")));
+                    return switch (String.valueOf(m.get("kind"))) {
+                        case "ammo" -> "Произвести боеприпасы";
+                        case "both" -> "Нанять: " + род + " и произвести боеприпасы";
+                        default -> "Нанять: " + род;
+                    };
                 }
             }
             case "landing" -> {

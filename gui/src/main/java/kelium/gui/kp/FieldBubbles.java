@@ -7,6 +7,7 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.RoundRectangle2D;
@@ -46,10 +47,20 @@ public final class FieldBubbles {
      * @param tone   {@code 0} — обычный, {@code 1} — главный (акцент),
      *               {@code 2} — опасный/отказ (приглушённый)
      */
-    public record Opt(String label, String sub, int tone, Runnable pick) {
+    public record Opt(String label, String sub, int tone, Runnable pick,
+                      java.awt.image.BufferedImage icon) {
+
+        public Opt(String label, String sub, int tone, Runnable pick) {
+            this(label, sub, tone, pick, null);
+        }
 
         public static Opt of(String label, Runnable pick) {
             return new Opt(label, null, 0, pick);
+        }
+
+        /** Тот же вариант с иконкой действия слева вместо кружка. */
+        public Opt withIcon(java.awt.image.BufferedImage i) {
+            return new Opt(label, sub, tone, pick, i);
         }
     }
 
@@ -472,7 +483,8 @@ public final class FieldBubbles {
         int maxRow = Theme.px(340);
         int bw = Theme.px(160);
         for (Opt o : opts) {
-            bw = Math.max(bw, Math.min(maxRow, lm.stringWidth(o.label()) + Theme.px(40)));
+            int ик = o.icon() != null ? rowH - Theme.px(16) : 0;
+            bw = Math.max(bw, Math.min(maxRow, lm.stringWidth(o.label()) + Theme.px(40) + ик));
             if (o.sub() != null) {
                 bw = Math.max(bw, Math.min(maxRow, sm.stringWidth(o.sub()) + Theme.px(40)));
             }
@@ -519,10 +531,24 @@ public final class FieldBubbles {
             }
             // маркер варианта: кружок цвета тона
             int d = Theme.px(8);
-            g.setColor(o.tone() == 1 ? seatColor : o.tone() == 2 ? Theme.ink3() : Theme.ink2());
-            g.fillOval(r.x + Theme.px(8), r.y + (rowH - d) / 2, d, d);
             int tx = r.x + Theme.px(24);
-            int avail = r.width - Theme.px(30);
+            if (o.icon() != null) {
+                // ИКОНКА ДЕЙСТВИЯ вместо кружка (Влад 03.10.2026: «нанять»,
+                // «произвести боеприпасы» — значками печати)
+                int s = rowH - Theme.px(4);
+                Object было = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.drawImage(o.icon(), r.x + Theme.px(4), r.y + Theme.px(2), s, s, null);
+                if (было != null) {
+                    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, было);
+                }
+                tx = r.x + Theme.px(8) + s;
+            } else {
+                g.setColor(o.tone() == 1 ? seatColor : o.tone() == 2 ? Theme.ink3() : Theme.ink2());
+                g.fillOval(r.x + Theme.px(8), r.y + (rowH - d) / 2, d, d);
+            }
+            int avail = r.x + r.width - Theme.px(6) - tx;
             g.setFont(lf);
             g.setColor(o.tone() == 2 ? Theme.ink2() : Theme.ink());
             String l = clip(lm, o.label(), avail);

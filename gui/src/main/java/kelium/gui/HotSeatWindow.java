@@ -3737,7 +3737,7 @@ public final class HotSeatWindow {
         Map.entry("neutral_victim", "какой нейтрал атаковать"),
         Map.entry("attack", "атака"),
         Map.entry("mine", "добыча: что взять"),
-        Map.entry("assemble", "выпуск: что даёт здание — войско или боеприпасы"),
+        Map.entry("assemble", "выпуск: нанять войско или произвести боеприпасы"),
         Map.entry("tuck", "подложить карту-символ"),
         Map.entry("open_container", "вскрытие контейнера"),
         Map.entry("pick_container", "какой контейнер вскрыть"),
@@ -4868,6 +4868,10 @@ public final class HotSeatWindow {
                 пояснение, pass ? 2 : 0, () -> {
                     submit(agent, d, idx);
                 });
+            if ("assemble".equals(kind) && c.payload() instanceof Map<?, ?> am) {
+                opt = opt.withIcon(kelium.report.Textures.icon(
+                    "ammo".equals(am.get("kind")) ? "plus_ammo" : "hire"));
+            }
             if (c.payload() instanceof Map<?, ?> pm && pm.get("sectors") instanceof List<?> ss) {
                 List<Integer> sides = new ArrayList<>();
                 for (Object o : ss) {
@@ -5030,8 +5034,8 @@ public final class HotSeatWindow {
                 + "заново у другого здания. Щёлкните войско на поле или «Никого не снимать»";
         } else if ("assemble".equals(kind)) {
             title = "Выпуск: что даёт здание";
-            hint = "Запитанное здание даёт войско своего рода ИЛИ боеприпасы — выберите "
-                + "у здания на поле; «Пропустить здание» — ничего";
+            hint = "Запитанное здание может нанять войско своего рода ИЛИ произвести "
+                + "боеприпасы — выберите у здания на поле; «Пропустить здание» — ничего";
         }
         // ЧТО ПРОИСХОДИТ И ЧТО БУДЕТ — словами у каждого вопроса на поле
         // (дизайнер 28.09.2026: игрок, отошедший от стола, должен сразу понять,
