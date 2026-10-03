@@ -134,6 +134,7 @@ public final class CardShop {
         acts.add(button("Сохранить…", this::save, false));
         acts.add(button("Выпустить PNG", this::export, true));
         acts.add(button("В игру…", this::toGame, false));
+        acts.add(button("Рубашка", this::toggleBack, false));
         acts.add(button("Папка шаблонов", () -> openFolder(assets.templates), false));
         top.add(acts, BorderLayout.EAST);
 
@@ -877,7 +878,31 @@ public final class CardShop {
     //  РИСОВАНИЕ
     // ======================================================================
 
+    private boolean showBack;
+
+    /** Показать оборот карты (рубашку типа) или снова лицо. */
+    private void toggleBack() {
+        showBack = !showBack;
+        if (showBack) {
+            BufferedImage b = assets.back(card.type());
+            if (b == null) {
+                showBack = false;
+                status.setForeground(Style.BAD);
+                status.setText("Рубашки для типа «" + card.type().ru + "» нет в «экспорт-рубашки»"
+                    + (card.type() == CardSpec.Type.SPAWN_HEX ? " — у жетона гекса вторая сторона: "
+                    + "переключите «Сторона»" : ""));
+                return;
+            }
+            preview.set(b, false);
+            status.setForeground(Style.GOOD);
+            status.setText("Рубашка · " + card.type().ru + " · ещё раз «Рубашка» — лицо");
+        } else {
+            render();
+        }
+    }
+
     private void render() {
+        showBack = false;
         CardSpec snapshot = new CardSpec(card.type());
         snapshot.fields.putAll(card.fields);
         new SwingWorker<BufferedImage, Void>() {

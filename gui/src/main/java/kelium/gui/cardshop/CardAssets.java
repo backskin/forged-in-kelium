@@ -120,6 +120,29 @@ public final class CardAssets {
         return im;
     }
 
+    /** Рубашка типа карты из «экспорт-рубашки»; null — нет файла. */
+    public BufferedImage back(CardSpec.Type t) {
+        String f = switch (t) {
+            case OBJECTIVE -> "задания.png";
+            case OBJECTIVE_START -> "Задания начальные.png";
+            case ARSENAL -> "арсенал.png";
+            case ARSENAL_START -> "арсенал-начальный.png";
+            case ARSENAL_SUPER -> "арсенал-супер.png";
+            case MARKET -> "Карты рынка.png";
+            case CONTAINER -> "контейнеры.png";
+            case SPAWN_HEX -> null;
+        };
+        if (f == null) {
+            return null;
+        }
+        File file = new File(new File(common, "экспорт-рубашки"), f);
+        try {
+            return file.isFile() ? toArgb(ImageIO.read(file)) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** Шаблон слоями: фон и поверх подложка (любой из двух может отсутствовать). */
     public BufferedImage layered(String bg, String over) {
         String key = bg + "|" + over;
