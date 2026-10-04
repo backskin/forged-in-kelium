@@ -75,7 +75,8 @@ def картинка_текстуры(путь, ширина=360):
     box = im.getbbox()
     if box:
         im = im.crop(box)
-    ширина = max(ширина, 900) if im.width > 1500 else ширина   # широкие планшеты — чётче
+    # крупные картинки (планшеты, лица карт) — до 1000 точек: при печати 300 dpi
+    ширина = max(ширина, min(im.width, 1000)) if im.width >= 600 else ширина
     if im.width > ширина:
         im = im.resize((ширина, max(1, round(im.height * ширина / im.width))), Image.LANCZOS)
     буфер = io.BytesIO()

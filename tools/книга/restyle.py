@@ -474,6 +474,8 @@ CSS = r"""
     gap: 5mm; margin: 0 0 3mm; }
   .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
   .карт-рис img.значок { max-height: 68%; }
+  /* одна картинка (лицо карты, широкий жетон) — во всю ширину карточки */
+  .карт-рис img:only-child { max-width: 100%; }
 
   /* ---- состав игры: сетка компонентов (27.09.2026) ---- */
   .комп-сетка { display: grid; gap: 3mm 3.5mm; margin: 1mm 0 3mm; }
