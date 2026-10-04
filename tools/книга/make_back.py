@@ -184,7 +184,7 @@ def страница(t):
       <div class="пм-кол пм-прав">
         <div class="блок ход">{ХОД}</div>
         <div class="блок">
-          <h2>Пять действий <span class="зв">каждое действие: одна ветка, раз за ход</span></h2>
+          <h2>Пять действий <span class="зв">каждое действие: одно из двух, раз за ход</span></h2>
           <div class="дей-сетка">{сетка}</div>
           {ПОСТРОЙКА}
         </div>
@@ -246,7 +246,7 @@ CSS = r"""
   .стр.обложка.задняя img { width: auto; height: auto; display: inline-block; object-fit: contain; }
   .стр.обложка.задняя .и { height: 3.9mm; width: auto; vertical-align: -1mm; margin: 0 .15mm; }
 
-  /* ПЯТЬ ДЕЙСТВИЙ: значок и имя | ветка | или | ветка; пять «или» стоят
+  /* ПЯТЬ ДЕЙСТВИЙ: значок и имя | действие | или | действие; пять «или» стоят
      одним столбцом и сами читаются как «одно из двух». */
   .задняя .дей-сетка { display: flex; flex-direction: column; }
   .задняя .дей { display: grid; grid-template-columns: 19mm 1.25fr 5mm 1fr; column-gap: 2mm; align-items: center;

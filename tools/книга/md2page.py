@@ -148,7 +148,7 @@ def ячейка_с_иконкой(текст):
     if not з:
         return None
     return ('<span class="дст">' + з.replace('class="и"', 'class="и"')
-            + "<b>" + inline(m.group(2)) + "</b></span>")
+            + "<b>" + inline(m.group(2), ресурсы=False) + "</b></span>")
 
 
 def гекс_номер(номер):
@@ -178,10 +178,45 @@ def гекс_номер(номер):
             % base64.b64encode(буфер.getvalue()).decode())
 
 
-def inline(s):
+# РЕСУРС В ТЕКСТЕ — СО ЗНАЧКОМ (дизайнер 04.10.2026: «где энергия, келемий,
+# боеприпасы, трофеи — добавлять иконку этих ресурсов в текст»). Значок
+# встаёт за первым упоминанием ресурса в абзаце или пункте; если значок уже
+# стоит рядом (перед словом или сразу за ним), второй не ставится.
+РЕСУРСЫ = [
+    (re.compile(r"(?<![\w-])(энерги[яиюей]|энергией)(?![\w-])", re.I), "энергия"),
+    (re.compile(r"(?<![\w-])(келеми[йяюеи]|келемием)(?![\w-])", re.I), "келемий"),
+    (re.compile(r"(?<![\w-])(боеприпас(?:а|ов|ы|ом|ами|ах|ам)?)(?![\w-])", re.I), "боеприпас"),
+    (re.compile(r"(?<![\w-])(трофе(?:й|я|ю|ем|е|и|ев|ям|ями|ях))(?![\w-])", re.I), "трофей"),
+]
+
+
+def значки_ресурсов(s):
+    куски = re.split(r"(<[^>]+>)", s)
+    for рег, имя in РЕСУРСЫ:
+        з = значок(имя)
+        if not з or з in s:
+            continue
+        for k, кус in enumerate(куски):
+            if кус.startswith("<"):
+                continue
+            m = рег.search(кус)
+            if not m:
+                continue
+            # слово внутри <b>…</b>: значок — за закрывающим тегом
+            if k + 1 < len(куски) and куски[k + 1] == "</b>" and m.end() == len(кус):
+                куски[k + 1] = "</b>" + з
+            else:
+                куски[k] = кус[:m.end()] + з + кус[m.end():]
+            break
+    return "".join(куски)
+
+
+def inline(s, ресурсы=True):
     s = html.escape(s, quote=False)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
     s = re.sub(r"\[иконка:\s*([^\]]+)\]", _иконка_в_тексте, s)
+    if ресурсы:
+        s = значки_ресурсов(s)
     # «с. 20», «главы 6–9»: сокращение и число не разрываются переносом строки
     s = re.sub(r"(?<![\w])(с\.|стр\.|гл\.|глава|главы|главе)[ \u00a0]+(\d)", "\\1\u00a0\\2", s)
     return s
@@ -191,14 +226,29 @@ def заголовок_главы(title):
     """«Глава 4. Основы игры» → плашка с номером и сам заголовок."""
     m = re.match(r"(Глава \d+)\.\s*(.+)", title)
     if not m:
-        return f'<div class="глава">{inline(title)}</div>'
-    return (f'<div class="глава"><span class="гл-н">{inline(m.group(1))}</span>'
-            f'<span class="гл-т">{inline(m.group(2))}</span></div>')
+        return f'<div class="глава">{inline(title, ресурсы=False)}</div>'
+    return (f'<div class="глава"><span class="гл-н">{inline(m.group(1), ресурсы=False)}</span>'
+            f'<span class="гл-т">{inline(m.group(2), ресурсы=False)}</span></div>')
 
 
 # Кайма страницы — векторная рамка, одна на все страницы (её пишет restyle.py).
 КАЙМА = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "_кайма.svg"),
              encoding="utf-8").read().strip()
+
+
+def фрагмент(имя):
+    """Готовый рисунок `_имя.svg` (его пишут make_fig_*.py / figs.py).
+
+    Нет файла и задан KNIGA_FIG_MARK — метка на его месте: по ней
+    снять_рисунки.py достаёт рисунок из нынешней вёрстки (генераторы части
+    рисунков читают папки дизайнера, которых в облаке нет)."""
+    путь = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_" + имя + ".svg")
+    if not os.path.exists(путь) and os.environ.get("KNIGA_FIG_MARK"):
+        return '<div class="рисунок-в-колонке" data-нет="%s"></div>' % имя
+    return open(путь, encoding="utf-8").read()
+
+
+фрагмент_ = фрагмент
 
 
 def blocks(md):
@@ -276,13 +326,13 @@ def blocks(md):
             continue
         if ln.startswith("## "):
             flush()
-            cur.append(f"        <h2>{inline(ln[3:])}</h2>")
+            cur.append(f"        <h2>{inline(ln[3:], ресурсы=False)}</h2>")
             i += 1
             continue
         if ln.startswith("### "):
             if not пара[0] and not (len(cur) == 1 and cur[0].lstrip().startswith("<h2>")):
                 flush()
-            cur.append(f"        <h3>{inline(ln[4:])}</h3>")
+            cur.append(f"        <h3>{inline(ln[4:], ресурсы=False)}</h3>")
             i += 1
             continue
         if ln.startswith("> "):
@@ -301,9 +351,7 @@ def blocks(md):
             вид = {"Важно!": " важно", "Важно": " важно", "Совет": " совет"}.get(label, "")
             res.append(f'      <div class="пример{вид}">\n        <span class="метка">{inline(label)}</span>\n'
                        f"        <p>{inline(rest)}</p>\n"
-                       + "".join(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                                   "_" + r + ".svg"), encoding="utf-8").read()
-                                 for r in рис)
+                       + "".join(фрагмент_(r) for r in рис)
                        + "      </div>")
             continue
         # ТРИ ФАЗЫ РАУНДА — сетка из трёх колонок (CSS .фазы). В разметке:
@@ -363,8 +411,8 @@ def blocks(md):
                 if len(части) == 3:
                     рис = "".join(картинка_текстуры(r, 300) for r in части[0].split("+"))
                     ячейки.append('<div class="комп"><div class="комп-рис">' + рис
-                                  + '</div><div class="комп-число">' + inline(части[1])
-                                  + '</div><div class="комп-имя">' + inline(части[2])
+                                  + '</div><div class="комп-число">' + inline(части[1], ресурсы=False)
+                                  + '</div><div class="комп-имя">' + inline(части[2], ресурсы=False)
                                   + "</div></div>")
                 i += 1
             i += 1
@@ -386,7 +434,7 @@ def blocks(md):
                 if len(ч) >= 3:
                     з = значок(ч[0]) or ""
                     ветки = '<span class="или">или</span>'.join(
-                        '<span class="ветка">' + inline(x) + "</span>" for x in ч[2:])
+                        '<span class="ветка">' + inline(x, ресурсы=False) + "</span>" for x in ч[2:])
                     ячейки.append('<div class="плитка">' + з.replace('class="и"', 'class="и плит"')
                                   + '<b>' + inline(ч[1]) + "</b>" + ветки + "</div>")
                 i += 1
@@ -429,7 +477,7 @@ def blocks(md):
                        + "".join(картинка_текстуры(r) for r in к["рис"]) + "</div>"
                        if к["рис"] else "")
                 html_к.append('<div class="блок карточка">' + рис
-                              + "<h2>" + inline(к["имя"]) + "</h2>"
+                              + "<h2>" + inline(к["имя"], ресурсы=False) + "</h2>"
                               + текст_карточки(к["текст"]) + "</div>")
             res.append('      <div class="карточки">' + "".join(html_к) + "</div>")
             continue
@@ -507,9 +555,7 @@ def blocks(md):
                        + "".join(ячейки) + "</div>")
             continue
         if re.fullmatch(r"\[\[[^\]]+\]\]", ln.strip()):
-            фрагмент = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                         "_" + ln.strip()[2:-2] + ".svg"),
-                            encoding="utf-8").read()
+            фрагмент = фрагмент_(ln.strip()[2:-2])
             # РИСУНОК НА ВСЮ ШИРИНУ НЕ КЛАДЁТСЯ В .блок: у него column-span:all,
             # он уходит из потока колонки, а подложка блока остаётся пустым
             # прямоугольником над следующим заголовком (баг, замеченный
