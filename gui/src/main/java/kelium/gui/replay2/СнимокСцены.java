@@ -186,6 +186,10 @@ public final class СнимокСцены {
             }
             стрелка(g, т, size, цвет(a, "#1F5FA8"), (String) a.get("label"),
                 ((Number) a.getOrDefault("trim", 0.42)).doubleValue());
+            // ЗНАЧОК ПОД СТРЕЛКОЙ: «+1» и картинка (что принесло действие)
+            if (a.get("badge") instanceof Map<?, ?> бм) {
+                значок(g, т, size, (Map<String, Object>) бм);
+            }
         }
         g.dispose();
         Path dir = out.toAbsolutePath().getParent();
@@ -277,6 +281,32 @@ public final class СнимокСцены {
             java.awt.FontMetrics fm = g.getFontMetrics();
             g.drawString(номер, (float) (a[0] - fm.stringWidth(номер) / 2.0),
                 (float) (a[1] + fm.getAscent() / 2.0 - fm.getDescent() / 2.0));
+        }
+    }
+
+    private static void значок(Graphics2D g, double[][] т, double size, Map<String, Object> б)
+            throws java.io.IOException {
+        double mx = (т[0][0] + т[т.length - 1][0]) / 2;
+        double my = (т[0][1] + т[т.length - 1][1]) / 2;
+        double dy = ((Number) б.getOrDefault("dy", 0.42)).doubleValue() * size;
+        double dx = ((Number) б.getOrDefault("dx", 0.0)).doubleValue() * size;
+        String текст = (String) б.get("text");
+        double h = size * ((Number) б.getOrDefault("h", 0.36)).doubleValue();
+        BufferedImage im = б.get("icon") == null ? null
+            : ImageIO.read(Path.of((String) б.get("icon")).toFile());
+        double iw = im == null ? 0 : h * im.getWidth() / im.getHeight();
+        g.setFont(new Font("Tektur", Font.BOLD, (int) Math.round(h * 0.8)));
+        java.awt.FontMetrics fm = g.getFontMetrics();
+        double tw = текст == null ? 0 : fm.stringWidth(текст) + h * 0.12;
+        double x = mx + dx - (tw + iw) / 2;
+        double y = my + dy;
+        if (текст != null) {
+            g.setColor(Color.decode((String) б.getOrDefault("color", "#1F7A3A")));
+            g.drawString(текст, (float) x, (float) (y + fm.getAscent() / 2.0 - fm.getDescent() / 2.0));
+        }
+        if (im != null) {
+            g.drawImage(im, (int) Math.round(x + tw), (int) Math.round(y - h / 2), (int) Math.round(iw),
+                (int) Math.round(h), null);
         }
     }
 

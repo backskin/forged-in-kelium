@@ -70,19 +70,76 @@ def ряд(до, после, награды):
     return холст
 
 
-контейнер = картинка(os.path.join(ИКОНКИ, "контейнер.png"), 140)
-трофей = картинка(os.path.join(ИКОНКИ, "кубик-трофея.png"), 130)
-оборот = картинка(os.path.join(КОРЕНЬ, "data", "textures", "token", "barracks_trophy.png"), 150)
+РУБАШКА = os.path.join(КОРЕНЬ, "data", "textures", "card", "orders", "back_blue.png")
 
-р1 = ряд(сцена("здание-до"), сцена("здание-после"),
-         [("на свалку Акселя", [оборот]), ("Бриане — контейнеры", [контейнер])])
-р2 = ряд(сцена("постройка-до"), сцена("постройка-после"),
-         [("Акселю — контейнер и трофей", [контейнер, трофей])])
+
+def свалка(оборот, h):
+    """Карта свалки (рубашка приказа набок) с жетоном оборотом вверх на ней."""
+    from PIL import ImageFilter
+    карта = Image.open(РУБАШКА).convert("RGBA").rotate(90, expand=True)
+    карта = карта.resize((round(карта.width * h / карта.height), h), Image.LANCZOS)
+    м = Image.new("L", карта.size, 0)
+    ImageDraw.Draw(м).rounded_rectangle((0, 0, карта.width - 1, h - 1), radius=round(h * 0.06), fill=255)
+    карта.putalpha(м)
+    ж = оборот.resize((round(оборот.width * h * 0.52 / оборот.height), round(h * 0.52)), Image.LANCZOS)
+    ж = ж.rotate(-6, resample=Image.BICUBIC, expand=True)
+    x, y = (карта.width - ж.width) // 2, (h - ж.height) // 2
+    т = Image.new("RGBA", ж.size, (20, 15, 5, 0))
+    т.putalpha(ж.getchannel("A").point(lambda v: int(v * 0.4)))
+    слой = Image.new("RGBA", карта.size, (0, 0, 0, 0))
+    слой.alpha_composite(т, (x + 8, y + 10))
+    карта = Image.alpha_composite(карта, слой.filter(ImageFilter.GaussianBlur(6)))
+    карта.alpha_composite(ж, (x, y))
+    return карта
+
+
+def ряд_н(до, после, оборот, подписи):
+    """Две строки: «до → после», под ней — КРУПНЫЙ оборот → карта свалки."""
+    def выс(im, h):
+        return im.resize((round(im.width * h / im.height), h), Image.LANCZOS)
+    до, после = выс(до, 560), выс(после, 560)
+    об = выс(оборот, 520)
+    св = свалка(оборот, 520)
+    мерка = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    ш_подп = int(max(мерка.textlength(п, font=шр) for п in подписи))
+    W1 = до.width + 300 + после.width
+    W2 = об.width + 60 + ш_подп + 60 + 260 + св.width
+    W = max(W1, W2)
+    H = 560 + 60 + 520 + 110
+    холст = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(холст)
+    x = (W - W1) // 2
+    холст.alpha_composite(до, (x, 0))
+    стрелка(d, x + до.width + 30, 280)
+    холст.alpha_composite(после, (x + до.width + 300, 0))
+    y2 = 560 + 60
+    x = (W - W2) // 2
+    холст.alpha_composite(об, (x, y2))
+    x += об.width + 60
+    yt = y2 + 260 - len(подписи) * 43
+    for п in подписи:
+        d.text((x, yt), п, font=шр, fill=ОХРА)
+        yt += 86
+    x += ш_подп + 60
+    стрелка(d, x, y2 + 260)
+    x += 260
+    холст.alpha_composite(св, (x, y2))
+    d.text((x + св.width // 2, y2 + 540), "свалка Акселя", font=шр, fill=ОХРА, anchor="ma")
+    return холст
+
+
+оборот_казармы = Image.open(os.path.join(КОРЕНЬ, "data", "textures", "token", "barracks_trophy.png")).convert("RGBA")
+оборот_постройки = Image.open(os.path.join(КОРЕНЬ, "data", "textures", "field", "neutral_big_trophy.png")).convert("RGBA")
+р1 = ряд_н(сцена("здание-до"), сцена("здание-после"), оборот_казармы,
+           ["2 трофея — Акселю на свалку", "контейнер — Бриане (владельцу)"])
+р2 = ряд_н(сцена("постройка-до"), сцена("постройка-после"), оборот_постройки,
+           ["1 трофей — Акселю на свалку", "контейнер — Акселю"])
 W = max(р1.width, р2.width)
-холст = Image.new("RGBA", (W, р1.height + р2.height + 80), (0, 0, 0, 0))
-холст.alpha_composite(р1, (0, 0))
-холст.alpha_composite(р2, (0, р1.height + 80))
+холст = Image.new("RGBA", (W, р1.height + р2.height + 120), (0, 0, 0, 0))
+холст.alpha_composite(р1, ((W - р1.width) // 2, 0))
+ImageDraw.Draw(холст).line((80, р1.height + 60, W - 80, р1.height + 60), fill=(190, 175, 140, 255), width=6)
+холст.alpha_composite(р2, ((W - р2.width) // 2, р1.height + 120))
 png = os.path.join(D, "_уничтожение.png")
 холст.save(png)
-figure("уничтожение", png, 1800, холст.width, холст.height, [], css_w="100%", pad="0.6mm 0 1.0mm")
+figure("уничтожение", png, 2000, холст.width, холст.height, [], css_w="82%", pad="0.2mm 0 0.4mm")
 print("ok", холст.size)

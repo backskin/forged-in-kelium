@@ -3,6 +3,9 @@ hexes:
   - {q: 0, r: 0, spawn: {kelium: 1, start: true, flipped: true}}
   - {q: 1, r: 0}
 tokens:
-  - {type: miner, owner: 0, q: 1, r: 0, building: true, sides: [3, 4], level: 1, energySlots: 2, energyPlaced: 2}
+  - {type: miner, owner: 0, q: 1, r: 0, building: true, sides: [3], level: 1, energySlots: 2, energyPlaced: 2}
 arrows:
-  - {path: [[0, 0], [1, 0]], color: "#1F7A3A", trim: 0.30}
+  - path: [[0, 0], [1, 0]]
+    color: "#1F7A3A"
+    trim: 0.30
+    badge: {text: "+1", icon: "rules/иконки-экспорт/келемий.png", dy: 1.02, dx: -0.40, h: 0.42}

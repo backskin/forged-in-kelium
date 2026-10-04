@@ -27,6 +27,56 @@ def сцена(имя):
 
 
 до, после = сцена("тайл-до"), сцена("тайл-после")
+
+
+def разорванный_тайл(высота):
+    """Опустевший тайл, разорванный по диагонали неровным краем: две половины
+    чуть разъехались — тайл уходит с поля."""
+    from PIL import ImageFilter
+    import random
+    random.seed(7)
+    т = Image.open(os.path.join(КОРЕНЬ, "data", "textures", "field", "spawn_start_flipped.png")).convert("RGBA")
+    т = т.resize((round(т.width * высота / т.height), высота), Image.LANCZOS)
+    w, h = т.size
+    # неровная линия разрыва из верхнего правого угла в нижний левый
+    шаги = 14
+    линия = []
+    for k in range(шаги + 1):
+        f = k / шаги
+        x = w * (0.72 - 0.44 * f) + random.uniform(-0.035, 0.035) * w
+        y = h * f
+        линия.append((x, y))
+    левая = Image.new("L", т.size, 0)
+    ImageDraw.Draw(левая).polygon([(0, 0)] + линия + [(0, h)], fill=255)
+    правая = Image.new("L", т.size, 0)
+    ImageDraw.Draw(правая).polygon([(w, 0)] + линия + [(w, h)], fill=255)
+    куски = []
+    for маска, угол, сдвиг in ((левая, 7, (-0.06, 0.03)), (правая, -6, (0.06, -0.02))):
+        кус = т.copy()
+        кус.putalpha(Image.composite(т.getchannel("A"), Image.new("L", т.size, 0), маска))
+        кус = кус.rotate(угол, resample=Image.BICUBIC, expand=True)
+        куски.append((кус, сдвиг))
+    W, H = round(w * 1.35), round(h * 1.25)
+    холст = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    for кус, (dx, dy) in куски:
+        x = (W - кус.width) // 2 + round(dx * w)
+        y = (H - кус.height) // 2 + round(dy * h)
+        тень = Image.new("RGBA", кус.size, (20, 15, 5, 0))
+        тень.putalpha(кус.getchannel("A").point(lambda v: int(v * 0.35)))
+        слой = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        слой.alpha_composite(тень, (x + 10, y + 12))
+        холст = Image.alpha_composite(холст, слой.filter(ImageFilter.GaussianBlur(8)))
+        холст.alpha_composite(кус, (x, y))
+    return холст
+
+
+обрывки = разорванный_тайл(round(после.height * 0.62))
+# обрывки — в верхнем левом углу «после», чуть наезжая на пустой гекс
+сдвиг_x = обрывки.width // 2
+широкий = Image.new("RGBA", (после.width + сдвиг_x, после.height), (0, 0, 0, 0))
+широкий.alpha_composite(после, (сдвиг_x, 0))
+широкий.alpha_composite(обрывки, (0, 0))
+после = широкий
 куб = Image.open(os.path.join(КОРЕНЬ, "rules", "иконки-экспорт", "кубик-трофея.png")).convert("RGBA")
 куб = куб.resize((120, round(куб.height * 120 / куб.width)), Image.LANCZOS)
 ШРИФТ = next(п for п in (r"C:\Windows\Fonts\TekturNarrow-Bold.ttf",
