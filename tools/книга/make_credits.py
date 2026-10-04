@@ -23,7 +23,7 @@ def логотип(ширина=1400):
     """Логотип игры из экспорта дизайнера, вписанный в ширину."""
     import base64
     from PIL import Image
-    # надпись названия «С небес на землю» (tools/обложка/make_cover.py)
+    # надпись названия «Кристалл Раздора» (tools/обложка/make_cover.py)
     путь = os.path.join(os.path.dirname(os.path.dirname(D)), "design-docs", "обложка",
                         "надпись названия.png")
     im = Image.open(путь).convert("RGBA")
@@ -73,7 +73,7 @@ def страница():
       <div class="блок">
         <h2>Издание</h2>
         <div class="строки">
-          <div class="кто"><span class="роль">Название</span><span class="имя"><b>С небес на землю</b></span></div>
+          <div class="кто"><span class="роль">Название</span><span class="имя"><b>Кристалл Раздора</b></span></div>
           <div class="кто"><span class="роль">Игроков</span><span class="имя">2–4</span></div>
           <div class="кто"><span class="роль">Партия</span><span class="имя">120–180 минут</span></div>
           <div class="кто"><span class="роль">Возраст</span><span class="имя">12+</span></div>
