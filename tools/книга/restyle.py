@@ -416,6 +416,12 @@ CSS = r"""
   .блок.легенда { column-count: 2; column-gap: 5mm; column-span: all; }
   /* БЛОК ПОПОЛАМ: во всю ширину полосы, слева рисунки, справа текст. */
   .блок.вовсю { column-span: all; }
+  /* ---- заглавная иконка главы (04.10.2026): слева от вступления, ростом с него ---- */
+  .с-заглавной { column-span: all; display: flex; align-items: stretch; gap: 4mm; margin: 0 0 3mm; }
+  .с-заглавной > .блок { flex: 1; margin: 0; }
+  .с-заглавной .заглавная { flex: none; display: flex; align-items: center; justify-content: center;
+    width: 26mm; }
+  .с-заглавной .заг-и { height: 100%; max-height: 26mm; width: auto; max-width: 26mm; object-fit: contain; }
   /* Блок на ступень крупнее: когда на полосе остаётся воздух, текст
      лучше дать больше, чем растягивать пустоту (15.09.2026). */
   .блок.крупно p, .блок.крупно li { font-size: 10.4pt; line-height: 1.32; }
@@ -468,6 +474,8 @@ CSS = r"""
     gap: 5mm; margin: 0 0 3mm; }
   .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
   .карт-рис img.значок { max-height: 68%; }
+  /* одна картинка (лицо карты, широкий жетон) — во всю ширину карточки */
+  .карт-рис img:only-child { max-width: 100%; }
 
   /* ---- состав игры: сетка компонентов (27.09.2026) ---- */
   .комп-сетка { display: grid; gap: 3mm 3.5mm; margin: 1mm 0 3mm; }

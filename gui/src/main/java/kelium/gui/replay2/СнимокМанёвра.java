@@ -47,13 +47,19 @@ public final class СнимокМанёвра {
 
     private static int uid = 1;
 
-    private static ReplayRecord.Tok жетон(String тип, int seat, String hex) {
+    private static ReplayRecord.Tok жетон(String тип, int seat, String hex, int... стороны) {
         ReplayRecord.Tok t = new ReplayRecord.Tok();
         t.uid = uid++;
         t.owner = seat;
         t.type = тип;
         t.hexId = hex;
         t.hp = 1;
+        if (стороны.length > 0) {
+            t.sides = new ArrayList<>();
+            for (int st : стороны) {
+                t.sides.add(st);
+            }
+        }
         return t;
     }
 
@@ -69,17 +75,39 @@ public final class СнимокМанёвра {
             h.id = "h" + qr[0] + "_" + qr[1];
             состояния.put(h.id, h);
         }
+        // СТАРЫЕ МЕСТА — ЖЕТОНЫ, НОВЫЕ — ПОЛУПРОЗРАЧНЫЙ СЛЕД (дизайнер 04.10.2026):
+        // рисунок показывает, как всё лежит до манёвра и куда жетоны придут.
         List<ReplayRecord.Tok> жетоны = new ArrayList<>();
-        // Выбранный гекс: наша вышка (остаётся) и пехота (уходит).
-        жетоны.add(жетон("tower", 0, "h0_0"));
-        // Пехота, которая уйдёт, — нарисована уже на новом месте.
-        жетоны.add(жетон("infantry", 0, "h-1_1"));
-        // Пришедшие: техника с соседнего гекса и пехота через гекс.
-        жетоны.add(жетон("vehicle", 0, "h0_0"));
-        жетоны.add(жетон("infantry", 0, "h0_0"));
-        // Чужая пехота закрывает короткий путь.
-        жетоны.add(жетон("infantry", 1, "h1_0"));
-        BufferedImage img = нарисовать(size, состояния, жетоны);
+        жетоны.add(жетон("tower", 0, "h0_0", 1));            // остаётся
+        жетоны.add(жетон("infantry", 0, "h0_0", 4));         // 1 — уходит
+        жетоны.add(жетон("vehicle", 0, "h0_-1", 3, 4));      // 2 — придёт с соседнего
+        жетоны.add(жетон("infantry", 0, "h2_-1", 0));        // 3 — придёт в обход
+        жетоны.add(жетон("infantry", 1, "h1_0", 2));         // чужая пехота закрывает путь
+        List<ReplayRecord.Tok> след = new ArrayList<>();
+        след.add(жетон("infantry", 0, "h-1_1", 1));
+        след.add(жетон("vehicle", 0, "h0_0", 5, 0));
+        след.add(жетон("infantry", 0, "h0_0", 2));
+        BufferedImage основа = нарисовать(size, состояния, жетоны, true);
+        BufferedImage пусто = нарисовать(size, состояния, List.of(), false);
+        BufferedImage призраки = нарисовать(size, состояния, след, false);
+        // где «призраки» отличаются от пустого поля — там след: подмешать на 45%
+        for (int y = 0; y < основа.getHeight(); y++) {
+            for (int x = 0; x < основа.getWidth(); x++) {
+                int e = пусто.getRGB(x, y);
+                int c = призраки.getRGB(x, y);
+                if (Math.abs(((e >> 16) & 255) - ((c >> 16) & 255)) + Math.abs(((e >> 8) & 255) - ((c >> 8) & 255))
+                        + Math.abs((e & 255) - (c & 255)) < 18) {
+                    continue;
+                }
+                int a = основа.getRGB(x, y);
+                double k = 0.45;
+                int r = (int) (((a >> 16) & 255) * (1 - k) + ((c >> 16) & 255) * k);
+                int gg = (int) (((a >> 8) & 255) * (1 - k) + ((c >> 8) & 255) * k);
+                int bb = (int) ((a & 255) * (1 - k) + (c & 255) * k);
+                основа.setRGB(x, y, (a & 0xFF000000) | (r << 16) | (gg << 8) | bb);
+            }
+        }
+        BufferedImage img = обрезать(основа);
         Path dir = out.toAbsolutePath().getParent();
         if (dir != null) {
             Files.createDirectories(dir);
@@ -90,7 +118,8 @@ public final class СнимокМанёвра {
     }
 
     private static BufferedImage нарисовать(double size,
-            Map<String, ReplayRecord.HexState> состояния, List<ReplayRecord.Tok> жетоны) {
+            Map<String, ReplayRecord.HexState> состояния, List<ReplayRecord.Tok> жетоны,
+            boolean стрелки) {
         double minx = Double.MAX_VALUE;
         double miny = Double.MAX_VALUE;
         double maxx = -Double.MAX_VALUE;
@@ -140,6 +169,10 @@ public final class СнимокМанёвра {
                 состояния.get(id), свои, cx0 + c[0], cy0 + c[1], false, соседи);
         }
 
+        if (!стрелки) {
+            g.dispose();
+            return img;
+        }
         double[] цель = FieldGeometry.hexCenter(ЦЕЛЬ[0], ЦЕЛЬ[1], size);
         обвести(g, cx0 + цель[0], cy0 + цель[1], size);
         // 1 — пехота уходит; 2 — техника приходит с соседнего; 3 — пехота в обход
@@ -147,7 +180,7 @@ public final class СнимокМанёвра {
         путь(g, cx0, cy0, size, new int[][]{{0, -1}, {0, 0}}, "2");
         путь(g, cx0, cy0, size, new int[][]{{2, -1}, {1, -1}, {0, 0}}, "3");
         g.dispose();
-        return обрезать(img);
+        return img;
     }
 
     /** Пунктирная обводка ВЫБРАННОГО гекса. */
@@ -209,7 +242,13 @@ public final class СнимокМанёвра {
         нос.lineTo(z[0] - ux * остриё - uy * остриё * 0.55, z[1] - uy * остриё + ux * остриё * 0.55);
         нос.closePath();
         g.fill(нос);
-        // номер шага — кружок у начала пути
+        // номер шага — кружок на середине первого отрезка (у начала он закрывал жетон)
+        double ddx = т[1][0] - т[0][0];
+        double ddy = т[1][1] - т[0][1];
+        double dl = Math.hypot(ddx, ddy);
+        double вбок = size * 0.24;
+        a = new double[]{(т[0][0] + т[1][0]) / 2 + ddy / dl * вбок,
+            (т[0][1] + т[1][1]) / 2 - ddx / dl * вбок};
         double r = size * 0.15;
         g.setColor(ХОД);
         g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - r, a[1] - r, 2 * r, 2 * r));

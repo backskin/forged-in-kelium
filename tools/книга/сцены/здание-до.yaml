@@ -1,0 +1,9 @@
+size: 300
+hexes:
+  - {q: 0, r: 0}
+  - {q: 1, r: -1}
+tokens:
+  - {type: barracks, owner: 1, q: 0, r: 0, building: true, sides: [1, 2], hp: 2, damage: 1, energySlots: 1, energyPlaced: 1}
+  - {type: infantry, owner: 0, q: 1, r: -1, sides: [4]}
+arrows:
+  - {path: [[1, -1], [0, 0]], color: "#B03A2E", trim: 0.38}

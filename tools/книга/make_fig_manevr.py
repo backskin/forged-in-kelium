@@ -24,5 +24,5 @@ subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
                check=True, capture_output=True, cwd=КОРЕНЬ)
 
 vw, vh = Image.open(png).size
-figure("манёвр", png, 1400, vw, vh, [], css_w="100%", pad="0.6mm 0 0.6mm", в_колонке=True)
+figure("манёвр", png, 1400, vw, vh, [], css_w="92%", pad="0.4mm 0 0.4mm", в_колонке=True)
 print("ok", (vw, vh))
