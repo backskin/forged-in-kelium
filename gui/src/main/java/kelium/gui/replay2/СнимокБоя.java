@@ -87,7 +87,17 @@ public final class СнимокБоя {
         // Стороны гекса не размечаются: в sideOwner место только зданиям,
         // а войска FieldPainter рассаживает сам по свободным сторонам.
 
-        BufferedImage img = нарисовать(size, состояния, жетоны);
+        // КТО КОГО БЬЁТ (дизайнер 05.10.2026: «показать, какое войско кого точно
+        // атакует, от начала до конца ломаной линией»). Номера — те же, что у
+        // врезок с планшета войск под текстом примера.
+        атаки.clear();
+        атаки.add(new Атака(центр(size, состояния, жетоны, нашаТ), центр(size, состояния, жетоны, врагП),
+            new int[]{1, 0}, "1", 0.0));
+        атаки.add(new Атака(центр(size, состояния, жетоны, нашаП), центр(size, состояния, жетоны, врагТ),
+            new int[]{1, -1}, "2", -0.22));
+        атаки.add(new Атака(центр(size, состояния, жетоны, нашаВ), центр(size, состояния, жетоны, врагТ),
+            new int[]{1, -1}, "3", 0.22));
+        BufferedImage img = обрезать(нарисовать(size, состояния, жетоны, true));
         Path dir = out.toAbsolutePath().getParent();
         if (dir != null) {
             Files.createDirectories(dir);
@@ -98,7 +108,8 @@ public final class СнимокБоя {
     }
 
     private static BufferedImage нарисовать(double size,
-            Map<String, ReplayRecord.HexState> состояния, List<ReplayRecord.Tok> жетоны) {
+            Map<String, ReplayRecord.HexState> состояния, List<ReplayRecord.Tok> жетоны,
+            boolean стрелки) {
         double minx = Double.MAX_VALUE;
         double miny = Double.MAX_VALUE;
         double maxx = -Double.MAX_VALUE;
@@ -149,17 +160,126 @@ public final class СнимокБоя {
                 состояния.get(id), свои, cx0 + c[0], cy0 + c[1], false, соседи);
         }
 
+        if (!стрелки) {
+            g.dispose();
+            return img;
+        }
         double[] цель = FieldGeometry.hexCenter(ЦЕЛЬ[0], ЦЕЛЬ[1], size);
         обвести(g, cx0 + цель[0], cy0 + цель[1], size);
-        for (int[] qr : КЛЕТКИ) {
-            if (qr[0] == ЦЕЛЬ[0] && qr[1] == ЦЕЛЬ[1]) {
-                continue;
-            }
-            double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
-            выстрел(g, cx0 + c[0], cy0 + c[1], cx0 + цель[0], cy0 + цель[1], size);
+        for (Атака а : атаки) {
+            выстрел(g, cx0, cy0, size, а);
         }
         g.dispose();
-        return обрезать(img);
+        return img;
+    }
+
+    /** Атака: центр атакующего жетона, центр цели, его гекс, номер, сдвиг вдоль стороны. */
+    private record Атака(double[] от, double[] до, int[] гекс, String номер, double вдоль) { }
+
+    private static final List<Атака> атаки = new ArrayList<>();
+    private static final Color ОРЕОЛ = new Color(0xF7, 0xF1, 0xE1, 230);
+    private static final Color АТАКА = new Color(0xB03A2E);
+
+    /**
+     * Центр жетона на картинке: сцена как есть против той же сцены, где у этого
+     * жетона другой хозяин. Место от цвета не зависит, меняется только его
+     * рамка — её середина и есть центр. (Убрать жетон или нарисовать его
+     * одного нельзя: FieldPainter рассаживает войска с оглядкой на соседей.)
+     */
+    private static double[] центр(double size, Map<String, ReplayRecord.HexState> состояния,
+            List<ReplayRecord.Tok> все, ReplayRecord.Tok tk) {
+        BufferedImage пусто = нарисовать(size, состояния, все, false);
+        int был = tk.owner;
+        tk.owner = (был + 2) % 4;
+        BufferedImage один = нарисовать(size, состояния, все, false);
+        tk.owner = был;
+        double sx = 0;
+        double sy = 0;
+        long n = 0;
+        for (int y = 0; y < один.getHeight(); y++) {
+            for (int x = 0; x < один.getWidth(); x++) {
+                int e = пусто.getRGB(x, y);
+                int c = один.getRGB(x, y);
+                if (Math.abs(((e >> 16) & 255) - ((c >> 16) & 255)) + Math.abs(((e >> 8) & 255) - ((c >> 8) & 255))
+                        + Math.abs((e & 255) - (c & 255)) > 40) {
+                    sx += x;
+                    sy += y;
+                    n++;
+                }
+            }
+        }
+        return n == 0 ? new double[]{0, 0} : new double[]{sx / n, sy / n};
+    }
+
+    /**
+     * Стрелка атаки ломаной: от атакующего жетона через общую сторону гексов
+     * (со сдвигом вдоль неё, чтобы две атаки с одного гекса не слились) до
+     * жетона-цели. Тонкая, со светлым ореолом; номер — у начала.
+     */
+    private static void выстрел(Graphics2D g, double cx0, double cy0, double size, Атака а) {
+        double[] p = FieldGeometry.hexCenter(а.гекс()[0], а.гекс()[1], size);
+        double[] q = FieldGeometry.hexCenter(ЦЕЛЬ[0], ЦЕЛЬ[1], size);
+        double ex = q[0] - p[0];
+        double ey = q[1] - p[1];
+        double el = Math.hypot(ex, ey);
+        double[] м = {cx0 + (p[0] + q[0]) / 2 - ey / el * size * а.вдоль(),
+            cy0 + (p[1] + q[1]) / 2 + ex / el * size * а.вдоль()};
+        double[] a = сдвиг(а.от(), м, size * 0.10);
+        double[] z0 = а.до();
+        double dx = z0[0] - м[0];
+        double dy = z0[1] - м[1];
+        double len = Math.hypot(dx, dy);
+        double ux = dx / len;
+        double uy = dy / len;
+        double[] z = {z0[0] - ux * size * 0.08, z0[1] - uy * size * 0.08};
+        double остриё = size * 0.17;
+        Path2D линия = new Path2D.Double();
+        линия.moveTo(a[0], a[1]);
+        линия.lineTo(м[0], м[1]);
+        линия.lineTo(z[0] - ux * остриё * 0.6, z[1] - uy * остриё * 0.6);
+        Path2D нос = new Path2D.Double();
+        нос.moveTo(z[0], z[1]);
+        нос.lineTo(z[0] - ux * остриё + uy * остриё * 0.55, z[1] - uy * остриё - ux * остриё * 0.55);
+        нос.lineTo(z[0] - ux * остриё - uy * остриё * 0.55, z[1] - uy * остриё + ux * остриё * 0.55);
+        нос.closePath();
+        float толщ = (float) (size * 0.034);
+        g.setColor(ОРЕОЛ);
+        g.setStroke(new BasicStroke(толщ * 3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(линия);
+        g.draw(нос);
+        g.fill(нос);
+        g.setColor(АТАКА);
+        g.setStroke(new BasicStroke(толщ, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(линия);
+        g.fill(нос);
+        double rт = size * 0.045;
+        g.setColor(ОРЕОЛ);
+        g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - rт * 1.8, a[1] - rт * 1.8, rт * 3.6, rт * 3.6));
+        g.setColor(АТАКА);
+        g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - rт, a[1] - rт, 2 * rт, 2 * rт));
+        // номер атаки — на середине первого отрезка, сбоку
+        double ddx = м[0] - а.от()[0];
+        double ddy = м[1] - а.от()[1];
+        double dl = Math.hypot(ddx, ddy);
+        double вбок = size * 0.17 * (а.вдоль() > 0 ? -1 : 1);
+        double[] н = {(а.от()[0] + м[0]) / 2 + ddy / dl * вбок, (а.от()[1] + м[1]) / 2 - ddx / dl * вбок};
+        double r = size * 0.12;
+        g.setColor(ОРЕОЛ);
+        g.fill(new java.awt.geom.Ellipse2D.Double(н[0] - r * 1.25, н[1] - r * 1.25, r * 2.5, r * 2.5));
+        g.setColor(АТАКА);
+        g.fill(new java.awt.geom.Ellipse2D.Double(н[0] - r, н[1] - r, 2 * r, 2 * r));
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Tektur Narrow", Font.BOLD, (int) Math.round(size * 0.18)));
+        java.awt.FontMetrics fm = g.getFontMetrics();
+        g.drawString(а.номер(), (float) (н[0] - fm.stringWidth(а.номер()) / 2.0),
+            (float) (н[1] + fm.getAscent() / 2.0 - fm.getDescent() / 2.0));
+    }
+
+    private static double[] сдвиг(double[] от, double[] к, double на) {
+        double dx = к[0] - от[0];
+        double dy = к[1] - от[1];
+        double len = Math.hypot(dx, dy);
+        return new double[]{от[0] + dx / len * на, от[1] + dy / len * на};
     }
 
     /** Пунктирная обводка ВЫБРАННОГО гекса. */
@@ -181,36 +301,6 @@ public final class СнимокБоя {
             new float[]{(float) (size * 0.17), (float) (size * 0.11)}, 0f));
         g.setColor(new Color(0xB03A2E));
         g.draw(шестиугольник);
-    }
-
-    /** Стрелка атаки от соседнего гекса к выбранному. */
-    private static void выстрел(Graphics2D g, double x0, double y0,
-            double x1, double y1, double size) {
-        double dx = x1 - x0;
-        double dy = y1 - y0;
-        double len = Math.hypot(dx, dy);
-        double отступ = size * 0.62;
-        double ax = x0 + dx / len * отступ;
-        double ay = y0 + dy / len * отступ;
-        double bx = x1 - dx / len * отступ;
-        double by = y1 - dy / len * отступ;
-        g.setStroke(new BasicStroke((float) (size * 0.075), BasicStroke.CAP_ROUND,
-            BasicStroke.JOIN_ROUND));
-        g.setColor(new Color(0xB03A2E));
-        double остриё = size * 0.26;
-        g.drawLine((int) Math.round(ax), (int) Math.round(ay),
-            (int) Math.round(bx - dx / len * остриё * 0.5),
-            (int) Math.round(by - dy / len * остриё * 0.5));
-        double ux = dx / len;
-        double uy = dy / len;
-        Path2D нос = new Path2D.Double();
-        нос.moveTo(bx, by);
-        нос.lineTo(bx - ux * остриё + uy * остриё * 0.55,
-            by - uy * остриё - ux * остриё * 0.55);
-        нос.lineTo(bx - ux * остриё - uy * остриё * 0.55,
-            by - uy * остриё + ux * остриё * 0.55);
-        нос.closePath();
-        g.fill(нос);
     }
 
     private static BufferedImage обрезать(BufferedImage im) {

@@ -87,8 +87,19 @@ public final class СнимокМанёвра {
         след.add(жетон("infantry", 0, "h-1_1", 1));
         след.add(жетон("vehicle", 0, "h0_0", 5, 0));
         след.add(жетон("infantry", 0, "h0_0", 2));
-        BufferedImage основа = нарисовать(size, состояния, жетоны, true);
         BufferedImage пусто = нарисовать(size, состояния, List.of(), false);
+        // ПУТЬ ОТ ЖЕТОНА ДО ЖЕТОНА (дизайнер 05.10.2026: «вести стрелки прямо от
+        // исконного места жетона вплоть до его конечного положения, а не просто
+        // указывать на гекс»). Где именно лёг жетон, решает FieldPainter —
+        // поэтому каждый жетон рисуется отдельно и ищется по отличию от пустого поля.
+        ходы.clear();
+        ходы.add(new Ход(центр(size, состояния, пусто, жетоны.get(1)),
+            центр(size, состояния, пусто, след.get(0)), new int[][]{{0, 0}, {-1, 1}}, "1"));
+        ходы.add(new Ход(центр(size, состояния, пусто, жетоны.get(2)),
+            центр(size, состояния, пусто, след.get(1)), new int[][]{{0, -1}, {0, 0}}, "2", true));
+        ходы.add(new Ход(центр(size, состояния, пусто, жетоны.get(3)),
+            центр(size, состояния, пусто, след.get(2)), new int[][]{{2, -1}, {1, -1}, {0, 0}}, "3"));
+        BufferedImage основа = нарисовать(size, состояния, жетоны, true);
         BufferedImage призраки = нарисовать(size, состояния, след, false);
         // где «призраки» отличаются от пустого поля — там след: подмешать на 45%
         for (int y = 0; y < основа.getHeight(); y++) {
@@ -177,9 +188,9 @@ public final class СнимокМанёвра {
         double[] цель = FieldGeometry.hexCenter(ЦЕЛЬ[0], ЦЕЛЬ[1], size);
         обвести(g, cx0 + цель[0], cy0 + цель[1], size);
         // 1 — пехота уходит; 2 — техника приходит с соседнего; 3 — пехота в обход
-        путь(g, cx0, cy0, size, new int[][]{{0, 0}, {-1, 1}}, "1");
-        путь(g, cx0, cy0, size, new int[][]{{0, -1}, {0, 0}}, "2");
-        путь(g, cx0, cy0, size, new int[][]{{2, -1}, {1, -1}, {0, 0}}, "3");
+        for (Ход х : ходы) {
+            путь(g, cx0, cy0, size, х);
+        }
         g.dispose();
         return img;
     }
@@ -205,59 +216,136 @@ public final class СнимокМанёвра {
         g.draw(шестиугольник);
     }
 
+    /** Ход жетона: откуда (центр жетона), куда (центр следа), через какие гексы. */
+    private record Ход(double[] от, double[] до, int[][] гексы, String номер, boolean черезНебо) {
+        Ход(double[] от, double[] до, int[][] гексы, String номер) {
+            this(от, до, гексы, номер, false);
+        }
+    }
+
+    private static final List<Ход> ходы = new ArrayList<>();
+    private static final Color ОРЕОЛ = new Color(0xF7, 0xF1, 0xE1, 230);
+
+    /** Центр жетона на картинке: рисуем его одного и ищем отличие от пустого поля. */
+    private static double[] центр(double size, Map<String, ReplayRecord.HexState> состояния,
+            BufferedImage пусто, ReplayRecord.Tok tk) {
+        BufferedImage один = нарисовать(size, состояния, List.of(tk), false);
+        double sx = 0;
+        double sy = 0;
+        long n = 0;
+        for (int y = 0; y < один.getHeight(); y++) {
+            for (int x = 0; x < один.getWidth(); x++) {
+                int e = пусто.getRGB(x, y);
+                int c = один.getRGB(x, y);
+                if (Math.abs(((e >> 16) & 255) - ((c >> 16) & 255)) + Math.abs(((e >> 8) & 255) - ((c >> 8) & 255))
+                        + Math.abs((e & 255) - (c & 255)) > 40) {
+                    sx += x;
+                    sy += y;
+                    n++;
+                }
+            }
+        }
+        return n == 0 ? new double[]{0, 0} : new double[]{sx / n, sy / n};
+    }
+
     /**
-     * Путь жетона по центрам гексов: ломаная, на конце — стрелка, у начала —
-     * номер шага (порядок из правил: сначала вывести, потом ввести).
+     * Путь жетона ломаной: от центра жетона на старом месте через середины
+     * общих сторон гексов (и центры гексов, через которые он проходит) до
+     * центра следа. Линия тонкая, со светлым ореолом, как выноски на развороте
+     * подготовки (дизайнер 05.10.2026).
      */
-    private static void путь(Graphics2D g, double cx0, double cy0, double size,
-            int[][] гексы, String номер) {
-        double[][] т = new double[гексы.length][];
-        for (int i = 0; i < гексы.length; i++) {
-            double[] c = FieldGeometry.hexCenter(гексы[i][0], гексы[i][1], size);
-            т[i] = new double[]{cx0 + c[0], cy0 + c[1]};
+    private static void путь(Graphics2D g, double cx0, double cy0, double size, Ход х) {
+        List<double[]> т = new ArrayList<>();
+        т.add(х.от());
+        for (int i = 0; i < х.гексы().length - 1; i++) {
+            double[] p = FieldGeometry.hexCenter(х.гексы()[i][0], х.гексы()[i][1], size);
+            double[] q = FieldGeometry.hexCenter(х.гексы()[i + 1][0], х.гексы()[i + 1][1], size);
+            if (i > 0) {
+                т.add(new double[]{cx0 + p[0], cy0 + p[1]});
+            }
+            double mx = cx0 + (p[0] + q[0]) / 2;
+            double my = cy0 + (p[1] + q[1]) / 2;
+            if (х.черезНебо() && i == х.гексы().length - 2) {
+                // середину стороны занимает чужой след — идём ближе к левому
+                // углу этой стороны
+                double ex = q[0] - p[0];
+                double ey = q[1] - p[1];
+                double el = Math.hypot(ex, ey);
+                double px = -ey / el * size * 0.32;
+                double py = ex / el * size * 0.32;
+                if (px > 0) {
+                    px = -px;
+                    py = -py;
+                }
+                mx += px;
+                my += py;
+            }
+            т.add(new double[]{mx, my});
         }
-        // концы отодвинуты от центров, чтобы не закрывать жетоны
-        double отступ = size * 0.42;
-        double[] a = сдвиг(т[0], т[1], отступ);
-        double[] z = сдвиг(т[т.length - 1], т[т.length - 2], отступ);
-        Path2D линия = new Path2D.Double();
-        линия.moveTo(a[0], a[1]);
-        for (int i = 1; i < т.length - 1; i++) {
-            линия.lineTo(т[i][0], т[i][1]);
+        if (х.черезНебо()) {
+            // через пустое небо в середине гекса — не перечёркивать чужие следы
+            int[] к = х.гексы()[х.гексы().length - 1];
+            double[] c = FieldGeometry.hexCenter(к[0], к[1], size);
+            т.add(new double[]{cx0 + c[0], cy0 + c[1]});
         }
-        double[] пред = т[т.length - 2];
-        double dx = z[0] - (т.length > 2 ? пред[0] : a[0]);
-        double dy = z[1] - (т.length > 2 ? пред[1] : a[1]);
+        т.add(х.до());
+        // начало и конец — у края жетона, а не в самой середине картинки
+        double[] a = сдвиг(т.get(0), т.get(1), size * 0.12);
+        double[] z = т.get(т.size() - 1);
+        double[] пред = т.get(т.size() - 2);
+        double dx = z[0] - пред[0];
+        double dy = z[1] - пред[1];
         double len = Math.hypot(dx, dy);
         double ux = dx / len;
         double uy = dy / len;
-        double остриё = size * 0.26;
-        линия.lineTo(z[0] - ux * остриё * 0.5, z[1] - uy * остриё * 0.5);
-        g.setStroke(new BasicStroke((float) (size * 0.075), BasicStroke.CAP_ROUND,
-            BasicStroke.JOIN_ROUND));
-        g.setColor(ХОД);
-        g.draw(линия);
+        z = new double[]{z[0] - ux * size * 0.10, z[1] - uy * size * 0.10};
+        double остриё = size * 0.17;
+        Path2D линия = new Path2D.Double();
+        линия.moveTo(a[0], a[1]);
+        for (int i = 1; i < т.size() - 1; i++) {
+            линия.lineTo(т.get(i)[0], т.get(i)[1]);
+        }
+        линия.lineTo(z[0] - ux * остриё * 0.6, z[1] - uy * остриё * 0.6);
         Path2D нос = new Path2D.Double();
         нос.moveTo(z[0], z[1]);
         нос.lineTo(z[0] - ux * остриё + uy * остриё * 0.55, z[1] - uy * остриё - ux * остриё * 0.55);
         нос.lineTo(z[0] - ux * остриё - uy * остриё * 0.55, z[1] - uy * остриё + ux * остриё * 0.55);
         нос.closePath();
+        float толщ = (float) (size * 0.034);
+        // ореол
+        g.setColor(ОРЕОЛ);
+        g.setStroke(new BasicStroke(толщ * 3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(линия);
+        g.draw(нос);
         g.fill(нос);
-        // номер шага — кружок на середине первого отрезка (у начала он закрывал жетон)
-        double ddx = т[1][0] - т[0][0];
-        double ddy = т[1][1] - т[0][1];
-        double dl = Math.hypot(ddx, ddy);
-        double вбок = size * 0.24;
-        a = new double[]{(т[0][0] + т[1][0]) / 2 + ddy / dl * вбок,
-            (т[0][1] + т[1][1]) / 2 - ddx / dl * вбок};
-        double r = size * 0.15;
         g.setColor(ХОД);
-        g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - r, a[1] - r, 2 * r, 2 * r));
+        g.setStroke(new BasicStroke(толщ, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(линия);
+        g.fill(нос);
+        // точка на старом месте
+        double rт = size * 0.045;
+        g.setColor(ОРЕОЛ);
+        g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - rт * 1.8, a[1] - rт * 1.8, rт * 3.6, rт * 3.6));
+        g.setColor(ХОД);
+        g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - rт, a[1] - rт, 2 * rт, 2 * rт));
+        // номер шага — у первого излома, сбоку от линии
+        double[] p0 = т.get(0);
+        double[] p1 = т.get(1);
+        double ddx = p1[0] - p0[0];
+        double ddy = p1[1] - p0[1];
+        double dl = Math.hypot(ddx, ddy);
+        double вбок = size * 0.20;
+        double[] м = {(p0[0] + p1[0]) / 2 + ddy / dl * вбок, (p0[1] + p1[1]) / 2 - ddx / dl * вбок};
+        double r = size * 0.13;
+        g.setColor(ОРЕОЛ);
+        g.fill(new java.awt.geom.Ellipse2D.Double(м[0] - r * 1.25, м[1] - r * 1.25, r * 2.5, r * 2.5));
+        g.setColor(ХОД);
+        g.fill(new java.awt.geom.Ellipse2D.Double(м[0] - r, м[1] - r, 2 * r, 2 * r));
         g.setColor(Color.WHITE);
-        g.setFont(new Font("Tektur Narrow", Font.BOLD, (int) Math.round(size * 0.22)));
+        g.setFont(new Font("Tektur Narrow", Font.BOLD, (int) Math.round(size * 0.19)));
         java.awt.FontMetrics fm = g.getFontMetrics();
-        g.drawString(номер, (float) (a[0] - fm.stringWidth(номер) / 2.0),
-            (float) (a[1] + fm.getAscent() / 2.0 - fm.getDescent() / 2.0));
+        g.drawString(х.номер(), (float) (м[0] - fm.stringWidth(х.номер()) / 2.0),
+            (float) (м[1] + fm.getAscent() / 2.0 - fm.getDescent() / 2.0));
     }
 
     private static double[] сдвиг(double[] от, double[] к, double на) {

@@ -71,16 +71,16 @@ def ряд(куски, подписи_стрелок, подписи_под):
 оборот = обвести(выс(Image.open(os.path.join(ТЕКСТ, "token", "command_center_trophy.png")).convert("RGBA"), 300), 5)
 р1 = ряд([до, после, оборот], [None, None], ["последний удар", "ЦУ уничтожен", "на свалку Акселя"])
 
-# планшет войск Брианы (красный); модуль блокировки лежит на ячейке
+# планшет войск Брианы (красный — файл troop-p1); модуль блокировки лежит на ячейке
 # специальной атаки пехоты — род, изображённый на модуле
-планшет = Image.open(os.path.join(ТЕКСТ, "board", "troop-p2.png")).convert("RGBA")
+планшет = Image.open(os.path.join(ТЕКСТ, "board", "troop-p1.png")).convert("RGBA")
 планшет = планшет.crop((0, 0, round(планшет.width * 0.265), планшет.height))
 мод_лицо = Image.open(os.path.join(ТЕКСТ, "module", "mod_cu_infantry.png")).convert("RGBA")
 мод_оборот = Image.open(os.path.join(ТЕКСТ, "module", "mod_cu_trophy.png")).convert("RGBA")
 ячейка = (486, 425, 772, 760)                      # специальная атака пехоты
 м = мод_лицо.resize((ячейка[2] - ячейка[0], ячейка[2] - ячейка[0]), Image.LANCZOS)
 планшет.alpha_composite(м, (ячейка[0], (ячейка[1] + ячейка[3] - м.height) // 2))
-пустой = Image.open(os.path.join(ТЕКСТ, "board", "troop-p2.png")).convert("RGBA")
+пустой = Image.open(os.path.join(ТЕКСТ, "board", "troop-p1.png")).convert("RGBA")
 пустой = пустой.crop((0, 0, round(пустой.width * 0.265), пустой.height))
 пл = обвести(выс(планшет, 420), 5)
 # четвёртый шаг (дизайнер 05.10.2026): планшет Брианы, где модуля больше нет —

@@ -441,6 +441,7 @@ CSS = r"""
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  .блок.надвое > .под-низ { grid-column: 1 / -1; }
   /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
      рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
   .блок.пара { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
