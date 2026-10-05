@@ -165,6 +165,17 @@ CSS = r"""
   .блок { background: rgba(247, 241, 225, .66); padding: 1.9mm 2.7mm 1.6mm;
     margin: 0 0 2.1mm; outline: .18mm solid var(--кант); outline-offset: -.18mm; }
   .блок > :last-child { margin-bottom: 0; }
+  /* РАЗДЕЛ-ПРИМЕР — тот же жёлтый, что у врезки «Пример»: заливка, кант,
+     заголовок ярлыком-плашкой (дизайнер 05.10.2026). */
+  .блок.пример-блок { background: var(--пример); box-shadow: inset 0 0 0 .3mm var(--пример-кант); }
+  .блок.пример-блок > h2:first-child, .блок.пример-блок > .половина > h2:first-child,
+  .карточки .блок.пример-блок > h2 { display: inline-block; font: 800 8.4pt/1 "Tektur", sans-serif; color: var(--страница);
+    text-transform: uppercase; letter-spacing: .06em; background: var(--пример-кант); border: 0;
+    padding: 1.2mm 3.2mm 1mm 2.6mm; margin: -1.9mm 0 1.6mm -2.7mm;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
+  .блок.пример-блок > h2::after { display: none; }
+  .блок.пример-блок h3 { color: var(--пример-кант); }
+
 
   /* ---- заголовок главы: плашка с номером, заголовок, линия с ромбом ---- */
   .глава {
