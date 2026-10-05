@@ -178,6 +178,10 @@ public final class СнимокПоля {
         // дизайнера 28.09.2026).
         населить(с, 0, "h0_0", "command_center", 2, new int[]{0, 1}, "infantry");
         населить(с, 1, "h2_0", "factory", 2, new int[]{1, 2}, "vehicle");
+        // ТЕХНИКА КРАСНОГО — В НИЖНЕМ УГЛУ (стороны 4 и 5), а не на напечатанном
+        // месте для энергостанции: рассадка вразброс клала её поверх места
+        // (дизайнер 05.10.2026, стр. 12).
+        с.жетоны.get(с.жетоны.size() - 1).sides = new ArrayList<>(List.of(4, 5));
         // У ЖЁЛТОГО — ОДНИ ВОЙСКА, без авиации (там же, 28.09.2026).
         с.жетоны.add(жетон("infantry", 3, "h1_-1", false));
         с.жетоны.add(жетон("tower", 3, "h1_-1", false));
@@ -323,6 +327,9 @@ public final class СнимокПоля {
         kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
+        // БЕЗ ПОДКРАСКИ ГЕКСА ЦВЕТОМ ХОЗЯИНА (дизайнер 05.10.2026): в книге
+        // модуль поля всегда в своём печатном цвете, ни в одном примере.
+        FieldPainter.showOwnership = false;
         FieldPainter.showCardboard = true;
         FieldPainter.книжнаяТолщина = true;
         Font мелкий = new Font("Tektur Narrow", Font.PLAIN, (int) Math.round(size * 0.16));
