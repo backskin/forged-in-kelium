@@ -179,7 +179,8 @@ def figure(name, path, width, vw, vh, marks, r=None, fs=None, css_w="93%", pad="
             + f'            <svg viewBox="0 0 {vw} {vh}" preserveAspectRatio="none">'
             + "".join(g) + '</svg>' + NL
             + '          </div>' + NL + '        </div>')
-    open(os.path.join(D, f"_{name}.svg"), "w", encoding="utf-8").write(html)
+    from ореол import с_ореолом
+    open(os.path.join(D, f"_{name}.svg"), "w", encoding="utf-8").write(с_ореолом(html))
 
 
 # планшет войск: картинка 3354×886, координаты — в масштабе 2000×528
