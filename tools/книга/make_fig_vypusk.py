@@ -27,32 +27,47 @@ figure = ns["figure"]
 ОХРА = (107, 68, 19, 255)
 
 
-def запитать(im, файл):
-    """Кубики энергии в ячейки здания: ячейки — жёлтые пятна в .zones.png."""
+def ячейки(файл, размер):
+    """Жёлтые пятна .zones.png — ячейки энергии: [(cx, cy, сторона пятна)]."""
     import numpy as np
     from scipy import ndimage
     п = os.path.join(Т, "token", файл.replace(".png", ".zones.png"))
     if not os.path.exists(п):
-        return im
-    z = np.asarray(Image.open(п).convert("RGBA").resize(im.size, Image.NEAREST))
+        return []
+    z = np.asarray(Image.open(п).convert("RGBA").resize(размер, Image.NEAREST))
     жёлт = (z[..., 0] > 220) & (z[..., 1] > 220) & (z[..., 2] < 40)
     метки, n = ndimage.label(жёлт)
-    куб = Image.open(os.path.join(Т, "icons", "energy.png")).convert("RGBA")
+    out = []
     for k in range(1, n + 1):
         ys, xs = np.nonzero(метки == k)
-        if len(xs) < 50:
-            continue
-        сторона = round(min(np.ptp(xs), np.ptp(ys)) * 0.9)
-        к = куб.resize((сторона, сторона), Image.LANCZOS)
-        im.alpha_composite(к, (int(xs.mean()) - сторона // 2, int(ys.mean()) - сторона // 2))
+        if len(xs) >= 50:
+            out.append((int(xs.mean()), int(ys.mean()), min(np.ptp(xs), np.ptp(ys))))
+    return out
+
+
+def в_масштабе(файл, тип):
+    im = Image.open(os.path.join(Т, "token", файл)).convert("RGBA")
+    w = round(РАЗМ["жетоны"][тип][0] * ТНМ * К)
+    return im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
+
+
+def запитать(im, файл):
+    """Кубики энергии в ячейки здания, уже в масштабе рисунка. ОДНА СТОРОНА
+    КУБИКА НА ВСЕ ЗДАНИЯ — как в ячейке завода (дизайнер 05.10.2026: жетоны и
+    ячейки равны, а кубики выходили разными: пятна .zones.png нарисованы
+    неодинаково, а картинки жетонов разной ширины)."""
+    завод = в_масштабе("factory_p1.png", "factory")
+    мерка = [с for _, _, с in ячейки("factory_p1.png", завод.size)]
+    сторона = round(min(мерка) * 0.9) if мерка else round(im.width * 0.12)
+    куб = Image.open(os.path.join(Т, "icons", "energy.png")).convert("RGBA")
+    к = куб.resize((сторона, сторона), Image.LANCZOS)
+    for cx, cy, _ in ячейки(файл, im.size):
+        im.alpha_composite(к, (cx - сторона // 2, cy - сторона // 2))
     return im
 
 
 def жетон(файл, тип):
-    im = запитать(Image.open(os.path.join(Т, "token", файл)).convert("RGBA"), файл)
-    w_мм = РАЗМ["жетоны"][тип][0]
-    w = round(w_мм * ТНМ * К)
-    return обвести(im.resize((w, round(im.height * w / im.width)), Image.LANCZOS), 3)
+    return обвести(запитать(в_масштабе(файл, тип), файл), 3)
 
 
 def кубик(файл, h=110):
