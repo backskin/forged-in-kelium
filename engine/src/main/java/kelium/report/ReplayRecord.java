@@ -474,6 +474,7 @@ public final class ReplayRecord {
          * Первая в списке лежит слева.
          */
         public final List<String> arsenalDisplay = new ArrayList<>();
+        public final List<String> superDisplay = new ArrayList<>();
     }
 
     /**
@@ -812,6 +813,7 @@ public final class ReplayRecord {
             }
         }
         snap.arsenalDisplay.addAll(s.arsenalDisplay);
+        snap.superDisplay.addAll(s.superDisplay);
         return snap;
     }
 
@@ -1235,6 +1237,7 @@ public final class ReplayRecord {
         }
         o.put("decks", dk);
         o.put("arsDisplay", new ArrayList<>(s.arsenalDisplay));
+        o.put("superDisplay", new ArrayList<>(s.superDisplay));
         List<Object> hx = new ArrayList<>();
         for (HexState h : s.hexes) {
             Map<String, Object> ho = new LinkedHashMap<>();
@@ -1602,6 +1605,9 @@ public final class ReplayRecord {
         }
         for (Object x : Json.list(o, "arsDisplay")) {
             s.arsenalDisplay.add(String.valueOf(x));
+        }
+        for (Object x : Json.list(o, "superDisplay")) {
+            s.superDisplay.add(String.valueOf(x));
         }
         for (Object ho : Json.list(o, "hexes")) {
             Map<String, Object> h = (Map<String, Object>) ho;

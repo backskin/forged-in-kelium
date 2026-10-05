@@ -880,11 +880,17 @@ public final class Setup {
         // СУПЕР-ЗАДАНИЯ: по одной карте втайне каждому. Карта только считает
         // очки в конце партии (СуперЗадания.vp). Раздача спрашивает тумблер
         // дополнения: выключено — карт нет вовсе.
+        // С 05.10.2026 (super_objectives.display > 0) карт в руку не раздают:
+        // они лежат открыто на столе, см. refillSuperDisplay.
         if (expansionOn(ruleset, "super_objectives")) {
-            try {
-                СуперЗадания.deal(s, content.get("super_objectives").ids(), rng);
-            } catch (RuntimeException e) {
-                // каталога нет — режим включён зря; играем без карт
+            if (ruleset.getInt("super_objectives.display", 0) > 0) {
+                refillSuperDisplay(s, ruleset);
+            } else {
+                try {
+                    СуперЗадания.deal(s, content.get("super_objectives").ids(), rng);
+                } catch (RuntimeException e) {
+                    // каталога нет — режим включён зря; играем без карт
+                }
             }
         }
         установитьНачальныйАрсенал(s, ruleset);
@@ -1016,6 +1022,22 @@ public final class Setup {
      * колода и сброс исчерпаны, витрина остаётся неполной — это законное
      * состояние партии, а не ошибка.
      */
+    /** Добрать открытые супер-задания на столе до {@code super_objectives.display}. */
+    public static void refillSuperDisplay(GameState s, Ruleset ruleset) {
+        kelium.core.Deck deck = s.decks.get("super_objectives");
+        int n = ruleset.getInt("super_objectives.display", 0);
+        if (deck == null) {
+            return;
+        }
+        while (s.superDisplay.size() < n) {
+            String card = deck.draw(s.rng);
+            if (card == null) {
+                break;                    // колода кончилась — на столе меньше карт
+            }
+            s.superDisplay.add(card);
+        }
+    }
+
     public static void refillArsenalDisplay(GameState s) {
         kelium.core.Deck deck = s.decks.get("arsenal");
         if (deck == null) {

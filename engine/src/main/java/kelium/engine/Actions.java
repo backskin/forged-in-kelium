@@ -4409,6 +4409,28 @@ public final class Actions {
                     || !kelium.engine.Setup.expansionOn(rs, "super_objectives")) {
                 return;
             }
+            // ОТКРЫТЫЕ НА СТОЛЕ (свод super_objectives.display, 05.10.2026):
+            // игрок выбирает одну из лежащих карт, на её место выкладывают новую.
+            if (rs.getInt("super_objectives.display", 0) > 0) {
+                if (state.superDisplay.isEmpty()) {
+                    return;
+                }
+                List<Choice> opts = new ArrayList<>();
+                for (String c : state.superDisplay) {
+                    Map<String, Object> card = Ctx.cards(state, "super_objectives").find(c);
+                    String label = card == null ? c : String.valueOf(card.get("name"));
+                    opts.add(new Choice("super_take", c, label + " (" + c + ")"));
+                }
+                Choice ch = opts.size() == 1 ? opts.get(0)
+                    : agent.choose(state, opts, Map.of("kind", "super_take", "seat", player.seat));
+                String взята = ch.payload() instanceof String c && state.superDisplay.contains(c)
+                    ? c : state.superDisplay.get(0);
+                state.superDisplay.remove(взята);
+                player.superObjectives.add(взята);
+                player.superObjectiveOffer.add(взята);
+                kelium.engine.Setup.refillSuperDisplay(state, rs);
+                return;
+            }
             var колода = state.decks.get("super_objectives");
             if (колода == null) {
                 return;

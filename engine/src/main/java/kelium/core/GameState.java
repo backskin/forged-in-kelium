@@ -42,6 +42,13 @@ public final class GameState {
      * вслепую с верха колоды, витрины не касаясь.
      */
     public final java.util.List<String> arsenalDisplay = new java.util.ArrayList<>();
+    /**
+     * ОТКРЫТЫЕ СУПЕР-ЗАДАНИЯ НА СТОЛЕ (решение дизайнера 05.10.2026, свод
+     * {@code super_objectives.display}). На подготовке супер-заданий не
+     * раздают: 3 карты лежат лицом вверх, за третью ступень трека игрок
+     * забирает одну из них, и на её место выкладывают верхнюю карту колоды.
+     */
+    public final java.util.List<String> superDisplay = new java.util.ArrayList<>();
     public int circle = 0;                    // 1..circlesPerRound
     public int firstPlayer = 0;               // место с жетоном первого игрока
 
@@ -238,6 +245,7 @@ public final class GameState {
         // обязана её нести: без этого бот, доигрывая копию, «видел» бы пустую
         // витрину и не мог оценить покупку арсенала вовсе.
         s.arsenalDisplay.addAll(arsenalDisplay);
+        s.superDisplay.addAll(superDisplay);
         s.redBag.addAll(redBag);
         s.blueBag.addAll(blueBag);
         for (int side = 0; side < marketCells.length; side++) {
@@ -312,6 +320,8 @@ public final class GameState {
         superArsenalOffer.putAll(fresh.superArsenalOffer);
         arsenalDisplay.clear();
         arsenalDisplay.addAll(fresh.arsenalDisplay);
+        superDisplay.clear();
+        superDisplay.addAll(fresh.superDisplay);
         redBag.clear();
         redBag.addAll(fresh.redBag);
         blueBag.clear();
