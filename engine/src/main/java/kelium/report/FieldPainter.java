@@ -92,6 +92,61 @@ public final class FieldPainter {
     public static boolean showCardboard = true;
 
     /**
+     * КНИЖНАЯ ТОЛЩИНА ЖЕТОНОВ (дизайнер 05.10.2026): в книге правил жетоны на
+     * поле рисуются как на рисунке свалки — тёмный картонный торец строго вниз
+     * и мягкая тень на поле, а не цветной бортик по диагонали. Жетон при этом
+     * чуть отодвигается к середине гекса, чтобы торец не свисал за его край.
+     * В игре выключено.
+     */
+    public static boolean книжнаяТолщина = false;
+
+    /** Торец картона: тона от нижнего (тёмного) к верхнему. */
+    private static final String[] ТОРЕЦ = {"#3E3326", "#4A3D2D", "#564735", "#62523D", "#6E5C45"};
+
+    /**
+     * Книжная толщина под картинкой: тень (несколько полупрозрачных копий,
+     * расходящихся вниз-вправо), потом торец — копии силуэта со сдвигом вниз.
+     * Координаты и поворот — те же, что у самой картинки.
+     */
+    private static void книжныйТорец(FieldCanvas c, java.awt.image.BufferedImage tex, double x, double y,
+                                     double rot, double scale, double px, double py, double d) {
+        java.awt.image.BufferedImage тень = ТеньЖетона.силуэт(tex, "#14100A");
+        if (тень != null) {
+            java.awt.image.BufferedImage прозр = полупрозрачный(тень, 0.10);
+            for (int i = 4; i >= 1; i--) {
+                double t = d * (0.6 + 0.35 * i);
+                c.image(прозр, x + t * 0.7, y + t, rot, scale, px, py);
+            }
+        }
+        int шагов = Math.max(3, (int) Math.ceil(d * 1.5));
+        for (int i = шагов; i >= 1; i--) {
+            String тон = ТОРЕЦ[Math.min(ТОРЕЦ.length - 1, (шагов - i) * ТОРЕЦ.length / шагов)];
+            java.awt.image.BufferedImage сил = ТеньЖетона.силуэт(tex, тон);
+            if (сил != null) {
+                c.image(сил, x, y + d * i / шагов, rot, scale, px, py);
+            }
+        }
+    }
+
+    private static final java.util.Map<java.awt.image.BufferedImage, java.awt.image.BufferedImage> ПРОЗР =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static java.awt.image.BufferedImage полупрозрачный(java.awt.image.BufferedImage im, double k) {
+        return ПРОЗР.computeIfAbsent(im, src -> {
+            java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(src.getWidth(), src.getHeight(),
+                java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            for (int yy = 0; yy < src.getHeight(); yy++) {
+                for (int xx = 0; xx < src.getWidth(); xx++) {
+                    int argb = src.getRGB(xx, yy);
+                    int a = (int) (((argb >>> 24) & 0xFF) * k);
+                    out.setRGB(xx, yy, (a << 24) | (argb & 0xFFFFFF));
+                }
+            }
+            return out;
+        });
+    }
+
+    /**
      * ПОКАЗАТЬ, ЧЕМ НАКРЫТ ГЕКС: контуры картонок и их имена поверх поля
      * (заказ дизайнера 08.09.2026 — «тумблер видимости на поле, что за блоки
      * там расположены»). По умолчанию выключено: на столе этих линий нет.
@@ -970,7 +1025,10 @@ public final class FieldPainter {
     private static void drawUnitTexture(FieldCanvas c, java.awt.image.BufferedImage tex,
                                         FieldGeometry.Shape sh, double[] pos, double rotDeg,
                                         double targetW, String edge) {
-        if (edge != null) {
+        if (edge != null && книжнаяТолщина) {
+            книжныйТорец(c, tex, pos[0], pos[1], rotDeg, targetW / tex.getWidth(),
+                tex.getWidth() / 2.0, tex.getHeight() / 2.0, targetW * 0.07);
+        } else if (edge != null) {
             // БОРТИК ПОВТОРЯЕТ ФОРМУ САМОЙ КАРТОНКИ, А НЕ СИЛУЭТ РОДА ВОЙСК:
             // берём силуэт картинки по её непрозрачности. Из-под квадратной
             // картинки прежде торчал цветной пятиугольник обводки танка —
@@ -1015,7 +1073,8 @@ public final class FieldPainter {
         // между соседними жетонами появляется тонкая щель — она их и разделяет
         // (просьба дизайнера 13.08.2026). Всё, что печатается на жетоне, считается
         // от ЭТОЙ точки, поэтому едет вместе с ним.
-        double[] shift = FieldGeometry.polar(hexCx, hexCy, size * EDGE_SHIFT, face);
+        double[] shift = FieldGeometry.polar(hexCx, hexCy,
+            size * EDGE_SHIFT - (книжнаяТолщина ? size * 0.05 : 0), face);
         double cx = shift[0];
         double cy = shift[1];
 
@@ -1034,8 +1093,13 @@ public final class FieldPainter {
             // а должно быть объёмным, как пехота, техника и вышка) — тот же
             // бортик цветом обводки места, протянутый вниз-вправо.
             double k = FieldGeometry.seatScale(sh, size);
-            java.awt.image.BufferedImage бортик = ТеньЖетона.силуэт(tex,
+            java.awt.image.BufferedImage бортик = книжнаяТолщина ? null : ТеньЖетона.силуэт(tex,
                 FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(seat)]);
+            if (книжнаяТолщина) {
+                double perPixel = sh.vbW() / tex.getWidth();
+                книжныйТорец(c, tex, cx, cy, face - sh.outward(), k * perPixel,
+                    sh.hexCx() / perPixel, sh.hexCy() / perPixel, size * 0.045);
+            }
             if (бортик != null) {
                 double perPixel = sh.vbW() / tex.getWidth();
                 double d = sh.vbW() * k * TOKEN_LIFT;
@@ -1913,7 +1977,8 @@ public final class FieldPainter {
                 // Сдвиг δ вдоль биссектрисы сокращает щель до каждой стороны
                 // на δ·sin 60°; 0,15R даёт ту же щель, что у пехоты.
                 double r = FieldGeometry.unitSeatRadius(size, hТок)
-                    + (place.size() >= 2 ? size * 0.15 : 0);
+                    + (place.size() >= 2 ? size * 0.15 : 0)
+                    - (книжнаяТолщина ? size * 0.11 : 0);
                 pos = FieldGeometry.polar(cx, cy, r, face);
                 // ПОВОРОТ: ПО ФОРМЕ ЖЕТОНА, А НЕ ПО ЧИТАЕМОСТИ.
                 //

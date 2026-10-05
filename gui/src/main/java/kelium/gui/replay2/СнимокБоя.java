@@ -121,6 +121,7 @@ public final class СнимокБоя {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
         FieldPainter.showCardboard = false;
+        FieldPainter.книжнаяТолщина = true;
         Font мелкий = new Font("Tektur Narrow", Font.PLAIN, (int) Math.round(size * 0.185));
 
         double cx0 = поле - minx;

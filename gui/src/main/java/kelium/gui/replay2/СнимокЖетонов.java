@@ -133,7 +133,8 @@ public final class СнимокЖетонов {
         kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
-        FieldPainter.showCardboard = false;      // одиночный гекс, а не кусок поля
+        FieldPainter.showCardboard = false;
+        FieldPainter.книжнаяТолщина = true;      // одиночный гекс, а не кусок поля
 
         Font шрифт = new Font("Tektur Narrow", Font.BOLD, (int) Math.round(size * 0.21));
         for (int i = 0; i < клетки.size(); i++) {

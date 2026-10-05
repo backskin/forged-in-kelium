@@ -24,6 +24,11 @@ figure = ns["figure"]
 ОХРА = (107, 68, 19, 255)
 
 
+import sys
+sys.path.insert(0, D)
+from контур import обвести  # noqa: E402
+
+
 def сцена(имя):
     png = os.path.join(D, "_%s.png" % имя)
     subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8",
@@ -31,7 +36,7 @@ def сцена(имя):
                     os.path.join(D, "сцены", имя + ".yaml"), png], check=True,
                    capture_output=True, cwd=КОРЕНЬ,
                    env=dict(os.environ, LANG="C.UTF-8", LC_ALL="C.UTF-8"))
-    return Image.open(png).convert("RGBA")
+    return обвести(Image.open(png).convert("RGBA"), 5)
 
 
 def картинка(путь, h):
@@ -81,7 +86,7 @@ def свалка(оборот, h):
     м = Image.new("L", карта.size, 0)
     ImageDraw.Draw(м).rounded_rectangle((0, 0, карта.width - 1, h - 1), radius=round(h * 0.06), fill=255)
     карта.putalpha(м)
-    ж = оборот.resize((round(оборот.width * h * 0.52 / оборот.height), round(h * 0.52)), Image.LANCZOS)
+    ж = обвести(оборот.resize((round(оборот.width * h * 0.52 / оборот.height), round(h * 0.52)), Image.LANCZOS), 3)
     ж = ж.rotate(-6, resample=Image.BICUBIC, expand=True)
     x, y = (карта.width - ж.width) // 2, (h - ж.height) // 2
     т = Image.new("RGBA", ж.size, (20, 15, 5, 0))
@@ -98,7 +103,7 @@ def ряд_н(до, после, оборот, подписи):
     def выс(im, h):
         return im.resize((round(im.width * h / im.height), h), Image.LANCZOS)
     до, после = выс(до, 560), выс(после, 560)
-    об = выс(оборот, 520)
+    об = обвести(выс(оборот, 520), 6)
     св = свалка(оборот, 520)
     мерка = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
     ш_подп = int(max(мерка.textlength(п, font=шр) for п in подписи))
@@ -141,5 +146,5 @@ ImageDraw.Draw(холст).line((80, р1.height + 60, W - 80, р1.height + 60), 
 холст.alpha_composite(р2, ((W - р2.width) // 2, р1.height + 120))
 png = os.path.join(D, "_уничтожение.png")
 холст.save(png)
-figure("уничтожение", png, 2000, холст.width, холст.height, [], css_w="82%", pad="0.2mm 0 0.4mm")
+figure("уничтожение", png, 2000, холст.width, холст.height, [], css_w="63%", pad="0.2mm 0 0.4mm")
 print("ok", холст.size)

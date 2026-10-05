@@ -324,6 +324,7 @@ public final class СнимокПоля {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
         FieldPainter.showCardboard = true;
+        FieldPainter.книжнаяТолщина = true;
         Font мелкий = new Font("Tektur Narrow", Font.PLAIN, (int) Math.round(size * 0.16));
 
         double cx0 = поле - minx;

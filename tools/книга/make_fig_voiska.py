@@ -15,10 +15,10 @@ ns = {"__file__": os.path.join(D, "figs.py")}
 exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# планшет войск")[0], ns)
 figure = ns["figure"]
 
-ТОКЕНЫ = r"C:\shared\forged-in-kelium\data\textures\token"
+ТОКЕНЫ = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "textures", "token")
 КОРЕНЬ = os.path.dirname(os.path.dirname(D))
 РАННЕР = os.path.join(КОРЕНЬ, "gui", "target", "kelium-runner.jar")
-ШРИФТ = r"C:\Windows\Fonts\TekturNarrow-Bold.ttf"
+ШРИФТ = os.path.expanduser("~/.fonts/TekturNarrow-Bold.ttf")
 
 ВОЙСКА = [("infantry_p1", "пехота"), ("vehicle_p1", "техника"),
           ("aircraft_p1", "авиация"), ("tower_p1", "вышка")]

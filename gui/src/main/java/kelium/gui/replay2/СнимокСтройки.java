@@ -198,6 +198,7 @@ public final class СнимокСтройки {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
         FieldPainter.showCardboard = false;
+        FieldPainter.книжнаяТолщина = true;
 
         Font шапкаШ = new Font("Tektur", Font.BOLD, (int) Math.round(size * 0.235));
         // ПОДПИСИ КРУПНЕЕ: на полосе книги прежний кегль читался с трудом

@@ -4,6 +4,6 @@ hexes:
   - {q: 0, r: 0}
   - {q: 1, r: -1}
 tokens:
-  - {type: infantry, owner: 0, q: 1, r: -1, sides: [4]}
+  - {type: vehicle, owner: 0, q: 1, r: -1, sides: [3, 4]}
 outline:
   - {q: 0, r: 0, color: "#1F7A3A"}

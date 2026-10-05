@@ -219,6 +219,7 @@ public final class СнимокПримера {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
         FieldPainter.showCardboard = false;
+        FieldPainter.книжнаяТолщина = true;
 
         Font шапкаШ = new Font("Tektur", Font.BOLD, (int) Math.round(size * 0.235));
         for (int k = 0; k < кадров; k++) {

@@ -144,6 +144,7 @@ public final class СнимокСцены {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
         FieldPainter.showCardboard = false;
+        FieldPainter.книжнаяТолщина = true;
         Font мелкий = new Font("Tektur Narrow", Font.PLAIN, (int) Math.round(size * 0.185));
         double cx0 = поле - minx;
         double cy0 = поле - miny;
@@ -167,6 +168,28 @@ public final class СнимокСцены {
             }
             FieldPainter.paintHex(new Java2DCanvas(g, 1, мелкий), size, hi, состояния.get(id), свои,
                 cx0 + c[0], cy0 + c[1], false, соседи);
+        }
+        // ОБВОДКА КАЖДОГО ГЕКСА (книга, 05.10.2026): светлый гекс иначе
+        // сливается с кремовой страницей
+        if (сц.get("hexStroke") instanceof String обв) {
+            g.setColor(Color.decode(обв));
+            g.setStroke(new BasicStroke((float) (size * 0.03), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            for (int[] qr : клетки) {
+                double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
+                Path2D ш = new Path2D.Double();
+                for (int i = 0; i < 6; i++) {
+                    double a = Math.toRadians(60.0 * i);
+                    double x = cx0 + c[0] + size * 0.985 * Math.cos(a);
+                    double y = cy0 + c[1] + size * 0.985 * Math.sin(a);
+                    if (i == 0) {
+                        ш.moveTo(x, y);
+                    } else {
+                        ш.lineTo(x, y);
+                    }
+                }
+                ш.closePath();
+                g.draw(ш);
+            }
         }
         for (Map<String, Object> o : список(сц, "outline")) {
             double[] c = центр(o, size);
