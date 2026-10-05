@@ -83,7 +83,8 @@ def картинка_текстуры(путь, ширина=360):
     im.save(буфер, "PNG", optimize=True)
     # иконки (кубики, шестерёнки) рисуются мельче жетонов и тайлов: при одной
     # высоте кубик выглядел бы втрое крупнее жетона ЦУ
-    класс = ' class="значок"' if путь.strip().startswith("icons/") else ""
+    класс = (' class="значок"' if путь.strip().startswith("icons/")
+             else ' class="карта"' if путь.strip().startswith("card/") else "")
     return ('<img%s%s src="data:image/png;base64,%s" alt="">'
             % (класс, стиль, base64.b64encode(буфер.getvalue()).decode()))
 

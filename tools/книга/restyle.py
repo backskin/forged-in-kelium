@@ -326,7 +326,7 @@ CSS = r"""
   .ф-стрелка::before { content: ""; position: absolute; left: 0; width: 100%; top: 0; height: 16mm;
     background: var(--келемий); clip-path: polygon(0 0, 100% 50%, 0 100%); }
   .ф-стрелка::after { content: ""; position: absolute; left: .2mm; width: 2.6mm; top: 5.2mm; height: 5.6mm;
-    background: var(--охра); clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
+    background: #F3E7C9; clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
   .цикл-возврат { position: relative; height: 7mm; margin: 0 16.67%; border: .8mm solid var(--охра);
     border-top: 0; border-radius: 0 0 3mm 3mm; }
   .цикл-возврат::before { content: ""; position: absolute; left: -2.6mm; top: -2.4mm; width: 4.4mm; height: 3.6mm;
@@ -474,6 +474,8 @@ CSS = r"""
     gap: 5mm; margin: 0 0 3mm; }
   .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
   .карт-рис img.значок { max-height: 68%; }
+  /* карты — со скруглёнными углами и тёмным кантом, как на столе (05.10.2026) */
+  .карт-рис img.карта { border-radius: 2.4mm; box-shadow: 0 0 0 .35mm #3C3020, 0 .6mm 1.4mm rgba(0,0,0,.28); }
   /* одна картинка (лицо карты, широкий жетон) — во всю ширину карточки */
   .карт-рис img:only-child { max-width: 100%; }
 

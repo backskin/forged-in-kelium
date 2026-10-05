@@ -212,10 +212,11 @@ public final class СнимокСтола {
         якорьТ("7", задX - px(КАРТА_ЗАДАНИЕ_Ш + 16), задY);
 
         зонаИгрока(g, session, 0, 750, 806, 0);
-        double фишX = зона0[0] + зона0[2] + px(56);
+        double фишX = зона0[0] + зона0[2] + px(60);
         double фишY = зона0[1] + зона0[3] * 0.3;
         фишкаПервогоТ(g, фишX, фишY);
-        якорьТ("10", фишX, фишY);
+        // точка выноски — у края фишки, а не на ней: иначе закрывает рисунок
+        якорьТ("10", фишX - px(30), фишY + px(40));
         зонаИгрока(g, session, 1, 420, 162, 180);
         зонаИгрока(g, session, 2, 1082, 162, 180);
 
@@ -944,9 +945,23 @@ public final class СнимокСтола {
      * (icons/first_player.png): её рисунок и лежит на столе (дизайнер 30.09.2026).
      */
     private static void фишкаПервогоТ(Graphics2D g, double cx, double cy) {
-        BufferedImage фишка = Textures.icon("first_player");
+        // крупная фишка — из экспорта дизайнера (338 точек), иконка игры всего 128
+        BufferedImage фишка = null;
+        try {
+            java.nio.file.Path п = java.nio.file.Path.of("rules", "иконки-экспорт", "фишка-первого.png");
+            if (java.nio.file.Files.exists(п)) {
+                фишка = javax.imageio.ImageIO.read(п.toFile());
+            }
+        } catch (java.io.IOException ignored) {
+            фишка = null;
+        }
+        if (фишка == null) {
+            фишка = Textures.icon("first_player");
+        }
         if (фишка != null) {
-            int h = px(40);
+            // ФИШКА КРУПНО (дизайнер 05.10.2026: «её даже не видно») — почти в 3 раза
+            // больше прежнего; картинка иконки 256 точек, качество не теряется.
+            int h = px(110);
             int w = (int) Math.round(h * фишка.getWidth() / (double) фишка.getHeight());
             положить(g, фишка, (int) Math.round(cx - w / 2.0), (int) Math.round(cy - h / 2.0), w, h, 1.6);
             return;
