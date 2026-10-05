@@ -158,16 +158,29 @@ def figure(name, path, width, vw, vh, marks, r=None, fs=None, css_w="93%", pad="
                  f'stroke-width="{ЧЕРТА_ММ * вед:.1f}" stroke-linecap="round"/>')
     for m in marks:
         lab, px, py, bx, by = m[:5]
-        отвод = m[5] if len(m) > 5 else None
+        # шестой элемент: (dx, dy) — отвод ломаной; число — радиус КОЛЬЦА вокруг
+        # элемента вместо жирной точки (дизайнер 05.10.2026: «точка закрывает
+        # номер карты — обводить кольцом»)
+        отвод = m[5] if len(m) > 5 and isinstance(m[5], (tuple, list)) else None
+        кольцо = m[5] if len(m) > 5 and isinstance(m[5], (int, float)) else 0
         if отвод:
             ex, ey = px + отвод[0], py + отвод[1]
             путь = маршрут(bx, by, ex, ey, угол) + [(px, py)]
         else:
             путь = маршрут(bx, by, px, py, угол)
+        if кольцо:
+            # линия кончается на кольце
+            qx, qy = путь[-2]
+            dd = ((px - qx) ** 2 + (py - qy) ** 2) ** 0.5 or 1
+            путь[-1] = (px - (px - qx) / dd * кольцо, py - (py - qy) / dd * кольцо)
+            метка = (f'<circle cx="{px}" cy="{py}" r="{кольцо:.1f}" fill="none" class="выноска-л" '
+                     f'stroke-width="{линия * 1.3:.1f}"/>')
+        else:
+            метка = f'<circle cx="{px}" cy="{py}" r="{точка:.1f}" class="выноска-т"/>'
         точки = " ".join(f"{x:.1f},{y:.1f}" for x, y in путь)
         g.append(f'<polyline points="{точки}" fill="none" class="выноска-л" '
                  f'stroke-width="{линия:.1f}" stroke-linejoin="round"/>'
-                 f'<circle cx="{px}" cy="{py}" r="{точка:.1f}" class="выноска-т"/>'
+                 + метка +
                  f'<circle cx="{bx}" cy="{by}" r="{r:.1f}" class="номер-круг" '
                  f'stroke-width="{обводка:.1f}"/>'
                  f'<text x="{bx}" y="{by}" class="номер-текст" font-size="{fs:.1f}">{lab}</text>')
