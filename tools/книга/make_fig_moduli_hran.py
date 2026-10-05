@@ -22,7 +22,16 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 D = os.path.dirname(os.path.abspath(__file__))
 КОРЕНЬ = os.path.dirname(os.path.dirname(D))
-ЖЕТОНЫ = os.path.join(КОРЕНЬ, "rules", "жетоны-модулей")
+ЖЕТОНЫ = os.path.join(КОРЕНЬ, "rules", "жетоны модулей")
+# экспорт дизайнера 05.10.2026: номер файла → сторона
+ФАЙЛЫ = {
+    "энергия": "Жетон улучшения планшета хранилища-1.png",
+    "энергия-золото": "Жетон улучшения планшета хранилища-2.png",
+    "ячейка": "Жетон улучшения планшета хранилища-3.png",
+    "ячейка-золото": "Жетон улучшения планшета хранилища-4.png",
+}
+# модуль сборки на рисунке: «2 боеприпаса / 2 войска ↑» и его золотая сторона
+СБОРКА = ("Жетоны модулей сборки-1.png", "Жетоны модулей сборки-5.png")
 ТЕКСТУРЫ = os.path.join(КОРЕНЬ, "data", "textures", "module")
 ИКОНКИ = os.path.join(КОРЕНЬ, "rules", "иконки-экспорт")
 ШРИФТ = next(п for п in (r"C:\Windows\Fonts\TekturNarrow-Bold.ttf",
@@ -50,7 +59,7 @@ def позолотить(im):
 
 
 def жетон(имя, запасной, золото=False):
-    п = os.path.join(ЖЕТОНЫ, имя + ".png")
+    п = os.path.join(ЖЕТОНЫ, ФАЙЛЫ.get(имя, имя + ".png"))
     if os.path.exists(п):
         return Image.open(п).convert("RGBA")
     im = Image.open(os.path.join(ТЕКСТУРЫ, запасной)).convert("RGBA")
@@ -60,10 +69,15 @@ def жетон(имя, запасной, золото=False):
 # исходный рисунок модулей: картинка и выноски
 svg = open(os.path.join(D, "_модули.svg"), encoding="utf-8").read()
 src = re.search(r'<img src="([^"]+)"', svg).group(1)
-if src.startswith("data:"):
-    база = Image.open(io.BytesIO(base64.b64decode(src.split(",", 1)[1]))).convert("RGBA")
-else:
-    база = Image.open(os.path.join(ВЁРСТКА, src)).convert("RGBA")
+# основа — сохранённая картинка модулей (в вёрстке она уже под другим именем)
+база = Image.open(os.path.join(D, "_модули-база.png")).convert("RGBA")
+# модули сборки — новым экспортом дизайнера, ровно в рамки старых
+for файл, (x0, x1, y0, y1) in zip(СБОРКА, ((1167, 1421, 102, 524), (1552, 1806, 102, 524))):
+    п = os.path.join(ЖЕТОНЫ, файл)
+    if os.path.exists(п):
+        нов = Image.open(п).convert("RGBA").resize((x1 - x0, y1 - y0), Image.LANCZOS)
+        база.paste((0, 0, 0, 0), (x0 - 4, y0 - 4, x1 + 4, y1 + 4))
+        база.alpha_composite(нов, (x0, y0))
 vb_w, vb_h = [float(x) for x in re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', svg).groups()]
 css_w = float(re.search(r'class="рис" style="width:([\d.]+)%"', svg).group(1))
 W0, H0 = база.size
