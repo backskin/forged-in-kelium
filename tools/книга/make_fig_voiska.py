@@ -8,7 +8,7 @@
 import os
 import subprocess
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageFilter, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
 ns = {"__file__": os.path.join(D, "figs.py")}
@@ -44,7 +44,7 @@ ims = [im.resize((round(im.width * к), round(im.height * к)), Image.LANCZOS)
        for im in исходные]
 
 шрифт = ImageFont.truetype(ШРИФТ, 50)
-подпись_h = 74
+подпись_h = 94
 строка_w = sum(i.width for i in ims) + GAP * (len(ims) - 1)
 
 низ = Image.open(гексы).convert("RGBA")
@@ -52,12 +52,37 @@ W = max(строка_w, низ.width)
 разрыв = 54
 canvas = Image.new("RGBA", (W, H + подпись_h + разрыв + низ.height), (0, 0, 0, 0))
 
+
+
+def с_торцом(im, рамка=(0x2b, 0x6c, 0xb0)):
+    """Толщина картона, как у жетонов на поле (FieldPainter.книжныйТорец):
+    мягкая тень и торец строго вниз в цвет рамки, только темнее
+    (дизайнер 05.10.2026: жетоны без толщины рядом с объёмными — разнобой)."""
+    t = max(3, round(im.width * 0.07))
+    out = Image.new("RGBA", (im.width + 2 * t, im.height + 2 * t), (0, 0, 0, 0))
+    a = im.getchannel("A")
+    тень = Image.new("RGBA", im.size, (20, 16, 10, 0))
+    тень.putalpha(a.point(lambda v: int(v * 0.35)))
+    слой = Image.new("RGBA", out.size, (0, 0, 0, 0))
+    слой.alpha_composite(тень, (t + round(t * 0.9), t + round(t * 1.3)))
+    out.alpha_composite(слой.filter(ImageFilter.GaussianBlur(t * 0.8)))
+    for i in range(t, 0, -1):
+        k = 0.45 + 0.30 * (t - i) / max(1, t - 1)
+        с = Image.new("RGBA", im.size, tuple(int(v * k) for v in рамка) + (255,))
+        с.putalpha(a)
+        out.alpha_composite(с, (t, t + i))
+    out.alpha_composite(im, (t, t))
+    return out
+
+
 x = (W - строка_w) // 2
 d = ImageDraw.Draw(canvas)
 for im, (_, имя) in zip(ims, ВОЙСКА):
-    canvas.paste(im, (x, H - im.height), im)
+    т = с_торцом(im)
+    п = (т.width - im.width) // 2
+    canvas.alpha_composite(т, (x - п, H - im.height - п))
     w = d.textlength(имя, font=шрифт)
-    d.text((x + im.width / 2 - w / 2, H + 14), имя, font=шрифт, fill=(42, 35, 24, 255))
+    d.text((x + im.width / 2 - w / 2, H + 34), имя, font=шрифт, fill=(42, 35, 24, 255))
     x += im.width + GAP
 canvas.paste(низ, ((W - низ.width) // 2, H + подпись_h + разрыв), низ)
 

@@ -100,16 +100,19 @@ public final class FieldPainter {
      */
     public static boolean книжнаяТолщина = false;
 
-    /** Торец картона: тона от нижнего (тёмного) к верхнему. */
-    private static final String[] ТОРЕЦ = {"#3E3326", "#4A3D2D", "#564735", "#62523D", "#6E5C45"};
-
     /**
-     * Книжная толщина под картинкой: тень (несколько полупрозрачных копий,
-     * расходящихся вниз-вправо), потом торец — копии силуэта со сдвигом вниз.
-     * Координаты и поворот — те же, что у самой картинки.
+     * Книжная толщина под картинкой: мягкая тень (несколько полупрозрачных
+     * копий, расходящихся вниз-вправо), потом торец — копии силуэта со сдвигом
+     * строго вниз. Координаты и поворот — те же, что у самой картинки.
+     *
+     * <p>ТОРЕЦ В ЦВЕТ РАМКИ ЖЕТОНА, только темнее (дизайнер 05.10.2026: серо-
+     * коричневый торец под цветной рамкой читался как «двойная толщина —
+     * сначала своего цвета, а затем серая»). Рамка и торец теперь одна полоса:
+     * рамка — светлая грань, торец — её тень.
      */
     private static void книжныйТорец(FieldCanvas c, java.awt.image.BufferedImage tex, double x, double y,
-                                     double rot, double scale, double px, double py, double d) {
+                                     double rot, double scale, double px, double py, double d,
+                                     String рамка) {
         java.awt.image.BufferedImage тень = ТеньЖетона.силуэт(tex, "#14100A");
         if (тень != null) {
             java.awt.image.BufferedImage прозр = полупрозрачный(тень, 0.10);
@@ -118,9 +121,13 @@ public final class FieldPainter {
                 c.image(прозр, x + t * 0.7, y + t, rot, scale, px, py);
             }
         }
+        java.awt.Color цвет = java.awt.Color.decode(рамка == null ? "#6E5C45" : рамка);
         int шагов = Math.max(3, (int) Math.ceil(d * 1.5));
         for (int i = шагов; i >= 1; i--) {
-            String тон = ТОРЕЦ[Math.min(ТОРЕЦ.length - 1, (шагов - i) * ТОРЕЦ.length / шагов)];
+            // снизу темнее (0,45 яркости рамки), у самой рамки — 0,75
+            double k = 0.45 + 0.30 * (шагов - i) / (double) Math.max(1, шагов - 1);
+            String тон = String.format("#%02x%02x%02x", (int) (цвет.getRed() * k),
+                (int) (цвет.getGreen() * k), (int) (цвет.getBlue() * k));
             java.awt.image.BufferedImage сил = ТеньЖетона.силуэт(tex, тон);
             if (сил != null) {
                 c.image(сил, x, y + d * i / шагов, rot, scale, px, py);
@@ -1027,7 +1034,7 @@ public final class FieldPainter {
                                         double targetW, String edge) {
         if (edge != null && книжнаяТолщина) {
             книжныйТорец(c, tex, pos[0], pos[1], rotDeg, targetW / tex.getWidth(),
-                tex.getWidth() / 2.0, tex.getHeight() / 2.0, targetW * 0.07);
+                tex.getWidth() / 2.0, tex.getHeight() / 2.0, targetW * 0.07, edge);
         } else if (edge != null) {
             // БОРТИК ПОВТОРЯЕТ ФОРМУ САМОЙ КАРТОНКИ, А НЕ СИЛУЭТ РОДА ВОЙСК:
             // берём силуэт картинки по её непрозрачности. Из-под квадратной
@@ -1098,7 +1105,8 @@ public final class FieldPainter {
             if (книжнаяТолщина) {
                 double perPixel = sh.vbW() / tex.getWidth();
                 книжныйТорец(c, tex, cx, cy, face - sh.outward(), k * perPixel,
-                    sh.hexCx() / perPixel, sh.hexCy() / perPixel, size * 0.045);
+                    sh.hexCx() / perPixel, sh.hexCy() / perPixel, size * 0.045,
+                    FieldGeometry.SEAT_STROKE[FieldGeometry.seatColor(seat)]);
             }
             if (бортик != null) {
                 double perPixel = sh.vbW() / tex.getWidth();
@@ -1978,7 +1986,7 @@ public final class FieldPainter {
                 // на δ·sin 60°; 0,15R даёт ту же щель, что у пехоты.
                 double r = FieldGeometry.unitSeatRadius(size, hТок)
                     + (place.size() >= 2 ? size * 0.15 : 0)
-                    - (книжнаяТолщина ? size * 0.11 : 0);
+                    - (книжнаяТолщина ? size * 0.055 : 0);
                 pos = FieldGeometry.polar(cx, cy, r, face);
                 // ПОВОРОТ: ПО ФОРМЕ ЖЕТОНА, А НЕ ПО ЧИТАЕМОСТИ.
                 //
