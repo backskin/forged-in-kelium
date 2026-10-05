@@ -1,12 +1,19 @@
 # -*- coding: utf-8 -*-
-"""Рисунок главы 9: занятая ступень и прыжок через неё (дизайнер 04.10.2026).
+"""Рисунок главы 9: занятая ступень и прыжок через неё.
 
-Схема одного трека: ступени 1–4 с ценой и ячейками. У Брианы (красная)
-кубик на 1-й ступени, 2-я занята целиком (синий и зелёный) — она платит
-3 + 4 и встаёт сразу на 3-ю. Кубики — те же, что в составе игры.
+Переделан 05.10.2026 по замечанию дизайнера: не рисовать свои «ступени», а
+показать пример поверх куска настоящего планшета науки (красный трек), а
+перемещение кубика — его полупрозрачным призраком.
+
+Партия на троих. Бриана (красная) стоит на первой ступени; вторая занята
+синим и зелёным кубиками (третья ячейка — только вчетвером). Призрак её
+кубика из запаса перелетает через вторую ступень на третью: цена 3 + 4.
+Ячейки — по якорям планшета (data/textures/board/anchors.yaml).
 """
+import math
 import os
 
+import yaml
 from PIL import Image, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -14,58 +21,99 @@ D = os.path.dirname(os.path.abspath(__file__))
 ns = {"__file__": os.path.join(D, "figs.py")}
 exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# планшет войск")[0], ns)
 figure = ns["figure"]
-ШРИФТЫ = [os.path.expanduser("~/.fonts"), r"C:\Windows\Fonts"]
+
+шр = ImageFont.truetype(os.path.expanduser("~/.fonts/TekturNarrow-Bold.ttf"), 58)
+ОХРА = (107, 68, 19, 255)
+СВЕТ = (247, 241, 225, 235)
+ЗЕЛ = (24, 108, 36, 255)
+
+доска = Image.open(os.path.join(КОРЕНЬ, "data", "textures", "board", "science.png")).convert("RGBA")
+я = yaml.safe_load(open(os.path.join(КОРЕНЬ, "data", "textures", "board", "anchors.yaml"), encoding="utf-8"))
+наука = next(b for b in я["boards"] if b["id"] == "science")
+лев = next(t for t in наука["tracks"] if t["id"] == "left")
+ox, oy = лев["origin"]
+sx, sy = наука["step"]
+rx, ry = наука["row"]
 
 
-def шрифт(имя, р):
-    for п in ШРИФТЫ:
-        f = os.path.join(п, имя)
-        if os.path.exists(f):
-            return ImageFont.truetype(f, р)
-    raise FileNotFoundError(имя)
+def ячейка(ступень, ряд):
+    return ox + sx * ступень + rx * ряд, oy + sy * ступень + ry * ряд
 
 
-жир, узк = шрифт("Tektur-Bold.ttf", 64), шрифт("TekturNarrow-Bold.ttf", 52)
+# кусок красного трека: от цены первой ступени до вершины, с наградами
+X0, Y0, X1, Y1 = 60, 560, 960, 1180
+ЗАПАС = 330                                   # поле слева под «запас Брианы»
+кус = доска.crop((X0, Y0, X1, Y1))
+W, H = кус.width + ЗАПАС, кус.height + 40
+холст = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+холст.alpha_composite(кус, (ЗАПАС, 0))
+
+
+def в_холст(x, y):
+    return x - X0 + ЗАПАС, y - Y0
+
+
 кубы = Image.open(os.path.join(D, "_кубики-технологий.png")).convert("RGBA")
 w, h = кубы.size
 КУБ = {"синий": кубы.crop((0, 0, w // 2, h // 2)), "красный": кубы.crop((w // 2, 0, w, h // 2)),
        "зелёный": кубы.crop((0, h // 2, w // 2, h)), "жёлтый": кубы.crop((w // 2, h // 2, w, h))}
+С = 96
 for к in КУБ:
-    КУБ[к] = КУБ[к].crop(КУБ[к].getbbox()).resize((110, 110), Image.LANCZOS)
+    КУБ[к] = КУБ[к].crop(КУБ[к].getbbox()).resize((С, С), Image.LANCZOS)
 
-ЗЕЛ, ОХРА, БУМ, КАНТ = (24, 108, 36, 255), (107, 68, 19, 255), (250, 245, 232, 255), (170, 150, 110, 255)
-СТ, ЗАЗ = 330, 40                      # ширина ступени и зазор
-W, H = 4 * СТ + 3 * ЗАЗ + 80, 640
-холст = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+
+def куб(цвет, x, y, прозр=1.0):
+    im = КУБ[цвет].copy()
+    if прозр < 1:
+        im.putalpha(im.getchannel("A").point(lambda v: int(v * прозр)))
+    холст.alpha_composite(im, (round(x - С / 2), round(y - С / 2)))
+
+
+# кто где стоит
+куб("красный", *в_холст(*ячейка(0, 0)))
+куб("синий", *в_холст(*ячейка(1, 0)))
+куб("зелёный", *в_холст(*ячейка(1, 1)))
+откуда = (ЗАПАС * 0.42, 300)
+куда = в_холст(*ячейка(2, 0))
+куб("красный", *откуда, прозр=0.35)          # призрак: кубик из запаса Брианы
+куб("красный", *куда)
+
 d = ImageDraw.Draw(холст)
-# ступень: номер, цена, две ячейки
-стоят = {1: ["красный", None], 2: ["синий", "зелёный"], 3: [None, None], 4: [None, None]}
-верх = 230
-for k in range(1, 5):
-    x = 40 + (k - 1) * (СТ + ЗАЗ)
-    d.rounded_rectangle((x, верх, x + СТ, верх + 330), radius=26, fill=БУМ, outline=КАНТ, width=5)
-    d.rounded_rectangle((x, верх, x + СТ, верх + 80), radius=26, fill=ЗЕЛ)
-    d.rectangle((x, верх + 50, x + СТ, верх + 80), fill=ЗЕЛ)
-    d.text((x + 24, верх + 8), "ступень %d" % k, font=узк, fill=(255, 255, 255, 255))
-    d.text((x + СТ - 30, верх + 8), str(k + 1), font=жир, fill=(255, 225, 120, 255), anchor="ra")
-    for j in range(2):
-        cx = x + 40 + j * 140
-        d.rounded_rectangle((cx, верх + 130, cx + 120, верх + 250), radius=14, outline=КАНТ, width=5)
-        if стоят[k][j]:
-            холст.alpha_composite(КУБ[стоят[k][j]], (cx + 5, верх + 135))
-# новый кубик Брианы на 3-й ступени — бледной рамкой «сюда»
-x3 = 40 + 2 * (СТ + ЗАЗ) + 40
-холст.alpha_composite(КУБ["красный"], (x3 + 5, верх + 135))
-# дуга прыжка 1 → 3 над треком
-x1 = 40 + 40 + 60
-x3c = x3 + 60
-d.arc((x1, 60, x3c, верх + 260), 200, 340, fill=ОХРА, width=14)
-d.polygon([(x3c - 30, 165), (x3c + 34, 160), (x3c + 2, 222)], fill=ОХРА)
-d.text(((x1 + x3c) // 2, 120), "3 + 4 = 7 трофеев", font=узк, fill=ОХРА, anchor="ma")
-# крест на 2-й ступени: «занято»
-x2 = 40 + (СТ + ЗАЗ) + СТ // 2
-d.text((x2, верх + 270), "занято", font=узк, fill=(176, 58, 46, 255), anchor="ma")
+# дуга перелёта над занятой второй ступенью
+mx, my = (откуда[0] + куда[0]) / 2, min(откуда[1], куда[1]) - 260
+точки = []
+for i in range(41):
+    t = i / 40
+    x = (1 - t) ** 2 * откуда[0] + 2 * (1 - t) * t * mx + t ** 2 * куда[0]
+    y = (1 - t) ** 2 * откуда[1] + 2 * (1 - t) * t * my + t ** 2 * куда[1]
+    точки.append((x, y))
+# обрезать концы у кубиков
+точки = [p for p in точки if math.dist(p, откуда) > С * 0.6 and math.dist(p, куда) > С * 0.7]
+for цвет, ш in ((СВЕТ, 22), (ОХРА, 8)):
+    d.line(точки, fill=цвет, width=ш, joint="curve")
+x2, y2 = точки[-1]
+x1, y1 = точки[-4]
+a = math.atan2(y2 - y1, x2 - x1)
+L = 46
+нос = [(x2 + math.cos(a) * 20, y2 + math.sin(a) * 20),
+       (x2 + math.cos(a + 2.5) * L, y2 + math.sin(a + 2.5) * L),
+       (x2 + math.cos(a - 2.5) * L, y2 + math.sin(a - 2.5) * L)]
+d.polygon(нос, fill=ОХРА, outline=СВЕТ)
+
+# подписи
+d.text((откуда[0], откуда[1] + С / 2 + 14), "запас\nБрианы", font=шр, fill=ОХРА, anchor="ma",
+       align="center")
+bx, by = в_холст(*ячейка(1, 1))
+d.text((bx - 70, by + 10), "занято", font=шр, fill=(160, 40, 30, 255), anchor="rm",
+       stroke_width=6, stroke_fill=СВЕТ)
+d.text((mx, my + 70), "3 + 4 = 7 трофеев", font=шр, fill=ОХРА, anchor="mm",
+       stroke_width=6, stroke_fill=СВЕТ)
+# награда третьей ступени — кольцом: карта супер-задания
+нx, нy = в_холст(580, 750)
+for цвет, ш in ((СВЕТ, 16), (ЗЕЛ, 7)):
+    d.ellipse((нx - 92, нy - 92, нx + 92, нy + 92), outline=цвет, width=ш)
+
 png = os.path.join(D, "_ступень.png")
 холст.save(png)
 figure("ступень", png, 1400, W, H, [], css_w="100%", pad="0.4mm 0 0.4mm", в_колонке=True)
-print("ok", (W, H))
+print("ok", холст.size)

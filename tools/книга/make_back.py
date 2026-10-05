@@ -49,6 +49,10 @@ def найти(name):
 
 def b64(name, h=None):
     im = Image.open(найти(name)).convert("RGBA")
+    # пустые поля экспорта обрезаются — значок встаёт в строку ростом и по центру
+    рамка = im.getchannel("A").point(lambda v: 255 if v > 12 else 0).getbbox()
+    if рамка:
+        im = im.crop(рамка)
     if h and im.height > h:
         im = im.resize((round(im.width * h / im.height), h), Image.LANCZOS)
     buf = io.BytesIO()
@@ -174,7 +178,6 @@ def страница(t):
 <p class="подпись-разворота">Задняя сторона обложки · памятка</p>
 <div class="разворот одна">
   <div class="стр обложка задняя">
-    {кайма(t)}
     <div class="глава"><span class="гл-т">Памятка</span></div>
     <div class="пм">
       <div class="пм-кол пм-лев">
