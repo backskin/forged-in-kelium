@@ -22,6 +22,14 @@ public final class CardShopShot {
     public static void main(String[] args) throws Exception {
         CardShop.main(new String[0]);
         Thread.sleep(3000);
+        if (System.getProperty("shot.type") != null) {
+            CardShop.debugType(System.getProperty("shot.type"));
+            Thread.sleep(2500);
+        }
+        if (System.getProperty("shot.element") != null) {
+            CardShop.debugSelect(System.getProperty("shot.element"));
+            Thread.sleep(1500);
+        }
         JFrame f = null;
         for (java.awt.Frame fr : java.awt.Frame.getFrames()) {
             if (fr instanceof JFrame j && fr.isVisible()) {

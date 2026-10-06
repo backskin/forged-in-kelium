@@ -227,6 +227,10 @@ final class IconPicker {
         return p;
     }
 
+    /** Миниатюры плиток — один раз на всё время работы мастерской. */
+    static final java.util.Map<String, BufferedImage> TILE_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    static final BufferedImage NONE = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+
     /** Плитка: картинка иконки и подпись; наведение подсвечивает. */
     static final class Tile extends JComponent {
         private static final long serialVersionUID = 1L;
@@ -238,8 +242,10 @@ final class IconPicker {
         Tile(CardAssets a, String key, String name, Consumer<String> pick) {
             this.key = key;
             this.name = name;
-            BufferedImage ic = a.icon(key);
-            img = ic == null ? null : CardAssets.fit(ic, 64, 64);
+            img = TILE_CACHE.computeIfAbsent(key, kk -> {
+                BufferedImage ic = a.icon(kk);
+                return ic == null ? NONE : CardAssets.fit(ic, 64, 64);
+            }) == NONE ? null : TILE_CACHE.get(key);
             setPreferredSize(new Dimension(96, 100));
             setToolTipText("{" + key + "} — " + name);
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));

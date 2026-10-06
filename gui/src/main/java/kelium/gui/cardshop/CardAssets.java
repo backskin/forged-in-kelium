@@ -125,6 +125,12 @@ public final class CardAssets {
      * взять для любой карты того же размера (имя файла — от папки шаблонов).
      */
     public List<String> backgrounds(int w, int h) {
+        return bgCache.computeIfAbsent(w + "x" + h, k -> scanBackgrounds(w, h));
+    }
+
+    private final Map<String, List<String>> bgCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private List<String> scanBackgrounds(int w, int h) {
         List<String> out = new ArrayList<>();
         File[] fs = new File(templates, "фоны").listFiles((d, n) -> n.toLowerCase().endsWith(".png"));
         if (fs == null) {
@@ -312,8 +318,35 @@ public final class CardAssets {
     /** Вписать в прямоугольник w×h с сохранением пропорций. */
     static BufferedImage fit(BufferedImage im, double w, double h) {
         double k = Math.min(w / im.getWidth(), h / im.getHeight());
-        return scale(im, (int) Math.round(im.getWidth() * k), (int) Math.round(im.getHeight() * k));
+        int tw = (int) Math.round(im.getWidth() * k);
+        int th = (int) Math.round(im.getHeight() * k);
+        // СКОРОСТЬ (05.10.2026): одна и та же иконка одного размера рисуется на
+        // каждой карте каталога — масштабировать её один раз
+        FitKey key = new FitKey(System.identityHashCode(im), tw, th);
+        BufferedImage hit = FIT_CACHE.get(key);
+        if (hit != null) {
+            return hit;
+        }
+        BufferedImage out = scale(im, tw, th);
+        if (FIT_CACHE.size() > 4000) {
+            FIT_CACHE.clear();
+        }
+        FIT_CACHE.put(key, out);
+        return out;
     }
+
+    private record FitKey(int img, int w, int h) {
+    }
+
+    private static final Map<FitKey, BufferedImage> FIT_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Шаблон, увеличенный вдвое для холста, — один раз на шаблон. */
+    static BufferedImage doubled(BufferedImage t, int k) {
+        return DOUBLED.computeIfAbsent(System.identityHashCode(t) * 31 + k,
+            x -> scale(t, t.getWidth() * k, t.getHeight() * k));
+    }
+
+    private static final Map<Integer, BufferedImage> DOUBLED = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Ключи иконок, которые мастерская знает по короткому имени (как у рисовальщика). */
     public static final Map<String, String> ALIAS = new HashMap<>();
@@ -338,6 +371,36 @@ public final class CardAssets {
         for (String[] p : a) {
             ALIAS.put(p[0], p[1]);
         }
+    }
+
+    /**
+     * ПОПРАВКА ВИДА ИКОНКИ: у части иконок рамка рисунка шире его «тела»
+     * (у позолоты, № 48, стрелка торчит вверх-вправо, карточки — внизу слева),
+     * и вписанная в квадрат она выходит мелкой и висит выше соседей.
+     * {масштаб, сдвиг по x, сдвиг по y} — доли размера места.
+     */
+    static final Map<String, double[]> LOOK = Map.of(
+        "48", new double[] {1.3, 0.0, 0.07});
+
+    static double lookScale(String key) {
+        double[] l = LOOK.get(key(key));
+        return l == null ? 1.0 : l[0];
+    }
+
+    static double[] lookShift(String key) {
+        double[] l = LOOK.get(key(key));
+        return l == null ? new double[] {0, 0} : new double[] {l[1], l[2]};
+    }
+
+    /** Иконка по ключу, вписанная в w×h с поправкой вида; null — нет такой. */
+    BufferedImage fitIcon(String token, double w, double h) {
+        String k = key(token.replaceAll("[{}]", ""));
+        BufferedImage ic = icon(k);
+        if (ic == null) {
+            return null;
+        }
+        double s = lookScale(k);
+        return fit(ic, w * s, h * s);
     }
 
     /** Ключ иконки файла по тому, что написано в фигурных скобках. */

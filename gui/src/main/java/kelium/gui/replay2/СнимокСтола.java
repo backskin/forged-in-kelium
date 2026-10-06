@@ -370,6 +370,10 @@ public final class СнимокСтола {
         Graphics2D gg = слой.createGraphics();
         качество(gg);
         FieldPainter.dark = false;
+        // БЕЗ ПОДКРАСКИ ГЕКСА ЦВЕТОМ ХОЗЯИНА (дизайнер 05.10.2026): в книге
+        // модуль поля всегда в своём печатном цвете, ни в одном примере.
+        FieldPainter.showOwnership = false;
+        FieldPainter.книжнаяТолщина = true;      // толщина жетонов, как на всех кадрах книги
         FieldPainter.showCardboard = true;
         FieldPainter.showBlocks = false;
         // ГДЕ НАРИСОВАНЫ ВОЙСКА — берём у самого рисовальщика: выноска к пехоте

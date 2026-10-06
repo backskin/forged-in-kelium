@@ -34,7 +34,11 @@ final class CardCanvas {
 
     CardCanvas(CardAssets a, BufferedImage template) {
         this.a = a;
-        this.im = CardAssets.scale(template, template.getWidth() * K, template.getHeight() * K);
+        BufferedImage big = CardAssets.doubled(template, K);
+        this.im = new BufferedImage(big.getWidth(), big.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D cg = im.createGraphics();
+        cg.drawImage(big, 0, 0, null);
+        cg.dispose();
         this.g = im.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
@@ -47,9 +51,125 @@ final class CardCanvas {
         frc = g.getFontRenderContext();
     }
 
+    /** Карта холста — для своих элементов при завершении. */
+    CardSpec card;
+    Color freeInk = new Color(40, 40, 44);
+
     BufferedImage finish() {
+        if (card != null) {
+            CardRender.freeElements(this, card);
+        }
         g.dispose();
+        LAST_REGIONS.set(new java.util.LinkedHashMap<>(regions));
         return CardAssets.scale(im, im.getWidth() / K, im.getHeight() / K);
+    }
+
+    // ==================== элементы карты ====================
+    //
+    // ЭЛЕМЕНТ (дизайнер 05.10.2026: «на макете жмякнуть — и выделилась часть
+    // панели»): часть карты со своей областью — верх, название, условие,
+    // награда… Его можно сдвинуть, увеличить, сделать прозрачнее, скрыть,
+    // поменять подложку под текстом. Правки — в поле карты «раскладка»
+    // ({id: {dx, dy, масштаб, прозрачность, скрыт, подложка}}), поверх правок
+    // каталога («_раскладка_типа»).
+
+    /** Области элементов последней нарисованной карты (пиксели карты). */
+    static final ThreadLocal<java.util.Map<String, Rectangle2D>> LAST_REGIONS = new ThreadLocal<>();
+
+    private final java.util.Map<String, Rectangle2D> regions = new java.util.LinkedHashMap<>();
+    private final java.util.Map<String, java.util.Map<?, ?>> layout = new java.util.HashMap<>();
+    private AffineTransform savedT;
+    private java.awt.Composite savedC;
+    private String current;
+
+    /** Взять правки раскладки карты (каталог, потом сама карта). */
+    void layout(CardSpec c) {
+        for (String key : new String[] {"_раскладка_типа", "раскладка"}) {
+            if (c.fields.get(key) instanceof java.util.Map<?, ?> m) {
+                for (var e : m.entrySet()) {
+                    if (e.getValue() instanceof java.util.Map<?, ?> st) {
+                        java.util.Map<Object, Object> merged = new java.util.HashMap<>();
+                        java.util.Map<?, ?> had = layout.get(String.valueOf(e.getKey()));
+                        if (had != null) {
+                            merged.putAll(had);
+                        }
+                        merged.putAll(st);
+                        layout.put(String.valueOf(e.getKey()), merged);
+                    }
+                }
+            }
+        }
+    }
+
+    private double num(java.util.Map<?, ?> st, String k, double def) {
+        return st != null && st.get(k) instanceof Number n ? n.doubleValue() : def;
+    }
+
+    /**
+     * Начать элемент id с областью (x, y, w, h) в пикселях карты: дальше всё
+     * рисуется сдвинутым, увеличенным вокруг центра области и с прозрачностью
+     * элемента. false — элемент скрыт (рисовать не нужно); end() — всё равно.
+     */
+    boolean begin(String id, double x, double y, double w, double h) {
+        java.util.Map<?, ?> st = layout.get(id);
+        double dx = num(st, "dx", 0);
+        double dy = num(st, "dy", 0);
+        double s = num(st, "масштаб", 100) / 100.0;
+        double alpha = num(st, "прозрачность", 0) / 100.0;
+        boolean hidden = st != null && Boolean.TRUE.equals(st.get("скрыт"));
+        double cx = x + w / 2;
+        double cy = y + h / 2;
+        regions.put(id, new Rectangle2D.Double(cx + dx - w * s / 2, cy + dy - h * s / 2, w * s, h * s));
+        current = id;
+        savedT = g.getTransform();
+        savedC = g.getComposite();
+        g.translate((cx + dx) * K, (cy + dy) * K);
+        g.scale(s, s);
+        g.translate(-cx * K, -cy * K);
+        if (alpha > 0) {
+            g.setComposite(AlphaComposite.SrcOver.derive((float) Math.max(0, 1 - alpha)));
+        }
+        return !hidden;
+    }
+
+    void end() {
+        if (savedT != null) {
+            g.setTransform(savedT);
+            g.setComposite(savedC);
+        }
+        savedT = null;
+        current = null;
+    }
+
+    /** Непрозрачность белой подложки под текстом текущего элемента (0..255). */
+    /** Кегль текста текущего элемента, множитель (поле «кегль», %, по умолчанию 100). */
+    double size() {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        return Math.max(0.3, num(st, "кегль", 100) / 100.0);
+    }
+
+    /** Междустрочный интервал текущего элемента, множитель (поле «интервал», %). */
+    double leading() {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        return Math.max(0.5, num(st, "интервал", 100) / 100.0);
+    }
+
+    /** Шаг иконок в стопке текущего элемента, доля ширины иконки (поле «шаг», %, 78). */
+    double spacing() {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        return Math.max(0.1, num(st, "шаг", 78) / 100.0);
+    }
+
+    /** Ширина букв текущего элемента, множитель (поле «ширина_букв», %, по умолчанию 100). */
+    double letterWidth() {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        return Math.max(0.3, num(st, "ширина_букв", 100) / 100.0);
+    }
+
+    int plate(int defPercent) {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        double p = num(st, "подложка", defPercent);
+        return (int) Math.round(Math.max(0, Math.min(100, p)) * 2.55);
     }
 
     // ==================== шрифты и текст ====================
@@ -137,9 +257,11 @@ final class CardCanvas {
             missing(cx, cy, w, h, token);
             return;
         }
-        BufferedImage f = CardAssets.fit(ic, w * K, h * K);
-        g.drawImage(f, (int) (cx * K - f.getWidth() / 2.0), (int) (cy * K - f.getHeight() / 2.0),
-            null);
+        double s = CardAssets.lookScale(token);
+        double[] sh = CardAssets.lookShift(token);
+        BufferedImage f = CardAssets.fit(ic, w * K * s, h * K * s);
+        g.drawImage(f, (int) ((cx + sh[0] * w) * K - f.getWidth() / 2.0),
+            (int) ((cy + sh[1] * h) * K - f.getHeight() / 2.0), null);
     }
 
     void putImage(BufferedImage f, double cx, double cy) {

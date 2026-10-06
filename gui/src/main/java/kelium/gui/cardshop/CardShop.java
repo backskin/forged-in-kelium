@@ -65,7 +65,12 @@ public final class CardShop {
     private final CardAssets assets = new CardAssets();
     private final JFrame frame = new JFrame("Мастерская карт — Кристаллы Раздора");
     private final JPanel form = new WidthPanel();
-    private final Preview preview = new Preview();
+    private PreviewPane preview;
+    private ElementInspector inspector;
+    private final java.util.Map<String, JComponent> sectionOf = new java.util.HashMap<>();
+    private JComponent lit;
+    private boolean dragActive;
+    private final javax.swing.JProgressBar progress = new javax.swing.JProgressBar();
     private final JLabel status = new JLabel(" ");
     private JScrollPane formScroll;
     private final Timer redraw;
@@ -93,7 +98,23 @@ public final class CardShop {
         } catch (Throwable ignored) {
             // без темы — стандартный вид Swing
         }
-        SwingUtilities.invokeLater(() -> new CardShop().show());
+        SwingUtilities.invokeLater(() -> {
+            LAST = new CardShop();
+            LAST.show();
+        });
+    }
+
+    /** Окно — для снимков проверки (CardShopShot). */
+    static CardShop LAST;
+
+    /** Открыть каталог типа — для снимков проверки. */
+    static void debugType(String t) {
+        SwingUtilities.invokeLater(() -> LAST.openType(CardSpec.Type.valueOf(t)));
+    }
+
+    /** Выбрать часть карты как щелчком по макету — для снимков проверки. */
+    static void debugSelect(String id) {
+        SwingUtilities.invokeLater(() -> LAST.selectElement(id, true));
     }
 
     private CardShop() {
@@ -108,36 +129,124 @@ public final class CardShop {
     private void show() {
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Style.PANEL);
-        top.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Style.LINE));
-        JPanel types = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 10));
+        top.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Style.LINE),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)));
+        // ОДНА СТРОКА С ПРОКРУТКОЙ (дизайнер 06.10.2026): плитки не переносятся,
+        // лишнее уходит вправо, внизу тонкий ползунок; колесо мыши листает вбок
+        JPanel types = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         types.setOpaque(false);
-        JLabel logo = new JLabel("МАСТЕРСКАЯ КАРТ");
+        JLabel logo = new JLabel("<html>МАСТЕРСКАЯ<br>КАРТ</html>");
         logo.setFont(Style.title(20));
         logo.setForeground(Style.INK);
-        logo.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 18));
-        types.add(logo);
+        logo.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
         ButtonGroup tg = new ButtonGroup();
-        for (CardSpec.Type t : CardSpec.Type.values()) {
-            JToggleButton b = new JToggleButton(t.ru);
-            b.putClientProperty("type", t);
-            b.setFocusable(false);
-            b.addActionListener(e -> openType(t));
-            tg.add(b);
-            typeButtons.add(b);
-            types.add(b);
+        // ГРУППЫ ТИПОВ: задания, арсенал, прочее — плитками с рубашкой и числом карт
+        String[][][] groups = {
+            {{"Задания", ""}, {"OBJECTIVE", "Задания", "обычные"}, {"OBJECTIVE_START", "Задания", "начальные"},
+                {"OBJECTIVE_SUPER", "Задания", "супер"}},
+            {{"Арсенал", ""}, {"ARSENAL", "Арсенал", "обычный"}, {"ARSENAL_START", "Арсенал", "начальный"},
+                {"ARSENAL_SUPER", "Арсенал", "супер"}},
+            {{"Прочее", ""}, {"MARKET", "Рынок", ""}, {"CONTAINER", "Контейнеры", ""},
+                {"SPAWN_HEX", "Гекс", "зарождения"}, {"ORDER", "Приказы", ""}},
+        };
+        for (String[][] grp : groups) {
+            JPanel box = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+            box.setOpaque(false);
+            box.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Style.LINE),
+                    grp[0][0].toUpperCase(), javax.swing.border.TitledBorder.LEFT,
+                    javax.swing.border.TitledBorder.TOP, Style.title(12), Style.INK3),
+                BorderFactory.createEmptyBorder(2, 0, 2, 4)));
+            for (int i = 1; i < grp.length; i++) {
+                CardSpec.Type t = CardSpec.Type.valueOf(grp[i][0]);
+                TypeTile b = new TypeTile(assets, t, grp[i][1], grp[i][2], () -> lib == null ? 0 : lib.list(t).size());
+                b.putClientProperty("type", t);
+                b.addActionListener(e -> openType(t));
+                tg.add(b);
+                typeButtons.add(b);
+                box.add(b);
+            }
+            types.add(box);
         }
-        top.add(types, BorderLayout.CENTER);
-        JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 10));
+        JScrollPane typesScroll = new JScrollPane(types, JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        typesScroll.setBorder(null);
+        typesScroll.setOpaque(false);
+        typesScroll.getViewport().setOpaque(false);
+        typesScroll.getHorizontalScrollBar().setUnitIncrement(40);
+        typesScroll.getHorizontalScrollBar().setPreferredSize(new Dimension(0, 8));
+        typesScroll.addMouseWheelListener(e -> {
+            javax.swing.JScrollBar sb = typesScroll.getHorizontalScrollBar();
+            sb.setValue(sb.getValue() + e.getWheelRotation() * 80);
+        });
+        // прокручиваемая лента — в своей рамке, со скруглением и тёмным фоном
+        JPanel strip = new JPanel(new BorderLayout()) {
+            private static final long serialVersionUID = 1L;
+
+            @Override protected void paintComponent(Graphics g0) {
+                Graphics2D g = (Graphics2D) g0.create();
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(Style.BG);
+                g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+                g.setColor(Style.LINE);
+                g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+                g.dispose();
+            }
+        };
+        strip.setOpaque(false);
+        strip.setBorder(BorderFactory.createEmptyBorder(4, 8, 2, 8));
+        strip.add(typesScroll, BorderLayout.CENTER);
+        top.add(strip, BorderLayout.CENTER);
+        JPanel acts = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         acts.setOpaque(false);
-        acts.add(button("Импорт .kcard…", this::open, false));
-        acts.add(button("Сохранить .kcard…", this::save, false));
-        acts.add(button("Выпустить PNG", this::export, true));
-        acts.add(button("Выпустить все", this::exportAll, false));
-        acts.add(button("В игру…", this::toGame, false));
-        acts.add(button("Рубашка", this::toggleBack, false));
-        acts.add(button("Папка шаблонов", () -> openFolder(assets.templates), false));
-        acts.add(button("Папка библиотеки", () -> openFolder(lib.folder()), false));
-        top.add(acts, BorderLayout.EAST);
+        JButton menu = button("Файл ▾", () -> { }, false);
+        javax.swing.JPopupMenu pm = new javax.swing.JPopupMenu();
+        pm.add(menuItem("Выпустить эту карту PNG…", this::export));
+        pm.add(menuItem("Выпустить эту группу…", this::exportAll));
+        pm.addSeparator();
+        pm.add(menuItem("Переименовать набор…", this::renameSet));
+        pm.addSeparator();
+        pm.add(menuItem("Импорт карты .kcard…", this::open));
+        pm.add(menuItem("Сохранить карту .kcard…", this::save));
+        pm.addSeparator();
+        pm.add(menuItem("Выгрузить в колоды игры…", this::toGame));
+        pm.addSeparator();
+        pm.add(menuItem("Открыть папку библиотеки", () -> openFolder(lib.folder())));
+        pm.add(menuItem("Открыть папку шаблонов", () -> openFolder(assets.templates)));
+        menu.addActionListener(e -> pm.show(menu, 0, menu.getHeight()));
+        acts.add(menu);
+        // статичная часть слева: название и меню «Файл», отделена от ленты
+        JPanel fixed = new JPanel(new java.awt.GridBagLayout());
+        fixed.setOpaque(false);
+        fixed.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 16));
+        JPanel fixedRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
+        fixedRow.setOpaque(false);
+        JPanel names = new JPanel(new java.awt.GridLayout(3, 1, 0, 0));
+        names.setOpaque(false);
+        logo.setText("МАСТЕРСКАЯ КАРТ");
+        logo.setFont(Style.title(13));
+        logo.setForeground(Style.INK3);
+        setName = new JLabel();
+        setName.setFont(Style.title(22));
+        setName.setForeground(Color.WHITE);
+        setName.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+        setName.setToolTipText("название набора — щёлкните, чтобы переименовать");
+        setName.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                renameSet();
+            }
+        });
+        JLabel hint = new JLabel("набор карт · щёлкните, чтобы переименовать");
+        hint.setFont(hint.getFont().deriveFont(11f));
+        hint.setForeground(Style.INK3);
+        names.add(logo);
+        names.add(setName);
+        names.add(hint);
+        fixedRow.add(names);
+        fixedRow.add(acts);
+        fixed.add(fixedRow);
+        top.add(fixed, BorderLayout.WEST);
 
         form.setBackground(Style.BG);
         formScroll = new JScrollPane(form);
@@ -145,28 +254,93 @@ public final class CardShop {
         formScroll.getVerticalScrollBar().setUnitIncrement(20);
         formScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         formScroll.setPreferredSize(new Dimension(600, 800));
+        preview = new PreviewPane(new PreviewPane.Listener() {
+            @Override public void selected(String id) {
+                selectElement(id, true);
+            }
+
+            @Override public void dragged(String id, double dx, double dy, boolean done) {
+                if (!id.equals(inspector.current())) {
+                    selectElement(id, true);
+                }
+                if (!dragActive) {
+                    inspector.dragStart();
+                    dragActive = true;
+                }
+                inspector.dragTo(dx, dy, done);
+                if (done) {
+                    dragActive = false;
+                }
+            }
+        });
+        inspector = new ElementInspector(new ElementInspector.Store() {
+            @Override public java.util.Map<String, Object> style(String id, boolean catalog) {
+                java.util.Map<String, Object> root = catalog ? lib.layout(card.type()) : cardLayout();
+                Object st = root.get(id);
+                if (!(st instanceof java.util.Map<?, ?>)) {
+                    st = new java.util.LinkedHashMap<String, Object>();
+                    root.put(id, st);
+                }
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> m = (java.util.Map<String, Object>) st;
+                return m;
+            }
+
+            @Override public void changed(boolean catalog, boolean fast) {
+                redraw.setInitialDelay(fast ? 40 : 160);
+                redraw.restart();
+                autosave.restart();
+                if (catalog) {
+                    for (CardSpec c : lib.list(card.type())) {
+                        catalog().refresh(c, lib.layout(card.type()));
+                    }
+                } else {
+                    catalog().refresh(card, lib.layout(card.type()));
+                }
+            }
+        });
+        JPanel middle = new JPanel(new BorderLayout());
+        middle.add(inspector, BorderLayout.NORTH);
+        middle.add(formScroll, BorderLayout.CENTER);
         JPanel right = new JPanel(new BorderLayout());
+        JPanel pbar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 6));
+        pbar.setBackground(new Color(0x15181e));
+        JLabel tip = new JLabel("наведите — часть обведётся · щёлкните — выберете · тяните — сдвинете");
+        tip.setForeground(Style.INK3);
+        pbar.add(tip);
+        JToggleButton backBtn = new JToggleButton("Рубашка");
+        backBtn.setFocusable(false);
+        backBtn.addActionListener(e -> toggleBack());
+        pbar.add(backBtn);
+        JButton exp = new JButton("Выпуск группы…");
+        exp.setFocusable(false);
+        exp.addActionListener(e -> exportAll());
+        pbar.add(exp);
+        right.add(pbar, BorderLayout.NORTH);
         right.add(preview, BorderLayout.CENTER);
         status.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
         status.setOpaque(true);
         status.setBackground(Style.PANEL);
-        right.add(status, BorderLayout.SOUTH);
-        JSplitPane edit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, formScroll, right);
+        progress.setVisible(false);
+        progress.setStringPainted(true);
+        JPanel south = new JPanel(new BorderLayout());
+        south.add(status, BorderLayout.CENTER);
+        south.add(progress, BorderLayout.EAST);
+        right.add(south, BorderLayout.SOUTH);
+        JSplitPane edit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, middle, right);
+        edit.setResizeWeight(0.45);
         edit.setBorder(null);
         edit.setDividerSize(6);
         lib = new Library(workFolder());
         lib.seedFrom(new File(workFolder(), "выпуск 27.09.2026"));
+        showSetName();
         catalog = new CatalogPanel(assets, new CatalogPanel.Actions() {
             @Override public void select(int i) {
                 pick(i);
             }
 
-            @Override public void addEnd() {
-                insertAt(lib.list(card.type()).size(), CardSpec.blank(card.type()));
-            }
-
-            @Override public void insertAfter(int i) {
-                insertAt(i < 0 ? lib.list(card.type()).size() : i + 1, CardSpec.blank(card.type()));
+            @Override public void insert(int at) {
+                insertAt(at < 0 ? lib.list(card.type()).size() : at, CardSpec.blank(card.type()));
             }
 
             @Override public void duplicate(int i) {
@@ -183,19 +357,17 @@ public final class CardShop {
                 deleteAt(i);
             }
 
-            @Override public void move(int i, int d) {
+            @Override public void moveTo(int from, int to) {
                 CardSpec.Type t = card.type();
-                if (i < 0 || i + d < 0 || i + d >= lib.list(t).size()) {
-                    return;
-                }
-                lib.move(t, i, i + d);
-                index = i + d;
+                lib.move(t, from, to);
+                index = to;
                 saveLibrary();
                 catalog.show(t, lib.list(t), index);
                 setCard(lib.list(t).get(index));
             }
         });
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, catalog, edit);
+        split.setResizeWeight(0.2);
         split.setBorder(null);
         split.setDividerSize(6);
 
@@ -203,6 +375,12 @@ public final class CardShop {
         frame.add(top, BorderLayout.NORTH);
         frame.add(split, BorderLayout.CENTER);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        // правка за последние 1,2 с до закрытия ещё не записана таймером — записать сейчас
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosing(java.awt.event.WindowEvent e) {
+                saveLibrary();
+            }
+        });
         frame.setSize(1760, 1000);
         frame.setLocationRelativeTo(null);
         openType(CardSpec.Type.OBJECTIVE);
@@ -251,6 +429,7 @@ public final class CardShop {
     }
 
     private void insertAt(int at, CardSpec c) {
+        typeButtons.forEach(JComponent::repaint);
         CardSpec.Type t = c.type();
         lib.insert(t, at, c);
         index = Math.max(0, Math.min(at, lib.list(t).size() - 1));
@@ -271,6 +450,7 @@ public final class CardShop {
             return;
         }
         lib.remove(t, i);
+        typeButtons.forEach(JComponent::repaint);
         if (l.isEmpty()) {
             lib.insert(t, 0, CardSpec.blank(t));
         }
@@ -304,33 +484,98 @@ public final class CardShop {
 
     /** Номер карты — её место в каталоге. */
     private JComponent numberInfo() {
-        JLabel l = new JLabel("№ " + (index + 1) + " — ставится сам по месту в каталоге");
+        JLabel l = new JLabel(String.format("№ %02d", index + 1) + " — ставится сам по месту в каталоге");
         l.setForeground(Style.INK2);
         return l;
     }
 
-    /** Все карты каталога — картинками в папку «библиотека/<тип>». */
+    /**
+     * Все карты каталога — картинками в папку «библиотека/<тип>»: рисуется в
+     * фоне (окно не замирает), ход — на полосе внизу.
+     */
     private void exportAll() {
+        saveLibrary();
         CardSpec.Type t = card.type();
-        File dir = new File(lib.folder(), t.ru);
-        dir.mkdirs();
-        int n = 0;
-        java.util.List<String> bad = new ArrayList<>();
-        java.util.List<CardSpec> l = lib.list(t);
-        for (int i = 0; i < l.size(); i++) {
-            CardSpec c = l.get(i);
-            String nm = c.text("имя").replaceAll("[\\\\/:*?\"<>|\n]", " ").trim();
-            File f = new File(dir, String.format("%02d", i + 1) + (nm.isEmpty() ? "" : " — " + nm) + ".png");
+        java.util.List<CardSpec> l = new ArrayList<>();
+        for (CardSpec c : lib.list(t)) {
+            CardSpec snap = new CardSpec(t);
+            snap.fields.putAll(deepCopy(c.fields));
+            snap.fields.put("_раскладка_типа", deepCopy(lib.layout(t)));
+            l.add(snap);
+        }
+        new ExportDialog(frame, assets, t, l, new File(lib.folder(), t.ru)).setVisible(true);
+    }
+
+    private JLabel setName;
+
+    /** Показать название набора в шапке и в заголовке окна. */
+    private void showSetName() {
+        String n = lib.name();
+        setName.setText(n);
+        frame.setTitle(n + " — Мастерская карт");
+    }
+
+    private void renameSet() {
+        Object v = JOptionPane.showInputDialog(frame, "Название набора карт:", "Набор",
+            JOptionPane.PLAIN_MESSAGE, null, null, lib.name());
+        if (v != null && !String.valueOf(v).isBlank()) {
             try {
-                ImageIO.write(CardRender.render(assets, c), "png", f);
-                n++;
+                lib.setName(String.valueOf(v).trim());
             } catch (Exception e) {
-                bad.add("№ " + (i + 1) + ": " + e.getMessage());
+                JOptionPane.showMessageDialog(frame, "Не сохранилось: " + e.getMessage());
+            }
+            showSetName();
+        }
+    }
+
+    private CatalogPanel catalog() {
+        return catalog;
+    }
+
+    /** Правки раскладки этой карты (изменяемая запись в её полях). */
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String, Object> cardLayout() {
+        Object o = card.fields.get("раскладка");
+        if (!(o instanceof java.util.Map<?, ?>)) {
+            o = new java.util.LinkedHashMap<String, Object>();
+            card.fields.put("раскладка", o);
+        }
+        return (java.util.Map<String, Object>) o;
+    }
+
+    /**
+     * Выбрать часть карты: обвести на макете, показать в инспекторе и
+     * подсветить раздел панели, который за неё отвечает.
+     */
+    private void selectElement(String id, boolean scroll) {
+        preview.select(id);
+        inspector.show(id);
+        if (lit != null) {
+            lit.setOpaque(false);
+            lit.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
+            form.repaint();
+        }
+        JComponent sec = id == null ? null : sectionOf.get(id);
+        lit = sec;
+        if (sec != null) {
+            sec.setOpaque(true);
+            sec.setBackground(new Color(0x4A, 0x2B, 0x2A));   // сплошной: полупрозрачный фон у непрозрачной панели Swing не стирает — текст накладывался
+            sec.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 4, 0, 0, Style.ACCENT),
+                BorderFactory.createEmptyBorder(4, 6, 4, 6)));
+            sec.repaint();
+            if (scroll) {
+                java.awt.Rectangle r = SwingUtilities.convertRectangle(sec.getParent(), sec.getBounds(), form);
+                r.height = Math.max(r.height, formScroll.getViewport().getHeight() / 2);
+                form.scrollRectToVisible(r);
             }
         }
-        status.setForeground(bad.isEmpty() ? Style.GOOD : Style.BAD);
-        status.setText("Выпущено " + n + " из " + l.size() + " → " + dir
-            + (bad.isEmpty() ? "" : " · не нарисовались: " + String.join("; ", bad)));
+    }
+
+    private static javax.swing.JMenuItem menuItem(String t, Runnable r) {
+        javax.swing.JMenuItem i = new javax.swing.JMenuItem(t);
+        i.addActionListener(e -> r.run());
+        return i;
     }
 
     private void fresh() {
@@ -348,6 +593,8 @@ public final class CardShop {
             b.setSelected(b.getClientProperty("type") == c.type());
         }
         form.removeAll();
+        sectionOf.clear();
+        lit = null;
         form.setLayout(new MigLayout("wrap 1, fillx, insets 14 16 24 16, gapy 2", "[grow,fill]", ""));
         switch (c.type().layout) {
             case OBJECTIVE -> objectiveForm();
@@ -358,54 +605,48 @@ public final class CardShop {
             case ORDER -> orderForm();
             case SUPER_OBJECTIVE -> superObjectiveForm();
         }
+        section("Свои элементы — любой текст или иконки в любом месте карты");
+        form.add(new FreeEditor());
         form.revalidate();
         form.repaint();
-        if (formScroll != null) {
+        String keep = inspector == null ? null : inspector.current();
+        if (keep != null) {
+            SwingUtilities.invokeLater(() -> selectElement(keep, false));
+        } else if (formScroll != null) {
             SwingUtilities.invokeLater(() -> formScroll.getVerticalScrollBar().setValue(0));
         }
         render();
     }
 
     private void objectiveForm() {
-        section("Верх карты — эффект в чужой ход или сразу");
-        form.add(field("Значок слева", segmented("слот", new String[] {"∞", "▶"},
-            new String[] {"∞ постоянный", "▶ спец-действие"})));
-        String kind = card.text("верх_вид");
-        if ("иконка".equals(kind) || "2 max".equals(kind) || kind.isBlank()) {
-            // прежние виды — теперь ряд иконок
-            card.fields.put("иконки_верха", CardRender.topIcons(card));
-            card.fields.put("верх_вид", "иконки");
-            kind = "иконки";
-        }
-        form.add(field("Вид верха", segmentedOf(new String[] {"иконки", "текст", "реакция"},
-            new String[] {"Иконки и текст", "Только текст", "Плашка реакции"}, kind, v -> {
-                changed("верх_вид", v);
+        section("Верх карты — эффект в чужой ход или сразу", "верх", "слот", "плашка", "заголовок");
+        form.add(field("Значок слева", segmented("слот", new String[] {"∞", "▶", "нет"},
+            new String[] {"∞ постоянный", "▶ спец-действие", "без значка"})));
+        boolean plate = CardRender.hasPlate(card);
+        form.add(field("Плашка реакции", segmentedOf(new String[] {"false", "true"},
+            new String[] {"нет", "есть"}, String.valueOf(plate), v -> {
+                changed("плашка", Boolean.parseBoolean(v));
                 setCard(card);
             })));
-        if ("реакция".equals(kind)) {
-            form.add(field("Заголовок верха", text("заголовок_верха", false, "для реакции: «Рикошет!»")));
+        if (plate) {
+            form.add(field("Заголовок плашки", text("заголовок_верха", false, "«Рикошет!»")));
         }
-        if ("иконки".equals(kind)) {
-            form.add(field("Иконки верха", text("иконки_верха", false,
-                "по центру, на всю высоту: {36} / {34}   или   {66} 2 {54} max")));
-        }
-        form.add(field("Текст верха", text("верх", true, "свой перенос — Enter; без переноса — "
-            + "ровными строками; занимает остаток зоны")));
+        form.add(field("Строки верха", new RowsEditor()));
 
-        section("Название и условие");
+        section("Название и условие", "имя", "условие");
         art();
         form.add(field("Название карты", text("имя", false, "")));
         form.add(field("Условие", text("условие", true,
             "перенос сам — ровными строками; свой перенос — Enter. С фигурой можно оставить "
                 + "пустым — напечатается «Займи своими жетонами закрашенные секторы»")));
-        section("Фигура — закрашенные секторы надо занять своими жетонами");
+        section("Фигура — закрашенные секторы надо занять своими жетонами", "фигура");
         form.add(figure("фигура"));
 
-        section("Награда");
+        section("Награда", "награда");
         form.add(new RewardEditor("награда", true));
 
         if (card.type() != CardSpec.Type.OBJECTIVE_START) {
-            section("Дополнительно — усиленное условие и награда");
+            section("Дополнительно — усиленное условие и награда", "дополнительно", "доп_награда");
             form.add(field("Условие", text("дополнительно", true,
                 "пусто — шаблон без полосы «дополнительно», награда опустится ниже")));
             form.add(new RewardEditor("доп_награда", false));
@@ -416,7 +657,7 @@ public final class CardShop {
         form.add(note("В колоду игры задание выгружается с фигурой: фигура — его требование. "
             + "Награда берётся по иконкам награды."));
 
-        section("Номер");
+        section("Номер", "номер");
         form.add(field("Номер карты", numberInfo()));
     }
 
@@ -425,29 +666,39 @@ public final class CardShop {
         form.add(field("Карта", segmentedBool("спец", "∞ постоянная", "▶ со спец-действием")));
         boolean sup = card.type() == CardSpec.Type.ARSENAL_SUPER;
         if (!sup) {
-        section("Верх — разовый эффект");
+        section("Верх — разовый эффект", "верх");
         form.add(field("Текст верха", text("верх", true, "одна-две строки")));
         form.add(field("По центру", segmentedBool("верх_по_центру", "от иконок слева", "по центру")));
         form.add(field("Иконки слева", text("верх_слева", false, "перед текстом: -X {1} = {8}")));
         form.add(field("Иконки справа", text("верх_справа", false, "после текста: {44}")));
         }
-        section("Название и постоянный эффект");
+        section("Название и постоянный эффект", "имя", "свойство");
         art();
         form.add(field("Название", text("имя", false, "")));
         form.add(field("Эффект", text("низ", true, "**жирное** — жирным")));
-        section("Фигура — свойство работает, пока на поле есть такая фигура");
+        JSpinner indent = new JSpinner(new SpinnerNumberModel(card.integer("отступ_слева", 0), 0, 700, 5));
+        indent.setPreferredSize(new Dimension(80, 28));
+        indent.setToolTipText("0 — как обычно; больше — текст начинается правее (место под свои иконки)");
+        indent.addChangeListener(e -> changed("отступ_слева", indent.getValue()));
+        form.add(field("Текст от края, x", indent));
+        form.add(field("Место для контейнера", segmentedBool("контейнер", "нет", "есть")));
+        section("Фигура — свойство работает, пока на поле есть такая фигура", "фигура", "ряд", "звезда");
         form.add(figure("фигура"));
         form.add(field("Ряд иконок", text("ряд", false,
             "под текстом по центру; {/} перечёркивает иконку перед ним")));
-        form.add(field("Звезда", segmentedBool("звезда", "нет", "★ есть")));
+        int stars = card.fields.containsKey("звёзд") ? card.integer("звёзд", 0) : card.bool("звезда") ? 1 : 0;
+        form.add(field("Звёзды", segmentedOf(new String[] {"0", "1", "2", "3", "4"},
+            new String[] {"нет", "★", "★★", "★★★", "★★★★"}, String.valueOf(stars), v -> {
+                card.fields.remove("звезда");
+                changed("звёзд", Integer.parseInt(v));
+            })));
         if (card.bool("спец")) {
-            section("Спец-действие ▶");
+            section("Спец-действие ▶", "спец");
             form.add(field("Цена", text("цена", false, "сколько стоит: 1")));
             form.add(field("Чем платят", iconField("цена_иконка")));
             form.add(field("Иконка", iconField("спец_иконка")));
             form.add(field("Знак у иконки", text("спец_знак", false, "=1")));
             form.add(field("Текст", text("спец_текст", true, "строками")));
-            form.add(field("Контейнер", segmentedBool("контейнер", "нет", "место для контейнера")));
         }
         section("Для игры — свойство");
         form.add(field("Когда", whenEditor("свойство_когда")));
@@ -468,7 +719,7 @@ public final class CardShop {
             form.add(field("Что даёт", effectEditor("верх_эффект")));
         }
 
-        section("Номер");
+        section("Номер", "номер");
         form.add(field("Номер карты", numberInfo()));
     }
 
@@ -623,28 +874,28 @@ public final class CardShop {
     }
 
     private void superObjectiveForm() {
-        section("Супер-задание — две ступени награды");
+        section("Супер-задание — две ступени награды", "условие", "условие_2");
         art();
         form.add(field("За ★", text("условие", true, "под плашкой «Награда: по ★»; строками")));
         form.add(field("За ★★", text("условие_2", true, "под плашкой «Награда: по ★★»; строками")));
-        section("Фигура — под второй ступенью (если нужна)");
+        section("Фигура — под второй ступенью (если нужна)", "фигура");
         form.add(figure("фигура"));
-        section("Номер");
+        section("Номер", "номер");
         form.add(field("Номер карты", numberInfo()));
     }
 
     private void orderForm() {
-        section("Приказ");
+        section("Приказ", "имя");
         form.add(field("Цвет", segmented("цвет", new String[] {"красный", "синий", "зеленый", "желтый"},
             new String[] {"красный", "синий", "зелёный", "жёлтый"})));
         form.add(field("Название", text("имя", false, "ОСВОИТЬ")));
-        section("Верхний приказ — два действия");
+        section("Верхний приказ — два действия", "верх_слева", "верх_справа", "подпись_слева", "подпись_справа");
         form.add(field("Слева", text("верх_слева", false, "одна иконка или две: {36}")));
         form.add(field("Подпись", text("подпись_слева", false, "добыча")));
         form.add(field("Справа", text("верх_справа", false, "{34}")));
         form.add(field("Подпись", text("подпись_справа", false, "питание")));
         form.add(field("Плашка", text("плашка", false, "спец-плашка: {26} : {1}{1}; пусто — без плашки")));
-        section("Нижний приказ");
+        section("Нижний приказ", "низ_имя", "низ_слева", "низ_справа", "низ_подпись_слева", "низ_подпись_справа");
         form.add(field("Название", text("низ_имя", false, "НАСТУПАТЬ")));
         form.add(field("Слева", text("низ_слева", false, "{35}")));
         form.add(field("Подпись", text("низ_подпись_слева", false, "снабжение")));
@@ -653,18 +904,18 @@ public final class CardShop {
     }
 
     private void marketForm() {
-        section("Рынок — два предложения");
+        section("Рынок — два предложения", "слева", "справа", "иконка_слева", "иконка_справа");
         art();
         form.add(field("Слева", text("слева", true, "строками: «Выполни» / «Манёвр»")));
         form.add(field("Иконка слева", text("иконка_слева", false, "{38}")));
         form.add(field("Справа", text("справа", true, "строками")));
         form.add(field("Иконка справа", text("иконка_справа", false, "{34}")));
-        section("Номер");
+        section("Номер", "номер");
         form.add(field("Номер карты", numberInfo()));
     }
 
     private void hexForm() {
-        section("Жетон гекса зарождения");
+        section("Жетон гекса зарождения", "старт", "кубы", "число", "ярлык", "ряд");
         form.add(field("Сторона", segmented("сторона", new String[] {"зелёная", "рыжая"},
             new String[] {"зелёная рамка", "рыжая рамка"})));
         form.add(field("Рисунок", segmentedNumbers("рисунок", 2)));
@@ -675,7 +926,7 @@ public final class CardShop {
     }
 
     private void containerForm() {
-        section("Контейнер");
+        section("Контейнер", "буква", "число", "иконка", "имя");
         form.add(field("Буква", text("буква", false, "А, Б, В… — слева сверху")));
         form.add(field("Число", text("число", false, "справа сверху")));
         form.add(field("Иконка", text("иконка", false, "одна или несколько: {1}{1}")));
@@ -696,8 +947,286 @@ public final class CardShop {
         });
     }
 
-    private void section(String name) {
-        form.add(Style.caption(name), "gaptop 8");
+    private void section(String name, String... ids) {
+        JLabel cap = Style.caption(name);
+        cap.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
+        form.add(cap, "gaptop 8");
+        for (String id : ids) {
+            sectionOf.put(id, cap);
+        }
+        if (ids.length > 0) {
+            cap.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+            cap.setToolTipText("щёлкните — выбрать эту часть на карте");
+            cap.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                    selectElement(ids[0], false);
+                }
+            });
+        }
+    }
+
+    /**
+     * СТРОКИ ВЕРХА: каждая строка — иконки и слова вперемешку ({36} / {34},
+     * «Свободная добыча», «{66} 2 {54} max»), вес — доля высоты зоны.
+     */
+    private final class RowsEditor extends JPanel {
+        private static final long serialVersionUID = 1L;
+        private final java.util.List<java.util.Map<String, Object>> rows = new ArrayList<>();
+
+        RowsEditor() {
+            super(new MigLayout("insets 0, fillx, wrap 1, gapy 6", "[grow,fill]", ""));
+            setOpaque(false);
+            for (java.util.Map<String, Object> r : CardRender.topRows(card)) {
+                rows.add(new java.util.LinkedHashMap<>(r));
+            }
+            rebuild();
+        }
+
+        private void commit() {
+            java.util.List<Object> out = new ArrayList<>();
+            for (java.util.Map<String, Object> r : rows) {
+                out.add(new java.util.LinkedHashMap<>(r));
+            }
+            changed("верх_строки", out);
+        }
+
+        private void rebuild() {
+            removeAll();
+            for (int i = 0; i < rows.size(); i++) {
+                add(row(i));
+            }
+            JButton add = new JButton("+ строка");
+            add.setFocusable(false);
+            add.addActionListener(e -> {
+                rows.add(new java.util.LinkedHashMap<>(java.util.Map.of("текст", "", "вес", 1)));
+                commit();
+                rebuild();
+            });
+            JLabel h = new JLabel("<html>в строке иконки и слова: <b>{36} / {34}</b>, <b>Свободная добыча</b>,"
+                + " <b>{66} 2 {54} max</b>; «вес» — какую долю высоты верха займёт строка</html>");
+            h.setForeground(Style.INK3);
+            add(add, "split 2, growx 0");
+            add(h);
+            revalidate();
+            repaint();
+        }
+
+        private JComponent row(int i) {
+            java.util.Map<String, Object> r = rows.get(i);
+            JPanel p = new JPanel(new MigLayout("insets 6, fillx", "[grow,fill,0::]6[]6[]", ""));
+            p.setBackground(Style.PANEL);
+            JTextField f = new JTextField(String.valueOf(r.getOrDefault("текст", "")));
+            f.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
+            TextPreview pv = new TextPreview(assets);
+            pv.set(f.getText());
+            f.getDocument().addDocumentListener(new DocumentListener() {
+                void upd() {
+                    r.put("текст", f.getText());
+                    pv.set(f.getText());
+                    commit();
+                }
+                @Override public void insertUpdate(DocumentEvent e) { upd(); }
+                @Override public void removeUpdate(DocumentEvent e) { upd(); }
+                @Override public void changedUpdate(DocumentEvent e) { upd(); }
+            });
+            JButton ic = new JButton("+ иконка");
+            ic.setFocusable(false);
+            ic.addActionListener(e -> IconPicker.open(frame, assets, "Вставить иконку", k -> {
+                int at = Math.max(0, Math.min(f.getCaretPosition(), f.getText().length()));
+                f.setText(f.getText().substring(0, at) + "{" + k + "}" + f.getText().substring(at));
+            }));
+            double w = r.get("вес") instanceof Number n ? n.doubleValue() : 1;
+            JSpinner sp = new JSpinner(new SpinnerNumberModel(w, 0.2, 8.0, 0.5));
+            sp.setPreferredSize(new Dimension(64, 28));
+            sp.setToolTipText("вес строки — доля высоты");
+            sp.addChangeListener(e -> {
+                r.put("вес", ((Number) sp.getValue()).doubleValue());
+                commit();
+            });
+            JPanel tools = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+            tools.setOpaque(false);
+            tools.add(new JLabel("вес"));
+            tools.add(sp);
+            tools.add(small("↑", "выше", () -> {
+                if (i > 0) {
+                    rows.add(i - 1, rows.remove(i));
+                    commit();
+                    rebuild();
+                }
+            }));
+            tools.add(small("↓", "ниже", () -> {
+                if (i < rows.size() - 1) {
+                    rows.add(i + 1, rows.remove(i));
+                    commit();
+                    rebuild();
+                }
+            }));
+            tools.add(small("✕", "убрать строку", () -> {
+                rows.remove(i);
+                commit();
+                rebuild();
+            }));
+            p.add(f, "wmin 0, growx");
+            p.add(ic);
+            p.add(tools, "wrap");
+            p.add(pv, "span 3, growx, wmin 0");
+            return p;
+        }
+    }
+
+    /**
+     * СВОИ ЭЛЕМЕНТЫ: текст или ряд иконок с рамкой x, y, w, h (пиксели карты).
+     * Новый появляется в середине карты; на макете его тянут мышью.
+     */
+    private final class FreeEditor extends JPanel {
+        private static final long serialVersionUID = 1L;
+        private final java.util.List<java.util.Map<String, Object>> items = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        FreeEditor() {
+            super(new MigLayout("insets 0, fillx, wrap 1, gapy 6", "[grow,fill]", ""));
+            setOpaque(false);
+            if (card.fields.get("свои") instanceof java.util.List<?> l) {
+                for (Object o : l) {
+                    if (o instanceof java.util.Map<?, ?> m) {
+                        items.add(new java.util.LinkedHashMap<>((java.util.Map<String, Object>) m));
+                    }
+                }
+            }
+            rebuild();
+        }
+
+        private void commit() {
+            java.util.List<Object> out = new ArrayList<>();
+            for (java.util.Map<String, Object> m : items) {
+                out.add(new java.util.LinkedHashMap<>(m));
+            }
+            if (out.isEmpty()) {
+                card.fields.remove("свои");
+                redraw.restart();
+                autosave.restart();
+            } else {
+                changed("свои", out);
+            }
+        }
+
+        private void rebuild() {
+            removeAll();
+            for (int i = 0; i < items.size(); i++) {
+                add(item(i));
+            }
+            JButton addIcons = new JButton("+ ряд иконок");
+            addIcons.setFocusable(false);
+            addIcons.addActionListener(e -> add("иконки", "{1} {3}"));
+            JButton addText = new JButton("+ текст");
+            addText.setFocusable(false);
+            addText.addActionListener(e -> add("текст", "Новый текст"));
+            add(addIcons, "split 2, growx 0");
+            add(addText, "growx 0");
+            revalidate();
+            repaint();
+        }
+
+        private void add(String kind, String text) {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("вид", kind);
+            m.put("текст", text);
+            boolean wide = card.type().layout == CardSpec.Layout.ARSENAL
+                || card.type().layout == CardSpec.Layout.MARKET;
+            m.put("x", wide ? 300 : 200);
+            m.put("y", wide ? 220 : 420);
+            m.put("w", 260);
+            m.put("h", "текст".equals(kind) ? 90 : 80);
+            if ("текст".equals(kind)) {
+                m.put("кегль", 34);
+                m.put("выравнивание", "по центру");
+            }
+            items.add(m);
+            commit();
+            rebuild();
+            selectElement("свой_" + items.size(), false);
+        }
+
+        private JComponent item(int i) {
+            java.util.Map<String, Object> m = items.get(i);
+            JPanel p = new JPanel(new MigLayout("insets 6, fillx", "[grow,fill,0::]6[]", ""));
+            p.setBackground(Style.PANEL);
+            JLabel name = new JLabel("свой_" + (i + 1) + " · " + m.getOrDefault("вид", "иконки"));
+            name.setForeground(Style.ACCENT);
+            name.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+            name.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                    selectElement("свой_" + (i + 1), false);
+                }
+            });
+            sectionOf.put("свой_" + (i + 1), p);
+            JTextField f = new JTextField(String.valueOf(m.getOrDefault("текст", "")));
+            f.getDocument().addDocumentListener(new DocumentListener() {
+                void upd() {
+                    m.put("текст", f.getText());
+                    commit();
+                }
+                @Override public void insertUpdate(DocumentEvent e) { upd(); }
+                @Override public void removeUpdate(DocumentEvent e) { upd(); }
+                @Override public void changedUpdate(DocumentEvent e) { upd(); }
+            });
+            JButton ic = small("+ иконка", "вставить иконку", () -> IconPicker.open(frame, assets,
+                "Вставить иконку", k -> {
+                    int at = Math.max(0, Math.min(f.getCaretPosition(), f.getText().length()));
+                    f.setText(f.getText().substring(0, at) + "{" + k + "}" + f.getText().substring(at));
+                }));
+            JPanel geo = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+            geo.setOpaque(false);
+            for (String key : new String[] {"x", "y", "w", "h"}) {
+                geo.add(new JLabel(key));
+                JSpinner sp = new JSpinner(new SpinnerNumberModel(
+                    m.get(key) instanceof Number n ? n.intValue() : 0, -200, 1200, 2));
+                sp.setPreferredSize(new Dimension(64, 26));
+                sp.addChangeListener(e -> {
+                    m.put(key, sp.getValue());
+                    commit();
+                });
+                geo.add(sp);
+            }
+            if ("текст".equals(m.get("вид"))) {
+                geo.add(new JLabel("кегль"));
+                JSpinner sp = new JSpinner(new SpinnerNumberModel(
+                    m.get("кегль") instanceof Number n ? n.intValue() : 34, 10, 120, 1));
+                sp.setPreferredSize(new Dimension(56, 26));
+                sp.addChangeListener(e -> {
+                    m.put("кегль", sp.getValue());
+                    commit();
+                });
+                geo.add(sp);
+                javax.swing.JComboBox<String> al = new javax.swing.JComboBox<>(
+                    new String[] {"слева", "по центру", "справа"});
+                al.setSelectedItem(String.valueOf(m.getOrDefault("выравнивание", "по центру")));
+                al.addActionListener(e -> {
+                    m.put("выравнивание", al.getSelectedItem());
+                    commit();
+                });
+                geo.add(al);
+            }
+            geo.add(small("✕", "убрать элемент", () -> {
+                items.remove(i);
+                commit();
+                rebuild();
+            }));
+            p.add(name, "span 2, wrap");
+            p.add(f, "wmin 0, growx");
+            p.add(ic, "wrap");
+            p.add(geo, "span 2");
+            return p;
+        }
+    }
+
+    private static JButton small(String t, String tip, Runnable r) {
+        JButton b = new JButton(t);
+        b.setFocusable(false);
+        b.setToolTipText(tip);
+        b.setMargin(new java.awt.Insets(2, 6, 2, 6));
+        b.addActionListener(e -> r.run());
+        return b;
     }
 
     private static JComponent note(String text) {
@@ -727,7 +1256,7 @@ public final class CardShop {
         redraw.restart();
         autosave.restart();
         if (catalog != null) {
-            catalog.refresh(card);
+            catalog.refresh(card, lib.layout(card.type()));
         }
     }
 
@@ -1129,7 +1658,7 @@ public final class CardShop {
                     + "переключите «Сторона»" : ""));
                 return;
             }
-            preview.set(b, false);
+            preview.showBack(b);
             status.setForeground(Style.GOOD);
             status.setText("Рубашка · " + card.type().ru + " · ещё раз «Рубашка» — лицо");
         } else {
@@ -1137,17 +1666,22 @@ public final class CardShop {
         }
     }
 
+    private long renderTicket;
+
     private void render() {
+        redraw.setInitialDelay(220);
         showBack = false;
         CardSpec snapshot = new CardSpec(card.type());
-        snapshot.fields.putAll(card.fields);
-        new SwingWorker<BufferedImage, Void>() {
+        snapshot.fields.putAll(deepCopy(card.fields));
+        snapshot.fields.put("_раскладка_типа", deepCopy(lib.layout(card.type())));
+        long ticket = ++renderTicket;
+        new SwingWorker<CardRender.Rendered, Void>() {
             private String problem;
 
             @Override
-            protected BufferedImage doInBackground() {
+            protected CardRender.Rendered doInBackground() {
                 try {
-                    return CardRender.render(assets, snapshot);
+                    return CardRender.renderWithRegions(assets, snapshot);
                 } catch (CardRender.Problem p) {
                     problem = p.getMessage();
                 } catch (RuntimeException e) {
@@ -1159,15 +1693,19 @@ public final class CardShop {
             @Override
             protected void done() {
                 try {
-                    BufferedImage im = get();
+                    if (ticket != renderTicket) {
+                        return;     // уже рисуется более свежая правка
+                    }
+                    CardRender.Rendered rr = get();
+                    BufferedImage im = rr == null ? null : rr.image();
                     if (im != null) {
                         lastImage = im;
-                        preview.set(im, false);
+                        preview.set(im, rr.regions(), false);
                         status.setForeground(Style.GOOD);
                         status.setText("Готово · " + im.getWidth() + "×" + im.getHeight()
                             + " · шаблон «" + templateName(snapshot) + "»");
                     } else {
-                        preview.set(lastImage, true);
+                        preview.set(lastImage, null, true);
                         status.setForeground(Style.BAD);
                         status.setText(problem);
                     }
@@ -1195,46 +1733,6 @@ public final class CardShop {
         boolean alt = t.layout == CardSpec.Layout.OBJECTIVE ? !c.text("дополнительно").isBlank()
             : c.bool("спец");
         return t.bgFile(c.integer("рисунок", 1)) + " + " + t.overFile(alt);
-    }
-
-    /** Предпросмотр: карта вписана в панель; если не нарисовалась — прежняя, приглушённо. */
-    private static final class Preview extends JComponent {
-        private static final long serialVersionUID = 1L;
-        private BufferedImage im;
-        private boolean stale;
-
-        void set(BufferedImage im, boolean stale) {
-            this.im = im;
-            this.stale = stale;
-            repaint();
-        }
-
-        @Override
-        protected void paintComponent(Graphics g0) {
-            Graphics2D g = (Graphics2D) g0.create();
-            g.setColor(new Color(0x15181e));
-            g.fillRect(0, 0, getWidth(), getHeight());
-            if (im == null) {
-                g.dispose();
-                return;
-            }
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            double k = Math.min((getWidth() - 48.0) / im.getWidth(),
-                (getHeight() - 48.0) / im.getHeight());
-            k = Math.min(k, 1.4);
-            int w = (int) (im.getWidth() * k);
-            int h = (int) (im.getHeight() * k);
-            int x = (getWidth() - w) / 2;
-            int y = (getHeight() - h) / 2;
-            g.setColor(new Color(0, 0, 0, 120));
-            g.fillRoundRect(x + 6, y + 10, w, h, 24, 24);
-            if (stale) {
-                g.setComposite(java.awt.AlphaComposite.SrcOver.derive(0.35f));
-            }
-            g.drawImage(im, x, y, w, h, null);
-            g.dispose();
-        }
     }
 
     // ======================================================================
@@ -1267,7 +1765,7 @@ public final class CardShop {
 
     private String baseName() {
         String name = card.text("имя").replaceAll("[\\\\/:*?\"<>|]", "").trim();
-        return card.type().ru + " " + card.text("номер") + " — " + (name.isEmpty() ? "без имени" : name);
+        return card.type().ru + " " + CardRender.num(card) + " — " + (name.isEmpty() ? "без имени" : name);
     }
 
     private void save() {

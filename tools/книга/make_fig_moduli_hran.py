@@ -69,15 +69,9 @@ def жетон(имя, запасной, золото=False):
 # исходный рисунок модулей: картинка и выноски
 svg = open(os.path.join(D, "_модули.svg"), encoding="utf-8").read()
 src = re.search(r'<img src="([^"]+)"', svg).group(1)
-# основа — сохранённая картинка модулей (в вёрстке она уже под другим именем)
-база = Image.open(os.path.join(D, "_модули-база.png")).convert("RGBA")
-# модули сборки — новым экспортом дизайнера, ровно в рамки старых
-for файл, (x0, x1, y0, y1) in zip(СБОРКА, ((1167, 1421, 102, 524), (1552, 1806, 102, 524))):
-    п = os.path.join(ЖЕТОНЫ, файл)
-    if os.path.exists(п):
-        нов = Image.open(п).convert("RGBA").resize((x1 - x0, y1 - y0), Image.LANCZOS)
-        база.paste((0, 0, 0, 0), (x0 - 4, y0 - 4, x1 + 4, y1 + 4))
-        база.alpha_composite(нов, (x0, y0))
+# основа — картинка модулей, которую пишет make_fig.py (модули боя и сборки
+# там уже из экспорта дизайнера)
+база = Image.open(os.path.join(D, "_модули.png")).convert("RGBA")
 vb_w, vb_h = [float(x) for x in re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', svg).groups()]
 css_w = float(re.search(r'class="рис" style="width:([\d.]+)%"', svg).group(1))
 W0, H0 = база.size

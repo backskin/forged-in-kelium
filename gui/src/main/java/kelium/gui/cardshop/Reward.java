@@ -109,6 +109,11 @@ public final class Reward {
      * Нарисовать блок центром в (cx, cy) — пиксели карты; {@code width} —
      * сколько места по ширине, {@code size} — сторона кольца или иконки.
      */
+    /** Высота иконок награды при размере size: действие — кольцо, ресурсы — 0,8 размера. */
+    double iconHeight(double size) {
+        return ACTION.equals(kind) ? size : size * 0.8;
+    }
+
     void draw(CardCanvas k, double cx, double cy, double width, double size) {
         if (items.isEmpty()) {
             return;
