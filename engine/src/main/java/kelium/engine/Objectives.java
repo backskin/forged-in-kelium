@@ -524,6 +524,33 @@ public final class Objectives {
         return granted;
     }
 
+
+    /**
+     * ГОТОВЫЕ РЕЗУЛЬТАТЫ НАГРАДЫ (Задания 4.0, дизайнер 06.10.2026): каждый —
+     * эффект реестра {@link Effects#apply}, {@code {id, …параметры}}. Так задание
+     * даёт то, что обычно стоит нескольких звеньев конвейера: войско без
+     * энергии, здание без цены, шаг по треку без трофеев, урон без боя.
+     */
+    @SuppressWarnings("unchecked")
+    private static void выдатьЭффекты(GameState s, PlayerState p, Object список,
+                                      Map<String, Object> into) {
+        if (!(список instanceof java.util.List<?> l)) {
+            return;
+        }
+        java.util.List<Object> итоги = new java.util.ArrayList<>();
+        for (Object o : l) {
+            if (!(o instanceof Map<?, ?> m)) {
+                continue;
+            }
+            Map<String, Object> пар = new HashMap<>((Map<String, Object>) m);
+            String id = String.valueOf(пар.remove("id"));
+            Map<String, Object> итог = new HashMap<>(Effects.apply(id, s, p.seat, пар));
+            итог.put("effect", id);
+            итоги.add(итог);
+        }
+        into.put("effects", итоги);
+    }
+
     private static void grantBase(GameState s, PlayerState p, Map<String, Object> reward,
                                   Map<String, Object> into) {
         for (var e : reward.entrySet()) {
@@ -616,6 +643,7 @@ public final class Objectives {
                     s.journal.of(p.seat).specBonus += Math.max(0, сколько);
                     into.put("spec_actions", сколько);
                 }
+                case "effects" -> выдатьЭффекты(s, p, e.getValue(), into);
                 case "gild" -> {
                     Agent агент = s.agents == null || p.seat >= s.agents.size()
                         ? null : s.agents.get(p.seat);
@@ -652,6 +680,7 @@ public final class Objectives {
             Object v = e.getValue();
             int n = v instanceof Number num ? num.intValue() : 0;
             switch (k) {
+                case "effects" -> выдатьЭффекты(s, p, v, into);
                 case "kelium" -> {
                     int added = Storage.addKeliumCapped(s, p, n);
                     into.put("kelium", added);

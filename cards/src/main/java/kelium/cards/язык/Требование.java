@@ -502,6 +502,33 @@ public interface Требование {
         }
     }
 
+    /**
+     * БЕЗ УСЛОВИЯ — карта, вся суть которой в жертве (Задания 4.0): «сдайте 3
+     * келемия», «верните здание в запас». Проверку «есть ли чем заплатить» делает
+     * движок по записи жертвы.
+     */
+    record Всегда() implements Требование {
+        @Override public boolean выполнено(CardContext ctx) {
+            return true;
+        }
+
+        @Override public double близость(CardContext ctx) {
+            return 1.0;
+        }
+
+        @Override public String суть() {
+            return "заплатите цену карты";
+        }
+
+        @Override public boolean происшествие() {
+            return false;
+        }
+
+        @Override public Map<String, Object> запись() {
+            return Map.of("узел", "всегда");
+        }
+    }
+
     /** «выполни это задание третьим спец-действием хода». */
     record ОчередьСпец(int k) implements Требование {
         @Override public boolean выполнено(CardContext ctx) {
@@ -1356,6 +1383,8 @@ public interface Требование {
             case "модули" -> new Модули(число(m, "сколько", 2), Boolean.TRUE.equals(m.get("золотых")));
             case "рода" -> new Рода(число(m, "сколько", 3));
             case "узор" -> Узор.из(m);
+            case "показатель" -> Показатель.из(m);
+            case "всегда" -> new Всегда();
             case "и" -> {
                 List<Требование> ч = new ArrayList<>();
                 if (m.get("части") instanceof List<?> l) {

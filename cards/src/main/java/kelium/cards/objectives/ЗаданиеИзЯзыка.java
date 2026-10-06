@@ -39,6 +39,8 @@ public final class ЗаданиеИзЯзыка extends ЗаданиеВКоде
     private final Награда сверх;
     private final Утиль верх;
     private final String значок;
+    /** Жертва (Задания 4.0): {@code {ресурс: kelium|trophies|buildings_off_cu|…, сколько: N}}. */
+    private final Map<String, Object> жертва;
 
     public ЗаданиеИзЯзыка(String id, Map<String, Object> язык) {
         super(id);
@@ -48,6 +50,10 @@ public final class ЗаданиеИзЯзыка extends ЗаданиеВКоде
         this.усиление = язык.get("усиление") == null ? null : Требование.из(язык.get("усиление"));
         this.награда = награда(язык.get("награда"));
         this.сверх = награда(язык.get("сверх"));
+        this.жертва = язык.get("жертва") instanceof Map<?, ?> ж
+            ? Map.of("resource", String.valueOf(ж.get("ресурс")),
+                "amount", ж.get("сколько") instanceof Number n ? n.intValue() : 1)
+            : null;
         this.верх = язык.get("верх") == null ? null : Утиль.valueOf(String.valueOf(язык.get("верх")));
         this.значок = язык.get("значок") == null ? null : String.valueOf(язык.get("значок"));
     }
@@ -61,7 +67,25 @@ public final class ЗаданиеИзЯзыка extends ЗаданиеВКоде
             число(m, "келемий"), число(m, "картыЗаданий"), число(m, "картыАрсенала"),
             число(m, "картыСВитрины"), m.get("модуль") == null ? null : String.valueOf(m.get("модуль")),
             m.get("действие") == null ? null : String.valueOf(m.get("действие")),
-            Boolean.TRUE.equals(m.get("позолота")), число(m, "спецДействий"));
+            Boolean.TRUE.equals(m.get("позолота")), число(m, "спецДействий"), эффекты(m.get("эффекты")));
+    }
+
+    /**
+     * ГОТОВЫЕ РЕЗУЛЬТАТЫ (Задания 4.0): список {@code {id: эффект, …параметры}} —
+     * эффекты реестра движка. Пример: {@code {id: free_action, action: science,
+     * virtual_trophy: 5}} — шаг по треку даром.
+     */
+    @SuppressWarnings("unchecked")
+    private static java.util.List<Map<String, Object>> эффекты(Object o) {
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        if (o instanceof java.util.List<?> l) {
+            for (Object x : l) {
+                if (x instanceof Map<?, ?> m) {
+                    out.add(new java.util.LinkedHashMap<>((Map<String, Object>) m));
+                }
+            }
+        }
+        return out;
     }
 
     private static int число(Map<?, ?> m, String ключ) {
@@ -78,6 +102,11 @@ public final class ЗаданиеИзЯзыка extends ЗаданиеВКоде
             : (усиление.происшествие() && !требование.происшествие() ? "в этот ход " : "")
                 + усиление.суть();
         return печатное(имя, природа, требование.текст(), доп, награда, сверх, верх);
+    }
+
+    @Override
+    protected Map<String, Object> жертваВЗаписи() {
+        return жертва;
     }
 
     @Override
