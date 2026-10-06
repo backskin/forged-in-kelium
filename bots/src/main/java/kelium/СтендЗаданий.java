@@ -71,7 +71,8 @@ public final class СтендЗаданий {
 
     /** Итог одного парного опыта. */
     private record Опыт(String карта, boolean лидер, boolean выполнена, int δОчков,
-                        int δПобед, double сдвиг, int δМеста, String выдано, boolean былаГотова) {
+                        int δПобед, double сдвиг, int δМеста, String выдано, boolean былаГотова,
+                        Map<String, Integer> δИсточников) {
     }
 
     /** Накопитель по карте. */
@@ -89,6 +90,8 @@ public final class СтендЗаданий {
         /** Раздельно: опыты, где карту выполнили, и где нет — разница и есть вклад награды. */
         /** Что награда выдала на деле — пара примеров для отчёта. */
         List<String> выдано = new ArrayList<>();
+        /** ОТКУДА ОЧКИ: Δ по источникам (опыт − контроль), сумма по опытам. */
+        Map<String, Long> источники = new TreeMap<>();
         /** Опытов, где карта хоть раз была готова к выполнению. */
         int былаГотова;
         long δОчковВып;
@@ -100,6 +103,9 @@ public final class СтендЗаданий {
             опытов++;
             if (о.былаГотова()) {
                 былаГотова++;
+            }
+            for (var e : о.δИсточников().entrySet()) {
+                источники.merge(e.getKey(), (long) e.getValue(), Long::sum);
             }
             if (о.выполнена()) {
                 выполнено++;
@@ -248,12 +254,15 @@ public final class СтендЗаданий {
         int δПобед = (опыт.победители.contains(место) ? 1 : 0) - (контроль.победители.contains(место) ? 1 : 0);
         int δМеста = ранг(контроль.очки, место) - ранг(опыт.очки, место);
         return new Опыт(карта, место == ср.лидер, опыт.выполнена, δОчков, δПобед,
-            сдвиг(опыт, контроль, место), δМеста, опыт.выдано, опыт.былаГотова || опыт.выполнена);
+            сдвиг(опыт, контроль, место), δМеста, опыт.выдано, опыт.былаГотова || опыт.выполнена,
+            δИсточников(опыт.разбивка.get(место), контроль.разбивка.get(место)));
     }
 
     /** Результат одного доигрывания. */
     private static final class Прогон {
         int[] очки;
+        /** Разбивка очков по источникам, по местам. */
+        List<Map<String, Integer>> разбивка = new ArrayList<>();
         List<Integer> победители = new ArrayList<>();
         boolean выполнена;
         boolean былаГотова;
@@ -310,11 +319,28 @@ public final class СтендЗаданий {
         п.очки = new int[s.numPlayers()];
         for (int i = 0; i < s.numPlayers(); i++) {
             п.очки[i] = sc.get(i).getOrDefault("total", 0);
+            п.разбивка.add(new HashMap<>(sc.get(i)));
         }
         if (горизонт <= 0) {
             п.победители.addAll(s.winners.isEmpty() && s.winner != null ? List.of(s.winner) : s.winners);
         }
         return п;
+    }
+
+    private static Map<String, Integer> δИсточников(Map<String, Integer> опыт, Map<String, Integer> контроль) {
+        Map<String, Integer> out = new HashMap<>();
+        java.util.Set<String> ключи = new java.util.HashSet<>(опыт.keySet());
+        ключи.addAll(контроль.keySet());
+        for (String k : ключи) {
+            if ("total".equals(k)) {
+                continue;
+            }
+            int d = опыт.getOrDefault(k, 0) - контроль.getOrDefault(k, 0);
+            if (d != 0) {
+                out.put(k, d);
+            }
+        }
+        return out;
     }
 
     /** Насколько поменялся набор действий игрока: опыт против контроля. */
@@ -452,6 +478,26 @@ public final class СтендЗаданий {
             b.append(String.format(Locale.ROOT,
                 "\n**По набору:** выполняется в среднем %.0f%%, ком %+.2f очка, сдвиг %.2f.\n",
                 100 * сумВып / n, сумКом / n, сумСдвиг / n));
+        }
+        b.append("\n## Откуда очки — Δ по источникам на опыт (опыт − контроль)\n\n");
+        b.append("Источник растёт — карта ведёт туда; падает — игрок за него заплатил. ")
+            .append("Показаны источники с |Δ| ≥ 0.15 на опыт.\n\n");
+        for (var e : итоги.entrySet()) {
+            Итог и = e.getValue();
+            if (и.опытов == 0) {
+                continue;
+            }
+            List<String> части = new ArrayList<>();
+            и.источники.entrySet().stream()
+                .sorted((x, y) -> Long.compare(Math.abs(y.getValue()), Math.abs(x.getValue())))
+                .forEach(x -> {
+                    double v = (double) x.getValue() / и.опытов;
+                    if (Math.abs(v) >= 0.15) {
+                        части.add(String.format(Locale.ROOT, "%s %+.2f", x.getKey(), v));
+                    }
+                });
+            b.append("- **").append(e.getKey()).append(" ").append(и.имя).append("**: ")
+                .append(части.isEmpty() ? "—" : String.join(", ", части)).append("\n");
         }
         b.append("\n## Что выдали награды (примеры)\n\n");
         for (var e : итоги.entrySet()) {
