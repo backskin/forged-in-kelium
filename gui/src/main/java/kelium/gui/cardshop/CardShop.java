@@ -1332,12 +1332,12 @@ public final class CardShop {
         return p;
     }
 
-    /** Значок в кружке плашки: кулак из шаблона или любая иконка (реакция — 78). */
+    /** Значок в кружке плашки: по умолчанию «Бой» (39), любая иконка — плиткой. */
     private JComponent badgeField() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         p.setOpaque(false);
         p.add(iconField("значок_плашки"));
-        JButton reset = new JButton("кулак из шаблона");
+        JButton reset = new JButton("по умолчанию — «Бой»");
         reset.setFocusable(false);
         reset.addActionListener(e -> {
             card.fields.remove("значок_плашки");
