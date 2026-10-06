@@ -23,8 +23,8 @@ import javax.swing.SwingUtilities;
  */
 final class TypeTile extends JToggleButton {
     private static final long serialVersionUID = 1L;
-    private static final int H = 74;
-    private static final int PIC = 56;
+    private static final int H = 70;
+    private static final int PIC = 53;
 
     final CardSpec.Type type;
     private final IntSupplier count;
@@ -43,7 +43,7 @@ final class TypeTile extends JToggleButton {
         setContentAreaFilled(false);
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         setToolTipText(type.ru);
-        setPreferredSize(new Dimension(168, H));
+        setPreferredSize(new Dimension(160, H));
         addMouseListener(new MouseAdapter() {
             @Override public void mouseEntered(MouseEvent e) { hover = true; repaint(); }
             @Override public void mouseExited(MouseEvent e) { hover = false; repaint(); }
@@ -86,17 +86,17 @@ final class TypeTile extends JToggleButton {
         }
         x += PIC + 9;
         g.setColor(on ? Color.WHITE : Style.INK);
-        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 15));
-        g.drawString(line1, x, line2.isEmpty() ? 34 : 27);
+        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+        g.drawString(line1, x, line2.isEmpty() ? 32 : 25);
         if (!line2.isEmpty()) {
             g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
             g.setColor(on ? new Color(0xF2D6D0) : Style.INK2);
-            g.drawString(line2, x, 45);
+            g.drawString(line2, x, 43);
         }
         g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
         g.setColor(on ? new Color(0xF2D6D0) : Style.INK3);
         int n = count.getAsInt();
-        g.drawString(n + " " + Library.cardsWord(n), x, 62);
+        g.drawString(n + " " + Library.cardsWord(n), x, 59);
         g.dispose();
     }
 }

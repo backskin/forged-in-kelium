@@ -130,7 +130,9 @@ public final class CardShop {
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Style.PANEL);
         top.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Style.LINE));
-        JPanel types = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 8));
+        // ОДНА СТРОКА С ПРОКРУТКОЙ (дизайнер 06.10.2026): плитки не переносятся,
+        // лишнее уходит вправо, внизу тонкий ползунок; колесо мыши листает вбок
+        JPanel types = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         types.setOpaque(false);
         JLabel logo = new JLabel("<html>МАСТЕРСКАЯ<br>КАРТ</html>");
         logo.setFont(Style.title(20));
@@ -166,8 +168,19 @@ public final class CardShop {
             }
             types.add(box);
         }
-        top.add(types, BorderLayout.CENTER);
-        JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 30));
+        JScrollPane typesScroll = new JScrollPane(types, JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        typesScroll.setBorder(null);
+        typesScroll.setOpaque(false);
+        typesScroll.getViewport().setOpaque(false);
+        typesScroll.getHorizontalScrollBar().setUnitIncrement(40);
+        typesScroll.getHorizontalScrollBar().setPreferredSize(new Dimension(0, 8));
+        typesScroll.addMouseWheelListener(e -> {
+            javax.swing.JScrollBar sb = typesScroll.getHorizontalScrollBar();
+            sb.setValue(sb.getValue() + e.getWheelRotation() * 80);
+        });
+        top.add(typesScroll, BorderLayout.CENTER);
+        JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 34));
         acts.setOpaque(false);
         JButton menu = button("Файл ▾", () -> { }, false);
         javax.swing.JPopupMenu pm = new javax.swing.JPopupMenu();
