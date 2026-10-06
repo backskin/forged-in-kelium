@@ -743,7 +743,7 @@ def арсенал(карта):
     if карта.get('звезда'):
         положить(im, вписать(икона(ИА['star']), 80 * K, 80 * K), 62, 445)
     d = ImageDraw.Draw(im)
-    d.text((777 * K, 484 * K), str(карта['номер']), font=шрифт('TekturNarrow-Bold.ttf', 34),
+    d.text((777 * K, 484 * K), '%02d' % карта['номер'], font=шрифт('TekturNarrow-Bold.ttf', 34),
            fill=НОМЕР_А, anchor='rm')
     return мелко(im)
 

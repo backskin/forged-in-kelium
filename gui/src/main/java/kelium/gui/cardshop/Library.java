@@ -25,6 +25,8 @@ public final class Library {
 
     private final File dir;
     private final Map<CardSpec.Type, List<CardSpec>> lists = new EnumMap<>(CardSpec.Type.class);
+    /** Правки раскладки на весь каталог типа: {элемент: {dx, dy, масштаб, …}}. */
+    private final Map<CardSpec.Type, Map<String, Object>> layouts = new EnumMap<>(CardSpec.Type.class);
 
     public Library(File workFolder) {
         this.dir = new File(workFolder, "библиотека");
@@ -51,6 +53,9 @@ public final class Library {
         if (f.isFile()) {
             try {
                 Object raw = new Yaml().load(Files.readString(f.toPath(), StandardCharsets.UTF_8));
+                if (raw instanceof Map<?, ?> m && m.get("раскладка") instanceof Map<?, ?> lay) {
+                    layouts.put(t, new LinkedHashMap<>((Map<String, Object>) lay));
+                }
                 if (raw instanceof Map<?, ?> m && m.get("карты") instanceof List<?> l) {
                     for (Object o : l) {
                         if (o instanceof Map<?, ?> cm) {
@@ -123,6 +128,10 @@ public final class Library {
         }
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("тип", t.ru);
+        Map<String, Object> lay = layouts.get(t);
+        if (lay != null && !lay.isEmpty()) {
+            doc.put("раскладка", lay);
+        }
         doc.put("карты", cards);
         DumperOptions o = new DumperOptions();
         o.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
@@ -132,6 +141,40 @@ public final class Library {
         File tmp = new File(f.getParentFile(), f.getName() + ".tmp");
         Files.writeString(tmp.toPath(), new Yaml(o).dump(doc), StandardCharsets.UTF_8);
         Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /** Правки раскладки каталога типа (изменяемая запись). */
+    public Map<String, Object> layout(CardSpec.Type t) {
+        list(t);
+        return layouts.computeIfAbsent(t, x -> new LinkedHashMap<>());
+    }
+
+    /** Название карты для каталога: имя, а у карт без имени — что на ней написано. */
+    static String title(CardSpec c) {
+        String n = c.text("имя");
+        if (n.isBlank()) {
+            n = switch (c.type()) {
+                case MARKET -> first(c.text("слева")) + " / " + first(c.text("справа"));
+                case SPAWN_HEX -> c.text("сторона") + " · " + c.text("число");
+                default -> c.text("условие");
+            };
+        }
+        if (c.type() == CardSpec.Type.ORDER) {
+            n = c.text("цвет") + " · " + n;
+        }
+        n = n.replace('\n', ' ').trim();
+        return n.isBlank() ? "без названия" : n;
+    }
+
+    private static String first(String s) {
+        int i = s.indexOf('\n');
+        return i < 0 ? s : s.substring(0, i);
+    }
+
+    static String cardsWord(int n) {
+        int a = n % 10;
+        int b = n % 100;
+        return a == 1 && b != 11 ? "карта" : a >= 2 && a <= 4 && (b < 12 || b > 14) ? "карты" : "карт";
     }
 
     /** Все карты всех типов — для выгрузки в игру. */
