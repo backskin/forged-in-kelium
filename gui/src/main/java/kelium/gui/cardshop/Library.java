@@ -143,6 +143,32 @@ public final class Library {
         Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
 
+    /** Название набора карт (файл «набор.yaml» в папке библиотеки). */
+    public String name() {
+        File f = new File(folder(), "набор.yaml");
+        try {
+            if (f.isFile()) {
+                Object raw = new Yaml().load(Files.readString(f.toPath(), StandardCharsets.UTF_8));
+                if (raw instanceof Map<?, ?> m && m.get("название") != null) {
+                    return String.valueOf(m.get("название"));
+                }
+            }
+        } catch (Exception e) {
+            // нет названия — ниже по умолчанию
+        }
+        return "Набор без названия";
+    }
+
+    public void setName(String n) throws Exception {
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("название", n);
+        DumperOptions o = new DumperOptions();
+        o.setAllowUnicode(true);
+        o.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        Files.writeString(new File(folder(), "набор.yaml").toPath(), new Yaml(o).dump(doc),
+            StandardCharsets.UTF_8);
+    }
+
     /** Правки раскладки каталога типа (изменяемая запись). */
     public Map<String, Object> layout(CardSpec.Type t) {
         list(t);

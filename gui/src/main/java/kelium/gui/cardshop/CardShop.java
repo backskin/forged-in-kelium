@@ -129,7 +129,9 @@ public final class CardShop {
     private void show() {
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Style.PANEL);
-        top.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Style.LINE));
+        top.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Style.LINE),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)));
         // ОДНА СТРОКА С ПРОКРУТКОЙ (дизайнер 06.10.2026): плитки не переносятся,
         // лишнее уходит вправо, внизу тонкий ползунок; колесо мыши листает вбок
         JPanel types = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
@@ -137,8 +139,7 @@ public final class CardShop {
         JLabel logo = new JLabel("<html>МАСТЕРСКАЯ<br>КАРТ</html>");
         logo.setFont(Style.title(20));
         logo.setForeground(Style.INK);
-        logo.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 14));
-        types.add(logo);
+        logo.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
         ButtonGroup tg = new ButtonGroup();
         // ГРУППЫ ТИПОВ: задания, арсенал, прочее — плитками с рубашкой и числом карт
         String[][][] groups = {
@@ -179,13 +180,32 @@ public final class CardShop {
             javax.swing.JScrollBar sb = typesScroll.getHorizontalScrollBar();
             sb.setValue(sb.getValue() + e.getWheelRotation() * 80);
         });
-        top.add(typesScroll, BorderLayout.CENTER);
-        JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 34));
+        // прокручиваемая лента — в своей рамке, со скруглением и тёмным фоном
+        JPanel strip = new JPanel(new BorderLayout()) {
+            private static final long serialVersionUID = 1L;
+
+            @Override protected void paintComponent(Graphics g0) {
+                Graphics2D g = (Graphics2D) g0.create();
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(Style.BG);
+                g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+                g.setColor(Style.LINE);
+                g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+                g.dispose();
+            }
+        };
+        strip.setOpaque(false);
+        strip.setBorder(BorderFactory.createEmptyBorder(4, 8, 2, 8));
+        strip.add(typesScroll, BorderLayout.CENTER);
+        top.add(strip, BorderLayout.CENTER);
+        JPanel acts = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         acts.setOpaque(false);
         JButton menu = button("Файл ▾", () -> { }, false);
         javax.swing.JPopupMenu pm = new javax.swing.JPopupMenu();
         pm.add(menuItem("Выпустить эту карту PNG…", this::export));
         pm.add(menuItem("Выпустить эту группу…", this::exportAll));
+        pm.addSeparator();
+        pm.add(menuItem("Переименовать набор…", this::renameSet));
         pm.addSeparator();
         pm.add(menuItem("Импорт карты .kcard…", this::open));
         pm.add(menuItem("Сохранить карту .kcard…", this::save));
@@ -196,7 +216,37 @@ public final class CardShop {
         pm.add(menuItem("Открыть папку шаблонов", () -> openFolder(assets.templates)));
         menu.addActionListener(e -> pm.show(menu, 0, menu.getHeight()));
         acts.add(menu);
-        top.add(acts, BorderLayout.EAST);
+        // статичная часть слева: название и меню «Файл», отделена от ленты
+        JPanel fixed = new JPanel(new java.awt.GridBagLayout());
+        fixed.setOpaque(false);
+        fixed.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 16));
+        JPanel fixedRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
+        fixedRow.setOpaque(false);
+        JPanel names = new JPanel(new java.awt.GridLayout(3, 1, 0, 0));
+        names.setOpaque(false);
+        logo.setText("МАСТЕРСКАЯ КАРТ");
+        logo.setFont(Style.title(13));
+        logo.setForeground(Style.INK3);
+        setName = new JLabel();
+        setName.setFont(Style.title(22));
+        setName.setForeground(Color.WHITE);
+        setName.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+        setName.setToolTipText("название набора — щёлкните, чтобы переименовать");
+        setName.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                renameSet();
+            }
+        });
+        JLabel hint = new JLabel("набор карт · щёлкните, чтобы переименовать");
+        hint.setFont(hint.getFont().deriveFont(11f));
+        hint.setForeground(Style.INK3);
+        names.add(logo);
+        names.add(setName);
+        names.add(hint);
+        fixedRow.add(names);
+        fixedRow.add(acts);
+        fixed.add(fixedRow);
+        top.add(fixed, BorderLayout.WEST);
 
         form.setBackground(Style.BG);
         formScroll = new JScrollPane(form);
@@ -283,6 +333,7 @@ public final class CardShop {
         edit.setDividerSize(6);
         lib = new Library(workFolder());
         lib.seedFrom(new File(workFolder(), "выпуск 27.09.2026"));
+        showSetName();
         catalog = new CatalogPanel(assets, new CatalogPanel.Actions() {
             @Override public void select(int i) {
                 pick(i);
@@ -453,6 +504,28 @@ public final class CardShop {
             l.add(snap);
         }
         new ExportDialog(frame, assets, t, l, new File(lib.folder(), t.ru)).setVisible(true);
+    }
+
+    private JLabel setName;
+
+    /** Показать название набора в шапке и в заголовке окна. */
+    private void showSetName() {
+        String n = lib.name();
+        setName.setText(n);
+        frame.setTitle(n + " — Мастерская карт");
+    }
+
+    private void renameSet() {
+        Object v = JOptionPane.showInputDialog(frame, "Название набора карт:", "Набор",
+            JOptionPane.PLAIN_MESSAGE, null, null, lib.name());
+        if (v != null && !String.valueOf(v).isBlank()) {
+            try {
+                lib.setName(String.valueOf(v).trim());
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(frame, "Не сохранилось: " + e.getMessage());
+            }
+            showSetName();
+        }
     }
 
     private CatalogPanel catalog() {
