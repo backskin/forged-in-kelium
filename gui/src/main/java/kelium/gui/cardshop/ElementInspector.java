@@ -54,6 +54,9 @@ final class ElementInspector extends JPanel {
     private final JSlider step = new JSlider(20, 160, 78);
     private final JLabel stepV = new JLabel();
     private final JLabel stepL = new JLabel("Шаг иконок");
+    private final JSlider letters = new JSlider(40, 160, 100);
+    private final JLabel lettersV = new JLabel();
+    private final JLabel lettersL = new JLabel("Ширина букв");
     private final JSlider plate = new JSlider(0, 100, 15);
     private final JLabel plateV = new JLabel();
     private final JLabel plateL = new JLabel("Подложка под текстом");
@@ -71,7 +74,7 @@ final class ElementInspector extends JPanel {
         title.setForeground(Style.INK);
         add(title);
         body.setOpaque(false);
-        body.setLayout(new MigLayout("insets 0, fillx, gapy 4", "[130!]10[grow,fill]10[60!]", ""));
+        body.setLayout(new MigLayout("insets 0, fillx, gapy 4, hidemode 3", "[130!]10[grow,fill]10[60!]", ""));
         ButtonGroup g = new ButtonGroup();
         g.add(forCard);
         g.add(forAll);
@@ -113,6 +116,10 @@ final class ElementInspector extends JPanel {
         body.add(stepL);
         body.add(step);
         body.add(stepV, "wrap");
+        lettersL.setForeground(Style.INK2);
+        body.add(lettersL);
+        body.add(letters);
+        body.add(lettersV, "wrap");
         plateL.setForeground(Style.INK2);
         body.add(plateL);
         body.add(plate);
@@ -142,6 +149,10 @@ final class ElementInspector extends JPanel {
             put("подложка", plate.getValue());
         });
         hidden.addActionListener(e -> put("скрыт", hidden.isSelected()));
+        letters.addChangeListener(e -> {
+            lettersV.setText(letters.getValue() + "%");
+            put("ширина_букв", letters.getValue());
+        });
         step.addChangeListener(e -> {
             stepV.setText(step.getValue() + "%");
             put("шаг", step.getValue());
@@ -183,6 +194,11 @@ final class ElementInspector extends JPanel {
             load();
         }
         revalidate();
+        repaint();
+        if (getParent() != null) {
+            getParent().revalidate();
+            getParent().repaint();
+        }
     }
 
     String current() {
@@ -214,6 +230,12 @@ final class ElementInspector extends JPanel {
         sizeV.setText(size.getValue() + "%");
         lead.setValue((int) num(st, "интервал", 100));
         leadV.setText(lead.getValue() + "%");
+        boolean squeeze = Elements.SQUEEZE.contains(id);
+        for (javax.swing.JComponent c : new javax.swing.JComponent[] {letters, lettersV, lettersL}) {
+            c.setVisible(squeeze);
+        }
+        letters.setValue((int) num(st, "ширина_букв", 100));
+        lettersV.setText(letters.getValue() + "%");
         boolean stack = Elements.STACK.contains(id);
         for (javax.swing.JComponent c : new javax.swing.JComponent[] {step, stepV, stepL}) {
             c.setVisible(stack);

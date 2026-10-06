@@ -295,9 +295,14 @@ public final class CardRender {
                     BufferedImage p2 = CardAssets.scale(p, p.getWidth() * 2, p.getHeight() * 2);
                     k.g.drawImage(p2, 117 * 2, 8 * 2, null);
                 }
-                Font f = k.font(F_TOP_B, 51);
+            }
+            k.end();
+            // ЗАГОЛОВОК ПЛАШКИ — своя часть карты (дизайнер 06.10.2026): кегль,
+            // ширина букв, сдвиг, размер — как у остальных текстов
+            if (k.begin("заголовок", 190, 40, 420, 62)) {
+                Font f = k.font(F_TOP_B, 51 * k.size());
                 k.squeezed(c.text("заголовок_верха"), f, 400, 71, CardCanvas.WHITE,
-                    spec ? RED_STROKE : SLATE_TITLE, 4, 0.85, 420);
+                    spec ? RED_STROKE : SLATE_TITLE, 4, 0.85 * k.letterWidth(), 420 * k.letterWidth());
             }
             k.end();
             zoneTop = 126;

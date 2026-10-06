@@ -130,25 +130,44 @@ public final class CardShop {
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Style.PANEL);
         top.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Style.LINE));
-        JPanel types = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 10));
+        JPanel types = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 8));
         types.setOpaque(false);
-        JLabel logo = new JLabel("МАСТЕРСКАЯ КАРТ");
+        JLabel logo = new JLabel("<html>МАСТЕРСКАЯ<br>КАРТ</html>");
         logo.setFont(Style.title(20));
         logo.setForeground(Style.INK);
-        logo.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 18));
+        logo.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 14));
         types.add(logo);
         ButtonGroup tg = new ButtonGroup();
-        for (CardSpec.Type t : CardSpec.Type.values()) {
-            JToggleButton b = new JToggleButton(t.ru);
-            b.putClientProperty("type", t);
-            b.setFocusable(false);
-            b.addActionListener(e -> openType(t));
-            tg.add(b);
-            typeButtons.add(b);
-            types.add(b);
+        // ГРУППЫ ТИПОВ: задания, арсенал, прочее — плитками с рубашкой и числом карт
+        String[][][] groups = {
+            {{"Задания", ""}, {"OBJECTIVE", "Задания", "обычные"}, {"OBJECTIVE_START", "Задания", "начальные"},
+                {"OBJECTIVE_SUPER", "Задания", "супер"}},
+            {{"Арсенал", ""}, {"ARSENAL", "Арсенал", "обычный"}, {"ARSENAL_START", "Арсенал", "начальный"},
+                {"ARSENAL_SUPER", "Арсенал", "супер"}},
+            {{"Прочее", ""}, {"MARKET", "Рынок", ""}, {"CONTAINER", "Контейнеры", ""},
+                {"SPAWN_HEX", "Гекс", "зарождения"}, {"ORDER", "Приказы", ""}},
+        };
+        for (String[][] grp : groups) {
+            JPanel box = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+            box.setOpaque(false);
+            box.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Style.LINE),
+                    grp[0][0].toUpperCase(), javax.swing.border.TitledBorder.LEFT,
+                    javax.swing.border.TitledBorder.TOP, Style.title(12), Style.INK3),
+                BorderFactory.createEmptyBorder(2, 0, 2, 4)));
+            for (int i = 1; i < grp.length; i++) {
+                CardSpec.Type t = CardSpec.Type.valueOf(grp[i][0]);
+                TypeTile b = new TypeTile(assets, t, grp[i][1], grp[i][2], () -> lib == null ? 0 : lib.list(t).size());
+                b.putClientProperty("type", t);
+                b.addActionListener(e -> openType(t));
+                tg.add(b);
+                typeButtons.add(b);
+                box.add(b);
+            }
+            types.add(box);
         }
         top.add(types, BorderLayout.CENTER);
-        JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 10));
+        JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 30));
         acts.setOpaque(false);
         JButton menu = button("Файл ▾", () -> { }, false);
         javax.swing.JPopupMenu pm = new javax.swing.JPopupMenu();
@@ -346,6 +365,7 @@ public final class CardShop {
     }
 
     private void insertAt(int at, CardSpec c) {
+        typeButtons.forEach(JComponent::repaint);
         CardSpec.Type t = c.type();
         lib.insert(t, at, c);
         index = Math.max(0, Math.min(at, lib.list(t).size() - 1));
@@ -366,6 +386,7 @@ public final class CardShop {
             return;
         }
         lib.remove(t, i);
+        typeButtons.forEach(JComponent::repaint);
         if (l.isEmpty()) {
             lib.insert(t, 0, CardSpec.blank(t));
         }
@@ -446,13 +467,13 @@ public final class CardShop {
         if (lit != null) {
             lit.setOpaque(false);
             lit.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
-            lit.repaint();
+            form.repaint();
         }
         JComponent sec = id == null ? null : sectionOf.get(id);
         lit = sec;
         if (sec != null) {
             sec.setOpaque(true);
-            sec.setBackground(new Color(0xE0, 0x4A, 0x36, 70));
+            sec.setBackground(new Color(0x4A, 0x2B, 0x2A));   // сплошной: полупрозрачный фон у непрозрачной панели Swing не стирает — текст накладывался
             sec.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 4, 0, 0, Style.ACCENT),
                 BorderFactory.createEmptyBorder(4, 6, 4, 6)));
@@ -512,7 +533,7 @@ public final class CardShop {
     }
 
     private void objectiveForm() {
-        section("Верх карты — эффект в чужой ход или сразу", "верх", "слот", "плашка");
+        section("Верх карты — эффект в чужой ход или сразу", "верх", "слот", "плашка", "заголовок");
         form.add(field("Значок слева", segmented("слот", new String[] {"∞", "▶", "нет"},
             new String[] {"∞ постоянный", "▶ спец-действие", "без значка"})));
         boolean plate = CardRender.hasPlate(card);

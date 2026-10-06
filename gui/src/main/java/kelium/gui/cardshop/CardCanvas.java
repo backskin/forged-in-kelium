@@ -160,6 +160,12 @@ final class CardCanvas {
         return Math.max(0.1, num(st, "шаг", 78) / 100.0);
     }
 
+    /** Ширина букв текущего элемента, множитель (поле «ширина_букв», %, по умолчанию 100). */
+    double letterWidth() {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        return Math.max(0.3, num(st, "ширина_букв", 100) / 100.0);
+    }
+
     int plate(int defPercent) {
         java.util.Map<?, ?> st = current == null ? null : layout.get(current);
         double p = num(st, "подложка", defPercent);
