@@ -610,7 +610,12 @@ public final class CardShop {
         form.add(figure("фигура"));
         form.add(field("Ряд иконок", text("ряд", false,
             "под текстом по центру; {/} перечёркивает иконку перед ним")));
-        form.add(field("Звезда", segmentedBool("звезда", "нет", "★ есть")));
+        int stars = card.fields.containsKey("звёзд") ? card.integer("звёзд", 0) : card.bool("звезда") ? 1 : 0;
+        form.add(field("Звёзды", segmentedOf(new String[] {"0", "1", "2", "3", "4"},
+            new String[] {"нет", "★", "★★", "★★★", "★★★★"}, String.valueOf(stars), v -> {
+                card.fields.remove("звезда");
+                changed("звёзд", Integer.parseInt(v));
+            })));
         if (card.bool("спец")) {
             section("Спец-действие ▶", "спец");
             form.add(field("Цена", text("цена", false, "сколько стоит: 1")));

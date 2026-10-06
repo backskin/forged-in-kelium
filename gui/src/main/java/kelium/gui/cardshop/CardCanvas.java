@@ -142,6 +142,24 @@ final class CardCanvas {
     }
 
     /** Непрозрачность белой подложки под текстом текущего элемента (0..255). */
+    /** Кегль текста текущего элемента, множитель (поле «кегль», %, по умолчанию 100). */
+    double size() {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        return Math.max(0.3, num(st, "кегль", 100) / 100.0);
+    }
+
+    /** Междустрочный интервал текущего элемента, множитель (поле «интервал», %). */
+    double leading() {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        return Math.max(0.5, num(st, "интервал", 100) / 100.0);
+    }
+
+    /** Шаг иконок в стопке текущего элемента, доля ширины иконки (поле «шаг», %, 78). */
+    double spacing() {
+        java.util.Map<?, ?> st = current == null ? null : layout.get(current);
+        return Math.max(0.1, num(st, "шаг", 78) / 100.0);
+    }
+
     int plate(int defPercent) {
         java.util.Map<?, ?> st = current == null ? null : layout.get(current);
         double p = num(st, "подложка", defPercent);

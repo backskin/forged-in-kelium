@@ -45,6 +45,15 @@ final class ElementInspector extends JPanel {
     private final JLabel scaleV = new JLabel();
     private final JSlider fade = new JSlider(0, 100, 0);
     private final JLabel fadeV = new JLabel();
+    private final JSlider size = new JSlider(50, 200, 100);
+    private final JLabel sizeV = new JLabel();
+    private final JLabel sizeL = new JLabel("Кегль текста");
+    private final JSlider lead = new JSlider(60, 200, 100);
+    private final JLabel leadV = new JLabel();
+    private final JLabel leadL = new JLabel("Межстрочный интервал");
+    private final JSlider step = new JSlider(20, 160, 78);
+    private final JLabel stepV = new JLabel();
+    private final JLabel stepL = new JLabel("Шаг иконок");
     private final JSlider plate = new JSlider(0, 100, 15);
     private final JLabel plateV = new JLabel();
     private final JLabel plateL = new JLabel("Подложка под текстом");
@@ -91,6 +100,19 @@ final class ElementInspector extends JPanel {
         body.add(label("Прозрачность"));
         body.add(fade);
         body.add(fadeV, "wrap");
+        sizeL.setForeground(Style.INK2);
+        leadL.setForeground(Style.INK2);
+        body.add(sizeL);
+        body.add(size);
+        body.add(sizeV, "wrap");
+        body.add(leadL);
+        body.add(lead);
+        body.add(leadV, "wrap");
+        stepL.setForeground(Style.INK2);
+        stepL.setToolTipText("меньше — иконки плотнее друг на друге, больше — шире");
+        body.add(stepL);
+        body.add(step);
+        body.add(stepV, "wrap");
         plateL.setForeground(Style.INK2);
         body.add(plateL);
         body.add(plate);
@@ -120,6 +142,18 @@ final class ElementInspector extends JPanel {
             put("подложка", plate.getValue());
         });
         hidden.addActionListener(e -> put("скрыт", hidden.isSelected()));
+        step.addChangeListener(e -> {
+            stepV.setText(step.getValue() + "%");
+            put("шаг", step.getValue());
+        });
+        size.addChangeListener(e -> {
+            sizeV.setText(size.getValue() + "%");
+            put("кегль", size.getValue());
+        });
+        lead.addChangeListener(e -> {
+            leadV.setText(lead.getValue() + "%");
+            put("интервал", lead.getValue());
+        });
         show(null);
     }
 
@@ -172,6 +206,20 @@ final class ElementInspector extends JPanel {
         scaleV.setText(scale.getValue() + "%");
         fade.setValue((int) num(st, "прозрачность", 0));
         fadeV.setText(fade.getValue() + "%");
+        boolean texty = Elements.TEXT.contains(id) || id.startsWith("свой_");
+        for (javax.swing.JComponent c : new javax.swing.JComponent[] {size, sizeV, sizeL, lead, leadV, leadL}) {
+            c.setVisible(texty);
+        }
+        size.setValue((int) num(st, "кегль", 100));
+        sizeV.setText(size.getValue() + "%");
+        lead.setValue((int) num(st, "интервал", 100));
+        leadV.setText(lead.getValue() + "%");
+        boolean stack = Elements.STACK.contains(id);
+        for (javax.swing.JComponent c : new javax.swing.JComponent[] {step, stepV, stepL}) {
+            c.setVisible(stack);
+        }
+        step.setValue((int) num(st, "шаг", 78));
+        stepV.setText(step.getValue() + "%");
         boolean plated = Elements.PLATED.contains(id);
         plate.setVisible(plated);
         plateV.setVisible(plated);

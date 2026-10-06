@@ -82,7 +82,7 @@ public final class CardRender {
             String kind = String.valueOf(m.get("вид") == null ? "иконки" : m.get("вид"));
             if (k.begin("свой_" + (i + 1), x, y, w, h)) {
                 if ("текст".equals(kind)) {
-                    double px = d(m, "кегль", 34);
+                    double px = d(m, "кегль", 34) * k.size();
                     String al = String.valueOf(m.get("выравнивание") == null ? "по центру" : m.get("выравнивание"));
                     freeText(k, text, x, y, w, h, px, al);
                 } else {
@@ -111,7 +111,7 @@ public final class CardRender {
             for (String para : text.split("\n")) {
                 lines.addAll(wrapGreedy(k, para, f, fb, px, w * 2));
             }
-            step = px * 1.22;
+            step = px * 1.22 * k.leading();
             if (lines.size() * step <= h || px <= 14) {
                 break;
             }
@@ -304,18 +304,102 @@ public final class CardRender {
         }
         double zoneBottom = 240;
         if (k.begin("верх", 128, zoneTop, 494, zoneBottom - zoneTop)) {
-            double total = 0;
-            for (Map<String, Object> r : rows) {
-                total += weight(r);
-            }
-            double y = zoneTop;
-            for (Map<String, Object> r : rows) {
-                double h = (zoneBottom - zoneTop) * weight(r) / total;
-                drawRow(k, CardAssets.tokens(String.valueOf(r.getOrDefault("текст", ""))), 375, y, h, 484);
-                y += h;
-            }
+            topBlock(k, rows, zoneTop, zoneBottom);
         }
         k.end();
+    }
+
+    /**
+     * ВЕРХ ЗАДАНИЯ ЦЕЛИКОМ (дизайнер 06.10.2026: «слишком мелкий текст, слишком
+     * большой интервал»). Строки с иконками получают свою долю высоты по весу;
+     * строки только из слов — абзац: кегль сколько влезет, интервал 1,15 кегля,
+     * абзац по центру своего места. «Кегль» и «Интервал» элемента «Верх»
+     * в инспекторе — множители.
+     */
+    static void topBlock(CardCanvas k, List<Map<String, Object>> rows, double top, double bottom) {
+        double H = bottom - top;
+        double totalW = 0;
+        double textW = 0;
+        for (Map<String, Object> r : rows) {
+            totalW += weight(r);
+            if (wordsOnly(r)) {
+                textW += weight(r);
+            }
+        }
+        // подряд идущие строки из слов — один абзац
+        double y = top;
+        int i = 0;
+        while (i < rows.size()) {
+            if (!wordsOnly(rows.get(i))) {
+                double h = H * weight(rows.get(i)) / totalW;
+                drawRow(k, CardAssets.tokens(text(rows.get(i))), 375, y, h, 484);
+                y += h;
+                i++;
+                continue;
+            }
+            int j = i;
+            double w = 0;
+            List<String> para = new ArrayList<>();
+            while (j < rows.size() && wordsOnly(rows.get(j))) {
+                w += weight(rows.get(j));
+                para.add(text(rows.get(j)));
+                j++;
+            }
+            double h = H * w / totalW;
+            paragraph(k, para, y, h, 484);
+            y += h;
+            i = j;
+        }
+    }
+
+    static String text(Map<String, Object> r) {
+        return String.valueOf(r.getOrDefault("текст", ""));
+    }
+
+    /**
+     * Строка — текст (иконки в нём строчные, как в условии), если слов больше,
+     * чем иконок, и нет «/» и «→»; иначе — ряд крупных иконок.
+     */
+    static boolean wordsOnly(Map<String, Object> r) {
+        int icons = 0;
+        int words = 0;
+        for (String t : CardAssets.tokens(text(r))) {
+            if ("/".equals(t) || isArrow(t)) {
+                return false;
+            }
+            if (t.startsWith("{")) {
+                icons++;
+            } else {
+                words++;
+            }
+        }
+        return words > icons;
+    }
+
+    /** Абзац верха: каждая строка — свой перенос; кегль — наибольший, что влезает. */
+    static void paragraph(CardCanvas k, List<String> lines, double top, double h, double width) {
+        double lead = 1.15 * k.leading();
+        double px = Math.min(44, h / Math.max(1, lines.size()) / lead) * k.size();
+        List<String> out;
+        Font f;
+        while (true) {
+            f = k.font(F_TOP, px);
+            out = new ArrayList<>();
+            for (String l : lines) {
+                out.addAll(wrapGreedy(k, l, f, k.font(F_TOP_B, px), px, width * 2));
+            }
+            if (out.size() * px * lead <= h * 1.02 || px <= 14) {
+                break;
+            }
+            px -= 0.5;
+        }
+        double step = px * lead;
+        double y0 = top + (h - out.size() * step) / 2 + step / 2;
+        final double pp = px;
+        for (int n = 0; n < out.size(); n++) {
+            k.line(out.get(n), f, k.font(F_TOP_B, px), 375, y0 + n * step, 'm', CardCanvas.WHITE, SLATE,
+                Math.max(2, px * 0.09), (t, p) -> topIcon(k, t, pp), px, true);
+        }
     }
 
     /** Есть ли у карты плашка реакции (прежние карты — вид «реакция»). */
@@ -629,9 +713,12 @@ public final class CardRender {
             return 0;
         }
         List<String> lines;
+        double lead = step / px * k.leading();
+        px *= k.size();
+        double minPx = 28 * k.size();
         while (true) {
             lines = wrapBalanced(k, text, px, 480, maxLines);
-            if (lines != null || px <= 28) {
+            if (lines != null || px <= minPx) {
                 break;
             }
             px -= 1;
@@ -639,6 +726,7 @@ public final class CardRender {
         if (lines == null) {
             throw new Problem("Текст не влезает в " + maxLines + " строки: «" + text + "»");
         }
+        step = px * lead;
         Font f = k.font(F_COND, px);
         final double pxF = px;
         k.g.setColor(new Color(255, 255, 255, k.plate(15)));
@@ -873,9 +961,15 @@ public final class CardRender {
             }
             k.end();
         }
-        if (c.bool("звезда")) {
-            if (k.begin("звезда", 22, 405, 80, 80)) {
-                k.put("22", 62, 445, 80, 80);
+        // ЗВЁЗДЫ (дизайнер 06.10.2026: «почему только одна?»): «звёзд» — сколько,
+        // стопкой вверх от нижнего угла; прежнее «звезда: да» — одна
+        int stars = c.fields.containsKey("звёзд") ? c.integer("звёзд", 0) : c.bool("звезда") ? 1 : 0;
+        if (stars > 0) {
+            double top = 445 - (stars - 1) * 56;
+            if (k.begin("звезда", 22, top - 40, 80, 80 + (stars - 1) * 56)) {
+                for (int i = 0; i < stars; i++) {
+                    k.put("22", 62, 445 - i * 56, 80, 80);
+                }
             }
             k.end();
         }
@@ -1012,7 +1106,7 @@ public final class CardRender {
             for (String para : text.split("\n")) {
                 lines.addAll(wrapGreedy(k, para, f, fb, px, (rightX - leftX) * 2));
             }
-            step = px * 1.28;
+            step = px * 1.28 * k.leading();
             if (lines.size() * step <= bottom - top || px <= 26) {
                 break;
             }
@@ -1240,8 +1334,9 @@ public final class CardRender {
         if (keys.isEmpty()) {
             return;
         }
-        double each = Math.min(h, w / (keys.size() * 0.78 + 0.22));
-        double step = each * 0.78;
+        double sp = k.spacing();
+        double each = Math.min(h, w / ((keys.size() - 1) * sp + 1));
+        double step = each * sp;
         double x = cx - step * (keys.size() - 1) / 2.0;
         for (String key : keys) {
             k.put(key, x, cy, each, each);
