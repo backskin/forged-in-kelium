@@ -245,8 +245,12 @@ public final class CardRender {
             k.end();
         }
         // ОСНОВНАЯ НАГРАДА — блок «вид / выбор / позиции» (см. Reward)
-        if (k.begin("награда", 365, 614 + shift - 58, 270, 116)) {
-            Reward.of(c.fields.get("награда"), true).draw(k, 500, 614 + shift, 270, 110);
+        // У НАЧАЛЬНОГО ЗАДАНИЯ иконки награды — внутри плашки «Награда:» (её
+        // середина y 762), чуть выше середины, как на печати (центр 748)
+        Reward rw = Reward.of(c.fields.get("награда"), true);
+        double rcy = start ? 748 : 614 + shift;
+        if (k.begin("награда", 365, rcy - 58, 270, 116)) {
+            rw.draw(k, 500, rcy, 270, start ? 108 : 110);
         }
         k.end();
         if (hasDop) {

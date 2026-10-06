@@ -153,7 +153,7 @@ public final class CardShop {
         JButton menu = button("Файл ▾", () -> { }, false);
         javax.swing.JPopupMenu pm = new javax.swing.JPopupMenu();
         pm.add(menuItem("Выпустить эту карту PNG…", this::export));
-        pm.add(menuItem("Выпустить весь каталог PNG", this::exportAll));
+        pm.add(menuItem("Выпустить эту группу…", this::exportAll));
         pm.addSeparator();
         pm.add(menuItem("Импорт карты .kcard…", this::open));
         pm.add(menuItem("Сохранить карту .kcard…", this::save));
@@ -230,6 +230,10 @@ public final class CardShop {
         backBtn.setFocusable(false);
         backBtn.addActionListener(e -> toggleBack());
         pbar.add(backBtn);
+        JButton exp = new JButton("Выпуск группы…");
+        exp.setFocusable(false);
+        exp.addActionListener(e -> exportAll());
+        pbar.add(exp);
         right.add(pbar, BorderLayout.NORTH);
         right.add(preview, BorderLayout.CENTER);
         status.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
@@ -401,8 +405,6 @@ public final class CardShop {
     private void exportAll() {
         saveLibrary();
         CardSpec.Type t = card.type();
-        File dir = new File(lib.folder(), t.ru);
-        dir.mkdirs();
         java.util.List<CardSpec> l = new ArrayList<>();
         for (CardSpec c : lib.list(t)) {
             CardSpec snap = new CardSpec(t);
@@ -410,46 +412,7 @@ public final class CardShop {
             snap.fields.put("_раскладка_типа", deepCopy(lib.layout(t)));
             l.add(snap);
         }
-        progress.setMaximum(l.size());
-        progress.setValue(0);
-        progress.setVisible(true);
-        status.setForeground(Style.INK2);
-        status.setText("Выпускаю " + t.ru + "…");
-        new SwingWorker<java.util.List<String>, Integer>() {
-            @Override protected java.util.List<String> doInBackground() {
-                java.util.List<String> bad = new ArrayList<>();
-                for (int i = 0; i < l.size(); i++) {
-                    CardSpec c = l.get(i);
-                    String nm = c.text("имя").replaceAll("[\\\\/:*?\"<>|\n]", " ").trim();
-                    File f = new File(dir, String.format("%02d", i + 1) + (nm.isEmpty() ? "" : " — " + nm) + ".png");
-                    try {
-                        ImageIO.write(CardRender.render(assets, c), "png", f);
-                    } catch (Exception e) {
-                        bad.add(String.format("%02d", i + 1) + ": " + e.getMessage());
-                    }
-                    publish(i + 1);
-                }
-                return bad;
-            }
-
-            @Override protected void process(java.util.List<Integer> done) {
-                int n = done.get(done.size() - 1);
-                progress.setValue(n);
-                progress.setString(n + " из " + l.size());
-            }
-
-            @Override protected void done() {
-                progress.setVisible(false);
-                try {
-                    java.util.List<String> bad = get();
-                    status.setForeground(bad.isEmpty() ? Style.GOOD : Style.BAD);
-                    status.setText("Выпущено " + (l.size() - bad.size()) + " из " + l.size() + " → " + dir
-                        + (bad.isEmpty() ? "" : " · не нарисовались: " + String.join("; ", bad)));
-                } catch (Exception e) {
-                    status.setText("Выпуск прервался: " + e);
-                }
-            }
-        }.execute();
+        new ExportDialog(frame, assets, t, l, new File(lib.folder(), t.ru)).setVisible(true);
     }
 
     private CatalogPanel catalog() {
