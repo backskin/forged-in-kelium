@@ -277,9 +277,15 @@ public final class CardRender {
         String slotKind = c.text("слот");
         boolean spec = "▶".equals(slotKind);
         if (!"нет".equals(slotKind)) {
+            // СВОЙ ЗНАЧОК СЛЕВА (дизайнер 07.10.2026): «своя» — любая иконка вместо ∞/▶
+            boolean own = "своя".equals(slotKind);
+            String ownKey = CardAssets.tokens(c.text("иконка_слота")).stream().filter(t -> t.startsWith("{"))
+                .map(t -> t.substring(1, t.length() - 1)).findFirst().orElse("78");
             if (k.begin("слот", 20, spec ? 27 : 36, 89, 89)) {
-                BufferedImage slot = k.icon(spec ? "26" : "28");
-                if (slot != null) {
+                BufferedImage slot = k.icon(own ? ownKey : spec ? "26" : "28");
+                if (own) {
+                    k.put(ownKey, 64.5, 80, 92, 92);
+                } else if (slot != null) {
                     k.putImage(CardCanvas.slate(CardAssets.fit(slot, 89 * 2, 89 * 2)), 64.5,
                         spec ? 71 : 80);
                 }
@@ -291,9 +297,25 @@ public final class CardRender {
         if (plate) {
             if (k.begin("плашка", 117, 8, 500, 112)) {
                 BufferedImage p = k.a.template("плашка боевого эффекта на задание.png");
+                String badge = CardAssets.tokens(c.text("значок_плашки")).stream()
+                    .filter(t -> t.startsWith("{")).map(t -> t.substring(1, t.length() - 1)).findFirst()
+                    .orElse(null);
                 if (p != null) {
-                    BufferedImage p2 = CardAssets.scale(p, p.getWidth() * 2, p.getHeight() * 2);
+                    BufferedImage src = badge == null ? p : plateWithoutFist(p);
+                    BufferedImage p2 = CardAssets.scale(src, src.getWidth() * 2, src.getHeight() * 2);
                     k.g.drawImage(p2, 117 * 2, 8 * 2, null);
+                }
+                if (badge != null) {
+                    // свой значок в кружке плашки: обод, светлое кольцо, иконка
+                    double cx = 117 + 52;
+                    double cy = 8 + 60;
+                    k.g.setColor(new Color(120, 132, 152));
+                    k.g.fill(new java.awt.geom.Ellipse2D.Double((cx - 45) * 2, (cy - 45) * 2, 180, 180));
+                    k.g.setColor(new Color(231, 232, 231));
+                    k.g.fill(new java.awt.geom.Ellipse2D.Double((cx - 41) * 2, (cy - 41) * 2, 164, 164));
+                    k.g.setColor(new Color(164, 121, 121));
+                    k.g.fill(new java.awt.geom.Ellipse2D.Double((cx - 34) * 2, (cy - 34) * 2, 136, 136));
+                    k.put(badge, cx, cy, 84, 84);
                 }
             }
             k.end();
@@ -409,6 +431,26 @@ public final class CardRender {
             k.line(out.get(n), f, k.font(F_TOP_B, px), 375, y0 + n * step, 'm', CardCanvas.WHITE, SLATE,
                 Math.max(2, px * 0.09), (t, p) -> topIcon(k, t, pp), px, true);
         }
+    }
+
+    private static BufferedImage noFist;
+
+    /** Плашка без впечатанного кулака: кружок и осколки слева стёрты. */
+    static synchronized BufferedImage plateWithoutFist(BufferedImage p) {
+        if (noFist != null && noFist.getWidth() == p.getWidth()) {
+            return noFist;
+        }
+        BufferedImage out = new BufferedImage(p.getWidth(), p.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < p.getHeight(); y++) {
+            for (int x = 0; x < p.getWidth(); x++) {
+                double dx = x - 52;
+                double dy = y - 60;
+                boolean fist = dx * dx + dy * dy <= 50 * 50 || x < 108 && y > 92;
+                out.setRGB(x, y, fist ? 0 : p.getRGB(x, y));
+            }
+        }
+        noFist = out;
+        return out;
     }
 
     /** Есть ли у карты плашка реакции (прежние карты — вид «реакция»). */
