@@ -71,7 +71,7 @@ public final class СтендЗаданий {
 
     /** Итог одного парного опыта. */
     private record Опыт(String карта, boolean лидер, boolean выполнена, int δОчков,
-                        int δПобед, double сдвиг, int δМеста) {
+                        int δПобед, double сдвиг, int δМеста, String выдано, boolean былаГотова) {
     }
 
     /** Накопитель по карте. */
@@ -87,6 +87,10 @@ public final class СтендЗаданий {
         long δПобед;
         long δМеста;
         /** Раздельно: опыты, где карту выполнили, и где нет — разница и есть вклад награды. */
+        /** Что награда выдала на деле — пара примеров для отчёта. */
+        List<String> выдано = new ArrayList<>();
+        /** Опытов, где карта хоть раз была готова к выполнению. */
+        int былаГотова;
         long δОчковВып;
         long δОчковНевып;
         double сдвигВып;
@@ -94,8 +98,14 @@ public final class СтендЗаданий {
 
         void учесть(Опыт о) {
             опытов++;
+            if (о.былаГотова()) {
+                былаГотова++;
+            }
             if (о.выполнена()) {
                 выполнено++;
+                if (выдано.size() < 2 && о.выдано() != null) {
+                    выдано.add(о.выдано());
+                }
                 δОчковВып += о.δОчков();
                 сдвигВып += о.сдвиг();
             } else {
@@ -135,7 +145,10 @@ public final class СтендЗаданий {
         String набор = args.length > 6 && !"-".equals(args[6]) ? args[6] : null;
         List<String> толькоКарты = args.length > 7 ? List.of(args[7].split(",")) : null;
         if (набор != null) {
-            System.setProperty("kelium.content.objectives", набор);
+            // набор заданий подменяется правкой свода, как и любая другая настройка запуска
+            String было = System.getProperty("kelium.rules", "").trim();
+            System.setProperty("kelium.rules", (было.isEmpty() ? "" : было + ",")
+                + "content_versions.objectives=" + набор);
         }
 
         GameConfig пробный = GameConfig.buildCached(свод, игроков, 1L, null, null);
@@ -235,7 +248,7 @@ public final class СтендЗаданий {
         int δПобед = (опыт.победители.contains(место) ? 1 : 0) - (контроль.победители.contains(место) ? 1 : 0);
         int δМеста = ранг(контроль.очки, место) - ранг(опыт.очки, место);
         return new Опыт(карта, место == ср.лидер, опыт.выполнена, δОчков, δПобед,
-            сдвиг(опыт, контроль, место), δМеста);
+            сдвиг(опыт, контроль, место), δМеста, опыт.выдано, опыт.былаГотова || опыт.выполнена);
     }
 
     /** Результат одного доигрывания. */
@@ -243,6 +256,8 @@ public final class СтендЗаданий {
         int[] очки;
         List<Integer> победители = new ArrayList<>();
         boolean выполнена;
+        boolean былаГотова;
+        String выдано;
         /** Сыгранные действия по местам: место → действие → сколько раз. */
         Map<Integer, Map<String, Integer>> действия = new HashMap<>();
     }
@@ -268,8 +283,18 @@ public final class СтендЗаданий {
                 return;
             }
             String тип = String.valueOf(ev.get("type"));
+            if ("objective_hints".equals(тип) && si == место && карта != null
+                    && ev.get("hints") instanceof List<?> hs) {
+                for (Object h : hs) {
+                    if (h instanceof Map<?, ?> m && карта.equals(String.valueOf(m.get("card")))
+                            && Boolean.TRUE.equals(m.get("ready"))) {
+                        п.былаГотова = true;
+                    }
+                }
+            }
             if ("objective".equals(тип) && si == место && карта != null && карта.equals(String.valueOf(ev.get("card")))) {
                 п.выполнена = true;
+                п.выдано = String.valueOf(ev.get("granted"));
             } else if ("action".equals(тип) && Boolean.TRUE.equals(ev.get("ok"))) {
                 п.действия.computeIfAbsent(si, k -> new HashMap<>())
                     .merge(String.valueOf(ev.get("action")), 1, Integer::sum);
@@ -380,12 +405,12 @@ public final class СтендЗаданий {
             .append("- **очки выполн. / невып.** — Δ очков в опытах, где карту выполнили и где нет;\n")
             .append("- **обход** — сдвиг действий у выполнивших минус у невыполнивших: шум от лишней ")
             .append("карты в руке вычитается, остаётся то, насколько награда увела игрока с привычного пути.\n\n");
-        b.append("| карта | название | опытов | выполнена | Δ лидеру | Δ отстающему | ком | сдвиг | Δ мест "
+        b.append("| карта | название | опытов | была готова | выполнена | Δ лидеру | Δ отстающему | ком | сдвиг | Δ мест "
             + "| очки выполн. | очки невып. | обход |");
         if (горизонт == 0) {
             b.append(" Δ побед |");
         }
-        b.append("\n|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        b.append("\n|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         if (горизонт == 0) {
             b.append("---:|");
         }
@@ -415,8 +440,8 @@ public final class СтендЗаданий {
             String очН = нв == 0 ? "—" : String.format(Locale.ROOT, "%+.2f", (double) и.δОчковНевып / нв);
             String обх = и.выполнено == 0 || нв == 0 ? "—" : String.format(Locale.ROOT, "%+.2f",
                 и.сдвигВып / и.выполнено - и.сдвигНевып / нв);
-            b.append(String.format(Locale.ROOT, "| %s | %s | %d | %.0f%% | %+.2f | %+.2f | %+.2f | %.2f | %+.2f | %s | %s | %s |",
-                e.getKey(), и.имя, и.опытов, 100 * вып, и.дЛ(), и.дО(), ком, сд, (double) и.δМеста / и.опытов,
+            b.append(String.format(Locale.ROOT, "| %s | %s | %d | %.0f%% | %.0f%% | %+.2f | %+.2f | %+.2f | %.2f | %+.2f | %s | %s | %s |",
+                e.getKey(), и.имя, и.опытов, 100.0 * и.былаГотова / и.опытов, 100 * вып, и.дЛ(), и.дО(), ком, сд, (double) и.δМеста / и.опытов,
                 очВ, очН, обх));
             if (горизонт == 0) {
                 b.append(String.format(Locale.ROOT, " %+.0f%% |", 100.0 * и.δПобед / и.опытов));
@@ -428,7 +453,17 @@ public final class СтендЗаданий {
                 "\n**По набору:** выполняется в среднем %.0f%%, ком %+.2f очка, сдвиг %.2f.\n",
                 100 * сумВып / n, сумКом / n, сумСдвиг / n));
         }
-        Path out = Path.of("reports", "balance", "стенд-заданий.md");
+        b.append("\n## Что выдали награды (примеры)\n\n");
+        for (var e : итоги.entrySet()) {
+            if (!e.getValue().выдано.isEmpty()) {
+                b.append("- **").append(e.getKey()).append(" ").append(e.getValue().имя).append("**: ")
+                    .append(String.join(" · ", e.getValue().выдано)).append("\n");
+            }
+        }
+        String набор = System.getProperty("kelium.rules", "").contains("content_versions.objectives=")
+            ? System.getProperty("kelium.rules").replaceAll(".*content_versions.objectives=([^,]+).*", "$1") : "свод";
+        b.insert(0, "Набор заданий: **" + набор + "**\n\n");
+        Path out = Path.of("reports", "balance", "стенд-заданий-" + набор + ".md");
         Files.createDirectories(out.getParent());
         Files.writeString(out, b.toString(), StandardCharsets.UTF_8);
         System.out.println("отчёт: " + out.toAbsolutePath());
