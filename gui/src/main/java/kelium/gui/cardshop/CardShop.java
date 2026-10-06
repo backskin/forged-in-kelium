@@ -292,6 +292,12 @@ public final class CardShop {
         frame.add(top, BorderLayout.NORTH);
         frame.add(split, BorderLayout.CENTER);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        // правка за последние 1,2 с до закрытия ещё не записана таймером — записать сейчас
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosing(java.awt.event.WindowEvent e) {
+                saveLibrary();
+            }
+        });
         frame.setSize(1760, 1000);
         frame.setLocationRelativeTo(null);
         openType(CardSpec.Type.OBJECTIVE);
