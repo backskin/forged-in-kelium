@@ -277,9 +277,15 @@ public final class CardRender {
         String slotKind = c.text("слот");
         boolean spec = "▶".equals(slotKind);
         if (!"нет".equals(slotKind)) {
+            // СВОЙ ЗНАЧОК СЛЕВА (дизайнер 07.10.2026): «своя» — любая иконка вместо ∞/▶
+            boolean own = "своя".equals(slotKind);
+            String ownKey = CardAssets.tokens(c.text("иконка_слота")).stream().filter(t -> t.startsWith("{"))
+                .map(t -> t.substring(1, t.length() - 1)).findFirst().orElse("78");
             if (k.begin("слот", 20, spec ? 27 : 36, 89, 89)) {
-                BufferedImage slot = k.icon(spec ? "26" : "28");
-                if (slot != null) {
+                BufferedImage slot = k.icon(own ? ownKey : spec ? "26" : "28");
+                if (own) {
+                    k.put(ownKey, 64.5, 80, 92, 92);
+                } else if (slot != null) {
                     k.putImage(CardCanvas.slate(CardAssets.fit(slot, 89 * 2, 89 * 2)), 64.5,
                         spec ? 71 : 80);
                 }
@@ -290,10 +296,21 @@ public final class CardRender {
         double zoneTop = 12;
         if (plate) {
             if (k.begin("плашка", 117, 8, 500, 112)) {
-                BufferedImage p = k.a.template("плашка боевого эффекта на задание.png");
+                // ПЛАШКА С ПУСТЫМ КРУЖКОМ (дизайнер 07.10.2026, «плашка эффекта на
+                // задание.png»): в кружке — значок на выбор, по умолчанию «Бой» (39)
+                BufferedImage p = k.a.template("плашка эффекта на задание.png");
+                String badge = CardAssets.tokens(c.text("значок_плашки")).stream()
+                    .filter(t -> t.startsWith("{")).map(t -> t.substring(1, t.length() - 1)).findFirst()
+                    .orElse("39");
                 if (p != null) {
                     BufferedImage p2 = CardAssets.scale(p, p.getWidth() * 2, p.getHeight() * 2);
-                    k.g.drawImage(p2, 117 * 2, 8 * 2, null);
+                    k.g.drawImage(p2, 100 * 2, 8 * 2, null);
+                    k.put(badge, 100 + 69, 8 + 62, 70, 70);
+                } else {
+                    BufferedImage old = k.a.template("плашка боевого эффекта на задание.png");
+                    if (old != null) {
+                        k.g.drawImage(CardAssets.scale(old, old.getWidth() * 2, old.getHeight() * 2), 117 * 2, 8 * 2, null);
+                    }
                 }
             }
             k.end();

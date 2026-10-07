@@ -620,8 +620,15 @@ public final class CardShop {
 
     private void objectiveForm() {
         section("Верх карты — эффект в чужой ход или сразу", "верх", "слот", "плашка", "заголовок");
-        form.add(field("Значок слева", segmented("слот", new String[] {"∞", "▶", "нет"},
-            new String[] {"∞ постоянный", "▶ спец-действие", "без значка"})));
+        form.add(field("Значок слева", segmentedOf(new String[] {"∞", "▶", "своя", "нет"},
+            new String[] {"∞ постоянный", "▶ спец-действие", "своя иконка", "без значка"},
+            card.text("слот").isEmpty() ? "∞" : card.text("слот"), v -> {
+                changed("слот", v);
+                setCard(card);
+            })));
+        if ("своя".equals(card.text("слот"))) {
+            form.add(field("Иконка слева", iconField("иконка_слота")));
+        }
         boolean plate = CardRender.hasPlate(card);
         form.add(field("Плашка реакции", segmentedOf(new String[] {"false", "true"},
             new String[] {"нет", "есть"}, String.valueOf(plate), v -> {
@@ -630,6 +637,7 @@ public final class CardShop {
             })));
         if (plate) {
             form.add(field("Заголовок плашки", text("заголовок_верха", false, "«Рикошет!»")));
+            form.add(field("Значок плашки", badgeField()));
         }
         form.add(field("Строки верха", new RowsEditor()));
 
@@ -1321,6 +1329,30 @@ public final class CardShop {
             h.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
             p.add(h, "span 2, growx, wmin 0");
         }
+        return p;
+    }
+
+    /** Значок в кружке плашки: по умолчанию «Бой» (39), любая иконка — плиткой. */
+    private JComponent badgeField() {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        p.setOpaque(false);
+        p.add(iconField("значок_плашки"));
+        JButton reset = new JButton("по умолчанию — «Бой»");
+        reset.setFocusable(false);
+        reset.addActionListener(e -> {
+            card.fields.remove("значок_плашки");
+            redraw.restart();
+            autosave.restart();
+            setCard(card);
+        });
+        p.add(reset);
+        JButton react = new JButton("реакция");
+        react.setFocusable(false);
+        react.addActionListener(e -> {
+            changed("значок_плашки", "{78}");
+            setCard(card);
+        });
+        p.add(react);
         return p;
     }
 
