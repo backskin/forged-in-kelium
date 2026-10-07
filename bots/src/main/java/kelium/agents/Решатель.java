@@ -82,6 +82,7 @@ public final class Решатель extends Agent {
     private boolean вмоёмХоду = false;
     /** Отпечаток стола в миг выбора текущего действия (за столом). */
     private long отпечатокДействия = 0;
+    private GameState последнийСтол;
 
     /** Сколько раз бот видел, что задуманное действие стало холостым, и сменил его. */
     public int холостыхИзбежано = 0;
@@ -151,13 +152,18 @@ public final class Решатель extends Agent {
     @Override
     public void observeEvent(Map<String, Object> e) {
         правила.observeEvent(e);
-        if (ОТЛАДКА && "action".equals(e.get("type")) && String.valueOf(e.get("detail")).startsWith("built nothing")) {
-            System.err.println("ПУСТАЯ ПОСТРОЙКА " + name + " план " + план + " сыграно " + сыграно);
+        if (ОТЛАДКА && "action".equals(e.get("type")) && последнийСтол != null
+                && e.get("seat") instanceof Number n && n.intValue() == seat
+                && !Boolean.TRUE.equals(e.get("free"))
+                && Lookahead.materialSignature(последнийСтол, seat) == отпечатокДействия) {
+            System.err.println("ХОЛОСТОЕ ЗА СТОЛОМ " + name + " " + e.get("detail") + "\n  план " + план
+                + "\n  пустые " + пустыеВПлане + "\n  сыграно " + сыграно);
         }
     }
 
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> ctx) {
+        последнийСтол = state;
         String вид = ctx == null ? "" : String.valueOf(ctx.getOrDefault("kind", ""));
         if (state.round != последнийРаунд) {
             последнийРаунд = state.round;
@@ -192,6 +198,16 @@ public final class Решатель extends Agent {
             пустыеВПлане = и.пустыеШаги();
             c = поПлану(options, вид, k);
         }
+        if (c != null && "action".equals(вид) && "action".equals(c.kind()) && c.payload() != null
+                && !сработаетЗаСтолом(state, String.valueOf(c.payload()), подшаги(k))) {
+            // ПОСЛЕДНЯЯ ПРОВЕРКА НА НАСТОЯЩЕМ СТОЛЕ: план строился по копии в
+            // начале хода, а случай в ходе лёг иначе (другой модуль из мешка,
+            // другая карта) — задуманное действие стало бы холостым. Берётся
+            // другое рабочее действие, нет такого — пас; план пересчитается.
+            холостыхИзбежано++;
+            c = рабочееИлиПас(state, options, ctx, c);
+            план = null;
+        }
         if (c == null && ОТЛАДКА) {
             List<String> кл = new ArrayList<>();
             for (Choice o : options) {
@@ -220,16 +236,9 @@ public final class Решатель extends Agent {
             // и для действий проверка «не холостое ли»
             c = поПравилам(правила, state, options, ctx, вид);
             if ("action".equals(вид) && "action".equals(c.kind()) && c.payload() != null
-                    && !развилкаРаботает(state, String.valueOf(c.payload()))) {
+                    && !сработаетЗаСтолом(state, String.valueOf(c.payload()), List.of())) {
                 холостыхИзбежано++;
-                c = пас(options);
-                for (Choice o : options) {
-                    if ("action".equals(o.kind()) && o.payload() != null
-                            && развилкаРаботает(state, String.valueOf(o.payload()))) {
-                        c = o;
-                        break;
-                    }
-                }
+                c = рабочееИлиПас(state, options, ctx, c);
             }
         }
         if (Исполнитель.верхнее(вид)) {
@@ -279,6 +288,64 @@ public final class Решатель extends Agent {
             }
         }
         return null;
+    }
+
+    /** Решения плана внутри действия, начатого на шаге k (до следующего верхнего решения). */
+    private List<Шаг> подшаги(int k) {
+        List<Шаг> out = new ArrayList<>();
+        if (план == null) {
+            return out;
+        }
+        for (int i = k + 1; i < план.size() && !Исполнитель.верхнее(план.get(i).вид()); i++) {
+            out.add(план.get(i));
+        }
+        return out;
+    }
+
+    /**
+     * Сработает ли действие на НАСТОЯЩЕМ столе: копия текущего положения,
+     * действие разыгрывается теми решениями, что задуманы (дальше — правилами),
+     * и смотрится, изменилось ли на столе хоть что-нибудь.
+     */
+    private boolean сработаетЗаСтолом(GameState s, String развилка, List<Шаг> решения) {
+        long семя = семя(s) ^ 0x9E3779B97F4A7C15L;
+        GameState c = s.deepCopy(семя);
+        Исполнитель исп = new Исполнитель(seat, решения, правила);
+        List<Agent> agents = new ArrayList<>();
+        for (int i = 0; i < c.numPlayers(); i++) {
+            agents.add(i == seat ? исп : new StrategicAgent(i, new Random(0), others, "модель"));
+        }
+        GameEngine.bindResume(c, agents, null);
+        long до = Lookahead.materialSignature(c, seat);
+        try {
+            kelium.engine.TurnContext ctx = new kelium.engine.TurnContext(seat, 0);
+            kelium.engine.ActionResult r = kelium.engine.Actions.create(развилка, c)
+                .perform(c.player(seat), ctx, исп);
+            return r.ok() && Lookahead.materialSignature(c, seat) != до;
+        } catch (RuntimeException e) {
+            return true;   // проверить не удалось — верим плану
+        }
+    }
+
+    /** Другое рабочее действие (по правилам, с проверкой на столе) или пас. */
+    private Choice рабочееИлиПас(GameState s, List<Choice> options, Map<String, Object> ctx, Choice плохое) {
+        List<Choice> остальные = new ArrayList<>();
+        for (Choice o : options) {
+            if (o != плохое && "action".equals(o.kind()) && o.payload() != null) {
+                остальные.add(o);
+            }
+        }
+        while (!остальные.isEmpty()) {
+            Choice o = остальные.size() == 1 ? остальные.get(0) : правила.choose(s, остальные, ctx);
+            if (o.payload() == null || !остальные.contains(o)) {
+                break;
+            }
+            if (сработаетЗаСтолом(s, String.valueOf(o.payload()), List.of())) {
+                return o;
+            }
+            остальные.remove(o);
+        }
+        return пас(options);
     }
 
     /** Хоть одна ветка развилки что-то меняет на столе (проверка на копии). */
