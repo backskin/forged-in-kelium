@@ -63,7 +63,7 @@ public final class ObjectivePack implements CardRegistry.CardPack {
         out.add(new ЗаданияЭкономикиI.Жила());                // o04
         out.add(new ЗаданияЭкономикиI.Выработка());           // o05
         out.add(new ЗаданияЭкономикиI.РазведкаНедр());        // o08
-        out.add(new ЗаданияЭкономикиII.Стройбум());           // o15
+        out.add(new ЗаданияЭкономикиII.СтройКрупно());        // o79 (вместо o15, 27.09)
         out.add(new ЗаданияЭкономикиII.ПолнаяНагрузка());     // o18
         out.add(new ЗаданияЭкономикиII.Коммутация());         // o20
         out.add(new ЗаданияЭкономикиIII.Биржа());             // o33
@@ -89,7 +89,7 @@ public final class ObjectivePack implements CardRegistry.CardPack {
         // того, чего прежняя колода не просила ни разу.
         out.add(new ЗаданияТаблицы.ГолыйЗапас());             // o63
         out.add(new ЗаданияТаблицы.РазносТрофеев());          // o64
-        out.add(new ЗаданияТаблицы.Перестройка());            // o65
+        out.add(new ЗаданияТаблицы.ВстретьСтенкой());     // o78 (вместо o65, 27.09)
         out.add(new ЗаданияТаблицы.Списание());               // o66
         out.add(new ЗаданияТаблицы.Разрядка());               // o67
         out.add(new ЗаданияТаблицы.Бронебой());               // o68

@@ -35,7 +35,10 @@ public final class UndoableAgent extends Agent {
 
     /** Действия, после которых остаётся точка отката (см. javadoc класса). */
     public static final Set<String> SAFE_ACTIONS = Set.of(
-        "build", "mining", "movement", "energy_swap", "assembly");
+        "build", "mining", "movement", "energy_swap", "assembly",
+        // развилки свода 1.46.0: Бой, Рынок и Наука запекаются своими видами
+        // решений (attack, market_*, sci_*), как и прежде
+        "extract", "power", "supply", "command");
 
     /**
      * ВИДЫ РЕШЕНИЙ, ФАКТИЧЕСКИ СОВЕРШАЮЩИЕ необратимое: первый залп боя,

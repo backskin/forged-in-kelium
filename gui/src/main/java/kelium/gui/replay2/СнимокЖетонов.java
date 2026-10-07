@@ -133,7 +133,11 @@ public final class СнимокЖетонов {
         kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
-        FieldPainter.showCardboard = false;      // одиночный гекс, а не кусок поля
+        // БЕЗ ПОДКРАСКИ ГЕКСА ЦВЕТОМ ХОЗЯИНА (дизайнер 05.10.2026): в книге
+        // модуль поля всегда в своём печатном цвете, ни в одном примере.
+        FieldPainter.showOwnership = false;
+        FieldPainter.showCardboard = false;
+        FieldPainter.книжнаяТолщина = true;      // одиночный гекс, а не кусок поля
 
         Font шрифт = new Font("Tektur Narrow", Font.BOLD, (int) Math.round(size * 0.21));
         for (int i = 0; i < клетки.size(); i++) {

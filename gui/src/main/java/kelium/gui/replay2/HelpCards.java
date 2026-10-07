@@ -175,6 +175,9 @@ public final class HelpCards {
         if ("starting".equals(String.valueOf(card.get("kind")))) {
             return "начальные";
         }
+        if (card.get("язык") != null) {
+            return "задания языком карт (Карты 2.0)";
+        }
         return objectiveType(String.valueOf(card.get("type")));
     }
 

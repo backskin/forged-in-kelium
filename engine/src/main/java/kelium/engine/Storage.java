@@ -323,11 +323,8 @@ public final class Storage {
             Cells c = countCells(storage.plantCells(lv));
             u += c.u; k += c.k; a += c.a;
         }
-        for (String tok : player.storageTokens) {
-            if ("+1_universal_cell".equals(tok)) {
-                u++;
-            }
-        }
+        // обе стороны жетона-ячейки дают ячейку (жетоны 2.0, 02.10.2026)
+        u += ЖетоныХранилища.ячеек(player);
         return new Cells(u, k, a);
     }
 

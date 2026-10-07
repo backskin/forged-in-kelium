@@ -977,8 +977,9 @@ final class PrintedBoards {
             }
             // ЗОНА ЯЧЕЙКИ — для подсказки по каждой детали планшета (увеличение
             // планшета, 25.09.2026): чья ячейка, открыта ли и что в ней лежит.
-            hit("cell:" + c.group() + ":" + c.level() + ":" + seen + ":" + (open ? 1 : 0)
-                + ":" + (has == 0 ? '-' : has), box);
+            String cellKey = "cell:" + c.group() + ":" + c.level() + ":" + seen + ":" + (open ? 1 : 0)
+                + ":" + (has == 0 ? '-' : has);
+            hit(cellKey, box);
             seen++;
             if (!open) {
                 // ЯЧЕЙКА НАКРЫТА СВОИМ ЖЕТОНОМ — и жетон мы сейчас на неё и
@@ -989,7 +990,9 @@ final class PrintedBoards {
                 String key = ("miner".equals(c.group()) ? "miner-" : "plant-") + c.level();
                 зоны.computeIfAbsent(key, ключ -> new java.util.ArrayList<>()).add(box);
             } else if (has != 0) {
+                cubeKey = cellKey;
                 cube(g, box, has);
+                cubeKey = null;
             }
         }
         // КРЫЛЬЯ ПЛАНШЕТА: жетон занимает КРЫЛО целиком, а не только свои
@@ -1011,9 +1014,12 @@ final class PrintedBoards {
                 Rectangle box = scale(x, y, k, последняяОбщая.x() + сдвиг,
                     последняяОбщая.y(), последняяОбщая.w(), последняяОбщая.h());
                 рамкаБезПечати(g, box);
-                hit("cell:base:0:" + i + ":1:" + (base[i] == 0 ? '-' : base[i]), box);
+                String baseKey = "cell:base:0:" + i + ":1:" + (base[i] == 0 ? '-' : base[i]);
+                hit(baseKey, box);
                 if (base[i] != 0) {
+                    cubeKey = baseKey;
                     cube(g, box, base[i]);
+                    cubeKey = null;
                 }
             }
         }
@@ -1310,7 +1316,23 @@ final class PrintedBoards {
             case 'D' -> Theme.trophy();
             default -> Theme.ink2();
         });
+        // СИЛУЭТ КУБИКА — для подсветки по форме (дизайнер 28.09.2026:
+        // «выделения на хранилище квадратные, а просил по форме и положению
+        // жетона»): та же картинка и то же место, что у MarkIcons.paint
+        if (cubeKey != null) {
+            BufferedImage img = Textures.icon(has == 'K' ? "kelium" : has == 'D' ? "trophy" : "ammo");
+            if (img != null) {
+                int px = (int) Math.round(s * 1.15);
+                java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform();
+                at.translate(Math.round(cx - px / 2.0), Math.round(cy - px / 2.0));
+                at.scale(px / (double) img.getWidth(), px / (double) img.getHeight());
+                TokenSilhouettes.put(cubeKey, img, at);
+            }
+        }
     }
+
+    /** Ключ ячейки, в которую сейчас кладётся кубик (для его силуэта). */
+    private static String cubeKey;
 
     // ==================== мелочи рисования ====================
 

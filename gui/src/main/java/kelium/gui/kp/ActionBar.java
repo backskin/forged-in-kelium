@@ -43,14 +43,85 @@ public final class ActionBar extends JPanel {
     /** Русские имена действий. Порядок печатный — он же порядок на карте. */
     public static final Map<String, String> ACTIONS = new LinkedHashMap<>();
     static {
-        ACTIONS.put("build", "Стройка");
-        ACTIONS.put("energy_swap", "Энергия");
-        ACTIONS.put("assembly", "Сборка");
-        ACTIONS.put("mining", "Добыча");
+        // ВЕТКИ — ПЕЧАТНЫМИ СЛОВАМИ ПЯТИ РАЗВИЛОК (свод 1.46.0): «Стройки»,
+        // «Сборки» и «Энергии» как действий больше нет
+        ACTIONS.put("build", "Постройка");
+        ACTIONS.put("energy_swap", "Переложить энергию");
+        ACTIONS.put("assembly", "Выпустить");
+        ACTIONS.put("mining", "Добыть");
         ACTIONS.put("movement", "Манёвр");
         ACTIONS.put("combat", "Бой");
         ACTIONS.put("market", "Рынок");
         ACTIONS.put("science", "Наука");
+        // ПЯТЬ ДЕЙСТВИЙ-РАЗВИЛОК свода 1.46.0 (приказы 5.0.0)
+        ACTIONS.put("extract", "Добыча");
+        ACTIONS.put("power", "Питание");
+        ACTIONS.put("supply", "Снабжение");
+        ACTIONS.put("command", "Командование");
+        ACTIONS.put("develop", "Развитие");
+        // ветки «построить» отдельно — так их называют награды карт
+        ACTIONS.put("build_miner", "Построить добытчик");
+        ACTIONS.put("build_plant", "Построить энергостанцию");
+        ACTIONS.put("build_military", "Построить военное здание");
+    }
+
+    /**
+     * ВЕТКА РАЗВИЛКИ СЛОВАМИ: {@code (extract, build)} → «Построить добытчик».
+     * Неизвестная пара — прежнее имя действия.
+     */
+    public static String branchRu(String fork, String branch) {
+        if ("build".equals(branch)) {
+            return switch (fork == null ? "" : fork) {
+                case "extract" -> "Построить добытчик";
+                case "power" -> "Построить энергостанцию";
+                case "supply" -> "Построить военное здание";
+                default -> "Построить";
+            };
+        }
+        return switch (branch == null ? "" : branch) {
+            case "mining" -> "Добыть";
+            case "energy_swap" -> "Переложить энергию";
+            case "assembly" -> "Выпустить";
+            case "movement" -> "Манёвр";
+            case "combat" -> "Бой";
+            case "market" -> "Рынок";
+            case "science" -> "Наука";
+            default -> ACTIONS.getOrDefault(branch, "Действие");
+        };
+    }
+
+    /** Из чего выбирает развилка — подпись под её кружком. */
+    public static String forkSub(String fork) {
+        return switch (fork == null ? "" : fork) {
+            case "extract" -> "добыть или построить добытчик";
+            case "power" -> "энергия или энергостанция";
+            case "supply" -> "выпуск или военное здание";
+            case "command" -> "манёвр или бой";
+            case "develop" -> "рынок или наука";
+            default -> null;
+        };
+    }
+
+    /** Что делает ветка — подпись под кнопкой. */
+    public static String branchSub(String fork, String branch) {
+        return switch (branch == null ? "" : branch) {
+            // одно здание своего вида или снос одного; ЦУ веткой не строится
+            // ЧТО ДЕЛАЕТ ВЕТКА — словами, которые понятны без памяти правил
+            case "build" -> switch (fork == null ? "" : fork) {
+                case "extract" -> "1 добытчик — сразу добудет";
+                case "power" -> "1 станция — сразу даст энергию";
+                case "supply" -> "1 военное здание — сразу выпуск";
+                default -> "одно здание или снос";
+            };
+            case "mining" -> "добытчики дают келемий";
+            case "energy_swap" -> "снять и разложить энергию";
+            case "assembly" -> "войска или боеприпасы";
+            case "movement" -> "вывести и ввести войска";
+            case "combat" -> "атака по соседнему гексу";
+            case "market" -> "обмен келемия и сделки";
+            case "science" -> "шаг по треку или обмен";
+            default -> null;
+        };
     }
 
     private static final int BTN_W = 108;

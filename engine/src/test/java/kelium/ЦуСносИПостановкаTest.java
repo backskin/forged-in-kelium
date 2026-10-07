@@ -76,7 +76,8 @@ class ЦуСносИПостановкаTest {
 
     @Test
     void сносЦуОтдаётЖетонСоперникуБезМонеты() {
-        GameState s = Fix.game();
+        // правило свода 1.45.0: в 1.46.0 своё ЦУ сносить нельзя вовсе
+        GameState s = Fix.game("1.45.0", 4, 7L);
         PlayerState p = s.player(0);
         assertTrue(p.ownCuTokenAvailable, "на старте свой жетон у игрока");
         int монет = p.resources.coin();

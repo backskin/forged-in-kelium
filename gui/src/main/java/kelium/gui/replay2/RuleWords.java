@@ -38,6 +38,8 @@ public final class RuleWords {
             case "containers" -> "Контейнеры";
             case "containers_storage" -> "Где держат контейнеры";
             case "storage" -> "Планшет хранилища";
+            case "cards" -> "Карты: срабатывания и ветки";
+            case "mining" -> "Добыча";
             case "symbols" -> "Символы супер-заданий";
             case "contested_cards" -> "Спорные карты";
             case "market" -> "Рынок";
@@ -179,6 +181,10 @@ public final class RuleWords {
             case "setup.start_kelium" -> "келемий на старте, по местам";
             case "setup.start_ammo" -> "боеприпасы на старте";
             case "setup.start_containers" -> "карты контейнера на старте";
+            case "setup.start_arsenal_offer" ->
+                "начальный арсенал: столько карт наугад, одну оставить, остальные в коробку";
+            case "setup.start_arsenal_installed" ->
+                "начальный арсенал открывают на подготовке: верх — стартовые ресурсы";
 
             // ---------- Экономика ----------
             case "economy.coins_per_vp" -> "монет за одно победное очко";
@@ -220,6 +226,8 @@ public final class RuleWords {
             case "energy.plant_off_cell_gives" ->
                 "сколько энергии даёт станция ВНЕ жёлтой ячейки (на ней — номинал уровня)";
             case "rounds.order_hand_size" -> "приказов в руке";
+            case "rounds.scrapyard_first" ->
+                "свалка — первый шаг Обновления, до новой карты рынка";
             case "rounds.objective_hand_limit" -> "предел заданий в руке";
             case "rounds.blind_discard_choice" ->
                 "отложенный приказ игрок выбирает сам, а не наугад";
@@ -321,6 +329,18 @@ public final class RuleWords {
                 "в небе гекса сколько угодно авиации, но одного игрока";
             case "field.enemy_units_block_build" ->
                 "чужие войска на гексе не дают строить, сносить и выводить нанятых";
+            case "field.units_hold_sectors" ->
+                "войско стоит на выбранном секторе, как здание, пока не уйдёт с гекса";
+            case "modules.red_gold_damage" ->
+                "золотой модуль боя: атака за 1 боеприпас наносит столько урона; урон можно разделить";
+            case "modules.red_gold_universal" ->
+                "золотой модуль боя: универсальная атака за 1 боеприпас по любой цели";
+            case "combat_model.super_unit_damage" ->
+                "атака супер-войска за 1 боеприпас наносит столько урона; урон можно разделить";
+            case "mining.unpowered_yield" ->
+                "добытчик без энергии всё же добывает столько келемия";
+            case "cards.branch_must_act" ->
+                "ветка считается сыгранной, только если что-то сделала: бой без выстрела не в счёт";
 
             // ---------- Центр управления ----------
             case "command_center.build_price_coins" -> "цена постройки центра управления";
@@ -369,6 +389,12 @@ public final class RuleWords {
                 "ячеек хранилища, открытых всегда (на печати планшета — одна)";
             case "storage.module_slots" ->
                 "ячеек под жетон модуля хранилища на планшете";
+            case "actions.build.branch_demolish_before_build" ->
+                "в ветке «построить» сначала снеси сколько угодно своих зданий её вида, потом поставь одно";
+            case "storage.gild_tokens" ->
+                "жетоны хранилища улучшаются позолотой, как модули";
+            case "storage.cell_star_when_empty" ->
+                "обычная сторона ячейки хранилища даёт звезду, если ячейка пуста";
 
             case "actions.assembly.ammo_base" ->
                 "сколько боеприпасов даёт здание за Снаряжение";
@@ -481,6 +507,8 @@ public final class RuleWords {
                 "уничтоженные жетоны возвращаются в запас";
             case "return_step.refill_objectives_to_limit" ->
                 "задания добираются до предела руки";
+            case "return_step.refill_objectives" ->
+                "шаг «Задания» в Возвращении: карты заданий добираются";
             case "return_step.trophy_to_upgrade_exchange_enabled" ->
                 "трофеи можно обменять на улучшение";
 
@@ -495,6 +523,8 @@ public final class RuleWords {
             case "super_objectives.mode" -> "режим супер-заданий";
             case "super_objectives.deal" -> "сколько карт раздаётся игроку";
             case "super_objectives.choose" -> "сколько из них он оставляет";
+            case "super_objectives.display" ->
+                "сколько супер-заданий лежит открытыми на столе (0 — раздача в руку)";
             case "super_objectives.require_symbols" ->
                 "для развёртывания нужен набор символов";
 

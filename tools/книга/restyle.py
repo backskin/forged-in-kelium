@@ -22,7 +22,7 @@ import os
 import re
 
 D = os.path.dirname(os.path.abspath(__file__))
-КНИГА = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*\вёрстка\Книга правил.html")[0]
+КНИГА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*", "вёрстка", "Книга правил.html"))[0]
 
 
 # ---------------------------------------------------------------- кайма
@@ -165,6 +165,17 @@ CSS = r"""
   .блок { background: rgba(247, 241, 225, .66); padding: 1.9mm 2.7mm 1.6mm;
     margin: 0 0 2.1mm; outline: .18mm solid var(--кант); outline-offset: -.18mm; }
   .блок > :last-child { margin-bottom: 0; }
+  /* РАЗДЕЛ-ПРИМЕР — тот же жёлтый, что у врезки «Пример»: заливка, кант,
+     заголовок ярлыком-плашкой (дизайнер 05.10.2026). */
+  .блок.пример-блок { background: var(--пример); box-shadow: inset 0 0 0 .3mm var(--пример-кант); }
+  .блок.пример-блок > h2:first-child, .блок.пример-блок > .половина > h2:first-child,
+  .карточки .блок.пример-блок > h2 { display: inline-block; font: 800 8.4pt/1 "Tektur", sans-serif; color: var(--страница);
+    text-transform: uppercase; letter-spacing: .06em; background: var(--пример-кант); border: 0;
+    padding: 1.2mm 3.2mm 1mm 2.6mm; margin: -1.9mm 0 1.6mm -2.7mm;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
+  .блок.пример-блок > h2::after { display: none; }
+  .блок.пример-блок h3 { color: var(--пример-кант); }
+
 
   /* ---- заголовок главы: плашка с номером, заголовок, линия с ромбом ---- */
   .глава {
@@ -326,7 +337,7 @@ CSS = r"""
   .ф-стрелка::before { content: ""; position: absolute; left: 0; width: 100%; top: 0; height: 16mm;
     background: var(--келемий); clip-path: polygon(0 0, 100% 50%, 0 100%); }
   .ф-стрелка::after { content: ""; position: absolute; left: .2mm; width: 2.6mm; top: 5.2mm; height: 5.6mm;
-    background: var(--охра); clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
+    background: #F3E7C9; clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
   .цикл-возврат { position: relative; height: 7mm; margin: 0 16.67%; border: .8mm solid var(--охра);
     border-top: 0; border-radius: 0 0 3mm 3mm; }
   .цикл-возврат::before { content: ""; position: absolute; left: -2.6mm; top: -2.4mm; width: 4.4mm; height: 3.6mm;
@@ -416,6 +427,12 @@ CSS = r"""
   .блок.легенда { column-count: 2; column-gap: 5mm; column-span: all; }
   /* БЛОК ПОПОЛАМ: во всю ширину полосы, слева рисунки, справа текст. */
   .блок.вовсю { column-span: all; }
+  /* ---- заглавная иконка главы (04.10.2026): слева от вступления, ростом с него ---- */
+  .с-заглавной { column-span: all; display: flex; align-items: stretch; gap: 4mm; margin: 0 0 3mm; }
+  .с-заглавной > .блок { flex: 1; margin: 0; }
+  .с-заглавной .заглавная { flex: none; display: flex; align-items: center; justify-content: center;
+    width: 26mm; }
+  .с-заглавной .заг-и { height: 100%; max-height: 26mm; width: auto; max-width: 26mm; object-fit: contain; }
   /* Блок на ступень крупнее: когда на полосе остаётся воздух, текст
      лучше дать больше, чем растягивать пустоту (15.09.2026). */
   .блок.крупно p, .блок.крупно li { font-size: 10.4pt; line-height: 1.32; }
@@ -424,6 +441,18 @@ CSS = r"""
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  .блок.надвое > .под-низ { grid-column: 1 / -1; }
+  /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
+     рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
+  .блок.пара { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    column-gap: 5mm; align-items: start; }
+  .блок.пара > h2 { grid-column: 1 / -1; }
+  .блок.пара .половина > h3 { margin-top: 0; }
+  .блок.пара .пара-ряд { display: grid; grid-template-columns: 46% 1fr; column-gap: 2.6mm;
+    align-items: start; }
+  .блок.пара .пара-ряд .рисунок-в-колонке { padding: 0 !important; margin: 0; }
+  .блок.пара .пара-ряд .рис { width: 100% !important; }
+  .блок.пара .пара-ряд p { margin-top: 0; }
   .блок.надвое .половина > *:first-child { margin-top: 0; }
   .блок.надвое .половина > ul, .блок.надвое .половина > ol { margin-top: 0; }
   .блок.легенда h3 { column-span: all; }
@@ -457,6 +486,10 @@ CSS = r"""
     gap: 5mm; margin: 0 0 3mm; }
   .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
   .карт-рис img.значок { max-height: 68%; }
+  /* карты — со скруглёнными углами и тёмным кантом, как на столе (05.10.2026) */
+  .карт-рис img.карта { border-radius: 2.4mm; box-shadow: 0 0 0 .35mm #3C3020, 0 .6mm 1.4mm rgba(0,0,0,.28); }
+  /* одна картинка (лицо карты, широкий жетон) — во всю ширину карточки */
+  .карт-рис img:only-child { max-width: 100%; }
 
   /* ---- состав игры: сетка компонентов (27.09.2026) ---- */
   .комп-сетка { display: grid; gap: 3mm 3.5mm; margin: 1mm 0 3mm; }

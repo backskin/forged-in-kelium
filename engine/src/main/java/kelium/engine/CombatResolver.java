@@ -208,6 +208,43 @@ public final class CombatResolver {
     }
 
     /**
+     * УРОН АТАКИ БОЛЬШЕ ОДНОГО — И ЕГО МОЖНО РАЗДЕЛИТЬ (решение дизайнера
+     * 01.10.2026, свод 1.48.0). Две атаки бьют на 2 урона за 1 боеприпас:
+     * <ul>
+     *   <li>золотая сторона модуля боя ({@code modules.red_gold_damage}) — по
+     *       жетонам двух типов, изображённых на модуле;</li>
+     *   <li>супер-войско ({@code combat_model.super_unit_damage}) — по любым
+     *       жетонам.</li>
+     * </ul>
+     * Урон кладут на один жетон или делят между жетонами на гексе-цели, если
+     * эта атака может бить каждый из них. Прежде золотой модуль клал ровно
+     * по 1 урону жетону каждого из двух типов; это решение его заменяет.
+     *
+     * @return типы целей, между жетонами которых делится урон, или
+     *     {@code null}, если атака наносит 1 урон
+     */
+    private List<Target> делимыеЦели(int seat, UnitToken unit, AttackRow ar) {
+        if (уронАтаки(ar) <= 1) {
+            return null;
+        }
+        if (ar.row().startsWith("super")) {
+            return List.of(Target.INFANTRY, Target.VEHICLE, Target.AIRCRAFT, Target.BUILDINGS_TOWERS);
+        }
+        return ar.target2() == null ? List.of(ar.target()) : List.of(ar.target(), ar.target2());
+    }
+
+    /** Сколько урона наносит атака этой строки (см. {@link #делимыеЦели}). */
+    private int уронАтаки(AttackRow ar) {
+        if (ar.row().startsWith("super")) {
+            return rs.getInt("combat_model.super_unit_damage", 1);
+        }
+        if (ar.target2() != null) {
+            return rs.getInt("modules.red_gold_damage", 1);
+        }
+        return 1;
+    }
+
+    /**
      * Строки (row, стоимость, цель) для юнита из таблицы его планшета. Красный
      * модуль заменяет цель ВТР-строки выбором из двух; позолота — обе цели.
      */
@@ -299,6 +336,11 @@ public final class CombatResolver {
             int modCost = mod.get("ammo") instanceof Number n ? n.intValue() : secCost;
             if (t1 == null) {
                 rows.add(new AttackRow("secondary", modCost, t0));
+            } else if (Boolean.TRUE.equals(mod.get("gold"))
+                    && rs.getBool("modules.red_gold_universal", false)) {
+                for (Target t : Target.values()) {       // вариант для сравнения, см. ниже
+                    rows.add(new AttackRow("secondary", modCost, t));
+                }
             } else if (Boolean.TRUE.equals(mod.get("gold"))) {
                 // ЗОЛОТО: одна атака, одна плата, по 1 урону жетону каждого типа.
                 rows.add(new AttackRow("secondary", modCost, t0, t1));
@@ -452,6 +494,13 @@ public final class CombatResolver {
             int modCost = mod.get("ammo") instanceof Number n ? n.intValue() : specCost;
             if (t1 == null) {
                 rows.add(new AttackRow("specialized", modCost, t0));
+            } else if (Boolean.TRUE.equals(mod.get("gold"))
+                    && rs.getBool("modules.red_gold_universal", false)) {
+                // ВАРИАНТ ДЛЯ СРАВНЕНИЯ (01.10.2026): золото — универсальная
+                // атака за 1 боеприпас; одна строка, цель из четырёх любая.
+                for (Target t : Target.values()) {
+                    rows.add(new AttackRow("specialized", modCost, t));
+                }
             } else if (Boolean.TRUE.equals(mod.get("gold"))) {
                 // ЗОЛОТО (печать жетона: один кубик боеприпаса, две стрелки к
                 // двум целям): ОДНА атака за 1 боеприпас наносит по 1 урону
@@ -872,6 +921,7 @@ public final class CombatResolver {
             ? aliveUnitsOnField(attackerSeat) : unitsOf(attackerSeat, source);
         Set<String> usedRows = new HashSet<>();   // "uid:row"
         boolean[] firstAttackUsed = {false};
+        Set<String> предложеноДелимых = new HashSet<>();   // "uid:row@гекс", пересобирается на каждый выстрел
         int killsThisBattle = 0;
         boolean neutralRazedThisBattle = false;
         boolean enemyDamagedThisBattle = false;
@@ -880,6 +930,7 @@ public final class CombatResolver {
 
         while (true) {
             List<Choice> options = new ArrayList<>();
+            предложеноДелимых.clear();
             for (UnitToken u : attackers) {
                 // ЖЕТОН МОГ ПОГИБНУТЬ ПРЯМО В ЭТОМ ЖЕ ДЕЙСТВИИ. Список
                 // стреляющих собран ДО первого выстрела, а между выстрелами
@@ -932,8 +983,32 @@ public final class CombatResolver {
                         Token victim2 = ar.target2() == null ? null
                             : pickVictimCategory(цель, attackerSeat, ar.target2(),
                                 restrictTargetOwner, closed, u);
+                        // ДЕЛИМЫЙ УРОН: супер-войско перебирает четыре строки
+                        // с одним ключом — атака одна, и вариант нужен один.
+                        List<Target> делимые = делимыеЦели(attackerSeat, u, ar);
+                        if (делимые != null) {
+                            for (Target dt : делимые) {
+                                if (victim != null || victim2 != null) {
+                                    break;
+                                }
+                                victim = pickVictimCategory(цель, attackerSeat, dt,
+                                    restrictTargetOwner, closed, u);
+                            }
+                            if ((victim != null || victim2 != null)
+                                    && !предложеноДелимых.add(u.uid + ":" + ar.row() + "@" + цель)) {
+                                continue;
+                            }
+                        }
                         if (victim != null || victim2 != null) {
                             Map<String, Object> pl = new HashMap<>();
+                            if (делимые != null) {
+                                List<String> коды = new ArrayList<>();
+                                for (Target dt : делимые) {
+                                    коды.add(dt.code);
+                                }
+                                pl.put("split", коды);
+                                pl.put("damage", уронАтаки(ar));
+                            }
                             pl.put("uid", u.uid);
                             pl.put("row", ar.row());
                             pl.put("ammo", cost);
@@ -1022,6 +1097,19 @@ public final class CombatResolver {
             Target tcat = Target.fromCode((String) pl.get("tcat"));
             String target = (String) pl.get("target");
             String key = uid + ":" + row;
+            // КТО БЬЁТ — для окон реакций: интерфейс показывает игроку, чем и
+            // откуда его атакуют (дизайнер 28.09: «нигде не было слова о том,
+            // что на меня кто-то нападает»).
+            текущийУдар = new HashMap<>();
+            for (UnitToken u : s.player(attackerSeat).units) {
+                if (u.uid == uid) {
+                    текущийУдар.put("attacker_type", u.type.code);
+                    if (u.hexId != null) {
+                        текущийУдар.put("attacker_hex", u.hexId);
+                    }
+                }
+            }
+            текущийУдар.put("target_hex", target);
             // ОТХОД — окно на КАЖДЫЙ гекс по одному разу, перед первой атакой по
             // нему. «Уже разыгранные атаки остаются» (текст карты), поэтому окно
             // не открывается заново после каждого выстрела: ушедший жетон уходит
@@ -1052,6 +1140,12 @@ public final class CombatResolver {
             // СТРЕЛОК МОГ ПОГИБНУТЬ В ОКНЕ ПЕРЕД АТАКОЙ: контратака бьёт раньше,
             // чем выстрел состоится, и выбранного жетона может уже не быть.
             if (unit == null || !unit.alive() || unit.hexId == null) {
+                usedRows.add(key);
+                continue;
+            }
+            // ОКНО ПЕРЕД АТАКОЙ МОГЛО ОТНЯТЬ БОЕПРИПАСЫ (реакции на отход и
+            // контратаку): платить больше нечем — выстрел не состоялся.
+            if (!можетОплатитьАтаку(p, ammo)) {
                 usedRows.add(key);
                 continue;
             }
@@ -1102,21 +1196,44 @@ public final class CombatResolver {
                 continue;
             }
 
-            // ЗОЛОТОЙ КРАСНЫЙ МОДУЛЬ бьёт по одному жетону КАЖДОГО из двух типов
-            // за одну плату: категорий в атаке одна или две, плата берётся один
-            // раз — при первом найденном жетоне.
-            List<Target> категории = new ArrayList<>();
-            категории.add(tcat);
-            if (pl.get("tcat2") instanceof String tc2) {
-                категории.add(Target.fromCode(tc2));
+            // УДАРЫ ОДНОЙ АТАКИ — по 1 урону каждый, плата одна (берётся при
+            // первом найденном жетоне).
+            //   прежнее золото красного: по удару на каждый из двух типов;
+            //   делимый урон (свод 1.48.0): столько ударов, сколько урона, и
+            //   каждый ложится на любой жетон, который эта атака может бить, —
+            //   хоть все на один, хоть по одному на разные.
+            List<List<Target>> удары = new ArrayList<>();
+            if (pl.get("split") instanceof List<?> коды) {
+                List<Target> цели = new ArrayList<>();
+                for (Object к : коды) {
+                    цели.add(Target.fromCode(String.valueOf(к)));
+                }
+                int урон = ((Number) pl.getOrDefault("damage", 1)).intValue();
+                for (int i = 0; i < урон; i++) {
+                    удары.add(цели);
+                }
+            } else {
+                удары.add(List.of(tcat));
+                if (pl.get("tcat2") instanceof String tc2) {
+                    удары.add(List.of(Target.fromCode(tc2)));
+                }
             }
             boolean оплачено = false;
             usedRows.add(key);
-            for (Target кат : категории) {
-            // K4: жертву внутри категории выбирает ИГРОК (поимённо): важно для
-            // добивания раненых и выбора, ЧЕЙ жетон бить (кто получит ответку).
-            List<Token> victims = victimCandidates(target, attackerSeat, кат,
-                restrictTargetOwner, closed, unit);
+            int номерУдара = 0;
+            for (List<Target> кат : удары) {
+            номерУдара++;
+            // K4: жертву выбирает ИГРОК (поимённо): важно для добивания раненых
+            // и выбора, ЧЕЙ жетон бить (кто получит ответку).
+            List<Token> victims = new ArrayList<>();
+            for (Target т : кат) {
+                for (Token кандидат : victimCandidates(target, attackerSeat, т,
+                        restrictTargetOwner, closed, unit)) {
+                    if (!victims.contains(кандидат)) {
+                        victims.add(кандидат);
+                    }
+                }
+            }
             Token victim;
             if (victims.isEmpty()) {
                 victim = null;
@@ -1129,8 +1246,15 @@ public final class CombatResolver {
                         victimLabel(t) + " игрока " + t.owner()
                         + " (урон " + damageOf(t) + "/" + Passives.effectiveHp(s, t) + ")"));
                 }
-                Choice vpick = agent.choose(s, vopts,
-                    Map.of("kind", "combat_victim", "target", target));
+                // при делимом уроне окно пишет, какой это кубик урона из скольких
+                Map<String, Object> вопрос = new HashMap<>();
+                вопрос.put("kind", "combat_victim");
+                вопрос.put("target", target);
+                if (pl.get("split") != null) {
+                    вопрос.put("blow", номерУдара);
+                    вопрос.put("blows", удары.size());
+                }
+                Choice vpick = agent.choose(s, vopts, вопрос);
                 victim = (Token) vpick.payload();
             }
             if (victim == null) {
@@ -1165,7 +1289,7 @@ public final class CombatResolver {
                     continue;
                 }
             }
-            int dmg = rs.getInt("combat_model.all_attacks_damage");
+            int dmg = pl.get("split") != null ? 1 : rs.getInt("combat_model.all_attacks_damage");
             if (victim instanceof UnitToken vt) {
                 vt.damage += dmg;
             } else {
@@ -1248,7 +1372,7 @@ public final class CombatResolver {
                     Passives.effectiveHp(s, victim),
                     s.player(owner).unitsOnField().size(), p.unitsOnField().size(),
                     s.player(owner).resources.kelium(), p.resources.kelium(),
-                    уСтартового));
+                    уСтартового, unit.type.code, row, unit.hexId, target));
             }
             // ТРОФЕИ убитого — в событие: без этого поля трофейную
             // экономику нечем мерить, а она половина смысла боя. Ценность
@@ -1264,7 +1388,8 @@ public final class CombatResolver {
                 "attacker", unit.type.code + "." + row, "victim_owner", owner,
                 "victim", victimLabel(victim), "destroyed", destroyed, "ammo", ammo,
                 "trophy", destroyed ? victim.trophyValue() : 0,
-                "base_ammo", pl.getOrDefault("base_ammo", ammo));
+                "base_ammo", pl.getOrDefault("base_ammo", ammo),
+                "gold", pl.get("tcat2") != null || pl.get("split") != null);
             if (destroyed) {
                 killsThisBattle++;
                 // ЭВАКУАЦИЯ ТРОФЕЕВ спрашивается ПЕРЕД уничтожением: после него
@@ -2068,6 +2193,35 @@ public final class CombatResolver {
      * жетону-убийце и ТОЛЬКО один; если хрип добивает убийцу, второго хрипа не
      * будет — отвечать некому, а окно внутри окна {@link Реакции} не открывает.
      */
+    /** Подробности текущего удара для окон реакций (кто и откуда бьёт). */
+    private Map<String, Object> текущийУдар = new HashMap<>();
+
+    /**
+     * ОКНО РЕАКЦИИ С ПОДРОБНОСТЯМИ: кто атакует, чем, откуда и по какому жетону.
+     * Всё, что знает бой в этот миг, уходит в точку решения — интерфейс
+     * подсвечивает оба жетона и пишет это словами.
+     */
+    private Map<String, Object> окно(int attackerSeat, Token жертва, Map<String, Object> ещё) {
+        Map<String, Object> m = new HashMap<>(текущийУдар);
+        m.put("attacker", attackerSeat);
+        if (жертва != null) {
+            m.put("victim_type", жертва instanceof BuildingToken b ? b.type.code
+                : ((UnitToken) жертва).type.code);
+            m.put("victim_building", жертва instanceof BuildingToken);
+            if (жертва instanceof BuildingToken b && b.level != null) {
+                m.put("victim_level", b.level);
+            }
+            String гекс = жертва instanceof BuildingToken b ? b.hexId : ((UnitToken) жертва).hexId;
+            if (гекс != null) {
+                m.put("victim_hex", гекс);
+            }
+        }
+        if (ещё != null) {
+            m.putAll(ещё);
+        }
+        return m;
+    }
+
     private void хрип(Token убитый, UnitToken убийца, int attackerSeat) {
         if (убийца == null || !убийца.alive() || убийца.hexId == null) {
             return;                       // бить некого: убийцы на поле уже нет
@@ -2077,7 +2231,8 @@ public final class CombatResolver {
         int хозяин = убитый.owner();
         String карта = Реакции.предложить(state, хозяин, вид, agentFor(хозяин),
             "нанести 1 урон жетону, который тебя уничтожил",
-            Map.of("attacker", attackerSeat, "killer_hex", убийца.hexId),
+            окно(attackerSeat, убитый, Map.of("killer_hex", убийца.hexId,
+                "attacker_type", убийца.type.code, "attacker_hex", убийца.hexId)),
             emit);
         if (карта == null) {
             return;
@@ -2103,7 +2258,7 @@ public final class CombatResolver {
         int хозяин = жертва.owner();
         String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЭВАКУАЦИЯ_ТРОФЕЕВ,
             agentFor(хозяин), "увести свой уничтоженный жетон в запас, а не отдать врагу",
-            Map.of("attacker", attackerSeat), emit);
+            окно(attackerSeat, жертва, null), emit);
         if (карта == null) {
             return false;
         }
@@ -2143,7 +2298,7 @@ public final class CombatResolver {
         }
         String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЭВАКУАЦИЯ,
             agentFor(хозяин), "атакуют твой жетон — вернуть его в свой запас",
-            Map.of("attacker", attackerSeat), emit);
+            окно(attackerSeat, жертва, null), emit);
         if (карта == null) {
             return false;
         }
@@ -2173,7 +2328,7 @@ public final class CombatResolver {
         }
         String карта = Реакции.предложить(state, хозяин, Реакции.Вид.ЗАКРОМА,
             agentFor(хозяин), "атакуют твой жетон — получить 2 боеприпаса",
-            Map.of("attacker", attackerSeat), emit);
+            окно(attackerSeat, жертва, null), emit);
         if (карта == null) {
             return;
         }
@@ -2206,7 +2361,7 @@ public final class CombatResolver {
             }
             String карта = Реакции.предложить(state, pl.seat, Реакции.Вид.КОНТРАТАКА,
                 agentFor(pl.seat), "атакуют гекс с твоими жетонами — войска оттуда бьют первыми",
-                Map.of("attacker", attackerSeat, "hex", hexId), emit);
+                окно(attackerSeat, null, Map.of("hex", hexId)), emit);
             if (карта == null) {
                 continue;
             }
@@ -2244,7 +2399,7 @@ public final class CombatResolver {
         }
         String карта = Реакции.предложить(state, хозяин, Реакции.Вид.РИКОШЕТ,
             agentFor(хозяин), "перевести атаку на другой жетон в этом же гексе",
-            Map.of("attacker", attackerSeat, "hex", hexId), emit);
+            окно(attackerSeat, жертва, Map.of("hex", hexId)), emit);
         if (карта == null) {
             return жертва;
         }
@@ -2318,7 +2473,7 @@ public final class CombatResolver {
             }
             String карта = Реакции.предложить(state, pl.seat, Реакции.Вид.ОТХОД,
                 agentFor(pl.seat), "увести один жетон из атакуемого гекса",
-                Map.of("attacker", attackerSeat, "hex", hexId), emit);
+                окно(attackerSeat, null, Map.of("hex", hexId)), emit);
             if (карта == null) {
                 continue;
             }

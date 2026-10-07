@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 D = os.path.dirname(os.path.abspath(__file__))
-DIR = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*")[0]
+DIR = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*"))[0]
 first = int(sys.argv[1])
 names = sys.argv[2:]
 

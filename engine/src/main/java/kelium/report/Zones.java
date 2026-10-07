@@ -110,11 +110,15 @@ public final class Zones {
      * Разметка для ключа текстуры (без расширения). Ищется файл
      * {@code <ключ>.zones.png} рядом с самой текстурой; нет файла — пустая разметка.
      */
-    public static synchronized Zones of(String key, Path root) {
-        Zones got = CACHE.get(key);
-        if (got != null) {
-            return got;
+    public static Zones of(String key, Path root) {
+        synchronized (Zones.class) {
+            Zones got = CACHE.get(key);
+            if (got != null) {
+                return got;
+            }
         }
+        // РАЗБОР МАСКИ — ВНЕ ЗАМКА (28.09.2026): разогрев при старте партии
+        // идёт отдельным потоком, окно не ждёт его ради готовой разметки
         Zones z = EMPTY;
         if (root != null) {
             Path file = key.contains("/")
@@ -134,8 +138,10 @@ public final class Zones {
                 }
             }
         }
-        CACHE.put(key, z);
-        return z;
+        synchronized (Zones.class) {
+            Zones got = CACHE.putIfAbsent(key, z);
+            return got != null ? got : z;
+        }
     }
 
     /** Забыть разобранное — нужно при смене папки текстур. */

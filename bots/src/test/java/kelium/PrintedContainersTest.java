@@ -283,10 +283,20 @@ class PrintedContainersTest {
         // ПРАВИЛО ДИЗАЙНЕРА 13.09.2026: «карты контейнера на старте нет».
         // Прежняя раздача (по одной каждому) была тестовой и расходилась с
         // книгой правил — ключ setup.start_containers теперь ноль.
+        // Контейнеры с верха начального арсенала (его открывают на подготовке,
+        // решение 30.09.2026) — не раздача, а напечатанный набор карты.
         for (long seed : new long[]{25L, 26L, 27L}) {
             GameState s = game(seed);
             for (int seat = 0; seat < 4; seat++) {
-                assertEquals(0, s.player(seat).containers,
+                int сВерха = 0;
+                for (String cid : s.player(seat).arsenalInstalled) {
+                    var top = GameEngine.стартовыйНабор(s, cid);
+                    if (top != null && top.get("params") instanceof java.util.Map<?, ?> m
+                            && m.get("containers") instanceof Number n) {
+                        сВерха += n.intValue();
+                    }
+                }
+                assertEquals(сВерха, s.player(seat).containers,
                     "сид " + seed + ", место " + (seat + 1)
                         + ": на подготовке карт контейнера не выдают");
             }

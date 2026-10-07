@@ -68,7 +68,17 @@ public final class TurnContext implements kelium.core.TurnUndo {
             throw new IllegalStateException("превышен лимит SPEC-действий");
         }
         specUsed++;
+        if (факты != null) {
+            факты.спецИспользовано++;
+        }
     }
+
+    /**
+     * ФАКТЫ ХОДА В ЖУРНАЛЕ — туда же пишется число потраченных спец-действий,
+     * чтобы требование «в этот ход используй третье спец-действие» видело его
+     * (Карты 2.0). Ставит движок при начале хода; {@code null} — вне хода.
+     */
+    public kelium.core.TurnJournal.TurnFacts факты = null;
 
     /**
      * Наценка за СЛЕДУЮЩУЮ операцию {@code action} по расписанию вида [0,1,2,3];
@@ -99,8 +109,20 @@ public final class TurnContext implements kelium.core.TurnUndo {
 
     /** Названия действий, которые в этом ходу ещё не сыграны. */
     public Set<String> remainingActionNames() {
-        Set<String> out = new LinkedHashSet<>(orderActions);
-        out.removeAll(actionsPlayed);
+        // Развилка (приказы 5.0.0) открывает обе свои ветки — это имена прежних
+        // действий, по которым планируют задания.
+        Set<String> out = new LinkedHashSet<>();
+        for (String a : orderActions) {
+            if (actionsPlayed.contains(a)) {
+                continue;
+            }
+            List<String> ветки = Actions.FORKS.get(a);
+            if (ветки == null) {
+                out.add(a);
+            } else {
+                out.addAll(ветки);
+            }
+        }
         return out;
     }
 
@@ -273,6 +295,13 @@ public final class TurnContext implements kelium.core.TurnUndo {
      * надбавку за вторую операцию. −1 значит «цена обычная».
      */
     public int buildFixedPrice = -1;
+
+    /**
+     * ВЕТКА «ПОСТРОИТЬ» ДЕЙСТВИЯ-РАЗВИЛКИ (приказы 5.0.0): какие здания эта
+     * Стройка ставит и сносит — miner | plant | military (военные и ЦУ).
+     * {@code null} — обычная Стройка, все типы.
+     */
+    public String buildBranch = null;
 
     // ==================== памятка хода для отката ====================
 

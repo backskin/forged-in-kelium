@@ -33,6 +33,29 @@ public final class CardRegistry {
         List<Card> cards();
     }
 
+    /**
+     * КАРТА ИЗ ДАННЫХ (Карты 2.0, 30.09.2026): карта, чьё требование записано
+     * языком карт, а не классом. Фабрика смотрит на запись и, если узнаёт её
+     * язык, строит карту; иначе отвечает {@code null}. Так новые карты
+     * собираются программой без строчки кода под каждую.
+     */
+    public interface DataCardFactory {
+        /** Карта по записи набора {@code family} или {@code null}. */
+        Card изДанных(String family, Map<String, Object> entry);
+    }
+
+    private static final List<DataCardFactory> ФАБРИКИ = new ArrayList<>();
+
+    private static Card изДанных(String family, Map<String, Object> entry) {
+        for (DataCardFactory ф : ФАБРИКИ) {
+            Card c = ф.изДанных(family, entry);
+            if (c != null) {
+                return c;
+            }
+        }
+        return null;
+    }
+
     private static final Map<String, Card> BY_ID = new LinkedHashMap<>();
     private static final List<String> MISSING = new ArrayList<>();
     private static boolean loaded;
@@ -58,6 +81,9 @@ public final class CardRegistry {
             return;
         }
         loaded = true;
+        for (DataCardFactory ф : ServiceLoader.load(DataCardFactory.class)) {
+            ФАБРИКИ.add(ф);
+        }
         for (CardPack pack : ServiceLoader.load(CardPack.class)) {
             for (Card c : pack.cards()) {
                 Card prev = BY_ID.put(c.id(), c);
@@ -121,6 +147,12 @@ public final class CardRegistry {
             String id = String.valueOf(entry.get("id"));
             Card c = BY_ID.get(id);
             if (c == null) {
+                c = изДанных(family, entry);
+                if (c != null) {
+                    BY_ID.put(id, c);
+                }
+            }
+            if (c == null) {
                 String key = family + "/" + id + " ("
                     + entry.getOrDefault("name", "без имени") + ")";
                 if (!MISSING.contains(key)) {
@@ -162,6 +194,7 @@ public final class CardRegistry {
     public static synchronized void reset() {
         BY_ID.clear();
         MISSING.clear();
+        ФАБРИКИ.clear();
         loaded = false;
     }
 }

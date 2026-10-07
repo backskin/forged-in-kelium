@@ -70,7 +70,8 @@ public final class ЗаданияПоКартам {
         int games = args.length > 0 ? Integer.parseInt(args[0]) : 200;
         int players = args.length > 1 ? Integer.parseInt(args[1]) : 4;
         String ruleset = args.length > 2 ? args[2] : GameConfig.DEFAULT_RULESET;
-        List<String> пул = List.of("builder:3", "supplier:3", "stalker:3", "punisher:3");
+        List<String> пул = List.of(System.getProperty("kelium.стенд.боты",
+            "builder:3,supplier:3,stalker:3,punisher:3").split(","));
 
         Map<String, Карта> карты = new TreeMap<>();
         for (int g = 0; g < games; g++) {
@@ -165,6 +166,11 @@ public final class ЗаданияПоКартам {
         });
 
         long ниразу = список.stream().filter(e -> e.getValue().выполнена == 0).count();
+        long всегоВып = список.stream().mapToLong(e -> e.getValue().выполнена).sum();
+        long всегоСож = список.stream().mapToLong(e -> e.getValue().сожжена).sum();
+        b.append(String.format(Locale.ROOT,
+            "**Выполнено против сожжённого: %d / %d — доля выполнения %.0f%%** (ориентир дизайнера 50%%)\n\n",
+            всегоВып, всегоСож, 100.0 * всегоВып / Math.max(1, всегоВып + всегоСож)));
         b.append("**Ни разу не выполнено: ").append(ниразу).append(" карт из ")
             .append(карты.size()).append("**\n\n");
 
@@ -207,10 +213,14 @@ public final class ЗаданияПоКартам {
             }
         }
 
-        Path out = Path.of("reports", "balance", "задания-по-картам-" + players + "p.md");
+        String набор = System.getProperty("kelium.rules", "").contains("content_versions.objectives=")
+            ? System.getProperty("kelium.rules").replaceAll(".*content_versions.objectives=([^,]+).*", "$1") : "свод";
+        Path out = Path.of("reports", "balance", "задания-по-картам-" + набор + "-" + players + "p.md");
         Files.createDirectories(out.getParent());
         Files.writeString(out, b.toString(), StandardCharsets.UTF_8);
         System.out.println("ни разу не выполнено: " + ниразу + " из " + карты.size());
+        System.out.printf(Locale.ROOT, "выполнено %d, сожжено %d, доля %.0f%%%n", всегоВып, всегоСож,
+            100.0 * всегоВып / Math.max(1, всегоВып + всегоСож));
         System.out.println("отчёт: " + out.toAbsolutePath());
     }
 

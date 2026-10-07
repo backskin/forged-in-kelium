@@ -33,6 +33,37 @@ final class РедкиеРешения {
         Map<String, Object> ctx = new HashMap<>();
         ctx.put("kind", kind);
         switch (kind) {
+            case "reaction" -> {
+                // Реакции.предложить + CombatResolver.окно: чужое войско бьёт по
+                // своему жетону, в руке карта с верхом-реакцией (любая — для вида)
+                UnitToken стрелок = null;
+                for (PlayerState o : s.players) {
+                    for (UnitToken u : o.units) {
+                        if (o.seat != seat && u.hexId != null && стрелок == null) {
+                            стрелок = u;
+                        }
+                    }
+                }
+                BuildingToken жертва = me.buildingsOnField().isEmpty() ? null
+                    : me.buildingsOnField().get(0);
+                String карта = me.objectiveHand.isEmpty() ? null : me.objectiveHand.get(0);
+                if (стрелок == null || жертва == null || карта == null) {
+                    return null;
+                }
+                opts.add(new Choice("reaction_burn", карта, "сжечь «" + карта
+                    + "»: атакуют твой жетон — получить 2 боеприпаса"));
+                opts.add(new Choice("pass", null, "не отвечать"));
+                ctx.put("reaction", "ammo_on_attack");
+                ctx.put("attacker", стрелок.owner);
+                ctx.put("attacker_type", стрелок.type.code);
+                ctx.put("attacker_hex", стрелок.hexId);
+                ctx.put("victim_type", жертва.type.code);
+                ctx.put("victim_building", true);
+                if (жертва.level != null) {
+                    ctx.put("victim_level", жертва.level);
+                }
+                ctx.put("victim_hex", жертва.hexId);
+            }
             case "combat_victim" -> {
                 // CombatResolver: «<жертва> игрока N (урон d/hp)»
                 String hex = null;
@@ -104,6 +135,30 @@ final class РедкиеРешения {
             case "energy_or_modules" -> {
                 opts.add(new Choice("energy_or_modules", "energy_swap", "Смена энергии"));
                 opts.add(new Choice("energy_or_modules", "modules", "Смена модулей на планшете"));
+            }
+            case "sci_track" -> {
+                // Actions (наука): «<трек> -> шаг N (цена K)» по трём трекам
+                for (String track : List.of("left", "middle", "right")) {
+                    opts.add(new Choice("sci_track", new Object[]{track, 1},
+                        track + " -> шаг 1 (цена 2)"));
+                }
+                opts.add(new Choice("pass", null, "stop science"));
+            }
+            case "sci_exchange" -> {
+                // Actions.maybeExchange: печатные обмены планшета науки
+                Map<String, Object> карта = new HashMap<>();
+                карта.put("id", "draw_arsenal");
+                карта.put("give", 1);
+                opts.add(new Choice("sci_exchange", карта, "1 trophy -> draw 2 arsenal, keep 1"));
+                Map<String, Object> позолота = new HashMap<>();
+                позолота.put("id", "gild");
+                позолота.put("give", 2);
+                opts.add(new Choice("sci_exchange", позолота, "2 trophy -> gild a module"));
+                Map<String, Object> модуль = new HashMap<>();
+                модуль.put("id", "move_module");
+                модуль.put("give", 1);
+                opts.add(new Choice("sci_exchange", модуль, "1 trophy -> move a module"));
+                opts.add(new Choice("pass", null, "без обмена"));
             }
             case "exchange_where" -> {
                 opts.add(new Choice("exchange_where", "science", "обмен в Науке (без шага трека)"));

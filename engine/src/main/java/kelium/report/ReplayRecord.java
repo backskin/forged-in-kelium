@@ -474,6 +474,7 @@ public final class ReplayRecord {
          * Первая в списке лежит слева.
          */
         public final List<String> arsenalDisplay = new ArrayList<>();
+        public final List<String> superDisplay = new ArrayList<>();
     }
 
     /**
@@ -625,6 +626,13 @@ public final class ReplayRecord {
         public Snapshot snapshot;
         /** Шаг относится к бою (для перехода «к следующему бою»). */
         public boolean combat;
+        /**
+         * Ветка ничего не сделала — по суду движка ({@code Срабатывания.сделала}),
+         * а не по плашкам окна: кубик энергии мог переехать на промежуточном шаге
+         * действия, и сравнение соседних кадров его не видело (01.10.2026).
+         * {@code null} — шаг не ветка или запись старая.
+         */
+        public Boolean впустую;
         /** Решения игроков, принятые перед этим шагом (в порядке принятия). */
         public final List<Decision> decisions = new ArrayList<>();
     }
@@ -805,6 +813,7 @@ public final class ReplayRecord {
             }
         }
         snap.arsenalDisplay.addAll(s.arsenalDisplay);
+        snap.superDisplay.addAll(s.superDisplay);
         return snap;
     }
 
@@ -1228,6 +1237,7 @@ public final class ReplayRecord {
         }
         o.put("decks", dk);
         o.put("arsDisplay", new ArrayList<>(s.arsenalDisplay));
+        o.put("superDisplay", new ArrayList<>(s.superDisplay));
         List<Object> hx = new ArrayList<>();
         for (HexState h : s.hexes) {
             Map<String, Object> ho = new LinkedHashMap<>();
@@ -1595,6 +1605,9 @@ public final class ReplayRecord {
         }
         for (Object x : Json.list(o, "arsDisplay")) {
             s.arsenalDisplay.add(String.valueOf(x));
+        }
+        for (Object x : Json.list(o, "superDisplay")) {
+            s.superDisplay.add(String.valueOf(x));
         }
         for (Object ho : Json.list(o, "hexes")) {
             Map<String, Object> h = (Map<String, Object>) ho;

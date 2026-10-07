@@ -178,4 +178,113 @@ public final class Figures {
         return (name != null ? name : "фигура из " + n + " гексов")
             + " (" + what + ", можно поворачивать, отражать нельзя)";
     }
+
+    // ==================================================================
+    //  УЗОР ИЗ СЕКТОРОВ (дизайнер 03.10.2026)
+    // ==================================================================
+
+    /**
+     * Сколько секторов узора занято жетонами игрока при лучшем положении; −1 —
+     * узор не ложится на поле ни при одной опоре и повороте.
+     *
+     * <p>Запись узора — как у узла языка карт «узор»: {@code клетки: [{путь:
+     * [стороны…], секторы: [0..5]}]}. Поворот на 60° — прибавка к номерам и
+     * сторон пути, и секторов; отражения нет. Своя авиация в центре гекса —
+     * джокер: закрывает один любой недостающий сектор своего гекса.
+     */
+    public static int sectorsBest(GameState s, int seat, Map<?, ?> узор) {
+        List<int[]> пути = new ArrayList<>();
+        List<int[]> секторы = new ArrayList<>();
+        if (узор.get("клетки") instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Map<?, ?> к) {
+                    пути.add(ints(к.get("путь")));
+                    секторы.add(ints(к.get("секторы")));
+                }
+            }
+        }
+        if (пути.isEmpty()) {
+            return -1;
+        }
+        Set<Integer> мои = new java.util.HashSet<>();
+        PlayerState p = s.player(seat);
+        for (BuildingToken b : p.buildingsOnField()) {
+            мои.add(b.uid);
+        }
+        Set<String> авиация = new java.util.HashSet<>();
+        for (UnitToken u : p.unitsOnField()) {
+            мои.add(u.uid);
+            if (u.type == kelium.core.UnitType.AIRCRAFT && u.hexId != null) {
+                авиация.add(u.hexId);
+            }
+        }
+        int best = -1;
+        for (String опора : s.field.hexes.keySet()) {
+            for (int поворот = 0; поворот < 6; поворот++) {
+                int n = sectorsAt(s, опора, поворот, пути, секторы, мои, авиация);
+                best = Math.max(best, n);
+            }
+        }
+        return best;
+    }
+
+    /** Всего секторов в узоре. */
+    public static int sectorsTotal(Map<?, ?> узор) {
+        int n = 0;
+        if (узор.get("клетки") instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Map<?, ?> к) {
+                    n += ints(к.get("секторы")).length;
+                }
+            }
+        }
+        return n;
+    }
+
+    /** Узор выложен целиком. */
+    public static boolean sectorsSatisfied(GameState s, int seat, Map<?, ?> узор) {
+        int total = sectorsTotal(узор);
+        return total > 0 && sectorsBest(s, seat, узор) >= total;
+    }
+
+    private static int sectorsAt(GameState s, String опора, int поворот, List<int[]> пути,
+                                 List<int[]> секторы, Set<Integer> мои, Set<String> авиация) {
+        int n = 0;
+        for (int i = 0; i < пути.size(); i++) {
+            String cur = опора;
+            for (int side : пути.get(i)) {
+                Hex h = s.field.get(cur);
+                cur = h == null ? null : h.neighborBySide[Math.floorMod(side + поворот, 6)];
+                if (cur == null) {
+                    return -1;      // узор свисает за край поля
+                }
+            }
+            Hex h = s.field.get(cur);
+            int занято = 0;
+            for (int сектор : секторы.get(i)) {
+                Integer uid = h.sideOwner[Math.floorMod(сектор + поворот, 6)];
+                if (uid != null && мои.contains(uid)) {
+                    занято++;
+                }
+            }
+            // АВИАЦИЯ — ДЖОКЕР (дизайнер 03.10.2026): своя авиация в центре гекса
+            // закрывает собой один любой недостающий сектор этого гекса, не больше одного
+            if (занято < секторы.get(i).length && авиация.contains(h.id)) {
+                занято++;
+            }
+            n += занято;
+        }
+        return n;
+    }
+
+    private static int[] ints(Object o) {
+        if (!(o instanceof List<?> l)) {
+            return new int[0];
+        }
+        int[] out = new int[l.size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = l.get(i) instanceof Number n ? n.intValue() : 0;
+        }
+        return out;
+    }
 }

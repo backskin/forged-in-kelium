@@ -175,6 +175,10 @@ public final class GameEngine {
         for (Agent a : agents) {
             a.observePublicEvent(event);
         }
+        // СРАБАТЫВАНИЯ КАРТ «каждый раз, когда …» (Карты 2.0) — после того, как
+        // событие увидели запись и игроки: в записи причина идёт раньше следствия.
+        Срабатывания.учесть(state, event);
+        Срабатывания.раздать(state, event);
     }
 
     private static Map<String, Object> ev(Object... kv) {
@@ -200,6 +204,7 @@ public final class GameEngine {
         offerSealChoice();
         offerSuperPick();
         offerStartObjectivePick();
+        offerStartArsenalPick();
         loop(1, 1, true);
         return finishAndScore();
     }
@@ -218,6 +223,7 @@ public final class GameEngine {
         bind(s, agents, this::emit);
         emit(ev("type", "game_start", "players", s.numPlayers(), "ruleset", rs().id));
         dealStart();
+        offerStartArsenalPick();
         loop(1, 1, true);
     }
 
@@ -237,7 +243,10 @@ public final class GameEngine {
     public Map<String, Object> resume() {
         GameState s = state;
         maxRounds = roundLimit;
-        bindResume(s, agents, onEvent == null ? null : this::emit);
+        // Всегда через emit движка, даже без наблюдателя: события боя и веток с
+        // карт запускают срабатывания карт (Карты 2.0) — это правила, и повтор
+        // позиции обязан играть их так же, как настоящая партия.
+        bindResume(s, agents, this::emit);
         loop(Math.max(1, s.round), Math.max(1, s.circle), false);
         return finishAndScore();
     }
@@ -885,6 +894,10 @@ public final class GameEngine {
         PlayerState p = s.player(seat);
         Ruleset rs = rs();
         s.journal.startTurn(seat);
+        // «АВАРИЙНОЕ ПИТАНИЕ» 7.3.0: монеты с ячеек энергии уходят в общий запас
+        for (BuildingToken b : p.buildingsOnField()) {
+            b.stripEnergyOf(Actions.COIN_SOURCE_UID);
+        }
         // «КЕЛЕМИЕВЫЙ РУДНИК» (супер-арсенал sa6, редакция 17.08.2026): +1 келемий
         // В НАЧАЛЕ КАЖДОГО ХОДА, не раз в раунд — до вершины трека игрок
         // добирается поздно, и награда за раунд к тому времени уже ничего не решает.
@@ -898,10 +911,16 @@ public final class GameEngine {
         // ТОЧКА ПРАВИЛ: сколько СПЕЦ-действий за ход. Карта арсенала может дать
         // второе («два СПЕЦ, если не играл Безопасность») или третье («Параллельные
         // штабы»).
+        // совпадение известно уже сейчас — «Оперативный отдел» (арсенал 7.3.0)
+        // даёт за него ещё одно спец-действие и спрашивает об этом здесь
+        s.journal.of(seat).orderBlocked = reveal.coincided();
         int specLimit = (int) Math.round(kelium.engine.ability.RuleQuery
             .of(s, seat, kelium.engine.ability.Hook.ORDER_SPEC_COUNT)
             .base(Math.max(rs.getInt("actions.spec_per_turn"), Passives.specActions(s, seat)))
             .ask());
+        // ЗОЛОТАЯ ЯЧЕЙКА ХРАНИЛИЩА (жетоны 2.0, 02.10.2026): постоянная
+        // пассивка — ещё одно спец-действие в каждом своём ходу.
+        specLimit += ЖетоныХранилища.спецДействий(s.player(seat));
         specLimit = Math.max(0, specLimit - specPenalty);
         // «ШТАБНАЯ ДИРЕКТИВА» (супер-арсенал 4.0.0, печать 25.09.2026): «За
         // совпадение нижнего приказа ты получаешь ещё 1 спец. действие». Нижний
@@ -914,6 +933,7 @@ public final class GameEngine {
                 "ability", "directive_coincidence_both_bottom_spec"));
         }
         TurnContext ctx = new TurnContext(seat, specLimit);
+        ctx.факты = s.journal.of(seat);
         // Контекст хода — памятка для отката безопасных действий (концепт
         // «Командный пункт» §5): без него откат возвращал состояние, но не
         // знание «что сыграно», и игрок терял слот действия.
@@ -1130,10 +1150,20 @@ public final class GameEngine {
             java.util.Set<String> открытыДо = PrintedContainers.открытые(s);
             ActionResult res = action.perform(p, ctx, agents.get(p.seat));
             PrintedContainers.накрытия(s, p, открытыДо);
-            if (res.ok()) {
-                s.journal.onAction(p.seat, actionName, res.telemetry());
+            // РАЗВИЛКА (приказы 5.0.0): в журнал и в событие идёт ИМЯ ВЫПОЛНЕННОЙ
+            // ВЕТКИ — прежнего действия, на которое смотрят задания, отчёты и
+            // проигрыватель; имя самой развилки — в поле fork.
+            String fork = null;
+            String сыграно = actionName;
+            if (action instanceof Actions.ForkAction fa && fa.branch != null) {
+                fork = actionName;
+                сыграно = fa.branch;
             }
-            emit(ev("type", "action", "seat", p.seat, "action", actionName,
+            if (res.ok()) {
+                s.journal.onAction(p.seat, сыграно, res.telemetry());
+            }
+            emit(ev("type", "action", "seat", p.seat, "action", сыграно,
+                "fork", fork,
                 "ok", res.ok(), "detail", res.detail(), "telemetry", res.telemetry()));
             ctx.playedCount += 1;
             if (repeatable > 0) {
@@ -1871,6 +1901,14 @@ public final class GameEngine {
                 case "spec_arsenal_install" -> arsenalInstall(p, (String) ch.payload());
                 default -> { }
             }
+            // ОДНО СПЕЦ — ОДНО ВСКРЫТИЕ, когда массовое вскрытие отменено
+            // (containers_storage.mass_open: false, решение дизайнера 12.08.2026).
+            // Прежде цикл спрашивал «ещё?» и после единственного вскрытия —
+            // дизайнер 28.09: «нажал «Завершить ход», а он предлагает вскрыть».
+            if (!Boolean.TRUE.equals(Ctx.rules(s).get("containers_storage.mass_open",
+                    Boolean.TRUE))) {
+                return;
+            }
         }
     }
 
@@ -1906,6 +1944,36 @@ public final class GameEngine {
             p.superObjectives.add(chosen);
             emit(ev("type", "super_pick", "seat", p.seat, "card", chosen,
                 "offered", new ArrayList<>(p.superObjectiveOffer)));
+        }
+    }
+
+    /**
+     * ВЫБОР НАЧАЛЬНОГО АРСЕНАЛА (решение Влада 02.10.2026, ключ
+     * {@code setup.start_arsenal_offer}): игроку на подготовке раздали две карты
+     * из восьми; одну он оставляет — она встаёт на планшет и даёт стартовый
+     * набор с верха, — вторая уходит в коробку, в колоду арсенала не идёт: у
+     * начальных своя рубашка.
+     */
+    private void offerStartArsenalPick() {
+        GameState s = state;
+        for (PlayerState p : s.players) {
+            if (p.startArsenalOffer.isEmpty()) {
+                continue;
+            }
+            List<Choice> opts = new ArrayList<>();
+            for (String cid : p.startArsenalOffer) {
+                Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+                String label = card == null ? cid : String.valueOf(card.get("name"));
+                opts.add(new Choice("start_arsenal_pick", cid, label));
+            }
+            Choice ch = opts.size() == 1 ? opts.get(0)
+                : agents.get(p.seat).choose(s, opts, ev("kind", "start_arsenal_pick", "seat", p.seat));
+            String chosen = ch != null && ch.payload() instanceof String cid ? cid
+                : p.startArsenalOffer.get(0);
+            List<String> предложено = new ArrayList<>(p.startArsenalOffer);
+            p.startArsenalOffer.clear();
+            Setup.поставитьНачальную(s, p, chosen);
+            emit(ev("type", "start_arsenal_pick", "seat", p.seat, "card", chosen, "offered", предложено));
         }
     }
 
@@ -2674,6 +2742,7 @@ public final class GameEngine {
         state.combat = new CombatResolver(state, onEvent == null ? e -> { } : onEvent)
             .bindAgents(agents);
         state.agents = agents;
+        state.публикатор = onEvent;
     }
 
     /** Привязать без наблюдателя событий — для тестов и пробников. */
@@ -2694,6 +2763,7 @@ public final class GameEngine {
         state.combat = new CombatResolver(state, onEvent == null ? e -> { } : onEvent)
             .bindAgents(agents);
         state.agents = agents;
+        state.публикатор = onEvent;
     }
 
     /** Удобная обёртка: создать движок и прогнать партию, вернув итог. */

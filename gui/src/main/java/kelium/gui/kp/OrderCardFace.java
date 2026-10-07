@@ -140,7 +140,7 @@ public final class OrderCardFace {
 
         int gridTop = y + h / 14 + fm.getHeight() + g.getFontMetrics().getHeight() + pad / 2;
         double icon = Math.min((w - 2.0 * pad) / 4.6, (y + h - pad - gridTop) / 2.4);
-        List<String> all = List.copyOf(ActionBar.ACTIONS.keySet());
+        List<String> all = kelium.engine.Actions.ALL_NAMES;
         for (int i = 0; i < all.size(); i++) {
             double cx = x + pad + icon / 2 + (i % 4) * (w - 2.0 * pad - icon) / 3;
             double cy = gridTop + icon / 2 + (i / 4) * (icon + pad);

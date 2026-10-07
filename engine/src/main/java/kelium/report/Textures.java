@@ -178,8 +178,70 @@ public final class Textures {
      * спец-действие, жетон первого игрока, рода войск. {@code null} — иконки
      * нет, рисуется прежний значок.
      */
+    private static final java.util.Map<String, BufferedImage> СОСТАВНЫЕ =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Значок ветки «Построить …»: значок её развилки и знак стройки поверх, в
+     * правом нижнем углу на ~55% стороны. {@code null} — нет одной из картинок.
+     */
+    private static BufferedImage значокСтройки(String name) {
+        String развилка = switch (name.substring("action_build_".length())) {
+            case "miner" -> "extract";
+            case "plant" -> "power";
+            case "military" -> "supply";
+            default -> null;
+        };
+        BufferedImage знак = find(List.of("icons/build_mode"));
+        BufferedImage основа = развилка == null ? null : icon("action_" + развилка);
+        if (знак == null || основа == null) {
+            return null;
+        }
+        int w = основа.getWidth();
+        int h = основа.getHeight();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = out.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+            java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+        g.drawImage(основа, 0, 0, null);
+        int s = (int) Math.round(Math.min(w, h) * 0.55);
+        g.drawImage(знак, w - s, h - s, s, s, null);
+        g.dispose();
+        return out;
+    }
+
     public static BufferedImage icon(String name) {
-        return name == null ? null : find(List.of("icons/" + name));
+        if (name == null) {
+            return null;
+        }
+        // ДЕЙСТВИЯ-РАЗВИЛКИ свода 1.46.0 своих иконок пока не имеют (дизайнер
+        // нарисует позже): берётся иконка первой ветки. Появится свой файл —
+        // он и будет взят.
+        // ВЕТКИ «ПОСТРОИТЬ …» — ЗНАЧОК ДЕЙСТВИЯ С КРАНОМ (решение Влада 02.10.2026,
+        // «все иконки-80 — иконка стройки, вставляй её поверх иконки действия»; с выгрузки 03.10.2026 это «все иконки-32»):
+        // значок развилки ветки, в правом нижнем углу — жёлтый знак стройки
+        // (icons/build_mode.png). Без знака — прежний один значок action_build.
+        if (name.startsWith("action_build_")) {
+            BufferedImage составной = СОСТАВНЫЕ.computeIfAbsent(name, Textures::значокСтройки);
+            if (составной != null) {
+                return составной;
+            }
+            name = "action_build";
+        }
+        BufferedImage своя = find(List.of("icons/" + name));
+        if (своя != null || !name.startsWith("action_")) {
+            return своя;
+        }
+        String первая = switch (name.substring("action_".length())) {
+            case "extract" -> "mining";
+            case "power" -> "energy_swap";
+            case "supply" -> "assembly";
+            case "command" -> "movement";
+            case "develop" -> "market";
+            default -> null;
+        };
+        return первая == null ? null : find(List.of("icons/action_" + первая));
     }
 
     /**
@@ -334,40 +396,146 @@ public final class Textures {
      *
      * @param fileKey имя вместе с расширением, как оно записано в списке отпечатков
      */
-    public static synchronized boolean isUntouchedStub(String fileKey, BufferedImage img) {
-        init();
-        String print = stubPrints.get(fileKey);
+    public static boolean isUntouchedStub(String fileKey, BufferedImage img) {
+        String print;
+        synchronized (Textures.class) {
+            init();
+            print = stubPrints.get(fileKey);
+        }
         return print != null && print.equals(fingerprint(img));
     }
 
     /** Первая существующая и НЕ ЗАГОТОВОЧНАЯ картинка из списка имён. */
-    public static synchronized BufferedImage find(List<String> keys) {
-        init();
-        if (root == null) {
-            return null;
+    public static BufferedImage find(List<String> keys) {
+        synchronized (Textures.class) {
+            init();
+            if (root == null) {
+                return null;
+            }
         }
         for (String key : keys) {
-            if (CACHE.containsKey(key)) {
-                BufferedImage got = CACHE.get(key);
-                if (got != null) {
-                    return got;
+            synchronized (Textures.class) {
+                if (CACHE.containsKey(key)) {
+                    BufferedImage got = CACHE.get(key);
+                    if (got != null) {
+                        USED.add(key);
+                        return got;
+                    }
+                    continue;
                 }
-                continue;
             }
+            // ЧТЕНИЕ С ДИСКА — ВНЕ ЗАМКА (28.09.2026): картинки разогреваются
+            // отдельным потоком при старте партии, и окно не должно ждать его,
+            // чтобы взять уже загруженную.
             BufferedImage img = load(key);
-            CACHE.put(key, img);
+            synchronized (Textures.class) {
+                if (CACHE.containsKey(key)) {
+                    img = CACHE.get(key);
+                } else {
+                    CACHE.put(key, img);
+                }
+            }
             if (img != null) {
+                USED.add(key);
                 return img;
             }
         }
         return null;
     }
 
+    // ==================== РАЗОГРЕВ (28.09.2026) ====================
+    //
+    // Картинка грузится с диска при первом показе — и если показ идёт в потоке
+    // окна, окно замирает (замер: до 1,6 с на ход). Поэтому игра помнит, какие
+    // картинки ей понадобились, и при старте партии грузит их заранее отдельным
+    // потоком: список из данных игры плюс то, что понадобилось на этой машине.
+
+    private static final java.util.Set<String> USED =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Ключи картинок, которые понадобились с начала работы. */
+    public static java.util.Set<String> usedKeys() {
+        return new java.util.TreeSet<>(USED);
+    }
+
+    /** Файл списка разогрева рядом с текстурами (идёт с игрой). */
+    public static Path warmListShipped() {
+        Path f = folder();
+        return f == null ? null : f.resolve("warm-keys.txt");
+    }
+
+    /** Список разогрева этой машины. */
+    public static Path warmListLocal() {
+        String la = System.getenv("LOCALAPPDATA");
+        return la == null ? null : Path.of(la, "Kelium", "warm-keys.txt");
+    }
+
+    /** Прочитать ключи разогрева из обоих списков. */
+    public static java.util.Set<String> warmKeys() {
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        for (Path p : new Path[]{warmListShipped(), warmListLocal()}) {
+            if (p == null || !Files.isReadable(p)) {
+                continue;
+            }
+            try {
+                for (String s : Files.readAllLines(p, java.nio.charset.StandardCharsets.UTF_8)) {
+                    if (!s.isBlank()) {
+                        keys.add(s.strip());
+                    }
+                }
+            } catch (IOException e) {
+                // список разогрева — ускорение, без него игра просто грузит по ходу
+            }
+        }
+        return keys;
+    }
+
+    /** Дописать понадобившиеся ключи в список этой машины. */
+    public static void saveUsedKeys(Path to) {
+        if (to == null || USED.isEmpty()) {
+            return;
+        }
+        try {
+            java.util.Set<String> all = new java.util.TreeSet<>(USED);
+            if (Files.isReadable(to)) {
+                for (String s : Files.readAllLines(to, java.nio.charset.StandardCharsets.UTF_8)) {
+                    if (!s.isBlank()) {
+                        all.add(s.strip());
+                    }
+                }
+            }
+            Files.createDirectories(to.getParent());
+            Files.write(to, all, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            // не записалось — в следующий раз разогрев просто будет короче
+        }
+    }
+
+    /** Загрузить картинку и её разметку зон, не показывая. */
+    public static BufferedImage warm(String key) {
+        BufferedImage img = find(List.of(key));
+        if (img != null) {
+            Zones.of(key, folder());
+        }
+        return img;
+    }
+
     private static BufferedImage load(String key) {
+        Path root;
+        synchronized (Textures.class) {
+            root = Textures.root;
+        }
         // Ключ может нести подпапку: «field/hex» ищется в field/, остальное в token/.
-        Path file = key.contains("/")
-            ? root.resolve(key.replace('/', java.io.File.separatorChar) + ".png")
-            : root.resolve("token").resolve(key + ".png");
+        // ЗАКРЫТАЯ КАРТА В СЕТИ (29.09.2026) приходит другу как «?» — такого
+        // файла нет и быть не может, а знак недопустим в пути Windows.
+        Path file;
+        try {
+            file = key.contains("/")
+                ? root.resolve(key.replace('/', java.io.File.separatorChar) + ".png")
+                : root.resolve("token").resolve(key + ".png");
+        } catch (java.nio.file.InvalidPathException неФайл) {
+            return null;
+        }
         if (!Files.isReadable(file)) {
             // Сохранение в BMP дизайнеру тоже разрешено — читаем и его
             Path bmp = Path.of(file.toString().replaceAll("\\.png$", ".bmp"));
@@ -381,9 +549,14 @@ public final class Textures {
             if (img == null) {
                 return null;
             }
-            String stub = stubPrints.get(key + ".png");
+            String stub;
+            synchronized (Textures.class) {
+                stub = stubPrints.get(key + ".png");
+            }
             if (stub != null && stub.equals(fingerprint(img))) {
-                skipped++;             // это нетронутая заготовка, а не текстура
+                synchronized (Textures.class) {
+                    skipped++;         // это нетронутая заготовка, а не текстура
+                }
                 return null;
             }
             return img;

@@ -60,6 +60,14 @@ public final class Arsenal7Abilities {
                 "новый тайл зарождения, но карта уходит из игры", true)));
         Abilities.register(new SpecMoveEconomyAdjacent());
         Abilities.register(new TwoSpecWithSecurity());
+        Abilities.register(new ExtraSpecOnCoincidence());
+        // Обе проверяются в самом действии (Actions: обмены Науки, ветка
+        // «Переложить энергию») — здесь способности только объявлены, чтобы
+        // карта прошла проверку «у каждой карты живой код».
+        Abilities.register(new Метка("labs_kelium_trophy_swap",
+            "на Рынке и в Науке трофеи и келемий заменяют друг друга"));
+        Abilities.register(new Метка("coins_on_energy_cells",
+            "монеты на свободных ячейках энергии до следующего хода"));
         Abilities.register(new InfantryIgnoresBuildings());
         Abilities.register(new ScienceTrophyToAmmo());
         Abilities.register(new InfantryHp2ReturnsAtReturn());
@@ -331,7 +339,58 @@ public final class Arsenal7Abilities {
      * <p>Карта «Безопасность» в колоде приказов 4.0.0 называется «Затаиться»
      * (решение 23.09.2026), номер у неё прежний — {@code security_*}.
      */
+    /**
+     * «ОПЕРАТИВНЫЙ ОТДЕЛ» 7.3.0 (комплект «пять развилок», 27.09.2026): «Если в
+     * этот ход у тебя совпадение приказов, получи ещё одно спец-действие».
+     * Прежний низ ссылался на приказ БЕЗОПАСНОСТЬ, которого больше нет.
+     */
+    /** Способность, которую проверяет само действие; здесь она только объявлена. */
+    private record Метка(String id, String зачем) implements Ability {
+
+        @Override public Trigger trigger() {
+            return Trigger.PASSIVE;
+        }
+
+        @Override public Set<Hook> hooks() {
+            return EnumSet.noneOf(Hook.class);
+        }
+
+        @Override public void modify(RuleQuery q) {
+        }
+
+        @Override public Hint hint() {
+            return new Hint(Bottleneck.ENERGY, 1.0, Horizon.REST_OF_GAME, null, зачем, false);
+        }
+    }
+
+    private static final class ExtraSpecOnCoincidence implements Ability {
+
+        @Override public String id() {
+            return "extra_spec_on_coincidence";
+        }
+
+        @Override public Trigger trigger() {
+            return Trigger.PASSIVE;
+        }
+
+        @Override public Set<Hook> hooks() {
+            return EnumSet.of(Hook.ORDER_SPEC_COUNT);
+        }
+
+        @Override public void modify(RuleQuery q) {
+            if (q.state().journal != null && q.state().journal.of(q.seat()).orderBlocked) {
+                q.add(1);
+            }
+        }
+
+        @Override public Hint hint() {
+            return new Hint(Bottleneck.ACTIONS, 1.0, Horizon.THIS_ROUND,
+                (s, seat) -> true, "ещё одно спец-действие при совпадении приказов", false);
+        }
+    }
+
     private static final class TwoSpecWithSecurity implements Ability {
+        // замена для приказов 5.0.0 — ExtraSpecOnCoincidence выше
 
         @Override public String id() {
             return "two_spec_with_security";

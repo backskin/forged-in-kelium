@@ -60,15 +60,15 @@ public final class СнимокРаскладки {
                     LayoutEditor.Canvas.SEAT[2], LayoutEditor.Canvas.SEAT[3]),
             "стартовый гекс игрока: ЦУ и пехота"));
         л.add(PngExport.Item.hex(LayoutEditor.Canvas.SPAWN_START,
-            "малое зарождение: лицо 3 келемия, оборот 2"));
+            "стартовое зарождение: лицо 3 келемия, оборот 2"));
         л.add(PngExport.Item.hex(LayoutEditor.Canvas.SPAWN_NORMAL,
             "большое зарождение: лицо 4 келемия, оборот 3"));
         л.add(PngExport.Item.neutral(LayoutEditor.Canvas.NEUTRAL_FILL, false,
-            "нейтральная постройка, малая — одна стенка"));
+            "нейтральная постройка на 1 сектор"));
         л.add(PngExport.Item.neutral(LayoutEditor.Canvas.NEUTRAL_FILL, true,
-            "нейтральная постройка, большая — две стенки"));
+            "нейтральная постройка на 2 сектора, с гарнизоном"));
         л.add(PngExport.Item.hex(new java.awt.Color(0x3A3A3A),
-            "чёрная накладка — гекса в этой раскладке нет"));
+            "недоступный гекс: закройте тайлом"));
         return л;
     }
 

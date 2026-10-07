@@ -45,7 +45,8 @@ $apps = @(
     @{ Name = "KeliumReplay2";     Main = "kelium.gui.replay2.Replay2Gui";   Icon = "replay2";     Title = "разбор партии" },
     @{ Name = "KeliumHelp";        Main = "kelium.gui.replay2.HelpApp";      Icon = "help";        Title = "справочник" },
     @{ Name = "KeliumRunner";      Main = "kelium.gui.RunnerGui";            Icon = "runner";      Title = "прогоны" },
-    @{ Name = "KeliumConstructor"; Main = "kelium.gui.LayoutEditor";         Icon = "constructor"; Title = "конструктор" }
+    @{ Name = "KeliumConstructor"; Main = "kelium.gui.LayoutEditor";         Icon = "constructor"; Title = "конструктор" },
+    @{ Name = "Мастерская карт";   Main = "kelium.gui.cardshop.CardShop";    Icon = "constructor"; Title = "мастерская карт" }
 )
 # В раздачу не идёт: обучение ботов, архивы, заготовки художника.
 $junk = @("training", "selfplay", "genomes-archive-*", "genomes-boi2", "_archive", "tsv")
@@ -256,6 +257,15 @@ foreach ($p in @("runtime", "libs", "code", "rules", "textures")) {
 [System.IO.File]::WriteAllLines((Join-Path $PSScriptRoot "$packsOut\packs.txt"), $lines,
     (New-Object System.Text.UTF8Encoding $false))
 
+# ==================== ссылка на обновления (29.09.2026) ====================
+# update-link.txt в корне проекта — публичная ссылка на раздачу (папка
+# Яндекс.Диска или адрес). Запускатель друга по ней докачивает изменившиеся
+# паки. Нет файла — раздача без автообновления.
+$updateLink = Join-Path $PSScriptRoot "update-link.txt"
+if (Test-Path $updateLink) {
+    Copy-Item -Force $updateLink "$packsOut\update.txt"
+}
+
 # ==================== запускатели ====================
 
 # Иконка приложения: .ico из квадратного PNG (ICO с Vista несёт PNG прямо в
@@ -328,6 +338,43 @@ if ($want -contains "exe") {
                "$iconArg/out:`"$exe`" $refs $src"
         Invoke-Expression $cmd
         if (-not (Test-Path $exe)) { throw "не собрался $exe" }
+    }
+}
+
+# ==================== выкладка раздачи (29.09.2026) ====================
+# publish-dir.txt в корне проекта — папка раздачи (например, на Яндекс.Диске):
+# туда кладутся запускатели и паки. Пак копируется, только если изменился;
+# список паков — последним, чтобы друзья не увидели список раньше паков.
+$publishCfg = Join-Path $PSScriptRoot "publish-dir.txt"
+# Яндекс.Диск держит файл, пока его загружает, — копируем с повторами.
+function Copy-Stubborn([string]$from, [string]$to) {
+    for ($i = 0; $i -lt 60; $i++) {
+        try { Copy-Item -Force $from $to; return } catch { Start-Sleep -Seconds 2 }
+    }
+    throw "Файл занят другим процессом: $to"
+}
+if (Test-Path $publishCfg) {
+    $pub = (Get-Content $publishCfg -Raw -Encoding UTF8).Trim()
+    if ($pub) {
+        New-Item -ItemType Directory -Force "$pub\packs" | Out-Null
+        foreach ($p in @("runtime", "libs", "code", "rules", "textures")) {
+            $sha = (Get-Content "$packsOut\$p.pak.sha" -Raw).Trim()
+            $dst = "$pub\packs\$p.pak"
+            $dstSha = if (Test-Path "$dst.sha") { (Get-Content "$dst.sha" -Raw).Trim() } else { "" }
+            if ($dstSha -ne $sha -or -not (Test-Path $dst)) {
+                Write-Output "выкладка: $p.pak"
+                Copy-Stubborn "$packsOut\$p.pak" $dst
+                Copy-Stubborn "$packsOut\$p.pak.sha" "$dst.sha"
+            }
+        }
+        if (Test-Path "$packsOut\update.txt") {
+            Copy-Stubborn "$packsOut\update.txt" "$pub\packs\update.txt"
+        }
+        foreach ($app in $apps) {
+            Copy-Stubborn "dist\$($app.Name).exe" "$pub\$($app.Name).exe"
+        }
+        Copy-Stubborn "$packsOut\packs.txt" "$pub\packs\packs.txt"
+        Write-Output "раздача выложена: $pub"
     }
 }
 

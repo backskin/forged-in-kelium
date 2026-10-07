@@ -7,6 +7,7 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.RoundRectangle2D;
@@ -46,10 +47,20 @@ public final class FieldBubbles {
      * @param tone   {@code 0} — обычный, {@code 1} — главный (акцент),
      *               {@code 2} — опасный/отказ (приглушённый)
      */
-    public record Opt(String label, String sub, int tone, Runnable pick) {
+    public record Opt(String label, String sub, int tone, Runnable pick,
+                      java.awt.image.BufferedImage icon) {
+
+        public Opt(String label, String sub, int tone, Runnable pick) {
+            this(label, sub, tone, pick, null);
+        }
 
         public static Opt of(String label, Runnable pick) {
             return new Opt(label, null, 0, pick);
+        }
+
+        /** Тот же вариант с иконкой действия слева вместо кружка. */
+        public Opt withIcon(java.awt.image.BufferedImage i) {
+            return new Opt(label, sub, tone, pick, i);
         }
     }
 
@@ -75,6 +86,7 @@ public final class FieldBubbles {
         this.seatColor = seatColor == null ? Theme.accent() : seatColor;
         this.openHex = null;
         this.hover = null;
+        this.dockImages = List.of();
         // Одна цель с несколькими вариантами — пузырь открыт сразу: щёлкать по
         // гексу, чтобы увидеть единственный список, незачем.
         if (this.byHex.size() == 1) {
@@ -87,6 +99,18 @@ public final class FieldBubbles {
 
     public void clear() {
         set(null, null, null, null, null);
+        dockImages = List.of();
+    }
+
+    /**
+     * КАРТИНКИ В КАРТОЧКЕ ВОПРОСА (28.09.2026): лица карт, о которых вопрос, —
+     * например карта, которой можно ответить на атаку. Игрок читает её верх
+     * прямо в вопросе, не ища карту в руке.
+     */
+    private List<java.awt.image.BufferedImage> dockImages = List.of();
+
+    public void setDockImages(List<java.awt.image.BufferedImage> images) {
+        this.dockImages = images == null ? List.of() : List.copyOf(images);
     }
 
     /** Слева поле закрыто ящиком на столько точек — карточка вопроса правее. */
@@ -286,8 +310,10 @@ public final class FieldBubbles {
         Font cf = Theme.font(15, Font.BOLD);
         Font sf = Theme.font(12.5, Font.PLAIN);
         boolean сбоку = dockSide - dockInset >= dockSideMin();
+        // сверху — не под столбцом плашек чужих событий справа (обход 28.09:
+        // «+1 трофей» закрывал подсказку «Вас атакуют»)
         int maxW = сбоку ? dockSide - dockInset - Theme.px(20)
-            : Math.min(w - Theme.px(40), Theme.px(900));
+            : Math.max(Theme.px(360), Math.min(w - Theme.px(40) - Theme.px(470), Theme.px(900)));
 
         // ряды фишек-вариантов с переносом
         g.setFont(cf);
@@ -334,8 +360,10 @@ public final class FieldBubbles {
         int textMax = maxW - pad * 2 - Theme.px(8);
         // заголовок и подсказка переносятся по словам, а не срезаются: сбоку
         // карточка узкая
-        List<String> titleLines = title == null ? List.of("") : wrap(tm, title, textMax, 2);
-        List<String> hintLines = hint == null ? List.of() : wrap(hm, hint, textMax, 3);
+        // подсказка — целиком: обрезанная многоточием («кнопки на атакованн…»)
+        // оставляла игрока без ответа, что происходит (дизайнер 28.09.2026)
+        List<String> titleLines = title == null ? List.of("") : wrap(tm, title, textMax, 3);
+        List<String> hintLines = hint == null ? List.of() : wrap(hm, hint, textMax, 10);
         int textW = 0;
         for (String l : titleLines) {
             textW = Math.max(textW, tm.stringWidth(l));
@@ -345,11 +373,24 @@ public final class FieldBubbles {
             textW = Math.max(textW, hm.stringWidth(l));
         }
         int hintH = hintLines.size() * hm.getHeight();
-        int cardW = Math.min(maxW, Math.max(textW, widest) + pad * 2 + Theme.px(8));
-        int cardH = pad + titleH + hintH
+        // ряд картинок под подсказкой: высота — как у карты, читаемой без увеличения
+        int imgH = dockImages.isEmpty() ? 0 : Theme.px(240);
+        int imgsW = 0;
+        for (java.awt.image.BufferedImage im : dockImages) {
+            imgsW += (int) Math.round(imgH * im.getWidth() / (double) im.getHeight()) + gap;
+        }
+        imgsW = Math.max(0, imgsW - gap);
+        if (imgsW > maxW - pad * 2 && imgsW > 0) {
+            imgH = (int) Math.round(imgH * (maxW - pad * 2) / (double) imgsW);
+            imgsW = maxW - pad * 2;
+        }
+        int imgBlock = imgH == 0 ? 0 : Theme.px(10) + imgH;
+        int cardW = Math.min(maxW, Math.max(Math.max(textW, widest), imgsW) + pad * 2 + Theme.px(8));
+        int cardH = pad + titleH + hintH + imgBlock
             + (rows.isEmpty() ? 0 : Theme.px(8) + rows.size() * chipH + (rows.size() - 1) * gap)
             + pad;
-        int x = сбоку ? Theme.px(10) : (w - cardW) / 2;
+        int x = сбоку ? Theme.px(10) : Math.max(dockInset + Theme.px(10),
+            Math.min((w - cardW) / 2, w - Theme.px(470) - cardW - Theme.px(10)));
         int y = Theme.px(10);
         panel(g, x, y, cardW, cardH);
         // полоса цвета места слева — чей вопрос
@@ -367,7 +408,16 @@ public final class FieldBubbles {
         for (int i = 0; i < hintLines.size(); i++) {
             g.drawString(hintLines.get(i), x + pad + Theme.px(6), hy + hm.getHeight() * (i + 1));
         }
-        int cy = y + pad + titleH + hintH + Theme.px(8);
+        if (imgH > 0) {
+            int ix = x + (cardW - imgsW) / 2;
+            int iy = y + pad + titleH + hintH + Theme.px(10);
+            for (java.awt.image.BufferedImage im : dockImages) {
+                int iw = (int) Math.round(imgH * im.getWidth() / (double) im.getHeight());
+                kelium.report.Mips.draw(g, im, ix, iy, iw, imgH);
+                ix += iw + gap;
+            }
+        }
+        int cy = y + pad + titleH + hintH + imgBlock + Theme.px(8);
         for (List<Integer> r : rows) {
             int rw = 0;
             for (int i : r) {
@@ -433,7 +483,8 @@ public final class FieldBubbles {
         int maxRow = Theme.px(340);
         int bw = Theme.px(160);
         for (Opt o : opts) {
-            bw = Math.max(bw, Math.min(maxRow, lm.stringWidth(o.label()) + Theme.px(40)));
+            int ик = o.icon() != null ? rowH - Theme.px(16) : 0;
+            bw = Math.max(bw, Math.min(maxRow, lm.stringWidth(o.label()) + Theme.px(40) + ик));
             if (o.sub() != null) {
                 bw = Math.max(bw, Math.min(maxRow, sm.stringWidth(o.sub()) + Theme.px(40)));
             }
@@ -480,10 +531,24 @@ public final class FieldBubbles {
             }
             // маркер варианта: кружок цвета тона
             int d = Theme.px(8);
-            g.setColor(o.tone() == 1 ? seatColor : o.tone() == 2 ? Theme.ink3() : Theme.ink2());
-            g.fillOval(r.x + Theme.px(8), r.y + (rowH - d) / 2, d, d);
             int tx = r.x + Theme.px(24);
-            int avail = r.width - Theme.px(30);
+            if (o.icon() != null) {
+                // ИКОНКА ДЕЙСТВИЯ вместо кружка (Влад 03.10.2026: «нанять»,
+                // «произвести боеприпасы» — значками печати)
+                int s = rowH - Theme.px(4);
+                Object было = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.drawImage(o.icon(), r.x + Theme.px(4), r.y + Theme.px(2), s, s, null);
+                if (было != null) {
+                    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, было);
+                }
+                tx = r.x + Theme.px(8) + s;
+            } else {
+                g.setColor(o.tone() == 1 ? seatColor : o.tone() == 2 ? Theme.ink3() : Theme.ink2());
+                g.fillOval(r.x + Theme.px(8), r.y + (rowH - d) / 2, d, d);
+            }
+            int avail = r.x + r.width - Theme.px(6) - tx;
             g.setFont(lf);
             g.setColor(o.tone() == 2 ? Theme.ink2() : Theme.ink());
             String l = clip(lm, o.label(), avail);

@@ -397,6 +397,11 @@ public final class NarrativeLog {
                 case "acquire" -> "Приобрести";
                 case "control" -> "Контролировать";
                 case "explore" -> "Исследовать";
+                case "settle" -> "Освоить";
+                case "mobilize" -> "Мобилизовать";
+                case "advance" -> "Наступать";
+                case "secure" -> "Контролировать";
+                case "research" -> "Исследовать";
                 default -> top;
             };
             return cid + " (" + ru + ")";

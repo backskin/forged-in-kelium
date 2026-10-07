@@ -244,6 +244,10 @@ public abstract class ЗаданиеВКоде implements ObjectiveCard {
             case "market" -> "Рынок";
             case "science" -> "Наука";
             case "energy_swap" -> "Питание";
+            // ветки «построить» развилок (комплект «пять развилок», 27.09.2026)
+            case "build_miner" -> "Построить добытчик";
+            case "build_plant" -> "Построить энергостанцию";
+            case "build_military" -> "Построить военное здание";
             default -> код;
         };
     }

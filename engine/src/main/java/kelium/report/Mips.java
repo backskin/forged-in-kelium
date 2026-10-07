@@ -42,6 +42,36 @@ public final class Mips {
     }
 
     /**
+     * Пирамида картинки: из кэша или построенная. Строится ВНЕ ЗАМКА
+     * (28.09.2026): разогрев при старте партии строит пирамиды отдельным
+     * потоком, и окно не должно ждать его ради готовой.
+     */
+    private static List<BufferedImage> chain(BufferedImage src) {
+        synchronized (Mips.class) {
+            List<BufferedImage> got = CACHE.get(src);
+            if (got != null) {
+                return got;
+            }
+        }
+        List<BufferedImage> built = построить(src);
+        synchronized (Mips.class) {
+            List<BufferedImage> got = CACHE.get(src);
+            if (got != null) {
+                return got;
+            }
+            CACHE.put(src, built);
+            return built;
+        }
+    }
+
+    /** Построить пирамиду заранее (разогрев при старте партии). */
+    public static void warm(BufferedImage src) {
+        if (src != null && src.getWidth() > МИНИМУМ) {
+            chain(src);
+        }
+    }
+
+    /**
      * Уровень пирамиды под нужную ЭКРАННУЮ ширину.
      *
      * <p>Берётся самый мелкий уровень, который ещё НЕ МЕНЬШЕ нужного: досжать
@@ -50,16 +80,12 @@ public final class Mips {
      *
      * @param targetW сколько пикселей на экране займёт вся картинка
      */
-    static synchronized BufferedImage forWidth(BufferedImage src, double targetW) {
+    static BufferedImage forWidth(BufferedImage src, double targetW) {
         if (src == null || targetW <= 0 || src.getWidth() <= МИНИМУМ
                 || targetW >= src.getWidth() * 0.7) {
             return src;                 // крупный показ — рисуем сам исходник
         }
-        List<BufferedImage> chain = CACHE.get(src);
-        if (chain == null) {
-            chain = построить(src);
-            CACHE.put(src, chain);
-        }
+        List<BufferedImage> chain = chain(src);
         BufferedImage best = src;
         for (BufferedImage lvl : chain) {
             if (lvl.getWidth() >= targetW) {

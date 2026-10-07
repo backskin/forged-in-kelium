@@ -57,6 +57,8 @@ public final class TurnJournal {
         public boolean razedOwnBuilding = false;
         public final Set<String> razedOwnHexes = new HashSet<>();
         public final Set<String> builtOnHexes = new HashSet<>();
+        /** Гексы, где в этот ход поставлен добытчик или станция 3-го или 4-го уровня (o79). */
+        public final Set<String> builtBigEconomyHexes = new HashSet<>();
         public boolean tookLastKeliumFromGrid = false;
         public int containersOpened = 0;
         public int unitsMoved = 0;
@@ -299,6 +301,22 @@ public final class TurnJournal {
         /** Сколько своих зданий снесено Стройкой на каждом гексе за ход. */
         public final Map<String, Integer> razedOwnOnHex = new HashMap<>();
 
+        // === КАРТЫ 2.0 (30.09.2026): ход глазами карт — требования-связки ===
+        /** Все ветки, сыгранные за ход (с приказов и с карт), по порядку. */
+        public final List<String> веткиХода = new ArrayList<>();
+        /** Сколько заданий выполнено за ход (не сожжено). */
+        public int заданийВыполнено = 0;
+        /** Сколько карт сожжено за ход (заданий и арсенала). */
+        public int картСожжено = 0;
+        /** Сколько карт арсенала установлено за ход. */
+        public int картУстановлено = 0;
+        /** Сколько карт контейнеров вскрыто за ход. */
+        public int контейнеровВскрыто = 0;
+        /** Сколько спец-действий потрачено за ход. */
+        public int спецИспользовано = 0;
+        /** Келемия потрачено в этот ход: Рынок и плата карт (Карты 2.0, 01.10.2026). */
+        public int келемияПотрачено = 0;
+
         /**
          * Скопировать в себя все факты из {@code o} — нужно копии состояния для
          * просчёта вперёд: без журнала просчёт «забывает», что игрок уже успел
@@ -323,6 +341,8 @@ public final class TurnJournal {
             razedOwnHexes.addAll(o.razedOwnHexes);
             builtOnHexes.clear();
             builtOnHexes.addAll(o.builtOnHexes);
+            builtBigEconomyHexes.clear();
+            builtBigEconomyHexes.addAll(o.builtBigEconomyHexes);
             tookLastKeliumFromGrid = o.tookLastKeliumFromGrid;
             containersOpened = o.containersOpened;
             unitsMoved = o.unitsMoved;
@@ -372,11 +392,29 @@ public final class TurnJournal {
             minKillAmmoCost = o.minKillAmmoCost;
             movedAndKilledSameUnit = o.movedAndKilledSameUnit;
             killsByMovedUnit.clear();
-            destroyedOwners.clear();
-            destroyedPoweredEconomy = false;
-            destroyedLeaderBuilding = false;
-            damagedLeader = false;
             killsByMovedUnit.putAll(o.killsByMovedUnit);
+            // ПОЛНАЯ КОПИЯ (30.09.2026): копия стола обязана видеть те же факты
+            // хода, что партия (прибор kelium.ПроверкаПовтора).
+            orderBlocked = o.orderBlocked;
+            blockBypassGrants = o.blockBypassGrants;
+            retaliationSincePrevTurn = o.retaliationSincePrevTurn;
+            lostSincePrevTurn = o.lostSincePrevTurn;
+            destroyedOwners.clear();
+            destroyedOwners.addAll(o.destroyedOwners);
+            destroyedPoweredEconomy = o.destroyedPoweredEconomy;
+            destroyedLeaderBuilding = o.destroyedLeaderBuilding;
+            damagedLeader = o.damagedLeader;
+            destroyedOnHex.clear();
+            destroyedOnHex.putAll(o.destroyedOnHex);
+            destroyedPlantLevels.clear();
+            destroyedPlantLevels.addAll(o.destroyedPlantLevels);
+            victimUnitsAtHit.clear();
+            victimUnitsAtHit.putAll(o.victimUnitsAtHit);
+            myUnitsAtHit.clear();
+            myUnitsAtHit.putAll(o.myUnitsAtHit);
+            containersTaken = o.containersTaken;
+            destroyedFullMinerAtKelium = o.destroyedFullMinerAtKelium;
+            sacrificedStrikeGroup = o.sacrificedStrikeGroup;
             enemyBuildingHits = o.enemyBuildingHits;
             maxDestroyedHp = o.maxDestroyedHp;
             enemyBuildingsDamaged.clear();
@@ -406,6 +444,14 @@ public final class TurnJournal {
             freeAttacks = o.freeAttacks;
             killLog.clear();
             killLog.addAll(o.killLog);
+            веткиХода.clear();
+            веткиХода.addAll(o.веткиХода);
+            заданийВыполнено = o.заданийВыполнено;
+            картСожжено = o.картСожжено;
+            картУстановлено = o.картУстановлено;
+            контейнеровВскрыто = o.контейнеровВскрыто;
+            спецИспользовано = o.спецИспользовано;
+            келемияПотрачено = o.келемияПотрачено;
             hiredUids.clear();
             hiredUids.addAll(o.hiredUids);
             razedOwnOnHex.clear();
@@ -427,6 +473,7 @@ public final class TurnJournal {
             razedOwnBuilding = false;
             razedOwnHexes.clear();
             builtOnHexes.clear();
+            builtBigEconomyHexes.clear();
             tookLastKeliumFromGrid = false;
             containersOpened = 0;
             unitsMoved = 0;
@@ -506,6 +553,13 @@ public final class TurnJournal {
             killLog.clear();
             hiredUids.clear();
             razedOwnOnHex.clear();
+            веткиХода.clear();
+            заданийВыполнено = 0;
+            картСожжено = 0;
+            картУстановлено = 0;
+            контейнеровВскрыто = 0;
+            спецИспользовано = 0;
+            келемияПотрачено = 0;
         }
     }
 
@@ -521,13 +575,29 @@ public final class TurnJournal {
      * @param victimKelium  сколько келемия было у хозяина жетона
      * @param myKelium      сколько келемия было у бьющего
      * @param atStartSpawn  добытчик, примыкавший к СТАРТОВОМУ зарождению
+     * @param кем           род войска, которое уничтожило ({@code infantry}…);
+     *                      {@code null} — не войском (эффект карты)
+     * @param атака         {@code universal} / {@code specialized}; {@code null} —
+     *                      не атакой
+     * @param откуда        гекс, с которого била атака; {@code null} — не атакой
+     * @param где           гекс, на котором стоял уничтоженный жетон
      */
     public record Убитый(int owner, String kind, boolean building, int hp,
                          int victimUnits, int myUnits, int victimKelium, int myKelium,
-                         boolean atStartSpawn) {
+                         boolean atStartSpawn, String кем, String атака, String откуда,
+                         String где) {
     }
 
     private final TurnFacts[] perSeat;
+
+    /**
+     * НОМЕР ХОДА В ПАРТИИ — растёт с каждым {@link #startTurn}. По нему
+     * срабатывания карт «не больше N раз за ход» знают, что ход сменился, в
+     * том числе когда карта срабатывает в чужой ход (Карты 2.0, 30.09.2026).
+     */
+    private int номерХода = 0;
+    /** Сколько раз сработала каждая карта в текущем ходу: «место:карта» → раз. */
+    private final Map<String, Integer> срабатывания = new HashMap<>();
 
     public TurnJournal(int numPlayers) {
         perSeat = new TurnFacts[numPlayers];
@@ -542,12 +612,26 @@ public final class TurnJournal {
         for (int i = 0; i < perSeat.length; i++) {
             j.perSeat[i].copyFrom(perSeat[i]);
         }
+        j.номерХода = номерХода;
+        j.срабатывания.putAll(срабатывания);
         return j;
     }
 
     /** Начать ход места: обнулить его запись. */
     public void startTurn(int seat) {
         perSeat[seat].reset();
+        номерХода++;
+        срабатывания.clear();
+    }
+
+    /** Сколько раз карта {@code карта} игрока {@code место} уже сработала в этот ход. */
+    public int срабатываний(int место, String карта) {
+        return срабатывания.getOrDefault(место + ":" + карта, 0);
+    }
+
+    /** Отметить ещё одно срабатывание карты в этот ход. */
+    public void отметитьСрабатывание(int место, String карта) {
+        срабатывания.merge(место + ":" + карта, 1, Integer::sum);
     }
 
     /** Факты текущего хода указанного места. */

@@ -181,7 +181,7 @@ public class StrategicAgent extends HeuristicAgent {
         }
         return switch (kind) {
             case "reveal_order" -> explainReveal(state, pick);
-            case "action" -> explainAction(state, pick);
+            case "action", "action_branch" -> explainAction(state, pick);
             case "move" -> explainMove(state, pick);
             case "maneuver_unit" -> explainManeuver(state, pick);
             case "combat_target" -> explainCombatTarget(state, pick);
@@ -211,11 +211,12 @@ public class StrategicAgent extends HeuristicAgent {
             return Phrasebook.pick("приказ.безопасность." + jokerGrade(state), rng);
         }
         Order top = Order.fromCode((String) card.get("top"));
-        String what = switch (top) {
+        String what = switch (top.legacy()) {
             case ACQUIRE -> "разработка";      // фразы прежних наборов: ближайший по смыслу
             case PLACE -> "инфраструктура";
             case CONTROL -> "операция";
             case EXPLORE -> "приобретения";
+            default -> "операция";
         };
         return Phrasebook.pick("приказ." + what + "." + orderGrade(state, top), rng);
     }
@@ -224,7 +225,8 @@ public class StrategicAgent extends HeuristicAgent {
     private String orderGrade(GameState state, Order top) {
         String planned = plan == null || plan.nextStep == null
             ? null : plan.nextStep.action;
-        List<String> actions = List.of(Order.ORDER_ACTIONS.get(top));
+        List<String> actions = kelium.engine.Actions.expandForks(
+            List.of(Order.ORDER_ACTIONS.get(top)));
         if (planned != null && actions.contains(planned)) {
             return СИЛЬНО;
         }
@@ -597,11 +599,24 @@ public class StrategicAgent extends HeuristicAgent {
                 }
                 return 0.0;
             }
-            case "action" -> {
+            case "action", "action_branch" -> {
                 if (o.payload() == null) {
                     return 0.0;
                 }
                 String name = String.valueOf(o.payload());
+                // РАЗВИЛКА (приказы 5.0.0): годится, если одна из веток — нужная.
+                List<String> ветки = kelium.engine.Actions.FORKS.get(name);
+                if (ветки != null) {
+                    // List.of не принимает null в contains — план без действия бывает
+                    if (step != null && step.action != null && ветки.contains(step.action)) {
+                        return k * 6.0;
+                    }
+                    String итог = step == null ? finalAction(plan) : null;
+                    if (итог != null && ветки.contains(итог)) {
+                        return k * 8.0;
+                    }
+                    return 0.0;
+                }
                 // действие, которым закрывается ближайший шаг
                 if (step != null && name.equals(step.action)) {
                     return k * 6.0;
@@ -698,7 +713,8 @@ public class StrategicAgent extends HeuristicAgent {
         } catch (RuntimeException e) {
             return 0.0;
         }
-        for (String a : kelium.engine.Order.ORDER_ACTIONS.get(ord)) {
+        for (String a : kelium.engine.Actions.expandForks(
+                List.of(kelium.engine.Order.ORDER_ACTIONS.get(ord)))) {
             if (a.equals(action)) {
                 return 1.0;
             }
@@ -730,7 +746,7 @@ public class StrategicAgent extends HeuristicAgent {
         }
         Order top = Order.fromCode((String) card.get("top"));
         double pull = genome.get("plan.reveal_pull", 6.0);
-        for (String a : Order.ORDER_ACTIONS.get(top)) {
+        for (String a : kelium.engine.Actions.expandForks(List.of(Order.ORDER_ACTIONS.get(top)))) {
             if (a.equals(needNow)) {
                 // готовый план (nextStep == null) закрывается финальным действием
                 // — это самый ценный приказ на руке.

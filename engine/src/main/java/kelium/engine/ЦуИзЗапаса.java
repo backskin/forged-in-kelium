@@ -54,7 +54,7 @@ public final class ЦуИзЗапаса {
                 continue;
             }
             int[] груз = Actions.groundLoad(s, h.id, -1);
-            if (h.chooseFootprint(fp, груз[0], груз[1]) != null) {
+            if (h.chooseFootprint(fp, груз[0], груз[1], груз[2]) != null) {
                 out.add(h.id);
             }
         }
@@ -90,7 +90,7 @@ public final class ЦуИзЗапаса {
         int[] груз = Actions.groundLoad(s, гекс, -1);
         List<List<Integer>> повороты = new ArrayList<>();
         for (int start = 0; start < 6; start++) {
-            List<Integer> след = h.footprintAt(start, fp, груз[0], груз[1]);
+            List<Integer> след = h.footprintAt(start, fp, груз[0], груз[1], груз[2]);
             if (след != null) {
                 повороты.add(след);
             }

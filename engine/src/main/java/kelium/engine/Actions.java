@@ -61,6 +61,13 @@ public final class Actions {
     public static final int ARSENAL_CARD_SOURCE_UID = -3;
 
     /**
+     * МОНЕТА НА ЯЧЕЙКЕ ЭНЕРГИИ («Аварийное питание» 7.3.0): в ветке «Переложить
+     * энергию» монету кладут на свободную ячейку своего здания — ячейка занята,
+     * как кубиком. В начале следующего своего хода монеты уходят в общий запас.
+     */
+    public static final int COIN_SOURCE_UID = -4;
+
+    /**
      * Ключи приза шага 1 по порядку прихода на шаг: ячейка 1 · 2 · 3.
      * Ячеек у шага 1 три, поэтому и ключей три — сколько призов реально
      * прописано, решает свод, а не код.
@@ -109,22 +116,20 @@ public final class Actions {
         if (h == null) {
             return false;
         }
+        int[] load = groundLoad(state, hexId, -1);
         if (unit == UnitType.AIRCRAFT) {
             // У авиации свой сектор Неба: он не спорит с наземными ячейками,
             // спорит только с ЧУЖОЙ авиацией на этом же гексе.
             return roomForUnit(state, hexId, UnitType.AIRCRAFT, seat)
-                && h.fitsWithRepack(fp, groundLoad(state, hexId, -1)[0],
-                    groundLoad(state, hexId, -1)[1]);
+                && h.fitsWithRepack(fp, load[0], load[1], load[2]);
         }
         if (unit == UnitType.TOWER) {
             // Вышка ставится в ЛЮБОМ гексе зоны стройки, не обязательно в этом.
-            return h.fitsWithRepack(fp, groundLoad(state, hexId, -1)[0],
-                groundLoad(state, hexId, -1)[1]);
+            return h.fitsWithRepack(fp, load[0], load[1], load[2]);
         }
-        int[] load = groundLoad(state, hexId, -1);
         int vehicles = load[0] + (unit == UnitType.VEHICLE ? 1 : 0);
         int singles = load[1] + (unit == UnitType.VEHICLE ? 0 : 1);
-        return h.fitsWithRepack(fp, vehicles, singles);
+        return h.fitsWithRepack(fp, vehicles, singles, load[2]);
     }
 
     /**
@@ -290,6 +295,13 @@ public final class Actions {
             case "combat" -> new CombatAction(state);
             case "market" -> new MarketAction(state);
             case "science" -> new ScienceAction(state);
+            case "extract", "power", "supply", "command", "develop" ->
+                new ForkAction(state, name);
+            // ВЕТКИ «ПОСТРОИТЬ» ОТДЕЛЬНО — так их называют награды карт
+            // (комплект «пять развилок»: «… или Построить энергостанцию»)
+            case "build_miner" -> new BranchBuildAction(state, name, "miner");
+            case "build_plant" -> new BranchBuildAction(state, name, "plant");
+            case "build_military" -> new BranchBuildAction(state, name, "military");
             default -> throw new IllegalArgumentException("неизвестное действие: " + name);
         };
     }
@@ -327,6 +339,174 @@ public final class Actions {
     public static final List<String> ALL_NAMES = List.of(
         "assembly", "mining", "build", "energy_swap",
         "movement", "combat", "market", "science");
+
+    // ======================================================================
+    //  ПЯТЬ ДЕЙСТВИЙ-РАЗВИЛОК (решение дизайнера 27.09.2026, приказы 5.0.0)
+    // ======================================================================
+    //  Каждое действие — «одно из двух»: игрок в начале действия выбирает
+    //  ветку, и дальше идёт прежнее действие целиком. Ветка «построить» —
+    //  прежняя Стройка, но с набором типов зданий этого действия (и снос —
+    //  только этих типов).
+
+    /** Действия-развилки и их ветки (имена прежних действий), по порядку. */
+    public static final Map<String, List<String>> FORKS = new java.util.LinkedHashMap<>();
+
+    /** Какие здания строит ветка «построить» развилки: miner | plant | military. */
+    public static final Map<String, String> FORK_BUILD = new HashMap<>();
+
+    static {
+        FORKS.put("extract", List.of("mining", "build"));
+        FORKS.put("power", List.of("energy_swap", "build"));
+        FORKS.put("supply", List.of("assembly", "build"));
+        FORKS.put("command", List.of("movement", "combat"));
+        FORKS.put("develop", List.of("market", "science"));
+        FORK_BUILD.put("extract", "miner");
+        FORK_BUILD.put("power", "plant");
+        FORK_BUILD.put("supply", "military");
+    }
+
+    /**
+     * ВЕТКА «ПОСТРОИТЬ» КАК САМОСТОЯТЕЛЬНОЕ ДЕЙСТВИЕ — для наград карт, которые
+     * дают одну ветку, а не развилку: одно здание своего вида (или снос одного).
+     */
+    public static final class BranchBuildAction extends Action {
+        private final String id;
+        private final String вид;
+
+        BranchBuildAction(GameState state, String id, String вид) {
+            super(state);
+            this.id = id;
+            this.вид = вид;
+        }
+
+        @Override public String name() { return id; }
+        @Override public boolean implemented() { return true; }
+
+        @Override
+        public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
+            String было = ctx.buildBranch;
+            ctx.buildBranch = вид;
+            ActionResult res;
+            try {
+                res = create("build", state).perform(player, ctx, agent);
+            } finally {
+                ctx.buildBranch = было;
+            }
+            if (ctx.actionsPlayed.remove("build") || res.ok()) {
+                ctx.actionsPlayed.add(id);
+            }
+            return res;
+        }
+    }
+
+    /** Ветка «построить» развилки по её имени: extract → build_miner и т. д. */
+    public static String buildBranchCode(String fork) {
+        return switch (fork) {
+            case "extract" -> "build_miner";
+            case "power" -> "build_plant";
+            case "supply" -> "build_military";
+            default -> "build";
+        };
+    }
+
+    /** Имена пяти действий-развилок. */
+    public static final List<String> FORK_NAMES = List.copyOf(FORKS.keySet());
+
+    /**
+     * Имена действий с развилками, раскрытыми в их ветки (прежние действия):
+     * {@code [extract, power]} → {@code [mining, build, energy_swap]}.
+     */
+    public static List<String> expandForks(java.util.Collection<String> names) {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (String n : names) {
+            List<String> b = FORKS.get(n);
+            if (b == null) {
+                out.add(n);
+            } else {
+                out.addAll(b);
+            }
+        }
+        return new ArrayList<>(out);
+    }
+
+    /** Развилка ли это (а не прежнее действие). */
+    public static boolean isFork(String name) {
+        return name != null && FORKS.containsKey(name);
+    }
+
+    /**
+     * Можно ли ветке стройки {@code branch} ставить/сносить здание этого типа.
+     * {@code null} — ветки нет, обычная Стройка: можно всё.
+     */
+    public static boolean buildBranchAllows(String branch, BuildingType t) {
+        if (branch == null) {
+            return true;
+        }
+        return switch (branch) {
+            case "miner" -> t == BuildingType.MINER;
+            case "plant" -> t == BuildingType.POWER_PLANT;
+            // ЦУ веткой не строится (комплект 27.09): только спец-действием из запаса
+            case "military" -> t == BuildingType.BARRACKS || t == BuildingType.FACTORY
+                || t == BuildingType.AIRBASE;
+            default -> true;
+        };
+    }
+
+    /**
+     * ДЕЙСТВИЕ-РАЗВИЛКА: первым шагом игрок выбирает ветку (решение вида
+     * {@code action_branch}, вариант — имя прежнего действия), затем
+     * выполняется прежнее действие. В {@link TurnContext#actionsPlayed}
+     * попадает имя РАЗВИЛКИ (по нему действие не повторяется в ходу), а имя
+     * выполненной ветки остаётся в {@link #branch} — движок пишет его в журнал
+     * хода и в событие действия, чтобы задания вида «сделай Бой» работали.
+     */
+    public static final class ForkAction extends Action {
+        private final String id;
+        /** Выбранная ветка — имя прежнего действия (null, пока не выбрана). */
+        public String branch;
+
+        ForkAction(GameState state, String id) {
+            super(state);
+            this.id = id;
+        }
+
+        @Override public String name() { return id; }
+        @Override public boolean implemented() { return true; }
+
+        @Override
+        public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
+            List<String> ветки = FORKS.get(id);
+            List<Choice> opts = new ArrayList<>();
+            for (String b : ветки) {
+                // подпись «развилка:ветка» — окну, чтобы назвать ветку словами
+                opts.add(new Choice("action_branch", b, id + ":" + b));
+            }
+            Choice ch = agent.choose(state, opts, Map.of("kind", "action_branch",
+                "action", id));
+            branch = ch == null || ch.payload() == null
+                ? ветки.get(0) : String.valueOf(ch.payload());
+            if (!ветки.contains(branch)) {
+                branch = ветки.get(0);
+            }
+            Action sub = create(branch, state);
+            String былаВетка = ctx.buildBranch;
+            if ("build".equals(branch)) {
+                ctx.buildBranch = FORK_BUILD.get(id);
+            }
+            ActionResult res;
+            try {
+                res = sub.perform(player, ctx, agent);
+            } finally {
+                ctx.buildBranch = былаВетка;
+            }
+            // Слот хода занимает РАЗВИЛКА: ветка не мешает второй развилке с
+            // той же веткой (Добыча и Питание обе могут «построить»).
+            if (ctx.actionsPlayed.remove(branch) || res.ok()) {
+                ctx.actionsPlayed.add(id);
+            }
+            return res;
+        }
+    }
 
 
     // ======================================================================
@@ -455,10 +635,18 @@ public final class Actions {
             // чем двумя зданиями»; в обычной Добыче предела нет.
             int пределДобытчиков = ctx.objectLimit(name());
             int отработали = 0;
+            // ПОЧЕМУ ДОБЫЧА ПУСТАЯ (замер 01.10.2026: треть «Добыть» не даёт
+            // ничего) — счёт причин по добытчикам, в телеметрию
+            int добытчиков = 0;
+            int безЭнергии = 0;
+            int безКелемия = 0;
+            int пропущено = 0;
+            int складПолон = 0;
             for (BuildingToken b : player.buildingsOnField()) {
                 if (b.type != BuildingType.MINER) {
                     continue;
                 }
+                добытчиков++;
                 if (отработали >= пределДобытчиков) {
                     break;
                 }
@@ -472,11 +660,20 @@ public final class Actions {
                 // добытчиков работают в эту Добычу БЕЗ энергии. Все запитанные
                 // работают и так — «ещё один» может значить только этот, иначе
                 // прибавка была бы пустой.
+                // ВАРИАНТ ДЛЯ ЗАМЕРА (01.10.2026, mining.unpowered_yield): добытчик
+                // без энергии всё же добывает столько келемия (запитанный — по
+                // уровню). Две трети пустых «Добыть» — оттого, что все добытчики
+                // без энергии. 0 — прежнее правило: без энергии не работает.
+                int безЭнергииДобывает = 0;
                 if (!ctx.allPowered && !effectivelyPowered(s, player, b, agent, paid)) {
                     if (ctx.freeMinerMoves > 0) {
                         ctx.freeMinerMoves--;
                     } else {
-                        continue;
+                        безЭнергии++;
+                        безЭнергииДобывает = kelium.dataio.Ctx.rules(s).getInt("mining.unpowered_yield", 0);
+                        if (безЭнергииДобывает <= 0) {
+                            continue;
+                        }
                     }
                 }
                 String grid = adjacentGridWithKelium(b);
@@ -511,6 +708,7 @@ public final class Actions {
                     opts.add(new Choice("mine", "container", "take container @" + contHex));
                 }
                 if (opts.isEmpty()) {
+                    безКелемия++;
                     continue;   // ни келемия рядом, ни открытого контейнера
                 }
                 // СРАБАТЫВАНИЕ ПРИ ПОСТРОЙКЕ — БЕЗ ПРОПУСКА (решение дизайнера
@@ -523,12 +721,19 @@ public final class Actions {
                 Choice pick = приПостройке && opts.size() == 1 ? opts.get(0)
                     : agent.choose(s, opts, Map.of("kind", "mine"));
                 if (pick.payload() == null) {
+                    пропущено++;
                     continue;   // добытчик пропущен
                 }
                 takeContainerOnly = "container".equals(pick.payload());
                 отработали++;
                 if (!takeContainerOnly) {
-                    gainedK += mineFromMiner(s, player, b, grid);
+                    int добыто = безЭнергииДобывает > 0 && grid != null
+                        ? mineFlatFromTile(s, player, grid, безЭнергииДобывает)
+                        : mineFromMiner(s, player, b, grid);
+                    if (добыто == 0) {
+                        складПолон++;
+                    }
+                    gainedK += добыто;
                     if (both) {
                         gainedC += Storage.addContainersCapped(s, player, 1,
                             "Добыча: выработал тайл");
@@ -575,6 +780,11 @@ public final class Actions {
             tel.put("power_coins", paid[0]);
             tel.put("power_offers", paid[1]);
             tel.put("containers", gainedC);
+            tel.put("miners", добытчиков);
+            tel.put("miners_unpowered", безЭнергии);
+            tel.put("miners_no_kelium", безКелемия);
+            tel.put("miners_skipped", пропущено);
+            tel.put("miners_storage_full", складПолон);
             return ActionResult.ok("mined " + gainedK + " kelium, " + gainedC + " containers", tel);
         }
 
@@ -1068,7 +1278,7 @@ public final class Actions {
             return Placement.skyOpen(state, hexId, seat, -1);
         }
         int[] load = groundLoad(state, hexId, -1);
-        return h.fitsWithRepack(t == UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
+        return h.fitsWithRepack(t == UnitType.VEHICLE ? 2 : 1, load[0], load[1], load[2]);
     }
 
     // ======================================================================
@@ -1080,6 +1290,9 @@ public final class Actions {
         BuildAction(GameState state) {
             super(state);
         }
+
+        /** Ветка «построить» со сносом перед стройкой — на время одного perform. */
+        private boolean сносДоСтройки;
 
         @Override public String name() { return "build"; }
         @Override public Order order() { return Order.PLACE; }
@@ -1094,6 +1307,18 @@ public final class Actions {
             int coinsSpent = 0;
             // ПРЕДЕЛ С КАРТЫ: бесплатная Стройка бывает «одна операция».
             int opLimit = ctx.objectLimit(name());
+            // ВЕТКА «ПОСТРОИТЬ» РАЗВИЛКИ (комплект «пять развилок», 27.09.2026):
+            // ставит ОДНО здание своего вида или сносит одно своё такое здание.
+            if (ctx.buildBranch != null) {
+                opLimit = Math.min(opLimit, 1);
+            }
+            // СНОС ПЕРЕД СТРОЙКОЙ (решение Влада 02.10.2026, свод
+            // actions.build.branch_demolish_before_build): в ветке «построить»
+            // сначала можно снести сколько угодно своих зданий её вида (каждое
+            // даёт монету), потом поставить одно — в том числе только что
+            // снесённое. Переезд здания получается сам собой.
+            сносДоСтройки = ctx.buildBranch != null
+                && rs.getBool("actions.build.branch_demolish_before_build", false);
             // ОДНА ОПЕРАЦИЯ НА ОДНО ЗДАНИЕ ЗА ДЕЙСТВИЕ (заказ дизайнера
             // 25.08.2026, ключ actions.build.one_op_per_building). Иначе то же
             // здание можно поставить и тут же снять, доя монету за снос.
@@ -1119,12 +1344,19 @@ public final class Actions {
             // Это то же по природе ограничение, что ячейки предложений рынка —
             // нехватка РАЗНЫХ возможностей, а не потолок количества: она видна
             // на столе и не требует счёта.
+            int поставлено = 0;
+            // КРУПНАЯ ПОСТРОЙКА (02.10.2026): событие «построил добытчик или
+            // энергостанцию 3-го уровня или выше» для срабатываний арсенала
+            int крупныхДо = journal(state) == null ? 0
+                : journal(state).of(player.seat).builtBigEconomyHexes.size();
             while (true) {
-                if (ops >= opLimit) {
+                if (сносДоСтройки ? поставлено >= opLimit : ops >= opLimit) {
                     break;
                 }
+                int былоПоставлено = поставленные.size();
                 ActionResult one = performOneOp(player, ctx, agent, тронутые, поставленные,
                     снесённые);
+                поставлено += поставленные.size() - былоПоставлено;
                 if (one == null) {
                     break;   // пас или ничего доступного
                 }
@@ -1150,6 +1382,10 @@ public final class Actions {
             tel.put("ops", ops);
             tel.put("coin_spent", coinsSpent);
             tel.put("coins_left", player.resources.coin());
+            if (journal(state) != null) {
+                tel.put("big_built", journal(state).of(player.seat).builtBigEconomyHexes.size()
+                    - крупныхДо);
+            }
             return ActionResult.ok(detail.toString().trim(), tel);
         }
 
@@ -1192,6 +1428,11 @@ public final class Actions {
             surcharge -= Math.max(0, ctx.buildDiscountCoins);
             List<Map<String, Object>> menu = ctx.buildMovesOnly
                 ? new ArrayList<>() : buildable(player, surcharge, ctx.buildFree);
+            // ВЕТКА «ПОСТРОИТЬ» РАЗВИЛКИ (приказы 5.0.0): только свои типы.
+            if (ctx.buildBranch != null) {
+                menu.removeIf(m -> !buildBranchAllows(ctx.buildBranch,
+                    (BuildingType) m.get("btype")));
+            }
             // ЗДАНИЕ ЗА НАЗВАННУЮ ЦЕНУ (верх арсенала 5.0 «построй любое здание
             // за 1 монету»). Цена ЗАМЕНЯЕТ всю арифметику стройки - и печатную
             // цену, и надбавку за операцию: карта обещает ровно одну монету, и
@@ -1218,6 +1459,10 @@ public final class Actions {
             boolean переносМожно = rs.getBool("actions.build.move_enabled", true);
             List<Map<String, Object>> moveMenu = переносМожно
                 ? movable(player, ctx) : new ArrayList<>();
+            if (ctx.buildBranch != null) {
+                moveMenu.removeIf(m -> m.get("uid") instanceof Number n
+                    && !branchAllowsUid(player, ctx.buildBranch, n.intValue()));
+            }
             // ОДНА ОПЕРАЦИЯ НА ЗДАНИЕ. Уже тронутое этим действием здание из меню
             // уходит: иначе его можно переставлять и сносить по кругу.
             boolean одноНаЗдание = rs.getBool("actions.build.one_op_per_building", false);
@@ -1228,15 +1473,21 @@ public final class Actions {
                 // каждым зданием за действие делается одно — поставить или
                 // снести). Снесённый жетон вернулся в запас, и постройка взяла бы
                 // именно его — значит, это то же здание во второй операции.
-                menu.removeIf(m -> {
-                    BuildingToken запасной = reserveToken(player, (BuildingType) m.get("btype"),
-                        (Integer) m.get("level"));
-                    return запасной != null && тронутые.contains(запасной.uid);
-                });
+                // СНОС ПЕРЕД СТРОЙКОЙ (02.10.2026): снесённое в этой ветке ставить
+                // заново можно — это и есть переезд здания.
+                if (!сносДоСтройки) {
+                    menu.removeIf(m -> {
+                        BuildingToken запасной = reserveToken(player,
+                            (BuildingType) m.get("btype"), (Integer) m.get("level"));
+                        return запасной != null && тронутые.contains(запасной.uid);
+                    });
+                }
             }
-            if (menu.isEmpty() && moveMenu.isEmpty()) {
-                return null;
-            }
+            // ПУСТОЕ МЕНЮ ПОСТРОЙКИ — ЕЩЁ НЕ ПАС: снос монет не требует, наоборот,
+            // даёт их. Прежде при «строить не на что» операция кончалась здесь,
+            // и без денег нельзя было и снести своё здание (поймано 30.09.2026,
+            // когда стартовые монеты ушли на верх начального арсенала). Пусто
+            // ли всё меню, решается ниже, когда собран и снос.
             List<Choice> opts = new ArrayList<>();
             for (Map<String, Object> spec : menu) {
                 opts.add(new Choice("build_pick", spec, (String) spec.get("label")));
@@ -1277,6 +1528,9 @@ public final class Actions {
             // то есть раз за партию. Ставят ЦУ заново потом спец-действием.
             boolean цуЗаЖетон = rs.getBool("actions.build.demolish_cu_gives_token", false);
             for (BuildingToken b : player.buildingsOnField()) {
+                if (!buildBranchAllows(ctx.buildBranch, b.type)) {
+                    continue;
+                }
                 if (b.type == BuildingType.COMMAND_CENTER && !цуМожноСносить) {
                     continue;
                 }
@@ -1325,7 +1579,8 @@ public final class Actions {
             // сможет включить ремонт и померить, чего игре стоит его отсутствие.
             boolean ремонтМожно = rs.getBool("actions.build.repair_enabled", false);
             for (BuildingToken b : player.buildingsOnField()) {
-                if (!ремонтМожно || b.damage <= 0) {
+                if (!ремонтМожно || b.damage <= 0
+                        || !buildBranchAllows(ctx.buildBranch, b.type)) {
                     continue;
                 }
                 int цена = printedPrice(player, b);
@@ -1341,9 +1596,15 @@ public final class Actions {
                     + " (урон " + b.damage + ", " + цена + " мон)");
                 opts.add(new Choice("repair_pick", чинить, (String) чинить.get("label")));
             }
+            if (opts.isEmpty()) {
+                return null;                        // ни поставить, ни снести
+            }
             opts.add(new Choice("pass", null, "stop building"));
+            // ВЕТКА — в точку решения: интерфейс называет меню её именем
+            // («Построить добытчик») и не показывает чужих зданий
             Choice pick = agent.choose(state, opts, Map.of("kind", "build_pick",
-                "built", new ArrayList<>(поставленные), "demolished", new ArrayList<>(снесённые)));
+                "built", new ArrayList<>(поставленные), "demolished", new ArrayList<>(снесённые),
+                "branch", ctx.buildBranch == null ? "" : ctx.buildBranch));
             if (pick.payload() == null) {
                 return null;
             }
@@ -1392,8 +1653,9 @@ public final class Actions {
             for (String hid : buildSpots(player, btype)) {
                 // здание жёсткое, но войска на гексе НЕЖЁСТКИЕ: строить можно,
                 // если ПЕРЕУПАКОВКОЙ войск освобождается след из fp смежных ячеек
+                // (по своду 1.46.0 войска держат секторы — след только на свободных)
                 int[] ld = groundLoad(state, hid, -1);
-                if (state.field.get(hid).chooseFootprint(fp, ld[0], ld[1]) != null) {
+                if (state.field.get(hid).chooseFootprint(fp, ld[0], ld[1], ld[2]) != null) {
                     candidates.add(hid);
                 }
             }
@@ -1496,6 +1758,15 @@ public final class Actions {
                     разово.сборкаТолькоВойска = толькоНаКонтейнере;
                     Actions.create(своё, state).perform(player, разово, agent);
                 }
+                // ЭНЕРГОСТАНЦИЯ СРАБАТЫВАЕТ ТОЖЕ (комплект «пять развилок», 27.09):
+                // её кубики сразу раскладывают по ячейкам своих зданий — только
+                // эти кубики; неразложенные остаются на станции.
+                if (btype == BuildingType.POWER_PLANT && b.energyIdle > 0) {
+                    EnergySwapAction питание = new EnergySwapAction(state);
+                    int кубиков = b.energyIdle;
+                    b.energyIdle = 0;
+                    питание.placeCubes(player, agent, b.uid, кубиков, b, true);
+                }
             }
             // СТАРЫЙ РЕЖИМ: стройка на гексе СЖИГАЕТ лежащий там жетон
             // контейнера (ruleset 1.6.0-c1).
@@ -1504,6 +1775,10 @@ public final class Actions {
             f.buildOps += 1;
             f.builtOnHexes.add(targetHex);
             f.buildOpHexes.add(targetHex);      // o15 «Стройбум»: гексы операций
+            if ((btype == BuildingType.MINER || btype == BuildingType.POWER_PLANT)
+                    && b.level != null && b.level >= 3) {
+                f.builtBigEconomyHexes.add(targetHex);   // o79 «Строй крупно»
+            }
             if (btype == BuildingType.COMMAND_CENTER) {
                 f.cuPlacedHexes.add(targetHex);  // o17 «Штаб на передовой»
             }
@@ -1535,13 +1810,13 @@ public final class Actions {
             int[] load = groundLoad(state, hexId, -1);
             List<List<Integer>> variants = new ArrayList<>();
             for (int start = 0; start < 6; start++) {
-                List<Integer> run = h.footprintAt(start, fp, load[0], load[1]);
+                List<Integer> run = h.footprintAt(start, fp, load[0], load[1], load[2]);
                 if (run != null) {
                     variants.add(run);
                 }
             }
             if (variants.isEmpty()) {
-                return h.chooseFootprint(fp, load[0], load[1]);
+                return h.chooseFootprint(fp, load[0], load[1], load[2]);
             }
             if (variants.size() == 1) {
                 return variants.get(0);
@@ -1846,7 +2121,7 @@ public final class Actions {
                     continue;
                 }
                 int[] ld = groundLoad(state, hid, -1);
-                if (state.field.get(hid).chooseFootprint(fp, ld[0], ld[1]) != null) {
+                if (state.field.get(hid).chooseFootprint(fp, ld[0], ld[1], ld[2]) != null) {
                     candidates.add(hid);
                 }
             }
@@ -1854,9 +2129,14 @@ public final class Actions {
                 // Ставить некуда — возвращаем здание туда, где стояло: ход не
                 // состоялся, а не «здание пропало».
                 b.hexId = fromHex;
+                int[] ldBack = groundLoad(state, fromHex, -1);
                 List<Integer> back = state.field.get(fromHex)
-                    .chooseFootprint(fp, groundLoad(state, fromHex, -1)[0],
-                        groundLoad(state, fromHex, -1)[1]);
+                    .chooseFootprint(fp, ldBack[0], ldBack[1], ldBack[2]);
+                if (back == null) {
+                    // выселенное войско могло встать на след самого здания;
+                    // перенос не состоялся — здание встаёт на место в любом случае
+                    back = state.field.get(fromHex).chooseFootprint(fp, ldBack[0], ldBack[1]);
+                }
                 if (back != null) {
                     state.field.get(fromHex).occupySides(b.uid, back);
                 }
@@ -2068,6 +2348,15 @@ public final class Actions {
             return out;
         }
 
+        private static boolean branchAllowsUid(PlayerState player, String branch, int uid) {
+            for (BuildingToken b : player.buildings) {
+                if (b.uid == uid) {
+                    return buildBranchAllows(branch, b.type);
+                }
+            }
+            return true;
+        }
+
         private boolean hasReserve(PlayerState player, BuildingType bt) {
             for (BuildingToken b : player.buildings) {
                 if (b.type == bt && b.hexId == null) {
@@ -2090,6 +2379,29 @@ public final class Actions {
 
         @Override
         public ActionResult perform(PlayerState player, TurnContext ctx, Agent agent) {
+            // СДВИНУЛАСЬ ЛИ ЭНЕРГИЯ (01.10.2026): снять кубик и положить его туда
+            // же — перекладка впустую, хотя «положено» и «снято» не нули. Сравниваем
+            // расклад до и после; пишем в телеметрию energy_moved.
+            Map<Integer, Integer> раскладДо = расклад(player);
+            ActionResult итог = performInner(player, ctx, agent);
+            if (итог.ok() && итог.telemetry() != null) {
+                Map<String, Object> tel = new HashMap<>(итог.telemetry());
+                tel.put("energy_moved", раскладДо.equals(расклад(player)) ? 0 : 1);
+                return ActionResult.ok(итог.detail(), tel);
+            }
+            return итог;
+        }
+
+        /** Кубики энергии на каждом своём здании: лежащие и простаивающие. */
+        private static Map<Integer, Integer> расклад(PlayerState player) {
+            Map<Integer, Integer> out = new HashMap<>();
+            for (BuildingToken b : player.buildingsOnField()) {
+                out.put(b.uid, b.energyPlaced * 100 + b.energyIdle);
+            }
+            return out;
+        }
+
+        private ActionResult performInner(PlayerState player, TurnContext ctx, Agent agent) {
             // ПРАВИЛО 04.09.2026. Выбора гекса больше нет. Активируй каждый свой
             // ИСТОЧНИК не больше одного раза за действие, и каждая активация —
             // одно из двух:
@@ -2212,11 +2524,35 @@ public final class Actions {
                             "положить келемий на ячейку энергии"));
                     }
                 }
+                // «АВАРИЙНОЕ ПИТАНИЕ» 7.3.0: монета на свободную ячейку энергии
+                if (Passives.hasPassive(state, player.seat, "coins_on_energy_cells")
+                        && player.resources.coin() > 0) {
+                    boolean свободно = false;
+                    for (BuildingToken b : player.buildingsOnField()) {
+                        свободно |= b.energySlots > b.energyPlaced;
+                    }
+                    if (свободно) {
+                        opts.add(new Choice("energy_coin", "coin",
+                            "положить монету на свободную ячейку энергии"));
+                    }
+                }
                 if (opts.isEmpty()) {
                     break;
                 }
                 opts.add(new Choice("energy_done", null, "закончить"));
                 Choice pick = agent.choose(state, opts, Map.of("kind", "energy_activation"));
+                if (pick != null && "energy_coin".equals(pick.kind())) {
+                    player.resources.pay(kelium.core.Resource.COIN, 1);
+                    int положено = placeCubes(player, agent, COIN_SOURCE_UID, 1, null);
+                    if (положено == 0) {
+                        player.resources.add(kelium.core.Resource.COIN, 1);   // передумал
+                        break;
+                    }
+                    placedTotal += положено;
+                    activations++;
+                    ctx.recordOp("energy_swap");
+                    continue;
+                }
                 if (pick != null && "energy_kelium".equals(pick.kind())) {
                     Map<String, Object> итог = kelium.engine.Effects.apply(
                         "place_on_energy_cell", state, player.seat,
@@ -2332,6 +2668,16 @@ public final class Actions {
          */
         private int placeCubes(PlayerState player, Agent agent, int srcUid, int pool,
                                BuildingToken src) {
+            return placeCubes(player, agent, srcUid, pool, src, false);
+        }
+
+        /**
+         * @param onBuild кубики только что построенной станции (срабатывание при
+         *                постройке): окно говорит «станция построена и даёт N» и
+         *                предлагает оставить их на станции
+         */
+        private int placeCubes(PlayerState player, Agent agent, int srcUid, int pool,
+                               BuildingToken src, boolean onBuild) {
             int placed = 0;
             for (int i = 0; i < pool; i++) {
                 List<Choice> opts = new ArrayList<>();
@@ -2353,6 +2699,10 @@ public final class Actions {
                 Map<String, Object> вопрос = new HashMap<>();
                 вопрос.put("kind", "energy_place");
                 вопрос.put("remaining", pool - i);
+                вопрос.put("total", pool);
+                if (onBuild) {
+                    вопрос.put("on_build", true);
+                }
                 if (src != null && src.hexId != null) {
                     вопрос.put("source", src.hexId);
                     вопрос.put("source_type", src.type.code);
@@ -3014,9 +3364,10 @@ public final class Actions {
             // УМНАЯ проверка стоянки: войска НЕ приколочены к ячейкам — считаем,
             // влезет ли новичок, если стоящие переупакуются (правило дизайнера).
             // Технике нужна пара СМЕЖНЫХ ячеек; жёсткие только здания/нейтралы.
+            // По своду 1.46.0 войска держат секторы — новичку только свободные.
             int[] load = groundLoad(state, hexId, unit.uid);
             return h.fitsWithRepack(unit.type == UnitType.VEHICLE ? 2 : 1,
-                load[0], load[1]);
+                load[0], load[1], load[2]);
         }
 
     }
@@ -3180,6 +3531,30 @@ public final class Actions {
             super(state);
         }
 
+        /**
+         * СКОЛЬКО КЕЛЕМИЯ ИГРОК МОЖЕТ СДАТЬ НА РЫНКЕ. С «Кристальными
+         * лабораториями» (арсенал 7.3.0) трофеи идут вместо келемия: на Рынке и
+         * в Науке это один ресурс.
+         */
+        static int келемийНаРынке(GameState s, PlayerState p) {
+            int n = p.resources.kelium();
+            if (Passives.hasPassive(s, p.seat, "labs_kelium_trophy_swap")) {
+                n += p.resources.trophy();
+            }
+            return n;
+        }
+
+        /** Заплатить келемий на рынке: сперва келемием, недостачу — трофеями (с картой). */
+        static void платитьНаРынке(GameState s, PlayerState p, int n) {
+            int кел = Math.min(n, p.resources.kelium());
+            if (кел > 0) {
+                p.resources.pay(Resource.KELIUM, кел);
+            }
+            if (n > кел) {
+                p.resources.pay(Resource.TROPHY, n - кел);
+            }
+        }
+
         @Override public String name() { return "market"; }
         @Override public Order order() { return Order.ACQUIRE; }
         @Override public boolean implemented() { return true; }
@@ -3197,7 +3572,7 @@ public final class Actions {
             // цикл вовсе. Нулевая ступень — вход в цикл: Рынок без сделки
             // приносит её монеты. 0 — прежний рынок.
             int нулевая = ((Number) rs.get("market.zero_kelium_coin", 0)).intValue();
-            if (player.resources.kelium() < 1) {
+            if (келемийНаРынке(s, player) < 1) {
                 if (нулевая > 0) {
                     player.resources.add(Resource.COIN, нулевая);
                     return ActionResult.ok("market: -0 kelium -> +" + нулевая + " coin",
@@ -3252,13 +3627,13 @@ public final class Actions {
             boolean обменРаз = Boolean.TRUE.equals(
                 rs.get("market.exchange_once_per_action", Boolean.FALSE));
             java.util.Set<String> взятыеОбмены = new java.util.HashSet<>();
-            while (player.resources.kelium() >= 1) {
+            while (келемийНаРынке(s, player) >= 1) {
                 List<Choice> opts = new ArrayList<>();
                 // ---- печатные обмены планшета рынка ----
                 if (наКоин && !(обменРаз && взятыеОбмены.contains("coin"))) {
                     opts.add(new Choice("market_rate", rate("coin", coinRate),
                         "1 КЕЛ -> " + coinRate + " МОН"));
-                    if (pairBonus > 0 && player.resources.kelium() >= 2) {
+                    if (pairBonus > 0 && келемийНаРынке(s, player) >= 2) {
                         Map<String, Object> pair = rate("coin", 2 * coinRate + pairBonus);
                         pair.put("kelium", 2);
                         opts.add(new Choice("market_rate", pair,
@@ -3363,7 +3738,7 @@ public final class Actions {
                     keliumCost = 0;
                 }
                 if (keliumCost > 0) {
-                    player.resources.pay(Resource.KELIUM, keliumCost);
+                    платитьНаРынке(s, player, keliumCost);
                 }
                 keliumSpent += keliumCost;
                 deals++;
@@ -4034,6 +4409,28 @@ public final class Actions {
                     || !kelium.engine.Setup.expansionOn(rs, "super_objectives")) {
                 return;
             }
+            // ОТКРЫТЫЕ НА СТОЛЕ (свод super_objectives.display, 05.10.2026):
+            // игрок выбирает одну из лежащих карт, на её место выкладывают новую.
+            if (rs.getInt("super_objectives.display", 0) > 0) {
+                if (state.superDisplay.isEmpty()) {
+                    return;
+                }
+                List<Choice> opts = new ArrayList<>();
+                for (String c : state.superDisplay) {
+                    Map<String, Object> card = Ctx.cards(state, "super_objectives").find(c);
+                    String label = card == null ? c : String.valueOf(card.get("name"));
+                    opts.add(new Choice("super_take", c, label + " (" + c + ")"));
+                }
+                Choice ch = opts.size() == 1 ? opts.get(0)
+                    : agent.choose(state, opts, Map.of("kind", "super_take", "seat", player.seat));
+                String взята = ch.payload() instanceof String c && state.superDisplay.contains(c)
+                    ? c : state.superDisplay.get(0);
+                state.superDisplay.remove(взята);
+                player.superObjectives.add(взята);
+                player.superObjectiveOffer.add(взята);
+                kelium.engine.Setup.refillSuperDisplay(state, rs);
+                return;
+            }
             var колода = state.decks.get("super_objectives");
             if (колода == null) {
                 return;
@@ -4108,7 +4505,7 @@ public final class Actions {
                                 "permanent energy cube"));
                         Choice pick = agent.choose(state, opts,
                             Map.of("kind", "storage_side"));
-                        player.storageTokens.add(String.valueOf(pick.payload()));
+                        ЖетоныХранилища.положить(state, player, String.valueOf(pick.payload()));
                     }
                 }
             }
@@ -4370,8 +4767,11 @@ public final class Actions {
         private String maybeExchange(PlayerState player, Agent agent, List<String> уже) {
             // ОБМЕНЫ — ТОЛЬКО ЗА ТРОФЕИ: на планшете у них знак трофея без
             // келемия (финальный планшет 25.09.2026); келемий берут лишь треки.
+            // «КРИСТАЛЬНЫЕ ЛАБОРАТОРИИ» 7.3.0: обмены можно оплачивать келемием
+            boolean обменыЗаКелемий = Passives.hasPassive(state, player.seat,
+                "labs_kelium_trophy_swap");
             int pool = сколькоМожемЗаплатить(player)
-                - (наукаЗаКелемий() ? player.resources.kelium() : 0);
+                - (наукаЗаКелемий() && !обменыЗаКелемий ? player.resources.kelium() : 0);
             List<Choice> opts = new ArrayList<>();
             // ЧТО НАПЕЧАТАНО НА ПЛАНШЕТЕ НАУКИ — из свода (см. обменНаПланшете).
             // Обмен трофеев на монеты снят с планшета 02.09.2026 и переехал на
@@ -4452,7 +4852,7 @@ public final class Actions {
             // нет, остаётся прежняя тройка — числа сыгранных партий не должны
             // меняться задним числом.
             int gildCost = ((Number) rs.get("tech.gild_trophy_cost", 3)).intValue();
-            if (позолота && pool >= gildCost && Modules.canGild(player)) {
+            if (позолота && pool >= gildCost && Modules.canGild(state, player)) {
                 Map<String, Object> ex = new HashMap<>();
                 ex.put("id", "gild");
                 ex.put("give", gildCost);
@@ -4493,7 +4893,7 @@ public final class Actions {
                 return null;
             }
             Map<String, Object> ex = (Map<String, Object>) ch.payload();
-            payTrophy(player, ((Number) ex.get("give")).intValue(), agent, false);
+            payTrophy(player, ((Number) ex.get("give")).intValue(), agent, обменыЗаКелемий);
             String id = (String) ex.get("id");
             if ("trophy_to_coin".equals(id)) {
                 player.resources.add(Resource.COIN, ((Number) ex.get("coin")).intValue());

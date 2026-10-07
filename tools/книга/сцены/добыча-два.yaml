@@ -1,0 +1,20 @@
+# «Добыть»: два запитанных добытчика Гордона за стенками к тайлу —
+# каждый берёт столько келемия, сколько на нём написано
+size: 300
+hexStroke: "#5A4A33"
+hexes:
+  - {q: 0, r: 0, spawn: {kelium: 3}}
+  - {q: 1, r: 0}
+  - {q: 1, r: -1}
+tokens:
+  - {type: miner, owner: 3, q: 1, r: 0, building: true, sides: [3], level: 1, energySlots: 2, energyPlaced: 2}
+  - {type: miner, owner: 3, q: 1, r: -1, building: true, sides: [4], level: 2, energySlots: 1, energyPlaced: 1}
+arrows:
+  - path: [[0, 0], [1, 0]]
+    color: "#1F7A3A"
+    trim: 0.48
+    badge: {text: "+1", icon: "rules/иконки-экспорт/келемий.png", dy: 0.95, dx: -0.55, h: 0.42}
+  - path: [[0, 0], [1, -1]]
+    color: "#1F7A3A"
+    trim: 0.48
+    badge: {text: "+1", icon: "rules/иконки-экспорт/келемий.png", dy: -0.95, dx: -0.75, h: 0.42}
