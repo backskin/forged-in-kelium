@@ -80,6 +80,8 @@ public final class Решатель extends Agent {
     private String последняяКарта;
     private String намерение;
     private boolean вмоёмХоду = false;
+    /** Отпечаток стола в миг выбора текущего действия (за столом). */
+    private long отпечатокДействия = 0;
 
     /** Сколько раз бот видел, что задуманное действие стало холостым, и сменил его. */
     public int холостыхИзбежано = 0;
@@ -198,6 +200,21 @@ public final class Решатель extends Agent {
             System.err.println("ВНЕ ПЛАНА р" + state.round + " к" + state.circle + " " + name + " вопрос " + вид
                 + " №" + k + " варианты " + кл + " план " + план + " сыграно " + сыграно);
         }
+        if (c == null && !Исполнитель.верхнее(вид) && отпечатокДействия != 0
+                && Lookahead.materialSignature(state, seat) == отпечатокДействия) {
+            // НАЧАТОЕ ДЕЙСТВИЕ НЕ КОНЧАЕТСЯ ПУСТЫМ: действие уже выбрано, на
+            // столе от него пока ничего; жизнь разошлась с планом (цель ушла,
+            // кубик лёг иначе) — берётся лучший НЕ пустой вариант по правилам.
+            List<Choice> дело = new ArrayList<>();
+            for (Choice o : options) {
+                if (!"pass".equals(o.kind()) && o.payload() != null) {
+                    дело.add(o);
+                }
+            }
+            if (!дело.isEmpty()) {
+                c = дело.size() == 1 ? дело.get(0) : правила.choose(state, дело, ctx);
+            }
+        }
         if (c == null) {
             // план не нашёл этого вопроса (жизнь разошлась с копией) — правило,
             // и для действий проверка «не холостое ли»
@@ -214,6 +231,9 @@ public final class Решатель extends Agent {
                     }
                 }
             }
+        }
+        if (Исполнитель.верхнее(вид)) {
+            отпечатокДействия = Lookahead.materialSignature(state, seat);
         }
         сыграно.add(new Шаг(вид, TurnSim.keyOf(c)));
         return c;
