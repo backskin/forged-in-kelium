@@ -369,7 +369,7 @@ public final class BotBehaviorReport {
         sb.append('\n');
         avgLine(sb, "добытчиков на игрока к концу", t.minersEnd, games * 4);
         avgLine(sb, "энергостанций на игрока к концу", t.plantsEnd, games * 4);
-        avgLine(sb, "жетонов хранилища на игрока", t.storageTokensTaken, games * 4);
+        avgLine(sb, "модулей хранилища на игрока", t.storageTokensTaken, games * 4);
         avgLine(sb, "заданий выполнено за партию", t.objectivesDoneEv, games);
         avgLine(sb, "КОНТЕЙНЕРОВ вскрыто за партию (все игроки)", t.containersOpened, games);
         avgLine(sb, "контейнеров осталось нераскрытыми на игрока", t.containersLeft, games * 4);

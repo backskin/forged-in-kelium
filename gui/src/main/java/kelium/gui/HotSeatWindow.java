@@ -3755,7 +3755,7 @@ public final class HotSeatWindow {
         Map.entry("energy_loss_shift", "куда перенести кубик энергии"),
         Map.entry("energy_or_modules", "переложить энергию или модули"),
         Map.entry("return_unit", "выпуск: снять свои войска с поля (по желанию)"),
-        Map.entry("storage_side", "какой жетон хранилища взять"),
+        Map.entry("storage_side", "какой модуль хранилища взять"),
         Map.entry("storage_discard", "что выбросить со склада"),
         Map.entry("module_keep", "какой модуль оставить"),
         Map.entry("module_place_red", "куда положить красный модуль"),

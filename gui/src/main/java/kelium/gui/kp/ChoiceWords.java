@@ -244,7 +244,7 @@ public final class ChoiceWords {
             }
             case "gild_storage" -> {
                 // жетоны хранилища 2.0 (02.10.2026): payload — номер жетона
-                return "Улучшить жетон хранилища";
+                return "Улучшить модуль хранилища";
             }
             case "build_pick" -> {
                 if (p instanceof Map<?, ?> m && m.get("btype") != null) {

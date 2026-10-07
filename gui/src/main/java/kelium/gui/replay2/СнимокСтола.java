@@ -1005,24 +1005,73 @@ public final class СнимокСтола {
     // ==================== тени ====================
 
     /**
-     * ПОЛОЖИТЬ КОМПОНЕНТ НА СТОЛ: сначала размытая тень по его силуэту, потом
+     * ПОЛОЖИТЬ КОМПОНЕНТ НА СТОЛ: сначала мягкая тень по его силуэту, потом
      * он сам. Без тени картон выглядит наклейкой, а не предметом.
+     *
+     * Тень — настоящее гауссово размытие (три прохода по ящику), считанное на
+     * уменьшенной копии и растянутое бикубикой. Прежняя тень «уменьшить в 12 раз
+     * и растянуть обратно» давала на печати ступенчатый грязный ореол.
      *
      * @param мм насколько мягкая и далёкая тень (миллиметры стола); 0 — без тени
      */
     private static void положить(Graphics2D g, BufferedImage art, int x, int y,
                                  int w, int h, double мм) {
-        if (мм > 0) {
-            BufferedImage s = силуэт(art);
+        if (мм > 0 && w > 0 && h > 0) {
+            int р = Math.max(2, px(мм));          // радиус размытия, пикселей стола
+            int поле = р * 2;                      // запас вокруг, чтобы тень не обрезалась
+            int ск = Math.max(1, р / 3);           // во сколько раз считаем мельче
+            int sw = (w + 2 * поле) / ск + 1;
+            int sh = (h + 2 * поле) / ск + 1;
+            BufferedImage m = new BufferedImage(sw, sh, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D mg = m.createGraphics();
+            mg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            mg.drawImage(art, поле / ск, поле / ск, Math.max(1, w / ск), Math.max(1, h / ск), null);
+            mg.setComposite(AlphaComposite.SrcIn);
+            mg.setColor(Color.BLACK);
+            mg.fillRect(0, 0, sw, sh);
+            mg.dispose();
+            размыть(m, Math.max(1, р / ск));
             Graphics2D gg = (Graphics2D) g.create();
             gg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            gg.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
-            int р = px(мм);
-            gg.drawImage(s, x - р / 2, y + р / 3, w + р, h + р, null);
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            gg.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.42f));
+            gg.drawImage(m, x - поле, y - поле + р / 2, sw * ск, sh * ск, null);
             gg.dispose();
         }
         g.drawImage(art, x, y, w, h, null);
+    }
+
+    /** Размыть прозрачность чёрной картинки: три прохода ящика по строкам и столбцам. */
+    private static void размыть(BufferedImage m, int р) {
+        int w = m.getWidth(), h = m.getHeight();
+        int[] пк = m.getRGB(0, 0, w, h, null, 0, w);
+        int[] a = new int[w * h];
+        int[] б = new int[w * h];
+        for (int i = 0; i < a.length; i++) a[i] = пк[i] >>> 24;
+        for (int проход = 0; проход < 3; проход++) {
+            ящик(a, б, h, w, 1, w, р);   // по строкам
+            ящик(б, a, w, h, w, 1, р);   // по столбцам
+        }
+        for (int i = 0; i < a.length; i++) пк[i] = Math.min(255, a[i]) << 24;
+        m.setRGB(0, 0, w, h, пк, 0, w);
+    }
+
+    /** Скользящее среднее радиуса р вдоль одной оси; за краем — прозрачность. */
+    private static void ящик(int[] из, int[] в, int линий, int длина, int шагВдоль,
+                             int шагМеждуЛиниями, int р) {
+        int окно = 2 * р + 1;
+        for (int л = 0; л < линий; л++) {
+            int o = л * шагМеждуЛиниями;
+            long сум = 0;
+            for (int i = 0; i <= р && i < длина; i++) сум += из[o + i * шагВдоль];
+            for (int i = 0; i < длина; i++) {
+                в[o + i * шагВдоль] = (int) (сум / окно);
+                int вход = i + р + 1, выход = i - р;
+                if (вход < длина) сум += из[o + вход * шагВдоль];
+                if (выход >= 0) сум -= из[o + выход * шагВдоль];
+            }
+        }
     }
 
     private static void тень(Graphics2D g, java.awt.Shape s, double мм) {
@@ -1031,30 +1080,5 @@ public final class СнимокСтола {
         gg.setColor(new Color(0, 0, 0, 90));
         gg.fill(s);
         gg.dispose();
-    }
-
-    private static final java.util.Map<BufferedImage, BufferedImage> СИЛУЭТЫ =
-        new java.util.WeakHashMap<>();
-
-    /**
-     * РАЗМЫТЫЙ ЧЁРНЫЙ СИЛУЭТ картинки. Размывается уменьшением и обратным
-     * растягиванием: свёртка по картинке в четыре мегапикселя стоила бы секунд,
-     * а разницы на мягкой тени не видно.
-     */
-    private static BufferedImage силуэт(BufferedImage art) {
-        return СИЛУЭТЫ.computeIfAbsent(art, src -> {
-            int w = Math.max(4, src.getWidth() / 12);
-            int h = Math.max(4, src.getHeight() / 12);
-            BufferedImage мал = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = мал.createGraphics();
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g.drawImage(src, 0, 0, w, h, null);
-            g.setComposite(AlphaComposite.SrcIn);
-            g.setColor(Color.BLACK);
-            g.fillRect(0, 0, w, h);
-            g.dispose();
-            return мал;
-        });
     }
 }

@@ -165,7 +165,7 @@ class СуперЗадания9Test {
         я.redPlacements.put(UnitType.INFANTRY, new HashMap<>());
         я.redPlacements.put(UnitType.VEHICLE, new HashMap<>(Map.of("blocks", true)));
         я.bluePlacements.put(BuildingType.BARRACKS, new HashMap<>());
-        assertEquals(2, единиц("modules_on_board"), "модуль блокировки боя не в счёт");
+        assertEquals(2, единиц("modules_on_board"), "модуль ЦУ не в счёт");
     }
 
     @Test

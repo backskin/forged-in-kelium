@@ -44,7 +44,7 @@ from docx.shared import Cm, Pt, RGBColor
     "arsenal": "карта арсенала",
     "arsenal_from_display": "карта арсенала НА ВЫБОР из открытых",
     "module": "жетон модуля",
-    "storage_token": "жетон хранилища",
+    "storage_token": "модуль хранилища",
     "vp": "победные очки",
 }
 

@@ -92,7 +92,7 @@ class ЖетоныХранилищаTest {
         assertTrue(ЖетоныХранилища.золотой(p.storageTokens.get(0)));
         assertEquals(выработка + 2, Power.sourceCubes(s, цу), "золотая сторона — +2 энергии ЦУ");
         assertEquals(свободно + 2, цу.energyIdle);
-        assertEquals(1, p.goldModules, "золотой жетон хранилища — звезда");
+        assertEquals(1, p.goldModules, "золотой модуль хранилища — звезда");
     }
 
     @Test
