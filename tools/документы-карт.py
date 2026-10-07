@@ -53,7 +53,7 @@ from docx.shared import Cm, Pt, RGBColor
     "kelium": "келемий", "containers": "контейнер",
     "objective_cards": "карта задания", "objective_card": "карта задания",
     "arsenal": "карта арсенала", "vp": "победное очко",
-    "module": "жетон модуля", "storage_token": "жетон хранилища",
+    "module": "жетон модуля", "storage_token": "модуль хранилища",
     "arsenal_from_display": "карта арсенала НА ВЫБОР из открытых",
     "gild_module": "позолота жетона модуля",
     "objective_cards_keep": "карт задания оставить",

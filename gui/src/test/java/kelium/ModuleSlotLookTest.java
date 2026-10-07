@@ -79,7 +79,7 @@ class ModuleSlotLookTest {
     private static void storeRow(Graphics2D g, int y, int side) throws Exception {
         g.setFont(new Font("Dialog", Font.PLAIN, 13));
         g.setColor(ink());
-        g.drawString("жетон хранилища", 20, y + side / 2 + 5);
+        g.drawString("модуль хранилища", 20, y + side / 2 + 5);
         var m = Class.forName("kelium.gui.replay2.ModuleSlot")
             .getDeclaredMethod("paintStorageToken", Graphics2D.class, String.class,
                 double.class, double.class, double.class);

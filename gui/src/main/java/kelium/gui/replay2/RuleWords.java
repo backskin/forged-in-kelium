@@ -388,11 +388,11 @@ public final class RuleWords {
             case "storage.open_cells" ->
                 "ячеек хранилища, открытых всегда (на печати планшета — одна)";
             case "storage.module_slots" ->
-                "ячеек под жетон модуля хранилища на планшете";
+                "ячеек под модуль хранилища на планшете";
             case "actions.build.branch_demolish_before_build" ->
                 "в ветке «построить» сначала снеси сколько угодно своих зданий её вида, потом поставь одно";
             case "storage.gild_tokens" ->
-                "жетоны хранилища улучшаются позолотой, как модули";
+                "модули хранилища улучшаются позолотой";
             case "storage.cell_star_when_empty" ->
                 "обычная сторона ячейки хранилища даёт звезду, если ячейка пуста";
 
@@ -443,7 +443,7 @@ public final class RuleWords {
             case "tech.peak_unlimited" -> "вершину трека занимает сколько угодно игроков";
             case "end_conditions.peaks_instant_win" -> "вершины всех трёх треков — мгновенная победа";
             case "actions.build.demolish_cu_gives_token" ->
-                "снос своего ЦУ — без монеты, модуль блокировки боя уходит сопернику";
+                "снос своего ЦУ — без монеты, модуль ЦУ уходит сопернику";
             case "command_center.military_win_counts_kills" ->
                 "военная победа — за второе уничтожение ЦУ";
             case "command_center.military_win_min_players" -> "военная победа — с какого числа игроков";

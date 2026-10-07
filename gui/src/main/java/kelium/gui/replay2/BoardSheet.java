@@ -510,7 +510,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                     + "\nВскрыть — спец-действием: вы получаете написанное,"
                     + " карта уходит в сброс.";
             case "store":
-                return "Место под жетон модуля хранилища — пусто";
+                return "Место под модуль хранилища — пусто";
             case "cell": {
                 String grp = a.length > 1 ? a[1] : "";
                 String lvl = a.length > 2 ? a[2] : "";
@@ -1345,10 +1345,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 g.drawLine(cx + px(6), cy + cell - px(6), cx + cell - px(6), cy + px(6));
             }
             cellZones.put(new Rectangle(cx, cy, cell, cell), on
-                ? "ЯЧЕЙКА ОТ ЖЕТОНА ХРАНИЛИЩА\n\nОткрыта: жетон положен стороной "
+                ? "ЯЧЕЙКА ОТ МОДУЛЯ ХРАНИЛИЩА\n\nОткрыта: модуль положен стороной "
                     + "«склад». Годится под келемий, боеприпасы и трофеи."
-                : "ЯЧЕЙКА ОТ ЖЕТОНА ХРАНИЛИЩА\n\nПока закрыта. Откроется, когда "
-                    + "игрок положит сюда жетон модуля хранилища стороной «склад» "
+                : "ЯЧЕЙКА ОТ МОДУЛЯ ХРАНИЛИЩА\n\nПока закрыта. Откроется, когда "
+                    + "игрок положит сюда модуль хранилища стороной «склад» "
                     + "(жетоны приходят только с зелёного трека науки).");
             cx += cell + gap;
         }
@@ -1381,7 +1381,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             + "которые сейчас никого не питают. Во время смены энергии кубик "
             + "ходит отсюда на любое своё здание и обратно, и это не стоит денег.\n\n"
             + (cubes == 0
-                ? "Сейчас пусто: кубик даёт жетон модуля хранилища, положенный "
+                ? "Сейчас пусто: кубик даёт модуль хранилища, положенный "
                     + "стороной «энергия»."
                 : "Кубиков от жетонов: " + cubes + "."));
         cy += cell + px(10);
@@ -1464,9 +1464,9 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     private int paintStorageTokens(Graphics2D g, ReplayRecord.Player p, int x, int y) {
         g.setFont(font(11, Font.PLAIN));
         g.setColor(Theme.ink3());
-        g.drawString("жетоны хранилища:", x, y + px(17));
+        g.drawString("модули хранилища:", x, y + px(17));
         int side = px(26);
-        int sx = x + g.getFontMetrics().stringWidth("жетоны хранилища:") + px(8);
+        int sx = x + g.getFontMetrics().stringWidth("модули хранилища:") + px(8);
         for (int i = 0; i < 2; i++) {
             String tok = i < p.storageTokens.size() ? p.storageTokens.get(i) : null;
             ModuleSlot.paintStorageToken(g, tok, sx, y, side);

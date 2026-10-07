@@ -160,7 +160,7 @@ public final class ObjectiveRewards {
         row(out, md, "ТРОФЕЕВ (трофейных кубиков)", trophy / perPlayer);
         row(out, md, "жетонов модулей АТАКИ (красных)", modулesRed / perPlayer);
         row(out, md, "жетонов модулей СНАРЯЖЕНИЯ (синих)", modulesBlue / perPlayer);
-        row(out, md, "жетонов хранилища", storageTokens / perPlayer);
+        row(out, md, "модулей хранилища", storageTokens / perPlayer);
         row(out, md, "келемия", kelium / perPlayer);
         row(out, md, "лишних карт заданий", objectiveCards / perPlayer);
 

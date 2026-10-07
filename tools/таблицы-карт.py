@@ -63,7 +63,7 @@ from openpyxl.utils import get_column_letter
     "kelium": "келемий", "objective_card": "карты задания",
     "arsenal": "карта арсенала",
     "arsenal_from_display": "карта арсенала НА ВЫБОР из открытых",
-    "module": "жетон модуля", "storage_token": "жетон хранилища",
+    "module": "жетон модуля", "storage_token": "модуль хранилища",
     "vp": "победные очки",
 }
 
