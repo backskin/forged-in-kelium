@@ -523,6 +523,8 @@ public final class RuleWords {
             case "super_objectives.mode" -> "режим супер-заданий";
             case "super_objectives.deal" -> "сколько карт раздаётся игроку";
             case "super_objectives.choose" -> "сколько из них он оставляет";
+            case "super_objectives.display" ->
+                "сколько супер-заданий лежит открытыми на столе (0 — раздача в руку)";
             case "super_objectives.require_symbols" ->
                 "для развёртывания нужен набор символов";
 
