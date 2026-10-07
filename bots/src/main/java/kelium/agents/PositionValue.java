@@ -236,10 +236,14 @@ public final class PositionValue {
         // падает до нуля (прежде множитель 0.4 + early давал в 8-м раунде 0.4).
         double работа = "нет".equals(System.getProperty("kelium.бот.простойЭнергии"))
             ? 0.4 + early : 0.7 + early;
-        b.add("miners", minersWorking * 1.1 * ecoW * работа);
-        b.add("plants", plants * 0.45 * ecoW * (0.4 + early));
-        b.add("buildings", buildings * 0.3 * ecoW);
-        b.add("energy_hungry", -hungry * 0.28 * ecoW);
+        if (w.get("pl.econ_model", 0) >= 1) {
+            экономика(s, me, b, ecoW, w.get("pl.army", 1.0));
+        } else {
+            b.add("miners", minersWorking * 1.1 * ecoW * работа);
+            b.add("plants", plants * 0.45 * ecoW * (0.4 + early));
+            b.add("buildings", buildings * 0.3 * ecoW);
+            b.add("energy_hungry", -hungry * 0.28 * ecoW);
+        }
         int room = Storage.roomFor(s, me, kelium.core.Resource.KELIUM);
         b.add("storage_room", Math.min(room, 4) * 0.12 * ecoW);
         if (!me.hasCommandCenter()) {
@@ -286,9 +290,11 @@ public final class PositionValue {
         // Разнообразие родов: разные цели бьются разными родами дёшево.
         armySum += 0.35 * Math.max(0, byType.size() - 1);
         b.add("army", armySum * armyW);
-        b.add("military_powered", milPowered * 0.7 * armyW
-            * ("нет".equals(System.getProperty("kelium.бот.простойЭнергии")) ? 0.3 + early : 0.6 + early));
-        b.add("military_cap", milCap * 0.25 * armyW);
+        if (w.get("pl.econ_model", 0) < 1) {
+            b.add("military_powered", milPowered * 0.7 * armyW
+                * ("нет".equals(System.getProperty("kelium.бот.простойЭнергии")) ? 0.3 + early : 0.6 + early));
+            b.add("military_cap", milCap * 0.25 * armyW);
+        }
         // Боеприпасы: ценны ровно настолько, насколько есть кому стрелять.
         int useful = Math.min(ammo, 2 * units + 2);
         b.add("ammo", (useful * 0.45 + (ammo - useful) * 0.08) * w.get("pl.ammo", 1.0));
@@ -447,6 +453,106 @@ public final class PositionValue {
     }
 
     /** Доля партии, которая уже прошла (0 — начало, 1 — конец). */
+    /**
+     * ЭКОНОМИКА КАК ПОТОК (07.10.2026, требование дизайнера: «не оставлять здания
+     * без энергии просто так, делать то, что эффективно для следующих шагов»).
+     *
+     * <p>Прежде здание стоило за сам факт стройки (+0.3 любое, +0.25 военное), а
+     * запитанность добавляла немного. Замер kelium.СчётПитания: в 64% ходов
+     * потребителей у бота было больше, чем энергии вообще, 42% зданий стояли
+     * пустыми — бот строил ради разового срабатывания при постройке и бросал.
+     *
+     * <p>Теперь здание стоит тем, что оно ДАСТ до конца партии:
+     * <ul>
+     *   <li>запитанный добытчик у живой жилы — его выработка × ожидаемое число
+     *       Добыч до конца × цена келемия;</li>
+     *   <li>запитанное военное здание — выпуск (войско, если род ещё в запасе,
+     *       иначе боеприпасы) × ожидаемое число Выпусков × цена войска;</li>
+     *   <li>пустое здание — убыток: ничего не даёт, а снесённое врагом — его
+     *       трофей; станция сама по себе почти ничего — она ценна тем, что
+     *       запитывает.</li>
+     * </ul>
+     * Так бот сам приходит к экономике: строить станцию, когда потребители
+     * голодают; не строить потребителя, которого нечем запитать; перекладывать
+     * энергию на то, что даст больше.
+     */
+    static void экономика(GameState s, PlayerState me, Breakdown b, double ecoW, double armyW) {
+        int осталось = Math.max(0, new Rivalry(s, 0).roundsLeft());
+        double впереди = осталось + 0.5;            // раундов работы вперёд
+        final double ДОБЫЧ_ЗА_РАУНД = 0.6;          // как часто разыгрывается Добыча
+        final double ВЫПУСКОВ_ЗА_РАУНД = 0.6;
+        final double ЦЕНА_КЕЛЕМИЯ = 0.65;
+        Set<String> live = Plan.liveTileHexes(s);
+        double поток = 0;
+        double пусто = 0;
+        int станций = 0;
+        double капитал = 0;
+        for (BuildingToken bt : me.buildingsOnField()) {
+            // ВЛОЖЕННОЕ: здание на поле стоит своей цены. Без этого снос (+1
+            // монета) выглядел чистой прибылью, а снос с перестройкой — бесплатной
+            // перестановкой: бот сносил свои станции ради монеты и переставлял
+            // казармы туда-сюда (хроника 07.10.2026).
+            капитал += ценаЗдания(s, me, bt) * 0.22;
+            switch (bt.type) {
+                case MINER -> {
+                    if (bt.powered() && Plan.touchesLiveTile(s, bt.hexId, live)) {
+                        int выход = bt.level == null ? 1 : Math.max(1, s.tokenStats.minerYield(bt.level));
+                        поток += выход * ЦЕНА_КЕЛЕМИЯ * ДОБЫЧ_ЗА_РАУНД * впереди * ecoW;
+                    } else if (!bt.powered()) {
+                        пусто += 1;
+                    }
+                }
+                case BARRACKS, FACTORY, AIRBASE -> {
+                    if (bt.powered()) {
+                        kelium.core.UnitType род = bt.type == BuildingType.BARRACKS ? kelium.core.UnitType.INFANTRY
+                            : bt.type == BuildingType.FACTORY ? kelium.core.UnitType.VEHICLE
+                            : kelium.core.UnitType.AIRCRAFT;
+                        int наПоле = 0;
+                        for (UnitToken u : me.unitsOnField()) {
+                            if (u.type == род) {
+                                наПоле++;
+                            }
+                        }
+                        int запас;
+                        try {
+                            запас = s.tokenStats.unitStock(род);
+                        } catch (RuntimeException e) {
+                            запас = 4;
+                        }
+                        double выпуск = наПоле < запас
+                            ? (род == kelium.core.UnitType.AIRCRAFT ? 1.3 : род == kelium.core.UnitType.VEHICLE ? 1.05 : 0.8)
+                            : 0.6;                          // запас рода кончился — только боеприпасы
+                        поток += выпуск * ВЫПУСКОВ_ЗА_РАУНД * впереди * armyW;
+                    } else {
+                        пусто += 1;
+                    }
+                }
+                case POWER_PLANT -> станций++;
+                default -> { }
+            }
+        }
+        b.add("capital", капитал * ecoW);
+        b.add("production_flow", поток);
+        b.add("unpowered", -0.35 * пусто * ecoW);
+        b.add("plants", станций * 0.2 * ecoW);
+    }
+
+    /** Напечатанная цена здания (как у движка при постройке). */
+    static int ценаЗдания(GameState s, PlayerState me, BuildingToken b) {
+        try {
+            return switch (b.type) {
+                case BARRACKS -> me.board.troop.buildingPrice("barracks");
+                case FACTORY -> me.board.troop.buildingPrice("factory");
+                case AIRBASE -> me.board.troop.buildingPrice("airbase");
+                case MINER -> b.level == null ? 1 : s.tokenStats.minerCost(b.level);
+                case POWER_PLANT -> b.level == null ? 1 : s.tokenStats.plantCost(b.level);
+                default -> 0;
+            };
+        } catch (RuntimeException e) {
+            return 1;
+        }
+    }
+
     public static double lateness(GameState s) {
         Rivalry riv = new Rivalry(s, 0);
         int left = Math.max(0, riv.roundsLeft());
