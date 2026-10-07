@@ -51,6 +51,8 @@ public final class Решатель extends Agent {
 
     /** Печатать сбои прогонов (для разбора). */
     public static boolean ОТЛАДКА = Boolean.getBoolean("kelium.решатель.отладка");
+    /** Печатать разбор лучшего хода по статьям оценки. */
+    public static boolean РАЗБОР = Boolean.getBoolean("kelium.решатель.разбор");
 
     /** Прогонов на выбор хода. */
     private final int бюджетХода;
@@ -212,6 +214,13 @@ public final class Решатель extends Agent {
         Choice c = поПлану(options, вид, k);
         if (c == null) {
             Итог и = искать(снимок, карта, совпало, низОткрыт, сыграно, бюджетХода);
+            if (РАЗБОР && k == 0 && и.после() != null) {
+                // что дал лучший ход по статьям — против хода «пас»
+                Прогон пас = прогнать(снимок, карта, совпало, низОткрыт, List.of(new Шаг("action", "pass|pass")));
+                System.err.println("РАЗБОР " + name + " р" + state.round + " к" + state.circle + "\n  лучший " + и.путь()
+                    + "\n    " + PositionValue.breakdown(и.после(), seat, genome, intents)
+                    + "\n  пас " + (пас == null ? "—" : PositionValue.breakdown(пас.после(), seat, genome, intents)));
+            }
             план = и.путь();
             пустыеВПлане = и.пустыеШаги();
             намерение = замысел(state, и);

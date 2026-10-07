@@ -62,6 +62,9 @@ public final class СчётПитания {
         long пустыхНиРазу;          // пустое здание, ни разу не запитанное с постройки
         long пустыхПотерявших;      // было запитано, потеряло энергию
         final java.util.Map<String, Integer> пустыеПоВиду = new java.util.TreeMap<>();
+        long построеноПотребителей;     // построено за свой ход
+        long построеноПустыми;          // из них к концу того же хода без энергии
+        final java.util.Map<String, Integer> пустыеПостройки = new java.util.TreeMap<>();
         long ячеекПотребителей;     // сколько ячеек энергии у добытчиков и военных
         long кубиковВсего;          // сколько кубиков у игрока всего
         long ходовПерестроено;      // потребителям нужно больше, чем энергии есть вообще
@@ -95,6 +98,9 @@ public final class СчётПитания {
             выпусковПусто += о.выпусковПусто;
             добычНичего += о.добычНичего;
             ячеекПотребителей += о.ячеекПотребителей;
+            построеноПотребителей += о.построеноПотребителей;
+            построеноПустыми += о.построеноПустыми;
+            о.пустыеПостройки.forEach((k, v) -> пустыеПостройки.merge(k, v, Integer::sum));
             пустыхНиРазу += о.пустыхНиРазу;
             пустыхПотерявших += о.пустыхПотерявших;
             о.пустыеПоВиду.forEach((k, v) -> пустыеПоВиду.merge(k, v, Integer::sum));
@@ -200,6 +206,8 @@ public final class СчётПитания {
         md.append(String.format(Locale.ROOT, "| зданий-потребителей в среднем (добытчики + военные) | %.2f |%n", (double) в.потребителей / в.ходов));
         md.append(String.format(Locale.ROOT, "| из них без энергии | %.2f (%.0f%%) |%n", (double) в.незапитано / в.ходов, 100.0 * в.незапитано / Math.max(1, в.потребителей)));
         md.append(String.format(Locale.ROOT, "| свободных кубиков на источниках | %.2f из %.2f всех |%n", (double) в.свободныхКубиков / в.ходов, (double) в.всегоКубиков / в.ходов));
+        md.append(String.format(Locale.ROOT, "| построено потребителей за свой ход / из них пустыми к концу хода | %d / %d |%n", в.построеноПотребителей, в.построеноПустыми));
+        md.append("| пустые постройки: что было в ходу | " + в.пустыеПостройки + " |\n");
         md.append(String.format(Locale.ROOT, "| пустых: ни разу не запитанных / потерявших энергию | %d / %d |%n", в.пустыхНиРазу, в.пустыхПотерявших));
         md.append("| пустые по виду | " + в.пустыеПоВиду + " |\n");
         md.append(String.format(Locale.ROOT, "| ячеек энергии у потребителей / кубиков у игрока | %.2f / %.2f |%n", (double) в.ячеекПотребителей / в.ходов, (double) в.кубиковВсего / в.ходов));
@@ -264,6 +272,8 @@ public final class СчётПитания {
         int[] запВоен = {0};  // запитанных военных перед очередным действием
         long[] отпечаток = {0};
         java.util.Set<Integer> былоЗапитано = new java.util.HashSet<>();
+        java.util.Set<Integer> былиДоХода = new java.util.HashSet<>();
+        StringBuilder ходСловами = new StringBuilder();
         Runnable закрыть = () -> {
             if (кто[0] >= 0 && можно[0] && питаниеНаКарте[0]) {
                 с.можноИПитаниеДоступно++;
@@ -335,6 +345,21 @@ public final class СчётПитания {
                 запДоб[0] = запитано(p, true);
                 запВоен[0] = запитано(p, false);
                 отпечаток[0] = kelium.agents.Lookahead.materialSignature(s, seat);
+                былиДоХода.clear();
+                for (BuildingToken b : p.buildingsOnField()) {
+                    былиДоХода.add(b.uid);
+                }
+                ходСловами.setLength(0);
+            } else if ("turn_end".equals(тип) && ev.get("seat") instanceof Number нм && нм.intValue() == кто[0]) {
+                for (BuildingToken b : s.player(кто[0]).buildingsOnField()) {
+                    if (потребитель(b) && !былиДоХода.contains(b.uid)) {
+                        с.построеноПотребителей++;
+                        if (!b.powered()) {
+                            с.построеноПустыми++;
+                            с.пустыеПостройки.merge(b.type.code + (b.level == null ? "" : "L" + b.level) + " ← " + ходСловами, 1, Integer::sum);
+                        }
+                    }
+                }
             } else if ("action".equals(тип) && Boolean.TRUE.equals(ev.get("ok"))
                     && !Boolean.TRUE.equals(ev.get("free"))) {
                 int seat = ((Number) ev.get("seat")).intValue();
@@ -344,6 +369,7 @@ public final class СчётПитания {
                 String a = String.valueOf(ev.get("action"));
                 String fork = String.valueOf(ev.get("fork"));
                 PlayerState p = s.player(seat);
+                ходСловами.append(Boolean.TRUE.equals(ev.get("free")) ? "даром " : "").append(fork).append(':').append(a).append(' ');
                 long теперь = kelium.agents.Lookahead.materialSignature(s, seat);
                 int[] х = с.холостые.computeIfAbsent(fork + ":" + a, k -> new int[2]);
                 х[0]++;

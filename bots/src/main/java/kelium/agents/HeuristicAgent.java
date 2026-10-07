@@ -344,14 +344,9 @@ public class HeuristicAgent extends Agent {
             case COMMAND_CENTER:
                 return 2.5;
             case MINER: {
-                // Живая жила рядом — иначе добытчик выдаёт пустоту.
-                for (String nb : s.field.neighbors(b.hexId)) {
-                    kelium.core.Hex h = s.field.get(nb);
-                    if (h != null && h.spawnTile != null && h.spawnTile.kelium > 0) {
-                        return 3.0;
-                    }
-                }
-                return 0.2;      // жила выработана — добытчик выдаёт пустоту
+                // Добывает ли он вообще — по правилу движка (стоит на жиле или
+                // стенкой смотрит на неё). Иначе энергия на нём пропадает зря.
+                return Plan.добывает(s, b) ? 3.0 : 0.0;
             }
             case BARRACKS:
             case FACTORY:
@@ -671,6 +666,9 @@ public class HeuristicAgent extends Agent {
                         // Лестница была верна для мирного разгона и намертво
                         // держала военные здания в темноте до конца партии.
                         double base = ценностьВыхода(s, b);
+                        if (base <= 0) {
+                            return 0.0;   // здание ничего не даст — кубик на нём пропадёт
+                        }
                         // добить здание до запитанности ценнее, чем начать новое
                         if (b.energyPlaced + 1 >= b.energySlots) {
                             base += 1.0;
@@ -982,7 +980,7 @@ public class HeuristicAgent extends Agent {
         if (b.type == BuildingType.MINER) {
             // добытчик переносим ТОЛЬКО с выработанной жилы на живую
             var live = Plan.liveTileHexes(state);
-            boolean nowUseless = !Plan.touchesLiveTile(state, b.hexId, live);
+            boolean nowUseless = !Plan.добывает(state, b);
             boolean somewhereBetter = false;
             for (String hid : kelium.engine.Placement.buildableHexes(state, seat)) {
                 if (!hid.equals(b.hexId) && Plan.touchesLiveTile(state, hid, live)) {
@@ -1305,7 +1303,7 @@ public class HeuristicAgent extends Agent {
             for (BuildingToken b : me.buildingsOnField()) {
                 if (b.type == BuildingType.MINER && b.powered()) {
                     poweredMiner = true;
-                    if (Plan.touchesLiveTile(state, b.hexId, live)) {
+                    if (Plan.добывает(state, b)) {
                         liveVein = true;
                     }
                 }
@@ -1314,7 +1312,7 @@ public class HeuristicAgent extends Agent {
             for (BuildingToken b : me.buildingsOnField()) {
                 if (b.type == BuildingType.MINER && !b.powered()
                         && me.resources.coin() >= b.energySlots - b.energyPlaced
-                        && Plan.touchesLiveTile(state, b.hexId, live)) {
+                        && Plan.добывает(state, b)) {
                     minerPayable = true;
                     break;
                 }
@@ -1742,7 +1740,9 @@ public class HeuristicAgent extends Agent {
                     return 10.0;
                 }
             }
-            return 1.0;
+            // жилы ни здесь, ни рядом — добытчик не добудет ничего за всю
+            // партию: ниже отказа
+            return 0.05;
         }
         if ("power_plant".equals(btype)) {
             // ЖЁЛТАЯ ЯЧЕЙКА: только на ней станция даёт свой номинал. Гекс, где

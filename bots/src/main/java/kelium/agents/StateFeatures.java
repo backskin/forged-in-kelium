@@ -128,7 +128,7 @@ public final class StateFeatures {
             hungry += Math.max(0, b.energySlots - b.energyPlaced);
             switch (b.type) {
                 case MINER -> {
-                    if (b.powered() && Plan.touchesLiveTile(s, b.hexId, live)) {
+                    if (b.powered() && Plan.добывает(s, b)) {
                         minersWorking++;
                     }
                 }

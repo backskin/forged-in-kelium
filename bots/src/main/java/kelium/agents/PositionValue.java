@@ -194,7 +194,7 @@ public final class PositionValue {
             hungry += Math.max(0, bt.energySlots - bt.energyPlaced);
             switch (bt.type) {
                 case MINER -> {
-                    if (bt.powered() && Plan.touchesLiveTile(s, bt.hexId, live)) {
+                    if (bt.powered() && Plan.добывает(s, bt)) {
                         minersWorking += bt.level != null && bt.level >= 3 ? 2 : 1;
                     }
                 }
@@ -492,10 +492,12 @@ public final class PositionValue {
             // монета) выглядел чистой прибылью, а снос с перестройкой — бесплатной
             // перестановкой: бот сносил свои станции ради монеты и переставлял
             // казармы туда-сюда (хроника 07.10.2026).
-            капитал += ценаЗдания(s, me, bt) * 0.22;
+            // здание на поле — не деньги: за снос вернут монету; всё остальное
+            // в нём стоит только того, что оно выработает (поток ниже)
+            капитал += 1 * 0.22;
             switch (bt.type) {
                 case MINER -> {
-                    if (bt.powered() && Plan.touchesLiveTile(s, bt.hexId, live)) {
+                    if (bt.powered() && Plan.добывает(s, bt)) {
                         int выход = bt.level == null ? 1 : Math.max(1, s.tokenStats.minerYield(bt.level));
                         поток += выход * ЦЕНА_КЕЛЕМИЯ * ДОБЫЧ_ЗА_РАУНД * впереди * ecoW;
                     } else if (!bt.powered()) {
@@ -533,7 +535,9 @@ public final class PositionValue {
         }
         b.add("capital", капитал * ecoW);
         b.add("production_flow", поток);
-        b.add("unpowered", -0.35 * пусто * ecoW);
+        // пустое здание — убыток: не даёт ничего, держит сектор, а снесённое
+        // соперником — его трофей (трофей в оценке стоит 0.8)
+        b.add("unpowered", -(0.35 + 0.8) * пусто * ecoW);
         b.add("plants", станций * 0.2 * ecoW);
     }
 
