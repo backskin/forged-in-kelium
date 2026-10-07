@@ -110,15 +110,8 @@ public final class Решатель extends Agent {
         this.бюджетКарты = бюджетКарты;
     }
 
-    @Override
-    public boolean specInActionMenu() {
-        return true;      // спец-действия — в том же меню хода: одна развилка на всё
-    }
-
-    @Override
-    public boolean choosesSectors() {
-        return false;
-    }
+    // Спец-действие бот получает отдельным вопросом «spec», как все боты: признак
+    // «спец в меню хода» окно игры читает как «за местом живой игрок».
 
     @Override
     public String intent() {
@@ -218,6 +211,7 @@ public final class Решатель extends Agent {
             Итог и = искать(снимок, карта, совпало, низОткрыт, сыграно, бюджетХода);
             план = и.путь();
             пустыеВПлане = и.пустыеШаги();
+            намерение = замысел(state, и);
             c = поПлану(options, вид, k);
         }
         if (c != null && "action".equals(вид) && "action".equals(c.kind()) && c.payload() != null
@@ -403,11 +397,11 @@ public final class Решатель extends Agent {
 
     /** Итог прогона: путь решений, развилки по пути, оценка. */
     record Прогон(List<Шаг> путь, List<List<String>> варианты, double оценка, int холостых,
-                  double чистая, java.util.Set<Integer> пустыеШаги) {
+                  double чистая, java.util.Set<Integer> пустыеШаги, GameState после) {
     }
 
     /** Лучший найденный ход. */
-    record Итог(List<Шаг> путь, double оценка, java.util.Set<Integer> пустыеШаги) {
+    record Итог(List<Шаг> путь, double оценка, java.util.Set<Integer> пустыеШаги, GameState после) {
     }
 
     private Итог искать(GameState от, String cardId, boolean совп, boolean низ,
@@ -467,8 +461,8 @@ public final class Решатель extends Agent {
         // Холостое действие ничего не меняет — позиция та же, что при пасе;
         // поэтому цена хода — оценка без штрафа, а сами пустые шаги при
         // исполнении заменяются пасом.
-        return лучший == null ? new Итог(List.of(), Double.NEGATIVE_INFINITY, java.util.Set.of())
-            : new Итог(лучший.путь(), лучший.чистая(), лучший.пустыеШаги());
+        return лучший == null ? new Итог(List.of(), Double.NEGATIVE_INFINITY, java.util.Set.of(), null)
+            : new Итог(лучший.путь(), лучший.чистая(), лучший.пустыеШаги(), лучший.после());
     }
 
     /** Один прогон хода на копии: префикс решений задан, дальше — правила. */
@@ -499,7 +493,7 @@ public final class Решатель extends Agent {
         // лидера упала до случайных 31% (наблюдатель 07.10.2026).
         double v = (веса == null ? PositionValue.value(c, seat, genome, intents)
             : Относительно.оценка(c, seat, genome, intents, веса, others)) - ХОЛОСТОЕ * холостых;
-        return new Прогон(исп.путь, исп.варианты, v, холостых, v + ХОЛОСТОЕ * холостых, исп.пустыеШаги);
+        return new Прогон(исп.путь, исп.варианты, v, холостых, v + ХОЛОСТОЕ * холостых, исп.пустыеШаги, c);
     }
 
     private Agent правилаДля(GameState c) {
@@ -531,16 +525,6 @@ public final class Решатель extends Agent {
             super(seat, "исполнитель#" + seat);
             this.префикс = префикс;
             this.правила = правила;
-        }
-
-        @Override
-        public boolean specInActionMenu() {
-            return true;
-        }
-
-        @Override
-        public boolean choosesSectors() {
-            return false;
         }
 
         @Override
@@ -648,7 +632,6 @@ public final class Решатель extends Agent {
                 лучший = o;
             }
         }
-        намерение = "приказ " + лучший.label();
         return лучший;
     }
 
@@ -719,6 +702,24 @@ public final class Решатель extends Agent {
     private static Map<String, Object> картаПриказа(GameState s, String cid) {
         try {
             return kelium.dataio.Ctx.cards(s, "orders").byId(cid);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Зачем этот ход — словами, по задуманному ходу (для ленты партии). */
+    private String замысел(GameState до, Итог и) {
+        if (и.после() == null) {
+            return null;
+        }
+        List<String> действия = new ArrayList<>();
+        for (Шаг ш : и.путь()) {
+            if ("action".equals(ш.вид()) && ш.ключ().startsWith("action|")) {
+                действия.add(ш.ключ().substring("action|".length()));
+            }
+        }
+        try {
+            return Замысел.ход(до, и.после(), seat, Угрозы.лидер(до, seat), Map.of(), intents, действия);
         } catch (RuntimeException e) {
             return null;
         }

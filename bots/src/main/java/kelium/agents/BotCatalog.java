@@ -365,6 +365,8 @@ public final class BotCatalog {
             return Bots.create(kind, Bots.Level.of(arg.charAt(0) - '0'), seat, rng, players);
         }
         return switch (kind) {
+            // прежний планировщик-мастер — только для очных замеров с решателем
+            case "планировщик" -> PlannerAgent.ofLevel(3, character, seat, rng, players);
             case "решатель" -> new Решатель(seat, character, players,
                 Integer.getInteger("kelium.решатель.ход", 60),
                 Integer.getInteger("kelium.решатель.карта", 12));
