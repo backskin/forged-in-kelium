@@ -104,16 +104,25 @@ public final class Intents {
     public void retargetHex(GameState s, int seat, boolean force) {
         PlayerState me = s.player(seat);
         java.util.List<UnitToken> myUnits = me.unitsOnField();
+        double[] отрыв = поУгрозам && s.numPlayers() > 2
+            ? Относительно.долиОтрыва(s, seat) : new double[s.numPlayers()];
         // Собираем чужие жетоны по гексам.
         Map<String, Double> ценность = new HashMap<>();
         for (PlayerState p : s.players) {
             if (p.seat == seat) {
                 continue;
             }
-            double targetMult = p.seat == targetSeat ? 1.5 : 1.0;
+            // У ОТОРВАВШЕГОСЯ всё дороже: удар по нему — помеха лидеру, а не
+            // подарок ему (07.10.2026).
+            double targetMult = (p.seat == targetSeat ? 1.5 : 1.0) * (1.0 + отрыв[p.seat]);
             for (BuildingToken b : p.buildingsOnField()) {
+                // ЭКОНОМИЧЕСКИЙ ДВИГАТЕЛЬ — запитанные добытчик и станция: снести
+                // их значит остановить развитие соперника до Возврата.
+                boolean двигатель = (b.type == BuildingType.MINER || b.type == BuildingType.POWER_PLANT)
+                    && b.powered();
                 double v = b.type == BuildingType.COMMAND_CENTER ? 3.0
                     : b.type == BuildingType.AIRBASE || b.type == BuildingType.FACTORY ? 1.4
+                    : двигатель ? 1.3
                     : 1.0;
                 ценность.merge(b.hexId, v * targetMult, Double::sum);
             }
@@ -177,11 +186,15 @@ public final class Intents {
         Rivalry riv = new Rivalry(s, seat);
         int leader = поУгрозам ? Угрозы.лидер(s, seat) : riv.leader();
         PlayerState me = s.player(seat);
+        // ОТРЫВ ПО ВИДИМОМУ РАЗВИТИЮ (07.10.2026): чем дальше соперник ушёл
+        // вперёд, тем крепче он в прицеле — перевешивает и близость, и обиды.
+        double[] отрыв = поУгрозам && s.numPlayers() > 2
+            ? Относительно.долиОтрыва(s, seat) : new double[s.numPlayers()];
         for (PlayerState p : s.players) {
             if (p.seat == seat) {
                 continue;
             }
-            double v = 1.0;
+            double v = 1.0 + 3.0 * отрыв[p.seat];
             v += grudge[p.seat] * 1.2;
             if (p.seat == leader) {
                 // новый бот держит в прицеле того, кто ближе к победе, заметно крепче

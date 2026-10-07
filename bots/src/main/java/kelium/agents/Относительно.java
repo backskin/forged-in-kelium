@@ -82,6 +82,39 @@ public final class Относительно {
         return w;
     }
 
+    /**
+     * ДОЛЯ ОТРЫВА каждого соперника (0…1): насколько он видимо сильнее среднего
+     * по остальным соперникам, в долях {@link #ОТРЫВ_ПОЛНЫЙ}. Общая мерка для
+     * веса в оценке и для выбора цели: против кого собирается стол.
+     */
+    public static double[] долиОтрыва(GameState s, int seat) {
+        int n = s.numPlayers();
+        double[] out = new double[n];
+        double[] сил = new double[n];
+        Genome нейтр = Bots.genome("balanced", n);
+        for (int r = 0; r < n; r++) {
+            if (r != seat) {
+                сил[r] = сила(s, r, нейтр);
+            }
+        }
+        for (int r = 0; r < n; r++) {
+            if (r == seat) {
+                continue;
+            }
+            double прочие = 0;
+            int k = 0;
+            for (int q = 0; q < n; q++) {
+                if (q != seat && q != r) {
+                    прочие += сил[q];
+                    k++;
+                }
+            }
+            double отрыв = k == 0 ? 0 : сил[r] - прочие / k;
+            out[r] = Math.max(0, Math.min(1, отрыв / ОТРЫВ_ПОЛНЫЙ));
+        }
+        return out;
+    }
+
     /** Отрыв в очках видимой силы, при котором соперник весит как полный лидер. */
     public static final double ОТРЫВ_ПОЛНЫЙ = 6.0;
 
