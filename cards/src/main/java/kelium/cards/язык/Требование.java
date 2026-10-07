@@ -46,6 +46,15 @@ public interface Требование {
         return null;
     }
 
+    /**
+     * То же С ОБСТАНОВКОЙ: условию «наизнанку» («не больше…», «ни одного…»)
+     * подсказывать надо то, что УБАВЛЯЕТ, а не прибавляет, и сторону выбирает
+     * текущее значение (Задания 4.0).
+     */
+    default String действие(CardContext ctx) {
+        return действие();
+    }
+
     /** Печатный текст целиком, с заглавной и с «В ЭТОТ ХОД» у происшествий. */
     default String текст() {
         String с = суть();
@@ -1317,6 +1326,19 @@ public interface Требование {
                 }
             }
             return false;
+        }
+
+        @Override public String действие(CardContext ctx) {
+            // первая НЕвыполненная часть называет действие
+            for (Требование ч : части) {
+                if (!ч.выполнено(ctx)) {
+                    String а = ч.действие(ctx);
+                    if (а != null) {
+                        return а;
+                    }
+                }
+            }
+            return части.isEmpty() ? null : части.get(0).действие(ctx);
         }
 
         @Override public Map<String, Object> запись() {

@@ -208,6 +208,43 @@ public record Показатель(String что, int от, int до) implements
         return имя + " — от " + от + " до " + до;
     }
 
+    /**
+     * ЧЕМ ДВИГАТЬ ПОКАЗАТЕЛЬ: вверх (значение ниже «от») или вниз (выше «до»).
+     * Таблица — по смыслу действий: келемий прибывает Добычей и уходит на
+     * Рынке, боеприпасы прибывают Выпуском и уходят в Бою и т. д.
+     */
+    @Override public String действие(CardContext ctx) {
+        int v = значение(что, ctx.state(), ctx.seat());
+        boolean вверх = v < от;
+        boolean вниз = v > до;
+        if (!вверх && !вниз) {
+            return null;
+        }
+        return switch (что) {
+            case "войск" -> вверх ? "assembly" : "combat";
+            case "войск_макс_на_гексе", "гексов_с_войсками", "войск_вдвоём_на_гексе",
+                 "жетонов_у_врага" -> "movement";
+            case "зданий", "добытчиков" -> "build_miner";
+            case "зданий_запитано", "добытчиков_запитано" -> "energy_swap";
+            case "энергостанций" -> "build_plant";
+            case "военных" -> "build_military";
+            case "военных_незапитано" -> вверх ? "build_military" : "energy_swap";
+            case "зданий_на_гексах_врага" -> "build_military";
+            case "боеприпасы" -> вверх ? "assembly" : "combat";
+            case "келемий" -> вверх ? "mining" : "market";
+            case "трофеи", "трофеев_на_свалке" -> вверх ? "combat" : "science";
+            case "монеты" -> вверх ? "market" : "build_miner";
+            case "хранилище_занято" -> вверх ? "mining" : "market";
+            case "хранилище_свободно" -> вверх ? "market" : "mining";
+            case "отставание_по_трекам" -> вниз ? "science" : null;
+            default -> null;
+        };
+    }
+
+    @Override public String действие() {
+        return null;
+    }
+
     @Override public boolean происшествие() {
         return false;
     }

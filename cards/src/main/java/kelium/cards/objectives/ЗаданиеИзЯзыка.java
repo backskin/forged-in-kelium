@@ -111,7 +111,40 @@ public final class ЗаданиеИзЯзыка extends ЗаданиеВКоде
 
     @Override
     public boolean satisfied(CardContext ctx) {
-        return требование.выполнено(ctx);
+        return требование.выполнено(ctx) && запасЖертвы(ctx) >= нужноЖертвы();
+    }
+
+    /** Сколько единиц жертвы просит карта (0 — карта без жертвы). */
+    private int нужноЖертвы() {
+        return жертва == null ? 0 : ((Number) жертва.get("amount")).intValue();
+    }
+
+    /**
+     * ЧЕМ ИГРОК МОЖЕТ ЗАПЛАТИТЬ ЖЕРТВУ — тем же счётом, что и движок при
+     * розыгрыше: келемий из хранилища, жетоны свалки, здания кроме ЦУ, карты
+     * арсенала в руке. Без этого карта-жертва с требованием «всегда» говорила
+     * боту «готово», и он не копил под неё ни келемия, ни трофеев.
+     */
+    private int запасЖертвы(CardContext ctx) {
+        if (жертва == null) {
+            return 0;
+        }
+        kelium.core.PlayerState p = ctx.state().player(ctx.seat());
+        String рес = String.valueOf(жертва.get("resource"));
+        return switch (рес) {
+            case "trophies" -> p.destroyedTokens.size();
+            case "arsenal_cards" -> p.arsenalHand.size();
+            case "units_on_field" -> p.unitsOnField().size();
+            case "buildings_off_cu" -> (int) p.buildingsOnField().stream()
+                .filter(b -> b.type != kelium.core.BuildingType.COMMAND_CENTER).count();
+            default -> {
+                try {
+                    yield p.resources.get(kelium.core.Resource.fromCode(рес));
+                } catch (RuntimeException e) {
+                    yield 0;
+                }
+            }
+        };
     }
 
     @Override
@@ -135,7 +168,30 @@ public final class ЗаданиеИзЯзыка extends ЗаданиеВКоде
 
     @Override
     public double progress(CardContext ctx) {
-        return Math.max(0, Math.min(1, требование.близость(ctx)));
+        double б = Math.max(0, Math.min(1, требование.близость(ctx)));
+        int надо = нужноЖертвы();
+        if (надо > 0) {
+            б = Math.min(б, Math.min(1.0, (double) запасЖертвы(ctx) / надо));
+        }
+        return б;
+    }
+
+    @Override
+    protected String действие(CardContext ctx) {
+        // НЕЧЕМ ЗАПЛАТИТЬ — сперва добыть то, чем платят
+        if (нужноЖертвы() > 0 && запасЖертвы(ctx) < нужноЖертвы()) {
+            return switch (String.valueOf(жертва.get("resource"))) {
+                case "kelium" -> "mining";
+                case "ammo" -> "assembly";
+                case "coin" -> "market";
+                case "trophies", "trophy" -> "combat";
+                case "arsenal_cards" -> "science";
+                case "units_on_field" -> "assembly";
+                case "buildings_off_cu" -> "build_miner";
+                default -> требование.действие(ctx);
+            };
+        }
+        return требование.действие(ctx);
     }
 
     @Override
