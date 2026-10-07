@@ -77,6 +77,12 @@ public final class НаблюдательПартий {
         long заданийСож;
         Map<String, Long> победыПоХарактеру = new TreeMap<>();
         Map<String, Long> побеждаетКак = new TreeMap<>();
+        /** Путь в конце партии → [игроков, побед]. */
+        Map<String, long[]> пути = new TreeMap<>();
+        long сменПути;
+        long игроковСПланом;
+        /** С планом против без плана: [мест, побед, очков] по группам. */
+        Map<String, double[]> группы = new TreeMap<>();
         long раундов;
         StringBuilder хроника = new StringBuilder();
 
@@ -98,6 +104,11 @@ public final class НаблюдательПартий {
             заданийСож += о.заданийСож;
             о.победыПоХарактеру.forEach((k, v) -> победыПоХарактеру.merge(k, v, Long::sum));
             о.побеждаетКак.forEach((k, v) -> побеждаетКак.merge(k, v, Long::sum));
+            о.пути.forEach((k, v) -> пути.merge(k, v, (a, b2) -> new long[] {a[0] + b2[0], a[1] + b2[1]}));
+            сменПути += о.сменПути;
+            игроковСПланом += о.игроковСПланом;
+            о.группы.forEach((k, v) -> группы.merge(k, v,
+                (a, b2) -> new double[] {a[0] + b2[0], a[1] + b2[1], a[2] + b2[2]}));
             раундов += о.раундов;
             хроника.append(о.хроника);
         }
@@ -169,7 +180,15 @@ public final class НаблюдательПартий {
         for (int i = 0; i < игроков; i++) {
             String id = боты.get((i + номер) % боты.size());
             кто[i] = id;
-            ags.add(kelium.agents.BotCatalog.create(id, i, new Random(сид * 31 + i), игроков));
+            Agent a = kelium.agents.BotCatalog.create(id, i, new Random(сид * 31 + i), игроков);
+            // ОПЫТ «С ПЛАНОМ ПРОТИВ БЕЗ»: -Dkelium.наблюдатель.безПлана=чёт — без
+            // плана играют чётные места в чётных партиях и нечётные в нечётных,
+            // так каждое место и характер побывают в обеих группах.
+            if ("чёт".equals(System.getProperty("kelium.наблюдатель.безПлана"))
+                    && a instanceof kelium.agents.PlannerAgent pa && (i + номер) % 2 == 0) {
+                pa.безПлана();
+            }
+            ags.add(a);
         }
         Genome нейтр = Bots.genome("balanced", игроков);
         Счёт с = new Счёт();
@@ -193,7 +212,9 @@ public final class НаблюдательПартий {
                     х.append("\n**Раунд ").append(раунд[0]).append("**\n\n");
                     double[] сил = силы(s, нейтр);
                     for (int i = 0; i < игроков; i++) {
-                        х.append(String.format(Locale.ROOT, "- И%d (сила %.1f, очки %d): %s%n", i + 1, сил[i],
+                        String план = ags.get(i) instanceof kelium.agents.PlannerAgent pa && pa.стратегия() != null
+                            ? " [" + pa.стратегия().словами() + "]" : "";
+                        х.append(String.format(Locale.ROOT, "- И%d%s (сила %.1f, очки %d): %s%n", i + 1, план, сил[i],
                             Scoring.scorePlayer(s, i).getOrDefault("total", 0),
                             String.join("; ", ходы.getOrDefault(i, List.of()))));
                     }
@@ -277,6 +298,25 @@ public final class НаблюдательПартий {
             с.военныхПобед++;
         }
         с.побеждаетКак.merge(String.valueOf(s.winCondition), 1L, Long::sum);
+        for (int i = 0; i < игроков; i++) {
+            boolean план = ags.get(i) instanceof kelium.agents.PlannerAgent pa && pa.стратегия() != null
+                && pa.стратегия().путь != null;
+            String группа = план ? "с планом" : "без плана";
+            double[] гр = с.группы.computeIfAbsent(группа, k -> new double[3]);
+            гр[0] += 1;
+            гр[1] += победители.contains(i) ? 1.0 / победители.size() : 0;
+            гр[2] += Scoring.scorePlayer(s, i).getOrDefault("total", 0);
+            if (план) {
+                kelium.agents.Стратегия ст = ((kelium.agents.PlannerAgent) ags.get(i)).стратегия();
+                с.игроковСПланом++;
+                с.сменПути += ст.смен;
+                long[] п = с.пути.computeIfAbsent(ст.путь.name(), k -> new long[2]);
+                п[0]++;
+                if (победители.contains(i)) {
+                    п[1]++;
+                }
+            }
+        }
         for (int w : победители) {
             с.победыПоХарактеру.merge(кто[w].replaceAll(":.*", ""), 1L, Long::sum);
         }
@@ -328,6 +368,16 @@ public final class НаблюдательПартий {
             .forEach(e -> b.append("- ").append(e.getKey()).append(": ").append(e.getValue()).append('\n'));
         b.append("\n## Чем кончаются партии\n\n");
         в.побеждаетКак.forEach((k, v) -> b.append("- ").append(k).append(": ").append(v).append('\n'));
+        b.append("\n## Пути (план бота к концу партии)\n\n| путь | игроков | побед | доля побед |\n|---|---:|---:|---:|\n");
+        в.пути.forEach((k, v) -> b.append(String.format(Locale.ROOT, "| %s | %d | %d | %.0f%%%n", k, v[0], v[1],
+            100.0 * v[1] / Math.max(1, v[0])).replace("%\n", "% |\n")));
+        b.append(String.format(Locale.ROOT, "%nСмен пути за партию в среднем: %.2f%n",
+            (double) в.сменПути / Math.max(1, в.игроковСПланом)));
+        if (в.группы.size() > 1) {
+            b.append("\n## С планом против без плана (одни раздачи)\n\n| группа | мест | доля побед | очки в среднем |\n|---|---:|---:|---:|\n");
+            в.группы.forEach((k, v) -> b.append(String.format(Locale.ROOT, "| %s | %.0f | %.1f%% | %.1f |%n",
+                k, v[0], 100 * v[1] / Math.max(1, v[0]), v[2] / Math.max(1, v[0]))));
+        }
         b.append("\n## Победы по характерам\n\n");
         в.победыПоХарактеру.forEach((k, v) -> b.append("- ").append(k).append(": ").append(v).append('\n'));
         if (в.хроника.length() > 0) {

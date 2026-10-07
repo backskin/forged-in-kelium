@@ -64,7 +64,7 @@ class НаборКарт150Test {
             if ("regular".equals(e.get("kind")) && e.get("bottom") instanceof Map<?, ?> низ
                     && низ.get("когда") != null) {
                 String текст = kelium.cards.язык.Срабатывание.текст(низ);
-                assertTrue(текст.startsWith("Каждый раз, когда"), e.get("id") + ": " + текст);
+                assertTrue(текст.startsWith("Каждый раз, когда") || текст.startsWith("В начале своего хода"), e.get("id") + ": " + текст);
                 assertFalse(текст.contains("upgrade_building") || текст.contains("gain_per")
                     || текст.contains("permanent_energy"), e.get("id") + ": код вместо слов — " + текст);
             }

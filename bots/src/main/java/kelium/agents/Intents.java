@@ -51,6 +51,8 @@ public final class Intents {
     public String targetHex = null;
     /** Карта задания, которую довожу до выполнения ({@code null} — нет). */
     public String focusObjective = null;
+    /** План на партию и раунд (07.10.2026); {@code null} — бот без плана. */
+    public Стратегия стратегия = null;
     /** Насколько крепко держусь за противника (0..1): выше — реже меняю цель. */
     private final double commitment;
     private int lastRoundUpdated = -1;
