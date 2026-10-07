@@ -156,7 +156,9 @@ public class HeuristicAgent extends Agent {
                     reals.add(o);
                 }
             }
-            return reals.isEmpty() ? opts.get(0) : reals.get(rng.nextInt(reals.size()));
+            // БЕЗ СЛУЧАЙНОСТИ (требование дизайнера 07.10.2026): правила на
+            // этот вопрос нет — первый настоящий вариант, а не наугад.
+            return reals.isEmpty() ? opts.get(0) : reals.get(0);
         }
         double best = Double.NEGATIVE_INFINITY;
         double второй = Double.NEGATIVE_INFINITY;
@@ -175,7 +177,7 @@ public class HeuristicAgent extends Agent {
             }
         }
         Диагностика.записать(kind, best, второй, opts.size());
-        return top.get(rng.nextInt(top.size()));
+        return top.get(0);   // равные — первый по порядку движка, без случайности
     }
 
     /**

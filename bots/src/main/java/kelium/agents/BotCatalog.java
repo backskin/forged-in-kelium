@@ -364,6 +364,9 @@ public final class BotCatalog {
             return Bots.create(kind, Bots.Level.of(arg.charAt(0) - '0'), seat, rng, players);
         }
         return switch (kind) {
+            case "решатель" -> new Решатель(seat, character, players,
+                Integer.getInteger("kelium.решатель.ход", 60),
+                Integer.getInteger("kelium.решатель.карта", 12));
             case "search" -> SearchAgent.deep(seat, rng,
                 Bots.genome(character, players), character);
             case "trained" -> new StrategicAgent(seat, rng,

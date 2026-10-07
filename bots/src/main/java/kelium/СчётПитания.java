@@ -57,6 +57,8 @@ public final class СчётПитания {
         long добычПусто;                  // сыграна добыча/выпуск, а запитанных зданий этого вида нет
         long выпусков;
         long выпусковПусто;
+        final java.util.Map<String, int[]> холостые = new java.util.TreeMap<>(); // действие → [всего, холостых]
+        final List<String> примеры = new ArrayList<>();
         long добычНичего;
         final java.util.Map<String, Integer> причины = new java.util.TreeMap<>();                 // добыча не дала ни келемия, ни контейнера
         long выпусковНичего;              // выпуск не дал ни войск, ни боеприпасов
@@ -86,6 +88,16 @@ public final class СчётПитания {
             выпусков += о.выпусков;
             выпусковПусто += о.выпусковПусто;
             добычНичего += о.добычНичего;
+            for (String п : о.примеры) {
+                if (примеры.size() < 30) {
+                    примеры.add(п);
+                }
+            }
+            о.холостые.forEach((k, v) -> {
+                int[] м = холостые.computeIfAbsent(k, x -> new int[2]);
+                м[0] += v[0];
+                м[1] += v[1];
+            });
             о.причины.forEach((k, v) -> причины.merge(k, v, Integer::sum));
             выпусковНичего += о.выпусковНичего;
             ходовВсёПусто += о.ходовВсёПусто;
@@ -187,6 +199,18 @@ public final class СчётПитания {
         md.append(String.format(Locale.ROOT, "| добыча, не давшая ничего | %d из %d |%n", в.добычНичего, в.добычДействий));
         md.append(String.format(Locale.ROOT, "| выпуск, не давший ничего | %d из %d |%n", в.выпусковНичего, в.выпусков));
         md.append(String.format(Locale.ROOT, "| перекладок, не прибавивших ни одного запитанного здания | %d из %d |%n", в.перекладокБезТолку, в.перекладок));
+        md.append("\n## Холостые действия (на столе не изменилось ничего)\n\n| действие | сыграно | холостых |\n|---|---:|---:|\n");
+        int[] итого = new int[2];
+        в.холостые.forEach((k, v) -> {
+            итого[0] += v[0];
+            итого[1] += v[1];
+            md.append(String.format(Locale.ROOT, "| %s | %d | %d (%.1f%%) |%n", k, v[0], v[1], 100.0 * v[1] / Math.max(1, v[0])));
+        });
+        md.append(String.format(Locale.ROOT, "| **всего** | %d | %d (%.1f%%) |%n", итого[0], итого[1], 100.0 * итого[1] / Math.max(1, итого[0])));
+        md.append("\nПримеры холостых:\n\n");
+        for (String п : в.примеры) {
+            md.append("- ").append(п).append('\n');
+        }
         md.append("\n## Почему добыча не дала ничего\n\n| причина | раз |\n|---|---:|\n");
         в.причины.forEach((k, v) -> md.append("| ").append(k).append(" | ").append(v).append(" |\n"));
         md.append("\n## По раундам (в начале хода)\n\n| раунд | потребителей | без энергии | свободных кубиков |\n|---:|---:|---:|---:|\n");
@@ -222,6 +246,7 @@ public final class СчётПитания {
         boolean[] станция = {false};
         int[] запДоб = {0};   // запитанных добытчиков перед очередным действием
         int[] запВоен = {0};  // запитанных военных перед очередным действием
+        long[] отпечаток = {0};
         Runnable закрыть = () -> {
             if (кто[0] >= 0 && можно[0] && питаниеНаКарте[0]) {
                 с.можноИПитаниеДоступно++;
@@ -269,6 +294,7 @@ public final class СчётПитания {
                 станция[0] = false;
                 запДоб[0] = запитано(p, true);
                 запВоен[0] = запитано(p, false);
+                отпечаток[0] = kelium.agents.Lookahead.materialSignature(s, seat);
             } else if ("action".equals(тип) && Boolean.TRUE.equals(ev.get("ok"))
                     && !Boolean.TRUE.equals(ev.get("free"))) {
                 int seat = ((Number) ev.get("seat")).intValue();
@@ -278,6 +304,17 @@ public final class СчётПитания {
                 String a = String.valueOf(ev.get("action"));
                 String fork = String.valueOf(ev.get("fork"));
                 PlayerState p = s.player(seat);
+                long теперь = kelium.agents.Lookahead.materialSignature(s, seat);
+                int[] х = с.холостые.computeIfAbsent(fork + ":" + a, k -> new int[2]);
+                х[0]++;
+                if (теперь == отпечаток[0]) {
+                    х[1]++;
+                    if (с.примеры.size() < 30) {
+                        с.примеры.add("р" + s.round + " к" + s.circle + " место " + seat + " " + ags.get(seat).name
+                            + ": " + fork + ":" + a + " — " + ev.get("detail") + " " + ev.get("telemetry"));
+                    }
+                }
+                отпечаток[0] = теперь;
                 if ("energy_swap".equals(a)) {
                     переложил[0] = true;
                     с.перекладок++;
