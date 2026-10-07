@@ -357,7 +357,8 @@ public final class BotCatalog {
         // УРОВЕНЬ 5 — СТРАТЕГ (30.09.2026): гроссмейстер с оценкой позиции,
         // выученной самоигрой (kelium.ЦиклСтратега).
         if (Bots.ROSTER_4.contains(kind) && "5".equals(arg)) {
-            return ОбученныйСтратег.создать(kind, seat, rng, players);
+            // стратег — тот же решатель с самым глубоким перебором
+            return new Решатель(seat, kind, players, 200, 30);
         }
         if (Bots.ROSTER_4.contains(kind) && arg != null && arg.length() == 1
                 && Character.isDigit(arg.charAt(0))) {
