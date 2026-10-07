@@ -82,6 +82,8 @@ public final class Решатель extends Agent {
     private boolean вмоёмХоду = false;
     /** Отпечаток стола в миг выбора текущего действия (за столом). */
     private long отпечатокДействия = 0;
+    /** Веса соперников в оценке — по позиции до решения. */
+    private double[] веса;
     private GameState последнийСтол;
 
     /** Сколько раз бот видел, что задуманное действие стало холостым, и сменил его. */
@@ -99,6 +101,8 @@ public final class Решатель extends Agent {
         this.genome = Bots.genome(характер, players);
         this.others = Bots.genome("balanced", players);
         this.intents = new Intents(players, genome.get("pl.commitment", 0.5));
+        // лидер — тот, кто ближе к победе по открытому, а не по очкам сейчас
+        this.intents.поУгрозам = true;
         // Правила мелких решений — эвристика стратега; случайности в ней нет
         // (HeuristicAgent: равные — первый, неизвестный вопрос — первый вариант).
         this.правила = new StrategicAgent(seat, new Random(0), genome, характер);
@@ -124,6 +128,19 @@ public final class Решатель extends Agent {
     @Override
     public void observePublicEvent(Map<String, Object> e) {
         правила.observePublicEvent(e);
+        // ПАМЯТЬ ОБИД: кто снёс мой жетон — тот цель; снесли ЦУ — цель сразу
+        // пересматривается (так же, как у прежнего планировщика)
+        if ("combat_hit".equals(e.get("type")) && Boolean.TRUE.equals(e.get("destroyed"))
+                && e.get("victim_owner") instanceof Integer vo && vo == seat
+                && e.get("seat") instanceof Integer by && by != seat) {
+            intents.hurtBy(by, false);
+        } else if ("cu_destroyed".equals(e.get("type")) && e.get("seat") instanceof Integer owner
+                && owner == seat && e.get("by") instanceof Integer by) {
+            intents.hurtBy(by, true);
+            if (последнийСтол != null) {
+                intents.retarget(последнийСтол, seat, genome.get("pl.leader_bias", 0.8), true);
+            }
+        }
         if ("turn_orders".equals(e.get("type")) && e.get("seat") instanceof Number n
                 && n.intValue() == seat) {
             карта = String.valueOf(e.get("card"));
@@ -168,6 +185,10 @@ public final class Решатель extends Agent {
         if (state.round != последнийРаунд) {
             последнийРаунд = state.round;
             intents.newRound(state, seat, genome.get("pl.leader_bias", 0.8));
+            вФокус(state);
+        }
+        if ("reveal_order".equals(вид) || "blind_discard".equals(вид)) {
+            веса = Относительно.веса(state, seat, genome);
         }
         if ("reveal_order".equals(вид)) {
             Choice c = options.size() == 1 ? options.get(0) : выбратьПриказ(state, options);
@@ -180,6 +201,7 @@ public final class Решатель extends Agent {
         if (снимок == null && карта != null && вмоёмХоду) {
             // первый вопрос моего хода — снимок стола, с него и проигрываются ходы
             снимок = state.deepCopy(семя(state));
+            веса = Относительно.веса(state, seat, genome);
             план = null;
             сыграно.clear();
         }
@@ -471,7 +493,12 @@ public final class Решатель extends Agent {
         // Разошлось с путём (вытянуты другие карты) — прогон годится: до
         // расхождения он шёл по пути, дальше — по правилам.
         int холостых = Math.max(исп.холостых(Lookahead.materialSignature(c, seat)), исп.холостыхПоСобытиям);
-        double v = PositionValue.value(c, seat, genome, intents) - ХОЛОСТОЕ * холостых;
+        // ОЦЕНКА ОТНОСИТЕЛЬНО СОПЕРНИКОВ: моя позиция минус видимая сила
+        // соперников с весами — лидер по видимому развитию весит больше
+        // (Относительно.веса). Без этого бот бил кого попало: коалиция против
+        // лидера упала до случайных 31% (наблюдатель 07.10.2026).
+        double v = (веса == null ? PositionValue.value(c, seat, genome, intents)
+            : Относительно.оценка(c, seat, genome, intents, веса, others)) - ХОЛОСТОЕ * холостых;
         return new Прогон(исп.путь, исп.варианты, v, холостых, v + ХОЛОСТОЕ * холостых, исп.пустыеШаги);
     }
 
@@ -695,6 +722,20 @@ public final class Решатель extends Agent {
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    /** Задание в фокусе раунда: ближе к выполнению и ценнее по награде. */
+    private void вФокус(GameState s) {
+        kelium.core.PlayerState p = s.player(seat);
+        Map<String, Double> prog = new HashMap<>();
+        Map<String, Double> val = new HashMap<>();
+        kelium.engine.cards.EngineCardContext ctx = new kelium.engine.cards.EngineCardContext(s, seat);
+        for (String cid : p.objectiveHand) {
+            var card = kelium.engine.cards.CardRegistry.objective(cid);
+            prog.put(cid, card == null ? 0.0 : PositionValue.clamp(card.progress(ctx)));
+            val.put(cid, PositionValue.rewardValue(s, seat, cid) / 5.0);
+        }
+        intents.refocus(p.objectiveHand, prog, val);
     }
 
     /** Карта хода, о которой бот уже знает (для отчётов). */
