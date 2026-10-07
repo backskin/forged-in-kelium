@@ -211,7 +211,32 @@ public final class PositionValue {
                 b.add("own_damage", -0.4 * bt.damage);
             }
         }
-        b.add("miners", minersWorking * 1.1 * ecoW * (0.4 + early));
+        // ЭНЕРГИЯ БЕЗ ДЕЛА (замер 07.10.2026, kelium.СчётПитания): в 37% ходов у бота
+        // свободных кубиков хватало запитать здание, а перекладку он играл в 25%
+        // таких ходов — 54% его добытчиков и военных стояли пустыми, добычу он
+        // разыгрывал при нуле запитанных добытчиков. Кубик на станции ничего не
+        // стоил в оценке, поэтому перекладка казалась пустым действием. Теперь
+        // кубик, лежащий без дела при голодном здании, — прямой убыток.
+        if (!"нет".equals(System.getProperty("kelium.бот.простойЭнергии"))) {
+            int свободно = 0;
+            int голодПотребителей = 0;
+            for (BuildingToken bt : me.buildingsOnField()) {
+                if (bt.type == BuildingType.POWER_PLANT) {
+                    свободно += bt.energyIdle;
+                } else if (bt.type == BuildingType.COMMAND_CENTER) {
+                    свободно += Math.min(bt.energyIdle,
+                        Math.max(0, bt.energyIdle + bt.energyPlaced - bt.energySlots));
+                } else {
+                    голодПотребителей += Math.max(0, bt.energySlots - bt.energyPlaced);
+                }
+            }
+            b.add("energy_idle", -Math.min(свободно, голодПотребителей) * 0.45 * ecoW);
+        }
+        // Запитанное здание работает до конца партии — к концу его цена не
+        // падает до нуля (прежде множитель 0.4 + early давал в 8-м раунде 0.4).
+        double работа = "нет".equals(System.getProperty("kelium.бот.простойЭнергии"))
+            ? 0.4 + early : 0.7 + early;
+        b.add("miners", minersWorking * 1.1 * ecoW * работа);
         b.add("plants", plants * 0.45 * ecoW * (0.4 + early));
         b.add("buildings", buildings * 0.3 * ecoW);
         b.add("energy_hungry", -hungry * 0.28 * ecoW);
@@ -261,7 +286,8 @@ public final class PositionValue {
         // Разнообразие родов: разные цели бьются разными родами дёшево.
         armySum += 0.35 * Math.max(0, byType.size() - 1);
         b.add("army", armySum * armyW);
-        b.add("military_powered", milPowered * 0.7 * armyW * (0.3 + early));
+        b.add("military_powered", milPowered * 0.7 * armyW
+            * ("нет".equals(System.getProperty("kelium.бот.простойЭнергии")) ? 0.3 + early : 0.6 + early));
         b.add("military_cap", milCap * 0.25 * armyW);
         // Боеприпасы: ценны ровно настолько, насколько есть кому стрелять.
         int useful = Math.min(ammo, 2 * units + 2);

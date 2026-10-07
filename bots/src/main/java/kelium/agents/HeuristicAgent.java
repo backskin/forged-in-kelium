@@ -597,6 +597,64 @@ public class HeuristicAgent extends Agent {
                 double v = Math.min(снять, голод) * 1.5 - surcharge * 1.2;
                 return v > 0 ? 1.0 + v : 0.3;
             };
+            // ОТДАТЬ ИЛИ ЗАБРАТЬ (Питание). Прежде этого вопроса бот не знал вовсе:
+            // выбор шёл наугад среди «отдать» и «забрать», а «закончить» не
+            // выбирался никогда — бот снимал кубики с запитанных зданий и
+            // обесточивал их (замер 07.10.2026: 315 перекладок из 504 не
+            // прибавили ни одного запитанного здания, 54% зданий без энергии).
+            case "energy_activation" -> (s, o) -> {
+                PlayerState я = s.player(seat);
+                double голод = 0;          // голодные ячейки зданий, которым энергия нужна
+                for (BuildingToken b : я.buildingsOnField()) {
+                    int пусто = Math.max(0, b.energySlots - b.energyPlaced);
+                    if (пусто > 0 && b.type != BuildingType.POWER_PLANT) {
+                        double ц = ценностьВыхода(s, b);
+                        if (ц >= 1.5) {
+                            голод += пусто * ц;
+                        }
+                    }
+                }
+                if ("energy_done".equals(o.kind()) || o.payload() == null) {
+                    return 1.0;
+                }
+                if ("energy_kelium".equals(o.kind()) || "energy_coin".equals(o.kind())) {
+                    return голод > 0 ? 0.9 : 0.1;   // трата ресурса — только если очень нужно
+                }
+                int uid;
+                try {
+                    uid = Integer.parseInt(String.valueOf(o.payload()));
+                } catch (NumberFormatException e) {
+                    return 0.5;
+                }
+                BuildingToken src = null;
+                for (BuildingToken b : я.buildingsOnField()) {
+                    if (b.uid == uid) {
+                        src = b;
+                    }
+                }
+                if ("energy_give".equals(o.kind())) {
+                    int есть = src != null ? src.energyIdle : 1;
+                    return голод > 0 ? 2.0 + Math.min(есть, голод) : 0.4;
+                }
+                // ЗАБРАТЬ — только чтобы перекатить: кубики этого источника
+                // лежат на здании, которое сейчас почти ничего не даёт, а
+                // нужное здание голодает.
+                double снять = 0;
+                double потеря = 0;
+                for (BuildingToken b : я.buildingsOnField()) {
+                    int n = b.energyBySource.getOrDefault(uid, 0);
+                    if (n <= 0) {
+                        continue;
+                    }
+                    double ц = ценностьВыхода(s, b);
+                    if (ц < 1.5) {
+                        снять += n;
+                    } else {
+                        потеря += n * ц;
+                    }
+                }
+                return снять > 0 && голод > 0 && потеря == 0 ? 1.5 + снять : 0.2;
+            };
             // K3: раскладка кубика — приоритет ЦУ > добытчики > военные > прочее
             // (та же логика, что была зашита в движок, теперь решает бот).
             case "energy_place" -> (s, o) -> {
