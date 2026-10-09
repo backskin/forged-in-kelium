@@ -13,7 +13,7 @@ import os
 import re
 import sys
 
-DIR = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*")[0]
+DIR = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*"))[0]
 HTML = os.path.join(DIR, "вёрстка", "Книга правил.html")
 цель = sys.argv[1]
 

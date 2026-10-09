@@ -143,6 +143,11 @@ public final class TestCardContext implements CardContext {
         return true;
     }
 
+    @Override public boolean specActions(int n) {
+        log.add(Map.of("spec_actions", n));
+        return true;
+    }
+
     @Override public boolean speedBoost() {
         log.add(Map.of("speed_boost", true));
         return true;

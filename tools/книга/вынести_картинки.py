@@ -36,7 +36,7 @@ D = os.path.dirname(os.path.abspath(__file__))
 ВЁРСТКА = glob.glob(os.path.join(
     os.path.dirname(os.path.dirname(D)), "rules", "Книга правил*", "вёрстка"))
 if not ВЁРСТКА:
-    ВЁРСТКА = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*\вёрстка")
+    ВЁРСТКА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*", "вёрстка"))
 ВЁРСТКА = ВЁРСТКА[0]
 HTML = os.path.join(ВЁРСТКА, "Книга правил.html")
 ПАПКА = "илл"

@@ -278,6 +278,17 @@ class HotSeatUiClickTest {
                 add(o, all, plays);
             }
         }
+        // СЦЕНА ПЛАНШЕТА (28.09.2026): Рынок и Наука — кнопками рядом с доской
+        if (w.boardStage != null) {
+            for (var o : w.boardStage.optsForTest()) {
+                checkText("вариант на планшете", o.label());
+                checkText("пояснение варианта на планшете", o.sub());
+                all.add(o.pick());
+                if (o.tone() != 2) {
+                    plays.add(o.pick());
+                }
+            }
+        }
         // Карты вскрытия — только пока решение и правда карточное: гаснущая
         // раскладка прошлого вопроса ещё видна, но уже ничего не решает.
         if (w.ceremony.isVisible() && List.of("reveal_order", "blind_discard", "super_pick",

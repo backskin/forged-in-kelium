@@ -283,6 +283,14 @@ public final class EngineCardContext implements CardContext {
             Map.of("types", kinds == null ? java.util.List.of() : kinds)).isEmpty();
     }
 
+    @Override public boolean specActions(int n) {
+        if (state.journal == null || n <= 0) {
+            return false;
+        }
+        state.journal.of(seat).specBonus += n;
+        return true;
+    }
+
     @Override public boolean speedBoost() {
         return !kelium.engine.Effects.apply("speed_boost", state, seat, Map.of()).isEmpty();
     }

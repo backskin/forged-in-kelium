@@ -73,6 +73,16 @@ public final class NetSeats {
         return h == null || !claims(spec) ? null : h.seatName(seat);
     }
 
+    /**
+     * Имя любого места СЕТЕВОЙ партии (хост — его имя из лобби, друг — своё,
+     * бот — лидер нации) или null, если партия не сетевая. Одно на всех: у
+     * хоста и у друзей подписи совпадают.
+     */
+    public static String partyName(int seat) {
+        NetHost h = host;
+        return h == null ? null : h.partyName(seat);
+    }
+
     /** Кадры записи партии хоста — зовётся на потоке движка. */
     public static void frame(ReplayRecord r) {
         NetHost h = host;

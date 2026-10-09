@@ -1,0 +1,9 @@
+size: 300
+hexStroke: "#5A4A33"
+hexes:
+  - {q: 0, r: 0, neutral: {big: true, corners: [2, 3, 4], hp: 1}}
+  - {q: 1, r: -1}
+tokens:
+  - {type: infantry, owner: 0, q: 1, r: -1, sides: [4]}
+arrows:
+  - {path: [[1, -1], [0, 0]], color: "#B03A2E", trim: 0.38}

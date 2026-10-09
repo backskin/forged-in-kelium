@@ -92,9 +92,17 @@ class NetWindowsTest {
         return r.get();
     }
 
+    /**
+     * Окна партии, открытые ДО этого теста: их оставляют другие тесты окна
+     * (часть их не закрывает окно), и искать надо только новое — иначе тест
+     * ждал шторку в чужом окне и падал в общем прогоне, а отдельно проходил.
+     */
+    private static final java.util.Set<Frame> BEFORE =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
     private static JFrame hostFrame() {
         for (Frame f : Frame.getFrames()) {
-            if (f instanceof JFrame j && j.isDisplayable()
+            if (f instanceof JFrame j && j.isDisplayable() && !BEFORE.contains(f)
                     && j.getTitle().contains("Командный пункт")) {
                 return j;
             }
@@ -195,6 +203,8 @@ class NetWindowsTest {
         HotSeatWindow.Options o = host.begin();
         List<String> specs = new ArrayList<>(o.seatSpecs());
         specs.set(host.hostSeat(), "builder:1");
+        BEFORE.clear();
+        BEFORE.addAll(java.util.Arrays.asList(Frame.getFrames()));
         HotSeatWindow.open(new HotSeatWindow.Options(o.rulesetId(), o.players(), o.seed(), specs,
             o.scenarioId(), o.scenarioFile(), o.cuFacing(), o.seatColors(), o.startCoins(),
             o.startKelium(), o.startAmmo(), o.prepRound(), o.marketCards()));

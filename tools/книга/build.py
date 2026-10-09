@@ -12,7 +12,8 @@ import pymupdf
 from PIL import Image
 
 D = os.path.dirname(os.path.abspath(__file__))
-SRC = glob.glob(r"C:\shared\forged-in-kelium\rules\Книга правил*\вёрстка\Книга правил.html")[0]
+SRC = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                       "rules", "Книга правил*", "вёрстка", "Книга правил.html"))[0]
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 t = open(SRC, encoding="utf-8").read()

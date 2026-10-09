@@ -65,7 +65,8 @@ public final class LobbyWindow {
     private KpButton mainBtn;
     private boolean myReady;
     private volatile Map<String, Object> lastLobby;
-    private volatile NetClientWindow game;
+    /** Партия друга — в настоящем окне партии (29.09.2026; прежде прототип). */
+    private volatile RemoteGame game;
 
     private LobbyWindow(HotSeatWindow.Options table, JFrame menu) {
         this.table = table;
@@ -79,6 +80,36 @@ public final class LobbyWindow {
      */
     public static void open(HotSeatWindow.Options table, JFrame menu) {
         SwingUtilities.invokeLater(() -> new LobbyWindow(table, menu).start());
+    }
+
+    /**
+     * ПРОДОЛЖИТЬ СЕТЕВУЮ ПАРТИЮ ИЗ СОХРАНЕНИЯ (29.09.2026). Стол — как в
+     * сохранении; места друзей ({@code net:N}) снова открыты, друзья входят,
+     * и после «Начать» окно хоста доигрывает записанные решения до места
+     * сохранения — у друзей оно подтягивается само, как при переподключении.
+     */
+    public static void openContinued(kelium.gui.GameSave save, JFrame menu) {
+        HotSeatWindow.Options o = save.options;
+        List<String> specs = new ArrayList<>();
+        for (String s : o.seatSpecs()) {
+            specs.add(s.startsWith(NetSeats.PREFIX) ? "human" : s);
+        }
+        HotSeatWindow.Options table = new HotSeatWindow.Options(o.rulesetId(), o.players(), o.seed(),
+            specs, o.scenarioId(), o.scenarioFile(), o.cuFacing(), o.seatColors(), o.startCoins(),
+            o.startKelium(), o.startAmmo(), o.prepRound(), o.marketCards());
+        SwingUtilities.invokeLater(() -> {
+            LobbyWindow w = new LobbyWindow(table, menu);
+            w.continued = save;
+            w.start();
+        });
+    }
+
+    /** Не null — стол продолжает эту сохранённую партию. */
+    private kelium.gui.GameSave continued;
+
+    /** Есть ли в сохранении сетевые места (продолжать — через сетевой стол). */
+    public static boolean isNetSave(kelium.gui.GameSave save) {
+        return save.options.seatSpecs().stream().anyMatch(s -> s.startsWith(NetSeats.PREFIX));
     }
 
     public static void main(String[] args) {
@@ -145,7 +176,9 @@ public final class LobbyWindow {
         create.add(multiline(table == null
             ? "Стол собирается в «Штабе»: закройте это окно, выберите число мест, правила "
                 + "и поле, затем снова «По сети»."
-            : tableWords(table)), "growx, wrap");
+            : (continued == null ? "" : "ПРОДОЛЖЕНИЕ сохранённой партии «" + continued.name
+                + "» — " + continued.describe() + ". Друзья входят заново, партия доиграется "
+                + "до места сохранения. ") + tableWords(table)), "growx, wrap");
         KpButton go = new KpButton("Создать стол", "друзья войдут по адресу", null).primary(true);
         go.setPreferredSize(new Dimension(Theme.px(260), Theme.px(48)));
         go.setState(table == null ? KpButton.State.DISABLED : KpButton.State.AVAILABLE);
@@ -223,10 +256,14 @@ public final class LobbyWindow {
             full.add(a + ":" + p);
         }
         copyText = full.get(0);
-        addressLine.setText("Адрес для друзей: " + full.get(0));
-        otherAddresses.setText(full.size() < 2 ? " "
-            : "другие адреса этого компьютера (другая сеть, Radmin/ZeroTier): "
-                + String.join(" · ", full.subList(1, full.size())));
+        addressLine.setText("Адрес для друзей: " + full.get(0) + "  (" + NetHost.networkOf(addrs.get(0))
+            + ")");
+        List<String> other = new ArrayList<>();
+        for (int i = 1; i < full.size(); i++) {
+            other.add(full.get(i) + " (" + NetHost.networkOf(addrs.get(i)) + ")");
+        }
+        otherAddresses.setText(other.isEmpty() ? " "
+            : "другие адреса этого компьютера: " + String.join(" · ", other));
         renderLobby(h.lobbyMessage());
     }
 
@@ -250,7 +287,7 @@ public final class LobbyWindow {
 
             @Override
             public void reject(String reason) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.rejected(reason);      // посреди партии: место отдано боту
                     return;
@@ -274,15 +311,15 @@ public final class LobbyWindow {
             @Override
             public void chat(String from, String text) {
                 SwingUtilities.invokeLater(() -> addChat(from + ": " + text));
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
-                    g.chat(from + ": " + text);
+                    g.chatLine(from + ": " + text);
                 }
             }
 
             @Override
             public void paused(int seat, String name, boolean waiting) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.paused(seat, name, waiting);
                 }
@@ -290,7 +327,7 @@ public final class LobbyWindow {
 
             @Override
             public void resumed(int seat, String how) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.resumed(seat, how);
                 }
@@ -298,7 +335,7 @@ public final class LobbyWindow {
 
             @Override
             public void closed() {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.closed();
                 }
@@ -306,9 +343,9 @@ public final class LobbyWindow {
 
             @Override
             public void start(int seat, List<String> names) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g == null) {
-                    g = new NetClientWindow(client, seat, names, LobbyWindow.this::backFromGame);
+                    g = new RemoteGame(client, seat, names, LobbyWindow.this::backFromGame);
                     game = g;
                     g.show();
                     SwingUtilities.invokeLater(() -> {
@@ -322,7 +359,7 @@ public final class LobbyWindow {
 
             @Override
             public void record(ReplayRecord part, boolean reset, int from) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.record(part, reset, from);
                 }
@@ -330,7 +367,7 @@ public final class LobbyWindow {
 
             @Override
             public void decide(Map<String, Object> q) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.decide(q);
                 }
@@ -338,7 +375,7 @@ public final class LobbyWindow {
 
             @Override
             public void over(Map<String, Object> r) {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.over(r);
                 }
@@ -351,7 +388,7 @@ public final class LobbyWindow {
 
             @Override
             public void disconnected() {
-                NetClientWindow g = game;
+                RemoteGame g = game;
                 if (g != null) {
                     g.disconnected();
                 } else {
@@ -468,7 +505,14 @@ public final class LobbyWindow {
             }
             mainBtn.setTexts("Партия идёт", "окно лобби — связь и чат; закрыть — закрыть стол");
             mainBtn.setState(KpButton.State.DISABLED);
-            HotSeatWindow.open(o);
+            if (continued != null) {
+                // та же лента решений, места — как в лобби сейчас
+                kelium.gui.GameSave c = continued;
+                HotSeatWindow.open(new kelium.gui.GameSave(c.name, o, c.moves, c.rulesetId,
+                    c.contentVersions, c.saved, c.round, c.circle));
+            } else {
+                HotSeatWindow.open(o);
+            }
         } else if (client != null) {
             myReady = !myReady;
             client.ready(myReady);

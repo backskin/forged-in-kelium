@@ -10,14 +10,15 @@ ns = {"__file__": os.path.join(D, "figs.py")}
 exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# планшет войск")[0], ns)
 figure = ns["figure"]
 
-SRC = r"C:\shared\Yandex.Disk\Forged in Kelium\Общие компоненты\экспорт-жетоны-модулей"
+SRC = os.path.join(os.path.expanduser("~"), "Yandex.Disk", "Forged in Kelium", "Общие компоненты",
+                   "экспорт-жетоны-модулей")
 H = 600
 GAP = 40
 # МЕЖДУ ОБЫЧНОЙ И ЗОЛОТОЙ СТОРОНОЙ — СТРЕЛКА: это один и тот же жетон,
 # перевёрнутый (просьба дизайнера 15.09.2026). Поэтому зазор внутри пары шире.
 ПАРА = 190
-files = ["Жетон прокачки атаки-1.png", "Жетон прокачки атаки-7.png",
-         "Жетон прокачки найма-3.png", "Жетон прокачки найма-7.png"]
+files = ["Жетон модулей боя-1.png", "Жетон модулей боя-7.png",
+         "Жетоны модулей сборки-1.png", "Жетоны модулей сборки-5.png"]
 ims = []
 for f in files:
     im = Image.open(os.path.join(SRC, f)).convert("RGBA")

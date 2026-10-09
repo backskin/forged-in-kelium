@@ -75,7 +75,10 @@ public final class HotSeatShot {
                 continue;
             }
             String k = String.valueOf(d.context().get("kind"));
-            if (answered >= skip && (kind == null || kind.equals(k))) {
+            // -Dshot.ctx=ключ — только решение, в контексте которого есть этот ключ
+            String нужен = System.getProperty("shot.ctx");
+            if (answered >= skip && (kind == null || kind.equals(k))
+                    && (нужен == null || d.context().containsKey(нужен))) {
                 break;
             }
             int idx = pick(rnd, d.options());

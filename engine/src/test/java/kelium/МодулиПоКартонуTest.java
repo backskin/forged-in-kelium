@@ -206,4 +206,63 @@ class МодулиПоКартонуTest {
         assertEquals(1, техника.damage, "техника получила 1 урон той же атакой");
         assertEquals(0, s.player(0).resources.ammo(), "заплачен один боеприпас");
     }
+
+    /** Свод 1.48.0: золотой модуль боя наносит 2 урона за 1 боеприпас — оба на один жетон. */
+    @Test
+    void золотойКрасныйДваУронаНаОдинЖетон() {
+        int[] урон = боЗолотымНаДва(false);
+        assertEquals(2, урон[0] + урон[1], "атака нанесла 2 урона");
+        assertTrue(урон[0] == 2 || урон[1] == 2, "оба урона легли на один жетон");
+    }
+
+    /** Свод 1.48.0: те же 2 урона можно разделить между двумя жетонами цели. */
+    @Test
+    void золотойКрасныйДелитУронМеждуЖетонами() {
+        int[] урон = боЗолотымНаДва(true);
+        assertEquals(1, урон[0], "пехота получила 1 урон");
+        assertEquals(1, урон[1], "техника получила 1 урон той же атакой");
+    }
+
+    private static int[] боЗолотымНаДва(boolean делить) {
+        GameState s = Fix.game(2, 42L);
+        kelium.rules.Ruleset rs = kelium.dataio.Ctx.rules(s);
+        Object было = rs.get("modules.red_gold_damage", 1);
+        rs.override("modules.red_gold_damage", 2);
+        try {
+            String spot = Fix.freeNeighbour(s, s.player(0).startHex);
+            Fix.unit(s, 0, UnitType.INFANTRY, s.player(0).startHex);
+            UnitToken пехота = Fix.unit(s, 1, UnitType.INFANTRY, spot);
+            UnitToken техника = Fix.unit(s, 1, UnitType.VEHICLE, spot);
+            пехота.hp = 3;
+            техника.hp = 3;
+            Map<String, Object> mod = new HashMap<>();
+            mod.put("id", "R30-1");
+            mod.put("targets", new String[]{"infantry", "vehicle"});
+            mod.put("ammo", 1);
+            mod.put("gold", true);
+            s.player(0).redPlacements.put(UnitType.INFANTRY, mod);
+            s.player(0).resources.setAmmo(1);
+            s.player(1).resources.setAmmo(0);
+            // второй удар: делить — бить жетон без урона, иначе — уже раненый
+            Fix.AimingAgent наГекс = new Fix.AimingAgent(0, spot);
+            Agent прицел = new Agent(0, "прицел") {
+                @Override
+                public Choice choose(GameState st, List<Choice> options, Map<String, Object> ctx) {
+                    if ("combat_victim".equals(ctx.get("kind"))) {
+                        for (Choice c : options) {
+                            if (c.payload() instanceof UnitToken u && (u.damage > 0) != делить) {
+                                return c;
+                            }
+                        }
+                    }
+                    return наГекс.choose(st, options, ctx);
+                }
+            };
+            ((CombatResolver) s.combat).runBattle(0, прицел);
+            assertEquals(0, s.player(0).resources.ammo(), "заплачен один боеприпас");
+            return new int[]{пехота.damage, техника.damage};
+        } finally {
+            rs.override("modules.red_gold_damage", было);
+        }
+    }
 }

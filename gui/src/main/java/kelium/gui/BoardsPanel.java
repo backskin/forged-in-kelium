@@ -235,6 +235,54 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         paintPrintedStrip(g, pad, h - pad - strip, w - 2 * pad, strip);
     }
 
+    /**
+     * ОДНА ПЕЧАТНАЯ ДОСКА С ЖИВЫМ СОСТОЯНИЕМ — в прямоугольник экрана (сцена
+     * планшета, 28.09.2026): кубики науки в ячейках, карта рынка с кубиками.
+     */
+    public void paintBoard(Graphics2D g, String which, int x, int y, int w, int h) {
+        java.awt.image.BufferedImage art = kelium.report.Textures.board(which);
+        if (art == null || snap == null) {
+            return;
+        }
+        kelium.report.Сглаживание.включить(g);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        if ("science".equals(which) && kelium.gui.replay2.BoardAnchors.science() != null) {
+            paintScienceArt(g, art, x, y, w, h);
+        } else if ("market".equals(which) && kelium.gui.replay2.BoardAnchors.marketCard() != null) {
+            paintMarketArt(g, art, x, y, w, h);
+        } else {
+            g.drawImage(scaled(art, w, h), x, y, null);
+        }
+    }
+
+    /**
+     * Ячейка шага {@code step} трека {@code track} на картинке планшета науки —
+     * место варианта «шагнуть сюда» на сцене планшета (null — якорей нет).
+     */
+    public java.awt.Shape scienceStepArea(String track, int step) {
+        kelium.gui.replay2.BoardAnchors.Science sc = kelium.gui.replay2.BoardAnchors.science();
+        if (sc == null) {
+            return null;
+        }
+        int[] cost = ints("tech.step_cost_trophy", new int[]{2, 3, 4, 5});
+        int[] cap = ints("tech.step_capacity", new int[]{3, 3, 2, 1});
+        int steps = Math.min(cost.length, cap.length);
+        double[] c = sc.cell(track, Math.max(1, Math.min(steps, step)), 0, steps);
+        if (c == null) {
+            return null;
+        }
+        // ячейка шага напечатана наискось; подсветка — её повёрнутая рамка
+        double w = sc.cellW() * 1.08;
+        double h = sc.cellH() * 1.08;
+        java.awt.geom.AffineTransform t = new java.awt.geom.AffineTransform();
+        t.translate(c[0], c[1]);
+        t.rotate(Math.toRadians(sc.angle()));
+        return t.createTransformedShape(new java.awt.geom.RoundRectangle2D.Double(
+            -w / 2, -h / 2, w, h, w * 0.18, w * 0.18));
+    }
+
     /** Только одна доска: {@code science}, {@code market}; null — обе. */
     private String only;
 

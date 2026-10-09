@@ -447,6 +447,12 @@ public final class StartMenuWindow {
         if (chosenSave == null || chosenSave.checkCompatible() != null) {
             return;
         }
+        // СЕТЕВАЯ ПАРТИЯ (29.09.2026) — снова через сетевой стол: друзья входят,
+        // и она доигрывается до места сохранения (без этого их места занял бы бот)
+        if (kelium.gui.net.LobbyWindow.isNetSave(chosenSave)) {
+            kelium.gui.net.LobbyWindow.openContinued(chosenSave, frame);
+            return;
+        }
         frame.dispose();
         HotSeatWindow.open(chosenSave);
     }

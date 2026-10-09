@@ -96,6 +96,12 @@ public final class PlayerState {
      */
     public final List<String> startObjectiveOffer = new ArrayList<>();
     /**
+     * НАЧАЛЬНЫЙ АРСЕНАЛ НА ВЫБОР (решение Влада 02.10.2026, ключ
+     * {@code setup.start_arsenal_offer}): две карты из восьми наугад, одну игрок
+     * оставляет, вторая уходит в коробку. Пусто — выбор сделан или его нет.
+     */
+    public final List<String> startArsenalOffer = new ArrayList<>();
+    /**
      * НИЗЫ, КОТОРЫЕ УЖЕ ОТРАБОТАЛИ. Награда за жёсткое требование берётся один
      * раз за партию — но у каждой карты своя, поэтому флаг нужен ПОКАРТОЧНЫЙ:
      * супер-заданий у игрока может быть несколько ({@link #superObjectives}).
@@ -331,6 +337,7 @@ public final class PlayerState {
         p.superObjectives.addAll(superObjectives);
         p.superObjectiveOffer.addAll(superObjectiveOffer);
         p.startObjectiveOffer.addAll(startObjectiveOffer);
+        p.startArsenalOffer.addAll(startArsenalOffer);
         p.superObjectivesDone.addAll(superObjectivesDone);
         p.redModules = redModules;
         p.blueModules = blueModules;

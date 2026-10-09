@@ -57,7 +57,7 @@ public class HumanLikeAgent extends StrategicAgent {
      * остальное — рутина, и в ней человек надёжен.
      */
     private static final java.util.Set<String> HUMAN_KINDS = java.util.Set.of(
-        "reveal_order", "action", "build_pick", "combat_target", "combat_victim",
+        "reveal_order", "action", "action_branch", "build_pick", "combat_target", "combat_victim",
         "move", "maneuver_unit", "spec");
 
     /** Насколько сильно помнит обиды (0 — не помнит вовсе). */
@@ -310,7 +310,7 @@ public class HumanLikeAgent extends StrategicAgent {
                 bonus += grudgeWeight * g;
                 bonus += tilt * 0.8;   // на нервах бьём охотнее
             }
-            case "action" -> {
+            case "action", "action_branch" -> {
                 String name = String.valueOf(o.payload());
                 if ("combat".equals(name) || "movement".equals(name)) {
                     // Есть на кого злиться — тянет в драку сильнее расчёта.

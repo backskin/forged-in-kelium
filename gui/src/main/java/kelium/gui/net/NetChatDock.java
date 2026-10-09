@@ -29,7 +29,7 @@ import kelium.gui.replay2.Theme;
  * строка ввода (Enter — отправить). Лежит выше шторки паузы: пока ждём
  * вышедшего игрока, поговорить можно.
  */
-final class NetChatDock extends JPanel {
+public final class NetChatDock extends JPanel {
 
     private static final int GAP = 12;
 
@@ -44,7 +44,7 @@ final class NetChatDock extends JPanel {
     private String last;
     private java.awt.Component anchor;
 
-    NetChatDock(JFrame frame, Consumer<String> send) {
+    public NetChatDock(JFrame frame, Consumer<String> send) {
         super(new BorderLayout());
         this.frame = frame;
         this.send = send;
@@ -116,7 +116,7 @@ final class NetChatDock extends JPanel {
     }
 
     /** Новая строка «кто: что». Поток интерфейса. */
-    void add(String line) {
+    public void add(String line) {
         history.append(line + "\n");
         history.setCaretPosition(history.getDocument().getLength());
         if (!expanded) {
@@ -166,7 +166,7 @@ final class NetChatDock extends JPanel {
      * Стоять над этим компонентом, а не у нижнего края окна: в окне партии
      * хоста снизу стол игрока — чат встаёт над ним, в угол поля.
      */
-    void anchorAbove(java.awt.Component c) {
+    public void anchorAbove(java.awt.Component c) {
         anchor = c;
         c.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override

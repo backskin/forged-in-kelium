@@ -218,7 +218,11 @@ public final class СнимокПримера {
         kelium.report.Сглаживание.включить(g);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         FieldPainter.dark = false;
+        // БЕЗ ПОДКРАСКИ ГЕКСА ЦВЕТОМ ХОЗЯИНА (дизайнер 05.10.2026): в книге
+        // модуль поля всегда в своём печатном цвете, ни в одном примере.
+        FieldPainter.showOwnership = false;
         FieldPainter.showCardboard = false;
+        FieldPainter.книжнаяТолщина = true;
 
         Font шапкаШ = new Font("Tektur", Font.BOLD, (int) Math.round(size * 0.235));
         for (int k = 0; k < кадров; k++) {

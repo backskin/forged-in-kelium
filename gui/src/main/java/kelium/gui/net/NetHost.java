@@ -526,9 +526,24 @@ public final class NetHost {
     private Map<String, Object> startMessage(int seat) {
         List<Object> names = new ArrayList<>();
         for (Seat s : seats) {
-            names.add(s.name == null ? "Место " + (s.index + 1) : s.name);
+            names.add(partyName(s.index));
         }
         return msg(NetProtocol.START, "seat", seat, "players", seats.length, "names", names);
+    }
+
+    /**
+     * ИМЯ МЕСТА В ПАРТИИ: бот — лидер нации по цвету места (как в окне партии
+     * хоста, {@code BotNames}); в лобби у бота по-прежнему тип — там его выбирают.
+     */
+    String partyName(int seat) {
+        Seat s = seats[seat];
+        if (s.kind == Kind.BOT) {
+            List<Integer> colors = table.seatColors();
+            int color = colors != null && seat < colors.size() && colors.get(seat) != null
+                ? colors.get(seat) : seat;
+            return kelium.gui.BotNames.of(table.seed(), seat, color);
+        }
+        return s.name == null ? "Место " + (seat + 1) : s.name;
     }
 
     /** Агент сетевого места (после {@link #begin}); null — место не сетевое. */
@@ -689,6 +704,10 @@ public final class NetHost {
             if (hex != null) {
                 o.put("hex", hex);        // вариант выбирается щелчком по гексу
             }
+            // ДЛЯ ОКНА ПАРТИИ У ДРУГА (29.09.2026): данные варианта с типами и
+            // подпись движка — окно раскладывает вопрос по ним так же, как у хоста
+            o.put("raw", c.label());
+            o.put("p", Payloads.enc(c.payload()));
             opts.add(o);
         }
         Map<String, Object> facing = facingOf(kind, options, context);
@@ -701,7 +720,8 @@ public final class NetHost {
         return msg(NetProtocol.DECIDE, "seq", seq, "kind", kind,
             "prompt", HotSeatWindow.kindLabel(kind), "round", state.round, "circle", state.circle,
             "undo", undoTargets(seat, state.round, state.circle).size(),
-            "options", opts, "facing", facing, "view", view);
+            "options", opts, "facing", facing, "view", view,
+            "context", Payloads.encContext(context));
     }
 
     /**
@@ -1029,8 +1049,13 @@ public final class NetHost {
             NetChatDock chat = new NetChatDock(frame, this::say);
             overlay.allow(chat);
             // снизу окна партии — стол игрока: чат встаёт над ним, в угол поля
+            // (с 26.09 стол — зона, выезжающая поверх поля, а не половина
+            // разделителя: ищем её по имени, иначе чат ложился на карты заданий)
+            java.awt.Component zone = named(frame.getContentPane(), "kelium.zone");
             javax.swing.JSplitPane split = findSplit(frame.getContentPane());
-            if (split != null && split.getBottomComponent() != null) {
+            if (zone != null) {
+                chat.anchorAbove(zone);
+            } else if (split != null && split.getBottomComponent() != null) {
                 chat.anchorAbove(split.getBottomComponent());
             }
             for (String line : chatLog()) {
@@ -1050,6 +1075,22 @@ public final class NetHost {
             });
             render.run();
         });
+    }
+
+    /** Компонент окна с этим именем; null — нет такого. */
+    private static java.awt.Component named(java.awt.Container c, String name) {
+        for (java.awt.Component k : c.getComponents()) {
+            if (name.equals(k.getName())) {
+                return k;
+            }
+            if (k instanceof java.awt.Container cc) {
+                java.awt.Component in = named(cc, name);
+                if (in != null) {
+                    return in;
+                }
+            }
+        }
+        return null;
     }
 
     /** Разделитель «поле / стол игрока» в окне партии; null — нет такого. */
@@ -1133,19 +1174,38 @@ public final class NetHost {
     }
 
     private static int addressRank(String a) {
-        if (a.startsWith("192.168.") || a.startsWith("26.") || a.startsWith("100.")) {
+        // ИГРАЕМ ЧЕРЕЗ RADMIN (решение Влада 26.09.2026): его адрес — первым, в
+        // кнопку «Скопировать»; домашняя сеть — следом (друг за стенкой)
+        if (a.startsWith("26.") || a.startsWith("100.")) {
             return 0;
         }
-        if (a.startsWith("10.")) {
+        if (a.startsWith("192.168.")) {
             return 1;
+        }
+        if (a.startsWith("10.")) {
+            return 2;
         }
         String[] p = a.split("\\.");
         if (p.length == 4 && "172".equals(p[0])) {
             int b = Integer.parseInt(p[1]);
             if (b >= 16 && b <= 31) {
-                return 3;
+                return 4;
             }
         }
-        return 2;
+        return 3;
+    }
+
+    /** Какая это сеть — подпись к адресу для друзей. */
+    public static String networkOf(String address) {
+        if (address.startsWith("26.")) {
+            return "Radmin VPN";
+        }
+        if (address.startsWith("100.")) {
+            return "Tailscale";
+        }
+        if (address.startsWith("192.168.") || address.startsWith("10.")) {
+            return "домашняя сеть";
+        }
+        return "другая сеть";
     }
 }

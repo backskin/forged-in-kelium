@@ -29,15 +29,22 @@ import kelium.dataio.Ctx;
  */
 public final class GameLogger {
 
-    private static final Map<String, String> ACTIONS_RU = Map.of(
-        "assembly", "Снаряжение", "mining", "Добыча", "build", "Стройка",
-        "energy_swap", "Смена энергии", "movement", "Движение", "combat", "Бой",
-        "market", "Рынок", "science", "Наука");
-    private static final Map<String, String> ORDERS_RU = Map.of(
-        "development", "Разработка", "infrastructure", "Инфраструктура",
-        "operation", "Наступление", "acquisitions", "Приобретения",
-        "place", "Разместить", "acquire", "Приобрести", "control", "Контролировать",
-        "explore", "Исследовать");
+    private static final Map<String, String> ACTIONS_RU = Map.ofEntries(
+        Map.entry("assembly", "Снаряжение"), Map.entry("mining", "Добыча"),
+        Map.entry("build", "Стройка"), Map.entry("energy_swap", "Смена энергии"),
+        Map.entry("movement", "Движение"), Map.entry("combat", "Бой"),
+        Map.entry("market", "Рынок"), Map.entry("science", "Наука"),
+        Map.entry("extract", "Добыча"), Map.entry("power", "Питание"),
+        Map.entry("supply", "Снабжение"), Map.entry("command", "Командование"),
+        Map.entry("develop", "Развитие"));
+    private static final Map<String, String> ORDERS_RU = Map.ofEntries(
+        Map.entry("development", "Разработка"), Map.entry("infrastructure", "Инфраструктура"),
+        Map.entry("operation", "Наступление"), Map.entry("acquisitions", "Приобретения"),
+        Map.entry("place", "Разместить"), Map.entry("acquire", "Приобрести"),
+        Map.entry("control", "Контролировать"), Map.entry("explore", "Исследовать"),
+        Map.entry("settle", "Освоить"), Map.entry("mobilize", "Мобилизовать"),
+        Map.entry("advance", "Наступать"), Map.entry("secure", "Контролировать"),
+        Map.entry("research", "Исследовать"));
     private static final Map<String, String> COND_RU = Map.of(
         "victory_points", "по победным очкам", "military", "военная победа",
         "super_objective", "супер-задание", "all_peaks_occupied", "заняты все вершины",

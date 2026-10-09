@@ -69,95 +69,21 @@ public final class Shapes {
      */
     public static Set<Node> ownNodes(GameState s, int seat) {
         Set<Node> out = new HashSet<>();
-        PlayerState p = s.player(seat);
-        for (UnitToken u : p.units) {
-            if (u.hexId == null || !u.alive()) {
-                continue;
+        for (kelium.core.Token t : Соседство.жетоны(s, seat)) {
+            for (Соседство.Место m : Соседство.места(s, t)) {
+                out.add(new Node(m.hexId(), m.сектор()));
             }
-            if (u.type == UnitType.AIRCRAFT) {
-                out.add(new Node(u.hexId, -1));
-                continue;
-            }
-            addUnitCells(s, u, out);
-        }
-        for (BuildingToken b : p.buildings) {
-            if (b.hexId == null || !b.alive()) {
-                continue;
-            }
-            addCellsOf(s, b.hexId, b.uid, out);
         }
         return out;
     }
 
     /**
-     * СЕКТОРЫ ОДНОГО ВОЙСКА. Берутся из раскладки {@link СекторыВойск}: разметка
-     * гекса ({@code sideOwner}) хранит только здания и стенки нейтралов, а
-     * наземные войска раскладываются по свободным секторам выводом из состояния.
-     *
-     * <p>ПОЧЕМУ ОТДЕЛЬНЫЙ ПУТЬ ДЛЯ ВОЙСК. До 25.08.2026 войска шли тем же
-     * {@code addCellsOf}, что и здания, — то есть искали свой uid в sideOwner,
-     * куда их никто не писал. Узлов не появлялось вовсе, и все пять карт про
-     * непрерывное соседство были невыполнимы: 451 раздача, ноль выполнений.
+     * СОСЕДСТВО двух узлов — единое для движка ({@link Соседство}, 30.09.2026):
+     * небо — номер −1, как и здесь.
      */
-    private static void addUnitCells(GameState s, UnitToken u, Set<Node> out) {
-        List<Integer> секторы = СекторыВойск.секторыЖетона(s, u);
-        if (секторы == null) {
-            return;
-        }
-        for (int i : секторы) {
-            out.add(new Node(u.hexId, i));
-        }
-    }
-
-    /**
-     * Ячейки, занятые ОДНИМ жетоном. Берём из разметки гекса ({@code sideOwner}):
-     * это единственная модель размещения в движке, второй быть не должно. Техника и
-     * здания занимают несколько ячеек и дают несколько узлов.
-     */
-    private static void addCellsOf(GameState s, String hexId, int uid, Set<Node> out) {
-        Hex h = s.field.hexes.get(hexId);
-        if (h == null) {
-            return;
-        }
-        for (int i = 0; i < h.sideOwner.length; i++) {
-            if (h.sideOwner[i] != null && h.sideOwner[i] == uid) {
-                out.add(new Node(hexId, i));
-            }
-        }
-    }
-
-    /** СОСЕДСТВО двух узлов — по правилу дизайнера (см. описание класса). */
     public static boolean neighbours(GameState s, Node a, Node b) {
-        if (a.equals(b)) {
-            return false;
-        }
-        if (a.hexId().equals(b.hexId())) {
-            // Внутри гекса: воздушная ячейка соседствует со всеми наземными,
-            // наземные — со смежными по разметке гекса.
-            if (a.cell() < 0 || b.cell() < 0) {
-                return true;
-            }
-            // Шесть ячеек по кругу: смежные — те, что стоят рядом по кольцу.
-            int d = Math.abs(a.cell() - b.cell());
-            return d == 1 || d == 5;
-        }
-        // Разные гексы: нужна ПРИМЫКАЮЩАЯ пара ячеек через общее ребро.
-        if (!s.field.neighbors(a.hexId()).contains(b.hexId())) {
-            return false;
-        }
-        if (a.cell() < 0 || b.cell() < 0) {
-            return false;      // воздух за пределы своего гекса не тянется
-        }
-        Hex ha = s.field.hexes.get(a.hexId());
-        Hex hb = s.field.hexes.get(b.hexId());
-        if (ha == null || hb == null) {
-            return false;
-        }
-        // ПРИМЫКАНИЕ: ячейка-сторона смотрит ровно на один соседний гекс. Значит
-        // ячейки примыкают, если сторона A смотрит на гекс B, а сторона B — на A:
-        // это и есть общее ребро двух гексов.
-        return ha.sidesFacing(b.hexId()).contains(a.cell())
-            && hb.sidesFacing(a.hexId()).contains(b.cell());
+        return Соседство.соседствуют(s, new Соседство.Место(a.hexId(), a.cell()),
+            new Соседство.Место(b.hexId(), b.cell()));
     }
 
     /** Граф соседства по занятым ячейкам игрока. */
@@ -412,23 +338,12 @@ public final class Shapes {
         }
         boolean unitsOnly = what.startsWith("unit");
         Set<Node> out = new HashSet<>();
-        PlayerState p = s.player(seat);
-        if (unitsOnly) {
-            for (UnitToken u : p.units) {
-                if (u.hexId == null || !u.alive()) {
-                    continue;
-                }
-                if (u.type == UnitType.AIRCRAFT) {
-                    out.add(new Node(u.hexId, -1));
-                } else {
-                    addUnitCells(s, u, out);
-                }
+        for (kelium.core.Token t : Соседство.жетоны(s, seat)) {
+            if ((t instanceof UnitToken) != unitsOnly) {
+                continue;
             }
-        } else {
-            for (BuildingToken b : p.buildings) {
-                if (b.hexId != null && b.alive()) {
-                    addCellsOf(s, b.hexId, b.uid, out);
-                }
+            for (Соседство.Место m : Соседство.места(s, t)) {
+                out.add(new Node(m.hexId(), m.сектор()));
             }
         }
         return out;

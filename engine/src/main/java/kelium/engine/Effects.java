@@ -90,6 +90,7 @@ public final class Effects {
             case "swap_order_card" -> swapOrderCard(s, seat, p);
             // === УТИЛЬ 3.0 (заказ дизайнера 21.08.2026) ===
             case "gain_per" -> gainPer(s, seat, p);
+            case "upgrade_building" -> upgradeBuilding(s, seat, p);
             case "steal_resource" -> stealResource(s, seat, p);
             case "steal_arsenal_card" -> stealArsenalCard(s, seat, p);
             case "move_building_free" -> moveBuildingFree(s, seat, p);
@@ -146,7 +147,7 @@ public final class Effects {
                  // ШЕСТЬ ЭФФЕКТОВ УТИЛЯ 3.0 (21.08.2026): плата за положение на
                  // поле, две кражи, бесплатная перестройка, обновление витрины и
                  // золочение жетона модуля.
-                 "gain_per", "steal_resource", "steal_arsenal_card",
+                 "gain_per", "upgrade_building", "steal_resource", "steal_arsenal_card",
                  "move_building_free", "refresh_arsenal_row", "gild_module",
                  "combo", "exchange_table",
                  // Пять эффектов заказа 02.09.2026: карты рынка 2.0 и те низы
@@ -489,6 +490,22 @@ public final class Effects {
         PrintedContainers.накрытия(s, s.player(seat), открытыДо);
         if (s.journal instanceof TurnJournal tj && res != null && res.ok()) {
             tj.onAction(seat, name, res.telemetry());
+        }
+        // ВЕТКА С КАРТЫ — ТОЖЕ СОБЫТИЕ «сыграна ветка» (Карты 2.0, 30.09.2026):
+        // «каждый раз, когда играешь ветку …» считает и ветки с карт, иначе
+        // награда задания не могла бы запустить установленный арсенал.
+        if (s.публикатор != null && res != null) {
+            Map<String, Object> ev = new HashMap<>();
+            ev.put("type", "action");
+            ev.put("seat", seat);
+            boolean стройка = name.startsWith("build_");
+            ev.put("action", стройка ? "build" : name);
+            ev.put("fork", Срабатывания.развилка(name));
+            ev.put("ok", res.ok());
+            ev.put("free", true);
+            ev.put("detail", res.detail());
+            ev.put("telemetry", res.telemetry());
+            s.публикатор.accept(ev);
         }
         got.put("ran", res != null && res.ok());
         if (res != null) {
@@ -1360,6 +1377,15 @@ public final class Effects {
         int count = switch (per) {
             case "own_military_building" -> countBuildings(pl, true);
             case "own_economy_building" -> countBuildings(pl, false);
+            // ЭНЕРГИЯ И УРОВНИ (заказ Влада 02.10.2026): счёт по запитанным
+            // зданиям и по уровням добытчиков и энергостанций
+            case "own_powered_miner" -> countPowered(pl, BuildingType.MINER);
+            case "own_powered_plant" -> countPowered(pl, BuildingType.POWER_PLANT);
+            case "own_powered_building" -> countPowered(pl, null);
+            case "miner_levels" -> sumLevels(pl, BuildingType.MINER);
+            case "plant_levels" -> sumLevels(pl, BuildingType.POWER_PLANT);
+            case "top_miner_level" -> topLevel(pl, BuildingType.MINER);
+            case "top_plant_level" -> topLevel(pl, BuildingType.POWER_PLANT);
             default -> pl.unitsOnField().size();
         };
         Map<String, Object> got = new HashMap<>();
@@ -1376,6 +1402,172 @@ public final class Effects {
             got.putAll(gain(s, seat, one));
         }
         return got;
+    }
+
+    /** Сколько своих запитанных зданий типа {@code t} ({@code null} — любых, кроме ЦУ). */
+    private static int countPowered(PlayerState pl, BuildingType t) {
+        int n = 0;
+        for (BuildingToken b : pl.buildingsOnField()) {
+            if (b.type == BuildingType.COMMAND_CENTER || (t != null && b.type != t)) {
+                continue;
+            }
+            if (b.energySlots > 0 && b.powered()) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** Сумма уровней своих зданий типа {@code t} на поле. */
+    private static int sumLevels(PlayerState pl, BuildingType t) {
+        int n = 0;
+        for (BuildingToken b : pl.buildingsOnField()) {
+            if (b.type == t) {
+                n += b.level == null ? 1 : b.level;
+            }
+        }
+        return n;
+    }
+
+    /** Наибольший уровень своего здания типа {@code t} на поле (0 — нет). */
+    private static int topLevel(PlayerState pl, BuildingType t) {
+        int n = 0;
+        for (BuildingToken b : pl.buildingsOnField()) {
+            if (b.type == t) {
+                n = Math.max(n, b.level == null ? 1 : b.level);
+            }
+        }
+        return n;
+    }
+
+    /**
+     * ПОДНЯТЬ УРОВЕНЬ ДОБЫТЧИКА ИЛИ ЭНЕРГОСТАНЦИИ (заказ Влада 02.10.2026: у
+     * хозяйственных зданий есть уровни, а по базовым правилам они ни на что не
+     * влияют — карты дают им дело). Свой добытчик или станция на поле
+     * заменяется жетоном того же вида на уровень выше из своего запаса, на тех
+     * же секторах; плата — {@code cost} монет (по умолчанию 1).
+     *
+     * <p>Энергия не теряется: потребитель сохраняет кубики (лишние вернутся на
+     * источники, если ячеек стало меньше), станция сохраняет розданные кубики,
+     * а прибавку выработки получает свободными кубиками на себе. Урон остаётся
+     * на жетоне. Ячейки хранилища старого уровня закрываются, нового —
+     * открываются; излишек кубиков сгорает по общему правилу возврата.
+     *
+     * @param p {@code type}: miner | plant | any; {@code cost}: монет за подъём
+     */
+    static Map<String, Object> upgradeBuilding(GameState s, int seat, Map<String, Object> p) {
+        PlayerState pl = s.player(seat);
+        String вид = String.valueOf(p.getOrDefault("type", "any"));
+        int цена = p.get("cost") instanceof Number n ? n.intValue() : 1;
+        if (!pl.resources.canPay(Resource.COIN, цена)) {
+            return Map.of("upgraded", 0, "reason", "нечем заплатить");
+        }
+        List<Choice> opts = new ArrayList<>();
+        for (BuildingToken b : pl.buildingsOnField()) {
+            boolean подходит = (b.type == BuildingType.MINER && !"plant".equals(вид))
+                || (b.type == BuildingType.POWER_PLANT && !"miner".equals(вид));
+            if (!подходит || b.level == null || b.level >= 4 || уровеньНаПоле(pl, b.type, b.level + 1)) {
+                continue;
+            }
+            opts.add(new Choice("upgrade_pick", b.uid,
+                b.type.code + " " + b.level + "→" + (b.level + 1) + " @ " + b.hexId));
+        }
+        if (opts.isEmpty()) {
+            return Map.of("upgraded", 0, "reason", "поднимать нечего");
+        }
+        opts.add(new Choice("pass", null, "не поднимать"));
+        Agent agent = agentFor(s, seat);
+        Choice ch = agent == null ? opts.get(0)
+            : agent.choose(s, opts, Map.of("kind", "upgrade_pick"));
+        if (ch == null || ch.payload() == null) {
+            return Map.of("upgraded", 0);
+        }
+        int uid = ((Number) ch.payload()).intValue();
+        BuildingToken old = null;
+        for (BuildingToken b : pl.buildingsOnField()) {
+            if (b.uid == uid) {
+                old = b;
+            }
+        }
+        if (old == null) {
+            return Map.of("upgraded", 0);
+        }
+        BuildingToken нов = запасный(s, pl, old.type, old.level + 1);
+        pl.resources.pay(Resource.COIN, цена);
+        int былоВыработки = old.type == BuildingType.POWER_PLANT ? Power.sourceCubes(s, old) : 0;
+        Hex h = s.field.get(old.hexId);
+        for (int i = 0; i < 6; i++) {
+            if (h.sideOwner[i] != null && h.sideOwner[i] == old.uid) {
+                h.sideOwner[i] = нов.uid;
+            }
+        }
+        нов.hexId = old.hexId;
+        нов.damage = old.damage;
+        if (old.type == BuildingType.POWER_PLANT) {
+            // розданные кубики станции остаются на потребителях — под новым жетоном
+            for (BuildingToken c : pl.buildingsOnField()) {
+                Integer x = c.energyBySource.remove(old.uid);
+                if (x != null && x > 0) {
+                    c.energyBySource.merge(нов.uid, x, Integer::sum);
+                }
+            }
+            нов.energyIdle = old.energyIdle;
+        } else {
+            // потребитель сохраняет кубики, сколько влезет в ячейки нового уровня
+            int влезет = нов.energySlots;
+            for (Map.Entry<Integer, Integer> e : old.energyBySource.entrySet()) {
+                int сюда = Math.min(влезет, e.getValue());
+                if (сюда > 0) {
+                    нов.addEnergyFrom(e.getKey(), сюда);
+                    влезет -= сюда;
+                }
+                int лишних = e.getValue() - сюда;
+                for (BuildingToken src : pl.buildingsOnField()) {
+                    if (src.uid == e.getKey() && лишних > 0) {
+                        src.energyIdle += лишних;
+                    }
+                }
+            }
+        }
+        old.energyBySource.clear();
+        old.energyPlaced = 0;
+        old.energyIdle = 0;
+        old.hexId = null;
+        old.resetDamage();
+        if (нов.type == BuildingType.POWER_PLANT) {
+            нов.energyIdle += Math.max(0, Power.sourceCubes(s, нов) - былоВыработки);
+        }
+        Storage.evictOnBuildingReturn(s, pl, true);
+        return Map.of("upgraded", 1, "type", нов.type.code, "level", нов.level, "coin_spent", цена);
+    }
+
+    /** Стоит ли на поле своё здание типа {@code t} уровня {@code level} (жетон уровня один). */
+    private static boolean уровеньНаПоле(PlayerState pl, BuildingType t, int level) {
+        for (BuildingToken b : pl.buildingsOnField()) {
+            if (b.type == t && b.level != null && b.level == level) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Жетон здания типа {@code t} уровня {@code level} из своего запаса. Движок
+     * заводит жетон при первой постройке (как Стройка, {@code Actions.BuildAction}):
+     * лежавший в запасе берётся, иначе создаётся.
+     */
+    private static BuildingToken запасный(GameState s, PlayerState pl, BuildingType t, int level) {
+        for (BuildingToken b : pl.buildings) {
+            if (b.hexId == null && b.type == t && b.level != null && b.level == level) {
+                return b;
+            }
+        }
+        BuildingToken b = s.tokenStats.makeBuilding(t, pl.seat, Placement.nextUid(s), level);
+        if (Passives.hasPassive(s, pl.seat, "buildings_plus1_hp")) {
+            b.hp += 1;
+        }
+        pl.buildings.add(b);
+        return b;
     }
 
     /** Сколько своих зданий на поле: военные (с ЦУ) или хозяйственные. */
@@ -1544,7 +1736,7 @@ public final class Effects {
      */
     static Map<String, Object> gildModule(GameState s, int seat, Map<String, Object> p) {
         PlayerState pl = s.player(seat);
-        if (!Modules.canGild(pl)) {
+        if (!Modules.canGild(s, pl)) {
             return Map.of("gilded", 0, "reason", "все разложенные жетоны уже золотые");
         }
         Resource pay;
@@ -2265,7 +2457,7 @@ public final class Effects {
             }
             int fp = Actions.buildingFootprint(b.type);
             int[] ld = Actions.groundLoad(s, target, -1);
-            List<Integer> sides = s.field.get(target).chooseFootprint(fp, ld[0], ld[1]);
+            List<Integer> sides = s.field.get(target).chooseFootprint(fp, ld[0], ld[1], ld[2]);
             if (sides == null) {
                 continue;               // физически не влезло — остаётся на месте
             }

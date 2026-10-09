@@ -42,17 +42,17 @@ K = 2
 
 # крупные иконки действий
 БОЛЬШИЕ = {
-    'extract': os.path.join(ЭКСПОРТ, 'все иконки-34.png'),
-    'power': os.path.join(ЭКСПОРТ, 'все иконки-32.png'),
-    'supply': os.path.join(ЧЕРНОВИК_ИКОНОК, 'снабжение — ящики (черновик).png'),
-    'command': os.path.join(ЧЕРНОВИК_ИКОНОК, 'командование (вырезано).png'),
-    'develop': os.path.join(ЧЕРНОВИК_ИКОНОК, 'развитие (вырезано).png'),
-    'ring': os.path.join(ЭКСПОРТ, 'все иконки-24.png'),
-    'unit': os.path.join(ЭКСПОРТ, 'все иконки-49.png'),
-    'military': os.path.join(ЭКСПОРТ, 'все иконки-29.png'),
-    'build_zone': os.path.join(ЭКСПОРТ, 'все иконки-76.png'),   # свой гекс / гекс за стенкой
-    'build_own': os.path.join(ЭКСПОРТ, 'все иконки-77.png'),    # стройка на гексе со своим зданием
-    'build_wall': os.path.join(ЭКСПОРТ, 'все иконки-78.png'),   # стройка за свободной стенкой
+    'extract': os.path.join(ЭКСПОРТ, 'все иконки-36.png'),
+    'power': os.path.join(ЭКСПОРТ, 'все иконки-34.png'),
+    'supply': os.path.join(ЭКСПОРТ, 'все иконки-35.png'),
+    'command': os.path.join(ЭКСПОРТ, 'все иконки-37.png'),
+    'develop': os.path.join(ЭКСПОРТ, 'все иконки-40.png'),
+    'ring': os.path.join(ЭКСПОРТ, 'все иконки-25.png'),
+    'unit': os.path.join(ЭКСПОРТ, 'все иконки-54.png'),
+    'military': os.path.join(ЭКСПОРТ, 'все иконки-30.png'),
+    'build_zone': os.path.join(ЭКСПОРТ, 'все иконки-82.png'),   # свой гекс / гекс за стенкой
+    'build_own': os.path.join(ЭКСПОРТ, 'все иконки-83.png'),    # стройка на гексе со своим зданием
+    'build_wall': os.path.join(ЭКСПОРТ, 'все иконки-84.png'),   # стройка за свободной стенкой
 }
 _кэш = {}
 

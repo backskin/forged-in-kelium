@@ -112,6 +112,12 @@ public class PlannerAgent extends Agent {
         this.нейтральный = plannerDefaults("balanced", players);
         this.intents = new Intents(players, genome.get("pl.commitment", 1.0));
         this.intents.поУгрозам = true;
+        // ПЛАН НА ПАРТИЮ — пока ВЫКЛЮЧЕН по умолчанию: замер 07.10.2026 на одних
+        // раздачах показал, что с ним бот слабее (18% побед против 32%) — путь
+        // «война» при нынешнем балансе проигрывает. Включается для опытов
+        // свойством -Dkelium.план=да, пока путь и множители не доведены.
+        this.intents.стратегия = "да".equals(System.getProperty("kelium.план", "нет"))
+            ? new Стратегия(character) : null;
     }
 
     /** Пометить бота прежним (см. {@link #прежний}). */
@@ -127,12 +133,55 @@ public class PlannerAgent extends Agent {
         return прежний ? null : намерение;
     }
 
+    /**
+     * ОБУЧЕННАЯ ОЦЕНКА ПОЗИЦИИ (30.09.2026): если задана, судит позицию вместо
+     * ручной формулы — и после моего хода, и в конце доигрывания ответного
+     * раунда. Шкала — ожидаемый отрыв в очках от лучшего соперника (мгновенная
+     * победа — +10). Учится самоигрой ({@code kelium.ЦиклСтратега}).
+     */
+    public java.util.function.ToDoubleBiFunction<GameState, Integer> обученная = null;
+
+    /**
+     * ДОЛЯ СЕТИ В ОЦЕНКЕ (0..1): оценка = доля · сеть + (1 − доля) · формула.
+     * Обучение поднимает долю, только когда замер показывает, что так сильнее,
+     * — поэтому молодая сеть не делает бота хуже прежнего.
+     */
+    public double доляСети = 1.0;
+
     /** Оценка позиции после хода: новая — относительно соперников. */
     private double оценка(GameState после) {
-        if (прежний || веса == null) {
-            return PositionValue.value(после, seat, genome, intents);
+        if (обученная != null) {
+            double сеть = обученная.applyAsDouble(после, seat);
+            if (доляСети >= 1.0) {
+                return сеть;
+            }
+            return доляСети * сеть + (1 - доляСети) * формула(после);
         }
-        return Относительно.оценка(после, seat, genome, intents, веса, нейтральный);
+        return формула(после);
+    }
+
+    /** Веса оценки под текущий путь и тактику; {@code null} — веса характера. */
+    private Genome весаПлана;
+
+    /** Отключить план (для сравнительных замеров «с планом против без»). */
+    public PlannerAgent безПлана() {
+        intents.стратегия = null;
+        весаПлана = null;
+        return this;
+    }
+
+    /** План бота — путь на партию и тактика на раунд. */
+    public Стратегия стратегия() {
+        return intents.стратегия;
+    }
+
+    /** Ручная формула оценки позиции. */
+    private double формула(GameState после) {
+        Genome g = весаПлана != null ? весаПлана : genome;
+        if (прежний || веса == null) {
+            return PositionValue.value(после, seat, g, intents);
+        }
+        return Относительно.оценка(после, seat, g, intents, веса, нейтральный);
     }
 
     /** Лидер и веса соперников на это решение — по позиции ДО него. */
@@ -323,6 +372,10 @@ public class PlannerAgent extends Agent {
         if (state.round != lastRound) {
             lastRound = state.round;
             intents.newRound(state, seat, genome.get("pl.leader_bias", 0.8));
+            if (!прежний && intents.стратегия != null) {
+                intents.стратегия.новыйРаунд(state, seat);
+                весаПлана = intents.стратегия.применить(genome);
+            }
             refocus(state);
         }
         if (!прежний) {
@@ -672,7 +725,7 @@ public class PlannerAgent extends Agent {
         int удачных = 0;
         for (int i = 0; i < Math.max(1, horizonSamples); i++) {
             double д = Lookahead.playOut(после, seat, genome, others, null,
-                horizonRounds, seed + 7919L * i);
+                horizonRounds, seed + 7919L * i, обученная, доляСети);
             if (!Double.isNaN(д)) {
                 сумма += д;
                 удачных++;
@@ -1304,7 +1357,9 @@ public class PlannerAgent extends Agent {
         for (String cid : p.objectiveHand) {
             var card = CardRegistry.objective(cid);
             prog.put(cid, card == null ? 0.0 : PositionValue.clamp(card.progress(ctx)));
-            val.put(cid, PositionValue.rewardValue(s, seat, cid) / 5.0);
+            double сродство = intents.стратегия == null ? 1.0
+                : intents.стратегия.сродство(s, seat, cid);
+            val.put(cid, PositionValue.rewardValue(s, seat, cid) / 5.0 * сродство);
         }
         intents.refocus(p.objectiveHand, prog, val);
     }

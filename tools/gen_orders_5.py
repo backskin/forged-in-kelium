@@ -33,9 +33,9 @@ K = 2                                   # рисуем вдвое крупнее
 ЗАГ_ОБВОДКА = (78, 52, 42)
 
 # номер иконки в выгрузке «все иконки-N.png»
-ИК = {'extract': 34, 'power': 32, 'supply': 33, 'move': 35, 'combat': 36,
-      'market': 37, 'science': 38, 'spec': 25, 'coin': 1, 'ammo': 3,
-      'objective': 16, 'move_arrow': 61, 'unit': 49}
+ИК = {'extract': 36, 'power': 34, 'supply': 35, 'move': 38, 'combat': 39,
+      'market': 41, 'science': 42, 'spec': 26, 'coin': 1, 'ammo': 3,
+      'objective': 17, 'move_arrow': 66, 'unit': 54}
 ДЕЙСТВИЯ = {
     'extract': ('добыча', ['extract']),
     'power': ('питание', ['power']),

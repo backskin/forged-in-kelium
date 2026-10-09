@@ -91,7 +91,7 @@ public final class ChoiceWords {
                     + (m.find() ? sourceAcc(m.group(1)) : "источник");
             }
             case "energy_done" -> {
-                return "Закончить смену энергии";
+                return "Больше не перекладывать";
             }
             case "pay_power" -> {
                 if (Boolean.TRUE.equals(p)) {
@@ -173,6 +173,11 @@ public final class ChoiceWords {
             case "move_source" -> {
                 return "Двигать отсюда";
             }
+            case "action_branch" -> {
+                // подпись варианта — «развилка:ветка» (Actions.ForkAction)
+                String развилка = raw.contains(":") ? before(raw, ":") : null;
+                return ActionBar.branchRu(развилка, p instanceof String b ? b : null);
+            }
             case "action", "objective_reward_action", "energy_or_modules" -> {
                 if (p instanceof String a) {
                     return ActionBar.ACTIONS.getOrDefault(a, "modules".equals(a)
@@ -200,8 +205,14 @@ public final class ChoiceWords {
             }
             case "assemble" -> {
                 if (p instanceof Map<?, ?> m) {
-                    return "ammo".equals(m.get("kind")) ? "Взять боеприпасы"
-                        : "Нанять: " + unitRu(after(raw, "->"));
+                    // действия здания словами печати (Влад 03.10.2026): «произвести
+                    // боеприпасы» (иконка 62) и «нанять» (иконка 63)
+                    String род = m.get("unit") == null ? "" : unitRu(String.valueOf(m.get("unit")));
+                    return switch (String.valueOf(m.get("kind"))) {
+                        case "ammo" -> "Произвести боеприпасы";
+                        case "both" -> "Нанять: " + род + " и произвести боеприпасы";
+                        default -> "Нанять: " + род;
+                    };
                 }
             }
             case "landing" -> {
@@ -228,8 +239,12 @@ public final class ChoiceWords {
                 return specWords(c, cardName);
             }
             case "storage_side" -> {
-                return String.valueOf(p).contains("energy") ? "Постоянный кубик энергии"
-                    : "Универсальная ячейка склада";
+                return String.valueOf(p).contains("energy") ? "Жетон энергии: +1 кубик энергии ЦУ"
+                    : "Жетон ячейки: +1 ячейка склада";
+            }
+            case "gild_storage" -> {
+                // жетоны хранилища 2.0 (02.10.2026): payload — номер жетона
+                return "Улучшить жетон хранилища";
             }
             case "build_pick" -> {
                 if (p instanceof Map<?, ?> m && m.get("btype") != null) {
@@ -288,12 +303,36 @@ public final class ChoiceWords {
         };
     }
 
+    /** «3 МОН» → «3 монеты»: число и слово по числу. */
+    private static String согласовать(String s, String code, String one, String few, String many) {
+        Matcher m = Pattern.compile("(\\d+)\\s*" + code + "(?![А-ЯЁа-яёA-Za-z])").matcher(s);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            int n = Integer.parseInt(m.group(1));
+            int n100 = n % 100;
+            int n10 = n % 10;
+            String w = n100 >= 11 && n100 <= 14 ? many : n10 == 1 ? one : n10 >= 2 && n10 <= 4 ? few : many;
+            m.appendReplacement(out, Matcher.quoteReplacement(n + " " + w));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
     /** «запитать barracks монетами (2 МОН …» — здание и цена. */
     private static final Pattern PAY_POWER = Pattern.compile("запитать (\\S+) монетами \\((\\d+)");
 
     /** Пояснение мелко: цена, расход, последствие; null — нечего сказать. */
     public static String sub(String kind, Choice c) {
         Object p = c.payload();
+        // ОТВЕТ КАРТОЙ: вторая строка кнопки — что даст ответ
+        if ("reaction_burn".equals(c.kind()) && c.label() != null) {
+            String raw = c.label();
+            int colon = raw.indexOf(':');
+            int тире = raw.lastIndexOf(" — ");
+            String даст = тире > colon ? raw.substring(тире + 3)
+                : colon > 0 ? raw.substring(colon + 1).trim() : null;
+            return даст;
+        }
         if ("pay_power".equals(c.kind()) && Boolean.TRUE.equals(p) && c.label() != null) {
             Matcher m = PAY_POWER.matcher(c.label());
             if (m.find()) {
@@ -316,6 +355,10 @@ public final class ChoiceWords {
         if ("sci_exchange".equals(kind) && p instanceof Map<?, ?> m && m.get("give") != null) {
             return "трофеев: " + m.get("give");
         }
+        if ("action_branch".equals(kind) && p instanceof String b && c.label() != null) {
+            String l = c.label();
+            return ActionBar.branchSub(l.contains(":") ? l.substring(0, l.indexOf(':')) : null, b);
+        }
         if ("build_pick".equals(kind) && p instanceof Map<?, ?> m && m.get("cost") != null) {
             return "монет: " + m.get("cost");
         }
@@ -334,14 +377,14 @@ public final class ChoiceWords {
             case "sci_track", "sci_exchange" -> "Закончить с наукой";
             case "market" -> "Хватит торговать";
             case "spec" -> "Без СПЕЦ-действия";
-            case "mass_open" -> "Больше не вскрывать";
+            case "mass_open" -> "Не вскрывать";
             case "reaction" -> "Не отвечать";
             case "maneuver_unit" -> "Без манёвра";
             case "return_unit" -> "Никого не снимать";
-            case "energy_place" -> "Хватит — остаток оставить на источнике";
+            case "energy_place" -> "Хватит — остаток оставить, где лежит";
             case "mine" -> "Пропустить добытчик";
             case "assemble" -> "Пропустить здание";
-            case "build_pick" -> "Закончить стройку";
+            case "build_pick" -> "Больше не строить";
             case "build_hex", "build_facing" -> "Не строить";
             case "combat_victim", "neutral_victim" -> "Не выбирать";
             case "market_offer", "market_rate" -> "Хватит торговать";
@@ -369,14 +412,18 @@ public final class ChoiceWords {
             case "mass_container" -> "Вскрыть контейнер";
             case "reaction_burn" -> {
                 String raw = c.label() == null ? "" : c.label();
+                // коротко — что даст ответ: повод уже в заголовке окна
                 int colon = raw.indexOf(':');
-                yield "Сжечь " + name + (colon > 0 ? ":" + raw.substring(colon + 1) : "");
+                int тире = raw.lastIndexOf(" — ");
+                String даст = тире > colon ? raw.substring(тире + 3)
+                    : colon > 0 ? raw.substring(colon + 1).trim() : "";
+                yield "Сжечь " + name;
             }
             default -> {
                 String raw = c.label() == null ? String.valueOf(c.payload()) : c.label();
                 Matcher open = OPEN_ONE.matcher(raw);
                 if (open.find()) {
-                    yield "Вскрыть одну находку (контейнеров " + open.group(1)
+                    yield "Вскрыть контейнер или карту арсенала (контейнеров " + open.group(1)
                         + ", арсенала " + open.group(2) + ")";
                 }
                 yield tidy(raw);
@@ -396,18 +443,43 @@ public final class ChoiceWords {
             case "special", "specialized" -> "спец-атака";
             default -> "атака";
         };
-        String tcat = Boolean.TRUE.equals(payload.get("neutral")) ? "снести нейтральную постройку"
-            : switch (String.valueOf(payload.get("tcat"))) {
-                case "infantry" -> "по пехоте";
-                case "vehicle" -> "по технике";
-                case "aircraft" -> "по авиации";
-                case "units" -> "по войскам";
-                case "buildings_towers" -> "по зданиям и вышкам";
-                case "any" -> "по любой цели";
-                default -> "";
-            };
+        String tcat;
+        if (Boolean.TRUE.equals(payload.get("neutral"))) {
+            tcat = "снести нейтральную постройку";
+        } else if (payload.get("split") instanceof List<?> все && все.size() >= 4) {
+            tcat = "по любой цели";
+        } else {
+            // у золотого модуля боя целей две: «по пехоте и технике»
+            List<String> цели = new java.util.ArrayList<>();
+            Object вторая = payload.get("tcat2");
+            if (payload.get("split") instanceof List<?> пара && пара.size() == 2) {
+                вторая = пара.get(1);
+            }
+            for (Object код : new Object[]{payload.get("tcat"), вторая}) {
+                String слово = целиДат(String.valueOf(код));
+                if (код != null && !слово.isEmpty() && !цели.contains(слово)) {
+                    цели.add(слово);
+                }
+            }
+            tcat = цели.isEmpty() ? "" : "по " + String.join(" и ", цели);
+        }
+        String урон = payload.get("damage") instanceof Number n && n.intValue() > 1
+            ? " · " + n.intValue() + " урона" : "";
         String head = unit.isEmpty() ? "Атака" : cap(unit);
-        return head + " · " + row + (tcat.isEmpty() ? "" : " → " + tcat);
+        return head + " · " + row + (tcat.isEmpty() ? "" : " → " + tcat) + урон;
+    }
+
+    /** Цель атаки в дательном падеже: «пехоте», «зданиям и вышкам». */
+    private static String целиДат(String код) {
+        return switch (код) {
+            case "infantry" -> "пехоте";
+            case "vehicle" -> "технике";
+            case "aircraft" -> "авиации";
+            case "units" -> "войскам";
+            case "buildings_towers" -> "зданиям и вышкам";
+            case "any" -> "любой цели";
+            default -> "";
+        };
     }
 
     /** Английские фразы движка, которые доходят до игрока, — по-русски. */
@@ -416,7 +488,7 @@ public final class ChoiceWords {
         {"stop building", "Не строить"},
         {"stop science", "Закончить с наукой"},
         {"stop attacking", "Прекратить бой"},
-        {"stop opening", "Больше не вскрывать"},
+        {"stop opening", "Не вскрывать"},
         {"leave in reserve", "Оставить в запасе"},
         {"cancel", "Отмена"},
         {"extract kelium", "Добыть келемий"},
@@ -449,7 +521,12 @@ public final class ChoiceWords {
         String s = AT_HEX.matcher(raw).replaceAll("");
         // жетоны модулей «R30-1», «C30-12» — служебные номера
         s = s.replaceAll("\\b[RC]\\d+-\\d+\\b", "модуль");
-        s = s.replace("->", "→").replace("КЕЛ", "келемий").replace("МОН", "монет");
+        s = s.replace("->", "→");
+        // число с согласованием: «1 келемий → 3 монеты», «2 келемия → 7 монет»
+        s = согласовать(s, "КЕЛ", "келемий", "келемия", "келемия");
+        s = согласовать(s, "МОН", "монета", "монеты", "монет");
+        s = согласовать(s, "БПР", "боеприпас", "боеприпаса", "боеприпасов");
+        s = s.replace("КЕЛ", "келемий").replace("МОН", "монет");
         // «miner L1», «power_plantL3» — здание с уровнем
         Matcher lv = LEVELED.matcher(s);
         StringBuilder lb = new StringBuilder();

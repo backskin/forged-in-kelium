@@ -978,7 +978,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // на самом жетоне хранилища и на самой карте.
         int printed = holders.size();
         for (int i = 0; i < p.storageTokens.size(); i++) {
-            if ("+1_universal_cell".equals(p.storageTokens.get(i))) {
+            if (kelium.engine.ЖетоныХранилища.ячейка(p.storageTokens.get(i))) {
                 char[] arr = new char[1];
                 cellFill.put("store-" + i, arr);
                 holders.add(arr);
@@ -1360,9 +1360,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         cx = divider(g, cx, cy, cell);
         int cubes = 0;
         for (String tok : p.storageTokens) {
-            if (tok != null && tok.contains("energy")) {
-                cubes++;
-            }
+            cubes += kelium.engine.ЖетоныХранилища.кубиковЦу(tok);
         }
         int zoneW = Math.max(cell * 2 + gap, cubes * (cell + gap));
         g.setColor(Theme.alpha(Theme.energy(), Theme.isDark() ? 0.16 : 0.14));

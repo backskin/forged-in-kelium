@@ -379,6 +379,18 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         return spots.containsKey(key);
     }
 
+    /** Ключи деталей стола, начинающиеся с {@code prefix} (ячейки хранилища и т. п.). */
+    public List<String> spotKeys(String prefix) {
+        ensurePainted();
+        List<String> out = new ArrayList<>();
+        for (String k : spots.keySet()) {
+            if (k.startsWith(prefix)) {
+                out.add(k);
+            }
+        }
+        return out;
+    }
+
     /** Лежит ли карта в одной из раскрываемых групп (руки, стопка, пазы). */
     public boolean hasCard(String id) {
         State s = state;
@@ -570,6 +582,60 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         int w = getWidth();
         int h = getHeight();
+        // СТОЛ — ИЗ КЭША (28.09.2026: «игра дико тормозит»). Стол стоил ~19 мс,
+        // а перерисовывался от каждого тика плашек событий над ним. Теперь он
+        // рисуется заново, только когда сам попросил (repaint: состояние,
+        // наведение), а чужие перерисовки берут готовую картинку.
+        java.awt.geom.AffineTransform dev = g.getTransform();
+        double dpr = Math.max(1.0, dev.getScaleX());
+        int iw = (int) Math.ceil(w * dpr);
+        int ih = (int) Math.ceil(h * dpr);
+        if (stale || baseImg == null || baseImg.getWidth() != iw || baseImg.getHeight() != ih) {
+            if (iw <= 0 || ih <= 0) {
+                g.dispose();
+                return;
+            }
+            if (baseImg == null || baseImg.getWidth() != iw || baseImg.getHeight() != ih) {
+                baseImg = new BufferedImage(iw, ih, BufferedImage.TYPE_INT_RGB);
+            }
+            Graphics2D gi = baseImg.createGraphics();
+            gi.setRenderingHints(g.getRenderingHints());
+            gi.scale(dpr, dpr);
+            gi.setFont(g.getFont());
+            boolean готов = paintBase(gi, w, h);
+            gi.dispose();
+            stale = false;
+            baseReady = готов;
+        }
+        Graphics2D gd = (Graphics2D) g.create();
+        java.awt.geom.Point2D at = dev.transform(new Point2D.Double(0, 0), null);
+        gd.setTransform(java.awt.geom.AffineTransform.getTranslateInstance(
+            Math.round(at.getX()), Math.round(at.getY())));
+        gd.drawImage(baseImg, 0, 0, null);
+        gd.dispose();
+        if (!baseReady) {
+            g.dispose();
+            return;
+        }
+        paintOverlay(g, w, h);
+        g.dispose();
+    }
+
+    /** Картинка стола без подсветок выбора и пузырей. */
+    private BufferedImage baseImg;
+    /** Стол сам попросил перерисовки — кэш устарел. */
+    private boolean stale = true;
+    /** В кэше нарисован стол (а не заглушка «зона появится»). */
+    private boolean baseReady;
+
+    @Override
+    public void repaint(long tm, int x, int y, int width, int height) {
+        stale = true;
+        super.repaint(tm, x, y, width, height);
+    }
+
+    /** Стол без подсветок; {@code false} — партии ещё нет, нарисована заглушка. */
+    private boolean paintBase(Graphics2D g, int w, int h) {
         dirty = false;
         spots.clear();
         outlines.clear();
@@ -581,8 +647,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             g.setFont(Theme.italic());
             g.setColor(MAT_INK2);
             g.drawString("зона игрока появится, когда партия начнётся", Theme.px(24), Theme.px(34));
-            g.dispose();
-            return;
+            return false;
         }
         // ПЛАНШЕТЫ — НА ВСЮ ВЫСОТУ ЗОНЫ, ресурсы и вкладки мест — полосой над
         // картами слева и справа (ревью 26.09.2026: строка ресурсов отнимала
@@ -661,7 +726,11 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
         blocks.put("приказ", new Rectangle(L.orderX(), oy, L.orderW(), orderH));
         blocks.put("конец хода", new Rectangle(L.orderX() + L.orderW() + Theme.px(10), oy,
             L.endW(), orderH));
+        return true;
+    }
 
+    /** Подсветки выбора и пузыри вариантов — поверх стола, каждый кадр. */
+    private void paintOverlay(Graphics2D g, int w, int h) {
         // ---- обводка всего, что можно выбрать
         for (String key : choices.keySet()) {
             Rectangle r = spots.get(key);
@@ -688,7 +757,6 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             Rectangle r = spots.get(key);
             return r == null ? null : new Point2D.Double(r.getCenterX(), r.getCenterY());
         }, Theme.px(30));
-        g.dispose();
     }
 
     // ---------- раскладка ряда ----------
@@ -1277,7 +1345,7 @@ public final class PlayerTable extends JComponent implements javax.swing.Scrolla
             return out;
         }
         if (info.joker()) {
-            out.addAll(ActionBar.ACTIONS.keySet());
+            out.addAll(kelium.engine.Actions.ALL_NAMES);
             return out;
         }
         out.addAll(ActionIcons.CATEGORY_ACTIONS.getOrDefault(info.top(), List.of()));

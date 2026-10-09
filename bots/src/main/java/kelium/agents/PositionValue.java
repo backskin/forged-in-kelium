@@ -117,6 +117,11 @@ public final class PositionValue {
             double reward = rewardValue(s, seat, cid);       // в «ресурсных единицах»
             double vpReward = reward / 4.0;                  // 4 единицы ≈ очко
             double focus = in != null && cid.equals(in.focusObjective) ? 1.35 : 1.0;
+            // ПОЛЬЗА КАРТЫ ДЛЯ ПЛАНА (07.10.2026): награда на мой путь и
+            // требование по пути — дороже; карта в чужую сторону — дешевле.
+            if (in != null && in.стратегия != null) {
+                vpReward *= in.стратегия.сродство(s, seat, cid);
+            }
             // ПРОИСШЕСТВИЕ ЖИВЁТ ОДИН ХОД, И ЭТО МЕНЯЕТ ВСЮ ЦЕНУ КАРТЫ.
             //
             // Требование-происшествие («В ЭТОТ ХОД уничтожь…») проверяется по

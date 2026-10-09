@@ -261,6 +261,14 @@ public final class GameRecorder {
             cfg.scenarioId, cfg.cuFacing);
         if (seatColors != null) {
             rec.seatColors.addAll(seatColors);
+            // лидер нации — по настоящему цвету места, известному только здесь
+            for (int seat = 0; seat < rec.seatIds.size() && seat < seatColors.size(); seat++) {
+                String id = rec.seatIds.get(seat);
+                if (rec.seatIds.contains("human") && !"human".equals(id)
+                        && seatColors.get(seat) != null) {
+                    rec.seatLabels.set(seat, BotNames.of(seed, seat, seatColors.get(seat)));
+                }
+            }
         }
         rememberExpansions(rec);
 
@@ -387,7 +395,11 @@ public final class GameRecorder {
             // «human» — не бот из справочника, а живое место цифровой версии:
             // без этого в планшетах игрока красовалось сырое «human» (блокер
             // приёмки: отладка на экране игрока).
-            rec.seatLabels.add("human".equals(id) ? "Игрок " + (seat + 1) : botLabel(id));
+            // БОТЫ ЗА ЖИВЫМ СТОЛОМ — ЛЮДИ С ИМЕНАМИ (дизайнер 28.09.2026), а в
+            // прогонах «бот против бота» для замеров — их типы, по ним и ищут
+            boolean живой = seatIds.contains("human");
+            rec.seatLabels.add("human".equals(id) ? "Игрок " + (seat + 1)
+                : живой ? BotNames.of(seed, seat, seat) : botLabel(id));
             rec.sides.add(state.player(seat).board.troop.side);
         }
         fillTableAndField(rec, cfg, state);
@@ -829,6 +841,9 @@ public final class GameRecorder {
             f.circle = state.circle;
             f.seat = event.get("seat") instanceof Number n ? n.intValue() : null;
             f.log = text.describe(event, state);
+            if ("action".equals(f.type) && Boolean.TRUE.equals(event.get("ok"))) {
+                f.впустую = !kelium.engine.Срабатывания.сделала(event);
+            }
             f.combat = "combat_hit".equals(f.type) || "raze_neutral".equals(f.type)
                 || "damage_neutral".equals(f.type);
             f.thoughts.addAll(pending);
@@ -989,24 +1004,41 @@ public final class GameRecorder {
     static final class ReplayText {
 
         private static final Map<String, String> ACTIONS = Map.ofEntries(
-            Map.entry("assembly", "сборка"),
+            // ВЕТКИ ПЯТИ РАЗВИЛОК — печатными словами (свод 1.46.0): «Стройки»,
+            // «Сборки» и «Смены энергии» больше нет
+            Map.entry("assembly", "выпуск"),
             Map.entry("mining", "добыча"),
-            Map.entry("build", "стройка"),
-            Map.entry("energy_swap", "энергия"),
-            Map.entry("movement", "движение"),
+            Map.entry("build", "постройка"),
+            Map.entry("energy_swap", "переложить энергию"),
+            Map.entry("movement", "манёвр"),
             Map.entry("combat", "бой"),
             Map.entry("market", "рынок"),
-            Map.entry("science", "наука"));
+            Map.entry("science", "наука"),
+            // пять развилок (свод 1.46.0) и их ветки «построить»
+            Map.entry("extract", "Добыча"),
+            Map.entry("power", "Питание"),
+            Map.entry("supply", "Снабжение"),
+            Map.entry("command", "Командование"),
+            Map.entry("develop", "Развитие"),
+            Map.entry("build_miner", "построить добытчик"),
+            Map.entry("build_plant", "построить энергостанцию"),
+            Map.entry("build_military", "построить военное здание"));
 
-        private static final Map<String, String> ORDERS = Map.of(
-            "development", "Разработка",
-            "infrastructure", "Инфраструктура",
-            "operation", "Наступление",
-            "acquisitions", "Приобретения",
-            "place", "Разместить",
-            "acquire", "Приобрести",
-            "control", "Контролировать",
-            "explore", "Исследовать");
+        private static final Map<String, String> ORDERS = Map.ofEntries(
+            Map.entry("development", "Разработка"),
+            Map.entry("infrastructure", "Инфраструктура"),
+            Map.entry("operation", "Наступление"),
+            Map.entry("acquisitions", "Приобретения"),
+            Map.entry("place", "Разместить"),
+            Map.entry("acquire", "Приобрести"),
+            Map.entry("control", "Контролировать"),
+            Map.entry("explore", "Исследовать"),
+            // приказы 5.0.0 — пять развилок (27.09.2026)
+            Map.entry("settle", "Освоить"),
+            Map.entry("mobilize", "Мобилизовать"),
+            Map.entry("advance", "Наступать"),
+            Map.entry("secure", "Контролировать"),
+            Map.entry("research", "Исследовать"));
 
         private final GameConfig cfg;
         private final ReplayRecord rec;
@@ -1440,6 +1472,18 @@ public final class GameRecorder {
                 if ("no affordable step".equals(m.group(1))) {
                     return "на шаг по треку не хватает трофеев";
                 }
+                // ТОЛЬКО ОБМЕНЫ, БЕЗ ШАГА ТРЕКА: движок пишет коды обменов
+                // через «+» («exchange trophy_to_ammo+draw_arsenal:a7_3»).
+                if (m.group(1).startsWith("exchange ")) {
+                    StringBuilder обмены = new StringBuilder();
+                    for (String id : m.group(1).substring("exchange ".length()).split("\\+")) {
+                        if (обмены.length() > 0) {
+                            обмены.append(", ");
+                        }
+                        обмены.append(scienceExchange(id));
+                    }
+                    return "наука: обмен — " + обмены;
+                }
                 return "наука: " + m.group(1)
                     .replace("left", "левый трек").replace("middle", "средний трек")
                     .replace("right", "правый трек").replace("->", "→ шаг ");
@@ -1448,6 +1492,19 @@ public final class GameRecorder {
                 case "built nothing" -> "ничего не построено";
                 case "combat: no battle" -> "боя не вышло — бить некого";
                 default -> s;
+            };
+        }
+
+        /** Обмен Научного отдела словами по коду из движка. */
+        private static String scienceExchange(String id) {
+            String код = id.contains(":") ? id.substring(0, id.indexOf(':')) : id;
+            return switch (код) {
+                case "trophy_to_coin" -> "трофеи на монеты";
+                case "trophy_to_ammo" -> "трофеи на боеприпасы";
+                case "draw_arsenal" -> "взята карта арсенала";
+                case "gild" -> "модуль позолочен";
+                case "move_module" -> "модуль переставлен";
+                default -> "обмен трофеев";
             };
         }
 
@@ -1513,6 +1570,11 @@ public final class GameRecorder {
     }
 
     /** Полное русское название рода войск. */
+    /** Приказ словами по коду категории: settle → «Освоить». */
+    public static String orderName(String code) {
+        return ReplayText.ORDERS.getOrDefault(code, code);
+    }
+
     public static String unitName(String typeCode) {
         return kelium.report.Labels.unitName(typeCode);
     }

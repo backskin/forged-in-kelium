@@ -87,15 +87,12 @@ public final class Power {
         return n;
     }
 
-    /** Сколько жетонов хранилища игрок положил стороной энергии. */
+    /**
+     * Сколько кубиков энергии ЦУ дают жетоны хранилища: обычная сторона — 1,
+     * золотая (жетоны 2.0, 02.10.2026) — 2.
+     */
     public static int storageEnergyTokens(GameState state, int seat) {
-        int n = 0;
-        for (String tok : state.player(seat).storageTokens) {
-            if ("+1_energy".equals(tok)) {
-                n++;
-            }
-        }
-        return n;
+        return ЖетоныХранилища.энергииЦу(state.player(seat));
     }
 
     /**

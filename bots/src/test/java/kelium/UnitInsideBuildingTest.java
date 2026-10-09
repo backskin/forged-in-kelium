@@ -95,11 +95,16 @@ class UnitInsideBuildingTest {
         BuildingToken barracks = barracksNextToStart(s);
         UnitToken inf = Fix.unit(s, 0, UnitType.INFANTRY, barracks.hexId);
 
-        int[] withUnit = Placement.groundLoad(s, barracks.hexId, -1);
+        int withUnit = occupied(Placement.groundLoad(s, barracks.hexId, -1));
         inf.insideBuildingUid = barracks.uid;
-        int[] whenInside = Placement.groundLoad(s, barracks.hexId, -1);
-        assertEquals(withUnit[1] - 1, whenInside[1],
+        int whenInside = occupied(Placement.groundLoad(s, barracks.hexId, -1));
+        assertEquals(withUnit - 1, whenInside,
             "войско внутри здания перестаёт занимать ячейку на гексе");
+    }
+
+    /** Секторы под войсками: счётчики (свод 1.45.0) плюс удержанные (1.46.0). */
+    private static int occupied(int[] ld) {
+        return 2 * ld[0] + ld[1] + Integer.bitCount(ld[2]);
     }
 
     /** Уход с гекса выводит войско из здания. */

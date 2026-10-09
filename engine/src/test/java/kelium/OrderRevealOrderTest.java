@@ -64,7 +64,8 @@ class OrderRevealOrderTest {
     @Test
     void первыйВскрывшийВКругеНеВстречаетНикого() {
         GameState s = Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 3, 11L, null, null));
+            GameConfig.buildCached("1.45.0",   // проверяет правило свода 1.45.0 (до пяти развилок)
+             3, 11L, null, null));
         List<Agent> agents = new ArrayList<>();
         for (int seat = 0; seat < s.numPlayers(); seat++) {
             agents.add(new SameOrderAgent(seat, "control"));

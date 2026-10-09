@@ -1,11 +1,14 @@
 @echo off
-rem Bot training (AlphaZero self-play). Double-click to start; close the window to stop.
-rem First start: networks learn to copy the old bots, then self-play generations.
-rem Resumes from the last finished generation. Report and log: data\selfplay\az\
+rem Bot training: the planner bot (whole-turn planning + opponents' reply round)
+rem learns its position evaluation by self-play. Double-click to start; close the
+rem window to stop. Restart resumes from the last finished generation.
+rem If rules or card decks changed, the best network is fine-tuned on the new
+rem cards instead of starting from scratch.
+rem Report and log: data\selfplay\strateg\
 chcp 65001 >nul
 title Bot training - close this window to stop
 cd /d "%~dp0"
-rem Always rebuild, so training runs on the current rules.
+rem Always rebuild, so training runs on the current rules and cards.
 echo Building the game with the current rules...
 call mvn -q -o -DskipTests package
 if errorlevel 1 (
@@ -17,12 +20,12 @@ if errorlevel 1 (
     exit /b 1
   )
 )
-if not exist data\selfplay\az mkdir data\selfplay\az
+if not exist data\selfplay\strateg mkdir data\selfplay\strateg
 rem Train from a private copy of the jar, so rebuilding the project does not break training.
-copy /y gui\target\kelium-runner.jar data\selfplay\az\runner.jar >nul
-start "" "data\selfplay\az"
-rem generations, games per generation, search probes per decision, rollout share, imitation games
-start "" /b /low /wait java -Xmx8g -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp data\selfplay\az\runner.jar kelium.TrainAZ 1000 200 128 0 4000
+copy /y gui\target\kelium-runner.jar data\selfplay\strateg\runner.jar >nul
+start "" "data\selfplay\strateg"
+rem generations, self-play games per generation, benchmark games per generation
+start "" /b /low /wait java -Xmx10g -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp data\selfplay\strateg\runner.jar kelium.TrainStrateg 1000 240 64
 echo.
 echo Training stopped. Press any key to close.
 pause >nul

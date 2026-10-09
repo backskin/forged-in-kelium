@@ -46,8 +46,14 @@ public final class Fix {
             super(seat, "fix#" + seat);
         }
 
+        /** Развилки (свод 1.46.0) — ветки по очереди, иначе «построить» не играется никогда. */
+        private int веток;
+
         @Override
         public Choice choose(GameState state, List<Choice> options, Map<String, Object> ctx) {
+            if (ctx != null && "action_branch".equals(ctx.get("kind")) && !options.isEmpty()) {
+                return options.get(веток++ % options.size());
+            }
             for (Choice c : options) {
                 if (!"pass".equals(c.kind()) && c.payload() != null) {
                     return c;

@@ -98,3 +98,9 @@ data/selfplay/*.bin
 data/selfplay/*.log
 
 data/selfplay/az/
+
+# папка выкладки раздачи — своя на каждой машине (make-exe.ps1)
+publish-dir.txt
+
+# прогоны обучения и замеров (сотни мегабайт позиций)
+data/selfplay/

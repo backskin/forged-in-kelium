@@ -118,7 +118,7 @@ class ObjectiveContractTest {
                 if (!жертва) {
                     String need = card.needed(ctx);
                     assertNotNull(need, "карта не сказала, чего не хватает");
-                    assertFalse(need.isBlank(), "пустое объяснение, чего не хватает");
+                    assertFalse(need.isBlank(), "пустое объяснение, чего не хватает: " + card.id() + " «" + card.name() + "»");
                     assertFalse("готово".equals(need),
                         "карта говорит «готово», хотя условие не выполнено");
                 }

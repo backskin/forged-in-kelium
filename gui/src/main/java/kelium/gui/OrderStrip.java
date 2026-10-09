@@ -192,15 +192,20 @@ public final class OrderStrip extends JPanel {
         java.util.Map.entry("market", "рынок"),
         java.util.Map.entry("science", "наука"));
 
-    private static final java.util.Map<String, String> ORDER_RU = java.util.Map.of(
-        "development", "РАЗРАБОТКА",
-        "infrastructure", "ИНФРАСТРУКТУРА",
-        "operation", "НАСТУПЛЕНИЕ",
-        "acquisitions", "ПРИОБРЕТЕНИЯ",
-        "place", "РАЗМЕСТИТЬ",
-        "acquire", "ПРИОБРЕСТИ",
-        "control", "КОНТРОЛИРОВАТЬ",
-        "explore", "ИССЛЕДОВАТЬ");
+    private static final java.util.Map<String, String> ORDER_RU = java.util.Map.ofEntries(
+        java.util.Map.entry("development", "РАЗРАБОТКА"),
+        java.util.Map.entry("infrastructure", "ИНФРАСТРУКТУРА"),
+        java.util.Map.entry("operation", "НАСТУПЛЕНИЕ"),
+        java.util.Map.entry("acquisitions", "ПРИОБРЕТЕНИЯ"),
+        java.util.Map.entry("place", "РАЗМЕСТИТЬ"),
+        java.util.Map.entry("acquire", "ПРИОБРЕСТИ"),
+        java.util.Map.entry("control", "КОНТРОЛИРОВАТЬ"),
+        java.util.Map.entry("explore", "ИССЛЕДОВАТЬ"),
+        java.util.Map.entry("settle", "ОСВОИТЬ"),
+        java.util.Map.entry("mobilize", "МОБИЛИЗОВАТЬ"),
+        java.util.Map.entry("advance", "НАСТУПАТЬ"),
+        java.util.Map.entry("secure", "КОНТРОЛИРОВАТЬ"),
+        java.util.Map.entry("research", "ИССЛЕДОВАТЬ"));
 
     private static Color orderColor(String code) {
         return switch (code) {
@@ -212,6 +217,10 @@ public final class OrderStrip extends JPanel {
             case "acquire" -> DEV;
             case "control" -> OPS;
             case "explore" -> ACQ;
+            case "settle" -> INF;
+            case "mobilize" -> DEV;
+            case "advance", "secure" -> OPS;
+            case "research" -> ACQ;
             default -> JOKER;
         };
     }

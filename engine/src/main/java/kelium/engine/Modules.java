@@ -402,7 +402,8 @@ public final class Modules {
                 n++;
             }
         }
-        return n;
+        // ЗОЛОТЫЕ ЖЕТОНЫ ХРАНИЛИЩА (жетоны 2.0, 02.10.2026) — та же звезда
+        return n + ЖетоныХранилища.золотых(p);
     }
 
     /** Есть ли у игрока лежащий модуль, который ещё можно позолотить. */
@@ -418,6 +419,11 @@ public final class Modules {
             }
         }
         return false;
+    }
+
+    /** То же с жетонами хранилища, если свод разрешает их золотить. */
+    public static boolean canGild(GameState s, PlayerState p) {
+        return canGild(p) || !ЖетоныХранилища.кЗолочению(s, p).isEmpty();
     }
 
     /**
@@ -443,6 +449,11 @@ public final class Modules {
                     e.getValue().get("id") + " на " + e.getKey().code));
             }
         }
+        // ЖЕТОНЫ ХРАНИЛИЩА ТОЖЕ ЗОЛОТЯТСЯ (жетоны 2.0, 02.10.2026)
+        for (int номер : ЖетоныХранилища.кЗолочению(s, p)) {
+            opts.add(new Choice("gild_storage", номер,
+                p.storageTokens.get(номер) + " на хранилище"));
+        }
         if (opts.isEmpty()) {
             return false;
         }
@@ -451,7 +462,9 @@ public final class Modules {
         if (ch == null || ch.payload() == null) {
             ch = opts.get(0);
         }
-        if ("gild_red".equals(ch.kind())) {
+        if ("gild_storage".equals(ch.kind())) {
+            ЖетоныХранилища.позолотить(s, p, (Integer) ch.payload());
+        } else if ("gild_red".equals(ch.kind())) {
             p.redPlacements.get((UnitType) ch.payload()).put("gold", true);
         } else {
             p.bluePlacements.get((BuildingType) ch.payload()).put("gold", true);

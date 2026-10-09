@@ -43,6 +43,13 @@ static class Launcher
                 throw new FileNotFoundException("рядом с программой нет папки packs со списком паков ("
                     + list + "). Скопируй папку packs вместе с exe.");
             }
+            // АВТООБНОВЛЕНИЕ — до распаковки: изменившиеся паки докачиваются, и
+            // дальше всё идёт как обычно. На машине сборки не обновляемся: там
+            // свежая сборка, а на Диске — прошлая выкладка.
+            if (!Directory.Exists(DevData) || Environment.GetEnvironmentVariable("KELIUM_UPDATE") == "1")
+            {
+                Updater.Run(packsDir, list, Title);
+            }
             string cacheRoot = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Kelium");
             Directory.CreateDirectory(cacheRoot);
@@ -82,6 +89,10 @@ static class Launcher
             bool dev = Directory.Exists(DevData)
                 && Environment.GetEnvironmentVariable("KELIUM_PACKS") != "1";
             StringBuilder args = new StringBuilder();
+            // ПАМЯТЬ — ДО ПОЛОВИНЫ ОПЕРАТИВКИ (29.09.2026): живых данных партии
+            // ~0,9 ГБ (печатные картинки в полном разрешении), а по умолчанию Java
+            // берёт четверть — на машине с 4 ГБ это 1 ГБ, и игре тесно.
+            args.Append("-XX:MaxRAMPercentage=50 ");
             if (dev)
             {
                 args.Append(Q("-Dkelium.data=" + DevData)).Append(' ');
@@ -283,5 +294,208 @@ static class Launcher
             }
         }
         catch (Exception) { }
+    }
+}
+
+// АВТООБНОВЛЕНИЕ (29.09.2026). Рядом с паками лежит packs\update.txt — ссылка на
+// раздачу: публичная папка Яндекс.Диска (https://disk.yandex.ru/d/…) или
+// обычный адрес, где лежат packs/packs.txt и паки. При старте запускатель берёт
+// оттуда список паков, сравнивает отпечатки со своим и докачивает только
+// изменившиеся (обычно код и правила — единицы МБ). Скачанный пак проверяется
+// по отпечатку (первые 12 знаков SHA-256). Нет сети, нет ссылки, что-то не так —
+// молча играем тем, что есть.
+static class Updater
+{
+    public static void Run(string packsDir, string list, string title)
+    {
+        string src = Path.Combine(packsDir, "update.txt");
+        if (!File.Exists(src))
+        {
+            return;
+        }
+        string link = File.ReadAllText(src, Encoding.UTF8).Trim();
+        if (link.Length == 0)
+        {
+            return;
+        }
+        try
+        {
+            System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; // TLS 1.2
+            string remote = Encoding.UTF8.GetString(Fetch(link, "packs/packs.txt", 6000));
+            Dictionary<string, string> local = Read(File.ReadAllLines(list, Encoding.UTF8));
+            List<string[]> need = new List<string[]>();          // {файл, отпечаток}
+            foreach (string line in remote.Split('\n'))
+            {
+                string[] f = line.TrimEnd('\r').Split('\t');
+                if (f.Length < 3 || f[0].StartsWith("#"))
+                {
+                    continue;
+                }
+                string mine;
+                bool have = local.TryGetValue(f[0], out mine) && mine == f[1]
+                    && File.Exists(Path.Combine(packsDir, f[2]));
+                if (!have)
+                {
+                    need.Add(new string[] { f[2], f[1] });
+                }
+            }
+            if (need.Count == 0)
+            {
+                return;
+            }
+            Exception failure = null;
+            Form form = new Form();
+            form.Text = title;
+            form.FormBorderStyle = FormBorderStyle.FixedDialog;
+            form.StartPosition = FormStartPosition.CenterScreen;
+            form.ClientSize = new Size(460, 96);
+            form.MaximizeBox = false;
+            form.MinimizeBox = false;
+            form.ControlBox = false;
+            Label label = new Label();
+            label.SetBounds(16, 14, 428, 22);
+            label.Text = "Обновление: скачиваю…";
+            ProgressBar bar = new ProgressBar();
+            bar.SetBounds(16, 44, 428, 22);
+            bar.Maximum = 1000;
+            form.Controls.Add(label);
+            form.Controls.Add(bar);
+            Thread worker = new Thread(() =>
+            {
+                try
+                {
+                    for (int i = 0; i < need.Count; i++)
+                    {
+                        string file = need[i][0];
+                        string fp = need[i][1];
+                        int n = i;
+                        form.BeginInvoke((Action)(() => label.Text = "Обновление: " + file
+                            + " (" + (n + 1) + " из " + need.Count + ")…"));
+                        string part = Path.Combine(packsDir, file + ".part");
+                        Download(link, "packs/" + file, part, v =>
+                            form.BeginInvoke((Action)(() => bar.Value = Math.Max(0, Math.Min(1000, v)))));
+                        if (Sha12(part) != fp)
+                        {
+                            File.Delete(part);
+                            throw new IOException("скачанный " + file + " не сошёлся с отпечатком");
+                        }
+                        string dest = Path.Combine(packsDir, file);
+                        if (File.Exists(dest))
+                        {
+                            File.Delete(dest);
+                        }
+                        File.Move(part, dest);
+                        File.WriteAllText(dest + ".sha", fp, Encoding.ASCII);
+                    }
+                    // список — последним: пока все паки не на месте, остаётся старый
+                    File.WriteAllText(list, remote, new UTF8Encoding(false));
+                }
+                catch (Exception e) { failure = e; }
+                form.BeginInvoke((Action)(() => form.Close()));
+            });
+            worker.IsBackground = true;
+            form.Shown += (s, e) => worker.Start();
+            Application.Run(form);
+            worker.Join();
+            if (failure != null)
+            {
+                MessageBox.Show("Обновление не скачалось — запускаю прежнюю версию.\n\n" + failure.Message,
+                    title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+        catch (Exception)
+        {
+            // нет сети или ссылки — играем тем, что есть
+        }
+    }
+
+    static Dictionary<string, string> Read(string[] lines)
+    {
+        Dictionary<string, string> m = new Dictionary<string, string>();
+        foreach (string line in lines)
+        {
+            string[] f = line.Split('\t');
+            if (f.Length >= 3 && !f[0].StartsWith("#"))
+            {
+                m[f[0]] = f[1];
+            }
+        }
+        return m;
+    }
+
+    /** Прямая ссылка на файл раздачи: у Яндекс.Диска — через его открытый API. */
+    static string Url(string link, string path)
+    {
+        if (link.IndexOf("disk.yandex", StringComparison.OrdinalIgnoreCase) >= 0
+            || link.IndexOf("yadi.sk", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            string api = "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key="
+                + Uri.EscapeDataString(link) + "&path=" + Uri.EscapeDataString("/" + path);
+            string json = Encoding.UTF8.GetString(Get(api, 6000));
+            System.Text.RegularExpressions.Match m =
+                System.Text.RegularExpressions.Regex.Match(json, "\"href\"\\s*:\\s*\"([^\"]+)\"");
+            if (!m.Success)
+            {
+                throw new IOException("Диск не дал ссылку на " + path);
+            }
+            return m.Groups[1].Value.Replace("\\/", "/");
+        }
+        return link.TrimEnd('/') + "/" + path;
+    }
+
+    static byte[] Fetch(string link, string path, int timeoutMs)
+    {
+        return Get(Url(link, path), timeoutMs);
+    }
+
+    static byte[] Get(string url, int timeoutMs)
+    {
+        System.Net.HttpWebRequest rq = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+        rq.Timeout = timeoutMs;
+        rq.ReadWriteTimeout = timeoutMs;
+        rq.UserAgent = "Kelium-Launcher";
+        using (System.Net.WebResponse rs = rq.GetResponse())
+        using (Stream s = rs.GetResponseStream())
+        using (MemoryStream ms = new MemoryStream())
+        {
+            s.CopyTo(ms);
+            return ms.ToArray();
+        }
+    }
+
+    static void Download(string link, string path, string to, Action<int> progress)
+    {
+        System.Net.HttpWebRequest rq = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(
+            Url(link, path));
+        rq.Timeout = 15000;
+        rq.ReadWriteTimeout = 30000;
+        rq.UserAgent = "Kelium-Launcher";
+        using (System.Net.WebResponse rs = rq.GetResponse())
+        using (Stream s = rs.GetResponseStream())
+        using (FileStream f = File.Create(to))
+        {
+            long total = rs.ContentLength;
+            long done = 0;
+            byte[] buf = new byte[1 << 16];
+            int n;
+            while ((n = s.Read(buf, 0, buf.Length)) > 0)
+            {
+                f.Write(buf, 0, n);
+                done += n;
+                if (total > 0)
+                {
+                    progress((int)(done * 1000 / total));
+                }
+            }
+        }
+    }
+
+    static string Sha12(string file)
+    {
+        using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+        using (FileStream f = File.OpenRead(file))
+        {
+            return BitConverter.ToString(sha.ComputeHash(f)).Replace("-", "").Substring(0, 12).ToLower();
+        }
     }
 }

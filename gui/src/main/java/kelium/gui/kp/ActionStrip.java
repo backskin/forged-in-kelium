@@ -300,7 +300,7 @@ public final class ActionStrip extends JComponent {
 
     /** Высота самой полосы (кружки с подписями). */
     public static int stripHeight() {
-        return Theme.px(150);
+        return Theme.px(174);
     }
 
     /** Высота с запасом под раскрытое меню спец-действия. */
@@ -327,7 +327,7 @@ public final class ActionStrip extends JComponent {
         boolean листать = overflow() > 0;
         int x0 = листать ? edgeW() - scroll : (w - total) / 2;
         // середина кружка — на прежней высоте, чтобы подписи стояли где стояли
-        int cy = h - Theme.px(56) - Theme.px(76) / 2;
+        int cy = h - Theme.px(80) - Theme.px(76) / 2;   // место под двухстрочные подписи
         // видимая часть ряда: при листании края отданы стрелкам
         Rectangle окно = листать ? new Rectangle(edgeW(), 0, w - 2 * edgeW(), h)
             : new Rectangle(0, 0, w, h);
@@ -399,17 +399,40 @@ public final class ActionStrip extends JComponent {
             gi.dispose();
             g.setFont(Theme.font(15, Font.BOLD));
             FontMetrics fm = g.getFontMetrics();
-            String lab = it.label();
+            // название — в две строки, если не влезает в ширину кнопки
+            java.util.List<String> labs = FieldBubbles.wrap(fm, it.label(), cell - Theme.px(6), 2);
             int ty = cy + dd / 2 + Theme.px(22);
-            g.setColor(Theme.alpha(Color.BLACK, 0.7));
-            g.drawString(lab, cx - fm.stringWidth(lab) / 2 + 1, ty + 1);
-            g.setColor(dim ? Theme.ink2() : hot ? Color.WHITE : Theme.ink());
-            g.drawString(lab, cx - fm.stringWidth(lab) / 2, ty);
+            for (int li = 0; li < labs.size(); li++) {
+                String lab = labs.get(li);
+                int y = ty + li * (fm.getHeight() - Theme.px(2));
+                g.setColor(Theme.alpha(Color.BLACK, 0.7));
+                g.drawString(lab, cx - fm.stringWidth(lab) / 2 + 1, y + 1);
+                g.setColor(dim ? Theme.ink2() : hot ? Color.WHITE : Theme.ink());
+                g.drawString(lab, cx - fm.stringWidth(lab) / 2, y);
+            }
+            ty += (labs.size() - 1) * (fm.getHeight() - Theme.px(2));
             if (it.sub() != null && !it.sub().isBlank()) {
+                // ПОДПИСЬ — В ДВЕ СТРОКИ ПО ШИРИНЕ КНОПКИ и на тёмной плашке: на
+                // светлом поле серый текст не читался, длинный налезал на соседа
                 g.setFont(Theme.font(12.5, Font.PLAIN));
                 FontMetrics fs = g.getFontMetrics();
-                g.setColor(Theme.ink2());
-                g.drawString(it.sub(), cx - fs.stringWidth(it.sub()) / 2, ty + Theme.px(18));
+                java.util.List<String> строки = FieldBubbles.wrap(fs, it.sub(),
+                    cell - Theme.px(10), 2);
+                int ширина = 0;
+                for (String l : строки) {
+                    ширина = Math.max(ширина, fs.stringWidth(l));
+                }
+                int верх = ty + Theme.px(6);
+                int выс = строки.size() * fs.getHeight() + Theme.px(4);
+                g.setColor(Theme.alpha(Color.BLACK, 0.55f));
+                g.fill(new java.awt.geom.RoundRectangle2D.Double(cx - ширина / 2.0 - Theme.px(6),
+                    верх, ширина + Theme.px(12), выс, Theme.px(8), Theme.px(8)));
+                g.setColor(dim ? Theme.alpha(Color.WHITE, 0.55f) : Theme.alpha(Color.WHITE, 0.9f));
+                for (int li = 0; li < строки.size(); li++) {
+                    String l = строки.get(li);
+                    g.drawString(l, cx - fs.stringWidth(l) / 2,
+                        верх + Theme.px(2) + fs.getAscent() + li * fs.getHeight());
+                }
             }
         }
         g.setClip(clipWas);

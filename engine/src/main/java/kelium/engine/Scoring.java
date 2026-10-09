@@ -106,12 +106,11 @@ public final class Scoring {
         // планшету не переставляются, поэтому в движке, где ячейки не
         // поимённые, считается так: свободных ячеек хватает на звезду — она
         // есть; звёзд не больше, чем таких жетонов и чем свободных ячеек.
-        int cellTokens = 0;
-        for (String tok : p.storageTokens) {
-            if ("+1_universal_cell".equals(tok)) {
-                cellTokens++;
-            }
-        }
+        //
+        // ЖЕТОНЫ 2.0 (02.10.2026, storage.cell_star_when_empty: false): у обычной
+        // стороны ячейки звезды нет; звезда золотой стороны — в gold_modules.
+        int cellTokens = ЖетоныХранилища.звездаПустойЯчейки(state)
+            ? ЖетоныХранилища.ячеек(p) : 0;
         if (cellTokens > 0) {
             int free = Storage.totalMax(state, p) - p.resources.kelium()
                 - p.resources.ammo() - p.resources.trophy();

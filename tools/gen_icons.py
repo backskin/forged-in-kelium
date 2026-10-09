@@ -22,37 +22,48 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 КУДА = os.path.join(ROOT, 'data', 'textures', 'icons')
 РАЗМЕР = 128
 
-# номер файла → имя иконки
+# номер файла → имя иконки (или несколько имён — одна картинка под разными
+# именами, по которым её ищет программа)
 ТАБЛИЦА = {
-    # выгрузка 27.09.2026 — дизайнер пересобрал все иконки, нумерация новая
+    # выгрузка 03.10.2026 — дизайнер сдвинул нумерацию и подправил обводки и
+    # цвета; новые 86–102 (утили арсенала, карты рынка, ремонт, здания)
     1: 'coin', 2: 'ammo_box', 3: 'ammo', 4: 'kelium_raw', 5: 'kelium',
     6: 'energy_battery', 7: 'energy', 8: 'gear', 9: 'module_cube',
     10: 'trophy_kelium', 11: 'any_cube', 12: 'infinity_cube', 13: 'container',
-    14: 'arsenal', 15: 'super_arsenal', 16: 'objective', 17: 'super_objective',
-    18: 'objective_discard', 19: 'container_discard', 20: 'arsenal_burn',
-    21: 'vp', 22: 'hp', 23: 'damage', 24: 'action_ring', 25: 'spec',
-    26: 'instant', 27: 'infinity', 28: 'energy_cell', 29: 'attack_row',
-    30: 'energy_circle',
-    31: 'action_build', 32: 'action_energy_swap', 33: 'action_assembly',
-    34: 'action_mining', 35: 'action_movement', 36: 'action_combat',
-    37: 'action_market', 38: 'action_science',
-    39: 'spec_plate', 40: 'module_red', 41: 'module_blue', 42: 'storage',
-    43: 'gild', 44: 'first_player', 45: 'science_vp', 46: 'hex_cubes',
-    47: 'hex_rotate', 48: 'hex_split', 49: 'attack', 50: 'burn', 51: 'condition',
-    52: 'module_move', 53: 'hex', 54: 'cell', 55: 'coin_big', 56: 'coin_5',
-    57: 'unit_infantry', 58: 'unit_vehicle', 59: 'unit_aircraft', 60: 'unit_tower',
-    61: 'redeploy', 62: 'plus_ammo', 63: 'hire', 64: 'punch',
-    65: 'unit_infantry_w', 66: 'unit_vehicle_w', 67: 'unit_aircraft_w',
-    68: 'unit_tower_w', 69: 'build_buildings', 70: 'recolor_buildings',
-    71: 'player', 72: 'other_turn_energy', 73: 'container_other_turn',
-    74: 'other_turn', 75: 'arrow',
+    14: 'container_big', 15: 'arsenal', 16: 'super_arsenal', 17: 'objective',
+    18: 'super_objective', 19: 'objective_discard', 20: 'container_discard',
+    21: 'arsenal_burn', 22: 'vp', 23: 'hp', 24: 'damage', 25: 'action_ring',
+    26: 'spec', 27: 'instant', 28: 'infinity', 29: 'energy_cell',
+    30: ('military_building', 'attack_row'), 31: 'energy_circle',
+    32: 'build_mode',                                  # знак стройки (кран в треугольнике)
+    33: 'action_build', 34: ('action_energy_swap', 'action_power'),
+    35: ('action_assembly', 'action_supply'), 36: ('action_mining', 'action_extract'),
+    37: 'action_command', 38: 'action_movement', 39: 'action_combat',
+    40: 'action_develop', 41: 'action_market', 42: 'action_science',
+    43: 'science_track', 44: 'spec_plate', 45: 'module_red', 46: 'module_blue',
+    47: 'storage', 48: 'gild', 49: 'first_player', 50: 'science_vp',
+    51: 'hex_cubes', 52: 'hex_rotate', 53: 'hex_split', 54: 'attack', 55: 'burn',
+    56: 'condition', 57: 'module_move', 58: 'hex', 59: 'cell', 60: 'coin_big',
+    61: 'coin_5', 62: 'unit_infantry', 63: 'unit_vehicle', 64: 'unit_aircraft',
+    65: 'unit_tower', 66: 'redeploy', 67: 'step', 68: 'plus_ammo', 69: 'hire',
+    70: 'punch', 71: 'unit_infantry_w', 72: 'unit_vehicle_w', 73: 'unit_aircraft_w',
+    74: 'unit_tower_w', 75: 'build_buildings', 76: 'recolor_buildings',
+    77: 'player', 78: ('other_turn_energy', 'reaction'),   # реакция на чужое действие
+    79: 'container_other_turn', 80: 'other_turn', 81: 'arrow',
+    82: 'build_zones', 83: 'build_own_hex', 84: 'build_behind_wall',
+    85: 'container_closed', 86: 'grab_first_player', 87: 'kelium_and_mining',
+    88: 'hire_two_kinds', 89: 'spec_three', 90: 'build_for_coin',
+    91: 'steal_arsenal', 92: 'order', 93: 'discard_enemy_arsenal',
+    94: 'steal_objective', 95: 'market_card', 96: 'market_card_for_one',
+    97: 'hex_plus', 98: 'heal', 99: 'hex_cross', 100: 'hp_cross',
+    101: 'building_miner', 102: 'building_plant',
 }
 
 
 def main():
     os.makedirs(КУДА, exist_ok=True)
     нет = []
-    for n, имя in ТАБЛИЦА.items():
+    for n, имена in ТАБЛИЦА.items():
         путь = os.path.join(ПАПКА, 'все иконки-%d.png' % n)
         if not os.path.isfile(путь):
             нет.append(путь)
@@ -67,7 +78,8 @@ def main():
         sq = Image.new('RGBA', (s, s), (0, 0, 0, 0))
         sq.paste(im, ((s - w) // 2, (s - h) // 2))
         sq = sq.resize((РАЗМЕР, РАЗМЕР), Image.LANCZOS)
-        sq.save(os.path.join(КУДА, имя + '.png'), optimize=True)
+        for имя in (имена if isinstance(имена, tuple) else (имена,)):
+            sq.save(os.path.join(КУДА, имя + '.png'), optimize=True)
     print('иконок:', len(ТАБЛИЦА) - len(нет), '->', КУДА)
     for p in нет:
         print('  НЕТ ФАЙЛА:', p)
