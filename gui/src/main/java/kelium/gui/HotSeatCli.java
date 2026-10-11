@@ -49,7 +49,7 @@ public final class HotSeatCli {
             seatSpecs.add(spec);
         }
 
-        GameConfig cfg = GameConfig.build(GameConfig.DEFAULT_RULESET, players, seed, null, null);
+        GameConfig cfg = GameConfig.build(GameConfig.GAME_RULESET, players, seed, null, null);
         GameState state = Setup.buildGame(cfg);
 
         // ОДНА общая очередь на все человеческие места: движок однопоточный и

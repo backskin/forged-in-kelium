@@ -112,7 +112,7 @@ public final class HotSeatWindow {
         }
 
         public static Options simple(int players, long seed, List<String> seatSpecs) {
-            return new Options(GameConfig.DEFAULT_RULESET, players, seed, seatSpecs,
+            return new Options(GameConfig.GAME_RULESET, players, seed, seatSpecs,
                 null, null, null, null, null, null, null);
         }
     }

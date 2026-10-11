@@ -338,6 +338,14 @@ public final class GameConfig {
     public static final String DEFAULT_RULESET =
         System.getProperty("kelium.ruleset", "1.46.0");
 
+    /**
+     * СВОД ИГРЫ — тот, с которым игра открывается у игрока (выпуск 1.0,
+     * 07.10.2026: 1.50.0 — задания 3.0, арсенал 9.0, начальный арсенал на
+     * выбор). {@link #DEFAULT_RULESET} остаётся опорой тестов и стендов.
+     */
+    public static final String GAME_RULESET =
+        System.getProperty("kelium.ruleset", "1.50.0");
+
     // Кэш «правила + контент» по (версия, каталог данных): YAML читается один раз,
     // а не на каждую партию (на батче в тысячи партий это была главная статья
     // времени). Содержимое только читается: колоды строит Setup отдельным объектом.

@@ -521,6 +521,7 @@ public final class RuleWords {
                 "дополнение «Супер-арсенал»: карты на вершинах треков технологий";
             case "super_objectives.enabled" -> "супер-задания в игре";
             case "super_objectives.mode" -> "режим супер-заданий";
+            case "super_objectives.display" -> "сколько супер-заданий открыто на столе";
             case "super_objectives.deal" -> "сколько карт раздаётся игроку";
             case "super_objectives.choose" -> "сколько из них он оставляет";
             case "super_objectives.require_symbols" ->
