@@ -2480,10 +2480,13 @@ public final class HotSeatWindow {
     private final class Journaled extends Agent {
 
         private final Agent inner;
+        /** Поколение прогона, которому принадлежит эта обёртка. */
+        private final int gen;
 
-        Journaled(Agent inner) {
+        Journaled(Agent inner, int gen) {
             super(inner.seat, inner.name);
             this.inner = inner;
+            this.gen = gen;
         }
 
         @Override
@@ -2506,6 +2509,13 @@ public final class HotSeatWindow {
             Choice picked = inner.choose(state, options, context);
             int idx = options.indexOf(picked);
             synchronized (moves) {
+                // ПРОГОН УЖЕ ОТМЕНЁН ОТКАТОМ — его решение в ленту не пишется.
+                // Бот мог додумывать ход, пока откат начал новый прогон; без
+                // этой проверки запоздалое решение старого прогона ложилось в
+                // ленту нового, и сохранение переставало сходиться с правилами.
+                if (gen != generation) {
+                    throw new kelium.core.GameAborted("прогон отменён откатом");
+                }
                 moves.add(idx);
                 decisions.add(new Decision(seat, String.valueOf(context.get("kind")),
                     decisionWords(String.valueOf(context.get("kind")), picked),
@@ -2763,7 +2773,7 @@ public final class HotSeatWindow {
         // продолженную партию будет нечем.
         List<Agent> journaled = new ArrayList<>(playing.size());
         for (Agent a : playing) {
-            journaled.add(new Journaled(a));
+            journaled.add(new Journaled(a, gen));
         }
         playing = journaled;
 

@@ -156,7 +156,9 @@ public class HeuristicAgent extends Agent {
                     reals.add(o);
                 }
             }
-            return reals.isEmpty() ? opts.get(0) : reals.get(rng.nextInt(reals.size()));
+            // БЕЗ СЛУЧАЙНОСТИ (требование дизайнера 07.10.2026): правила на
+            // этот вопрос нет — первый настоящий вариант, а не наугад.
+            return reals.isEmpty() ? opts.get(0) : reals.get(0);
         }
         double best = Double.NEGATIVE_INFINITY;
         double второй = Double.NEGATIVE_INFINITY;
@@ -175,7 +177,7 @@ public class HeuristicAgent extends Agent {
             }
         }
         Диагностика.записать(kind, best, второй, opts.size());
-        return top.get(rng.nextInt(top.size()));
+        return top.get(0);   // равные — первый по порядку движка, без случайности
     }
 
     /**
@@ -342,14 +344,9 @@ public class HeuristicAgent extends Agent {
             case COMMAND_CENTER:
                 return 2.5;
             case MINER: {
-                // Живая жила рядом — иначе добытчик выдаёт пустоту.
-                for (String nb : s.field.neighbors(b.hexId)) {
-                    kelium.core.Hex h = s.field.get(nb);
-                    if (h != null && h.spawnTile != null && h.spawnTile.kelium > 0) {
-                        return 3.0;
-                    }
-                }
-                return 0.2;      // жила выработана — добытчик выдаёт пустоту
+                // Добывает ли он вообще — по правилу движка (стоит на жиле или
+                // стенкой смотрит на неё). Иначе энергия на нём пропадает зря.
+                return Plan.добывает(s, b) ? 3.0 : 0.0;
             }
             case BARRACKS:
             case FACTORY:
@@ -597,6 +594,64 @@ public class HeuristicAgent extends Agent {
                 double v = Math.min(снять, голод) * 1.5 - surcharge * 1.2;
                 return v > 0 ? 1.0 + v : 0.3;
             };
+            // ОТДАТЬ ИЛИ ЗАБРАТЬ (Питание). Прежде этого вопроса бот не знал вовсе:
+            // выбор шёл наугад среди «отдать» и «забрать», а «закончить» не
+            // выбирался никогда — бот снимал кубики с запитанных зданий и
+            // обесточивал их (замер 07.10.2026: 315 перекладок из 504 не
+            // прибавили ни одного запитанного здания, 54% зданий без энергии).
+            case "energy_activation" -> (s, o) -> {
+                PlayerState я = s.player(seat);
+                double голод = 0;          // голодные ячейки зданий, которым энергия нужна
+                for (BuildingToken b : я.buildingsOnField()) {
+                    int пусто = Math.max(0, b.energySlots - b.energyPlaced);
+                    if (пусто > 0 && b.type != BuildingType.POWER_PLANT) {
+                        double ц = ценностьВыхода(s, b);
+                        if (ц >= 1.5) {
+                            голод += пусто * ц;
+                        }
+                    }
+                }
+                if ("energy_done".equals(o.kind()) || o.payload() == null) {
+                    return 1.0;
+                }
+                if ("energy_kelium".equals(o.kind()) || "energy_coin".equals(o.kind())) {
+                    return голод > 0 ? 0.9 : 0.1;   // трата ресурса — только если очень нужно
+                }
+                int uid;
+                try {
+                    uid = Integer.parseInt(String.valueOf(o.payload()));
+                } catch (NumberFormatException e) {
+                    return 0.5;
+                }
+                BuildingToken src = null;
+                for (BuildingToken b : я.buildingsOnField()) {
+                    if (b.uid == uid) {
+                        src = b;
+                    }
+                }
+                if ("energy_give".equals(o.kind())) {
+                    int есть = src != null ? src.energyIdle : 1;
+                    return голод > 0 ? 2.0 + Math.min(есть, голод) : 0.4;
+                }
+                // ЗАБРАТЬ — только чтобы перекатить: кубики этого источника
+                // лежат на здании, которое сейчас почти ничего не даёт, а
+                // нужное здание голодает.
+                double снять = 0;
+                double потеря = 0;
+                for (BuildingToken b : я.buildingsOnField()) {
+                    int n = b.energyBySource.getOrDefault(uid, 0);
+                    if (n <= 0) {
+                        continue;
+                    }
+                    double ц = ценностьВыхода(s, b);
+                    if (ц < 1.5) {
+                        снять += n;
+                    } else {
+                        потеря += n * ц;
+                    }
+                }
+                return снять > 0 && голод > 0 && потеря == 0 ? 1.5 + снять : 0.2;
+            };
             // K3: раскладка кубика — приоритет ЦУ > добытчики > военные > прочее
             // (та же логика, что была зашита в движок, теперь решает бот).
             case "energy_place" -> (s, o) -> {
@@ -611,6 +666,9 @@ public class HeuristicAgent extends Agent {
                         // Лестница была верна для мирного разгона и намертво
                         // держала военные здания в темноте до конца партии.
                         double base = ценностьВыхода(s, b);
+                        if (base <= 0) {
+                            return 0.0;   // здание ничего не даст — кубик на нём пропадёт
+                        }
                         // добить здание до запитанности ценнее, чем начать новое
                         if (b.energyPlaced + 1 >= b.energySlots) {
                             base += 1.0;
@@ -922,7 +980,7 @@ public class HeuristicAgent extends Agent {
         if (b.type == BuildingType.MINER) {
             // добытчик переносим ТОЛЬКО с выработанной жилы на живую
             var live = Plan.liveTileHexes(state);
-            boolean nowUseless = !Plan.touchesLiveTile(state, b.hexId, live);
+            boolean nowUseless = !Plan.добывает(state, b);
             boolean somewhereBetter = false;
             for (String hid : kelium.engine.Placement.buildableHexes(state, seat)) {
                 if (!hid.equals(b.hexId) && Plan.touchesLiveTile(state, hid, live)) {
@@ -1245,7 +1303,7 @@ public class HeuristicAgent extends Agent {
             for (BuildingToken b : me.buildingsOnField()) {
                 if (b.type == BuildingType.MINER && b.powered()) {
                     poweredMiner = true;
-                    if (Plan.touchesLiveTile(state, b.hexId, live)) {
+                    if (Plan.добывает(state, b)) {
                         liveVein = true;
                     }
                 }
@@ -1254,7 +1312,7 @@ public class HeuristicAgent extends Agent {
             for (BuildingToken b : me.buildingsOnField()) {
                 if (b.type == BuildingType.MINER && !b.powered()
                         && me.resources.coin() >= b.energySlots - b.energyPlaced
-                        && Plan.touchesLiveTile(state, b.hexId, live)) {
+                        && Plan.добывает(state, b)) {
                     minerPayable = true;
                     break;
                 }
@@ -1682,7 +1740,9 @@ public class HeuristicAgent extends Agent {
                     return 10.0;
                 }
             }
-            return 1.0;
+            // жилы ни здесь, ни рядом — добытчик не добудет ничего за всю
+            // партию: ниже отказа
+            return 0.05;
         }
         if ("power_plant".equals(btype)) {
             // ЖЁЛТАЯ ЯЧЕЙКА: только на ней станция даёт свой номинал. Гекс, где

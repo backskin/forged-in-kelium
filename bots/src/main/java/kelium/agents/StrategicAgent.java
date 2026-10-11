@@ -297,7 +297,7 @@ public class StrategicAgent extends HeuristicAgent {
                 boolean anyNear = false;
                 for (BuildingToken b : me.buildingsOnField()) {
                     if (b.type != BuildingType.MINER
-                            || !Plan.touchesLiveTile(state, b.hexId, live)) {
+                            || !Plan.добывает(state, b)) {
                         continue;
                     }
                     anyNear = true;

@@ -259,7 +259,7 @@ public final class Plan {
                 continue;
             }
             anyMiner = b;
-            if (touchesLiveTile(s, b.hexId, liveTiles)) {
+            if (добывает(s, b)) {
                 working++;
                 if (adjMiner == null || (!adjMiner.powered() && b.powered())) {
                     adjMiner = b;
@@ -910,6 +910,18 @@ public final class Plan {
             }
         }
         return out;
+    }
+
+    /**
+     * ДОБЫВАЕТ ЛИ ДОБЫТЧИК — ровно по правилу движка: стоит на живой жиле или
+     * его СТЕНКА смотрит на соседнюю живую жилу ({@link
+     * kelium.engine.Actions#minerAdjacentGridWithKelium}). Прежде бот считал
+     * рабочим добытчик, у которого жила просто где-то рядом: строил добытчики,
+     * которые ничего не добывают, запитывал их и считал их доход (07.10.2026).
+     */
+    public static boolean добывает(GameState s, BuildingToken miner) {
+        return miner != null && miner.hexId != null
+            && kelium.engine.Actions.minerAdjacentGridWithKelium(s, miner) != null;
     }
 
     /** Примыкает ли гекс к живой жиле (или сам ею является). */

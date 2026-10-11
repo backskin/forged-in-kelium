@@ -110,6 +110,12 @@ public final class ObjectiveHints {
         PRICE.put("arsenal", 3.0);
         PRICE.put("storage_token", 4.0);
         PRICE.put("module", 6.0);
+        // НАГРАДА-ДЕЙСТВИЕ и ГОТОВЫЕ РЕЗУЛЬТАТЫ (Задания 4.0): каждый результат —
+        // это несколько звеньев конвейера разом (войско без энергии, шаг по
+        // треку без трофеев), поэтому дороже одной монеты-боеприпаса.
+        PRICE.put("action", 4.0);
+        PRICE.put("spec_actions", 2.0);
+        PRICE.put("effects", 4.5);
     }
 
     /** Цена одной записи награды из данных карты. */
@@ -124,7 +130,8 @@ public final class ObjectiveHints {
                 continue;
             }
             // «module: attack» — не число: жетон один, но дорогой.
-            int n = e.getValue() instanceof Number num ? num.intValue() : 1;
+            int n = e.getValue() instanceof Number num ? num.intValue()
+                : e.getValue() instanceof java.util.List<?> список ? список.size() : 1;
             sum += price * n;
         }
         return sum;
