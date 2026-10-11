@@ -5056,11 +5056,17 @@ public final class HotSeatWindow {
                 : GameRecorder.buildingName(String.valueOf(bt).toLowerCase(java.util.Locale.ROOT), null);
             title = "Построить: " + здание + " — куда поставить";
             hint = "Подсвечены гексы, куда его можно поставить: где уже стоит ваше здание или "
-                + "за его свободной стенкой. Новое здание сразу сработает — без энергии.";
+                + "за его свободной стенкой."
+                + (liveState != null && kelium.dataio.Ctx.rules(liveState)
+                        .getBool("actions.build.building_fires_on_build", false)
+                    ? " Новое здание сразу сработает — без энергии."
+                    : " Новое здание в этом действии ничего не делает; энергостанция "
+                        + "приходит со своими кубиками.");
         } else if ("mine".equals(kind)) {
             title = "Добыча: что взять этим добытчиком";
             hint = "Запитанный добытчик берёт келемий с соседнего гекса зарождения или контейнер "
-                + "со своего гекса, если тот открыт. Щёлкните подсвеченный гекс — "
+                + "со своего гекса, если тот открыт; без энергии — только 1 контейнер. "
+                + "Щёлкните подсвеченный гекс — "
                 + "или «Пропустить добытчик».";
         } else if ("combat_target".equals(kind)) {
             int бпр = -1;
@@ -5643,13 +5649,13 @@ public final class HotSeatWindow {
         // каталог зданий игрока в постоянном порядке, по категориям
         for (int lv = 1; lv <= 4 && добытчики; lv++) {
             rows.add(buildRow(seat, st, me, "Добытчики", kelium.core.BuildingType.MINER, lv,
-                "добывает " + st.tokenStats.minerYield(lv) + " келемия · ячеек склада "
+                "добывает " + st.tokenStats.minerYield(lv, seat) + " келемия · ячеек склада "
                     + cellCount(me, "miner", lv),
                 buildIdx, buildCost, built, demolished, coin, agent, d));
         }
         for (int lv = 1; lv <= 4 && станции; lv++) {
             rows.add(buildRow(seat, st, me, "Энергостанции", kelium.core.BuildingType.POWER_PLANT,
-                lv, "даёт энергии " + st.tokenStats.plantEnergyGives(lv) + " · ячеек склада "
+                lv, "даёт энергии " + st.tokenStats.plantEnergyGives(lv, seat) + " · ячеек склада "
                     + cellCount(me, "plant", lv),
                 buildIdx, buildCost, built, demolished, coin, agent, d));
         }
@@ -5663,7 +5669,7 @@ public final class HotSeatWindow {
             };
             rows.add(buildRow(seat, st, me, "Военные здания", bt, null,
                 "выпускает " + unit + " или боеприпасы · ячеек энергии "
-                    + st.tokenStats.buildingEnergySlots(bt, null),
+                    + st.tokenStats.buildingEnergySlots(bt, null, seat),
                 buildIdx, buildCost, built, demolished, coin, agent, d));
         }
         if (buildIdx.containsKey("command_center:null")) {

@@ -2,7 +2,7 @@
 #  ЯКОРЯ ПЕЧАТНЫХ ПЛАНШЕТОВ — где на картинке лежит живое
 # ===========================================================================
 #  Файл СГЕНЕРИРОВАН по самим картинкам (tools/gen_anchors.py) и сверен
-#  с boards.3.0.0.yaml. Художник перерисовал планшет — перегенерировать, а не
+#  с boards.3.3.0.yaml. Художник перерисовал планшет — перегенерировать, а не
 #  править руками. Координаты — пиксели ИСХОДНОЙ картинки, игра пересчитает
 #  их под свой масштаб сама.
 #
@@ -17,7 +17,7 @@
 meta:
   id: 1.0.0
   type: board_anchors
-  source: boards.3.0.0.yaml
+  source: boards.3.3.0.yaml
 
 boards:
   - id: market
@@ -63,9 +63,9 @@ boards:
     size: [1547, 886]
     cells:
       - {group: miner, level: 1, type: U, box: [461, 36, 112, 112]}
-      - {group: miner, level: 2, type: U, box: [188, 179, 112, 112]}
-      - {group: miner, level: 3, type: U, box: [122, 496, 112, 112]}
-      - {group: miner, level: 3, type: U, box: [182, 622, 112, 112]}
+      - {group: miner, level: 2, type: U, box: [182, 155, 112, 112]}
+      - {group: miner, level: 2, type: U, box: [124, 281, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [197, 577, 112, 112]}
       - {group: miner, level: 4, type: U, box: [396, 733, 112, 112]}
       - {group: miner, level: 4, type: U, box: [524, 733, 112, 112]}
       - {group: plant, level: 1, type: U, box: [969, 36, 112, 112]}
@@ -108,14 +108,12 @@ boards:
     cells:
       - {group: miner, level: 1, type: U, box: [461, 36, 112, 112]}
       - {group: miner, level: 2, type: U, box: [188, 179, 112, 112]}
-      - {group: miner, level: 3, type: U, box: [122, 496, 112, 112]}
-      - {group: miner, level: 3, type: U, box: [182, 622, 112, 112]}
+      - {group: miner, level: 3, type: U, box: [209, 591, 112, 112]}
       - {group: miner, level: 4, type: U, box: [396, 733, 112, 112]}
       - {group: miner, level: 4, type: U, box: [524, 733, 112, 112]}
       - {group: plant, level: 1, type: U, box: [969, 36, 112, 112]}
       - {group: plant, level: 2, type: U, box: [1233, 179, 112, 112]}
-      - {group: plant, level: 3, type: U, box: [1313, 496, 112, 112]}
-      - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
+      - {group: plant, level: 3, type: U, box: [1234, 591, 112, 112]}
       - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
       - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
       - {group: base, level: 0, type: U, box: [718, 606, 112, 112]}
@@ -135,9 +133,9 @@ boards:
       - {group: miner, level: 4, type: U, box: [396, 733, 112, 112]}
       - {group: miner, level: 4, type: U, box: [524, 733, 112, 112]}
       - {group: plant, level: 1, type: U, box: [969, 36, 112, 112]}
-      - {group: plant, level: 2, type: U, box: [1233, 179, 112, 112]}
-      - {group: plant, level: 3, type: U, box: [1313, 496, 112, 112]}
-      - {group: plant, level: 3, type: U, box: [1254, 622, 112, 112]}
+      - {group: plant, level: 2, type: U, box: [1250, 157, 112, 112]}
+      - {group: plant, level: 2, type: U, box: [1310, 283, 112, 111]}
+      - {group: plant, level: 3, type: U, box: [1234, 591, 112, 112]}
       - {group: plant, level: 4, type: U, box: [911, 733, 112, 112]}
       - {group: plant, level: 4, type: U, box: [1039, 733, 112, 112]}
       - {group: base, level: 0, type: U, box: [718, 606, 112, 112]}

@@ -328,11 +328,6 @@
   .создатели .кто:last-child { border-bottom: 0; }
   .создатели .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
     color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
-  .выходные-данные .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
-    border-bottom: .2mm dotted var(--пример-кант); }
-  .выходные-данные .кто:last-child { border-bottom: 0; }
-  .выходные-данные .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
-    color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
   .создатели .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
   .создатели h2 { font-size: 10.5pt; }
   .создатели p, .создатели li { font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
@@ -360,6 +355,9 @@
   .блок.легенда { column-count: 2; column-gap: 5mm; column-span: all; }
   /* БЛОК ПОПОЛАМ: во всю ширину полосы, слева рисунки, справа текст. */
   .блок.вовсю { column-span: all; }
+  /* блок на всю ширину отделён от колонок над ним: иначе нижний блок колонки
+     ложится на него вплотную (стр. 25, 06.10.2026) */
+  .блок.вовсю, .карточки, .блок.надвое, .блок.пара { margin-top: 2.6mm; }
   /* ---- заглавная иконка главы (04.10.2026): слева от вступления, ростом с него ---- */
   .с-заглавной { column-span: all; display: flex; align-items: stretch; gap: 4mm; margin: 0 0 3mm; }
   .с-заглавной > .блок { flex: 1; margin: 0; }
@@ -1075,12 +1073,11 @@
       </div>
 
         <div class="рисунок-во-всю" style="padding:1.0mm 0 1.6mm">
-          <div class="рис" style="width:84%">
-            <img src="илл/387643d0fe76d6e4.png" alt="">
+          <div class="рис" style="width:100%">
+            <img src="илл/e420e52771f078a4.png" alt="">
             <svg viewBox="0 0 3354 857" preserveAspectRatio="none"><polyline points="712.0,795.0 712.0,386.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="17.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1885.0,795.0 1885.0,471.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="17.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="2642.0,795.0 2642.0,240.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="17.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="2114.0,795.0 2114.0,322.0 2264.0,172.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="17.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="712" cy="386" r="21.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1885" cy="471" r="21.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="2642" cy="240" r="21.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="2264" cy="172" r="21.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><polyline points="712.0,795.0 712.0,386.0" fill="none" class="выноска-л" stroke-width="6.2" stroke-linejoin="round"/><circle cx="712" cy="386" r="15.0" class="выноска-т"/><circle cx="712" cy="795" r="53.0" class="номер-круг" stroke-width="5.3"/><text x="712" y="795" class="номер-текст" font-size="68.8">А</text><polyline points="1885.0,795.0 1885.0,471.0" fill="none" class="выноска-л" stroke-width="6.2" stroke-linejoin="round"/><circle cx="1885" cy="471" r="15.0" class="выноска-т"/><circle cx="1885" cy="795" r="53.0" class="номер-круг" stroke-width="5.3"/><text x="1885" y="795" class="номер-текст" font-size="68.8">Б</text><polyline points="2642.0,795.0 2642.0,240.0" fill="none" class="выноска-л" stroke-width="6.2" stroke-linejoin="round"/><circle cx="2642" cy="240" r="15.0" class="выноска-т"/><circle cx="2642" cy="795" r="53.0" class="номер-круг" stroke-width="5.3"/><text x="2642" y="795" class="номер-текст" font-size="68.8">В</text><polyline points="2114.0,795.0 2114.0,322.0 2264.0,172.0" fill="none" class="выноска-л" stroke-width="6.2" stroke-linejoin="round"/><circle cx="2264" cy="172" r="15.0" class="выноска-т"/><circle cx="2114" cy="795" r="53.0" class="номер-круг" stroke-width="5.3"/><text x="2114" y="795" class="номер-текст" font-size="68.8">Г</text></svg>
           </div>
         </div>
-
 
       <div class="блок легенда">
         <ul>
@@ -1167,11 +1164,10 @@
         </ul>
         <div class="рисунок-в-колонке" style="padding:0.2mm 0 0.2mm">
           <div class="рис" style="width:54%">
-            <img src="илл/907bd4c986579c83.png" alt="">
+            <img src="илл/177b52fc4795d4bb.png" alt="">
             <svg viewBox="0 0 1200 958" preserveAspectRatio="none"></svg>
           </div>
         </div>
-
       </div>
     </div>
 
@@ -1267,7 +1263,7 @@
 
       <div class="пример совет">
         <span class="метка">Совет</span>
-        <p>Здание без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> не работает. Прежде чем строить, прикиньте, хватит ли вам кубиков энергии, чтобы его запитать.</p>
+        <p>Здание без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> даёт совсем немного. Прежде чем строить, прикиньте, хватит ли вам кубиков энергии, чтобы его запитать.</p>
       </div>
     </div>
 
@@ -1400,12 +1396,11 @@
         <h2>Карта приказа</h2>
         <div class="половина">
         <div class="рисунок-в-колонке" style="padding:1.0mm 0 1.2mm">
-          <div class="рис" style="width:84%">
-            <img src="илл/4f0ecf4156f6c97c.png" alt="">
+          <div class="рис" style="width:93%">
+            <img src="илл/25c72a7b7f411d11.png" alt="">
             <svg viewBox="0 0 894 1028" preserveAspectRatio="none"><polyline points="857.0,66.0 447.0,66.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="37.0,166.0 187.0,166.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="857.0,190.0 471.0,190.0 447.0,166.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="857.0,300.0 829.0,300.0 695.0,166.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="37.0,331.0 288.0,331.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="857.0,556.0 448.0,556.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="37.0,683.0 195.0,683.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="37.0,834.0 283.0,834.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="857.0,954.0 448.0,954.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="10.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="447" cy="66" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="187" cy="166" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="447" cy="166" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="695" cy="166" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="288" cy="331" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="448" cy="556" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="195" cy="683" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="283" cy="834" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="448" cy="954" r="12.6" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><polyline points="857.0,66.0 447.0,66.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="447" cy="66" r="8.9" class="выноска-т"/><circle cx="857" cy="66" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="857" y="66" class="номер-текст" font-size="40.8">1</text><polyline points="37.0,166.0 187.0,166.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="187" cy="166" r="8.9" class="выноска-т"/><circle cx="37" cy="166" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="37" y="166" class="номер-текст" font-size="40.8">2</text><polyline points="857.0,190.0 471.0,190.0 447.0,166.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="447" cy="166" r="8.9" class="выноска-т"/><circle cx="857" cy="190" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="857" y="190" class="номер-текст" font-size="40.8">3</text><polyline points="857.0,300.0 829.0,300.0 695.0,166.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="695" cy="166" r="8.9" class="выноска-т"/><circle cx="857" cy="300" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="857" y="300" class="номер-текст" font-size="40.8">4</text><polyline points="37.0,331.0 288.0,331.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="288" cy="331" r="8.9" class="выноска-т"/><circle cx="37" cy="331" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="37" y="331" class="номер-текст" font-size="40.8">5</text><polyline points="857.0,556.0 448.0,556.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="448" cy="556" r="8.9" class="выноска-т"/><circle cx="857" cy="556" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="857" y="556" class="номер-текст" font-size="40.8">6</text><polyline points="37.0,683.0 195.0,683.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="195" cy="683" r="8.9" class="выноска-т"/><circle cx="37" cy="683" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="37" y="683" class="номер-текст" font-size="40.8">7</text><polyline points="37.0,834.0 283.0,834.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="283" cy="834" r="8.9" class="выноска-т"/><circle cx="37" cy="834" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="37" y="834" class="номер-текст" font-size="40.8">8</text><polyline points="857.0,954.0 448.0,954.0" fill="none" class="выноска-л" stroke-width="3.7" stroke-linejoin="round"/><circle cx="448" cy="954" r="8.9" class="выноска-т"/><circle cx="857" cy="954" r="31.3" class="номер-круг" stroke-width="3.1"/><text x="857" y="954" class="номер-текст" font-size="40.8">9</text></svg>
           </div>
         </div>
-
         </div>
         <div class="половина">
         <ol>
@@ -1491,7 +1486,7 @@
 
       <div class="блок">
         <h2>Спец-плашки</h2>
-        <p>Плашка есть на 4 картах из 5 (на НАСТУПАТЬ — нет), у каждого цвета на своих картах. Её разыгрывают спец-действием.</p>
+        <p>Плашка есть на 4 картах из 5. Какая карта осталась без плашки и какая плашка на какой карте, у каждого цвета своё. Плашку разыгрывают спец-действием.</p>
         <div class="плитки к2" style="--плит-h:9mm"><div class="плитка"><img class="и плит" src="илл/e72a2eb0b08f2f69.png" alt=""><b>Монеты</b><span class="ветка">Возьмите 2 монеты</span></div><div class="плитка"><img class="и плит" src="илл/c2f384aa3ab3eb1b.png" alt=""><b>Боеприпас</b><span class="ветка">Заплатите 1 монету и возьмите 1 боеприпас</span></div><div class="плитка"><img class="и плит" src="илл/9b5d6e8cb79a6036.png" alt=""><b>Задание</b><span class="ветка">Заплатите 1 монету и возьмите 1 карту задания</span></div><div class="плитка"><img class="и плит" src="илл/8570f7ab512608ee.png" alt=""><b>Движение</b><span class="ветка">Заплатите 1 монету и переместите 1 жетон войск на его скорость</span></div></div>
       </div>
     </div>
@@ -1519,13 +1514,13 @@
         <p>Аврора — первый игрок. Все четверо выбрали карты и вскрывают их по очереди.</p>
         <div class="рисунок-во-всю" style="padding:1.2mm 0 3mm">
           <div class="рис" style="width:93%">
-            <img src="илл/e54e6ee20009234f.png" alt="">
+            <img src="илл/b21575d3223eb964.png" alt="">
             <svg viewBox="0 0 2272 1015" preserveAspectRatio="none"></svg>
           </div>
         </div>
       </div>
 
-      <div class="карточки"><div class="блок пример-блок карточка"><h2>1. Аврора</h2><p>Вскрывает ОСВОИТЬ. До неё карт не вскрывали: совпадения нет, низ закрыт. Аврора разыгрывает оба действия верха — Добычу и Питание — и спец-действием берёт 2 монеты с плашки.</p></div><div class="блок пример-блок карточка"><h2>2. Бастиан</h2><p>Вскрывает НАСТУПАТЬ. Совпадения нет, а ИССЛЕДОВАТЬ никто не вскрывал, поэтому низ закрыт. Бастиан разыгрывает Снабжение и Командование.</p></div><div class="блок пример-блок карточка"><h2>3. Виола</h2><p>Вскрывает КОНТРОЛИРОВАТЬ. Совпадения нет. ОСВОИТЬ уже вскрыла Аврора, поэтому низ Виолы открыт. Виола разыгрывает Развитие с верха и Добычу с низа, а Командование пропускает.</p></div><div class="блок пример-блок карточка"><h2>4. Гордон</h2><p>Вскрывает НАСТУПАТЬ. Эту карту уже вскрыл Бастиан, это совпадение: верх даёт Гордону одно действие, и он выбирает Командование. ИССЛЕДОВАТЬ никто не вскрывал, низ закрыт.</p></div></div>
+      <div class="карточки"><div class="блок пример-блок карточка"><h2>1. Аврора</h2><p>Вскрывает ОСВОИТЬ. До неё карт не вскрывали: совпадения нет, низ закрыт. Аврора разыгрывает оба действия верха — Добычу и Питание. Спец-плашки на этой карте у синих нет.</p></div><div class="блок пример-блок карточка"><h2>2. Бастиан</h2><p>Вскрывает НАСТУПАТЬ. Совпадения нет, а ИССЛЕДОВАТЬ никто не вскрывал, поэтому низ закрыт. Бастиан разыгрывает Снабжение и Командование, а спец-действием платит 1 монету и берёт 1 боеприпас<img class="и" src="илл/1c327a8f878529f9.png" alt=""> с плашки.</p></div><div class="блок пример-блок карточка"><h2>3. Виола</h2><p>Вскрывает КОНТРОЛИРОВАТЬ. Совпадения нет. ОСВОИТЬ уже вскрыла Аврора, поэтому низ Виолы открыт. Виола разыгрывает Развитие с верха и Добычу с низа, а Командование пропускает.</p></div><div class="блок пример-блок карточка"><h2>4. Гордон</h2><p>Вскрывает НАСТУПАТЬ. Эту карту уже вскрыл Бастиан, это совпадение: верх даёт Гордону одно действие, и он выбирает Командование. ИССЛЕДОВАТЬ никто не вскрывал, низ закрыт.</p></div></div>
     </div>
 
     <div class="колонцифра"><span>22</span></div>
@@ -1550,11 +1545,11 @@
       </div>
       </div>
 
-      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:13mm"><img src="илл/0d6fb5161ae16e8c.png" alt=""><img src="илл/2edc818936e33bc1.png" alt=""><img src="илл/f4144f40d1074458.png" alt=""></div><h2>Что строят</h2><p>Это действие ставит <b>одно</b> здание: Добыча строит добытчик <img class="и" src="илл/16e66b74ef78582b.png" alt="">, Питание — энергостанцию <img class="и" src="илл/8ecdf4925395b5ad.png" alt="">, Снабжение — казарму, завод или авиабазу <img class="и" src="илл/f4144f40d1074458.png" alt="">. Добытчик и энергостанцию можно взять с любым номером. Новое здание <b>сразу срабатывает один раз</b>, даже без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> (глава 7).</p></div><div class="блок карточка"><div class="карт-рис" style="height:13mm"><img class="значок" src="илл/87fc1dc56fb56a2f.png" alt=""></div><h2>Цена</h2><p>Заплатите цену здания в монетах. Цены военных зданий напечатаны на планшете войск, цены добытчиков и энергостанций — на планшете хранилища: цена равна номеру здания. Если монет не хватает или жетона нет в запасе, здание не строится.</p></div><div class="блок карточка"><div class="карт-рис" style="height:13mm"><img src="илл/45e056c2006849ff.png" alt=""></div><h2>Куда</h2><p>Здание ставят в <b>зону стройки</b>: на гекс со своим зданием или на соседний гекс, к которому обращена стенка вашего здания (с. 10). На гексе с чужими войсками и на тайле зарождения не строят.</p></div><div class="блок карточка"><div class="карт-рис" style="height:13mm"><img src="илл/580dbeef3b1f2130.png" alt=""></div><h2>Как</h2><p>Зданию нужны свободные секторы подряд — столько, сколько изображено на жетоне. Поворот выбираете вы. Чужие здания на гексе стройке не мешают.</p></div></div>
+      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:13mm"><img src="илл/0d6fb5161ae16e8c.png" alt=""><img src="илл/2edc818936e33bc1.png" alt=""><img src="илл/f4144f40d1074458.png" alt=""></div><h2>Что строят</h2><p>Это действие ставит <b>одно</b> здание: Добыча строит добытчик <img class="и" src="илл/16e66b74ef78582b.png" alt="">, Питание — энергостанцию <img class="и" src="илл/8ecdf4925395b5ad.png" alt="">, Снабжение — казарму, завод или авиабазу <img class="и" src="илл/f4144f40d1074458.png" alt="">. Добытчик и энергостанцию можно взять с любым номером. Новое здание <b>только встаёт на поле</b>: в этом действии оно ничего не делает. Энергостанция сразу получает свои кубики энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt="">, и они лежат на ней до действия «Переложить энергию» (глава 7).</p></div><div class="блок карточка"><div class="карт-рис" style="height:13mm"><img class="значок" src="илл/87fc1dc56fb56a2f.png" alt=""></div><h2>Цена</h2><p>Заплатите цену здания в монетах. Цены военных зданий напечатаны на планшете войск, цены добытчиков и энергостанций — на планшете хранилища: цена равна номеру здания. Если монет не хватает или жетона нет в запасе, здание не строится.</p></div><div class="блок карточка"><div class="карт-рис" style="height:13mm"><img src="илл/45e056c2006849ff.png" alt=""></div><h2>Куда</h2><p>Здание ставят в <b>зону стройки</b>: на гекс со своим зданием или на соседний гекс, к которому обращена стенка вашего здания (с. 10). На гексе с чужими войсками и на тайле зарождения не строят.</p></div><div class="блок карточка"><div class="карт-рис" style="height:13mm"><img src="илл/580dbeef3b1f2130.png" alt=""></div><h2>Как</h2><p>Зданию нужны свободные секторы подряд — столько, сколько изображено на жетоне. Поворот выбираете вы. Чужие здания на гексе стройке не мешают.</p></div></div>
 
       <div class="пример совет">
         <span class="метка">Совет</span>
-        <p>Добытчик стенкой к тайлу сразу даст келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt="">, даже без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt="">.</p>
+        <p>Ставьте добытчик стенкой к тайлу: келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> он будет брать, когда его запитают.</p>
       </div>
     </div>
 
@@ -1600,13 +1595,13 @@
 
       <div class="блок">
         <h2>Энергия</h2>
-        <p><b>Энергия</b> <img class="и" src="илл/5809b44657c5fc1d.png" alt=""> — кубики, без которых здания не работают. Их не тратят: кубик лежит на здании, пока вы не переложите его действием «Переложить энергию» (глава 7).</p>
+        <p><b>Энергия</b> <img class="и" src="илл/5809b44657c5fc1d.png" alt=""> — кубики, которые запитывают здания. Их не тратят: кубик лежит на здании, пока вы не переложите его действием «Переложить энергию» (глава 7).</p>
         <ul>
           <li><b>Источники</b> дают кубики: это ЦУ, энергостанции и жетоны энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> на планшете хранилища. Когда источник построен или получен, положите на него из общего запаса столько кубиков, сколько он даёт. ЦУ даёт 1 кубик, жетон энергии — 1 (золотой — 2, глава 10).</li>
         </ul>
         <p class="иконка-строка"><img class="и крупно" src="илл/7ac8ea3fea4b8e43.png" alt=""><span>Место для энергостанции на поле. Энергостанция даёт энергию<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> на себя, только если построена на секторе с таким кругом: столько кубиков, сколько напечатано на её жетоне. На любом другом секторе она не даёт ничего.</span></p>
         <ul>
-          <li><b>Потребители</b> — здания с ячейками энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> <img class="и" src="илл/c873277d68f5ccc8.png" alt="">: ЦУ, военные здания и добытчики. Здание <b>запитано</b>, когда во всех его ячейках лежат кубики; ЦУ запитано, если на нём лежит хотя бы один. Добывают и выпускают только запитанные здания.</li>
+          <li><b>Потребители</b> — здания с ячейками энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> <img class="и" src="илл/c873277d68f5ccc8.png" alt="">: ЦУ, военные здания и добытчики. Здание <b>запитано</b>, когда во всех его ячейках лежат кубики; ЦУ запитано, если на нём лежит хотя бы один. Запитанное здание работает по печати, здание без энергии даёт меньше (глава 7).</li>
         </ul>
       </div>
     </div>
@@ -1632,17 +1627,6 @@
         </ul>
       </div>
 
-      <div class="пример">
-        <span class="метка">Пример</span>
-        <p>Станцию Бастиана, дававшую 3 кубика, уничтожили. Бастиан убирает в общий запас любые 3 своих кубика.</p>
-        <div class="рисунок-в-колонке" style="padding:0.3mm 0 1.2mm">
-          <div class="рис" style="width:84%">
-            <img src="илл/c18ab62b5d1232cc.png" alt="">
-            <svg viewBox="0 0 1737 438" preserveAspectRatio="none"></svg>
-          </div>
-        </div>
-      </div>
-
       <div class="блок">
         <h2>Хранилище</h2>
         <p>Келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt="">, боеприпасы<img class="и" src="илл/1c327a8f878529f9.png" alt=""> и трофеи<img class="и" src="илл/a2720aad90e07cf1.png" alt=""> лежат в <b>ячейках</b> планшета хранилища, по одному кубику в ячейке. Кубик, для которого нет свободной ячейки, не берётся. Положенный кубик лежит, пока вы его не потратите: кубики в хранилище не переставляют и не выбрасывают.</p>
@@ -1656,6 +1640,17 @@
       <div class="пример совет">
         <span class="метка">Совет</span>
         <p>Держите свободную ячейку хранилища: кубик, которому негде лечь, вы не получите. Трофеи<img class="и" src="илл/a2720aad90e07cf1.png" alt=""> можно хранить и на свалке — жетоны места в хранилище не занимают.</p>
+      </div>
+
+      <div class="блок пример-блок вовсю">
+        <h2>Пример: уничтожена энергостанция</h2>
+        <p>Станция Бастиана давала 3 кубика: 2 лежат на ней, 3-й — в ячейке его казармы. Станцию уничтожили, и Бастиан убирает в общий запас любые 3 своих кубика энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> — здесь все три.</p>
+        <div class="рисунок-во-всю" style="padding:1.0mm 0 1.0mm">
+          <div class="рис" style="width:78%">
+            <img src="илл/c18ab62b5d1232cc.png" alt="">
+            <svg viewBox="0 0 1737 438" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1680,20 +1675,21 @@
 
     <div class="две">
       <div class="блок вовсю">
-        <p>Добыча даёт келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> и карты контейнеров, Питание переносит энергию<img class="и" src="илл/5809b44657c5fc1d.png" alt="">, Снабжение даёт войска и боеприпасы<img class="и" src="илл/1c327a8f878529f9.png" alt="">. Первое действие каждого из них заставляет сработать ваши запитанные здания, второе строит новое здание, и оно сразу срабатывает один раз (глава 6).</p>
+        <p>Добыча даёт келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> и карты контейнеров, Питание переносит энергию<img class="и" src="илл/5809b44657c5fc1d.png" alt="">, Снабжение даёт войска и боеприпасы<img class="и" src="илл/1c327a8f878529f9.png" alt="">. Первое действие каждого из них заставляет сработать ваши здания, второе строит новое здание (глава 6).</p>
+        <p><b>Здание без энергии</b><img class="и" src="илл/5809b44657c5fc1d.png" alt=""> даёт меньше: добытчик — 1 карту контейнера, военное здание и ЦУ — 1 боеприпас<img class="и" src="илл/1c327a8f878529f9.png" alt="">.</p>
       </div>
 
       <div class="раздел"><img class="и разд" src="илл/18df2722a8713a8e.png" alt=""><span>Добыча</span></div>
 
-      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:14mm"><img class="значок" src="илл/6f8229204b87d6e8.png" alt=""><img class="значок" src="илл/a27a4d41d8ec602b.png" alt=""></div><h2>Добыть</h2><p>Каждый ваш запитанный добытчик берёт, сколько на нём написано:</p><ul><li><b>келемий</b><img class="и" src="илл/0aff9abd2db508d8.png" alt=""> в хранилище — с тайла зарождения за своей стенкой;</li><li>или карты контейнеров — с открытого контейнера на своём гексе.</li></ul><p>Нет запитанных добытчиков — действие ничего не даёт.</p></div><div class="блок карточка"><div class="карт-рис" style="height:14mm"><img style="max-height:62%" src="илл/52bcc806a38d8b0f.png" alt=""><img style="max-height:55%" src="илл/e9511b3c2a84c83c.png" alt=""></div><h2>Построить добытчик</h2><p>Поставьте один добытчик из запаса по его цене (глава 6). Новый добытчик сразу добывает один раз, даже без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt="">.</p></div></div>
+      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:14mm"><img class="значок" src="илл/6f8229204b87d6e8.png" alt=""><img class="значок" src="илл/a27a4d41d8ec602b.png" alt=""></div><h2>Добыть</h2><p>Каждый ваш запитанный добытчик берёт, сколько на нём написано:</p><ul><li><b>келемий</b><img class="и" src="илл/0aff9abd2db508d8.png" alt=""> в хранилище — с тайла зарождения за своей стенкой;</li><li>или карты контейнеров — с открытого контейнера на своём гексе.</li></ul><p>Добытчик без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> берёт только 1 карту контейнера со своего гекса.</p></div><div class="блок карточка"><div class="карт-рис" style="height:14mm"><img style="max-height:62%" src="илл/52bcc806a38d8b0f.png" alt=""><img style="max-height:55%" src="илл/a5ef9943805dcb08.png" alt=""></div><h2>Построить добытчик</h2><p>Поставьте один добытчик из запаса по его цене (глава 6). В этом действии он ничего не добывает.</p></div></div>
 
       <div class="блок пример-блок вовсю">
         <h2>Пример добычи</h2>
-        <p>Гордон (жёлтый) ставит добытчик стенкой к тайлу — он сразу берёт 1 келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt="">. Позже «Добыть»: оба его запитанных добытчика берут по 1, кубики — в открытые ячейки хранилища.</p>
+        <p>Гордон (жёлтый) ставит добытчик стенкой к тайлу — сейчас он ничего не берёт. Позже «Добыть»: оба его запитанных добытчика берут по 1, кубики — в открытые ячейки хранилища.</p>
         <div class="рисунок-во-всю" style="padding:0.6mm 0 0.8mm">
-          <div class="рис" style="width:82%">
-            <img src="илл/ff31fdbf5a8f4851.png" alt="">
-            <svg viewBox="0 0 3379 730" preserveAspectRatio="none"></svg>
+          <div class="рис" style="width:74%">
+            <img src="илл/a4711e3b9df902a1.png" alt="">
+            <svg viewBox="0 0 3378 730" preserveAspectRatio="none"></svg>
           </div>
         </div>
       </div>
@@ -1727,7 +1723,7 @@
 
       <div class="раздел"><img class="и разд" src="илл/a53b8b066ff1fbc2.png" alt=""><span>Питание</span></div>
 
-      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:23mm"><img class="значок" src="илл/70e0118ea69087bc.png" alt=""><img class="значок" src="илл/037a4200e9ad2f61.png" alt=""></div><h2>Переложить энергию</h2><p>Переложите любые свои кубики энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> между источниками (ЦУ, энергостанциями и жетонами энергии) и ячейками своих зданий.</p></div><div class="блок карточка"><div class="карт-рис" style="height:23mm"><img style="max-height:62%" src="илл/52bcc806a38d8b0f.png" alt=""><img style="max-height:55%" src="илл/b7b7eb153e871596.png" alt=""></div><h2>Построить энергостанцию</h2><p>Поставьте одну энергостанцию из запаса по её цене. Она сразу даёт свои кубики энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> (глава 6). Разложите по ячейкам своих зданий только их.</p></div></div>
+      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:23mm"><img class="значок" src="илл/70e0118ea69087bc.png" alt=""><img class="значок" src="илл/037a4200e9ad2f61.png" alt=""></div><h2>Переложить энергию</h2><p>Переложите любые свои кубики энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> между источниками (ЦУ, энергостанциями и жетонами энергии) и ячейками своих зданий.</p></div><div class="блок карточка"><div class="карт-рис" style="height:23mm"><img style="max-height:62%" src="илл/52bcc806a38d8b0f.png" alt=""><img style="max-height:55%" src="илл/9ecfab0222f7030a.png" alt=""></div><h2>Построить энергостанцию</h2><p>Поставьте одну энергостанцию из запаса по её цене. Она сразу даёт свои кубики энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> (глава 6), и они лежат на ней до «Переложить энергию».</p></div></div>
     </div>
 
     <div class="колонцифра"><span>27</span></div>
@@ -1750,7 +1746,7 @@
     <div class="две">
       <div class="раздел"><img class="и разд" src="илл/07729298921afb6b.png" alt=""><span>Снабжение</span></div>
 
-      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:23mm"><img src="илл/1978099bd3c6d1c1.png" alt=""><img class="значок" src="илл/239db4598a39752c.png" alt=""></div><h2>Выпустить</h2><p>Каждое ваше запитанное здание, военное или ЦУ, выбирает: жетоны войск своего рода или боеприпасы<img class="и" src="илл/1c327a8f878529f9.png" alt=""> в хранилище — сколько напечатано на планшете войск. Нет запитанных зданий — действие ничего не даёт.</p><p>В начале действия можно вернуть в запас любое число своих войск с поля.</p></div><div class="блок карточка"><div class="карт-рис" style="height:23mm"><img style="max-height:62%" src="илл/52bcc806a38d8b0f.png" alt=""><img style="max-height:100%" src="илл/38805b590f60199d.png" alt=""></div><h2>Построить военное здание</h2><p>Поставьте казарму, завод или авиабазу из запаса по её цене с планшета войск. Новое здание сразу выпускает один раз, даже без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt="">.</p></div></div>
+      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:23mm"><img src="илл/1978099bd3c6d1c1.png" alt=""><img class="значок" src="илл/239db4598a39752c.png" alt=""></div><h2>Выпустить</h2><p>Каждое ваше запитанное здание, военное или ЦУ, выбирает: жетоны войск своего рода или боеприпасы<img class="и" src="илл/1c327a8f878529f9.png" alt=""> в хранилище — сколько напечатано на планшете войск. Здание без энергии<img class="и" src="илл/5809b44657c5fc1d.png" alt=""> даёт только 1 боеприпас — всегда 1, что бы ни было напечатано на планшете и что бы на нём ни лежало.</p><p>В начале действия можно вернуть в запас любое число своих войск с поля.</p></div><div class="блок карточка"><div class="карт-рис" style="height:23mm"><img style="max-height:62%" src="илл/52bcc806a38d8b0f.png" alt=""><img style="max-height:100%" src="илл/f20db0c04f9ec35d.png" alt=""></div><h2>Построить военное здание</h2><p>Поставьте казарму, завод или авиабазу из запаса по её цене с планшета войск. В этом действии новое здание ничего не выпускает.</p></div></div>
 
       <div class="блок пример-блок надвое">
         <h2>Пример выпуска</h2>
@@ -1771,7 +1767,7 @@
 
       <div class="пример важно">
         <span class="метка">Важно!</span>
-        <p>ЦУ не делает вышек, пока на нём нет модуля сборки: число вышек на ЦУ напечатано нулём (глава 10).</p>
+        <p>Вышек на ЦУ напечатано: у синих 1, у остальных 0 — их ЦУ делает вышки только с модулем сборки (глава 10).</p>
       </div>
     </div>
 
@@ -2077,7 +2073,7 @@
         <p>Забранное супер-задание можно не показывать соперникам. Запоминайте, какие карты они берут со стола: так проще понять их планы и помешать им до подсчёта очков.</p>
       </div>
 
-      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:17mm"><img class="значок" src="илл/910118b2a9e9ac1b.png" alt=""><img class="значок" src="илл/f5c60ad06e3f8584.png" alt=""><img class="значок" src="илл/6f8229204b87d6e8.png" alt=""></div><h2>Чем платят</h2><p>Платите кубиками трофеев<img class="и" src="илл/a2720aad90e07cf1.png" alt=""> из хранилища или жетонами со своей свалки: жетон отдаётся целиком за столько трофеев, сколько шестерёнок на его обороте. Сдачи нет, и жетон возвращается в запас владельца. <b>Ступени треков</b> можно оплатить и келемием<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> из хранилища: 1 келемий заменяет 1 трофей.</p></div><div class="блок карточка"><div class="карт-рис" style="height:17mm"><img src="илл/dc8ddd2711a9c343.png" alt=""></div><h2>Кубики технологий</h2><p>Вдвоём у каждого 8 кубиков технологий, втроём 7, вчетвером 6. Каждая ступень занимается новым кубиком, и он лежит там до конца партии. Если кубиков не осталось, на треки вы больше не встаёте.</p></div></div>
+      <div class="карточки"><div class="блок карточка"><div class="карт-рис" style="height:17mm"><img class="значок" src="илл/910118b2a9e9ac1b.png" alt=""><img class="значок" src="илл/f5c60ad06e3f8584.png" alt=""><img class="значок" src="илл/6f8229204b87d6e8.png" alt=""></div><h2>Чем платят</h2><p>Платите кубиками трофеев<img class="и" src="илл/a2720aad90e07cf1.png" alt=""> из хранилища или жетонами со своей свалки: жетон отдаётся целиком за столько трофеев, сколько шестерёнок на его обороте. Сдачи нет, и жетон возвращается в запас владельца. <b>Ступени треков</b> можно оплатить и келемием<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> из хранилища: 1 келемий заменяет 1 трофей, но келемия в оплате не может быть больше, чем трофеев.</p></div><div class="блок карточка"><div class="карт-рис" style="height:17mm"><img src="илл/dc8ddd2711a9c343.png" alt=""></div><h2>Кубики технологий</h2><p>Вдвоём у каждого 8 кубиков технологий, втроём 7, вчетвером 6. Каждая ступень занимается новым кубиком, и он лежит там до конца партии. Если кубиков не осталось, на треки вы больше не встаёте.</p></div></div>
     </div>
 
     <div class="колонцифра"><span>35</span></div>
@@ -2297,9 +2293,9 @@
   </div>
 </div>
 
+<!-- ============ ЗАДНЯЯ ОБЛОЖКА ============ -->
 <p class="подпись-разворота">Задняя сторона обложки · памятка</p>
 <div class="разворот одна">
-
   <div class="стр обложка задняя">
     <div class="глава"><span class="гл-т">Памятка</span></div>
     <div class="пм">
@@ -2347,8 +2343,8 @@
 </div>
         <div class="блок">
           <h2>Пять действий <span class="зв">каждое действие: одно из двух, раз за ход</span></h2>
-          <div class="дей-сетка"><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/1f1d64536b88012f.png" alt=""><div class="дей-имя">Добыча</div></div><div class="вет"><b>Добыть.</b> Каждый запитанный добытчик берёт келемий <img class="и" src="илл/85985e32f9eb51c3.png" alt=""> с тайла за своей стенкой или карты контейнеров <img class="и" src="илл/0abb4bcedd2f8b20.png" alt=""> со своего гекса.</div><div class="или">или</div><div class="вет"><b>Построить добытчик</b> — он сразу добывает.</div></div><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/954f5f94ec36ffcd.png" alt=""><div class="дей-имя">Питание</div></div><div class="вет"><b>Переложить энергию.</b> Любые свои кубики <img class="и" src="илл/39b62f06b554850f.png" alt=""> между источниками и ячейками <img class="и" src="илл/c873277d68f5ccc8.png" alt=""> зданий.</div><div class="или">или</div><div class="вет"><b>Построить энергостанцию</b> — её кубики сразу на ячейки.</div></div><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/a3ca758d12631dc7.png" alt=""><div class="дей-имя">Снабжение</div></div><div class="вет"><b>Выпустить.</b> Каждое запитанное военное здание и ЦУ делает войска <img class="и" src="илл/d5acb3888f8658b3.png" alt=""> или боеприпасы <img class="и" src="илл/146655081e70256e.png" alt="">.</div><div class="или">или</div><div class="вет"><b>Построить военное здание</b> — оно сразу выпускает.</div></div><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/c2e5ec50735823c8.png" alt=""><div class="дей-имя">Командование</div></div><div class="вет"><b>Манёвр.</b> Выведите войска с одного гекса и введите на него те, что дойдут.</div><div class="или">или</div><div class="вет"><b>Бой.</b> Каждый ваш жетон у гекса-цели бьёт жетон на нём: <span class='нр'>2&nbsp;<img class="и" src="илл/146655081e70256e.png" alt="">&nbsp;— любой</span>, <span class='нр'>1&nbsp;<img class="и" src="илл/146655081e70256e.png" alt="">&nbsp;— вид с&nbsp;планшета</span>.</div></div><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/5c455fdbde484605.png" alt=""><div class="дей-имя">Развитие</div></div><div class="вет"><b>Рынок.</b> Келемий <img class="и" src="илл/85985e32f9eb51c3.png" alt=""> на монеты <img class="и" src="илл/900a74db93282494.png" alt="">: <span class='нр'>0&nbsp;→&nbsp;1,</span> <span class='нр'>1&nbsp;→&nbsp;3,</span> <span class='нр'>2&nbsp;→&nbsp;7.</span> За 1 келемий — задание, за 1 — обновление карты. Одно предложение карты рынка.</div><div class="или">или</div><div class="вет"><b>Наука.</b> Шаг по треку за <span class='нр'>2 / 3 / 4 / 5</span> трофеев <img class="и" src="илл/18424d4fbaeca851.png" alt=""> или келемия; обмены только за трофеи: смена модуля&nbsp;1, улучшение модуля&nbsp;2, арсенал&nbsp;1.</div></div></div>
-          <p class="итог"><b>Построить:</b> одно здание своего вида по цене <img class="и" src="илл/900a74db93282494.png" alt=""> в зону стройки; оно срабатывает сразу, даже без энергии. Или снесите своё здание того же вида: <span class='нр'>+1&nbsp;<img class="и" src="илл/900a74db93282494.png" alt=""></span>.</p>
+          <div class="дей-сетка"><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/1f1d64536b88012f.png" alt=""><div class="дей-имя">Добыча</div></div><div class="вет"><b>Добыть.</b> Каждый запитанный добытчик берёт келемий <img class="и" src="илл/85985e32f9eb51c3.png" alt=""> с тайла за своей стенкой или карты контейнеров <img class="и" src="илл/0abb4bcedd2f8b20.png" alt=""> со своего гекса.</div><div class="или">или</div><div class="вет"><b>Построить добытчик.</b></div></div><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/954f5f94ec36ffcd.png" alt=""><div class="дей-имя">Питание</div></div><div class="вет"><b>Переложить энергию.</b> Любые свои кубики <img class="и" src="илл/39b62f06b554850f.png" alt=""> между источниками и ячейками <img class="и" src="илл/c873277d68f5ccc8.png" alt=""> зданий.</div><div class="или">или</div><div class="вет"><b>Построить энергостанцию</b> — она сразу получает свои кубики.</div></div><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/a3ca758d12631dc7.png" alt=""><div class="дей-имя">Снабжение</div></div><div class="вет"><b>Выпустить.</b> Каждое запитанное военное здание и ЦУ делает войска <img class="и" src="илл/d5acb3888f8658b3.png" alt=""> или боеприпасы <img class="и" src="илл/146655081e70256e.png" alt="">.</div><div class="или">или</div><div class="вет"><b>Построить военное здание.</b></div></div><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/c2e5ec50735823c8.png" alt=""><div class="дей-имя">Командование</div></div><div class="вет"><b>Манёвр.</b> Выведите войска с одного гекса и введите на него те, что дойдут.</div><div class="или">или</div><div class="вет"><b>Бой.</b> Каждый ваш жетон у гекса-цели бьёт жетон на нём: <span class='нр'>2&nbsp;<img class="и" src="илл/146655081e70256e.png" alt="">&nbsp;— любой</span>, <span class='нр'>1&nbsp;<img class="и" src="илл/146655081e70256e.png" alt="">&nbsp;— вид с&nbsp;планшета</span>.</div></div><div class="дей"><div class="дей-гол"><img class="дей-зн" src="илл/5c455fdbde484605.png" alt=""><div class="дей-имя">Развитие</div></div><div class="вет"><b>Рынок.</b> Келемий <img class="и" src="илл/85985e32f9eb51c3.png" alt=""> на монеты <img class="и" src="илл/900a74db93282494.png" alt="">: <span class='нр'>0&nbsp;→&nbsp;1,</span> <span class='нр'>1&nbsp;→&nbsp;3,</span> <span class='нр'>2&nbsp;→&nbsp;7.</span> За 1 келемий — задание, за 1 — обновление карты. Одно предложение карты рынка.</div><div class="или">или</div><div class="вет"><b>Наука.</b> Шаг по треку за <span class='нр'>2 / 3 / 4 / 5</span> трофеев <img class="и" src="илл/18424d4fbaeca851.png" alt="">, до половины — келемием; обмены только за трофеи: смена модуля&nbsp;1, улучшение модуля&nbsp;2, арсенал&nbsp;1.</div></div></div>
+          <p class="итог"><b>Построить</b> здание своего вида в зону стройки за его цену <img class="и" src="илл/900a74db93282494.png" alt=""> — оно пока не работает; снос своего того же вида: <span class='нр'>+1&nbsp;<img class="и" src="илл/900a74db93282494.png" alt=""></span>. <b>Без энергии:</b> добытчик — 1 карта контейнера, военное здание и ЦУ — 1 боеприпас.</p>
         </div>
         <div class="блок">
 <h2>Победные очки <span class="зв"><img class="и" src="илл/14d9417436b86288.png" alt=""> = 1 очко</span></h2>
