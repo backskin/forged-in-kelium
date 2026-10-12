@@ -74,5 +74,5 @@ for i, (k, п) in enumerate(zip(кадры, подписи)):
         x += ЗАЗОР
 png = os.path.join(D, "_добыча-пример.png")
 холст.save(png)
-figure("добыча-пример", png, 2200, холст.width, холст.height, [], css_w="74%", pad="0.6mm 0 0.8mm")
+figure("добыча-пример", png, 2200, холст.width, холст.height, [], css_w="72%", pad="0.2mm 0 0.2mm")
 print("ok", холст.size)

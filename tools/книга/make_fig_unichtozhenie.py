@@ -146,5 +146,5 @@ ImageDraw.Draw(холст).line((80, р1.height + 60, W - 80, р1.height + 60), 
 холст.alpha_composite(р2, ((W - р2.width) // 2, р1.height + 120))
 png = os.path.join(D, "_уничтожение.png")
 холст.save(png)
-figure("уничтожение", png, 2000, холст.width, холст.height, [], css_w="63%", pad="0.2mm 0 0.4mm")
+figure("уничтожение", png, 2000, холст.width, холст.height, [], css_w="80%", pad="0.2mm 0 0.4mm")
 print("ok", холст.size)
