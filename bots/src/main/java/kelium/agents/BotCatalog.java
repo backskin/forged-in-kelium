@@ -367,6 +367,12 @@ public final class BotCatalog {
         return switch (kind) {
             // прежний планировщик-мастер — только для очных замеров с решателем
             case "планировщик" -> PlannerAgent.ofLevel(3, character, seat, rng, players);
+            case "решатель0" -> {
+                // тот же решатель без доигрывания вперёд — для очных замеров
+                Решатель р = new Решатель(seat, character, players, 60, 12);
+                р.доигрываний = 0;
+                yield р;
+            }
             case "решатель" -> new Решатель(seat, character, players,
                 Integer.getInteger("kelium.решатель.ход", 60),
                 Integer.getInteger("kelium.решатель.карта", 12));
