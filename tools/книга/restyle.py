@@ -134,6 +134,8 @@ CSS = r"""
   .кайма .к-осн { fill: none; stroke: var(--чернила); stroke-width: .5; stroke-linejoin: round; }
   .кайма .к-тонк { fill: none; stroke: var(--чернила); stroke-width: .16; opacity: .7; }
   .кайма .к-риски { fill: none; stroke: var(--чернила); stroke-width: .25; }
+  /* Цвет уголков на полосах с картинкой задаёт фон_иллюстрации.py —
+     «вывернутый» цвет фона разворота (дизайнер 14.10.2026). */
   .кайма .к-скобка { fill: none; stroke: var(--келемий); stroke-width: 1.05; stroke-linecap: square; }
   .кайма .к-хвл, .кайма .к-хвп { display: none; }
   /* У корешка рамка открыта: левая страница теряет правую сторону, правая — левую,
