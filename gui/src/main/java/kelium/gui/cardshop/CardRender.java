@@ -275,11 +275,17 @@ public final class CardRender {
 
     static void objectiveTop(CardCanvas k, CardSpec c) {
         String slotKind = c.text("слот");
+        // РЕАКЦИЯ ПО УМОЛЧАНИЮ (дизайнер 12.10.2026): у карты с плашкой реакции
+        // значок слева — «реакция на чужое действие» (78), если не выбран другой
+        if (slotKind.isEmpty() && hasPlate(c)) {
+            slotKind = "реакция";
+        }
         boolean spec = "▶".equals(slotKind);
         if (!"нет".equals(slotKind)) {
             // СВОЙ ЗНАЧОК СЛЕВА (дизайнер 07.10.2026): «своя» — любая иконка вместо ∞/▶
-            boolean own = "своя".equals(slotKind);
-            String ownKey = CardAssets.tokens(c.text("иконка_слота")).stream().filter(t -> t.startsWith("{"))
+            boolean own = "своя".equals(slotKind) || "реакция".equals(slotKind);
+            String ownKey = "реакция".equals(slotKind) ? "78"
+                : CardAssets.tokens(c.text("иконка_слота")).stream().filter(t -> t.startsWith("{"))
                 .map(t -> t.substring(1, t.length() - 1)).findFirst().orElse("78");
             if (k.begin("слот", 20, spec ? 27 : 36, 89, 89)) {
                 BufferedImage slot = k.icon(own ? ownKey : spec ? "26" : "28");
@@ -294,8 +300,26 @@ public final class CardRender {
         }
         boolean plate = hasPlate(c);
         double zoneTop = 12;
+        double zoneBottom = 240;
+        List<Map<String, Object>> rows = topRows(c);
+        // МЕСТО ПЛАШКИ СРЕДИ СТРОК: строки над ней делят место сверху, под ней —
+        // снизу, по весам; плашка сверху (0) — прежняя раскладка
+        int at = plate ? Math.max(0, Math.min(rows.size(), plateIndex(c))) : 0;
+        double pdy = 0;
+        if (plate && at > 0) {
+            double all = 0;
+            double above = 0;
+            for (int i = 0; i < rows.size(); i++) {
+                all += weight(rows.get(i));
+                if (i < at) {
+                    above += weight(rows.get(i));
+                }
+            }
+            pdy = all <= 0 ? 0 : (zoneBottom - 126) * above / all;
+        }
         if (plate) {
             if (k.begin("плашка", 117, 8, 500, 112)) {
+                k.g.translate(0, pdy * CardCanvas.K);
                 // ПЛАШКА С ПУСТЫМ КРУЖКОМ (дизайнер 07.10.2026, «плашка эффекта на
                 // задание.png»): в кружке — значок на выбор, по умолчанию «Бой» (39)
                 BufferedImage p = k.a.template("плашка эффекта на задание.png");
@@ -317,6 +341,7 @@ public final class CardRender {
             // ЗАГОЛОВОК ПЛАШКИ — своя часть карты (дизайнер 06.10.2026): кегль,
             // ширина букв, сдвиг, размер — как у остальных текстов
             if (k.begin("заголовок", 190, 40, 420, 62)) {
+                k.g.translate(0, pdy * CardCanvas.K);
                 Font f = k.font(F_TOP_B, 51 * k.size());
                 k.squeezed(c.text("заголовок_верха"), f, 400, 71, CardCanvas.WHITE,
                     spec ? RED_STROKE : SLATE_TITLE, 4, 0.85 * k.letterWidth(), 420 * k.letterWidth());
@@ -324,13 +349,19 @@ public final class CardRender {
             k.end();
             zoneTop = 126;
         }
-        List<Map<String, Object>> rows = topRows(c);
         if (rows.isEmpty()) {
             return;
         }
-        double zoneBottom = 240;
-        if (k.begin("верх", 128, zoneTop, 494, zoneBottom - zoneTop)) {
-            topBlock(k, rows, zoneTop, zoneBottom);
+        double top = plate && at > 0 ? 12 : zoneTop;
+        if (k.begin("верх", 128, top, 494, zoneBottom - top)) {
+            if (plate && at > 0) {
+                topBlock(k, rows.subList(0, at), 12, 12 + pdy);
+                if (at < rows.size()) {
+                    topBlock(k, rows.subList(at, rows.size()), 126 + pdy, zoneBottom);
+                }
+            } else {
+                topBlock(k, rows, zoneTop, zoneBottom);
+            }
         }
         k.end();
     }
@@ -436,6 +467,31 @@ public final class CardRender {
         return "реакция".equals(c.text("верх_вид"));
     }
 
+    /**
+     * ПЛАШКА РЕАКЦИИ — СТРОКА ВЕРХА (дизайнер 12.10.2026: «чтобы она не была
+     * выбором есть/нет, а была такой же строкой, которую можно подвигать»): в
+     * списке «верх_строки» её место отмечает запись {плашка: true}.
+     */
+    static boolean isPlateRow(Map<?, ?> m) {
+        return Boolean.TRUE.equals(m.get("плашка"));
+    }
+
+    /** Сколько строк верха стоит НАД плашкой (нет отметки — 0, плашка сверху). */
+    static int plateIndex(CardSpec c) {
+        if (c.fields.get("верх_строки") instanceof List<?> l) {
+            int before = 0;
+            for (Object o : l) {
+                if (o instanceof Map<?, ?> m) {
+                    if (isPlateRow(m)) {
+                        return before;
+                    }
+                    before++;
+                }
+            }
+        }
+        return 0;
+    }
+
     static double weight(Map<String, Object> r) {
         return r.get("вес") instanceof Number n ? Math.max(0.2, n.doubleValue()) : 1;
     }
@@ -450,7 +506,7 @@ public final class CardRender {
         List<Map<String, Object>> out = new ArrayList<>();
         if (c.fields.get("верх_строки") instanceof List<?> l) {
             for (Object o : l) {
-                if (o instanceof Map<?, ?> m) {
+                if (o instanceof Map<?, ?> m && !isPlateRow(m)) {
                     out.add((Map<String, Object>) m);
                 }
             }
@@ -516,7 +572,7 @@ public final class CardRender {
         }
         boolean word = !l.get(j).startsWith("{") && !"/".equals(l.get(j));
         boolean next = !l.get(j + 1).startsWith("{") && !"/".equals(l.get(j + 1));
-        return word && next ? k.len(" ", k.font(F_TOP, size * 0.62)) / 2 : size * 0.12;
+        return (word && next ? k.len(" ", k.font(F_TOP, size * 0.62)) / 2 : size * 0.12) + k.extraGap();
     }
 
     static double rowWidth(CardCanvas k, List<String> l, double size) {
@@ -554,7 +610,7 @@ public final class CardRender {
     static void arrow(CardCanvas k, double cx, double cy, double size, Color ink) {
         double w = size * 0.6;
         double y = cy * 2;
-        k.g.setColor(ink);
+        k.g.setColor(k.inkFill(ink));
         k.g.setStroke(new BasicStroke((float) (size * 0.09 * 2), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         k.g.draw(new Line2D.Double((cx - w / 2) * 2, y, (cx + w / 2 - size * 0.12) * 2, y));
         java.awt.geom.Path2D head = new java.awt.geom.Path2D.Double();
@@ -663,9 +719,9 @@ public final class CardRender {
         while (true) {
             double total = 0;
             for (String t : toks) {
-                total += chipW(k, t, size) + size * 0.12;
+                total += chipW(k, t, size) + size * 0.12 + k.extraGap();
             }
-            total -= size * 0.12;
+            total -= size * 0.12 + k.extraGap();
             if (total <= width || size < 30) {
                 double x = cx - total / 2;
                 for (String t : toks) {
@@ -688,7 +744,7 @@ public final class CardRender {
                         k.text(t, k.font(F_TOP_B, size * 0.62), (x + w / 2) * 2, cy * 2, 'm',
                             CardCanvas.WHITE, SLATE, 4 * 2);
                     }
-                    x += w + size * 0.12;
+                    x += w + size * 0.12 + k.extraGap();
                 }
                 return;
             }
@@ -989,12 +1045,16 @@ public final class CardRender {
         }
         // ЗВЁЗДЫ (дизайнер 06.10.2026: «почему только одна?»): «звёзд» — сколько,
         // стопкой вверх от нижнего угла; прежнее «звезда: да» — одна
+        // НЕСКОЛЬКО ЗВЁЗД — ОДНА ЗВЕЗДА С ЧИСЛОМ (дизайнер 12.10.2026: стопка
+        // из четырёх звёзд заезжала на рисунок карты): звезда на прежнем месте,
+        // на ней — сколько очков
         int stars = c.fields.containsKey("звёзд") ? c.integer("звёзд", 0) : c.bool("звезда") ? 1 : 0;
         if (stars > 0) {
-            double top = 445 - (stars - 1) * 56;
-            if (k.begin("звезда", 22, top - 40, 80, 80 + (stars - 1) * 56)) {
-                for (int i = 0; i < stars; i++) {
-                    k.put("22", 62, 445 - i * 56, 80, 80);
+            if (k.begin("звезда", 22, 405, 80, 80)) {
+                k.put("22", 62, 445, 80, 80);
+                if (stars > 1) {
+                    k.text(String.valueOf(stars), k.font("Tektur-Bold.ttf", 38), 62 * 2, 449 * 2, 'm',
+                        CardCanvas.WHITE, new Color(120, 70, 10), 4 * 2);
                 }
             }
             k.end();
@@ -1081,7 +1141,7 @@ public final class CardRender {
             }
         }
         double total = ws.stream().mapToDouble(Double::doubleValue).sum()
-            + 6 * 2 * Math.max(0, toks.size() - 1);
+            + (6 * 2 + k.extraGap() * 2) * Math.max(0, toks.size() - 1);
         double cx = ax == 'r' ? x * 2 - total : x * 2;
         for (int i = 0; i < toks.size(); i++) {
             Object o = made.get(i);
@@ -1094,7 +1154,7 @@ public final class CardRender {
             } else {
                 k.missing((cx + ws.get(i) / 2) / 2, y, size, size, toks.get(i));
             }
-            cx += ws.get(i) + 12;
+            cx += ws.get(i) + 12 + k.extraGap() * 2;
         }
         return ax == 'r' ? (x * 2 - total) / 2 : (x * 2 + total) / 2;
     }
@@ -1251,7 +1311,7 @@ public final class CardRender {
             double cy = q[1];
             double from = q[2];
             double to = q[3];
-            int n = Math.max(1, (int) (r * Math.abs(Math.toRadians(to - from)) * 57.3 / step));
+            int n = Math.max(1, (int) Math.round(r * Math.abs(Math.toRadians(to - from)) / step));
             for (int i = 0; i <= n; i++) {
                 double t = Math.toRadians(from + (to - from) * i / n);
                 dots.add(new double[] {cx + r * Math.cos(t), cy + r * Math.sin(t)});
@@ -1446,7 +1506,7 @@ public final class CardRender {
                 ws.add(k.len(t, f) / 2);
             }
         }
-        double gap = size * 0.12;
+        double gap = size * 0.12 + k.extraGap();
         double total = ws.stream().mapToDouble(Double::doubleValue).sum() + gap * (toks.size() - 1);
         double x = cx - total / 2;
         for (int i = 0; i < toks.size(); i++) {

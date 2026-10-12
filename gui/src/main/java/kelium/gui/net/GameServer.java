@@ -137,7 +137,7 @@ public final class GameServer {
 
     private Map<String, Object> create(Map<String, Object> req) {
         int players = req.get("players") instanceof Number n ? n.intValue() : 2;
-        String ruleset = req.get("ruleset") instanceof String s ? s : GameConfig.DEFAULT_RULESET;
+        String ruleset = req.get("ruleset") instanceof String s ? s : GameConfig.GAME_RULESET;
         long seed = req.get("seed") instanceof Number n ? n.longValue() : idRng.nextLong();
 
         String id;

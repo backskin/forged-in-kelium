@@ -357,13 +357,19 @@ public final class BotCatalog {
         // УРОВЕНЬ 5 — СТРАТЕГ (30.09.2026): гроссмейстер с оценкой позиции,
         // выученной самоигрой (kelium.ЦиклСтратега).
         if (Bots.ROSTER_4.contains(kind) && "5".equals(arg)) {
-            return ОбученныйСтратег.создать(kind, seat, rng, players);
+            // стратег — тот же решатель с самым глубоким перебором
+            return new Решатель(seat, kind, players, 200, 30);
         }
         if (Bots.ROSTER_4.contains(kind) && arg != null && arg.length() == 1
                 && Character.isDigit(arg.charAt(0))) {
             return Bots.create(kind, Bots.Level.of(arg.charAt(0) - '0'), seat, rng, players);
         }
         return switch (kind) {
+            // прежний планировщик-мастер — только для очных замеров с решателем
+            case "планировщик" -> PlannerAgent.ofLevel(3, character, seat, rng, players);
+            case "решатель" -> new Решатель(seat, character, players,
+                Integer.getInteger("kelium.решатель.ход", 60),
+                Integer.getInteger("kelium.решатель.карта", 12));
             case "search" -> SearchAgent.deep(seat, rng,
                 Bots.genome(character, players), character);
             case "trained" -> new StrategicAgent(seat, rng,

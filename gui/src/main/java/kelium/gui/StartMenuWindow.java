@@ -173,7 +173,7 @@ public final class StartMenuWindow {
     }
     private int players = 2;
     private long seed = 100000 + new Random().nextInt(900000);
-    private String rulesetId = GameConfig.DEFAULT_RULESET;
+    private String rulesetId = GameConfig.GAME_RULESET;
     private FieldOption map = new FieldOption(null, "любая — по сиду", null);
     /** Место игрока за столом; null — ещё не выбрано. */
     Integer mySeat;
@@ -1130,8 +1130,8 @@ public final class StartMenuWindow {
             // список не прочитан — остаётся действующий свод
         }
         if (out.isEmpty()) {
-            out.add(new KpChooser.Item(GameConfig.DEFAULT_RULESET,
-                "свод " + GameConfig.DEFAULT_RULESET));
+            out.add(new KpChooser.Item(GameConfig.GAME_RULESET,
+                "свод " + GameConfig.GAME_RULESET));
         }
         return out;
     }

@@ -40,6 +40,7 @@ public final class RuleWords {
             case "storage" -> "Планшет хранилища";
             case "cards" -> "Карты: срабатывания и ветки";
             case "mining" -> "Добыча";
+            case "assembly" -> "Снабжение";
             case "symbols" -> "Символы супер-заданий";
             case "contested_cards" -> "Спорные карты";
             case "market" -> "Рынок";
@@ -339,6 +340,12 @@ public final class RuleWords {
                 "атака супер-войска за 1 боеприпас наносит столько урона; урон можно разделить";
             case "mining.unpowered_yield" ->
                 "добытчик без энергии всё же добывает столько келемия";
+            case "mining.unpowered_container" ->
+                "добытчик без энергии берёт ровно 1 контейнер со своего гекса";
+            case "assembly.unpowered_ammo" ->
+                "военное здание и ЦУ без энергии дают столько боеприпасов";
+            case "tech.kelium_not_more_than_trophies" ->
+                "в оплате шага науки келемия не больше, чем трофеев";
             case "cards.branch_must_act" ->
                 "ветка считается сыгранной, только если что-то сделала: бой без выстрела не в счёт";
 

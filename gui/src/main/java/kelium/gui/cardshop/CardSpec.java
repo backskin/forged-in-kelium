@@ -184,7 +184,7 @@ public final class CardSpec {
         Map<String, Object> f = c.fields;
         if (t.layout == Layout.OBJECTIVE) {
             f.put("рисунок", 1);
-            f.put("слот", "∞");
+            f.put("слот", "реакция");
             f.put("верх_вид", "реакция");
             f.put("заголовок_верха", "Закрома");
             f.put("иконки_верха", "");

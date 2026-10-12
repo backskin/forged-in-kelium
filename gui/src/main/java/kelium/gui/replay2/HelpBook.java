@@ -114,7 +114,7 @@ public final class HelpBook {
      */
     public static HelpBook of(Session session) {
         Path root = GameConfig.resolveDataRoot(null);
-        String id = GameConfig.DEFAULT_RULESET;
+        String id = GameConfig.GAME_RULESET;
         if (session != null && session.hasRecord() && session.record().ruleset != null
                 && !session.record().ruleset.isBlank()) {
             id = session.record().ruleset;

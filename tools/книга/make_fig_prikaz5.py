@@ -17,8 +17,9 @@ ns = {"__file__": os.path.join(D, "figs.py")}
 exec(open(os.path.join(D, "figs.py"), encoding="utf-8-sig").read().split("# планшет войск")[0], ns)
 figure, скруглить = ns["figure"], ns["скруглить"]
 
-ЛИЦА = os.path.join(os.path.expanduser("~"), "Yandex.Disk", "Forged in Kelium",
-                    "комплект — пять развилок (27.09.2026)", "лица", "orders")
+# приказы 6.0.0 (12.10.2026): плашки разложены по нациям заново — лица из
+# генератора tools/gen_orders_5.py
+ЛИЦА = os.path.join(ROOT, "design-docs", "карты", "приказы 6.0 (12.10)")
 ШРИФТЫ = os.path.join(ROOT, "gui", "src", "main", "resources", "fonts")
 ЖИРНЫЙ = os.path.join(ШРИФТЫ, "Tektur-Bold.ttf")
 УЗКИЙ = os.path.join(ШРИФТЫ, "TekturNarrow-Bold.ttf")
@@ -48,7 +49,7 @@ figure("карта-приказа", путь, 560, карта.width, карта.
 # ---------------------------------------------------------- круг на четверых
 КРУГ = [
     ("blue_settle", "Аврора", "Добыча · Питание", (0, 1)),
-    ("red_advance", "Бастиан", "Снабжение · Командование", (0, 1)),
+    ("red_advance", "Бастиан", "Снабжение · Командование · плашка", (0, 1)),
     ("green_secure", "Виола", "Развитие · Добыча", (1, 2)),
     ("yellow_advance", "Гордон", "Командование", (1,)),
 ]

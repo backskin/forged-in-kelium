@@ -21,46 +21,46 @@ ART = os.path.join(ROOT, 'data', 'textures', 'board')
 
 
 def components(im, pred, gap, minpx):
-    """Связные пятна пикселей, подходящих под pred, с допуском разрыва gap."""
+    """Связные пятна пикселей, подходящих под pred, с допуском разрыва gap.
+
+    Два пикселя в одном пятне, если между ними цепочка шагов не длиннее gap по
+    каждой оси. Считается через scipy (12.10.2026): квадрат стороны gap вокруг
+    каждого пикселя, связность 8 — ровно то же отношение, что прежний обход на
+    чистом Python (сверено на трёх gap), но в десятки раз быстрее. Порядок пятен
+    прежний — по первому пикселю построчно.
+    """
+    import numpy as np
+    from scipy import ndimage
     w, h = im.size
     px = im.load()
-    m = bytearray(w * h)
+    m = np.zeros((h, w), bool)
     for y in range(h):
-        r0 = y * w
         for x in range(w):
             if pred(*px[x, y]):
-                m[r0 + x] = 1
-    seen = bytearray(w * h)
-    out = []
-    for y0 in range(h):
-        for x0 in range(w):
-            i = y0 * w + x0
-            if not m[i] or seen[i]:
-                continue
-            st = [(x0, y0)]
-            seen[i] = 1
-            pts = []
-            while st:
-                x, y = st.pop()
-                pts.append((x, y))
-                for dy in range(-gap, gap + 1):
-                    yy = y + dy
-                    if yy < 0 or yy >= h:
-                        continue
-                    for dx in range(-gap, gap + 1):
-                        xx = x + dx
-                        if 0 <= xx < w:
-                            j = yy * w + xx
-                            if m[j] and not seen[j]:
-                                seen[j] = 1
-                                st.append((xx, yy))
-            if len(pts) < minpx:
-                continue
-            xs = [p[0] for p in pts]
-            ys = [p[1] for p in pts]
-            out.append([min(xs), min(ys),
-                        max(xs) - min(xs) + 1, max(ys) - min(ys) + 1, len(pts)])
-    return out
+                m[y, x] = True
+    s = max(1, gap)
+    d = m if s == 1 else ndimage.binary_dilation(
+        m, structure=np.ones((s, s), bool), origin=(-(s // 2) if s % 2 == 0 else 0,) * 2)
+    lab, _ = ndimage.label(d, structure=np.ones((3, 3), int))
+    lab = np.where(m, lab, 0)
+    idx = np.flatnonzero(lab)
+    if idx.size == 0:
+        return []
+    L = lab.ravel()[idx]
+    order = np.argsort(L, kind='stable')
+    L, idx = L[order], idx[order]
+    starts = np.flatnonzero(np.r_[True, L[1:] != L[:-1]])
+    ends = np.r_[starts[1:], len(L)]
+    comps = []
+    for a, b in zip(starts, ends):
+        ii = idx[a:b]
+        if len(ii) < minpx:
+            continue
+        ys, xs = ii // w, ii % w
+        comps.append((int(ii.min()), [int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1),
+                                      int(ys.max() - ys.min() + 1), int(len(ii))]))
+    comps.sort()
+    return [c for _, c in comps]
 
 
 def green(r, g, b):
@@ -303,7 +303,12 @@ def места_хранилища(board_id, path, problems):
     return ['    stores:'] + ['      - [%d, %d, %d, %d]' % b for b in боксы]
 
 
-def player_board(board_id, path, problems):
+# номер планшета в игре → цвет (tools/gen_board_art.py: p1 красный, p2 зелёный,
+# p3 синий, p4 жёлтый)
+ЦВЕТ_ПЛАНШЕТА = {'p1': 'red', 'p2': 'green', 'p3': 'blue', 'p4': 'yellow'}
+
+
+def player_board(board_id, path, problems, counts=None):
     """Якоря цветного планшета игрока: хранилище по образцу, войска по замеру."""
     im = Image.open(path).convert('RGB')
     w, h = im.size
@@ -315,14 +320,22 @@ def player_board(board_id, path, problems):
         lines += ['  - id: %s' % board_id, '    kind: storage',
                   '    side: %s' % board_id.split('-')[1],
                   '    size: [%d, %d]' % (w, h), '    cells:']
-        сколько = {'miner': 6, 'plant': 6, 'base': 2}
+        # ЯЧЕЕК ПО УРОВНЯМ У КАЖДОГО ЦВЕТА СВОЁ (планшеты 12.10.2026): уровни
+        # берутся из данных цвета (storage_<цвет> в data/boards), ячейки идут
+        # сверху вниз — уровень 1 выше всех, 4 ниже всех
+        цвет = ЦВЕТ_ПЛАНШЕТА.get(board_id.split('-')[1])
+        данные = (counts or {}).get(цвет, {})
         for grp in ('miner', 'plant', 'base'):
-            if len(groups[grp]) != сколько[grp]:
+            уровни = ([0] if grp == 'base' else
+                      [lv for lv, s in enumerate(данные.get(grp + 's', []), 1) for _ in s]
+                      or [1, 2, 3, 3, 4, 4])
+            if len(groups[grp]) != len(уровни):
                 problems.append('%s/%s: ячеек нашлось %d, а должно быть %d'
-                                % (board_id, grp, len(groups[grp]), сколько[grp]))
+                                % (board_id, grp, len(groups[grp]), len(уровни)))
             for i, c in enumerate(groups[grp]):
+                lv = уровни[i] if i < len(уровни) else уровень(grp, i)
                 lines.append('      - {group: %s, level: %d, type: U, '
-                             'box: [%d, %d, %d, %d]}' % ((grp, уровень(grp, i)) + c))
+                             'box: [%d, %d, %d, %d]}' % ((grp, lv) + c))
         lines += места_хранилища(board_id, path, problems)
         return lines
     # ПЛАНШЕТ ВОЙСК: четыре колонки, в каждой два места под жетоны модулей,
@@ -571,7 +584,7 @@ def main():
         # ЦВЕТНЫЕ ПЛАНШЕТЫ ИГРОКОВ идут отдельным путём: места на них замерены
         # по печати, а не найдены детектором (см. PLAYER_TROOP выше).
         if re.fullmatch(r'p[1-4]', side):
-            lines += player_board(name[:-4], path, problems)
+            lines += player_board(name[:-4], path, problems, counts)
             continue
         if name.startswith('storage-'):
             (w, h), groups = storage_cells(path)

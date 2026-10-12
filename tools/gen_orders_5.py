@@ -25,7 +25,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ИКОНКИ = os.path.join(ДИСК, 'Общие компоненты', 'экспорт-иконки')
 ШРИФТЫ = os.path.join(ROOT, 'gui', 'src', 'main', 'resources', 'fonts')
 ВЫВОД = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    ROOT, 'design-docs', 'карты', 'приказы 5.0 (черновик 27.09)')
+    ROOT, 'design-docs', 'карты', 'приказы 6.0 (12.10)')
 
 K = 2                                   # рисуем вдвое крупнее, потом уменьшаем
 ПОДПИСЬ = (47, 58, 52)                  # тёмный сланец подписей, как на печатных
@@ -53,13 +53,13 @@ K = 2                                   # рисуем вдвое крупнее
 ]
 ИМЯ = {p[0]: p[1] for p in ПРИКАЗЫ}
 ВЕРХ = {p[0]: p[2] for p in ПРИКАЗЫ}
-# плашки прежних приказов по цветам (orders 4.0.0): place→ОСВОИТЬ,
-# acquire→МОБИЛИЗОВАТЬ, control→КОНТРОЛИРОВАТЬ, explore→ИССЛЕДОВАТЬ
+# ПРИКАЗЫ 6.0.0 (12.10.2026): плашки разложены по нациям заново — см.
+# data/cards/orders.6.0.0.yaml; у каждого цвета своя карта без плашки
 ПЛАШКИ = {
-    'синий': {'settle': 'coin', 'mobilize': 'ammo', 'secure': 'movement', 'research': 'objective'},
-    'красный': {'settle': 'movement', 'mobilize': 'coin', 'secure': 'ammo', 'research': 'objective'},
-    'зеленый': {'settle': 'objective', 'mobilize': 'movement', 'secure': 'coin', 'research': 'ammo'},
-    'желтый': {'settle': 'ammo', 'mobilize': 'objective', 'secure': 'movement', 'research': 'coin'},
+    'синий': {'mobilize': 'coin', 'advance': 'movement', 'secure': 'ammo', 'research': 'objective'},
+    'красный': {'settle': 'coin', 'mobilize': 'movement', 'advance': 'ammo', 'secure': 'objective'},
+    'зеленый': {'settle': 'objective', 'mobilize': 'ammo', 'secure': 'coin', 'research': 'movement'},
+    'желтый': {'settle': 'movement', 'mobilize': 'objective', 'advance': 'coin', 'research': 'ammo'},
 }
 ЦВЕТ_ID = {'синий': 'blue', 'красный': 'red', 'зеленый': 'green', 'желтый': 'yellow'}
 
@@ -71,9 +71,10 @@ _кэш = {}
 
 
 # новые иконки-черновики поверх выгрузки (лежат рядом с картами)
-ЗАМЕНА = {'supply': os.path.join(ВЫВОД, 'иконки', 'снабжение — ящики (черновик).png'),
-          'command': os.path.join(ВЫВОД, 'иконки', 'командование (вырезано).png'),
-          'develop': os.path.join(ВЫВОД, 'иконки', 'развитие (вырезано).png')}
+ИКОНКИ_ЧЕРНОВИКИ = os.path.join(ROOT, 'design-docs', 'карты', 'приказы 5.0 (черновик 27.09)', 'иконки')
+ЗАМЕНА = {'supply': os.path.join(ИКОНКИ_ЧЕРНОВИКИ, 'снабжение — ящики (черновик).png'),
+          'command': os.path.join(ИКОНКИ_ЧЕРНОВИКИ, 'командование (вырезано).png'),
+          'develop': os.path.join(ИКОНКИ_ЧЕРНОВИКИ, 'развитие (вырезано).png')}
 
 
 def икона(имя):

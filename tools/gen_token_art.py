@@ -89,14 +89,35 @@ from PIL import Image, ImageOps
                "buildings": {"barracks": (2, 1), "factory": (1, 1),
                              "airbase": (1, 1), "command_center": (1, 3)}},
 }
-# одинаковые у всех цветов: уровень → (ячеек, сердец, кубиков выработки)
+# до 12.10.2026 одинаковые у всех цветов; с экспорта 12.10 у каждого цвета
+# свои — таблица в data/boards/boards.3.3.0.yaml (tokens.miners/power_plants)
 ПЕЧАТЬ_ДОБЫТЧИК = {1: (2, 1), 2: (1, 1), 3: (2, 2), 4: (1, 2)}
 ПЕЧАТЬ_СТАНЦИЯ = {1: (1, 1), 2: (1, 2), 3: (2, 2), 4: (2, 3)}   # (сердец, кубиков)
+# ЭКСПОРТ 12.10.2026 — у каждого цвета свои (прочитано глазами по листу):
+# добытчик уровень → (ячеек, сердец, келемия); станция → (сердец, кубиков)
+ПЕЧАТЬ_ДОБЫТЧИК_ЦВЕТА = {
+    "red":    {1: (2, 1, 1), 2: (1, 2, 1), 3: (2, 2, 2), 4: (1, 2, 2)},
+    "green":  {1: (2, 1, 1), 2: (1, 1, 1), 3: (1, 2, 1), 4: (1, 2, 2)},
+    "blue":   {1: (2, 1, 1), 2: (2, 2, 2), 3: (2, 1, 2), 4: (1, 2, 2)},
+    "yellow": {1: (2, 1, 1), 2: (1, 1, 1), 3: (2, 1, 2), 4: (1, 2, 2)},
+}
+ПЕЧАТЬ_СТАНЦИЯ_ЦВЕТА = {
+    "red":    {1: (1, 1), 2: (2, 2), 3: (2, 2), 4: (2, 2)},
+    "green":  {1: (1, 1), 2: (2, 2), 3: (1, 2), 4: (2, 3)},
+    "blue":   {1: (1, 1), 2: (2, 2), 3: (1, 3), 4: (2, 3)},
+    "yellow": {1: (1, 1), 2: (2, 1), 3: (1, 2), 4: (2, 3)},
+}
 # шестерни (очки трофея) на оборотах
 ПЕЧАТЬ_ОБОРОТ = {"miner": [1, 1, 2, 2], "power_plant": [1, 1, 2, 2],
                  "barracks": 2, "factory": 3, "airbase": 3, "command_center": 1,
                  "infantry": (1, 2), "vehicle": (1, 2), "aircraft": (1, 2),
                  "tower": (1, 2)}
+
+
+def здания(папка, имя):
+    """ЭКСПОРТ 12.10.2026 кладёт «жетоны зданий-N» в корень экспорта, без папок
+    цвета (нумерация листа та же). Есть в корне — берётся оттуда."""
+    return имя if os.path.exists(os.path.join(ИСТОЧНИК, имя)) else os.path.join(папка, имя)
 
 
 def раскладка():
@@ -107,12 +128,12 @@ def раскладка():
             out.append((os.path.join(папка, "Жетоны войск-%d.png" % (1 + 4 * c + i)),
                         os.path.join(ТОКЕНЫ, "%s_p%d.png" % (род, p))))
         for ур in range(1, 5):
-            out.append((os.path.join(папка, "жетоны зданий-%d.png" % (4 * (ур - 1) + 1 + c)),
+            out.append((здания(папка, "жетоны зданий-%d.png" % (4 * (ур - 1) + 1 + c)),
                         os.path.join(ТОКЕНЫ, "miner_l%d_p%d.png" % (ур, p))))
-            out.append((os.path.join(папка, "жетоны зданий-%d.png" % (16 + 4 * (ур - 1) + 1 + c)),
+            out.append((здания(папка, "жетоны зданий-%d.png" % (16 + 4 * (ур - 1) + 1 + c)),
                         os.path.join(ТОКЕНЫ, "power_plant_l%d_p%d.png" % (ур, p))))
         for j, здание in enumerate(["barracks", "factory", "airbase", "command_center"]):
-            out.append((os.path.join(папка, "жетоны зданий-%d.png" % (41 + 4 * j + c)),
+            out.append((здания(папка, "жетоны зданий-%d.png" % (41 + 4 * j + c)),
                         os.path.join(ТОКЕНЫ, "%s_p%d.png" % (здание, p))))
     for i, род in enumerate(ВОЙСКА):
         out.append((os.path.join("_Супер", "Жетоны войск-%d.png" % (17 + i)),
@@ -121,16 +142,16 @@ def раскладка():
             out.append((os.path.join("_оборот", "Жетоны войск-%d.png" % (21 + 2 * i + k - 1)),
                         os.path.join(ТОКЕНЫ, "%s_trophy%d.png" % (род, k))))
     for ур in range(1, 5):
-        out.append((os.path.join("_оборот", "жетоны зданий-%d.png" % (32 + ур)),
+        out.append((здания("_оборот", "жетоны зданий-%d.png" % (32 + ур)),
                     os.path.join(ТОКЕНЫ, "miner_l%d_trophy.png" % ур)))
-        out.append((os.path.join("_оборот", "жетоны зданий-%d.png" % (36 + ур)),
+        out.append((здания("_оборот", "жетоны зданий-%d.png" % (36 + ур)),
                     os.path.join(ТОКЕНЫ, "power_plant_l%d_trophy.png" % ур)))
     for j, здание in enumerate(["barracks", "factory", "airbase", "command_center"]):
-        out.append((os.path.join("_оборот", "жетоны зданий-%d.png" % (57 + j)),
+        out.append((здания("_оборот", "жетоны зданий-%d.png" % (57 + j)),
                     os.path.join(ТОКЕНЫ, "%s_trophy.png" % здание)))
     for n, имя in ((61, "neutral_big"), (62, "neutral_big_trophy"),
                    (63, "neutral_small"), (64, "neutral_small_trophy")):
-        out.append((os.path.join("_нейтральные", "жетоны зданий-%d.png" % n),
+        out.append((здания("_нейтральные", "жетоны зданий-%d.png" % n),
                     os.path.join(ПОЛЕ, имя + ".png")))
     return out
 

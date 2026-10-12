@@ -553,7 +553,7 @@ public final class Actions {
     public static int mineFromMiner(GameState state, PlayerState player, BuildingToken b,
                                     String grid) {
         int bonusK = player.techSteps.getOrDefault("middle", 0) >= 3 ? 1 : 0;
-        int yieldK = state.tokenStats.minerYield(b.level) + bonusK;
+        int yieldK = state.tokenStats.minerYield(b.level, b.owner()) + bonusK;
         return mineFlatFromTile(state, player, grid, yieldK);
     }
 
@@ -665,13 +665,20 @@ public final class Actions {
                 // уровню). Две трети пустых «Добыть» — оттого, что все добытчики
                 // без энергии. 0 — прежнее правило: без энергии не работает.
                 int безЭнергииДобывает = 0;
+                // ДОБЫТЧИК БЕЗ ЭНЕРГИИ БЕРЁТ РОВНО ОДИН КОНТЕЙНЕР (решение
+                // дизайнера 12.10.2026, ключ mining.unpowered_container): здание
+                // без энергии всё же что-то даёт — один контейнер со своего гекса,
+                // если он там открыт. Келемий — только запитанный.
+                boolean толькоКонтейнер = false;
                 if (!ctx.allPowered && !effectivelyPowered(s, player, b, agent, paid)) {
                     if (ctx.freeMinerMoves > 0) {
                         ctx.freeMinerMoves--;
                     } else {
                         безЭнергии++;
                         безЭнергииДобывает = kelium.dataio.Ctx.rules(s).getInt("mining.unpowered_yield", 0);
-                        if (безЭнергииДобывает <= 0) {
+                        толькоКонтейнер = безЭнергииДобывает <= 0
+                            && kelium.dataio.Ctx.rules(s).getBool("mining.unpowered_container", false);
+                        if (безЭнергииДобывает <= 0 && !толькоКонтейнер) {
                             continue;
                         }
                     }
@@ -681,7 +688,7 @@ public final class Actions {
                 // пропустить; выбор по каждому добытчику отдельно.
                 boolean takeContainerOnly;
                 List<Choice> opts = new ArrayList<>();
-                if (grid != null) {
+                if (grid != null && !толькоКонтейнер) {
                     opts.add(new Choice("mine", "kelium", "extract kelium"));
                 }
                 // ВЕТКА КОНТЕЙНЕРА (правило дизайнера 12.08.2026): добытчик
@@ -749,8 +756,9 @@ public final class Actions {
                     // РАЗМЕТКА ВЫБОРА (вопрос дизайнера 13.08.2026): контейнер и келемий —
                     // это ЛИБО-ЛИБО. Надо знать, берут ли контейнер ВМЕСТО келемия,
                     // или просто рядом нет живой грядки и выбора не было.
-                    int контейнеров = поВыработке && b.level != null
-                        ? Math.max(1, state.tokenStats.minerYield(b.level)) : 1;
+                    int контейнеров = толькоКонтейнер ? 1
+                        : поВыработке && b.level != null
+                        ? Math.max(1, state.tokenStats.minerYield(b.level, b.owner())) : 1;
                     int взято = Storage.addContainersCapped(s, player, контейнеров,
                         grid != null ? "Добыча: контейнер ВМЕСТО келемия"
                                      : "Добыча: контейнер (келемия рядом не было)");
@@ -844,8 +852,16 @@ public final class Actions {
                 }
                 // МОБИЛИЗАЦИЯ (карта рынка «Военный подряд»): в эту Сборку
                 // энергия не нужна вообще, все здания считаются запитанными.
+                // ЗДАНИЕ БЕЗ ЭНЕРГИИ ДАЁТ РОВНО 1 БОЕПРИПАС (решение дизайнера
+                // 12.10.2026, ключ assembly.unpowered_ammo): войск не нанимает,
+                // модули и карты это число не меняют. 0 — прежнее правило:
+                // без энергии здание не работает.
+                int безЭнергииБоеприпасов = 0;
                 if (!ctx.allPowered && !effectivelyPowered(state, player, b, agent, paid)) {
-                    continue;
+                    безЭнергииБоеприпасов = kelium.dataio.Ctx.rules(state).getInt("assembly.unpowered_ammo", 0);
+                    if (безЭнергииБоеприпасов <= 0 || ctx.сборкаТолькоВойска) {
+                        continue;
+                    }
                 }
                 UnitType unitType = ASSEMBLY_UNIT.get(b.type);
                 // «Нет места → вариант недоступен» (свод §2.1): авиация — своб.
@@ -886,6 +902,10 @@ public final class Actions {
                 int ammoOut = kelium.engine.ability.RuleQuery
                     .of(state, player.seat, kelium.engine.ability.Hook.ASSEMBLY_AMMO_OUT)
                     .about(b).base(Modules.assemblyOutput(state, player, b.type, "ammo")).ask();
+                if (безЭнергииБоеприпасов > 0) {
+                    ammoOut = безЭнергииБоеприпасов;
+                    unitsOut = 0;
+                }
                 // НОЛЬ ВОЙСК — НАНИМАТЬ НЕЧЕГО (печатный выпуск ЦУ 25.09.2026: вышек 0,
                 // пока синий жетон не накрыл число).
                 if (unitsOut <= 0) {
@@ -4555,10 +4575,26 @@ public final class Actions {
         }
 
         private int сколькоМожемЗаплатить(PlayerState player) {
-            int трофеи = rs.getBool("tech.pay_with_trophy_only", false)
+            return трофеевВКармане(player) + келемийВКармане(player);
+        }
+
+        private int трофеевВКармане(PlayerState player) {
+            return rs.getBool("tech.pay_with_trophy_only", false)
                 ? player.resources.trophy()
                 : player.destroyedValue() + player.resources.trophy();
-            return трофеи + (наукаЗаКелемий() ? player.resources.kelium() : 0);
+        }
+
+        /** Сколько келемия может пойти в оплату шагов (не больше трофеев, если так в своде). */
+        private int келемийВКармане(PlayerState player) {
+            if (!наукаЗаКелемий()) {
+                return 0;
+            }
+            int k = player.resources.kelium();
+            return келемийНеБольшеТрофеев() ? Math.min(k, трофеевВКармане(player)) : k;
+        }
+
+        private boolean келемийНеБольшеТрофеев() {
+            return rs.getBool("tech.kelium_not_more_than_trophies", false);
         }
 
         /**
@@ -4616,6 +4652,12 @@ public final class Actions {
                     ? player.resources.trophy()
                     : player.destroyedValue() + player.resources.trophy();
                 int макс = Math.min(cost, player.resources.kelium());
+                // КЕЛЕМИЯ НЕ БОЛЬШЕ, ЧЕМ ТРОФЕЕВ (решение дизайнера 12.10.2026,
+                // ключ tech.kelium_not_more_than_trophies): в оплате шага келемий
+                // может закрыть не больше, чем закрыли трофеи, — половину цены.
+                if (келемийНеБольшеТрофеев()) {
+                    макс = Math.min(макс, cost / 2);
+                }
                 int мин = Math.max(0, cost - трофеев);
                 int келемием = макс;
                 if (agent != null && мин < макс) {
@@ -4659,7 +4701,7 @@ public final class Actions {
                     || kelium.engine.ability.RuleQuery
                     .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                     .base(0).ask() >= 1.0
-                    || келемийТреков;
+                    || (келемийТреков && !келемийНеБольшеТрофеев());
                 int pay = Math.min(remaining, player.resources.trophy());
                 if (pay > 0) {
                     player.resources.pay(Resource.TROPHY, pay);
@@ -4682,7 +4724,7 @@ public final class Actions {
                 || kelium.engine.ability.RuleQuery
                 .of(state, player.seat, kelium.engine.ability.Hook.SCIENCE_PAY_WITH)
                 .base(0).ask() >= 1.0
-                    || келемийТреков;
+                    || (келемийТреков && !келемийНеБольшеТрофеев());
             // ЧЕМ ПЛАТИТЬ — РЕШАЕТ ИГРОК (решение дизайнера 13.09.2026): кубиками
             // трофеев из хранилища или жетоном со своей свалки целиком, без
             // сдачи. Жетоны предлагаются рядом с кубиками, а не тратятся первыми.
@@ -4770,8 +4812,9 @@ public final class Actions {
             // «КРИСТАЛЬНЫЕ ЛАБОРАТОРИИ» 7.3.0: обмены можно оплачивать келемием
             boolean обменыЗаКелемий = Passives.hasPassive(state, player.seat,
                 "labs_kelium_trophy_swap");
-            int pool = сколькоМожемЗаплатить(player)
-                - (наукаЗаКелемий() && !обменыЗаКелемий ? player.resources.kelium() : 0);
+            int pool = обменыЗаКелемий
+                ? трофеевВКармане(player) + (наукаЗаКелемий() ? player.resources.kelium() : 0)
+                : трофеевВКармане(player);
             List<Choice> opts = new ArrayList<>();
             // ЧТО НАПЕЧАТАНО НА ПЛАНШЕТЕ НАУКИ — из свода (см. обменНаПланшете).
             // Обмен трофеев на монеты снят с планшета 02.09.2026 и переехал на

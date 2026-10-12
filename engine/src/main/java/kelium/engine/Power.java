@@ -60,7 +60,7 @@ public final class Power {
             }
             return base;
         }
-        int nominal = state.tokenStats.plantEnergyGives(b.level);
+        int nominal = state.tokenStats.plantEnergyGives(b.level, b.owner());
         if (!onEnergyCell(state, b)) {
             int off = Ctx.rules(state).getInt("energy.plant_off_cell_gives", 1);
             return Math.min(nominal, off);

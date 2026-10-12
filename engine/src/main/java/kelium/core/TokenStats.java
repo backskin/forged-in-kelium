@@ -29,8 +29,10 @@ public final class TokenStats {
      * прочность военных зданий напечатаны на жетонах, и у каждого цвета свои.
      * Место за столом → поправка того же устройства, что общая запись
      * ({@code units.<род>.hp}, {@code buildings.<здание>.hp/energy_slots}).
-     * Добытчики и энергостанции одинаковы у всех цветов (решение дизайнера
-     * 23.09.2026) и поправкой не накрываются.
+     * Добытчики и энергостанции были одинаковы у всех цветов (23.09.2026);
+     * с жетонов 12.10.2026 они тоже свои у каждого цвета — списки
+     * {@code miners} и {@code power_plants} в поправке цвета накрывают общие
+     * целиком (нет списка — общие).
      */
     private final Map<Integer, Map<String, Object>> seatPatch = new HashMap<>();
 
@@ -83,13 +85,31 @@ public final class TokenStats {
         return (Map<String, Object>) buildings.get(t.code);
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> minerRaw(int level) {
+        return minerRaw(level, -1);
+    }
+
+    private Map<String, Object> plantRaw(int level) {
+        return plantRaw(level, -1);
+    }
+
+    /** Добытчик уровня по жетону цвета владельца (нет своего списка — общий). */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> minerRaw(int level, int owner) {
+        Map<String, Object> p = seatPatch.get(owner);
+        if (p != null && p.get("miners") instanceof List<?> own && own.size() >= level) {
+            return (Map<String, Object>) own.get(level - 1);
+        }
         return (Map<String, Object>) miners.get(level - 1);
     }
 
+    /** Энергостанция уровня по жетону цвета владельца. */
     @SuppressWarnings("unchecked")
-    private Map<String, Object> plantRaw(int level) {
+    private Map<String, Object> plantRaw(int level, int owner) {
+        Map<String, Object> p = seatPatch.get(owner);
+        if (p != null && p.get("power_plants") instanceof List<?> own && own.size() >= level) {
+            return (Map<String, Object>) own.get(level - 1);
+        }
         return (Map<String, Object>) powerPlants.get(level - 1);
     }
 
@@ -116,10 +136,10 @@ public final class TokenStats {
     /** HP здания по жетону цвета владельца. */
     public int buildingHp(BuildingType t, Integer level, int owner) {
         if (t == BuildingType.MINER) {
-            return asInt(minerRaw(level).get("hp")) + hpBonus;
+            return asInt(minerRaw(level, owner).get("hp")) + hpBonus;
         }
         if (t == BuildingType.POWER_PLANT) {
-            return asInt(plantRaw(level).get("hp")) + hpBonus;
+            return asInt(plantRaw(level, owner).get("hp")) + hpBonus;
         }
         Object v = patched(owner, "buildings", t.code, "hp");
         return asInt(v != null ? v : buildingRaw(t).get("hp")) + hpBonus;
@@ -150,7 +170,12 @@ public final class TokenStats {
 
     /** Выработка келемия добытчика указанного уровня. */
     public int minerYield(int level) {
-        return asInt(minerRaw(level).get("yield_kelium"));
+        return minerYield(level, -1);
+    }
+
+    /** Выработка келемия добытчика по жетону цвета владельца. */
+    public int minerYield(int level, int owner) {
+        return asInt(minerRaw(level, owner).get("yield_kelium"));
     }
 
     /** Цена постройки добытчика указанного уровня. */
@@ -160,7 +185,12 @@ public final class TokenStats {
 
     /** Число ячеек энергии добытчика указанного уровня. */
     public int minerEnergySlots(int level) {
-        return asInt(minerRaw(level).get("energy_slots"));
+        return minerEnergySlots(level, -1);
+    }
+
+    /** Ячейки энергии добытчика по жетону цвета владельца. */
+    public int minerEnergySlots(int level, int owner) {
+        return asInt(minerRaw(level, owner).get("energy_slots"));
     }
 
     /** Цена постройки энергостанции указанного уровня. */
@@ -170,7 +200,12 @@ public final class TokenStats {
 
     /** Сколько энергии даёт энергостанция указанного уровня. */
     public int plantEnergyGives(int level) {
-        return asInt(plantRaw(level).get("energy_gives"));
+        return plantEnergyGives(level, -1);
+    }
+
+    /** Сколько энергии даёт энергостанция по жетону цвета владельца. */
+    public int plantEnergyGives(int level, int owner) {
+        return asInt(plantRaw(level, owner).get("energy_gives"));
     }
 
     /** Сколько энергии даёт здание указанного типа (например, ЦУ). */
@@ -239,7 +274,7 @@ public final class TokenStats {
     /** Ячейки энергии здания по жетону цвета владельца. */
     public int buildingEnergySlots(BuildingType t, Integer level, int owner) {
         if (t == BuildingType.MINER) {
-            return minerEnergySlots(level);
+            return minerEnergySlots(level, owner);
         }
         if (t == BuildingType.POWER_PLANT) {
             return 0;                       // источники, а не потребители

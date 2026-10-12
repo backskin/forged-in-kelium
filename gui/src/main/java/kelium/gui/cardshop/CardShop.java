@@ -298,6 +298,26 @@ public final class CardShop {
                     catalog().refresh(card, lib.layout(card.type()));
                 }
             }
+
+            @Override public void applyToAll(String id) {
+                java.util.Map<String, Object> look = effective(id);
+                java.util.Map<String, Object> cat = style(id, true);
+                cat.clear();
+                cat.putAll(look);
+                for (CardSpec c : lib.list(card.type())) {
+                    if (c.fields.get("раскладка") instanceof java.util.Map<?, ?> m) {
+                        m.remove(id);
+                    }
+                }
+            }
+
+            @Override public java.awt.geom.Rectangle2D region(String id) {
+                return preview.region(id);
+            }
+
+            @Override public java.awt.Dimension cardSize() {
+                return preview.cardSize();
+            }
         });
         JPanel middle = new JPanel(new BorderLayout());
         middle.add(inspector, BorderLayout.NORTH);
@@ -620,9 +640,9 @@ public final class CardShop {
 
     private void objectiveForm() {
         section("Верх карты — эффект в чужой ход или сразу", "верх", "слот", "плашка", "заголовок");
-        form.add(field("Значок слева", segmentedOf(new String[] {"∞", "▶", "своя", "нет"},
-            new String[] {"∞ постоянный", "▶ спец-действие", "своя иконка", "без значка"},
-            card.text("слот").isEmpty() ? "∞" : card.text("слот"), v -> {
+        form.add(field("Значок слева", segmentedOf(new String[] {"реакция", "∞", "▶", "своя", "нет"},
+            new String[] {"реакция", "∞ постоянный", "▶ спец-действие", "своя иконка", "без значка"},
+            card.text("слот").isEmpty() ? (CardRender.hasPlate(card) ? "реакция" : "∞") : card.text("слот"), v -> {
                 changed("слот", v);
                 setCard(card);
             })));
@@ -987,6 +1007,11 @@ public final class CardShop {
             for (java.util.Map<String, Object> r : CardRender.topRows(card)) {
                 rows.add(new java.util.LinkedHashMap<>(r));
             }
+            // ПЛАШКА РЕАКЦИИ — СТРОКА СРЕДИ СТРОК (дизайнер 12.10.2026)
+            if (CardRender.hasPlate(card)) {
+                int at = Math.min(rows.size(), CardRender.plateIndex(card));
+                rows.add(at, new java.util.LinkedHashMap<>(java.util.Map.of("плашка", true)));
+            }
             rebuild();
         }
 
@@ -1019,8 +1044,42 @@ public final class CardShop {
             repaint();
         }
 
+        private JComponent plateRow(int i) {
+            JPanel p = new JPanel(new MigLayout("insets 6, fillx", "[grow,fill,0::]6[]", ""));
+            p.setBackground(new Color(0x3A2E2A));
+            JLabel l = new JLabel("Плашка реакции — заголовок и значок в кружке");
+            l.setForeground(Style.INK);
+            l.setFont(Style.title(13));
+            JPanel tools = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+            tools.setOpaque(false);
+            tools.add(small("↑", "выше", () -> {
+                if (i > 0) {
+                    rows.add(i - 1, rows.remove(i));
+                    commit();
+                    rebuild();
+                }
+            }));
+            tools.add(small("↓", "ниже", () -> {
+                if (i < rows.size() - 1) {
+                    rows.add(i + 1, rows.remove(i));
+                    commit();
+                    rebuild();
+                }
+            }));
+            tools.add(small("✕", "убрать плашку", () -> {
+                changed("плашка", false);
+                setCard(card);
+            }));
+            p.add(l);
+            p.add(tools);
+            return p;
+        }
+
         private JComponent row(int i) {
             java.util.Map<String, Object> r = rows.get(i);
+            if (CardRender.isPlateRow(r)) {
+                return plateRow(i);
+            }
             JPanel p = new JPanel(new MigLayout("insets 6, fillx", "[grow,fill,0::]6[]6[]", ""));
             p.setBackground(Style.PANEL);
             JTextField f = new JTextField(String.valueOf(r.getOrDefault("текст", "")));

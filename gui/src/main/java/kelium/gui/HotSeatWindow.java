@@ -112,7 +112,7 @@ public final class HotSeatWindow {
         }
 
         public static Options simple(int players, long seed, List<String> seatSpecs) {
-            return new Options(GameConfig.DEFAULT_RULESET, players, seed, seatSpecs,
+            return new Options(GameConfig.GAME_RULESET, players, seed, seatSpecs,
                 null, null, null, null, null, null, null);
         }
     }
@@ -2480,10 +2480,13 @@ public final class HotSeatWindow {
     private final class Journaled extends Agent {
 
         private final Agent inner;
+        /** Поколение прогона, которому принадлежит эта обёртка. */
+        private final int gen;
 
-        Journaled(Agent inner) {
+        Journaled(Agent inner, int gen) {
             super(inner.seat, inner.name);
             this.inner = inner;
+            this.gen = gen;
         }
 
         @Override
@@ -2506,6 +2509,13 @@ public final class HotSeatWindow {
             Choice picked = inner.choose(state, options, context);
             int idx = options.indexOf(picked);
             synchronized (moves) {
+                // ПРОГОН УЖЕ ОТМЕНЁН ОТКАТОМ — его решение в ленту не пишется.
+                // Бот мог додумывать ход, пока откат начал новый прогон; без
+                // этой проверки запоздалое решение старого прогона ложилось в
+                // ленту нового, и сохранение переставало сходиться с правилами.
+                if (gen != generation) {
+                    throw new kelium.core.GameAborted("прогон отменён откатом");
+                }
                 moves.add(idx);
                 decisions.add(new Decision(seat, String.valueOf(context.get("kind")),
                     decisionWords(String.valueOf(context.get("kind")), picked),
@@ -2763,7 +2773,7 @@ public final class HotSeatWindow {
         // продолженную партию будет нечем.
         List<Agent> journaled = new ArrayList<>(playing.size());
         for (Agent a : playing) {
-            journaled.add(new Journaled(a));
+            journaled.add(new Journaled(a, gen));
         }
         playing = journaled;
 
@@ -5046,11 +5056,17 @@ public final class HotSeatWindow {
                 : GameRecorder.buildingName(String.valueOf(bt).toLowerCase(java.util.Locale.ROOT), null);
             title = "Построить: " + здание + " — куда поставить";
             hint = "Подсвечены гексы, куда его можно поставить: где уже стоит ваше здание или "
-                + "за его свободной стенкой. Новое здание сразу сработает — без энергии.";
+                + "за его свободной стенкой."
+                + (liveState != null && kelium.dataio.Ctx.rules(liveState)
+                        .getBool("actions.build.building_fires_on_build", false)
+                    ? " Новое здание сразу сработает — без энергии."
+                    : " Новое здание в этом действии ничего не делает; энергостанция "
+                        + "приходит со своими кубиками.");
         } else if ("mine".equals(kind)) {
             title = "Добыча: что взять этим добытчиком";
             hint = "Запитанный добытчик берёт келемий с соседнего гекса зарождения или контейнер "
-                + "со своего гекса, если тот открыт. Щёлкните подсвеченный гекс — "
+                + "со своего гекса, если тот открыт; без энергии — только 1 контейнер. "
+                + "Щёлкните подсвеченный гекс — "
                 + "или «Пропустить добытчик».";
         } else if ("combat_target".equals(kind)) {
             int бпр = -1;
@@ -5633,13 +5649,13 @@ public final class HotSeatWindow {
         // каталог зданий игрока в постоянном порядке, по категориям
         for (int lv = 1; lv <= 4 && добытчики; lv++) {
             rows.add(buildRow(seat, st, me, "Добытчики", kelium.core.BuildingType.MINER, lv,
-                "добывает " + st.tokenStats.minerYield(lv) + " келемия · ячеек склада "
+                "добывает " + st.tokenStats.minerYield(lv, seat) + " келемия · ячеек склада "
                     + cellCount(me, "miner", lv),
                 buildIdx, buildCost, built, demolished, coin, agent, d));
         }
         for (int lv = 1; lv <= 4 && станции; lv++) {
             rows.add(buildRow(seat, st, me, "Энергостанции", kelium.core.BuildingType.POWER_PLANT,
-                lv, "даёт энергии " + st.tokenStats.plantEnergyGives(lv) + " · ячеек склада "
+                lv, "даёт энергии " + st.tokenStats.plantEnergyGives(lv, seat) + " · ячеек склада "
                     + cellCount(me, "plant", lv),
                 buildIdx, buildCost, built, demolished, coin, agent, d));
         }
@@ -5653,7 +5669,7 @@ public final class HotSeatWindow {
             };
             rows.add(buildRow(seat, st, me, "Военные здания", bt, null,
                 "выпускает " + unit + " или боеприпасы · ячеек энергии "
-                    + st.tokenStats.buildingEnergySlots(bt, null),
+                    + st.tokenStats.buildingEnergySlots(bt, null, seat),
                 buildIdx, buildCost, built, demolished, coin, agent, d));
         }
         if (buildIdx.containsKey("command_center:null")) {

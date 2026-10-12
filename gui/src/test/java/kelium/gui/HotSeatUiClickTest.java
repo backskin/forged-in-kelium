@@ -293,7 +293,7 @@ class HotSeatUiClickTest {
         // раскладка прошлого вопроса ещё видна, но уже ничего не решает.
         if (w.ceremony.isVisible() && List.of("reveal_order", "blind_discard", "super_pick",
                 "start_objective_pick", "arsenal_draw2", "keep_objective", "objective_keep",
-                "pick_container")
+                "pick_container", "start_arsenal_pick")
                 .contains(w.pendingKindForTest())) {
             for (var c : w.ceremony.cards()) {
                 checkText("карта выбора", c.title());
