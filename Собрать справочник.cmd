@@ -14,6 +14,8 @@ set KELIUM_RULESET=%RULESET%
 set PYTHONIOENCODING=utf-8
 "C:\Users\backskin\AppData\Local\Programs\Python\Python312\python.exe" справочник_книга.py
 if errorlevel 1 goto fail
+rem Pictures out of the HTML into "илл" next to it: git keeps the parts, not one big file.
+"C:\Users\backskin\AppData\Local\Programs\Python\Python312\python.exe" вынести_картинки.py "..\..\rules\Справочник — черновик\вёрстка\Справочник.html"
 echo.
 echo Done: "rules\Справочник — черновик\вёрстка\Справочник.pdf"
 pause

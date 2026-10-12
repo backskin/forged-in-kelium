@@ -39,6 +39,10 @@ if not ВЁРСТКА:
     ВЁРСТКА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*", "вёрстка"))
 ВЁРСТКА = ВЁРСТКА[0]
 HTML = os.path.join(ВЁРСТКА, "Книга правил.html")
+# python вынести_картинки.py <вёрстка.html> — то же для другой книги (справочник)
+if len(sys.argv) > 1:
+    HTML = os.path.abspath(sys.argv[1])
+    ВЁРСТКА = os.path.dirname(HTML)
 ПАПКА = "илл"
 ОКНО = os.path.join(ВЁРСТКА, ПАПКА)
 
