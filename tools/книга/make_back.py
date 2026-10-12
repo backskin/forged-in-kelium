@@ -194,7 +194,6 @@ def страница(t):
         <div class="блок">{ОЧКИ}</div>
       </div>
     </div>
-    <div class="пм-легенда">{легенда}</div>
   </div>
 </div>
 """
@@ -202,9 +201,12 @@ def страница(t):
 
 CSS = r"""
   /* ---- задняя сторона обложки: памятка в оформлении глав ---- */
-  .стр.обложка.задняя { padding: 15mm 15mm 13mm; background: var(--страница) url("ФОН") center / cover no-repeat;
+  /* ОБОРОТ — ИЛЛЮСТРАЦИЯ ДИЗАЙНЕРА ПОД ПАМЯТКОЙ, высветленная бумагой, без сетки;
+     сдвиг 32% — в кадре инженеры за работой (14.10.2026). */
+  .стр.обложка.задняя { padding: 12mm 15mm 14mm;
+    background: linear-gradient(rgba(244,238,220,.55), rgba(244,238,220,.55)), url("ОБОРОТ") 32% center / cover no-repeat;
     color: var(--чернила); display: flex; flex-direction: column; }
-  .стр.обложка.задняя::after { СЕТКА }
+  .стр.обложка.задняя::after { display: none; }
   .задняя .глава { flex: none; }
   /* КОРЕШОК У ЗАДНЕЙ ОБЛОЖКИ СПРАВА: рамка открыта справа, слева замкнута. */
   .разворот.одна > .стр.задняя .к-лев { display: inline; }
@@ -215,7 +217,7 @@ CSS = r"""
   .задняя .пм-кол { display: flex; flex-direction: column; gap: 4mm; min-height: 0; }
   .задняя .пм-кол > .блок:last-child { flex: 1; }
   .задняя .ход li { break-inside: avoid; }
-  .задняя .блок { margin: 0; padding: 3mm 3.4mm 2.6mm; }
+  .задняя .блок { margin: 0; padding: 3mm 3.4mm 2.6mm; background: rgba(247,241,225,.93); }
 
   .задняя h2 { font: 700 10pt/1.2 "Tektur", sans-serif; margin: 0 0 2mm; padding-bottom: .8mm;
     display: flex; align-items: baseline; justify-content: space-between; gap: 2mm; }
@@ -247,7 +249,7 @@ CSS = r"""
   .задняя .флаги > li::before { display: none; }
 
   .стр.обложка.задняя img { width: auto; height: auto; display: inline-block; object-fit: contain; }
-  .стр.обложка.задняя .и { height: 3.9mm; width: auto; vertical-align: -1mm; margin: 0 .15mm; }
+  .стр.обложка.задняя .и { height: 3.9mm; width: auto; vertical-align: -1mm; margin: 0 .2mm 0 1mm; }
 
   /* ПЯТЬ ДЕЙСТВИЙ: значок и имя | действие | или | действие; пять «или» стоят
      одним столбцом и сами читаются как «одно из двух». */
@@ -286,7 +288,7 @@ def main():
     фон = m.group(1)
     i = t.index(".стр:not(.обложка)::after {")
     сетка = t[t.index("{", i) + 1:t.index("}", i)].strip()
-    css = CSS.replace("ФОН", фон).replace("СЕТКА", сетка)
+    css = CSS.replace("ОБОРОТ", "илл/63355acfd38c0614.jpg")
     # CSS — один раз, перед </style>
     if ".стр.обложка.задняя" not in t:
         t = t.replace("\n</style>", css + "\n</style>", 1)

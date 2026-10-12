@@ -72,9 +72,11 @@ def кайма():
 # ---------------------------------------------------------------- CSS
 
 СКОС = "polygon({c} 0, 100% 0, 100% calc(100% - {c}), calc(100% - {c}) 100%, 0 100%, 0 {c})"
-ГЕКС_СЕТКА = ("url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='52' height='90' "
-              "viewBox='0 0 52 90'><path d='M26 1 L50 15 L50 45 L26 59 L2 45 L2 15 Z M26 61 L50 75 L50 105 "
-              "M26 61 L2 75 L2 105' fill='none' stroke='%232A2318' stroke-opacity='.075' stroke-width='1.1'/></svg>\")")
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import мозаика as _мозаика  # фон внутренних полос — tools/книга/мозаика.py
+
+ГЕКС_СЕТКА = _мозаика.url()
 
 CSS = r"""
   /* Оформление книг игры: квадрат 22×22 см, две колонки, Tektur, охра
@@ -116,10 +118,10 @@ CSS = r"""
     box-shadow: 0 2px 10px rgba(0,0,0,.4);
   }
   ФОНЫ
-  /* Гекс-сетка едва заметной разметкой поверх фона страницы, под текстом. */
+  /* Мозаика едва заметной разметкой поверх фона страницы, под текстом. */
   .стр:not(.обложка)::after {
     content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background-image: ГЕКС_СЕТКА; background-size: 13mm 22.5mm; opacity: .8;
+    background-image: ГЕКС_СЕТКА; background-size: 9mm 15.59mm; opacity: 1;
   }
 
   /* ---- кайма страницы ---- */
@@ -395,12 +397,12 @@ CSS = r"""
      колонкой не помещается на полосу, а рисунок ужимать уже некуда. */
   /* ---- создатели игры ---- */
   .создатели .строки { margin: .5mm 0 0; }
-  .создатели .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
+  .строки .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
     border-bottom: .2mm dotted var(--пример-кант); }
-  .создатели .кто:last-child { border-bottom: 0; }
-  .создатели .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
+  .строки .кто:last-child { border-bottom: 0; }
+  .строки .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
     color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
-  .создатели .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
+  .строки .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
   .создатели h2 { font-size: 10.5pt; }
   .создатели p, .создатели li { font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
   .создатели .пример p { font-size: 8.4pt; }
@@ -415,7 +417,7 @@ CSS = r"""
     object-fit: contain; display: block; }
   .создатели .марка .заглушка { height: 100%; width: 100%; margin: 0; }
   /* ИКОНКА В СТРОКЕ ТЕКСТА — настоящая иконка игры, не заглушка. */
-  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm; }
+  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm 0 1.2mm; }
   td .и, th .и { vertical-align: -1.3mm; height: 4.8mm; }
   /* Ячейка «иконка + подпись»: иконка крупно, подпись по центру под ней. */
   .дст { display: flex; flex-direction: column; align-items: center;
@@ -441,6 +443,7 @@ CSS = r"""
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  .блок.надвое:has(.широкий) { grid-template-columns: 1fr 1fr; }
   .блок.надвое > .под-низ { grid-column: 1 / -1; }
   /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
      рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
@@ -569,10 +572,8 @@ def патч_разметки(t, кайма_svg):
             return m.group(0)
         return m.group(0) + "\n    " + кайма_svg
     t = re.sub(r'<div class="стр ([^"]*)">', вставить, t)
-    # РАМКА НА ПЕРЕДНЕЙ ОБЛОЖКЕ — та же техно-рамка, что на памятке
-    # (просьба дизайнера 15.09.2026). Ставится поверх иллюстрации.
-    t = re.sub(r'(<div class="стр обложка">)(?!<div class="рамка-техно")',
-               r'\1<div class="рамка-техно"></div>', t)
+    # ПЕРЕДНЯЯ ОБЛОЖКА — БЕЗ ТЕХНО-РАМКИ (дизайнер 14.10.2026 убрал её).
+    t = t.replace('<div class="стр обложка"><div class="рамка-техно"></div>', '<div class="стр обложка">')
     return t
 
 

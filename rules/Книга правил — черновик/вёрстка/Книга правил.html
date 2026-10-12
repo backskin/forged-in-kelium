@@ -44,10 +44,10 @@
     box-shadow: 0 2px 10px rgba(0,0,0,.4);
   }
   
-  /* Гекс-сетка едва заметной разметкой поверх фона страницы, под текстом. */
+  /* Мозаика едва заметной разметкой поверх фона страницы, под текстом. */
   .стр:not(.обложка)::after {
     content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='52' height='90' viewBox='0 0 52 90'><path d='M26 1 L50 15 L50 45 L26 59 L2 45 L2 15 Z M26 61 L50 75 L50 105 M26 61 L2 75 L2 105' fill='none' stroke='%232A2318' stroke-opacity='.075' stroke-width='1.1'/></svg>"); background-size: 13mm 22.5mm; opacity: .8;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.32 30.00'><path d='M0.00 -5.00L4.33 -2.50L4.33 2.50L0.00 5.00L-4.33 2.50L-4.33 -2.50ZM8.66 10.00L12.99 12.50L12.99 17.50L8.66 20.00L4.33 17.50L4.33 12.50ZM17.32 -5.00L21.65 -2.50L21.65 2.50L17.32 5.00L12.99 2.50L12.99 -2.50ZM0.00 25.00L4.33 27.50L4.33 32.50L0.00 35.00L-4.33 32.50L-4.33 27.50ZM17.32 25.00L21.65 27.50L21.65 32.50L17.32 35.00L12.99 32.50L12.99 27.50Z' fill='%232A2318' fill-opacity='.035' stroke='none'/><path d='M4.33 -7.50L4.33 7.50L-8.66 0.00ZM8.66 0.00L-4.33 7.50L-4.33 -7.50ZM12.99 7.50L12.99 22.50L0.00 15.00ZM17.32 15.00L4.33 22.50L4.33 7.50ZM21.65 -7.50L21.65 7.50L8.66 0.00ZM25.98 0.00L12.99 7.50L12.99 -7.50ZM4.33 22.50L4.33 37.50L-8.66 30.00ZM8.66 30.00L-4.33 37.50L-4.33 22.50ZM21.65 22.50L21.65 37.50L8.66 30.00ZM25.98 30.00L12.99 37.50L12.99 22.50Z' fill='none' stroke='%232A2318' stroke-opacity='.09' stroke-width='.45'/><path d='M-0.00 20.00L0.00 10.00M-0.00 20.00L8.66 25.00M-8.66 -5.00L-8.66 5.00M-8.66 -5.00L0.00 -10.00M-8.66 25.00L-8.66 35.00M-8.66 25.00L0.00 20.00M-8.66 35.00L0.00 40.00M-8.66 5.00L0.00 10.00M0.00 -10.00L8.66 -5.00M0.00 10.00L8.66 5.00M0.00 20.00L8.66 25.00M0.00 40.00L8.66 35.00M17.32 -10.00L25.98 -5.00M17.32 -10.00L8.66 -5.00M17.32 10.00L17.32 20.00M17.32 10.00L25.98 5.00M17.32 10.00L8.66 5.00M17.32 20.00L25.98 25.00M17.32 20.00L8.66 25.00M17.32 40.00L25.98 35.00M17.32 40.00L8.66 35.00M25.98 -5.00L25.98 5.00M25.98 25.00L25.98 35.00M8.66 -5.00L8.66 5.00M8.66 25.00L8.66 35.00' fill='none' stroke='%232A2318' stroke-opacity='.06' stroke-width='.35'/><g fill='%232A2318' fill-opacity='.10'><circle cx='0.00' cy='30.00' r='1.0'/><circle cx='0.00' cy='-10.00' r='.7'/><circle cx='8.66' cy='5.00' r='.7'/><circle cx='17.32' cy='30.00' r='1.0'/><circle cx='-8.66' cy='5.00' r='.7'/><circle cx='17.32' cy='-10.00' r='.7'/><circle cx='25.98' cy='5.00' r='.7'/><circle cx='-0.00' cy='20.00' r='.7'/><circle cx='8.66' cy='35.00' r='.7'/><circle cx='-8.66' cy='35.00' r='.7'/><circle cx='8.66' cy='-5.00' r='.7'/><circle cx='25.98' cy='35.00' r='.7'/><circle cx='-8.66' cy='-5.00' r='.7'/><circle cx='17.32' cy='20.00' r='.7'/><circle cx='25.98' cy='-5.00' r='.7'/><circle cx='0.00' cy='10.00' r='.7'/><circle cx='8.66' cy='25.00' r='.7'/><circle cx='-8.66' cy='25.00' r='.7'/><circle cx='17.32' cy='10.00' r='.7'/><circle cx='25.98' cy='25.00' r='.7'/><circle cx='0.00' cy='40.00' r='.7'/><circle cx='0.00' cy='0.00' r='1.0'/><circle cx='8.66' cy='15.00' r='1.0'/><circle cx='17.32' cy='40.00' r='.7'/><circle cx='17.32' cy='0.00' r='1.0'/></g></svg>"); background-size: 9mm 15.59mm; opacity: 1;
   }
 
   /* ---- кайма страницы ---- */
@@ -323,12 +323,12 @@
      колонкой не помещается на полосу, а рисунок ужимать уже некуда. */
   /* ---- создатели игры ---- */
   .создатели .строки { margin: .5mm 0 0; }
-  .создатели .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
+  .строки .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
     border-bottom: .2mm dotted var(--пример-кант); }
-  .создатели .кто:last-child { border-bottom: 0; }
-  .создатели .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
+  .строки .кто:last-child { border-bottom: 0; }
+  .строки .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
     color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
-  .создатели .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
+  .строки .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
   .создатели h2 { font-size: 10.5pt; }
   .создатели p, .создатели li { font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
   .создатели .пример p { font-size: 8.4pt; }
@@ -343,7 +343,7 @@
     object-fit: contain; display: block; }
   .создатели .марка .заглушка { height: 100%; width: 100%; margin: 0; }
   /* ИКОНКА В СТРОКЕ ТЕКСТА — настоящая иконка игры, не заглушка. */
-  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm; }
+  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm 0 1.2mm; }
   td .и, th .и { vertical-align: -1.3mm; height: 4.8mm; }
   /* Ячейка «иконка + подпись»: иконка крупно, подпись по центру под ней. */
   .дст { display: flex; flex-direction: column; align-items: center;
@@ -369,6 +369,7 @@
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  .блок.надвое:has(.широкий) { grid-template-columns: 1fr 1fr; }
   .блок.надвое > .под-низ { grid-column: 1 / -1; }
   /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
      рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
@@ -465,10 +466,12 @@
   .карточка ol { margin: 0 0 1.4mm; padding-left: 5mm; }
 
   /* ---- задняя сторона обложки: памятка в оформлении глав ---- */
-  .стр.обложка.задняя { padding: 15mm 15mm 13mm; background: var(--страница) url("илл/2e6573ab1f2f8186.jpg") center / cover no-repeat;
+  /* илл/63355acfd38c0614.jpg — ИЛЛЮСТРАЦИЯ ДИЗАЙНЕРА ПОД ПАМЯТКОЙ, высветленная бумагой, без сетки;
+     сдвиг 32% — в кадре инженеры за работой (14.10.2026). */
+  .стр.обложка.задняя { padding: 12mm 15mm 14mm;
+    background: linear-gradient(rgba(244,238,220,.55), rgba(244,238,220,.55)), url("илл/63355acfd38c0614.jpg") 32% center / cover no-repeat;
     color: var(--чернила); display: flex; flex-direction: column; }
-  .стр.обложка.задняя::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='52' height='90' viewBox='0 0 52 90'><path d='M26 1 L50 15 L50 45 L26 59 L2 45 L2 15 Z M26 61 L50 75 L50 105 M26 61 L2 75 L2 105' fill='none' stroke='%232A2318' stroke-opacity='.075' stroke-width='1.1'/></svg>"); background-size: 13mm 22.5mm; opacity: .8; }
+  .стр.обложка.задняя::after { display: none; }
   .задняя .глава { flex: none; }
   /* КОРЕШОК У ЗАДНЕЙ ОБЛОЖКИ СПРАВА: рамка открыта справа, слева замкнута. */
   .разворот.одна > .стр.задняя .к-лев { display: inline; }
@@ -479,7 +482,7 @@
   .задняя .пм-кол { display: flex; flex-direction: column; gap: 4mm; min-height: 0; }
   .задняя .пм-кол > .блок:last-child { flex: 1; }
   .задняя .ход li { break-inside: avoid; }
-  .задняя .блок { margin: 0; padding: 3mm 3.4mm 2.6mm; }
+  .задняя .блок { margin: 0; padding: 3mm 3.4mm 2.6mm; background: rgba(247,241,225,.93); }
 
   .задняя h2 { font: 700 10pt/1.2 "Tektur", sans-serif; margin: 0 0 2mm; padding-bottom: .8mm;
     display: flex; align-items: baseline; justify-content: space-between; gap: 2mm; }
@@ -511,7 +514,7 @@
   .задняя .флаги > li::before { display: none; }
 
   .стр.обложка.задняя img { width: auto; height: auto; display: inline-block; object-fit: contain; }
-  .стр.обложка.задняя .и { height: 3.9mm; width: auto; vertical-align: -1mm; margin: 0 .15mm; }
+  .стр.обложка.задняя .и { height: 3.9mm; width: auto; vertical-align: -1mm; margin: 0 .2mm 0 1mm; }
 
   /* ПЯТЬ ДЕЙСТВИЙ: значок и имя | действие | или | действие; пять «или» стоят
      одним столбцом и сами читаются как «одно из двух». */
@@ -570,7 +573,7 @@
 
 <!-- ============ ОБЛОЖКА ============ -->
 <div class="разворот одна">
-  <div class="стр обложка"><div class="рамка-техно"></div><img src="илл/f5b63bb3a826e340.jpg" alt="Обложка книги правил"></div>
+  <div class="стр обложка"><img src="илл/f5b63bb3a826e340.jpg" alt="Обложка книги правил"></div>
 </div>
 
 <!-- ============ РАЗВОРОТ 2–3 ============ -->
@@ -629,13 +632,12 @@
           <div class="кто"><span class="роль">Игроков</span><span class="имя">2–4</span></div>
           <div class="кто"><span class="роль">Партия</span><span class="имя">120–180 минут</span></div>
           <div class="кто"><span class="роль">Возраст</span><span class="имя">12+</span></div>
-          <div class="кто"><span class="роль">Редакция</span><span class="имя">черновик, сентябрь 2026</span></div>
         </div>
       </div>
 
       <div class="блок">
         <h2>Кто её сделал</h2>
-        <div class="строки"><div class="кто"><span class="роль">Автор игры</span><span class="имя">Владислав Башкин</span></div><div class="кто"><span class="роль">Правила и вёрстка</span><span class="имя">Владислав Башкин</span></div><div class="кто"><span class="роль">Иллюстрации</span><span class="имя">Seedream 5.0 Pro</span></div><div class="кто"><span class="роль">Оформление</span><span class="имя">Владислав Башкин</span></div><div class="кто"><span class="роль">Редактура</span><span class="имя">Claude Opus 5</span></div></div>
+        <div class="строки"><div class="кто"><span class="роль">Автор игры</span><span class="имя">Владислав Башкин</span></div><div class="кто"><span class="роль">Правила и вёрстка</span><span class="имя">Владислав Башкин</span></div><div class="кто"><span class="роль">Иллюстрации</span><span class="имя">Seedream 5.0 Pro</span></div><div class="кто"><span class="роль">Оформление</span><span class="имя">Владислав Башкин</span></div></div>
       </div>
 
       <div class="блок в-колонку">
@@ -1284,7 +1286,7 @@
     <div class="две">
       <div class="блок вовсю">
         <h2>Колоды и сброс</h2>
-        <p>Карты в игре лежат колодами: задания, арсенал, контейнеры, рынок, супер-задания и супер-арсенал (глава 9). Использованную карту <b>сбрасывают</b>: кладут лицом вверх в сброс её колоды. <b>Сжечь</b> карту — сбросить её ради верхнего эффекта; на картах это знак зачёркнутой карты. Если колода кончилась, перемешайте её сброс: он станет колодой. Если пусты и колода, и сброс, карту не берут.</p>
+        <p>Карты в игре лежат колодами: задания, арсенал, контейнеры, рынок, супер-задания и супер-арсенал (глава 9). Использованную карту <b>сбрасывают</b>: кладут лицом вверх в сброс её колоды. <b>Сжечь</b> карту — сбросить её ради верхнего эффекта; на картах это знак зачёркнутой карты. Если колода кончилась, перемешайте её сброс: он станет колодой — так и с арсеналом, и с заданиями. Если пусты и колода, и сброс, карту не берут.</p>
         <p>Текст карты сильнее правил книги, но только в той ситуации, о которой говорит карта.</p>
       </div>
 
@@ -1347,9 +1349,9 @@
           <li><b>Г.</b> Знак установленной карты. <b>Д.</b> Знак «постоянно». <b>Е.</b> Название. <b>Ж.</b> Эффект установленной карты. <b>З.</b> Номер карты.</li>
           <li><b>Откуда.</b> В Науке за 1 трофей<img class="и" src="илл/a2720aad90e07cf1.png" alt=""> (глава 9), из контейнеров и наградами карт.</li>
           <li><b>Где лежит.</b> Закрытая — рубашкой вверх в вашем запасе, сколько угодно. Установленная — в ячейке под планшетом войск.</li>
-          <li><b>Что делают.</b> Спец-действием установите карту лицом вверх в свободную ячейку или сожгите ради верхнего эффекта. Если эффект установленной карты отмечен знаком спец-действия, его разыгрывают спец-действием.</li>
+          <li><b>Что делают.</b> Спец-действием установите карту лицом вверх в свободную ячейку или сожгите ради верхнего эффекта. Нет свободной ячейки — освободите её: сбросьте невскрытые карты контейнеров или установленную карту арсенала. Если эффект установленной карты отмечен знаком спец-действия, его разыгрывают спец-действием.</li>
           <li><b>Одно название — одна карта.</b> Двух установленных карт с одним названием у вас быть не может.</li>
-          <li><b>Куда уходит.</b> Сожжённая — в сброс; установленная лежит до конца партии, звёзды на ней — победные очки.</li>
+          <li><b>Куда уходит.</b> Сожжённая — в сброс. Установленную карту в свой ход в любой момент можно снять в сброс и освободить ячейку. Звёзды установленной карты — победные очки.</li>
           <li><b>Начальный арсенал</b> берут на подготовке: из двух карт одну оставляют и сразу устанавливают (глава 3). Её верх — ваши стартовые ресурсы. Сжечь её нельзя.</li>
         </ul>
       </div>
@@ -1957,7 +1959,7 @@
     <div class="колонцифра"><span>32</span></div>
   </div>
 
-  <div class="стр фон2 просторно">
+  <div class="стр фон2">
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1971,7 +1973,7 @@
     <div class="две">
       <div class="с-заглавной"><div class="заглавная"><img class="заг-и" src="илл/de057b55fec7afd4.png" alt=""></div>
       <div class="блок вводка">
-        <p>Развитие превращает добытое в пользу: на <b>Рынке</b> келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> меняют на монеты, задания и предложения карты рынка, в <b>Науке</b> трофеи<img class="и" src="илл/a2720aad90e07cf1.png" alt=""> и келемий становятся шагами по трекам технологий и победными очками. Разыгрывая Развитие, выберите одно из двух: Рынок или Науку.</p>
+        <p>Развитие превращает добытое в пользу. Разыгрывая его, выберите одно из двух: <b>Рынок</b> — келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> на монеты, задания и предложения карты рынка — или <b>Науку</b> — шаги по трекам технологий.</p>
       </div>
       </div>
 
@@ -1980,13 +1982,12 @@
       <div class="блок надвое">
         <h2>Планшет рынка</h2>
         <div class="половина">
-        <div class="рисунок-в-колонке" style="padding:1.0mm 0 1.4mm">
-          <div class="рис" style="width:62%">
-            <img src="илл/87d5fed09dbfcd55.png" alt="">
-            <svg viewBox="0 0 2328 2328" preserveAspectRatio="none"><polyline points="1619.0,109.0 1619.0,639.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="30.2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="109.0,919.0 409.0,919.0 529.0,1039.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="30.2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="109.0,1309.0 479.0,1309.0 529.0,1259.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="30.2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1189.0,2219.0 1189.0,1119.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="30.2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="2219.0,1779.0 1589.0,1779.0 1529.0,1719.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="30.2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="1619" cy="639" r="37.0" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="529" cy="1039" r="37.0" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="529" cy="1259" r="37.0" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1189" cy="1119" r="37.0" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1529" cy="1719" r="37.0" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><polyline points="1619.0,109.0 1619.0,639.0" fill="none" class="выноска-л" stroke-width="10.8" stroke-linejoin="round"/><circle cx="1619" cy="639" r="26.2" class="выноска-т"/><circle cx="1619" cy="109" r="92.6" class="номер-круг" stroke-width="9.3"/><text x="1619" y="109" class="номер-текст" font-size="120.3">А</text><polyline points="109.0,919.0 409.0,919.0 529.0,1039.0" fill="none" class="выноска-л" stroke-width="10.8" stroke-linejoin="round"/><circle cx="529" cy="1039" r="26.2" class="выноска-т"/><circle cx="109" cy="919" r="92.6" class="номер-круг" stroke-width="9.3"/><text x="109" y="919" class="номер-текст" font-size="120.3">Б</text><polyline points="109.0,1309.0 479.0,1309.0 529.0,1259.0" fill="none" class="выноска-л" stroke-width="10.8" stroke-linejoin="round"/><circle cx="529" cy="1259" r="26.2" class="выноска-т"/><circle cx="109" cy="1309" r="92.6" class="номер-круг" stroke-width="9.3"/><text x="109" y="1309" class="номер-текст" font-size="120.3">В</text><polyline points="1189.0,2219.0 1189.0,1119.0" fill="none" class="выноска-л" stroke-width="10.8" stroke-linejoin="round"/><circle cx="1189" cy="1119" r="26.2" class="выноска-т"/><circle cx="1189" cy="2219" r="92.6" class="номер-круг" stroke-width="9.3"/><text x="1189" y="2219" class="номер-текст" font-size="120.3">Г</text><polyline points="2219.0,1779.0 1589.0,1779.0 1529.0,1719.0" fill="none" class="выноска-л" stroke-width="10.8" stroke-linejoin="round"/><circle cx="1529" cy="1719" r="26.2" class="выноска-т"/><circle cx="2219" cy="1779" r="92.6" class="номер-круг" stroke-width="9.3"/><text x="2219" y="1779" class="номер-текст" font-size="120.3">Д</text></svg>
+        <div class="рисунок-в-колонке широкий" style="padding:0 0 .6mm">
+          <div class="рис" style="width:100%">
+            <img src="илл/a79ad451c533b8dc.png" alt="">
+            <svg viewBox="0 0 2286 2286" preserveAspectRatio="none"><polyline points="1598.0,88.0 1598.0,618.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="24.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="88.0,898.0 388.0,898.0 508.0,1018.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="24.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="88.0,1288.0 458.0,1288.0 508.0,1238.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="24.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1168.0,2198.0 1168.0,1098.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="24.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="2198.0,1758.0 1568.0,1758.0 1508.0,1698.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="24.4" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="1598" cy="618" r="29.8" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="508" cy="1018" r="29.8" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="508" cy="1238" r="29.8" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1168" cy="1098" r="29.8" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1508" cy="1698" r="29.8" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><polyline points="1598.0,88.0 1598.0,618.0" fill="none" class="выноска-л" stroke-width="8.7" stroke-linejoin="round"/><circle cx="1598" cy="618" r="21.1" class="выноска-т"/><circle cx="1598" cy="88" r="74.5" class="номер-круг" stroke-width="7.5"/><text x="1598" y="88" class="номер-текст" font-size="96.9">А</text><polyline points="88.0,898.0 388.0,898.0 508.0,1018.0" fill="none" class="выноска-л" stroke-width="8.7" stroke-linejoin="round"/><circle cx="508" cy="1018" r="21.1" class="выноска-т"/><circle cx="88" cy="898" r="74.5" class="номер-круг" stroke-width="7.5"/><text x="88" y="898" class="номер-текст" font-size="96.9">Б</text><polyline points="88.0,1288.0 458.0,1288.0 508.0,1238.0" fill="none" class="выноска-л" stroke-width="8.7" stroke-linejoin="round"/><circle cx="508" cy="1238" r="21.1" class="выноска-т"/><circle cx="88" cy="1288" r="74.5" class="номер-круг" stroke-width="7.5"/><text x="88" y="1288" class="номер-текст" font-size="96.9">В</text><polyline points="1168.0,2198.0 1168.0,1098.0" fill="none" class="выноска-л" stroke-width="8.7" stroke-linejoin="round"/><circle cx="1168" cy="1098" r="21.1" class="выноска-т"/><circle cx="1168" cy="2198" r="74.5" class="номер-круг" stroke-width="7.5"/><text x="1168" y="2198" class="номер-текст" font-size="96.9">Г</text><polyline points="2198.0,1758.0 1568.0,1758.0 1508.0,1698.0" fill="none" class="выноска-л" stroke-width="8.7" stroke-linejoin="round"/><circle cx="1508" cy="1698" r="21.1" class="выноска-т"/><circle cx="2198" cy="1758" r="74.5" class="номер-круг" stroke-width="7.5"/><text x="2198" y="1758" class="номер-текст" font-size="96.9">Д</text></svg>
           </div>
         </div>
-
         </div>
         <div class="половина">
         <ul>
@@ -1994,25 +1995,17 @@
           <li><b>Б.</b> Обновление карты: 1 келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> в ячейку <b>В</b>. <b>Г</b> — открытая карта. Кубики с карты — в общий запас, карту — под низ колоды, откройте следующую; её предложение можно взять тем же Рынком. Ячейка <b>В</b> освобождается в Обновлении раунда.</li>
           <li><b>Д.</b> 1 келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> на задания: посмотрите 2 верхние карты колоды, одну возьмите в руку, вторую сбросьте.</li>
         </ul>
-        </div>
-      </div>
-
-      <div class="блок надвое">
-        <h2>Карта рынка</h2>
-        <div class="половина">
-        <div class="рисунок-в-колонке" style="padding:0.2mm 0 0.2mm">
-          <div class="рис" style="width:66%">
-            <img src="илл/3a715724ec154906.png" alt="">
-            <svg viewBox="0 0 1324 869" preserveAspectRatio="none"><polyline points="77.0,287.0 297.0,287.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="21.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1247.0,287.0 1017.0,287.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="21.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="77.0,702.0 307.0,702.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="21.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="661.0,77.0 661.0,352.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="21.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1247.0,687.0 1237.0,687.0 1132.0,792.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="21.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="297" cy="287" r="26.1" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1017" cy="287" r="26.1" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="307" cy="702" r="26.1" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="661" cy="352" r="26.1" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1132" cy="792" r="26.1" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><polyline points="77.0,287.0 297.0,287.0" fill="none" class="выноска-л" stroke-width="7.6" stroke-linejoin="round"/><circle cx="297" cy="287" r="18.5" class="выноска-т"/><circle cx="77" cy="287" r="65.4" class="номер-круг" stroke-width="6.5"/><text x="77" y="287" class="номер-текст" font-size="85.0">А</text><polyline points="1247.0,287.0 1017.0,287.0" fill="none" class="выноска-л" stroke-width="7.6" stroke-linejoin="round"/><circle cx="1017" cy="287" r="18.5" class="выноска-т"/><circle cx="1247" cy="287" r="65.4" class="номер-круг" stroke-width="6.5"/><text x="1247" y="287" class="номер-текст" font-size="85.0">Б</text><polyline points="77.0,702.0 307.0,702.0" fill="none" class="выноска-л" stroke-width="7.6" stroke-linejoin="round"/><circle cx="307" cy="702" r="18.5" class="выноска-т"/><circle cx="77" cy="702" r="65.4" class="номер-круг" stroke-width="6.5"/><text x="77" y="702" class="номер-текст" font-size="85.0">В</text><polyline points="661.0,77.0 661.0,352.0" fill="none" class="выноска-л" stroke-width="7.6" stroke-linejoin="round"/><circle cx="661" cy="352" r="18.5" class="выноска-т"/><circle cx="661" cy="77" r="65.4" class="номер-круг" stroke-width="6.5"/><text x="661" y="77" class="номер-текст" font-size="85.0">Г</text><polyline points="1247.0,687.0 1237.0,687.0 1132.0,792.0" fill="none" class="выноска-л" stroke-width="7.6" stroke-linejoin="round"/><circle cx="1132" cy="792" r="18.5" class="выноска-т"/><circle cx="1247" cy="687" r="65.4" class="номер-круг" stroke-width="6.5"/><text x="1247" y="687" class="номер-текст" font-size="85.0">Д</text></svg>
+        <p><b>Карта рынка</b> — два предложения на выбор.</p>
+<!--в-текст-->        <div class="рисунок-в-колонке" style="padding:0.4mm 0 0.6mm">
+          <div class="рис" style="width:72%">
+            <img src="илл/d4c4f3b666ea4d37.png" alt="">
+            <svg viewBox="0 0 1310 821" preserveAspectRatio="none"><polyline points="70.0,280.0 290.0,280.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="19.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1240.0,280.0 1010.0,280.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="19.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="70.0,695.0 300.0,695.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="19.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="654.0,70.0 654.0,345.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="19.3" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="290" cy="280" r="23.7" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1010" cy="280" r="23.7" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="300" cy="695" r="23.7" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="654" cy="345" r="23.7" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><polyline points="70.0,280.0 290.0,280.0" fill="none" class="выноска-л" stroke-width="6.9" stroke-linejoin="round"/><circle cx="290" cy="280" r="16.8" class="выноска-т"/><circle cx="70" cy="280" r="59.3" class="номер-круг" stroke-width="5.9"/><text x="70" y="280" class="номер-текст" font-size="77.1">А</text><polyline points="1240.0,280.0 1010.0,280.0" fill="none" class="выноска-л" stroke-width="6.9" stroke-linejoin="round"/><circle cx="1010" cy="280" r="16.8" class="выноска-т"/><circle cx="1240" cy="280" r="59.3" class="номер-круг" stroke-width="5.9"/><text x="1240" y="280" class="номер-текст" font-size="77.1">Б</text><polyline points="70.0,695.0 300.0,695.0" fill="none" class="выноска-л" stroke-width="6.9" stroke-linejoin="round"/><circle cx="300" cy="695" r="16.8" class="выноска-т"/><circle cx="70" cy="695" r="59.3" class="номер-круг" stroke-width="5.9"/><text x="70" y="695" class="номер-текст" font-size="77.1">В</text><polyline points="654.0,70.0 654.0,345.0" fill="none" class="выноска-л" stroke-width="6.9" stroke-linejoin="round"/><circle cx="654" cy="345" r="16.8" class="выноска-т"/><circle cx="654" cy="70" r="59.3" class="номер-круг" stroke-width="5.9"/><text x="654" y="70" class="номер-текст" font-size="77.1">Г</text></svg>
           </div>
         </div>
-        </div>
-        <div class="половина">
-        <p>Два предложения на выбор.</p>
         <ul>
           <li><b>А.</b> «Выполни…»: разыграйте действие. <b>Б.</b> «Получи…»: возьмите.</li>
-          <li><b>В.</b> Ячейки предложения: за предложение кладут 1 келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> в свободную ячейку; обе заняты — его не взять.</li>
-          <li><b>Г.</b> За ход — только одно предложение карты. <b>Д.</b> Номер карты.</li>
+          <li><b>В.</b> За предложение — 1 келемий<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> в его свободную ячейку; обе заняты — его не взять.</li>
+          <li><b>Г.</b> За ход — только одно предложение карты.</li>
         </ul>
         </div>
       </div>
@@ -2026,7 +2019,7 @@
 <p class="подпись-разворота">Разворот · страницы 34–35</p>
 <div class="разворот">
 
-  <div class="стр фон3 просторно">
+  <div class="стр фон3">
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2038,15 +2031,15 @@
     <div class="две">
       <div class="раздел"><img class="и разд" src="илл/3ce1a4febd1ecacb.png" alt=""><span>Наука</span></div>
 
-        <div class="рисунок-во-всю" style="padding:1.2mm 0 1.8mm">
-          <div class="рис" style="width:100%">
-            <img src="илл/160165ab93eb78f7.png" alt="">
-            <svg viewBox="0 0 3188 2075" preserveAspectRatio="none"><polyline points="2230.0,560.0 2311.0,809.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="2050.0,640.0 2211.0,969.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="2470.0,560.0 2451.0,969.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="2740.0,560.0 2711.0,969.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="2050.0,380.0 1569.0,749.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="700.0,1700.0 1194.0,1464.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="780.0,1840.0 1109.2,1595.9" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="860.0,1975.0 1179.0,1674.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1700.0,1250.0 1329.0,1524.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1010.0,2045.0 1319.2,2023.8" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="16.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="2311" cy="809" r="20.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="2211" cy="969" r="20.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="2451" cy="969" r="20.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="2711" cy="969" r="20.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1569" cy="749" r="20.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1194" cy="1464" r="20.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1159" cy="1559" r="62.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.0" opacity=".9"/><circle cx="1179" cy="1674" r="20.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1329" cy="1524" r="20.2" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1389" cy="2019" r="70.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.0" opacity=".9"/><polyline points="2230.0,560.0 2311.0,809.0" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="2311" cy="809" r="14.3" class="выноска-т"/><circle cx="2230" cy="560" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="2230" y="560" class="номер-текст" font-size="65.4">Е</text><polyline points="2050.0,640.0 2211.0,969.0" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="2211" cy="969" r="14.3" class="выноска-т"/><circle cx="2050" cy="640" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="2050" y="640" class="номер-текст" font-size="65.4">Г</text><polyline points="2470.0,560.0 2451.0,969.0" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="2451" cy="969" r="14.3" class="выноска-т"/><circle cx="2470" cy="560" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="2470" y="560" class="номер-текст" font-size="65.4">З</text><polyline points="2740.0,560.0 2711.0,969.0" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="2711" cy="969" r="14.3" class="выноска-т"/><circle cx="2740" cy="560" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="2740" y="560" class="номер-текст" font-size="65.4">Ж</text><polyline points="2050.0,380.0 1569.0,749.0" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="1569" cy="749" r="14.3" class="выноска-т"/><circle cx="2050" cy="380" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="2050" y="380" class="номер-текст" font-size="65.4">К</text><polyline points="700.0,1700.0 1194.0,1464.0" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="1194" cy="1464" r="14.3" class="выноска-т"/><circle cx="700" cy="1700" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="700" y="1700" class="номер-текст" font-size="65.4">И</text><polyline points="780.0,1840.0 1109.2,1595.9" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="1159" cy="1559" r="62.0" fill="none" class="выноска-л" stroke-width="7.7"/><circle cx="780" cy="1840" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="780" y="1840" class="номер-текст" font-size="65.4">Б</text><polyline points="860.0,1975.0 1179.0,1674.0" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="1179" cy="1674" r="14.3" class="выноска-т"/><circle cx="860" cy="1975" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="860" y="1975" class="номер-текст" font-size="65.4">В</text><polyline points="1700.0,1250.0 1329.0,1524.0" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="1329" cy="1524" r="14.3" class="выноска-т"/><circle cx="1700" cy="1250" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="1700" y="1250" class="номер-текст" font-size="65.4">А</text><polyline points="1010.0,2045.0 1319.2,2023.8" fill="none" class="выноска-л" stroke-width="5.9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="1389" cy="2019" r="70.0" fill="none" class="выноска-л" stroke-width="7.7"/><circle cx="1010" cy="2045" r="50.3" class="номер-круг" stroke-width="5.0"/><text x="1010" y="2045" class="номер-текст" font-size="65.4">Д</text></svg>
+      <div class="блок вовсю">
+        <h2>Планшет науки</h2>
+        <p>Наука двигает вас по трекам технологий: за одну Науку — один шаг на одном треке. Ступень оплачивают трофеями<img class="и" src="илл/a2720aad90e07cf1.png" alt=""> или келемием<img class="и" src="илл/0aff9abd2db508d8.png" alt=""> и сразу получают её награду. Треки, цены и награды напечатаны на планшете науки.</p>
+        <div class="рисунок-во-всю" style="padding:0.6mm 0 0.8mm">
+          <div class="рис" style="width:80%">
+            <img src="илл/0598f6dd15ccc6cb.png" alt="">
+            <svg viewBox="0 0 3220 2091" preserveAspectRatio="none"><polyline points="595.0,75.0 595.0,985.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="885.0,75.0 885.0,935.0 835.0,985.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="1165.0,75.0 1165.0,915.0 1095.0,985.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="75.0,645.0 515.0,645.0 695.0,825.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="75.0,885.0 315.0,885.0 430.0,1000.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="75.0,1105.0 520.0,1105.0 565.0,1060.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="75.0,1305.0 185.0,1305.0 395.0,1095.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="75.0,1505.0 120.0,1505.0 415.0,1210.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="75.0,1705.0 475.0,1705.0 625.0,1555.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><polyline points="3145.0,525.0 1825.0,525.0 1585.0,765.0" class="выноска-ореол" fill="none" stroke="#F7F1E1" stroke-width="20.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/><circle cx="595" cy="985" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="835" cy="985" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1095" cy="985" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="695" cy="825" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="430" cy="1000" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="565" cy="1060" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="395" cy="1095" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="415" cy="1210" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="625" cy="1555" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><circle cx="1585" cy="765" r="25.4" class="выноска-ореол" fill="#F7F1E1" opacity=".9"/><polyline points="595.0,75.0 595.0,985.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="595" cy="985" r="18.0" class="выноска-т"/><circle cx="595" cy="75" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="595" y="75" class="номер-текст" font-size="82.6">Г</text><polyline points="885.0,75.0 885.0,935.0 835.0,985.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="835" cy="985" r="18.0" class="выноска-т"/><circle cx="885" cy="75" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="885" y="75" class="номер-текст" font-size="82.6">З</text><polyline points="1165.0,75.0 1165.0,915.0 1095.0,985.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="1095" cy="985" r="18.0" class="выноска-т"/><circle cx="1165" cy="75" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="1165" y="75" class="номер-текст" font-size="82.6">Ж</text><polyline points="75.0,645.0 515.0,645.0 695.0,825.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="695" cy="825" r="18.0" class="выноска-т"/><circle cx="75" cy="645" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="75" y="645" class="номер-текст" font-size="82.6">Е</text><polyline points="75.0,885.0 315.0,885.0 430.0,1000.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="430" cy="1000" r="18.0" class="выноска-т"/><circle cx="75" cy="885" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="75" y="885" class="номер-текст" font-size="82.6">И</text><polyline points="75.0,1105.0 520.0,1105.0 565.0,1060.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="565" cy="1060" r="18.0" class="выноска-т"/><circle cx="75" cy="1105" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="75" y="1105" class="номер-текст" font-size="82.6">А</text><polyline points="75.0,1305.0 185.0,1305.0 395.0,1095.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="395" cy="1095" r="18.0" class="выноска-т"/><circle cx="75" cy="1305" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="75" y="1305" class="номер-текст" font-size="82.6">Б</text><polyline points="75.0,1505.0 120.0,1505.0 415.0,1210.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="415" cy="1210" r="18.0" class="выноска-т"/><circle cx="75" cy="1505" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="75" y="1505" class="номер-текст" font-size="82.6">В</text><polyline points="75.0,1705.0 475.0,1705.0 625.0,1555.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="625" cy="1555" r="18.0" class="выноска-т"/><circle cx="75" cy="1705" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="75" y="1705" class="номер-текст" font-size="82.6">Д</text><polyline points="3145.0,525.0 1825.0,525.0 1585.0,765.0" fill="none" class="выноска-л" stroke-width="7.4" stroke-linejoin="round"/><circle cx="1585" cy="765" r="18.0" class="выноска-т"/><circle cx="3145" cy="525" r="63.6" class="номер-круг" stroke-width="6.4"/><text x="3145" y="525" class="номер-текст" font-size="82.6">К</text></svg>
           </div>
         </div>
-
-
-      <div class="блок легенда">
         <ul>
           <li><b>А.</b> Трек технологий: красный — модули боя, синий — сборки, зелёный — жетоны хранилища.</li>
           <li><b>Б.</b> Ступень трека и её цена: 2, 3, 4, 5.</li>
@@ -2065,7 +2058,7 @@
     <div class="колонцифра"><span>34</span></div>
   </div>
 
-  <div class="стр фон4 просторно">
+  <div class="стр фон4">
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2112,7 +2105,7 @@
 <p class="подпись-разворота">Разворот · страницы 36–37</p>
 <div class="разворот">
 
-  <div class="стр фон1 просторно">
+  <div class="стр фон1">
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2328,9 +2321,9 @@
   </div>
 </div>
 
+<!-- ============ ЗАДНЯЯ ОБЛОЖКА ============ -->
 <p class="подпись-разворота">Задняя сторона обложки · памятка</p>
 <div class="разворот одна">
-
   <div class="стр обложка задняя">
     <div class="глава"><span class="гл-т">Памятка</span></div>
     <div class="пм">
@@ -2394,7 +2387,6 @@
 </div>
       </div>
     </div>
-    <div class="пм-легенда"><div><img class="и" src="илл/df777bd9c7a2938f.png" alt=""><span>действие</span></div><div><img class="и" src="илл/5d7f2ee7e66b5b65.png" alt=""><span>низ карты</span></div><div><img class="и" src="илл/99ed7532f86167e4.png" alt=""><span>спец-действие</span></div><div><img class="и" src="илл/18424d4fbaeca851.png" alt=""><span>трофей на жетоне</span></div><div><img class="и" src="илл/dab147ff7fed296c.png" alt=""><span>кубик трофея</span></div><div><img class="и" src="илл/c873277d68f5ccc8.png" alt=""><span>ячейка энергии</span></div><div><img class="и" src="илл/7ac8ea3fea4b8e43.png" alt=""><span>место для энергостанции</span></div><div><img class="и" src="илл/b67a04876e8ec428.png" alt=""><span>перенос модуля</span></div><div><img class="и" src="илл/2a82893c98c1e13f.png" alt=""><span>улучшение модуля</span></div><div><img class="и" src="илл/21d5dcaa37736452.png" alt=""><span>конец партии</span></div></div>
   </div>
 </div>
 
