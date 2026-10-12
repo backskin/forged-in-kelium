@@ -127,8 +127,8 @@ def отделать(pdf):
 
 if __name__ == '__main__':
     цели = sys.argv[1:] or [
-        str(КОРЕНЬ / 'rules' / 'РУЛБУК — Кристаллы Раздора.pdf'),
-        str(КОРЕНЬ / 'rules' / 'СПРАВОЧНИК — Кристаллы Раздора.pdf'),
+        str(КОРЕНЬ / 'rules' / 'РУЛБУК — Lex Talionis.pdf'),
+        str(КОРЕНЬ / 'rules' / 'СПРАВОЧНИК — Lex Talionis.pdf'),
     ]
     for ц in цели:
         п = pathlib.Path(ц)

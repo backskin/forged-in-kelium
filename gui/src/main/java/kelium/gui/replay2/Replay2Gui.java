@@ -133,7 +133,7 @@ public final class Replay2Gui {
     }
 
     private void show() {
-        frame = new JFrame("Кристаллы Раздора — разбор партии");
+        frame = new JFrame("Lex Talionis — разбор партии");
         kelium.gui.Ui.setAppIcon(frame, "replay2");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new BorderLayout());
@@ -1237,10 +1237,10 @@ public final class Replay2Gui {
     private void refreshTitle() {
         ReplayRecord rec = session.record();
         if (rec == null) {
-            frame.setTitle("Кристаллы Раздора — разбор партии");
+            frame.setTitle("Lex Talionis — разбор партии");
             return;
         }
-        StringBuilder sb = new StringBuilder("Кристаллы Раздора — разбор партии   ·   ");
+        StringBuilder sb = new StringBuilder("Lex Talionis — разбор партии   ·   ");
         sb.append(rec.players).append(" игрока, сид ").append(rec.seed);
         if (rec.scenarioId != null) {
             sb.append(", поле ").append(rec.scenarioId);
@@ -1638,7 +1638,7 @@ public final class Replay2Gui {
 
     private void showAbout() {
         JOptionPane.showMessageDialog(frame, Ui2.tip(
-            "Разбор партии «Кристаллы Раздора», версия 2.0.\n\n"
+            "Разбор партии «Lex Talionis», версия 2.0.\n\n"
             + "Показывает сыгранную партию по шагам: поле, полосы игроков, лента "
             + "времени, лог и мысли ботов.\n"
             + "Движок вызывается как библиотека — сама игра не меняется. Отрисовка "

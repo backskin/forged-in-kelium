@@ -28,7 +28,7 @@ static class Launcher
     const string MainClass = "@MAIN@";     // точка входа Java
     const string AppName = "@APP@";        // как называется приложение в сообщениях
     const string DevData = @"@DEVDATA@";   // папка data проекта на машине сборки
-    const string Title = "Кристаллы Раздора";
+    const string Title = "Lex Talionis";
 
     [STAThread]
     static int Main(string[] argv)

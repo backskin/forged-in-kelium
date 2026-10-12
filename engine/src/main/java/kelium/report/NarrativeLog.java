@@ -87,7 +87,7 @@ public final class NarrativeLog {
         }
         GameConfig cfg = Ctx.cfg(state);
         if (md) {
-            line("# Рассказ партии — «Кристаллы Раздора»");
+            line("# Рассказ партии — «Lex Talionis»");
             line("");
             line("**Игроков:** " + state.numPlayers() + " · **сид:** " + cfg.seed
                 + " · **правила:** " + cfg.ruleset.id);
@@ -98,7 +98,7 @@ public final class NarrativeLog {
             }
         } else {
             line("═".repeat(72));
-            line("  РАССКАЗ ПАРТИИ — «Кристаллы Раздора»");
+            line("  РАССКАЗ ПАРТИИ — «Lex Talionis»");
             line("  игроков: " + state.numPlayers() + "   сид: " + cfg.seed
                 + "   правила: " + cfg.ruleset.id);
             line("  за столом:");

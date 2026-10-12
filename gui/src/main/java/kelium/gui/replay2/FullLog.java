@@ -36,7 +36,7 @@ public final class FullLog {
     /** Собрать текст полного лога записи. */
     public static String build(ReplayRecord rec) {
         StringBuilder b = new StringBuilder();
-        b.append("ПОЛНЫЙ ЛОГ ПАРТИИ «Кристаллы Раздора»\n");
+        b.append("ПОЛНЫЙ ЛОГ ПАРТИИ «Lex Talionis»\n");
         b.append("=".repeat(72)).append("\n\n");
 
         b.append("КАК ПАРТИЯ БЫЛА ЗАДАНА\n");

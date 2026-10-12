@@ -119,7 +119,7 @@ public final class LobbyWindow {
 
     private void start() {
         Theme.applyTable();
-        frame = new JFrame("Кристаллы Раздора — сетевой стол");
+        frame = new JFrame("Lex Talionis — сетевой стол");
         frame.setDefaultCloseOperation(menu == null ? WindowConstants.EXIT_ON_CLOSE
             : WindowConstants.DISPOSE_ON_CLOSE);
         frame.getContentPane().setBackground(Theme.bg());

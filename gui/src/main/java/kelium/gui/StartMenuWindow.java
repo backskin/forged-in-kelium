@@ -202,7 +202,7 @@ public final class StartMenuWindow {
         // «ШТАБ» — СЕРЫЙ МЕТАЛЛ (26.09.2026): цвет появится, когда игрок выберет
         // место и сядет за стол
         Theme.applyTable(null);
-        frame = new JFrame("Кристаллы Раздора — Штаб");
+        frame = new JFrame("Lex Talionis — Штаб");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new BorderLayout());
         frame.getContentPane().setBackground(Theme.bg());

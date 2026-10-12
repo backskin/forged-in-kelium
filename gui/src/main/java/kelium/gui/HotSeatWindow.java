@@ -408,7 +408,7 @@ public final class HotSeatWindow {
         kelium.report.FieldGeometry.useSeatColors(options.seatColors());
         mySeat = meSeat(seatSpecs);
         buildUi();
-        frame.setTitle("Кристаллы Раздора — сетевая партия · " + seatName(mySeat));
+        frame.setTitle("Lex Talionis — сетевая партия · " + seatName(mySeat));
         viewedSeat = mySeat;
         remoteOverlay = new kelium.gui.net.NetOverlay(frame);
         remoteChat = new kelium.gui.net.NetChatDock(frame, remote::chat);
@@ -705,7 +705,7 @@ public final class HotSeatWindow {
             own = Math.max(0, seatSpecs.indexOf("human"));
         }
         Theme.applyTable(Theme.seat(own));
-        frame = new JFrame("Кристаллы Раздора — Командный пункт");
+        frame = new JFrame("Lex Talionis — Командный пункт");
         // Закрытие окна НЕ гасит программу: партию всегда можно закрыть и
         // вернуться в меню, а гасит программу уже само меню.
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);

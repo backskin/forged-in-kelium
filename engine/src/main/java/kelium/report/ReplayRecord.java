@@ -984,7 +984,7 @@ public final class ReplayRecord {
         @SuppressWarnings("unchecked")
         Map<String, Object> m = (Map<String, Object>) root;
         if (!FORMAT_TAG.equals(Json.s(m, "format"))) {
-            throw new IOException("это не запись партии «Кристаллов Раздора» "
+            throw new IOException("это не запись партии «Lex Talionis» "
                 + "(ожидался формат " + FORMAT_TAG + ")");
         }
         int ver = Json.i(m, "version");

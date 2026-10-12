@@ -209,7 +209,7 @@ public final class RunnerGui {
 
     // ==================== окно ====================
     private void createAndShow() {
-        frame = new JFrame("Кристаллы Раздора — прогоны ботов и нейросетей");
+        frame = new JFrame("Lex Talionis — прогоны ботов и нейросетей");
         Ui.setAppIcon(frame, "runner");
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new java.awt.event.WindowAdapter() {
