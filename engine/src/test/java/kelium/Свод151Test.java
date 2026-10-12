@@ -66,20 +66,9 @@ class Свод151Test {
             String.valueOf(цвет(s, "red").board.troop.raw.get("attacks") instanceof Map<?, ?> a ? a.get("aircraft") : null));
     }
 
-    @Test
-    void военноеЗданиеБезЭнергииДаётОдинБоеприпас() {
-        GameState s = Fix.game(СВОД, 4, 5L);
-        PlayerState p = s.player(0);
-        String гекс = null;
-        for (BuildingToken b : p.buildingsOnField()) {
-            гекс = b.hexId;
-        }
-        assertTrue(гекс != null, "у игрока есть здание на поле");
-        BuildingToken завод = s.tokenStats.makeBuilding(BuildingType.FACTORY, p.seat, 9300, null);
-        завод.hexId = гекс;
-        p.buildings.add(завод);
-        List<String> варианты = new ArrayList<>();
-        Agent агент = new Agent(p.seat, "сборщик") {
+    /** Агент сборки: у завода записывает варианты и берёт вариант {@code брать}, прочие пропускает. */
+    private static Agent сборщик(int seat, List<String> варианты, String брать) {
+        return new Agent(seat, "сборщик") {
             @Override
             public Choice choose(GameState st, List<Choice> options, Map<String, Object> ctx) {
                 boolean этоЗавод = "factory".equals(ctx.get("building_type"));
@@ -89,17 +78,56 @@ class Свод151Test {
                     }
                 }
                 for (Choice c : options) {
-                    if (этоЗавод ? c.payload() instanceof Map<?, ?> : "pass".equals(c.kind())) {
+                    if (этоЗавод ? c.payload() instanceof Map<?, ?> m && брать.equals(m.get("kind"))
+                            : "pass".equals(c.kind())) {
                         return c;
                     }
                 }
                 return options.get(options.size() - 1);
             }
         };
+    }
+
+    private static BuildingToken завод(GameState s, PlayerState p) {
+        String гекс = null;
+        for (BuildingToken b : p.buildingsOnField()) {
+            гекс = b.hexId;
+        }
+        assertTrue(гекс != null, "у игрока есть здание на поле");
+        BuildingToken завод = s.tokenStats.makeBuilding(BuildingType.FACTORY, p.seat, 9300, null);
+        завод.hexId = гекс;
+        p.buildings.add(завод);
+        return завод;
+    }
+
+    @Test
+    void военноеЗданиеБезЭнергииДаётОднуШтуку() {
+        GameState s = Fix.game(СВОД, 4, 5L);
+        PlayerState p = s.player(0);
+        завод(s, p);
+        List<String> варианты = new ArrayList<>();
         int было = p.resources.ammo();
-        Actions.create("assembly", s).perform(p, new TurnContext(p.seat, 1), агент);
-        assertEquals(List.of("ammo"), варианты, "без энергии — только боеприпас");
+        Actions.create("assembly", s).perform(p, new TurnContext(p.seat, 1), сборщик(p.seat, варианты, "ammo"));
+        assertEquals(List.of("unit", "ammo"), варианты, "без энергии — 1 войско или 1 боеприпас");
         assertEquals(было + 1, p.resources.ammo(), "ровно 1 боеприпас");
+    }
+
+    @Test
+    void запитанноеЗданиеДаётВсёСразу() {
+        GameState s = Fix.game(СВОД, 4, 5L);
+        PlayerState p = s.player(0);
+        завод(s, p);
+        List<String> варианты = new ArrayList<>();
+        int боеприпасов = p.resources.ammo();
+        int войск = p.units.size();
+        TurnContext ctx = new TurnContext(p.seat, 1);
+        ctx.allPowered = true;
+        Actions.create("assembly", s).perform(p, ctx, сборщик(p.seat, варианты, "both"));
+        assertEquals(List.of("both"), варианты, "запитанное — только «всё сразу»");
+        int печатьБП = p.board.troop.printedOutput(BuildingType.FACTORY, "ammo");
+        int печатьВойск = p.board.troop.printedOutput(BuildingType.FACTORY, "units");
+        assertEquals(боеприпасов + печатьБП, p.resources.ammo(), "боеприпасы по печати");
+        assertEquals(войск + печатьВойск, p.units.size(), "и войска по печати");
     }
 
     @Test
@@ -165,5 +193,40 @@ class Свод151Test {
             рода.add(ev.get("unit"));
         }
         assertEquals(4, рода.size(), "модули блокировки разных родов — и жетоны разных родов");
+    }
+
+    @Test
+    void наградаЗаданияДаётСуперЗадание() {
+        GameState s = Fix.game(СВОД, 4, 21L);
+        PlayerState p = s.player(0);
+        Setup.refillSuperDisplay(s, kelium.dataio.Ctx.rules(s));
+        int было = p.superObjectives.size();
+        int наСтоле = s.superDisplay.size();
+        assertTrue(наСтоле > 0, "супер-задания лежат открытыми на столе");
+        Map<String, Object> итог = kelium.engine.Effects.apply("take_super_objective", s, p.seat, Map.of());
+        assertEquals(1, итог.get("super_objective"));
+        assertEquals(было + 1, p.superObjectives.size(), "карта пришла игроку");
+        assertEquals(наСтоле, s.superDisplay.size(), "на её место выложена новая");
+    }
+
+    @Test
+    void большихТайловМеньшеИгроковИКелемияБольше() {
+        for (int n = 2; n <= 4; n++) {
+            for (long сид = 1; сид <= 5; сид++) {
+                GameState s = Setup.buildGame(GameConfig.buildCached(СВОД, n, сид, null, null));
+                int больших = 0;
+                for (kelium.core.Hex h : s.field.hexes.values()) {
+                    if (h.spawnTile == null) {
+                        continue;
+                    }
+                    if (h.spawnTile.isStart) {
+                        assertTrue(h.spawnTile.kelium >= 4, "стартовый тайл: 3 + 1 келемия");
+                    } else {
+                        больших++;
+                    }
+                }
+                assertTrue(больших <= n - 1, n + " игрока, сид " + сид + ": больших тайлов " + больших);
+            }
+        }
     }
 }

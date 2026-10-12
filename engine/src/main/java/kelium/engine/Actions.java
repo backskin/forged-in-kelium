@@ -670,12 +670,23 @@ public final class Actions {
                 // без энергии всё же что-то даёт — один контейнер со своего гекса,
                 // если он там открыт. Келемий — только запитанный.
                 boolean толькоКонтейнер = false;
+                // ОДНА ШТУКА БЕЗ ЭНЕРГИИ, ВСЁ СРАЗУ С ЭНЕРГИЕЙ (решение дизайнера
+                // 13.10.2026, ключи mining.unpowered_one_of и mining.powered_both):
+                // без энергии добытчик берёт 1 келемий ИЛИ 1 карту контейнера;
+                // запитанный — и келемий, и контейнеры сразу, сколько напечатано.
+                boolean поОдной = false;
+                boolean запитан = true;
                 if (!ctx.allPowered && !effectivelyPowered(s, player, b, agent, paid)) {
                     if (ctx.freeMinerMoves > 0) {
                         ctx.freeMinerMoves--;
                     } else {
+                        запитан = false;
                         безЭнергии++;
                         безЭнергииДобывает = kelium.dataio.Ctx.rules(s).getInt("mining.unpowered_yield", 0);
+                        поОдной = kelium.dataio.Ctx.rules(s).getBool("mining.unpowered_one_of", false);
+                        if (поОдной) {
+                            безЭнергииДобывает = 1;
+                        }
                         толькоКонтейнер = безЭнергииДобывает <= 0
                             && kelium.dataio.Ctx.rules(s).getBool("mining.unpowered_container", false);
                         if (безЭнергииДобывает <= 0 && !толькоКонтейнер) {
@@ -683,6 +694,8 @@ public final class Actions {
                         }
                     }
                 }
+                boolean всёСразу = запитан
+                    && kelium.dataio.Ctx.rules(s).getBool("mining.powered_both", false);
                 String grid = adjacentGridWithKelium(b);
                 // G1 (свод §2: «Пропустить здание можно») — добытчик можно
                 // пропустить; выбор по каждому добытчику отдельно.
@@ -718,6 +731,10 @@ public final class Actions {
                     безКелемия++;
                     continue;   // ни келемия рядом, ни открытого контейнера
                 }
+                if (всёСразу && opts.size() == 2) {
+                    opts.clear();
+                    opts.add(new Choice("mine", "both", "kelium + container @" + contHex));
+                }
                 // СРАБАТЫВАНИЕ ПРИ ПОСТРОЙКЕ — БЕЗ ПРОПУСКА (решение дизайнера
                 // 27.09.2026): поставленный добытчик берёт одно из того, что даёт;
                 // вариант один — берётся без вопроса.
@@ -732,6 +749,7 @@ public final class Actions {
                     continue;   // добытчик пропущен
                 }
                 takeContainerOnly = "container".equals(pick.payload());
+                boolean обаВыхода = "both".equals(pick.payload());
                 отработали++;
                 if (!takeContainerOnly) {
                     int добыто = безЭнергииДобывает > 0 && grid != null
@@ -745,7 +763,8 @@ public final class Actions {
                         gainedC += Storage.addContainersCapped(s, player, 1,
                             "Добыча: выработал тайл");
                     }
-                } else {
+                }
+                if (takeContainerOnly || обаВыхода) {
                     // Добытчик забирает ОТКРЫТЫЙ ПЕЧАТНЫЙ контейнер со своего гекса
                     // или с примыкающего (правило 12.08.2026, ветка выбрана выше —
                     // contHex). Ячейку надо ОТМЕТИТЬ собранной: замер 13.08.2026
@@ -756,7 +775,7 @@ public final class Actions {
                     // РАЗМЕТКА ВЫБОРА (вопрос дизайнера 13.08.2026): контейнер и келемий —
                     // это ЛИБО-ЛИБО. Надо знать, берут ли контейнер ВМЕСТО келемия,
                     // или просто рядом нет живой грядки и выбора не было.
-                    int контейнеров = толькоКонтейнер ? 1
+                    int контейнеров = толькоКонтейнер || поОдной ? 1
                         : поВыработке && b.level != null
                         ? Math.max(1, state.tokenStats.minerYield(b.level, b.owner())) : 1;
                     int взято = Storage.addContainersCapped(s, player, контейнеров,
@@ -857,12 +876,24 @@ public final class Actions {
                 // модули и карты это число не меняют. 0 — прежнее правило:
                 // без энергии здание не работает.
                 int безЭнергииБоеприпасов = 0;
+                // ОДНА ШТУКА БЕЗ ЭНЕРГИИ, ВСЁ СРАЗУ С ЭНЕРГИЕЙ (решение дизайнера
+                // 13.10.2026, ключи assembly.unpowered_one_of и
+                // assembly.powered_both): без энергии здание делает 1 жетон
+                // войск ИЛИ 1 боеприпас (войско — только если здание их вообще
+                // делает); запитанное — и войска, и боеприпасы сразу по печати.
+                boolean поОдной = false;
+                boolean запитано = true;
                 if (!ctx.allPowered && !effectivelyPowered(state, player, b, agent, paid)) {
-                    безЭнергииБоеприпасов = kelium.dataio.Ctx.rules(state).getInt("assembly.unpowered_ammo", 0);
-                    if (безЭнергииБоеприпасов <= 0 || ctx.сборкаТолькоВойска) {
+                    запитано = false;
+                    поОдной = kelium.dataio.Ctx.rules(state).getBool("assembly.unpowered_one_of", false);
+                    безЭнергииБоеприпасов = поОдной ? 1
+                        : kelium.dataio.Ctx.rules(state).getInt("assembly.unpowered_ammo", 0);
+                    if (безЭнергииБоеприпасов <= 0 || ctx.сборкаТолькоВойска && !поОдной) {
                         continue;
                     }
                 }
+                boolean всёСразу = запитано
+                    && kelium.dataio.Ctx.rules(state).getBool("assembly.powered_both", false);
                 UnitType unitType = ASSEMBLY_UNIT.get(b.type);
                 // «Нет места → вариант недоступен» (свод §2.1): авиация — своб.
                 // воздушная ячейка, наземка — свободная наземная ячейка гекса.
@@ -904,7 +935,7 @@ public final class Actions {
                     .about(b).base(Modules.assemblyOutput(state, player, b.type, "ammo")).ask();
                 if (безЭнергииБоеприпасов > 0) {
                     ammoOut = безЭнергииБоеприпасов;
-                    unitsOut = 0;
+                    unitsOut = поОдной ? Math.min(1, unitsOut) : 0;
                 }
                 // НОЛЬ ВОЙСК — НАНИМАТЬ НЕЧЕГО (печатный выпуск ЦУ 25.09.2026: вышек 0,
                 // пока синий жетон не накрыл число).
@@ -931,6 +962,15 @@ public final class Actions {
                 // из двух. Отдельный вариант выбора, а не молчаливая прибавка:
                 // выбор остаётся за игроком, и в журнале видно, что он взял.
                 boolean dualLeft = ctx.assemblyDualOutput > 0;
+                if (всёСразу && roomForUnit && !ctx.сборкаТолькоВойска) {
+                    // запитанное — оба выхода сразу, выбирать нечего
+                    opts.clear();
+                    dualLeft = false;
+                    opts.add(new Choice("assemble",
+                        Map.of("kind", "both", "building", b.uid, "unit", unitType.code, "units", unitsOut,
+                            "fits", встанут),
+                        b.type.code + "->" + unitType.code + " И ammo"));
+                }
                 if (dualLeft && roomForUnit) {
                     opts.add(new Choice("assemble",
                         Map.of("kind", "both", "building", b.uid, "unit", unitType.code, "units", unitsOut,
@@ -964,7 +1004,9 @@ public final class Actions {
                 // обычной ветвью ниже (её код длинный, и дублировать его значило
                 // бы развести две правды о найме).
                 if ("both".equals(payload.get("kind"))) {
-                    ctx.assemblyDualOutput--;
+                    if (!всёСразу) {
+                        ctx.assemblyDualOutput--;
+                    }
                     jf.assemblyAmmoBuildingTypes.add(b.type.code);
                     ammoMade += Storage.addAmmoCapped(state, player, ammoOut);
                     payload = new java.util.HashMap<>(payload);
@@ -4425,23 +4467,36 @@ public final class Actions {
                                                    int reached) {
             Ruleset rs = cfg.ruleset;
             int шаг = rs.getInt("tech.super_objective_on_step", 0);
-            if (шаг <= 0 || reached != шаг
-                    || !kelium.engine.Setup.expansionOn(rs, "super_objectives")) {
+            if (шаг <= 0 || reached != шаг) {
                 return;
+            }
+            взятьСуперЗадание(state, rs, player, agent);
+        }
+
+        /**
+         * ВЗЯТЬ КАРТУ СУПЕР-ЗАДАНИЯ: из открытых на столе (на выбор) или с
+         * колоды. Зовут шаг трека и награда обычного задания (решение
+         * дизайнера 13.10.2026: «выполнил задание — получил супер-задание»).
+         * Возвращает, взята ли карта.
+         */
+        public static boolean взятьСуперЗадание(GameState state, Ruleset rs, PlayerState player,
+                                                Agent agent) {
+            if (!kelium.engine.Setup.expansionOn(rs, "super_objectives")) {
+                return false;
             }
             // ОТКРЫТЫЕ НА СТОЛЕ (свод super_objectives.display, 05.10.2026):
             // игрок выбирает одну из лежащих карт, на её место выкладывают новую.
             if (rs.getInt("super_objectives.display", 0) > 0) {
                 if (state.superDisplay.isEmpty()) {
-                    return;
+                    return false;
                 }
                 List<Choice> opts = new ArrayList<>();
                 for (String c : state.superDisplay) {
                     Map<String, Object> card = Ctx.cards(state, "super_objectives").find(c);
                     String label = card == null ? c : String.valueOf(card.get("name"));
-                    opts.add(new Choice("super_take", c, label + " (" + c + ")"));
+                    opts.add(new Choice("super_take", c, label));   // номер карты игроку не показывают
                 }
-                Choice ch = opts.size() == 1 ? opts.get(0)
+                Choice ch = opts.size() == 1 || agent == null ? opts.get(0)
                     : agent.choose(state, opts, Map.of("kind", "super_take", "seat", player.seat));
                 String взята = ch.payload() instanceof String c && state.superDisplay.contains(c)
                     ? c : state.superDisplay.get(0);
@@ -4449,11 +4504,11 @@ public final class Actions {
                 player.superObjectives.add(взята);
                 player.superObjectiveOffer.add(взята);
                 kelium.engine.Setup.refillSuperDisplay(state, rs);
-                return;
+                return true;
             }
             var колода = state.decks.get("super_objectives");
             if (колода == null) {
-                return;
+                return false;
             }
             // КАРТА, КОТОРОЙ НИ У КОГО НЕТ: раздача подготовки берёт карты из
             // НАБОРА, а не из колоды, поэтому в колоде они всё ещё лежат.
@@ -4461,7 +4516,7 @@ public final class Actions {
             for (int попытка = 0; попытка < 8 && cid == null; попытка++) {
                 String тянем = колода.draw(state.rng);
                 if (тянем == null) {
-                    return;
+                    return false;
                 }
                 boolean занята = false;
                 for (PlayerState p : state.players) {
@@ -4472,10 +4527,11 @@ public final class Actions {
                 }
             }
             if (cid == null) {
-                return;
+                return false;
             }
             player.superObjectives.add(cid);
             player.superObjectiveOffer.add(cid);
+            return true;
         }
 
         /**

@@ -54,6 +54,23 @@ public final class Effects {
      * Применить эффект {@code eid} для места {@code seat} с параметрами
      * {@code params}. Возвращает карту фактически произошедшего (телеметрия).
      */
+    /**
+     * ВЗЯТЬ СУПЕР-ЗАДАНИЕ (решение дизайнера 13.10.2026: «выполнил задание —
+     * получил супер-задание»): одно из открытых на столе, на выбор; {@code n}
+     * — сколько карт (по умолчанию 1).
+     */
+    private static Map<String, Object> takeSuperObjective(GameState s, int seat, Map<String, Object> p) {
+        int n = p.get("n") instanceof Number num ? Math.max(1, num.intValue()) : 1;
+        int взято = 0;
+        for (int i = 0; i < n; i++) {
+            if (Actions.ScienceAction.взятьСуперЗадание(s, kelium.dataio.Ctx.rules(s), s.player(seat),
+                    agentFor(s, seat))) {
+                взято++;
+            }
+        }
+        return Map.of("super_objective", взято);
+    }
+
     public static Map<String, Object> apply(String eid, GameState s, int seat, Map<String, Object> params) {
         if (eid == null) {
             eid = "noop";
@@ -105,6 +122,8 @@ public final class Effects {
             case "replace_building_with_neutral" -> replaceBuildingWithNeutral(s, seat, p);
             case "steal_objective_cards" -> stealObjectiveCards(s, seat, p);
             case "exchange_table" -> exchangeTable(s, seat, p);
+            // СУПЕР-ЗАДАНИЕ НАГРАДОЙ (решение дизайнера 13.10.2026)
+            case "take_super_objective" -> takeSuperObjective(s, seat, p);
             case "noop" -> Map.of("noop", p.getOrDefault("note", "unimplemented"));
             // ПУСТОЙ КОНТЕЙНЕР (заказ дизайнера 18.08.2026, контейнеры 4.0) —
             // НАМЕРЕННО ничего не даёт, это не заглушка недоделки. Отдельно от

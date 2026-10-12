@@ -306,6 +306,45 @@ public final class Setup {
         }
     }
 
+    /**
+     * ТАЙЛЫ ЗАРОЖДЕНИЯ ПО СВОДУ (решение дизайнера 13.10.2026): «за большие
+     * тайлы должна быть драка». Ключи раздела field:
+     * <ul>
+     *   <li>{@code spawn_face_kelium_bonus} — столько келемия добавить на лицо
+     *       каждого тайла (стартового и большого);</li>
+     *   <li>{@code big_spawn_tiles_minus_players} — больших тайлов не больше,
+     *       чем игроков минус это число; лишние снимаются с поля случайно, и
+     *       гекс становится обычным.</li>
+     * </ul>
+     * Случай берётся своим генератором от сида партии — раздачи и всё прочее
+     * от этого не сдвигаются.
+     */
+    private static void тайлыЗарождения(Field field, Ruleset ruleset, int n, Long seed) {
+        int bonus = ruleset.getInt("field.spawn_face_kelium_bonus", 0);
+        int minus = ruleset.getInt("field.big_spawn_tiles_minus_players", -1);
+        List<Hex> big = new ArrayList<>();
+        for (Hex h : field.hexes.values()) {
+            if (h.spawnTile == null) {
+                continue;
+            }
+            if (bonus != 0) {
+                h.spawnTile.applyTopFaceDelta(bonus);
+            }
+            if (!h.spawnTile.isStart) {
+                big.add(h);
+            }
+        }
+        if (minus < 0) {
+            return;
+        }
+        int max = Math.max(0, n - minus);
+        Random r = seed != null ? new Random(seed * 0x9E3779B97F4A7C15L + 13) : new Random();
+        Collections.shuffle(big, r);
+        for (int i = max; i < big.size(); i++) {
+            big.get(i).spawnTile = null;
+        }
+    }
+
     /** Вернуть (Field, {seat: id стартового гекса}) — из сценария или кольцо-заглушку. */
     private static Scenario.FieldWithStarts loadField(GameConfig config, int n) {
         // B8: у сценариев СВОЙ ключ версии (независимый от досок).
@@ -443,6 +482,7 @@ public final class Setup {
         Scenario.FieldWithStarts fw = loadField(config, n);
         Field field = fw.field();
         Map<Integer, String> startHexes = fw.starts();
+        тайлыЗарождения(field, ruleset, n, config.seed);
 
         // КОНТЕЙНЕРЫ 2.0: поле раскладывается картонными блоками, и с них на
         // ячейки гексов переносятся ПЕЧАТНЫЕ контейнеры. Жетон, вставший на
@@ -884,6 +924,18 @@ public final class Setup {
         // они лежат открыто на столе, см. refillSuperDisplay.
         if (expansionOn(ruleset, "super_objectives")) {
             if (ruleset.getInt("super_objectives.display", 0) > 0) {
+                // КОЛОДА СУПЕР-ЗАДАНИЙ (ошибка, найденная 13.10.2026): колоды
+                // собираются списком выше, а супер-задания в него не входили —
+                // стол открытых супер-заданий с 05.10 оставался пустым, и шаг
+                // трека карты не давал. Колода — весь набор, перемешанный.
+                if (!s.decks.containsKey("super_objectives")) {
+                    try {
+                        s.decks.put("super_objectives", Deck.fromIds("super_objectives",
+                            new ArrayList<>(content.get("super_objectives").ids()), rng));
+                    } catch (RuntimeException e) {
+                        // набора нет — играем без супер-заданий
+                    }
+                }
                 refillSuperDisplay(s, ruleset);
             } else {
                 try {

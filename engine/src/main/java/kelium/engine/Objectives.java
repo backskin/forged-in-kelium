@@ -650,6 +650,19 @@ public final class Objectives {
                     boolean позолотил = Modules.gildOne(s, p, агент);
                     into.put("gild", позолотил ? 1 : 0);
                 }
+                // СУПЕР-ЗАДАНИЕ В НАГРАДУ (решение дизайнера 13.10.2026: «выполнил
+                // задание — получил супер-задание»): одно из открытых на столе.
+                case "super_objective" -> {
+                    Agent агент = s.agents == null || p.seat >= s.agents.size()
+                        ? null : s.agents.get(p.seat);
+                    int взято = 0;
+                    for (int i = 0; i < Math.max(1, e.getValue() instanceof Number сз ? сз.intValue() : 1); i++) {
+                        if (Actions.ScienceAction.взятьСуперЗадание(s, Ctx.rules(s), p, агент)) {
+                            взято++;
+                        }
+                    }
+                    into.put("super_objective", взято);
+                }
                 default -> { }
             }
         }
@@ -709,6 +722,19 @@ public final class Objectives {
                         ЖетоныХранилища.положить(s, p, ЖетоныХранилища.ЯЧЕЙКА);
                         into.put("storage_token", 1);
                     }
+                }
+                // СУПЕР-ЗАДАНИЕ В НАГРАДУ (решение дизайнера 13.10.2026: «выполнил
+                // задание — получил супер-задание»): одно из открытых на столе.
+                case "super_objective" -> {
+                    Agent агент = s.agents == null || p.seat >= s.agents.size()
+                        ? null : s.agents.get(p.seat);
+                    int взято = 0;
+                    for (int i = 0; i < Math.max(1, n); i++) {
+                        if (Actions.ScienceAction.взятьСуперЗадание(s, Ctx.rules(s), p, агент)) {
+                            взято++;
+                        }
+                    }
+                    into.put("super_objective", взято);
                 }
                 case "arsenal" -> {
                     // СКОЛЬКО НАПЕЧАТАНО, СТОЛЬКО И КАРТ (печатные задания

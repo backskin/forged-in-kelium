@@ -340,6 +340,20 @@ public final class RuleWords {
                 "атака супер-войска за 1 боеприпас наносит столько урона; урон можно разделить";
             case "mining.unpowered_yield" ->
                 "добытчик без энергии всё же добывает столько келемия";
+            case "mining.unpowered_one_of" ->
+                "добытчик без энергии берёт 1 келемий или 1 карту контейнера";
+            case "mining.powered_both" ->
+                "запитанный добытчик берёт и келемий, и контейнеры по печати";
+            case "assembly.unpowered_one_of" ->
+                "военное здание и ЦУ без энергии делают 1 жетон войск или 1 боеприпас";
+            case "assembly.powered_both" ->
+                "запитанное военное здание и ЦУ делают и войска, и боеприпасы по печати";
+            case "setup.start_unit_from_seal" ->
+                "стартовое войско — род с модуля блокировки боя, а не пехота";
+            case "field.spawn_face_kelium_bonus" ->
+                "столько келемия добавить на лицо каждого тайла зарождения";
+            case "field.big_spawn_tiles_minus_players" ->
+                "больших тайлов зарождения не больше, чем игроков минус столько";
             case "mining.unpowered_container" ->
                 "добытчик без энергии берёт ровно 1 контейнер со своего гекса";
             case "assembly.unpowered_ammo" ->

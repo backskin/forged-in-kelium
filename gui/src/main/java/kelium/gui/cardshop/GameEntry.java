@@ -85,11 +85,16 @@ public final class GameEntry {
         Reward r = Reward.of(raw, main);
         Map<String, Object> out = new LinkedHashMap<>();
         List<String> acts = new ArrayList<>();
+        List<Map<String, Object>> effects = new ArrayList<>();
         for (Reward.Item it : r.items) {
             String a = actionOf(it.icon());
             String res = resourceOf(it.icon());
             if (a != null) {
                 acts.add(a);
+            } else if ("18".equals(CardAssets.key(it.icon()))) {
+                // СУПЕР-ЗАДАНИЕ НАГРАДОЙ (дизайнер 13.10.2026): одно из открытых на столе
+                effects.add(new LinkedHashMap<>(Map.of("id", "take_super_objective",
+                    "n", Math.max(1, it.count()))));
             } else if ("позолота".equals(res)) {
                 out.put("позолота", true);
             } else if (res != null) {
@@ -100,6 +105,9 @@ public final class GameEntry {
         }
         if (!acts.isEmpty()) {
             out.put("действие", String.join("|", acts));
+        }
+        if (!effects.isEmpty()) {
+            out.put("эффекты", effects);
         }
         return out;
     }
