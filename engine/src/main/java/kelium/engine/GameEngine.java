@@ -2114,6 +2114,66 @@ public final class GameEngine {
 
     private void offerSealChoice() {
         Modules.раздатьГлухиеЖетоны(state, this::emit);
+        стартовоеВойскоПодБлокировкой();
+    }
+
+    /**
+     * СТАРТОВОЕ ВОЙСКО ПОД БЛОКИРОВКОЙ (решение дизайнера 13.10.2026, ключ
+     * setup.start_unit_from_seal): на подготовке каждый ставит на свой
+     * стартовый гекс 1 жетон того рода войск, который нарисован на его модуле
+     * блокировки боя. Нет места на гексе — жетон садится внутрь ЦУ (вышка
+     * внутрь не садится и тогда не ставится).
+     */
+    private void стартовоеВойскоПодБлокировкой() {
+        if (!Ctx.rules(state).getBool("setup.start_unit_from_seal", false)) {
+            return;
+        }
+        for (PlayerState p : state.players) {
+            UnitType род = null;
+            for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
+                if (Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                    род = e.getKey();
+                }
+            }
+            BuildingToken цу = null;
+            for (BuildingToken b : p.buildingsOnField()) {
+                if (b.type == kelium.core.BuildingType.COMMAND_CENTER) {
+                    цу = b;
+                }
+            }
+            if (род == null || цу == null) {
+                continue;
+            }
+            // ВМЕСТО СТАРТОВОЙ ПЕХОТЫ: она уходит в запас, на её место встаёт
+            // жетон рода с модуля (пехота на модуле — пехота и остаётся)
+            UnitToken пехота = null;
+            for (UnitToken x : p.units) {
+                if (x.type == UnitType.INFANTRY && цу.hexId.equals(x.hexId)) {
+                    пехота = x;
+                }
+            }
+            if (род == UnitType.INFANTRY && пехота != null) {
+                emit(ev("type", "start_unit", "seat", p.seat, "unit", род.code, "hex", цу.hexId));
+                continue;
+            }
+            if (пехота != null) {
+                p.units.remove(пехота);
+            }
+            boolean наГекс = Placement.canHireOn(state, p, цу.hexId, род);
+            if (!наГекс && род == UnitType.TOWER) {
+                continue;
+            }
+            UnitToken u = state.tokenStats.makeUnit(род, p.seat, Placement.nextUid(state),
+                p.unitsOfKind(род));
+            p.units.add(u);
+            u.hexId = цу.hexId;
+            if (наГекс) {
+                СекторыВойск.поставить(state, agents.get(p.seat), u);
+            } else {
+                u.insideBuildingUid = цу.uid;
+            }
+            emit(ev("type", "start_unit", "seat", p.seat, "unit", род.code, "hex", цу.hexId));
+        }
     }
 
 

@@ -145,4 +145,25 @@ class Свод151Test {
             assertTrue(s.round > 1, "сид " + сид + ": партия идёт по раундам");
         }
     }
+
+    @Test
+    void стартовоеВойскоРодаСМодуляБлокировки() {
+        GameState s = Setup.buildGame(GameConfig.buildCached(СВОД, 4, 11L, null, null));
+        List<Agent> agents = new ArrayList<>();
+        for (int seat = 0; seat < 4; seat++) {
+            agents.add(new Fix.FirstChoiceAgent(seat));
+        }
+        List<Map<String, Object>> выставлено = new ArrayList<>();
+        new GameEngine(s, agents, ev -> {
+            if ("start_unit".equals(ev.get("type"))) {
+                выставлено.add(ev);
+            }
+        }).run();
+        assertEquals(4, выставлено.size(), "у каждого из четырёх — стартовый жетон: " + выставлено);
+        java.util.Set<Object> рода = new java.util.HashSet<>();
+        for (Map<String, Object> ev : выставлено) {
+            рода.add(ev.get("unit"));
+        }
+        assertEquals(4, рода.size(), "модули блокировки разных родов — и жетоны разных родов");
+    }
 }
