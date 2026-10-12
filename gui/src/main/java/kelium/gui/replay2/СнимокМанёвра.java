@@ -28,9 +28,10 @@ import kelium.report.Textures;
  * «нет вообще примера движения»).
  *
  * <p>Выбран один гекс (пунктир). С него сначала уходит пехота, потом на него
- * приходят техника с соседнего гекса и пехота издалека — в обход гекса, где
- * стоят чужие войска: сквозь них наземные войска не проходят. Вышка остаётся:
- * её скорость 0.
+ * приходят техника с соседнего гекса и пехота издалека — напрямую сквозь гекс
+ * с чужой пехотой: пройти его можно, остановиться нельзя (дизайнер 14.10.2026).
+ * Четвёртая, красная стрелка с крестом — попытка встать на этот гекс: нельзя.
+ * Вышка остаётся: её скорость 0.
  *
  * <p>Запуск: {@code java -cp gui/target/kelium-runner.jar
  * kelium.gui.replay2.СнимокМанёвра <куда.png> [радиус гекса]}
@@ -44,6 +45,7 @@ public final class СнимокМанёвра {
     private static final int[] ЦЕЛЬ = {0, 0};
     private static final int[][] КЛЕТКИ = {{0, 0}, {-1, 1}, {0, -1}, {1, -1}, {2, -1}, {1, 0}};
     private static final Color ХОД = new Color(0x1F5FA8);
+    private static final Color ЗАПРЕТ = new Color(0xC8281E);
 
     private static int uid = 1;
 
@@ -81,7 +83,8 @@ public final class СнимокМанёвра {
         жетоны.add(жетон("tower", 0, "h0_0", 1));            // остаётся
         жетоны.add(жетон("infantry", 0, "h0_0", 4));         // 1 — уходит
         жетоны.add(жетон("vehicle", 0, "h0_-1", 3, 4));      // 2 — придёт с соседнего
-        жетоны.add(жетон("infantry", 0, "h2_-1", 0));        // 3 — придёт в обход
+        жетоны.add(жетон("infantry", 0, "h2_-1", 0));        // 3 — придёт сквозь чужой гекс
+        жетоны.add(жетон("infantry", 0, "h1_-1", 1));        // 4 — встать к чужим нельзя
         жетоны.add(жетон("infantry", 1, "h1_0", 2));         // чужая пехота закрывает путь
         List<ReplayRecord.Tok> след = new ArrayList<>();
         след.add(жетон("infantry", 0, "h-1_1", 1));
@@ -98,7 +101,14 @@ public final class СнимокМанёвра {
         ходы.add(new Ход(центр(size, состояния, пусто, жетоны.get(2)),
             центр(size, состояния, пусто, след.get(1)), new int[][]{{0, -1}, {0, 0}}, "2", true));
         ходы.add(new Ход(центр(size, состояния, пусто, жетоны.get(3)),
-            центр(size, состояния, пусто, след.get(2)), new int[][]{{2, -1}, {1, -1}, {0, 0}}, "3"));
+            центр(size, состояния, пусто, след.get(2)), new int[][]{{2, -1}, {1, 0}, {0, 0}}, "3"));
+        // 4 — ЗАПРЕТ: стрелка обрывается в гексе с чужими войсками крестом
+        double[] гб = FieldGeometry.hexCenter(1, 0, size);
+        double[] гс = FieldGeometry.hexCenter(1, -1, size);
+        double[] от4 = центр(size, состояния, пусто, жетоны.get(4));
+        double сх = гб[0] + (гс[0] - гб[0]) * 0.50 + поляX(size);
+        double су = гб[1] + (гс[1] - гб[1]) * 0.50 + поляY(size);
+        ходы.add(new Ход(от4, new double[]{сх, су}, new int[][]{{1, -1}}, "4", false, true));
         BufferedImage основа = нарисовать(size, состояния, жетоны, true);
         BufferedImage призраки = нарисовать(size, состояния, след, false);
         // где «призраки» отличаются от пустого поля — там след: подмешать на 45%
@@ -220,10 +230,35 @@ public final class СнимокМанёвра {
     }
 
     /** Ход жетона: откуда (центр жетона), куда (центр следа), через какие гексы. */
-    private record Ход(double[] от, double[] до, int[][] гексы, String номер, boolean черезНебо) {
+    private record Ход(double[] от, double[] до, int[][] гексы, String номер, boolean черезНебо, boolean запрет) {
         Ход(double[] от, double[] до, int[][] гексы, String номер) {
-            this(от, до, гексы, номер, false);
+            this(от, до, гексы, номер, false, false);
         }
+
+        Ход(double[] от, double[] до, int[][] гексы, String номер, boolean черезНебо) {
+            this(от, до, гексы, номер, черезНебо, false);
+        }
+
+        Color цвет() {
+            return запрет ? ЗАПРЕТ : ХОД;
+        }
+    }
+
+    /** Сдвиг начала координат рисунка — тот же, что в нарисовать(). */
+    private static double поляX(double size) {
+        double minx = Double.MAX_VALUE;
+        for (int[] qr : КЛЕТКИ) {
+            minx = Math.min(minx, FieldGeometry.hexCenter(qr[0], qr[1], size)[0] - size);
+        }
+        return Math.round(size * 0.22) - minx;
+    }
+
+    private static double поляY(double size) {
+        double miny = Double.MAX_VALUE;
+        for (int[] qr : КЛЕТКИ) {
+            miny = Math.min(miny, FieldGeometry.hexCenter(qr[0], qr[1], size)[1] - Math.sqrt(3) / 2 * size);
+        }
+        return Math.round(size * 0.52) - miny;
     }
 
     private static final List<Ход> ходы = new ArrayList<>();
@@ -321,15 +356,28 @@ public final class СнимокМанёвра {
         g.draw(линия);
         g.draw(нос);
         g.fill(нос);
-        g.setColor(ХОД);
+        g.setColor(х.цвет());
         g.setStroke(new BasicStroke(толщ, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.draw(линия);
         g.fill(нос);
+        if (х.запрет()) {
+            // крест в красном круге на конце: сюда встать нельзя
+            double rк = size * 0.15;
+            g.setColor(ОРЕОЛ);
+            g.fill(new java.awt.geom.Ellipse2D.Double(z[0] - rк * 1.25, z[1] - rк * 1.25, rк * 2.5, rк * 2.5));
+            g.setColor(ЗАПРЕТ);
+            g.fill(new java.awt.geom.Ellipse2D.Double(z[0] - rк, z[1] - rк, 2 * rк, 2 * rк));
+            g.setColor(Color.WHITE);
+            g.setStroke(new BasicStroke((float) (size * 0.045), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            double д = rк * 0.5;
+            g.draw(new java.awt.geom.Line2D.Double(z[0] - д, z[1] - д, z[0] + д, z[1] + д));
+            g.draw(new java.awt.geom.Line2D.Double(z[0] - д, z[1] + д, z[0] + д, z[1] - д));
+        }
         // точка на старом месте
         double rт = size * 0.045;
         g.setColor(ОРЕОЛ);
         g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - rт * 1.8, a[1] - rт * 1.8, rт * 3.6, rт * 3.6));
-        g.setColor(ХОД);
+        g.setColor(х.цвет());
         g.fill(new java.awt.geom.Ellipse2D.Double(a[0] - rт, a[1] - rт, 2 * rт, 2 * rт));
         // номер шага — у первого излома, сбоку от линии
         double[] p0 = т.get(0);
@@ -342,7 +390,7 @@ public final class СнимокМанёвра {
         double r = size * 0.13;
         g.setColor(ОРЕОЛ);
         g.fill(new java.awt.geom.Ellipse2D.Double(м[0] - r * 1.25, м[1] - r * 1.25, r * 2.5, r * 2.5));
-        g.setColor(ХОД);
+        g.setColor(х.цвет());
         g.fill(new java.awt.geom.Ellipse2D.Double(м[0] - r, м[1] - r, 2 * r, 2 * r));
         g.setColor(Color.WHITE);
         g.setFont(new Font("Tektur Narrow", Font.BOLD, (int) Math.round(size * 0.19)));

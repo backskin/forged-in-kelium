@@ -434,7 +434,7 @@ CSS = r"""
   .с-заглавной > .блок { flex: 1; margin: 0; }
   .с-заглавной .заглавная { flex: none; display: flex; align-items: center; justify-content: center;
     width: 26mm; }
-  .с-заглавной .заг-и { height: 100%; max-height: 26mm; width: auto; max-width: 26mm; object-fit: contain; }
+  .с-заглавной .заг-и { height: 100%; max-height: 18mm; width: auto; max-width: 18mm; object-fit: contain; }
   /* Блок на ступень крупнее: когда на полосе остаётся воздух, текст
      лучше дать больше, чем растягивать пустоту (15.09.2026). */
   .блок.крупно p, .блок.крупно li { font-size: 10.4pt; line-height: 1.32; }
@@ -444,6 +444,10 @@ CSS = r"""
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
   .блок.надвое:has(.широкий) { grid-template-columns: 1fr 1fr; }
+  .блок.надвое:has(.шире) { grid-template-columns: 1.45fr 1fr; }
+  .блок.в-две { column-count: 2; column-gap: 7mm; }
+  .блок.в-две > h2 { column-span: all; }
+  .блок.в-две li { break-inside: avoid; }
   .блок.надвое > .под-низ { grid-column: 1 / -1; }
   /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
      рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
