@@ -28,25 +28,31 @@ D = os.path.dirname(os.path.abspath(__file__))
 # растянутая на обе полосы: левая показывает её левую половину, правая —
 # правую, поэтому цвета соседних страниц всегда совпадают (дизайнер 14.10.2026).
 # Левая полоса разворота — чётная: (4,5), (6,7)…
+ВУАЛЬ = {8: .9}                    # разворот подготовки — тише: на нём поле и 18 шагов
 РАЗВОРОТЫ = {4: 38, 6: 45, 8: 21, 10: 5, 12: 76, 14: 32, 16: 40, 18: 43, 20: 98, 22: 99,
              24: 103, 26: 53, 28: 17, 30: 16, 32: 36, 34: 84, 36: 100, 38: 75}
 
 CSS = """
   /* ---- иллюстрации под полосами (фон_иллюстрации.py) ----
-     Картинка лежит на всей полосе и видна в полный цвет за рамкой, у краёв
-     листа. Внутри рамки на неё ложится вуаль цвета бумаги с мягким краем по
-     линии рамки: картинка еле проглядывает за текстом. На первой полосе главы
-     вуаль начинается ниже шапки — под заголовком главы картинка яркая. */
+     Картинка лежит на всей полосе. Внутри рамки — вуаль цвета бумаги с ЖЁСТКИМ
+     краем ровно по линии рамки (те же срезанные углы, ни теней, ни свечения);
+     у корешка вуаль идёт до края листа, чтобы по развороту не было шва и поле
+     подготовки читалось целиком. Картинка видна в полный цвет в полосе за
+     рамкой, а за текстом еле проглядывает. На первой полосе главы вуаль
+     начинается ниже шапки: под названием главы — картинка, снизу линия. */
   .илл-фон { position: absolute; inset: 0; z-index: -3; pointer-events: none;
     background-repeat: no-repeat; background-size: 200% auto; }
   .илл-фон.лев { background-position: 0% 50%; }
   .илл-фон.прав { background-position: 100% 50%; }
-  .илл-вуаль { position: absolute; inset: 7.5mm; z-index: -2; pointer-events: none;
-    background: rgba(244,238,220,.8); box-shadow: 0 0 3mm 1.6mm rgba(244,238,220,.8); }
-  .илл-вуаль.шапка { top: 46mm; box-shadow: 0 0 6mm 3mm rgba(244,238,220,.8); }
-  .стр:has(.илл-вуаль.шапка) .глава .гл-т { background: rgba(247,241,225,.88); padding: .6mm 2.4mm .4mm;
-    box-shadow: 0 0 3mm 1.5mm rgba(247,241,225,.88); }
-  /* вводный абзац главы — на светлой подложке, чтобы читался на картинке */
+  .илл-вуаль { position: absolute; z-index: -2; pointer-events: none; background: rgba(244,238,220,var(--вуаль,.84)); }
+  .илл-вуаль.лев { inset: 5mm 0 5mm 5mm;
+    clip-path: polygon(4mm 0, 100% 0, 100% 100%, 4mm 100%, 0 calc(100% - 4mm), 0 4mm); }
+  .илл-вуаль.прав { inset: 5mm 5mm 5mm 0;
+    clip-path: polygon(0 0, calc(100% - 4mm) 0, 100% 4mm, 100% calc(100% - 4mm), calc(100% - 4mm) 100%, 0 100%); }
+  .илл-вуаль.шапка { top: 43mm; border-top: .6mm solid var(--келемий); }
+  .илл-вуаль.лев.шапка { clip-path: polygon(0 0, 100% 0, 100% 100%, 4mm 100%, 0 calc(100% - 4mm)); }
+  .илл-вуаль.прав.шапка { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%) ; }
+  .стр:has(.илл-вуаль.шапка) .глава .гл-т { background: rgba(247,241,225,.9); padding: .6mm 2.4mm .4mm; }
   .стр:has(.илл-вуаль.шапка) .вводка { background: rgba(247,241,225,.9); padding: 2mm 3mm; margin-bottom: 4mm;
     outline: .18mm solid var(--кант); outline-offset: -.18mm; }
   .стр:has(.илл-вуаль.шапка) .с-заглавной > .блок { background: rgba(247,241,225,.92); }
@@ -57,20 +63,37 @@ def файл(номер):
     return os.path.join(ПАПКА, sorted(x for x in os.listdir(ПАПКА) if x.lower().endswith(".jpg"))[номер])
 
 
+ТОН = .56                          # к какой средней яркости приводятся картинки
+
+
 def в_илл(путь):
-    данные = open(путь, "rb").read()
-    имя = hashlib.sha1(данные).hexdigest()[:16] + ".jpg"
+    """Картинка разворота: яркость выровнена по горизонтали (левая и правая
+    половины одного тона), контраст чуть сжат. Имя — по хешу результата."""
+    import numpy as np
+    from scipy.ndimage import gaussian_filter1d
+    im = Image.open(путь).convert("RGB")
+    im.thumbnail((2600, 2600), Image.LANCZOS)
+    a = np.asarray(im, dtype=np.float32) / 255.0
+    L = a @ np.array([.299, .587, .114], dtype=np.float32)
+    колонки = gaussian_filter1d(L.mean(axis=0), a.shape[1] * 0.12)
+    g = np.clip(ТОН / np.maximum(колонки, .05), .7, 1.6)[None, :, None]
+    a = np.clip(a * g, 0, 1)
+    сер = (a @ np.array([.299, .587, .114], dtype=np.float32))[..., None]
+    a = np.clip(сер + (a - сер) * .92, 0, 1)                       # чуть тише цвет
+    a = ТОН + (a - ТОН) * .9                                      # и контраст
+    выход = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8))
+    буфер = io.BytesIO()
+    выход.save(буфер, "JPEG", quality=84, optimize=True)
+    имя = hashlib.sha1(буфер.getvalue()).hexdigest()[:16] + ".jpg"
     куда = os.path.join(ИЛЛ, имя)
     if not os.path.exists(куда):
-        im = Image.open(io.BytesIO(данные)).convert("RGB")
-        im.thumbnail((2600, 2600), Image.LANCZOS)
-        im.save(куда, "JPEG", quality=84, optimize=True)
+        open(куда, "wb").write(буфер.getvalue())
     return "илл/" + имя
 
 
 def main():
     t = io.open(КНИГА, encoding="utf-8").read()
-    t = re.sub(r'<div class="илл-фон[^"]*" style="[^"]*"></div>(<div class="илл-вуаль[^"]*"></div>)?', "", t)
+    t = re.sub(r'<div class="илл-фон[^"]*" style="[^"]*"></div>(<div class="илл-вуаль[^"]*"( style="[^"]*")?></div>)?', "", t)
     a = t.find("  /* ---- иллюстрации под полосами")
     if a >= 0:
         b = t.index("</style>", a)
@@ -88,8 +111,10 @@ def main():
         конец = t.find('<div class="стр', m.end())
         глава = '<div class="глава"' in t[m.end():конец if конец > 0 else len(t)]
         вставка = ('<div class="илл-фон %s" style="background-image:url(&quot;%s&quot;)"></div>'
-                   '<div class="илл-вуаль%s"></div>') % ("лев" if левая else "прав", кадр[левый],
-                                                         " шапка" if глава else "")
+                   '<div class="илл-вуаль %s%s"%s></div>') % ("лев" if левая else "прав", кадр[левый],
+                                                         "лев" if левая else "прав",
+                                                         " шапка" if глава else "",
+                                                         ' style="--вуаль:%s"' % ВУАЛЬ[левый] if левый in ВУАЛЬ else "")
         части.append(t[поз:m.end()] + вставка)
         поз = m.end()
     t = "".join(части) + t[поз:]

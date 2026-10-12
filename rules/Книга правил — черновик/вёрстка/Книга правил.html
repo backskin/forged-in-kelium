@@ -604,21 +604,27 @@
 
 
 
+
   /* ---- иллюстрации под полосами (фон_иллюстрации.py) ----
-     Картинка лежит на всей полосе и видна в полный цвет за рамкой, у краёв
-     листа. Внутри рамки на неё ложится вуаль цвета бумаги с мягким краем по
-     линии рамки: картинка еле проглядывает за текстом. На первой полосе главы
-     вуаль начинается ниже шапки — под заголовком главы картинка яркая. */
+     Картинка лежит на всей полосе. Внутри рамки — вуаль цвета бумаги с ЖЁСТКИМ
+     краем ровно по линии рамки (те же срезанные углы, ни теней, ни свечения);
+     у корешка вуаль идёт до края листа, чтобы по развороту не было шва и поле
+     подготовки читалось целиком. Картинка видна в полный цвет в полосе за
+     рамкой, а за текстом еле проглядывает. На первой полосе главы вуаль
+     начинается ниже шапки: под названием главы — картинка, снизу линия. */
   .илл-фон { position: absolute; inset: 0; z-index: -3; pointer-events: none;
     background-repeat: no-repeat; background-size: 200% auto; }
   .илл-фон.лев { background-position: 0% 50%; }
   .илл-фон.прав { background-position: 100% 50%; }
-  .илл-вуаль { position: absolute; inset: 7.5mm; z-index: -2; pointer-events: none;
-    background: rgba(244,238,220,.8); box-shadow: 0 0 3mm 1.6mm rgba(244,238,220,.8); }
-  .илл-вуаль.шапка { top: 46mm; box-shadow: 0 0 6mm 3mm rgba(244,238,220,.8); }
-  .стр:has(.илл-вуаль.шапка) .глава .гл-т { background: rgba(247,241,225,.88); padding: .6mm 2.4mm .4mm;
-    box-shadow: 0 0 3mm 1.5mm rgba(247,241,225,.88); }
-  /* вводный абзац главы — на светлой подложке, чтобы читался на картинке */
+  .илл-вуаль { position: absolute; z-index: -2; pointer-events: none; background: rgba(244,238,220,var(--вуаль,.84)); }
+  .илл-вуаль.лев { inset: 5mm 0 5mm 5mm;
+    clip-path: polygon(4mm 0, 100% 0, 100% 100%, 4mm 100%, 0 calc(100% - 4mm), 0 4mm); }
+  .илл-вуаль.прав { inset: 5mm 5mm 5mm 0;
+    clip-path: polygon(0 0, calc(100% - 4mm) 0, 100% 4mm, 100% calc(100% - 4mm), calc(100% - 4mm) 100%, 0 100%); }
+  .илл-вуаль.шапка { top: 43mm; border-top: .6mm solid var(--келемий); }
+  .илл-вуаль.лев.шапка { clip-path: polygon(0 0, 100% 0, 100% 100%, 4mm 100%, 0 calc(100% - 4mm)); }
+  .илл-вуаль.прав.шапка { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%) ; }
+  .стр:has(.илл-вуаль.шапка) .глава .гл-т { background: rgba(247,241,225,.9); padding: .6mm 2.4mm .4mm; }
   .стр:has(.илл-вуаль.шапка) .вводка { background: rgba(247,241,225,.9); padding: 2mm 3mm; margin-bottom: 4mm;
     outline: .18mm solid var(--кант); outline-offset: -.18mm; }
   .стр:has(.илл-вуаль.шапка) .с-заглавной > .блок { background: rgba(247,241,225,.92); }
@@ -725,7 +731,7 @@
 <p class="подпись-разворота">Разворот · страницы 4–5</p>
 <div class="разворот">
 
-  <div class="стр фон1 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/39f382f1ec26bd06.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон1 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/203214328d288e3d.jpg&quot;)"></div><div class="илл-вуаль лев шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -750,7 +756,7 @@
     <div class="колонцифра"><span>4</span></div>
   </div>
 
-  <div class="стр фон2 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/39f382f1ec26bd06.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон2 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/203214328d288e3d.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -782,7 +788,7 @@
 <p class="подпись-разворота">Разворот · страницы 6–7</p>
 <div class="разворот">
 
-  <div class="стр фон3 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/1cba495332a74748.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон3 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/e09e214ea18dbae1.jpg&quot;)"></div><div class="илл-вуаль лев шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -811,7 +817,7 @@
     <div class="колонцифра"><span>6</span></div>
   </div>
 
-  <div class="стр фон4 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/1cba495332a74748.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон4 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/e09e214ea18dbae1.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -843,7 +849,7 @@
 <p class="подпись-разворота">Разворот · страницы 8–9</p>
 <div class="разворот">
 
-  <div class="стр фон3 подготовка левая-подг"><div class="илл-фон лев" style="background-image:url(&quot;илл/6fea5ecdfa5eaa7c.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон3 подготовка левая-подг"><div class="илл-фон лев" style="background-image:url(&quot;илл/6e65e9d2fe2455a1.jpg&quot;)"></div><div class="илл-вуаль лев шапка" style="--вуаль:0.9"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -874,7 +880,7 @@
     <div class="колонцифра"><span>8</span></div>
   </div>
 
-  <div class="стр фон4 подготовка правая-подг"><div class="илл-фон прав" style="background-image:url(&quot;илл/6fea5ecdfa5eaa7c.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон4 подготовка правая-подг"><div class="илл-фон прав" style="background-image:url(&quot;илл/6e65e9d2fe2455a1.jpg&quot;)"></div><div class="илл-вуаль прав" style="--вуаль:0.9"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -915,7 +921,7 @@
 <p class="подпись-разворота">Разворот · страницы 10–11</p>
 <div class="разворот">
 
-  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/d93563dc52035e47.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/ecbcc37333c92397.jpg&quot;)"></div><div class="илл-вуаль лев шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -981,7 +987,7 @@
     <div class="колонцифра"><span>10</span></div>
   </div>
 
-  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/d93563dc52035e47.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/ecbcc37333c92397.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1028,7 +1034,7 @@
 <p class="подпись-разворота">Разворот · страницы 12–13</p>
 <div class="разворот">
 
-  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/dfd7d2601c8a8492.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/9bd198b8e003e2c7.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1062,7 +1068,7 @@
     <div class="колонцифра"><span>12</span></div>
   </div>
 
-  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/dfd7d2601c8a8492.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/9bd198b8e003e2c7.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1113,7 +1119,7 @@
 <p class="подпись-разворота">Разворот · страницы 14–15</p>
 <div class="разворот">
 
-  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/1a5f2bfe5c42d4c3.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/b019067128af5d3c.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1167,7 +1173,7 @@
     <div class="колонцифра"><span>14</span></div>
   </div>
 
-  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/1a5f2bfe5c42d4c3.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/b019067128af5d3c.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1237,7 +1243,7 @@
 <p class="подпись-разворота">Разворот · страницы 16–17</p>
 <div class="разворот">
 
-  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/c37e08676e130612.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/5cab39702419fa46.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1328,7 +1334,7 @@
     <div class="колонцифра"><span>16</span></div>
   </div>
 
-  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/c37e08676e130612.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/5cab39702419fa46.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1378,7 +1384,7 @@
 <p class="подпись-разворота">Разворот · страницы 18–19</p>
 <div class="разворот">
 
-  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/43346b0a80be6689.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/855652f199f41f1e.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1414,7 +1420,7 @@
     <div class="колонцифра"><span>18</span></div>
   </div>
 
-  <div class="стр фон4 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/43346b0a80be6689.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон4 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/855652f199f41f1e.jpg&quot;)"></div><div class="илл-вуаль прав шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1441,7 +1447,7 @@
 <p class="подпись-разворота">Разворот · страницы 20–21</p>
 <div class="разворот">
 
-  <div class="стр фон1 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/24a4714d1b04c78e.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон1 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/d5f63c710f274bdc.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1494,7 +1500,7 @@
     <div class="колонцифра"><span>20</span></div>
   </div>
 
-  <div class="стр фон2 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/24a4714d1b04c78e.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон2 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/d5f63c710f274bdc.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1558,7 +1564,7 @@
 <p class="подпись-разворота">Разворот · страницы 22–23</p>
 <div class="разворот">
 
-  <div class="стр фон3 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/91c880180a4b0315.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон3 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/6c8493ceb22d3d75.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1585,7 +1591,7 @@
     <div class="колонцифра"><span>22</span></div>
   </div>
 
-  <div class="стр фон4 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/91c880180a4b0315.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон4 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/6c8493ceb22d3d75.jpg&quot;)"></div><div class="илл-вуаль прав шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1620,7 +1626,7 @@
 <p class="подпись-разворота">Разворот · страницы 24–25</p>
 <div class="разворот">
 
-  <div class="стр фон1 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/8d95b65b7e1ab306.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон1 просторно"><div class="илл-фон лев" style="background-image:url(&quot;илл/df52bdee7def46eb.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1669,7 +1675,7 @@
     <div class="колонцифра"><span>24</span></div>
   </div>
 
-  <div class="стр фон2 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/8d95b65b7e1ab306.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон2 просторно"><div class="илл-фон прав" style="background-image:url(&quot;илл/df52bdee7def46eb.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1723,7 +1729,7 @@
 <p class="подпись-разворота">Разворот · страницы 26–27</p>
 <div class="разворот">
 
-  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/2ac92f668e4f0f6b.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/fc24604638aa610f.jpg&quot;)"></div><div class="илл-вуаль лев шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1759,7 +1765,7 @@
     <div class="колонцифра"><span>26</span></div>
   </div>
 
-  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/2ac92f668e4f0f6b.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/fc24604638aa610f.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1796,7 +1802,7 @@
 <p class="подпись-разворота">Разворот · страницы 28–29</p>
 <div class="разворот">
 
-  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/9f22e32ac2f9cf12.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/c58c17c5ee6119b6.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1835,7 +1841,7 @@
     <div class="колонцифра"><span>28</span></div>
   </div>
 
-  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/9f22e32ac2f9cf12.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/c58c17c5ee6119b6.jpg&quot;)"></div><div class="илл-вуаль прав шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1900,7 +1906,7 @@
 <p class="подпись-разворота">Разворот · страницы 30–31</p>
 <div class="разворот">
 
-  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/b3e6a1aaa9cd1d30.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/f026b20aa97fbd83.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1940,7 +1946,7 @@
     <div class="колонцифра"><span>30</span></div>
   </div>
 
-  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/b3e6a1aaa9cd1d30.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/f026b20aa97fbd83.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -1991,7 +1997,7 @@
 <p class="подпись-разворота">Разворот · страницы 32–33</p>
 <div class="разворот">
 
-  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/b0a915067f642680.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/38b29405949152e7.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2026,7 +2032,7 @@
     <div class="колонцифра"><span>32</span></div>
   </div>
 
-  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/b0a915067f642680.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/38b29405949152e7.jpg&quot;)"></div><div class="илл-вуаль прав шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2086,7 +2092,7 @@
 <p class="подпись-разворота">Разворот · страницы 34–35</p>
 <div class="разворот">
 
-  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/812693133f083260.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/8404baf779e421be.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2125,7 +2131,7 @@
     <div class="колонцифра"><span>34</span></div>
   </div>
 
-  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/812693133f083260.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/8404baf779e421be.jpg&quot;)"></div><div class="илл-вуаль прав"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2172,7 +2178,7 @@
 <p class="подпись-разворота">Разворот · страницы 36–37</p>
 <div class="разворот">
 
-  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/a0b8c5d2ed782ec8.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон1"><div class="илл-фон лев" style="background-image:url(&quot;илл/260c200c8429e2ee.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2190,7 +2196,7 @@
     <div class="колонцифра"><span>36</span></div>
   </div>
 
-  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/a0b8c5d2ed782ec8.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон2"><div class="илл-фон прав" style="background-image:url(&quot;илл/260c200c8429e2ee.jpg&quot;)"></div><div class="илл-вуаль прав шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2253,7 +2259,7 @@
 <p class="подпись-разворота">Разворот · страницы 38–39</p>
 <div class="разворот">
 
-  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/e829854f88917621.jpg&quot;)"></div><div class="илл-вуаль"></div>
+  <div class="стр фон3"><div class="илл-фон лев" style="background-image:url(&quot;илл/f2aa6a8140844170.jpg&quot;)"></div><div class="илл-вуаль лев"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
@@ -2318,7 +2324,7 @@
     <div class="колонцифра"><span>38</span></div>
   </div>
 
-  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/e829854f88917621.jpg&quot;)"></div><div class="илл-вуаль шапка"></div>
+  <div class="стр фон4"><div class="илл-фон прав" style="background-image:url(&quot;илл/f2aa6a8140844170.jpg&quot;)"></div><div class="илл-вуаль прав шапка"></div>
     <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
 <path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
 <path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
