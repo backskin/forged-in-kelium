@@ -112,12 +112,21 @@ public final class СнимокСтола {
     private static final java.util.Map<String, int[]> ЯКОРЯ =
         new java.util.LinkedHashMap<>();
 
+    /**
+     * ЗАПАС СЛОЯ ПО ВЫСОТЕ, мм. Руки игроков выходят за стол 1500×978: у
+     * сидящих напротив — за верхний край, у ближнего — за нижний, и слой
+     * обрезал карты пополам (дизайнер 14.10.2026). Слой выше на два запаса,
+     * всё рисуется со сдвигом вниз; лишнее потом срезает обрезка по компонентам.
+     */
+    private static final double ЗАПАС_В = 140;
+    private static int сдвигY;
+
     private static void якорь(String номер, double xМм, double yМм) {
-        ЯКОРЯ.put(номер, new int[]{px(xМм), px(yМм)});
+        ЯКОРЯ.put(номер, new int[]{px(xМм), px(yМм) + сдвигY});
     }
 
     private static void якорьТ(String номер, double x, double y) {
-        ЯКОРЯ.put(номер, new int[]{(int) Math.round(x), (int) Math.round(y)});
+        ЯКОРЯ.put(номер, new int[]{(int) Math.round(x), (int) Math.round(y) + сдвигY});
     }
 
     private static int px(double мм) {
@@ -133,7 +142,7 @@ public final class СнимокСтола {
         Path root = GameConfig.resolveDataRoot(null);
         Path раскладка = args.length > 2 && !args[2].isBlank()
             ? Path.of(args[2])
-            : root.resolve("scenarios/new/сценарий 3 игрока 1.kmap");
+            : root.resolve("scenarios/old/сценарий 3 игрока 1.kmap");
         long сид = args.length > 3 ? Long.parseLong(args[3]) : 7L;
         if (args.length > 4 && !args[4].isBlank()) {
             сукно = args[4];
@@ -184,13 +193,15 @@ public final class СнимокСтола {
     private static BufferedImage нарисовать(Session session, ReplayRecord rec,
                                             GameState st, int ширина) {
         k = ширина / СТОЛ_Ш;
-        int высота = px(СТОЛ_В);
+        сдвигY = px(ЗАПАС_В);
+        int высота = px(СТОЛ_В + 2 * ЗАПАС_В);
         // ВСЁ РИСУЕТСЯ НА ПРОЗРАЧНОМ СЛОЕ, а сукно подкладывается потом. Так
         // картинку можно обрезать ровно по компонентам: пустое сукно по краям
         // ничего не рассказывает, а места на развороте занимает.
         BufferedImage слой = new BufferedImage(ширина, высота, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = слой.createGraphics();
         качество(g);
+        g.translate(0, сдвигY);
 
         // РАССАДКА НА ТРОИХ: один игрок с ближнего края стола, двое напротив.
         // Их планшеты повёрнуты к ним, то есть к нам вверх ногами, — ровно так
@@ -226,6 +237,7 @@ public final class СнимокСтола {
         double мешX = рынок[0] + рынок[2] * 1.45;
         double мешY = рынок[1] + рынок[3] + px(150);
         мешочкиТ(g, мешX, мешY);
+        супергЗадания(g, рынок[0] + рынок[2] + px(30), рынок[1] - px(70));
         якорьТ("9", запX, запY);
         якорьТ("8", мешX, мешY);
 
@@ -571,16 +583,28 @@ public final class СнимокСтола {
         положить(g, art, x, y, w, h, 2.2);
         // Карты супер-арсенала на вершинах треков — по якорям печати.
         BoardAnchors.Science sci = BoardAnchors.science();
-        BufferedImage карта = Textures.card("deck_super_arsenal");
-        if (sci == null || карта == null) {
+        if (sci == null) {
             return;
         }
+        // Лицом вверх, по одной случайной карте на трек (подготовка, шаг 4).
+        String[] лица = {"arsenal_super/sa3_02", "arsenal_super/sa4_06", "arsenal_super/sa4_09"};
+        int номер = 0;
         double sk = w / (double) sci.artW();
         for (var e : sci.tracks().entrySet()) {
             var t = e.getValue();
-            положить(g, карта, x + (int) Math.round(t.cx() * sk),
-                y + (int) Math.round(t.cy() * sk),
-                (int) Math.round(t.cw() * sk), (int) Math.round(t.ch() * sk), 1.2);
+            BufferedImage карта = Textures.card(лица[номер++ % лица.length], "deck_super_arsenal");
+            if (карта == null) {
+                continue;
+            }
+            // В НАСТОЯЩИЙ РАЗМЕР КАРТЫ (дизайнер 14.10.2026): ячейка на печати —
+            // лишь значок места, а карта на столе в разы крупнее и лежит поверх
+            // вершины трека. Центр карты — центр ячейки.
+            double цx = x + (t.cx() + t.cw() / 2.0) * sk;
+            double цy = y + (t.cy() + t.ch() / 2.0) * sk;
+            int кw = px(КАРТА_АРСЕНАЛ_Ш);
+            int кh = (int) Math.round(кw * карта.getHeight() / (double) карта.getWidth());
+            положить(g, карта, (int) Math.round(цx - кw / 2.0), (int) Math.round(цy - кh / 2.0),
+                кw, кh, 1.6);
         }
     }
 
@@ -618,19 +642,34 @@ public final class СнимокСтола {
     private record Колода(String тег, double ширинаМм) {
     }
 
-    /** Колоды заданий, контейнеров и супер-заданий — общим местом стола. */
+    /** Колоды заданий и начальных заданий — общим местом стола. */
     private static void колодыЗаданий(Graphics2D g, double cx, double cy) {
         колодыТ(g, cx, cy, List.of(
             new Колода("deck_objectives", КАРТА_ЗАДАНИЕ_Ш),
-            new Колода("deck_objectives_start", КАРТА_ЗАДАНИЕ_Ш),
-            new Колода("deck_super_objectives", КАРТА_ЗАДАНИЕ_Ш)));
+            new Колода("deck_objectives_start", КАРТА_ЗАДАНИЕ_Ш)));
     }
 
-    /** Колоды арсенала — «рядом с планшетом науки» (подготовка, шаг 5). */
+    /**
+     * СУПЕР-ЗАДАНИЯ (подготовка, шаг 7; дизайнер 14.10.2026): колода рубашкой
+     * вверх и рядом три верхние карты лицом вверх. В руки на подготовке их не
+     * берут.
+     */
+    private static void супергЗадания(Graphics2D g, double cx, double cy) {
+        колодыТ(g, cx, cy, List.of(
+            new Колода("deck_super_objectives", КАРТА_ЗАДАНИЕ_Ш),
+            new Колода("objective_super/s9_03", КАРТА_ЗАДАНИЕ_Ш),
+            new Колода("objective_super/s9_08", КАРТА_ЗАДАНИЕ_Ш),
+            new Колода("objective_super/s9_11", КАРТА_ЗАДАНИЕ_Ш)), true);
+    }
+
+    /**
+     * Колоды арсенала и контейнеров — «рядом с планшетом науки» (подготовка,
+     * шаг 5). Колоды начального арсенала нет: после раздачи остаток уходит
+     * в коробку (дизайнер 14.10.2026).
+     */
     private static void колодыАрсенала(Graphics2D g, double cx, double cy) {
         колодыТ(g, cx, cy, List.of(
             new Колода("deck_arsenal", КАРТА_АРСЕНАЛ_Ш),
-            new Колода("deck_arsenal_start", КАРТА_АРСЕНАЛ_Ш),
             new Колода("deck_containers", КАРТА_КОНТЕЙНЕР_Ш)));
     }
 
@@ -640,6 +679,12 @@ public final class СнимокСтола {
      * к полю и заранее не знают, где окажутся в миллиметрах стола.
      */
     private static void колодыТ(Graphics2D g, double cx, double cy, List<Колода> список) {
+        колодыТ(g, cx, cy, список, false);
+    }
+
+    /** {@code открытые} — после первой колоды идут одиночные карты лицом вверх. */
+    private static void колодыТ(Graphics2D g, double cx, double cy, List<Колода> список,
+                                boolean открытые) {
         double зазор = 16;
         double всего = -зазор;
         List<BufferedImage> арт = new ArrayList<>();
@@ -659,7 +704,8 @@ public final class СнимокСтола {
             Колода к = список.get(i);
             int w = px(к.ширинаМм());
             int h = (int) Math.round(w * a.getHeight() / (double) a.getWidth());
-            стопка(g, a, (int) Math.round(x), (int) Math.round(cy) - h / 2, w, h, 4);
+            стопка(g, a, (int) Math.round(x), (int) Math.round(cy) - h / 2, w, h,
+                открытые && i > 0 ? 1 : 4);
             x += px(к.ширинаМм() + зазор);
         }
     }
@@ -765,7 +811,7 @@ public final class СнимокСтола {
 
     /**
      * РУКА ПРИКАЗОВ — пять карт рубашкой вверх веером перед планшетом, плюс
-     * карта супер-задания и начальное задание рядом: подготовка, шаги 15 и 16.
+     * начальное задание рядом: подготовка, шаги 15 и 16.
      */
     private static void рукаПриказов(Graphics2D g, int seat, int высотаСцепки) {
         BufferedImage back = Textures.card("orders/"
@@ -786,10 +832,10 @@ public final class СнимокСтола {
             положить(c, back, -w / 2, -h / 2, w, h, 1.4);
             c.dispose();
         }
-        // Справа от руки — начальное задание и супер-задание рубашкой вверх
-        // (подготовка, шаги 15 и 16), слева — две памятки игрока.
+        // Справа от руки — начальное задание рубашкой вверх (подготовка, шаг 16;
+        // супер-заданий на подготовке не берут), слева — две памятки игрока.
         int x = (int) Math.round(шаг * 2 + w * 0.78);
-        for (String тег : new String[]{"deck_objectives_start", "deck_super_objectives"}) {
+        for (String тег : new String[]{"deck_objectives_start"}) {
             BufferedImage карта = Textures.card(тег, "deck_objectives");
             if (карта != null) {
                 положить(g, карта, x, y - h / 2, w, h, 1.4);
