@@ -34,7 +34,7 @@ pdf = os.path.join(D, "book.pdf")
 # в абсолютный file:/// каталога вёрстки (см. вынести_картинки.py).
 илл = os.path.join(os.path.dirname(SRC), "илл").replace("\\", "/")
 t = t.replace('"илл/', '"file:///' + илл + '/')
-t = t.replace("'илл/", "'file:///" + илл + "/")
+t = t.replace("'илл/", "'file:///" + илл + "/").replace("&quot;илл/", "&quot;file:///" + илл + "/")
 
 open(book, "w", encoding="utf-8").write(t)
 if os.path.exists(pdf):

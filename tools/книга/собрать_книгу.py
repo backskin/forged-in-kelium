@@ -40,6 +40,7 @@ for г in главы:
     else:
         шаг("reflow.py", г)
 шаг("restyle.py")
+шаг("фон_иллюстрации.py")
 шаг("make_back.py")
 шаг("вынести_картинки.py")
 шаг("build.py")

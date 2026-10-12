@@ -269,7 +269,19 @@ CSS = r"""
   .задняя .победа b { color: var(--охра); }
   .задняя .две-кол { column-count: 2; column-gap: 4mm; }
   .задняя .две-кол li { break-inside: avoid; }
-  .задняя .ничья { margin: 1.2mm 0 0; }
+  .задняя .ничья { margin: 1.2mm 0 0; font-size: 8pt; line-height: 1.3; color: var(--чернила); }
+  /* ЛЕВАЯ КОЛОНКА (дизайнер 14.10.2026): «Раунд игры» тянется на всю высоту,
+     «Конец партии» — по содержимому; шрифт обоих крупнее. */
+  .задняя .пм-лев > .блок:first-child { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+  .задняя .пм-лев > .блок:last-child { flex: none; }
+  .задняя .пм-лев p, .задняя .пм-лев li { font-size: 8.6pt; line-height: 1.27; }
+  .задняя .пм-лев .прим { font-size: 7.8pt; }
+  .задняя .пм-лев .фаза { font-size: 8.2pt; }
+  .задняя .пм-лев ol > li::before { font-size: 8.8pt; }
+  .задняя .пм-лев .и { height: 4.6mm; }
+  /* «Памятка» на иллюстрации — со светлым ореолом */
+  .задняя .глава .гл-т { background: rgba(247,241,225,.8); padding: .6mm 2.4mm .4mm;
+    box-shadow: 0 0 3mm 2mm rgba(247,241,225,.8); }
 
   /* РЕДКИЕ ЗНАЧКИ — одна строка под блоками, значок и подпись рядом. */
   .задняя .пм-легенда { flex: none; margin-top: 2.4mm; display: grid; grid-template-columns: repeat(10, 1fr);
