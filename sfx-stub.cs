@@ -20,7 +20,7 @@ static class Sfx
 {
     const string Version = "@VERSION@";   // отпечаток содержимого: меняется — меняется папка
     const string Target = "@TARGET@";     // какой exe запускать после распаковки
-    const string Title = "Кристаллы Раздора";
+    const string Title = "Lex Talionis";
 
     [STAThread]
     static int Main(string[] argv)

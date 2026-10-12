@@ -46,7 +46,7 @@ exec java -Dfile.encoding=UTF-8 -Dkelium.data="$PWD/data" -cp kelium-runner.jar 
 SH
 chmod +x "$D/играть.sh"
 cat > "$D/ПРОЧТИ.txt" <<TXT
-Кристаллы Раздора («Всход») — выпуск $NAME
+Lex Talionis — выпуск $NAME
 
 Нужна Java 21 или новее (https://adoptium.net).
 Windows: двойной щелчок по «Играть.bat».

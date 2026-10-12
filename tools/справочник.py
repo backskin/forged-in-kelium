@@ -24,7 +24,7 @@ import re
 
 import yaml
 
-СПРАВОЧНИК = 'rules/СПРАВОЧНИК — Кристаллы Раздора.md'
+СПРАВОЧНИК = 'rules/СПРАВОЧНИК — Lex Talionis.md'
 
 
 def свод():

@@ -338,6 +338,10 @@ public final class RuleWords {
                 "золотой модуль боя: универсальная атака за 1 боеприпас по любой цели";
             case "combat_model.super_unit_damage" ->
                 "атака супер-войска за 1 боеприпас наносит столько урона; урон можно разделить";
+            case "mining.unpowered" ->
+                "добытчик без энергии: off — ничего, kelium — 1 келемий, container — 1 карта контейнера, one_of — одно из двух";
+            case "assembly.unpowered" ->
+                "военное здание и ЦУ без энергии: off — ничего, ammo — 1 боеприпас, units — 1 жетон войск, one_of — одно из двух";
             case "mining.unpowered_yield" ->
                 "добытчик без энергии всё же добывает столько келемия";
             case "mining.unpowered_one_of" ->

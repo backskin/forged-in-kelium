@@ -1,0 +1,1566 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Келемий. Кристалл раздора — справочник</title>
+<style>
+
+  /* Оформление книг игры: квадрат 22×22 см, две колонки, Tektur, охра
+     страницы, зелень келемия. РЕДАКЦИЯ «КОМАНДНАЯ ПАНЕЛЬ» (14.09.2026):
+     векторная кайма со скосами и скобками, плашки с косым срезом, панели
+     врезок со скошенными углами — тот же язык, что на картах приказов и на
+     задней обложке. Всё плоское, без свечения и градиентов. */
+  :root {
+    --страница: #F7F1E1;
+    --подложка: rgba(247, 241, 225, .90);
+    --чернила: #2A2318;
+    --охра: #6B4413;
+    --келемий: #186C24;
+    --келемий-ярк: #3FBF62;
+    --серый: #5E5139;
+    --рамка: #D8CCAE;
+    --кант: rgba(42, 35, 24, .28);
+    --выноска: #E7F0E2;
+    --пример: #F2E4C4;
+    --пример-кант: #A9761E;
+    --важно: #F3DED4;
+    --важно-кант: #9A2A12;
+    --совет: #E4EFDF;
+    --место-иконки: #EADFC6;
+    --уточнить: #9A2A12;
+  }
+  * { box-sizing: border-box; }
+  html { background: #4a463f; }
+  body { margin: 0; padding: 20px 0 40px; font-family: "Tektur", sans-serif; color: var(--чернила); }
+
+  .подпись-разворота { text-align: center; color: #e6dfd0; font: 13px "Tektur Med", "Tektur", sans-serif; margin: 0 0 8px; }
+  .разворот { display: flex; justify-content: center; width: 440mm; margin: 0 auto 30px; }
+  .разворот.одна { justify-content: flex-end; }
+
+  .стр {
+    flex: none; width: 220mm; height: 220mm; position: relative; overflow: hidden; isolation: isolate;
+    background: var(--страница) center / cover no-repeat;
+    padding: 15mm 15mm 16mm;
+    box-shadow: 0 2px 10px rgba(0,0,0,.4);
+  }
+  
+  /* Мозаика едва заметной разметкой поверх фона страницы, под текстом. */
+  .стр:not(.обложка)::after {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34.64 30.00'><path d='M-34.64 -33.00L-32.04 -31.50L-32.04 -28.50L-34.64 -27.00L-37.24 -28.50L-37.24 -31.50ZM-34.64 -3.00L-32.04 -1.50L-32.04 1.50L-34.64 3.00L-37.24 1.50L-37.24 -1.50ZM-34.64 27.00L-32.04 28.50L-32.04 31.50L-34.64 33.00L-37.24 31.50L-37.24 28.50ZM0.00 -33.00L2.60 -31.50L2.60 -28.50L0.00 -27.00L-2.60 -28.50L-2.60 -31.50ZM0.00 -3.00L2.60 -1.50L2.60 1.50L0.00 3.00L-2.60 1.50L-2.60 -1.50ZM0.00 27.00L2.60 28.50L2.60 31.50L0.00 33.00L-2.60 31.50L-2.60 28.50ZM34.64 -33.00L37.24 -31.50L37.24 -28.50L34.64 -27.00L32.04 -28.50L32.04 -31.50ZM34.64 -3.00L37.24 -1.50L37.24 1.50L34.64 3.00L32.04 1.50L32.04 -1.50ZM34.64 27.00L37.24 28.50L37.24 31.50L34.64 33.00L32.04 31.50L32.04 28.50Z' fill='%232A2318' fill-opacity='.06' stroke='%232A2318' stroke-opacity='.16' stroke-width='.35'/><path d='M-27.19 -25.70L-34.64 -21.40L-42.09 -25.70L-42.09 -34.30L-34.64 -38.60L-27.19 -34.30M-27.19 -34.30L-27.19 -31.89M-27.19 -28.11L-27.19 -25.70M-34.64 -33.00L-34.64 -38.60M-32.04 -28.50L-27.19 -25.70M-37.24 -28.50L-42.09 -25.70M-32.04 -31.50L-30.14 -32.60M-34.64 -27.00L-34.64 -24.80M-37.24 -31.50L-39.14 -32.60M-24.77 -34.30L-17.32 -38.60L-9.87 -34.30L-9.87 -25.70L-17.32 -21.40L-24.77 -25.70M-24.77 -25.70L-24.77 -28.11M-24.77 -31.89L-24.77 -34.30M-12.99 -32.50L-12.99 -27.50L-17.32 -25.00L-21.65 -27.50L-21.65 -32.50L-17.32 -35.00M-17.32 -35.00L-17.32 -33.00M-12.99 -30.00L-9.87 -30.00M-21.65 -30.00L-24.77 -30.00M-25.98 -6.40L-33.43 -10.70L-33.43 -19.30L-25.98 -23.60L-18.53 -19.30L-18.53 -10.70M-18.53 -10.70L-20.62 -9.50M-23.90 -7.60L-25.98 -6.40M-33.43 -16.50L-27.64 -16.50L-24.15 -22.54M-33.43 -14.50L-26.48 -14.50L-22.42 -21.54M-33.43 -12.50L-25.33 -12.50L-20.68 -20.54M-8.66 -23.60L-1.21 -19.30L-1.21 -10.70L-8.66 -6.40L-16.11 -10.70L-16.11 -19.30M-16.11 -19.30L-14.02 -20.50M-10.75 -22.40L-8.66 -23.60M-16.11 -19.30L-12.12 -17.00L-8.66 -19.00L-8.66 -21.20M-27.19 4.30L-34.64 8.60L-42.09 4.30L-42.09 -4.30L-34.64 -8.60L-27.19 -4.30M-27.19 -4.30L-27.19 -1.89M-27.19 1.89L-27.19 4.30M-34.64 -3.00L-34.64 -8.60M-32.04 1.50L-27.19 4.30M-37.24 1.50L-42.09 4.30M-32.04 -1.50L-30.14 -2.60M-34.64 3.00L-34.64 5.20M-37.24 -1.50L-39.14 -2.60M-24.77 -4.30L-17.32 -8.60L-9.87 -4.30L-9.87 4.30L-17.32 8.60L-24.77 4.30M-24.77 4.30L-24.77 1.89M-24.77 -1.89L-24.77 -4.30M-12.99 -2.50L-12.99 2.50L-17.32 5.00L-21.65 2.50L-21.65 -2.50L-17.32 -5.00M-17.32 -5.00L-17.32 -3.00M-12.99 0.00L-9.87 0.00M-21.65 0.00L-24.77 0.00M-25.98 23.60L-33.43 19.30L-33.43 10.70L-25.98 6.40L-18.53 10.70L-18.53 19.30M-18.53 19.30L-20.62 20.50M-23.90 22.40L-25.98 23.60M-33.43 13.50L-27.64 13.50L-24.15 7.46M-33.43 15.50L-26.48 15.50L-22.42 8.46M-33.43 17.50L-25.33 17.50L-20.68 9.46M-8.66 6.40L-1.21 10.70L-1.21 19.30L-8.66 23.60L-16.11 19.30L-16.11 10.70M-16.11 10.70L-14.02 9.50M-10.75 7.60L-8.66 6.40M-16.11 10.70L-12.12 13.00L-8.66 11.00L-8.66 8.80M-27.19 34.30L-34.64 38.60L-42.09 34.30L-42.09 25.70L-34.64 21.40L-27.19 25.70M-27.19 25.70L-27.19 28.11M-27.19 31.89L-27.19 34.30M-34.64 27.00L-34.64 21.40M-32.04 31.50L-27.19 34.30M-37.24 31.50L-42.09 34.30M-32.04 28.50L-30.14 27.40M-34.64 33.00L-34.64 35.20M-37.24 28.50L-39.14 27.40M-24.77 25.70L-17.32 21.40L-9.87 25.70L-9.87 34.30L-17.32 38.60L-24.77 34.30M-24.77 34.30L-24.77 31.89M-24.77 28.11L-24.77 25.70M-12.99 27.50L-12.99 32.50L-17.32 35.00L-21.65 32.50L-21.65 27.50L-17.32 25.00M-17.32 25.00L-17.32 27.00M-12.99 30.00L-9.87 30.00M-21.65 30.00L-24.77 30.00M-25.98 53.60L-33.43 49.30L-33.43 40.70L-25.98 36.40L-18.53 40.70L-18.53 49.30M-18.53 49.30L-20.62 50.50M-23.90 52.40L-25.98 53.60M-33.43 43.50L-27.64 43.50L-24.15 37.46M-33.43 45.50L-26.48 45.50L-22.42 38.46M-33.43 47.50L-25.33 47.50L-20.68 39.46M-8.66 36.40L-1.21 40.70L-1.21 49.30L-8.66 53.60L-16.11 49.30L-16.11 40.70M-16.11 40.70L-14.02 39.50M-10.75 37.60L-8.66 36.40M-16.11 40.70L-12.12 43.00L-8.66 41.00L-8.66 38.80M7.45 -25.70L0.00 -21.40L-7.45 -25.70L-7.45 -34.30L0.00 -38.60L7.45 -34.30M7.45 -34.30L7.45 -31.89M7.45 -28.11L7.45 -25.70M0.00 -33.00L0.00 -38.60M2.60 -28.50L7.45 -25.70M-2.60 -28.50L-7.45 -25.70M2.60 -31.50L4.50 -32.60M0.00 -27.00L0.00 -24.80M-2.60 -31.50L-4.50 -32.60M9.87 -34.30L17.32 -38.60L24.77 -34.30L24.77 -25.70L17.32 -21.40L9.87 -25.70M9.87 -25.70L9.87 -28.11M9.87 -31.89L9.87 -34.30M21.65 -32.50L21.65 -27.50L17.32 -25.00L12.99 -27.50L12.99 -32.50L17.32 -35.00M17.32 -35.00L17.32 -33.00M21.65 -30.00L24.77 -30.00M12.99 -30.00L9.87 -30.00M8.66 -6.40L1.21 -10.70L1.21 -19.30L8.66 -23.60L16.11 -19.30L16.11 -10.70M16.11 -10.70L14.02 -9.50M10.75 -7.60L8.66 -6.40M1.21 -16.50L7.01 -16.50L10.49 -22.54M1.21 -14.50L8.16 -14.50L12.23 -21.54M1.21 -12.50L9.31 -12.50L13.96 -20.54M25.98 -23.60L33.43 -19.30L33.43 -10.70L25.98 -6.40L18.53 -10.70L18.53 -19.30M18.53 -19.30L20.62 -20.50M23.90 -22.40L25.98 -23.60M18.53 -19.30L22.52 -17.00L25.98 -19.00L25.98 -21.20M7.45 4.30L0.00 8.60L-7.45 4.30L-7.45 -4.30L0.00 -8.60L7.45 -4.30M7.45 -4.30L7.45 -1.89M7.45 1.89L7.45 4.30M0.00 -3.00L0.00 -8.60M2.60 1.50L7.45 4.30M-2.60 1.50L-7.45 4.30M2.60 -1.50L4.50 -2.60M0.00 3.00L0.00 5.20M-2.60 -1.50L-4.50 -2.60M9.87 -4.30L17.32 -8.60L24.77 -4.30L24.77 4.30L17.32 8.60L9.87 4.30M9.87 4.30L9.87 1.89M9.87 -1.89L9.87 -4.30M21.65 -2.50L21.65 2.50L17.32 5.00L12.99 2.50L12.99 -2.50L17.32 -5.00M17.32 -5.00L17.32 -3.00M21.65 0.00L24.77 0.00M12.99 0.00L9.87 0.00M8.66 23.60L1.21 19.30L1.21 10.70L8.66 6.40L16.11 10.70L16.11 19.30M16.11 19.30L14.02 20.50M10.75 22.40L8.66 23.60M1.21 13.50L7.01 13.50L10.49 7.46M1.21 15.50L8.16 15.50L12.23 8.46M1.21 17.50L9.31 17.50L13.96 9.46M25.98 6.40L33.43 10.70L33.43 19.30L25.98 23.60L18.53 19.30L18.53 10.70M18.53 10.70L20.62 9.50M23.90 7.60L25.98 6.40M18.53 10.70L22.52 13.00L25.98 11.00L25.98 8.80M7.45 34.30L0.00 38.60L-7.45 34.30L-7.45 25.70L0.00 21.40L7.45 25.70M7.45 25.70L7.45 28.11M7.45 31.89L7.45 34.30M0.00 27.00L0.00 21.40M2.60 31.50L7.45 34.30M-2.60 31.50L-7.45 34.30M2.60 28.50L4.50 27.40M0.00 33.00L0.00 35.20M-2.60 28.50L-4.50 27.40M9.87 25.70L17.32 21.40L24.77 25.70L24.77 34.30L17.32 38.60L9.87 34.30M9.87 34.30L9.87 31.89M9.87 28.11L9.87 25.70M21.65 27.50L21.65 32.50L17.32 35.00L12.99 32.50L12.99 27.50L17.32 25.00M17.32 25.00L17.32 27.00M21.65 30.00L24.77 30.00M12.99 30.00L9.87 30.00M8.66 53.60L1.21 49.30L1.21 40.70L8.66 36.40L16.11 40.70L16.11 49.30M16.11 49.30L14.02 50.50M10.75 52.40L8.66 53.60M1.21 43.50L7.01 43.50L10.49 37.46M1.21 45.50L8.16 45.50L12.23 38.46M1.21 47.50L9.31 47.50L13.96 39.46M25.98 36.40L33.43 40.70L33.43 49.30L25.98 53.60L18.53 49.30L18.53 40.70M18.53 40.70L20.62 39.50M23.90 37.60L25.98 36.40M18.53 40.70L22.52 43.00L25.98 41.00L25.98 38.80M42.09 -25.70L34.64 -21.40L27.19 -25.70L27.19 -34.30L34.64 -38.60L42.09 -34.30M42.09 -34.30L42.09 -31.89M42.09 -28.11L42.09 -25.70M34.64 -33.00L34.64 -38.60M37.24 -28.50L42.09 -25.70M32.04 -28.50L27.19 -25.70M37.24 -31.50L39.14 -32.60M34.64 -27.00L34.64 -24.80M32.04 -31.50L30.14 -32.60M44.51 -34.30L51.96 -38.60L59.41 -34.30L59.41 -25.70L51.96 -21.40L44.51 -25.70M44.51 -25.70L44.51 -28.11M44.51 -31.89L44.51 -34.30M56.29 -32.50L56.29 -27.50L51.96 -25.00L47.63 -27.50L47.63 -32.50L51.96 -35.00M51.96 -35.00L51.96 -33.00M56.29 -30.00L59.41 -30.00M47.63 -30.00L44.51 -30.00M43.30 -6.40L35.85 -10.70L35.85 -19.30L43.30 -23.60L50.75 -19.30L50.75 -10.70M50.75 -10.70L48.66 -9.50M45.39 -7.60L43.30 -6.40M35.85 -16.50L41.65 -16.50L45.13 -22.54M35.85 -14.50L42.80 -14.50L46.87 -21.54M35.85 -12.50L43.96 -12.50L48.60 -20.54M60.62 -23.60L68.07 -19.30L68.07 -10.70L60.62 -6.40L53.17 -10.70L53.17 -19.30M53.17 -19.30L55.26 -20.50M58.54 -22.40L60.62 -23.60M53.17 -19.30L57.16 -17.00L60.62 -19.00L60.62 -21.20M42.09 4.30L34.64 8.60L27.19 4.30L27.19 -4.30L34.64 -8.60L42.09 -4.30M42.09 -4.30L42.09 -1.89M42.09 1.89L42.09 4.30M34.64 -3.00L34.64 -8.60M37.24 1.50L42.09 4.30M32.04 1.50L27.19 4.30M37.24 -1.50L39.14 -2.60M34.64 3.00L34.64 5.20M32.04 -1.50L30.14 -2.60M44.51 -4.30L51.96 -8.60L59.41 -4.30L59.41 4.30L51.96 8.60L44.51 4.30M44.51 4.30L44.51 1.89M44.51 -1.89L44.51 -4.30M56.29 -2.50L56.29 2.50L51.96 5.00L47.63 2.50L47.63 -2.50L51.96 -5.00M51.96 -5.00L51.96 -3.00M56.29 0.00L59.41 0.00M47.63 0.00L44.51 0.00M43.30 23.60L35.85 19.30L35.85 10.70L43.30 6.40L50.75 10.70L50.75 19.30M50.75 19.30L48.66 20.50M45.39 22.40L43.30 23.60M35.85 13.50L41.65 13.50L45.13 7.46M35.85 15.50L42.80 15.50L46.87 8.46M35.85 17.50L43.96 17.50L48.60 9.46M60.62 6.40L68.07 10.70L68.07 19.30L60.62 23.60L53.17 19.30L53.17 10.70M53.17 10.70L55.26 9.50M58.54 7.60L60.62 6.40M53.17 10.70L57.16 13.00L60.62 11.00L60.62 8.80M42.09 34.30L34.64 38.60L27.19 34.30L27.19 25.70L34.64 21.40L42.09 25.70M42.09 25.70L42.09 28.11M42.09 31.89L42.09 34.30M34.64 27.00L34.64 21.40M37.24 31.50L42.09 34.30M32.04 31.50L27.19 34.30M37.24 28.50L39.14 27.40M34.64 33.00L34.64 35.20M32.04 28.50L30.14 27.40M44.51 25.70L51.96 21.40L59.41 25.70L59.41 34.30L51.96 38.60L44.51 34.30M44.51 34.30L44.51 31.89M44.51 28.11L44.51 25.70M56.29 27.50L56.29 32.50L51.96 35.00L47.63 32.50L47.63 27.50L51.96 25.00M51.96 25.00L51.96 27.00M56.29 30.00L59.41 30.00M47.63 30.00L44.51 30.00M43.30 53.60L35.85 49.30L35.85 40.70L43.30 36.40L50.75 40.70L50.75 49.30M50.75 49.30L48.66 50.50M45.39 52.40L43.30 53.60M35.85 43.50L41.65 43.50L45.13 37.46M35.85 45.50L42.80 45.50L46.87 38.46M35.85 47.50L43.96 47.50L48.60 39.46M60.62 36.40L68.07 40.70L68.07 49.30L60.62 53.60L53.17 49.30L53.17 40.70M53.17 40.70L55.26 39.50M58.54 37.60L60.62 36.40M53.17 40.70L57.16 43.00L60.62 41.00L60.62 38.80' fill='none' stroke='%232A2318' stroke-opacity='.14' stroke-width='.38' stroke-linecap='round' stroke-linejoin='round'/><path d='' fill='none' stroke='%232A2318' stroke-opacity='.15' stroke-width='.32'/></svg>"); background-size: 56.00mm 48.50mm; opacity: 0.7;
+  }
+
+  /* ---- кайма страницы ---- */
+  .кайма { position: absolute; inset: 0; width: 220mm; height: 220mm; z-index: 5; pointer-events: none; overflow: visible; }
+  .кайма .к-осн { fill: none; stroke: var(--чернила); stroke-width: .5; stroke-linejoin: round; }
+  .кайма .к-тонк { fill: none; stroke: var(--чернила); stroke-width: .16; opacity: .7; }
+  .кайма .к-риски { fill: none; stroke: var(--чернила); stroke-width: .25; }
+  .кайма .к-скобка { fill: none; stroke: var(--келемий); stroke-width: 1.05; stroke-linecap: square; }
+  .кайма .к-хвл, .кайма .к-хвп { display: none; }
+  /* У корешка рамка открыта: левая страница теряет правую сторону, правая — левую,
+     а верх и низ дотягиваются до самого края. */
+  .разворот:not(.одна):not(.левая) > .стр:first-child .к-прав { display: none; }
+  .разворот:not(.одна):not(.левая) > .стр:first-child .к-хвп { display: block; }
+  .разворот:not(.одна):not(.левая) > .стр:last-child .к-лев { display: none; }
+  .разворот:not(.одна):not(.левая) > .стр:last-child .к-хвл { display: block; }
+  .разворот.одна > .стр .к-лев { display: none; }
+  .разворот.одна > .стр .к-хвл { display: block; }
+  .разворот.левая > .стр .к-прав { display: none; }
+  .разворот.левая > .стр .к-хвп { display: block; }
+  .стр.обложка { padding: 0; background: #222; }
+  .стр.обложка img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* ТЕХНО-РАМКА ОБЛОЖКИ — один в один с памяткой на задней стороне. */
+  .стр.обложка .рамка-техно { position: absolute; inset: 4.5mm; z-index: 3;
+    pointer-events: none; border: .45mm solid #2A2318;
+    clip-path: polygon(6mm 0, 100% 0, 100% calc(100% - 6mm), calc(100% - 6mm) 100%, 0 100%, 0 6mm); }
+  .стр.обложка .рамка-техно::before, .стр.обложка .рамка-техно::after {
+    content: ""; position: absolute; width: 14mm; height: 14mm;
+    border: .7mm solid var(--келемий); }
+  .стр.обложка .рамка-техно::before { right: -.3mm; top: -.3mm; border-left: 0; border-bottom: 0; }
+  .стр.обложка .рамка-техно::after { left: -.3mm; bottom: -.3mm; border-right: 0; border-top: 0; }
+
+  .колонцифра {
+    position: absolute; bottom: 5.8mm; left: 0; right: 0; text-align: center; z-index: 6;
+    font: 700 10pt/1 "Tektur", sans-serif; color: var(--страница);
+  }
+  .колонцифра span { display: inline-block; background: var(--чернила); padding: .9mm 3.8mm .75mm;
+    clip-path: polygon(1.6mm 0, 100% 0, calc(100% - 1.6mm) 100%, 0 100%); }
+
+  /* ПОДЛОЖКА ПОД ТЕКСТОМ. Три правила, все три — просьба дизайнера
+     14.09.2026: воздух от края текста, одинаковые поля слева и справа (никаких
+     отрицательных отступов, из-за которых колонки выглядели по-разному) и
+     заливка полупрозрачная, чтобы бумага и гекс-сетка проступали. */
+  .блок { background: rgba(247, 241, 225, .66); padding: 1.9mm 2.7mm 1.6mm;
+    margin: 0 0 2.1mm; outline: .18mm solid var(--кант); outline-offset: -.18mm; }
+  .блок > :last-child { margin-bottom: 0; }
+  /* РАЗДЕЛ-ПРИМЕР — тот же жёлтый, что у врезки «Пример»: заливка, кант,
+     заголовок ярлыком-плашкой (дизайнер 05.10.2026). */
+  .блок.пример-блок { background: var(--пример); box-shadow: inset 0 0 0 .3mm var(--пример-кант); }
+  .блок.пример-блок > h2:first-child, .блок.пример-блок > .половина > h2:first-child,
+  .карточки .блок.пример-блок > h2 { display: inline-block; font: 800 8.4pt/1 "Tektur", sans-serif; color: var(--страница);
+    text-transform: uppercase; letter-spacing: .06em; background: var(--пример-кант); border: 0;
+    padding: 1.2mm 3.2mm 1mm 2.6mm; margin: -1.9mm 0 1.6mm -2.7mm;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
+  .блок.пример-блок > h2::after { display: none; }
+  .блок.пример-блок h3 { color: var(--пример-кант); }
+
+
+  /* ---- заголовок главы: плашка с номером, заголовок, линия с ромбом ---- */
+  .глава {
+    display: flex; align-items: center; gap: 3mm; position: relative;
+    font: 700 17pt/1.15 "Tektur", sans-serif; color: var(--охра);
+    padding: 0 0 1.6mm; margin: 0 0 3.6mm;
+  }
+  .глава::after { content: ""; flex: 1; height: .5mm; background: var(--келемий); position: relative; }
+  .глава .гл-н { flex: none; background: var(--келемий); color: var(--страница); font: 800 9pt/1 "Tektur", sans-serif;
+    text-transform: uppercase; letter-spacing: .1em; padding: 2.1mm 3.6mm 1.9mm 3mm; align-self: stretch; display: flex; align-items: center;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.4mm) 100%, 0 100%); }
+  .глава .гл-т { flex: none; padding-left: .4mm; }
+  .глава:not(:has(.гл-н)) { padding-left: 2.4mm; }
+  .глава .гл-т::after { content: ""; display: inline-block; width: 2mm; height: 2mm; background: var(--охра); transform: rotate(45deg) translateY(-.2mm); margin-left: 3.2mm; vertical-align: middle; }
+
+  h2 { font: 700 11.5pt/1.2 "Tektur", sans-serif; color: var(--охра); margin: 3mm 0 1.4mm; padding-bottom: .7mm; position: relative;
+    border-bottom: .22mm solid var(--келемий); }
+  h2::after { content: ""; position: absolute; left: 0; bottom: -.62mm; width: 9mm; height: 1mm; background: var(--келемий); }
+  h2:first-child { margin-top: 0; }
+  h3 { font: 700 10pt/1.2 "Tektur", sans-serif; color: var(--келемий); margin: 2.5mm 0 1mm; }
+  h3::before { content: ""; display: inline-block; width: 1.7mm; height: 1.9mm; background: var(--келемий);
+    clip-path: polygon(0 0, 100% 50%, 0 100%); margin-right: 1.5mm; vertical-align: -.05mm; }
+  p, li { font: 9.5pt/1.3 "Tektur", sans-serif; margin: 0 0 1.4mm; hyphens: auto; }
+  /* ВВОДНЫЙ АБЗАЦ ГЛАВЫ — крупнее и без подложки: он задаёт тон полосе, а не
+     спорит с блоками правил (просьба дизайнера 14.09.2026). */
+  .вводка { background: none; outline: 0; padding: 0 1mm 1mm; margin: 0 0 3.4mm; column-span: all; }
+  .вводка p { font: 10.5pt/1.34 "Tektur", sans-serif; color: var(--чернила); }
+  .вводка p:last-child { margin-bottom: 0; }
+  ol, ul { margin: 0 0 1.4mm; padding-left: 4.5mm; }
+  li { margin-bottom: .8mm; }
+  ul li::marker { color: var(--келемий); content: "▸ "; }
+  ol li::marker { color: var(--охра); font-weight: 700; }
+  b { font-weight: 700; }
+  .ссылка { color: var(--серый); }
+
+  .две { column-count: 2; column-gap: 6mm; column-fill: balance; }
+  /* БЛОК НЕ РВЁТСЯ МЕЖДУ КОЛОНКАМИ. Прежде заголовок с одной фразой
+     оставался внизу первой колонки, а продолжение уезжало во вторую
+     отдельной рамкой и читалось как другой раздел. */
+  .две .блок { break-inside: avoid; }
+  .две .пример, .две h2, .две h3, .две table, .две .заглушка, .две svg { break-inside: avoid; }
+  .две h2, .две h3 { break-after: avoid; }
+  .звезда, .две li, .две p { break-inside: avoid; }
+  .две:has(> .блок:only-child) { column-count: 1; }
+
+  /* ---- таблицы ---- */
+  table { width: 100%; border-collapse: collapse; font: 10pt/1.3 "Tektur Narrow", "Tektur", sans-serif; background: rgba(255,255,255,.55);
+    outline: .18mm solid var(--кант); }
+  table + p { margin-top: 1.6mm; }
+  th { background: var(--келемий); color: #fff; font-weight: 700; text-align: left; padding: 1.3mm 1.8mm; text-transform: uppercase; letter-spacing: .04em; font-size: 8.6pt; }
+  th:first-child { padding-left: 2.6mm; }
+  td:first-child:has(.ико) { white-space: nowrap; }
+  td { padding: 1.2mm 1.8mm; border-bottom: .25mm dotted var(--пример-кант); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+
+  /* ---- заглушки ---- */
+  .ико {
+    display: inline-block; min-width: 4.8mm; height: 3.9mm; padding: 0 .8mm;
+    background: var(--место-иконки); border: .25mm dashed var(--пример-кант); border-radius: .8mm;
+    font: 8pt/3.5mm "Tektur Narrow", sans-serif; color: var(--серый); text-align: center; vertical-align: -.8mm; white-space: nowrap;
+  }
+  .ико.крупно { min-width: 10mm; height: 10mm; font-size: 8pt; line-height: 9.6mm; vertical-align: middle; }
+  .заглушка {
+    background: var(--место-иконки); border: .35mm dashed var(--пример-кант);
+    padding: 2.2mm 3mm; margin: 0 0 2.5mm; font: 9pt/1.3 "Tektur Narrow", "Tektur", sans-serif; color: var(--серый);
+  }
+  .заглушка .метка { display: block; font: 700 9pt "Tektur Narrow", sans-serif; color: var(--охра); margin-bottom: .8mm; letter-spacing: .02em; }
+  .заглушка.рисунок { display: flex; flex-direction: column; justify-content: center; text-align: center; }
+  /* ЗАПОЛНИТЕЛЬ ВЫНУЖДЕННОЙ ПУСТОТЫ: где полоса не набирается текстом, стоит
+     место под художественную иллюстрацию — дизайнер вставит её в конце работы. */
+  .добор { column-span: all; margin-top: 2mm; }
+  .добор .заглушка { height: 100%; min-height: 34mm; margin: 0; }
+  .уточнить { font: 700 9pt "Tektur Narrow", sans-serif; color: var(--уточнить); }
+  .звезда { display: flex; gap: 2.5mm; align-items: center; margin: .5mm 0 1.4mm; }
+  .звезда p { margin: 0; }
+
+  /* ---- состав игры ---- */
+  .сетка { display: grid; gap: 2.4mm 3mm; margin: 0 0 2.5mm; }
+  .сетка.к3 { grid-template-columns: repeat(3, 1fr); }
+  .сетка.к4 { grid-template-columns: repeat(4, 1fr); }
+  .комп .фото {
+    height: 15mm; background: var(--место-иконки); border: .3mm dashed var(--пример-кант);
+    display: flex; align-items: center; justify-content: center;
+    font: 8.5pt "Tektur Narrow", sans-serif; color: var(--серый); text-transform: uppercase; letter-spacing: .05em;
+    clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm);
+  }
+  .комп .фото.низ { height: 11mm; }
+  .крупнее .комп .фото { height: 30mm; }
+  .крупнее .комп .фото.низ { height: 22mm; }
+  .комп .имя { font: 700 9.5pt/1.2 "Tektur Narrow", "Tektur", sans-serif; margin-top: .9mm; }
+  .комп .сколько { font: 9.5pt/1.2 "Tektur Narrow", "Tektur", sans-serif; color: var(--серый); }
+  .комп .сколько b { color: var(--чернила); }
+  .набор { outline: .18mm solid var(--кант); outline-offset: -.18mm; padding: 2.2mm 2.4mm .6mm; background: var(--подложка); margin: 0 0 2.5mm; clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm); }
+  .набор > p { font-weight: 700; }
+
+  /* ---- разворот подготовки: иллюстрация в центре, текст у внешних краёв ---- */
+  .стр.подготовка { padding: 0; }
+  .подготовка .схема { position: absolute; inset: 0; width: 220mm; height: 220mm; z-index: 1; }
+  .подготовка .столбец { position: absolute; top: 13mm; bottom: 14mm; width: 80mm; z-index: 3; }
+  .стр.левая-подг .столбец { left: 12mm; top: 29mm; }
+  .стр.правая-подг .столбец { right: 11mm; width: 80mm; }
+  .стр.левая-подг .глава { position: absolute; left: 13mm; right: 13mm; top: 12mm; margin: 0; z-index: 3; }
+  .столбец .блок { margin: 0 0 1mm; padding: .8mm 1.8mm; }
+  .столбец h3 { margin: 0 0 1mm; }
+  .столбец p { font: 9.4pt/1.22 "Tektur Narrow", "Tektur", sans-serif; margin: 0; }
+  .шаг { display: inline-flex; align-items: center; justify-content: center; width: 4.4mm; height: 4.4mm;
+    border-radius: 50%; background: var(--келемий); color: #fff; font: 700 8.5pt "Tektur Narrow", sans-serif;
+    margin-right: 1mm; vertical-align: middle; }
+  .схема .номер-круг { fill: var(--келемий); stroke: #fff; stroke-width: .5; }
+  .схема .номер-текст { fill: #fff; font: 700 4.2px "Tektur Narrow", sans-serif; text-anchor: middle; dominant-baseline: central; }
+  .схема .выноска { fill: none; stroke: var(--келемий); stroke-width: .55; stroke-linejoin: round; }
+  .схема .выноска-фон { fill: none; stroke: #F7F1E1; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; opacity: .9; }
+  .схема .точка-фон { fill: #F7F1E1; opacity: .9; }
+  .схема .точка-выноски { fill: var(--келемий); }
+  .схема .макет { fill: rgba(255,255,255,.55); stroke: var(--пример-кант); stroke-width: .35; stroke-dasharray: 1.2 .8; }
+  .схема .подпись { fill: var(--чернила); font: 3.6px "Tektur Narrow", sans-serif; text-anchor: middle; }
+  .схема .метка-илл { fill: var(--охра); font: 700 3.8px "Tektur Narrow", sans-serif; text-anchor: middle; }
+
+  /* ---- врезки: Пример, Важно!, Совет — панель со скосами и ярлык-плашка ---- */
+  .пример { position: relative; background: var(--пример-кант); padding: .3mm; margin: 1.4mm 0 2.4mm; break-inside: avoid;
+    clip-path: polygon(2.8mm 0, 100% 0, 100% calc(100% - 2.8mm), calc(100% - 2.8mm) 100%, 0 100%, 0 2.8mm); }
+  .пример > * { position: relative; }
+  .пример::before { content: ""; position: absolute; inset: .3mm; background: var(--пример); clip-path: polygon(2.5mm 0, 100% 0, 100% calc(100% - 2.5mm), calc(100% - 2.5mm) 100%, 0 100%, 0 2.5mm); }
+  .пример .метка { display: inline-block; font: 800 8.4pt/1 "Tektur", sans-serif; color: var(--страница); text-transform: uppercase; letter-spacing: .08em;
+    background: var(--пример-кант); padding: 1.2mm 3.2mm 1mm 2.6mm; margin: 0 0 1.2mm 0;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
+  .пример p, .пример li { font-size: 9.5pt; padding: 0 2.9mm; }
+  .пример > p:last-child, .пример > ul:last-child, .пример > ol:last-child { padding-bottom: 2mm; margin-bottom: 0; }
+  .пример ul, .пример ol { padding-left: 6.6mm; }
+  .пример ul li, .пример ol li { padding: 0 2.6mm 0 0; }
+  .пример.важно { background: var(--важно-кант); }
+  .пример.важно::before { background: var(--важно); }
+  .пример.важно .метка { background: var(--важно-кант); }
+  .пример.совет { background: var(--келемий); }
+  .пример.совет::before { background: var(--совет); }
+  .пример.совет .метка { background: var(--келемий); }
+
+  /* ЦИКЛ РАУНДА: три фазы столбцами, стрелки между ними, возврат снизу. */
+  .цикл { column-span: all; break-inside: avoid; margin: 0 0 3mm; }
+  .цикл-ряд { display: grid; grid-template-columns: 1fr 5mm 1fr 5mm 1fr; align-items: stretch; }
+  .фаза { display: flex; flex-direction: column; background: var(--подложка);
+    outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: polygon(2.8mm 0, 100% 0, 100% calc(100% - 2.8mm), calc(100% - 2.8mm) 100%, 0 100%, 0 2.8mm); }
+  .фаза header { display: flex; align-items: center; gap: 2.6mm; background: var(--келемий);
+    color: #fff; padding: 0 3mm 0 2.4mm; height: 16mm; box-sizing: border-box; }
+  .фаза .ф-н { flex: none; width: 10.8mm; height: 12.5mm; filter: drop-shadow(0 .3mm .5mm rgba(0,0,0,.35)); }
+  .фаза header b { display: block; font: 800 13.5pt/1.05 "Tektur", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+  .фаза header i { display: block; font: 500 8.8pt/1.2 "Tektur", sans-serif; font-style: normal; color: #CFE8C9; margin-top: .6mm; }
+  .ф-тело { padding: 2.2mm 2.8mm 2.6mm; display: flex; flex-direction: column; gap: 1.8mm; }
+  .ф-тело p { margin: 0; font-size: 9.2pt; line-height: 1.27; }
+  .ф-шаг { display: flow-root; }
+  .ф-шаг .ф-и { float: left; width: 8.4mm; height: 8.4mm; object-fit: contain; margin: .3mm 2mm .6mm 0; }
+  .ф-шаг .ф-и.ф-карта { width: auto; height: 12mm; border-radius: .8mm; box-shadow: 0 .3mm .8mm rgba(0,0,0,.35); }
+  .ф-тело { flex: 1; }
+  .ф-низ { margin-top: auto; padding-top: 2mm; text-align: center; }
+  .ф-низ img { max-width: 88%; max-height: 30mm; }
+  .ф-стрелка { position: relative; }
+  /* Стрелка между фазами — клин во всю высоту зелёной шапки: шапка фазы
+     словно указывает на следующую. Внутри охряной шеврон. */
+  .ф-стрелка::before { content: ""; position: absolute; left: 0; width: 100%; top: 0; height: 16mm;
+    background: var(--келемий); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  .ф-стрелка::after { content: ""; position: absolute; left: .2mm; width: 2.6mm; top: 5.2mm; height: 5.6mm;
+    background: #F3E7C9; clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
+  .цикл-возврат { position: relative; height: 7mm; margin: 0 16.67%; border: .8mm solid var(--охра);
+    border-top: 0; border-radius: 0 0 3mm 3mm; }
+  .цикл-возврат::before { content: ""; position: absolute; left: -2.6mm; top: -2.4mm; width: 4.4mm; height: 3.6mm;
+    background: var(--охра); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .цикл-возврат span { position: absolute; left: 50%; bottom: -2.8mm; transform: translateX(-50%);
+    background: var(--охра); color: #fff; font: 700 8.6pt/1 "Tektur", sans-serif; text-transform: uppercase;
+    letter-spacing: .06em; padding: 1.2mm 3mm; white-space: nowrap; clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm); }
+
+  .фазы { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin: 0 0 3mm;
+    column-span: all; break-inside: avoid; }
+  .фазы > div { position: relative; background: var(--подложка); border-top: 1mm solid var(--келемий); padding: 1.8mm 2.4mm;
+    outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: polygon(2mm 0, 100% 0, 100% calc(100% - 2mm), calc(100% - 2mm) 100%, 0 100%, 0 2mm); }
+  .фазы > div { padding: 2.1mm 2.6mm; }
+  .фазы b { display: block; font: 700 11pt "Tektur", sans-serif; color: var(--охра); margin-bottom: .8mm; }
+  .фазы p { margin: 0; font: 9.8pt/1.28 "Tektur", sans-serif; }
+
+  .разворот.левая { justify-content: flex-start; }
+  .схема-гекса { display: block; width: 62mm; margin: 1mm auto 2mm; }
+
+  .обзор td { font-size: 9pt; vertical-align: top; }
+  .обзор td:nth-child(1) { width: 30%; }
+
+  .сведения { display: flex; gap: 6mm; justify-content: center; margin: 2mm 0 0; }
+  .сведения b { font: 700 13pt "Tektur", sans-serif; color: var(--охра); background: var(--подложка); padding: 2mm 4.6mm; outline: .18mm solid var(--кант); outline-offset: -.18mm;
+    clip-path: polygon(2mm 0, 100% 0, calc(100% - 2mm) 100%, 0 100%); }
+  .оглавление { list-style: none; margin: 0; padding: 3mm 5mm; background: var(--подложка); outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: polygon(2.8mm 0, 100% 0, 100% calc(100% - 2.8mm), calc(100% - 2.8mm) 100%, 0 100%, 0 2.8mm); }
+  .оглавление li { display: flex; align-items: center; gap: 3mm; font: 12pt/1.9 "Tektur", sans-serif; margin: 0; border-bottom: .25mm dotted var(--пример-кант); }
+  .оглавление li:last-child { border-bottom: 0; }
+  .оглавление .н { width: 10mm; flex: none; font: 800 9.5pt/1 "Tektur", sans-serif; color: var(--страница); background: var(--келемий); text-align: center; padding: 1.3mm 0 1.1mm;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 1.6mm) 100%, 0 100%); }
+  .оглавление .т { flex: 1; }
+  .оглавление .с { font-weight: 700; color: var(--охра); }
+  .оглавление .будет { color: var(--серый); }
+  .оглавление .будет .н { background: var(--серый); }
+
+  .рисунок-во-всю { column-span: all; break-inside: avoid; }
+  /* Врезка сразу под широким рисунком тоже идёт во всю ширину: в колонке
+     она валится под рисунок и уезжает за полосу (15.09.2026). */
+  .рисунок-во-всю + .пример { column-span: all; }
+  td .дст, .две td b + .и { white-space: nowrap; }
+  /* ЗАГОЛОВОК ПЕРЕД РИСУНКОМ НА ВСЮ ШИРИНУ — тоже на всю ширину: иначе
+     подложка заголовка обрывается посреди полосы (замечание дизайнера). */
+  .две .блок:has(+ .рисунок-во-всю) { column-span: all; break-after: avoid; }
+  .рисунок-в-колонке { break-inside: avoid; }
+  .две .блок:has(.рис) { break-inside: avoid; }
+  .рис { position: relative; margin: 0 auto; }
+  .рис img { display: block; width: 100%; height: auto; }
+  .рис svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .рис .номер-круг { fill: #fff; stroke: var(--келемий); }
+  .рис .номер-текст { fill: var(--келемий); font-family: "Tektur Narrow", sans-serif; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+  .рис .черта { stroke: var(--келемий); fill: none; }
+  .рис .выноска-л { stroke: var(--келемий); }
+  .рис .выноска-т { fill: var(--келемий); }
+  /* ЛЕГЕНДА ПОД РИСУНКОМ: две колонки. Список из девяти пунктов одной
+     колонкой не помещается на полосу, а рисунок ужимать уже некуда. */
+  /* ---- создатели игры ---- */
+  .создатели .строки { margin: .5mm 0 0; }
+  .строки .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
+    border-bottom: .2mm dotted var(--пример-кант); }
+  .строки .кто:last-child { border-bottom: 0; }
+  .строки .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
+    color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
+  .строки .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
+  .создатели h2 { font-size: 10.5pt; }
+  .создатели p, .создатели li { font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
+  .создатели .пример p { font-size: 8.4pt; }
+  .создатели .пример .метка { font-size: 8pt; }
+  .создатели .права p { font: 8pt/1.22 "Tektur Narrow", sans-serif; color: var(--серый); }
+  /* МЕСТО ПОД ЛОГОТИП занимает ВСЮ оставшуюся высоту полосы и отбито от блоков
+     текста сверху (просьба дизайнера 15.09.2026). */
+  .создатели .марка { position: absolute; left: 15mm; right: 15mm;
+    top: 126mm; bottom: 22mm; }
+  .создатели .марка { display: flex; align-items: center; justify-content: center; }
+  .создатели .марка img { max-width: 100%; max-height: 100%; width: auto; height: auto;
+    object-fit: contain; display: block; }
+  .создатели .марка .заглушка { height: 100%; width: 100%; margin: 0; }
+  /* ИКОНКА В СТРОКЕ ТЕКСТА — настоящая иконка игры, не заглушка. */
+  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm 0 1.2mm; }
+  td .и, th .и { vertical-align: -1.3mm; height: 4.8mm; }
+  /* Ячейка «иконка + подпись»: иконка крупно, подпись по центру под ней. */
+  .дст { display: flex; flex-direction: column; align-items: center;
+    gap: .5mm; text-align: center; line-height: 1.1; }
+  .дст .и { height: 8mm; width: auto; vertical-align: 0; margin: 0; }
+  .дст b { font-weight: 700; }
+  .и.крупно { height: 8.4mm; vertical-align: middle; margin: 0 2mm 0 0; }
+  .иконка-строка { display: flex; align-items: center; margin: 1.2mm 0; }
+  .блок.легенда { column-count: 2; column-gap: 5mm; column-span: all; }
+  /* БЛОК ПОПОЛАМ: во всю ширину полосы, слева рисунки, справа текст. */
+  .блок.вовсю { column-span: all; }
+  /* ---- заглавная иконка главы (04.10.2026): слева от вступления, ростом с него ---- */
+  .с-заглавной { column-span: all; display: flex; align-items: stretch; gap: 4mm; margin: 0 0 3mm; }
+  .с-заглавной > .блок { flex: 1; margin: 0; }
+  .с-заглавной .заглавная { flex: none; display: flex; align-items: center; justify-content: center;
+    width: 26mm; }
+  .с-заглавной .заг-и { height: 100%; max-height: 18mm; width: auto; max-width: 18mm; object-fit: contain; }
+  /* Блок на ступень крупнее: когда на полосе остаётся воздух, текст
+     лучше дать больше, чем растягивать пустоту (15.09.2026). */
+  .блок.крупно p, .блок.крупно li { font-size: 10.4pt; line-height: 1.32; }
+  .блок.крупно h2 { font-size: 13pt; }
+  .блок.крупно li { margin-bottom: 1.2mm; }
+  .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    column-gap: 5mm; align-items: start; }
+  .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  .блок.надвое:has(.широкий) { grid-template-columns: 1fr 1fr; }
+  .блок.надвое:has(.шире) { grid-template-columns: 1.45fr 1fr; }
+  .блок.в-две { column-count: 2; column-gap: 7mm; }
+  .блок.в-две > h2 { column-span: all; }
+  .блок.в-две li { break-inside: avoid; }
+  .блок.надвое > .под-низ { grid-column: 1 / -1; }
+  /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
+     рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
+  .блок.пара { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    column-gap: 5mm; align-items: start; }
+  .блок.пара > h2 { grid-column: 1 / -1; }
+  .блок.пара .половина > h3 { margin-top: 0; }
+  .блок.пара .пара-ряд { display: grid; grid-template-columns: 46% 1fr; column-gap: 2.6mm;
+    align-items: start; }
+  .блок.пара .пара-ряд .рисунок-в-колонке { padding: 0 !important; margin: 0; }
+  .блок.пара .пара-ряд .рис { width: 100% !important; }
+  .блок.пара .пара-ряд p { margin-top: 0; }
+  .блок.надвое .половина > *:first-child { margin-top: 0; }
+  .блок.надвое .половина > ul, .блок.надвое .половина > ol { margin-top: 0; }
+  .блок.легенда h3 { column-span: all; }
+  .блок.легенда > ul, .блок.легенда > ol { margin: 0; }
+  .блок.легенда li { break-inside: avoid; }
+  .легенда-цифры { margin: 1mm 0 0; padding-left: 5mm; }
+  .легенда-цифры li { font-size: 9pt; margin-bottom: .4mm; }
+
+  @media print {
+    html, body { background: none; padding: 0; }
+    .подпись-разворота { display: none; }
+    .разворот, .разворот.одна { display: block; width: auto; margin: 0; }
+    .стр { box-shadow: none; break-after: page; }
+    @page { size: 220mm 220mm; margin: 0; }
+  }
+
+  /* ---- просторная вёрстка (главы, переписанные с 27.09.2026) ----
+     Замечание дизайнера: при нынешнем кегле поля внутри плашек малы, а сами
+     плашки слипаются. Поля и промежутки — одной мерой по всей полосе. */
+  .стр.просторно .блок { padding: 3.2mm 4mm 3mm; margin: 0 0 4.5mm; }
+  .стр.просторно .блок h2 { margin-bottom: 2.2mm; }
+  .стр.просторно .две { column-gap: 7mm; }
+  .стр.просторно .дст .и { height: 15mm; }
+  .стр.просторно table { table-layout: fixed; width: 100%; }
+  .стр.просторно td { padding-top: 2mm; padding-bottom: 2mm; }
+  /* карточки: вещи игры сеткой 2×2 во всю ширину, картинка над текстом */
+  .карточки { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    gap: 4.5mm 7mm; margin: 0 0 4.5mm; align-items: stretch; }
+  .карточки .блок.карточка { margin: 0; }
+  .карт-рис { height: 27mm; display: flex; align-items: center; justify-content: center;
+    gap: 5mm; margin: 0 0 3mm; }
+  .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
+  .карт-рис img.значок { max-height: 68%; }
+  /* карты — со скруглёнными углами и тёмным кантом, как на столе (05.10.2026) */
+  .карт-рис img.карта { border-radius: 2.4mm; box-shadow: 0 0 0 .35mm #3C3020, 0 .6mm 1.4mm rgba(0,0,0,.28); }
+  /* одна картинка (лицо карты, широкий жетон) — во всю ширину карточки */
+  .карт-рис img:only-child { max-width: 100%; }
+
+  /* ---- состав игры: сетка компонентов (27.09.2026) ---- */
+  .комп-сетка { display: grid; gap: 3mm 3.5mm; margin: 1mm 0 3mm; }
+  .комп-сетка:last-child { margin-bottom: 0; }
+  /* планшеты войск и хранилища одной высоты на столе: колонки в том же
+     соотношении, что их ширины, — тогда оба встают в одном масштабе */
+  .комп-сетка.к2 { grid-template-columns: 2.01fr 1fr; }
+  .комп-сетка.к3 { grid-template-columns: repeat(3, 1fr); }
+  .комп-сетка.к4 { grid-template-columns: repeat(4, 1fr); }
+  .комп-сетка.к5 { grid-template-columns: repeat(5, 1fr); }
+  .комп-сетка.к6 { grid-template-columns: repeat(6, 1fr); }
+  .комп-сетка.к7 { grid-template-columns: repeat(7, 1fr); }
+  .комп-сетка.к8 { grid-template-columns: repeat(8, 1fr); }
+  .комп { text-align: center; }
+  .комп-рис { height: var(--комп-h, 16mm); display: flex; align-items: center; justify-content: center; gap: 1.5mm; }
+  .комп-рис img { max-height: 100%; max-width: 100%; object-fit: contain; min-width: 0; }
+  .комп-рис img + img { max-width: 48%; }
+  .комп-число { font: 800 11pt/1 "Tektur", sans-serif; color: var(--келемий); margin: 1mm 0 .4mm; }
+  .комп-рис img.значок { max-height: 62%; }
+  .комп-имя { font: 600 8pt/1.15 "Tektur Narrow", "Tektur", sans-serif; color: var(--чернила); }
+  .цвета { display: flex; gap: 2.5mm; align-items: center; margin: 0 0 2mm; }
+  .цвета span { width: 5mm; height: 5mm; border-radius: 1mm; display: inline-block;
+    outline: .2mm solid rgba(0,0,0,.35); }
+
+  /* ---- плитки действий-развилок (28.09.2026) ---- */
+  .плитки { display: grid; gap: 3mm; margin: 2mm 0 0; }
+  .плитки.к5 { grid-template-columns: repeat(5, 1fr); }
+  .плитки.к4 { grid-template-columns: repeat(4, 1fr); }
+  .плитки.к3 { grid-template-columns: repeat(3, 1fr); }
+  .плитки.к2 { grid-template-columns: repeat(2, 1fr); }
+  .плитка { display: flex; flex-direction: column; align-items: center; text-align: center;
+    background: rgba(255, 255, 255, .45); outline: .18mm solid var(--кант); padding: 2.4mm 1.6mm 2.6mm; }
+  .плитка .и.плит { height: var(--плит-h, 14mm); margin: 0 0 1.4mm; vertical-align: 0; }
+  .плитка b { font: 700 10pt/1.15 "Tektur", sans-serif; color: var(--охра); margin: 0 0 1.6mm; }
+  .плитка .ветка { font: 600 9pt/1.2 "Tektur Narrow", sans-serif; color: var(--чернила); }
+  .плитка .или { font: 400 8pt/1.1 "Tektur Narrow", sans-serif; color: var(--серый); margin: .7mm 0; }
+
+  /* ---- раздел: заголовок группы карточек одного действия (28.09.2026) ---- */
+  .раздел { column-span: all; display: flex; align-items: center; gap: 3mm;
+    margin: 1mm 0 3mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--келемий); }
+  .раздел .и.разд { height: 11mm; margin: 0; vertical-align: 0; }
+  .раздел span { font: 700 15pt/1 "Tektur", sans-serif; color: var(--охра); }
+  .карточка ul { margin: 0 0 1.4mm; padding-left: 4mm; }
+  .карточка li { margin: 0 0 .8mm; }
+  .карточка ol { margin: 0 0 1.4mm; padding-left: 5mm; }
+
+  /* ---- задняя сторона обложки: памятка в оформлении глав ---- */
+  /* илл/63355acfd38c0614.jpg — ИЛЛЮСТРАЦИЯ ДИЗАЙНЕРА ПОД ПАМЯТКОЙ, высветленная бумагой, без сетки;
+     сдвиг 32% — в кадре инженеры за работой (14.10.2026). */
+  .стр.обложка.задняя { padding: 12mm 15mm 14mm;
+    background: linear-gradient(rgba(244,238,220,.55), rgba(244,238,220,.55)), url("илл/63355acfd38c0614.jpg") 32% center / cover no-repeat;
+    color: var(--чернила); display: flex; flex-direction: column; }
+  .стр.обложка.задняя::after { display: none; }
+  .задняя .глава { flex: none; }
+  /* КОРЕШОК У ЗАДНЕЙ ОБЛОЖКИ СПРАВА: рамка открыта справа, слева замкнута. */
+  .разворот.одна > .стр.задняя .к-лев { display: inline; }
+  .разворот.одна > .стр.задняя .к-хвл { display: none; }
+  .разворот.одна > .стр.задняя .к-прав { display: none; }
+  .разворот.одна > .стр.задняя .к-хвп { display: inline; }
+  .задняя .пм { flex: 1; min-height: 0; display: grid; grid-template-columns: 57mm 1fr; column-gap: 4mm; }
+  .задняя .пм-кол { display: flex; flex-direction: column; gap: 4mm; min-height: 0; }
+  .задняя .пм-кол > .блок:last-child { flex: 1; }
+  .задняя .ход li { break-inside: avoid; }
+  .задняя .блок { margin: 0; padding: 3mm 3.4mm 2.6mm; background: rgba(247,241,225,.93); }
+
+  .задняя h2 { font: 700 10pt/1.2 "Tektur", sans-serif; margin: 0 0 2mm; padding-bottom: .8mm;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 2mm; }
+  .задняя h2 .зв { font: 400 7pt/1 "Tektur Narrow", sans-serif; color: var(--серый); white-space: nowrap; }
+
+  .задняя p, .задняя li { font: 400 7.8pt/1.26 "Tektur Narrow", sans-serif; color: var(--чернила); margin: 0 0 1.1mm; hyphens: manual; }
+  .задняя b { font-weight: 700; color: var(--чернила); }
+  .задняя .нр { white-space: nowrap; }
+  .задняя .прим { font-size: 7pt; line-height: 1.3; color: #4A3F2C; margin: 0 0 1mm; }
+  .задняя ul, .задняя ol { margin: 0; padding: 0; list-style: none; }
+  .задняя li { position: relative; padding-left: 3.4mm; }
+  .задняя li::marker { content: ""; }
+  .задняя ul > li::before { content: ""; position: absolute; left: .3mm; top: 1.15mm; width: 1.4mm; height: 1.4mm;
+    background: var(--келемий); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  .задняя ol { counter-reset: шаг; }
+  .задняя ol > li { counter-increment: шаг; }
+  .задняя ol > li::before { content: counter(шаг); position: absolute; left: 0; top: 0;
+    font: 700 8pt/1.32 "Tektur", sans-serif; color: var(--охра); }
+
+  /* .фаза в книге — карточка фазы (флекс, подложка, срезанные углы); в памятке
+     это строка-заголовок, и книжный стиль сплющивал её номер (02.10.2026). */
+  .задняя .фаза { display: block; background: none; outline: 0; clip-path: none;
+    font: 700 7.6pt/1.2 "Tektur", sans-serif; color: var(--келемий); text-transform: uppercase;
+    letter-spacing: .05em; margin: 2.4mm 0 1mm; }
+  .задняя h2 + .фаза { margin-top: 0; }
+  .задняя .фаза b { color: var(--охра); display: inline-block; min-width: 6.4mm; }
+  /* условия конца партии помечены флагом — второй маркер не нужен */
+  .задняя .флаги > li { padding-left: 0; }
+  .задняя .флаги > li::before { display: none; }
+
+  .стр.обложка.задняя img { width: auto; height: auto; display: inline-block; object-fit: contain; }
+  .стр.обложка.задняя .и { height: 3.9mm; width: auto; vertical-align: -1mm; margin: 0 .2mm 0 1mm; }
+
+  /* ПЯТЬ ДЕЙСТВИЙ: значок и имя | действие | или | действие; пять «или» стоят
+     одним столбцом и сами читаются как «одно из двух». */
+  .задняя .дей-сетка { display: flex; flex-direction: column; }
+  .задняя .дей { display: grid; grid-template-columns: 19mm 1.25fr 5mm 1fr; column-gap: 2mm; align-items: center;
+    padding: 1.8mm 0; border-top: .2mm solid var(--кант); }
+  .задняя .дей:first-child { border-top: 0; padding-top: .2mm; }
+  .задняя .дей-гол { display: flex; flex-direction: column; align-items: center; gap: .6mm; }
+  .стр.обложка.задняя .дей-зн { width: 6.5mm; height: 6.5mm; }
+  .задняя .дей-имя { font: 700 6.4pt/1 "Tektur", sans-serif; color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
+  .задняя .вет { font: 400 7.8pt/1.26 "Tektur Narrow", sans-serif; }
+  .задняя .или { font: 700 7pt/1 "Tektur", sans-serif; color: var(--охра); text-transform: uppercase; text-align: center; }
+  .задняя .итог { margin: 1.4mm 0 0; padding-top: 1.8mm; border-top: .2mm solid var(--кант); }
+
+  .задняя .победа { margin: 1.8mm 0 0; }
+  .задняя .победа b { color: var(--охра); }
+  .задняя .две-кол { column-count: 2; column-gap: 4mm; }
+  .задняя .две-кол li { break-inside: avoid; }
+  .задняя .ничья { margin: 1.2mm 0 0; }
+
+  /* РЕДКИЕ ЗНАЧКИ — одна строка под блоками, значок и подпись рядом. */
+  .задняя .пм-легенда { flex: none; margin-top: 2.4mm; display: grid; grid-template-columns: repeat(10, 1fr);
+    column-gap: 1.4mm; align-items: center; }
+  .задняя .пм-легенда div { display: flex; align-items: center; gap: 1.1mm;
+    font: 400 6.4pt/1.12 "Tektur Narrow", sans-serif; color: var(--серый); }
+  .стр.обложка.задняя .пм-легенда .и { height: 4.6mm; vertical-align: 0; margin: 0; flex: none; }
+
+  /* ---- полоса «мир игры» за обложкой ---- */
+  .мир-рис { margin: 5mm 0 4.5mm; }
+  .мир-рис img { display: block; width: 100%; height: auto;
+    clip-path: polygon(7mm 0, 100% 0, 100% calc(100% - 7mm), calc(100% - 7mm) 100%, 0 100%, 0 7mm); }
+  .мир-текст { column-count: 2; column-gap: 6mm; }
+  .мир-текст p { font: 10.4pt/1.36 "Tektur Narrow", sans-serif; margin: 0 0 2.4mm;
+    break-inside: avoid; }
+  .мир-текст p:last-child { margin-bottom: 0; color: var(--охра); }
+
+  /* ---- выходные данные. СОЗДАТЕЛИ ИГРЫ НА ПОЛОСЕ СОДЕРЖАНИЯ (02.10.2026): глава 8 выросла на
+     полосу (примеры манёвра и боя), и чтобы книга осталась в 36 полос,
+     выходные данные переехали под оглавление — там пустовала половина полосы. */
+  .выходные-данные { margin-top: 4mm; }
+  .стр:has(.выходные-данные) .оглавление li { line-height: 1.2; padding: .3mm 0; font-size: 10.4pt; }
+  .выходные-данные .глава { font-size: 13pt; margin-bottom: 2mm; }
+  .выходные-данные .две { column-gap: 5mm; column-fill: balance; height: auto; }
+  .выходные-данные .блок, .выходные-данные .пример { break-inside: avoid; }
+  .выходные-данные .в-колонку { break-before: column; }
+  .выходные-данные .блок { padding: 1.4mm 2.4mm; margin-bottom: 1.6mm; }
+  .выходные-данные .кто { padding: .25mm 0; }
+  .выходные-данные h2 { font-size: 9pt; margin-bottom: 1mm; }
+  .выходные-данные p, .выходные-данные .кто { font-size: 7.1pt; line-height: 1.18; }
+  .выходные-данные p { margin: 0 0 .8mm; }
+  .выходные-данные .пример { padding: 2mm 2.4mm 1.6mm; margin-top: 1mm; }
+  .выходные-данные .пример .метка { font-size: 7pt; }
+
+  /* ---- таблицы справочника (приказы, нации) ---- */
+  .табл { width: 100%; border-collapse: collapse; margin: 0 0 calc(var(--шаг) * 2.4);
+    background: var(--карточка); font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
+  .табл th, .табл td { border: .18mm solid var(--кант); padding: 1.3mm 2mm;
+    text-align: left; vertical-align: top; }
+  .табл tr:first-child th { font: 700 7.6pt/1.1 "Tektur Narrow", sans-serif;
+    color: #fff; background: var(--келемий); text-transform: uppercase; letter-spacing: .06em; }
+  .табл tr + tr th { font: 700 8.4pt/1.2 "Tektur", sans-serif; color: var(--чернила);
+    background: rgba(40, 110, 50, .10); text-transform: none; letter-spacing: .02em; }
+  .табл.узк td { text-align: center; }
+  .табл tr.разд td { background: transparent; border-left: 0; border-right: 0;
+    font: 700 7.2pt/1 "Tektur Narrow", sans-serif; color: var(--охра);
+    text-transform: uppercase; letter-spacing: .08em; padding-top: 3mm; }
+  .табл.нации td { text-align: center; white-space: nowrap; }
+  .подзаг { font: 800 9pt/1 "Tektur", sans-serif; color: var(--охра);
+    text-transform: uppercase; letter-spacing: .1em; margin: calc(var(--шаг) * 1.4) 0 calc(var(--шаг) * 1.2); }
+  .кк p i { font-style: italic; color: var(--серый); }
+  .выходные { font: 8pt/1.3 "Tektur Narrow", sans-serif; color: var(--серый);
+    margin-top: 6mm; border-top: .18mm solid var(--кант); padding-top: 2mm; }
+  .портреты { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--шаг) * 1.4) calc(var(--шаг) * 3); }
+  .портрет { background: var(--карточка); border: .18mm solid var(--кант);
+    border-left: .9mm solid var(--келемий); padding: 1.4mm 2.2mm; }
+  .портрет b { font: 700 9pt/1.2 "Tektur", sans-serif; color: var(--охра); }
+  .портрет p { font: 8pt/1.25 "Tektur Narrow", sans-serif; margin: .6mm 0 0; }
+  .стр.спр .раскл img { height: 52mm; }
+
+
+  /* ================= СПРАВОЧНИК =================
+     Это не книга правил: её читают подряд, а справочник открывают посреди
+     партии на нужной карте. Отсюда три решения (15.09.2026):
+     1) полосы без фоновой графики — за плотным текстом она мешает читать,
+        остаётся только едва заметная гекс-сетка;
+     2) единый шаг отступов 1.6 мм: поля карточки, промежутки, колонки —
+        всё кратно ему, иначе страница «дышит» вразнобой;
+     3) ярлык у каждой строки карточки одной ширины, чтобы тексты вставали
+        в колонку и глаз находил нужную строку не читая. */
+  :root { --шаг: 1.6mm; --карточка: rgba(255, 252, 243, .86); }
+
+  .стр.спр { background-image: none; background-color: var(--страница); }
+  .стр.спр::after { opacity: .5; }
+
+  /* ---- шапка раздела ---- */
+  .прил { display: flex; align-items: stretch; gap: 0; margin: 0 0 calc(var(--шаг) * 2.5); }
+  .прил .бк { flex: none; display: flex; align-items: center; background: var(--охра);
+    color: var(--страница); font: 800 13pt/1 "Tektur", sans-serif;
+    padding: 1.9mm 4.6mm 1.7mm 3.4mm; letter-spacing: .04em;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.8mm) 100%, 0 100%); }
+  .прил .им { display: flex; align-items: center; font: 700 15pt/1 "Tektur", sans-serif;
+    color: var(--охра); padding: 0 3mm 0 3.4mm; }
+  .прил .счёт { display: flex; align-items: center; font: 700 7.4pt/1 "Tektur Narrow", sans-serif;
+    color: var(--серый); text-transform: uppercase; letter-spacing: .08em;
+    padding: .9mm 2.2mm .7mm; border: .18mm solid var(--кант); align-self: center; }
+  .прил .черта { flex: 1; align-self: center; height: .45mm; background: var(--келемий);
+    margin-left: 3mm; }
+
+  /* ---- карточка карты ---- */
+  /* В книге правил .карточки — сетка рядами; здесь — газетные колонки:
+     ряды равняли пару карточек по высокой, и полоса пустела. */
+  .стр.спр .карточки { display: block; column-count: 2; column-gap: calc(var(--шаг) * 3.5);
+    column-fill: balance; }
+  .кк { break-inside: avoid; background: var(--карточка);
+    border: .18mm solid var(--кант); border-left: .9mm solid var(--келемий);
+    padding: calc(var(--шаг) * .95) calc(var(--шаг) * 1.4) var(--шаг);
+    margin: 0 0 calc(var(--шаг) * 1.5); }
+  .кк.нач { border-left-color: var(--охра); }
+  .кк .имя { display: flex; align-items: baseline; gap: 2mm;
+    font: 700 9.6pt/1.1 "Tektur", sans-serif; color: var(--чернила);
+    padding-bottom: calc(var(--шаг) * .55); margin-bottom: calc(var(--шаг) * .7);
+    border-bottom: .18mm solid var(--кант); }
+  .кк .имя small { margin-left: auto; flex: none; font: 700 6.2pt/1 "Tektur Narrow", sans-serif;
+    color: var(--серый); text-transform: uppercase; letter-spacing: .07em;
+    border: .16mm solid var(--кант); padding: .6mm 1.2mm .45mm; }
+  .кк p { display: flex; gap: 1.6mm; font: 8.3pt/1.24 "Tektur Narrow", sans-serif;
+    margin: 0 0 calc(var(--шаг) * .45); }
+  .кк p:last-child { margin-bottom: 0; }
+  .кк .кл { flex: none; width: 13mm; font: 700 6.6pt/1.5 "Tektur Narrow", sans-serif;
+    color: var(--келемий); text-transform: uppercase; letter-spacing: .06em; }
+  .кк .кл.о { color: var(--охра); }
+  /* Карточка-разъяснение: имя, номер и связный текст. Ни таблицы,
+     ни ярлыков — справочник объясняет карту, а не переписывает её. */
+  .кк.разъясн .имя small { font: 700 6.4pt/1 "Tektur Narrow", sans-serif;
+    color: var(--келемий); border-color: var(--келемий); }
+  .кк.разъясн p { display: block; font: 8.4pt/1.28 "Tektur Narrow", sans-serif; }
+
+  /* ---- иконки ---- */
+  .икс { display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 0 calc(var(--шаг) * 3); }
+  .икс .ряд { display: flex; align-items: center; gap: 2.4mm;
+    padding: calc(var(--шаг) * .62) 0; border-bottom: .18mm solid var(--кант);
+    break-inside: avoid; }
+  .икс .группа { border-bottom: 0; padding-top: calc(var(--шаг) * 1.5);
+    padding-bottom: calc(var(--шаг) * .3); }
+  .икс .группа b { font: 800 7.6pt/1 "Tektur", sans-serif; color: var(--келемий);
+    text-transform: uppercase; letter-spacing: .1em; }
+  .икс .ряд img.ик { width: 8.6mm; height: 8.6mm; object-fit: contain; flex: none; }
+  .икс .ик-нет { width: 8.6mm; height: 8.6mm; flex: none; background: var(--место-иконки);
+    border: .25mm dashed var(--пример-кант); font: 5pt/8.6mm "Tektur Narrow", sans-serif;
+    color: var(--серый); text-align: center; }
+  .икс .тек { flex: 1; min-width: 0; }
+  .икс .тек b { display: block; font: 700 8.2pt/1.12 "Tektur", sans-serif; color: var(--чернила); }
+  .икс .тек span { font: 7.2pt/1.14 "Tektur Narrow", sans-serif; color: var(--серый); }
+
+  /* ---- раскладки поля ---- */
+  .раскл { display: grid; grid-template-columns: 1fr 1fr;
+    gap: calc(var(--шаг) * 2.2) calc(var(--шаг) * 3); }
+  .раскл figure { margin: 0; background: var(--карточка);
+    border: .18mm solid var(--кант); padding: var(--шаг);
+    display: flex; flex-direction: column; }
+  /* Высота карты ограничена: без этого квадрат 2×2 вытягивает полосу вдвое. */
+  .раскл img { display: block; width: 100%; height: 62mm;
+    object-fit: contain; object-position: center; }
+  .раскл figcaption { font: 700 7.6pt/1 "Tektur Narrow", sans-serif; color: var(--келемий);
+    text-transform: uppercase; letter-spacing: .08em; margin-top: calc(var(--шаг) * .7);
+    text-align: center; }
+  .вступ { font: 8.6pt/1.3 "Tektur Narrow", sans-serif; color: var(--серый);
+    margin: 0 0 calc(var(--шаг) * 2); padding-left: 3mm;
+    border-left: .5mm solid var(--келемий); column-span: all; }
+  .легенда-поля { margin-top: calc(var(--шаг) * 2); border: .18mm solid var(--кант);
+    background: var(--карточка); padding: calc(var(--шаг) * 1.2); }
+  .легенда-поля img { display: block; width: 100%; height: auto; }
+
+  /* ---- словарь ---- */
+  .словарь { column-count: 2; column-gap: calc(var(--шаг) * 3.5); }
+  .словарь div { break-inside: avoid; margin: 0 0 calc(var(--шаг) * 1.3);
+    padding-left: 3mm; border-left: .5mm solid var(--кант); }
+  .словарь b { display: block; font: 700 8.8pt/1.15 "Tektur", sans-serif; color: var(--охра);
+    text-transform: uppercase; letter-spacing: .02em; }
+  .словарь p { font: 8.3pt/1.24 "Tektur Narrow", sans-serif; margin: .3mm 0 0; }
+
+  /* ---- титул и содержание ---- */
+  /* ---- обложки справочника ---- */
+  .стр.обложка { padding: 0; background: #222; }
+  .стр.обложка img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .стр.обложка .рамка-техно { position: absolute; inset: 4.5mm; z-index: 3;
+    pointer-events: none; border: .45mm solid #2A2318;
+    clip-path: polygon(6mm 0, 100% 0, 100% calc(100% - 6mm), calc(100% - 6mm) 100%, 0 100%, 0 6mm); }
+  .стр.обложка .рамка-техно::before, .стр.обложка .рамка-техно::after {
+    content: ""; position: absolute; width: 14mm; height: 14mm;
+    border: .7mm solid var(--келемий); }
+  .стр.обложка .рамка-техно::before { right: -.3mm; top: -.3mm; border-left: 0; border-bottom: 0; }
+  .стр.обложка .рамка-техно::after { left: -.3mm; bottom: -.3mm; border-right: 0; border-top: 0; }
+
+  /* Полоса для заметок — добор до кратности четырём. */
+  .для-заметок { position: absolute; inset: 22mm 18mm; border: .25mm dashed var(--кант);
+    display: flex; align-items: flex-start; justify-content: center; padding-top: 4mm; }
+  .для-заметок span { font: 700 8pt "Tektur Narrow", sans-serif; color: var(--серый);
+    text-transform: uppercase; letter-spacing: .18em; }
+
+  .титул-спр { position: absolute; inset: 24mm 20mm; display: flex;
+    flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; gap: 6mm; }
+  .титул-спр img { width: 130mm; height: auto; }
+  .титул-спр .под { font: 800 26pt/1 "Tektur", sans-serif; color: var(--охра);
+    letter-spacing: .14em; text-transform: uppercase;
+    border-top: .5mm solid var(--келемий); border-bottom: .5mm solid var(--келемий);
+    padding: 3mm 8mm; }
+  .титул-спр p { font: 10pt/1.4 "Tektur Narrow", sans-serif; color: var(--серый);
+    max-width: 118mm; margin: 0; }
+
+  .огл-спр { list-style: none; margin: 0; padding: 0; }
+  .огл-спр li { display: flex; align-items: center; gap: 3mm;
+    padding: calc(var(--шаг) * 1.05) 0; border-bottom: .18mm solid var(--кант);
+    font: 11pt/1 "Tektur", sans-serif; }
+  .огл-спр li:last-child { border-bottom: 0; }
+  .огл-спр .б { flex: none; width: 8mm; height: 8mm; display: flex;
+    align-items: center; justify-content: center; background: var(--охра);
+    color: var(--страница); font: 800 9.4pt/1 "Tektur", sans-serif;
+    clip-path: polygon(1.4mm 0, 100% 0, 100% calc(100% - 1.4mm), calc(100% - 1.4mm) 100%, 0 100%, 0 1.4mm); }
+  .огл-спр .т { flex: 1; }
+  .огл-спр .с { flex: none; width: 10mm; text-align: right; font-weight: 800;
+    color: var(--келемий); }
+</style>
+</head>
+<body>
+
+<p class="подпись-разворота">Разворот · страницы 1–2</p>
+<div class="разворот">
+
+  <div class="стр обложка"><img src="илл/406d0815ee5f2a7b.jpg" alt=""></div>
+
+
+  <div class="стр спр фон3 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="глава"><span class="гл-т">Содержание</span></div>
+    <ol class="огл-спр"><li><span class="б">А</span><span class="т">Карты приказов</span><span class="с">3</span></li><li><span class="б">Б</span><span class="т">Карты заданий</span><span class="с">4</span></li><li><span class="б">В</span><span class="т">Начальные задания</span><span class="с">10</span></li><li><span class="б">Г</span><span class="т">Карты арсенала</span><span class="с">12</span></li><li><span class="б">Д</span><span class="т">Начальный арсенал</span><span class="с">16</span></li><li><span class="б">Е</span><span class="т">Карты контейнеров</span><span class="с">17</span></li><li><span class="б">Ж</span><span class="т">Карты рынка</span><span class="с">18</span></li><li><span class="б">З</span><span class="т">Супер-задания</span><span class="с">19</span></li><li><span class="б">И</span><span class="т">Супер-арсенал</span><span class="с">20</span></li><li><span class="б">К</span><span class="т">Нации</span><span class="с">22</span></li><li><span class="б">Л</span><span class="т">Иконки игры</span><span class="с">23</span></li><li><span class="б">М</span><span class="т">Сценарии поля</span><span class="с">25</span></li><li><span class="б">Н</span><span class="т">Словарь игры</span><span class="с">28</span></li></ol>
+    <p class="выходные">Свод правил 1.51.0. Наборы карт: задания 3.0.0, начальные задания 3.0.0, супер-задания 9.0.0, арсенал 9.0.0, начальный арсенал 9.0.0, супер-арсенал 4.1.0, контейнеры 6.0.0, рынок 4.0.0, приказы 6.0.0, свод 1.51.0, курс наград лист «Курс наград»: три числа из таблицы дизайнера, остальные — предположения.</p>
+    <div class="колонцифра"><span>2</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 3–4</p>
+<div class="разворот">
+
+  <div class="стр спр фон4 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил"><span class="бк">А</span><span class="им">Карты приказов</span><span class="счёт">20 карт</span><span class="черта"></span></div>
+    <div class="вступ">У каждого игрока пять карт приказов своего цвета. Верх даёт два действия, при совпадении — одно. Низ называет другую карту: если её в этом круге вскрыли раньше вас, низ даёт одно из её действий. Каждое действие — выбор одного из двух.</div>
+    <table class="табл"><tr><th>Приказ</th><th>Верх: 2 действия</th><th>Низ: карта и одно её действие</th></tr><tr><th>ОСВОИТЬ</th><td>Добыча и Питание</td><td><b>НАСТУПАТЬ</b>: Снабжение или Командование</td></tr><tr><th>МОБИЛИЗОВАТЬ</th><td>Питание и Снабжение</td><td><b>КОНТРОЛИРОВАТЬ</b>: Командование или Развитие</td></tr><tr><th>НАСТУПАТЬ</th><td>Снабжение и Командование</td><td><b>ИССЛЕДОВАТЬ</b>: Развитие или Добыча</td></tr><tr><th>КОНТРОЛИРОВАТЬ</th><td>Командование и Развитие</td><td><b>ОСВОИТЬ</b>: Добыча или Питание</td></tr><tr><th>ИССЛЕДОВАТЬ</th><td>Развитие и Добыча</td><td><b>МОБИЛИЗОВАТЬ</b>: Питание или Снабжение</td></tr></table>
+    <div class="подзаг">Спец-плашки по цветам</div>
+    <table class="табл узк"><tr><th></th><th>Голубая</th><th>Красная</th><th>Зелёная</th><th>Жёлтая</th></tr><tr><th>ОСВОИТЬ</th><td>—</td><td>+2 монеты</td><td>−1 монета → 1 карта задания</td><td>−1 монета → переместить 1 жетон войск</td></tr><tr><th>МОБИЛИЗОВАТЬ</th><td>+2 монеты</td><td>−1 монета → переместить 1 жетон войск</td><td>−1 монета → 1 боеприпас</td><td>−1 монета → 1 карта задания</td></tr><tr><th>НАСТУПАТЬ</th><td>−1 монета → переместить 1 жетон войск</td><td>−1 монета → 1 боеприпас</td><td>—</td><td>+2 монеты</td></tr><tr><th>КОНТРОЛИРОВАТЬ</th><td>−1 монета → 1 боеприпас</td><td>−1 монета → 1 карта задания</td><td>+2 монеты</td><td>—</td></tr><tr><th>ИССЛЕДОВАТЬ</th><td>−1 монета → 1 карта задания</td><td>—</td><td>−1 монета → переместить 1 жетон войск</td><td>−1 монета → 1 боеприпас</td></tr></table>
+    <div class="подзаг">Пять действий: что выбирают</div>
+    <table class="табл"><tr><th>Действие</th><th>Первое на выбор</th><th>Второе на выбор</th></tr><tr><th>Добыча</th><td>Добыть: запитанные добытчики берут келемий или контейнеры</td><td>Построить добытчик</td></tr><tr><th>Питание</th><td>Переложить энергию</td><td>Построить энергостанцию</td></tr><tr><th>Снабжение</th><td>Выпустить: запитанные здания делают войска или боеприпасы</td><td>Построить военное здание</td></tr><tr><th>Командование</th><td>Манёвр</td><td>Бой</td></tr><tr><th>Развитие</th><td>Рынок</td><td>Наука</td></tr></table>
+    <div class="колонцифра"><span>3</span></div>
+  </div>
+
+
+  <div class="стр спр фон1 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил" data-h="Б"><span class="бк">Б</span><span class="им">Карты заданий</span><span class="счёт">50 карт</span><span class="черта"></span></div>
+    <div class="вступ прил">Выполнить задание — спец-действие, действие-награду играют сразу и за свой счёт. Или сожгите карту ради верхнего эффекта. Знак ∞ — верх свободный: сжечь его можно в свой ход в любой момент, без спец-действия.</div>
+    <div class="карточки">
+      <div data-k="57eb06d2d8dd" class="кк "><div class="имя"><span>Добытчик ×3</span><small>z3_01</small></div><p><span class="кл ">надо</span><span>Имей на поле 3 своих добытчика</span></p><p><span class="кл ">награда</span><span>на выбор: Построить добытчик или Питание</span></p><p><span class="кл о">сверх</span><span>Имей на поле 4 своих добытчика: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Добыть»</span></p></div>
+      <div data-k="7913b0e54286" class="кк "><div class="имя"><span>Добытчик рядом с врагом ×1</span><small>z3_02</small></div><p><span class="кл ">надо</span><span>Имей свой добытчик на гексе, соседнем с гексом, где есть добытчик врага</span></p><p><span class="кл ">награда</span><span>на выбор: Добыча или Построить энергостанцию</span></p><p><span class="кл о">сверх</span><span>Имей свои добытчики на 2 разных гексах, соседних с гексами, где есть добытчик врага: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Постройте одно здание любого вида по его цене</span></p></div>
+      <div data-k="60a3190052e4" class="кк "><div class="имя"><span>Потрать келемий ×1</span><small>z3_03</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД потрать 1 келемий</span></p><p><span class="кл ">награда</span><span>на выбор: Построить добытчик или Построить энергостанцию и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Обменяйте 1 келемий на 1 трофей</span></p></div>
+      <div data-k="60131765d704" class="кк "><div class="имя"><span>Уровни добытчиков 6+</span><small>z3_04</small></div><p><span class="кл ">надо</span><span>Имей на поле свои добытчики с суммой уровней 6 или больше</span></p><p><span class="кл ">награда</span><span>на выбор: Добыча или Питание и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Добыть»</span></p></div>
+      <div data-k="31e18789aeca" class="кк "><div class="имя"><span>Запитанный добытчик ×2</span><small>z3_05</small></div><p><span class="кл ">надо</span><span>Имей на поле 2 своих запитанных добытчика</span></p><p><span class="кл ">награда</span><span>на выбор: Построить добытчик или Питание</span></p><p><span class="кл о">сверх</span><span>Имей на поле 3 своих запитанных добытчика: 1 карта арсенала и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>Постройте одно здание любого вида по его цене</span></p></div>
+      <div data-k="89747e2d8fb2" class="кк "><div class="имя"><span>Добытчик рядом с врагом ×2</span><small>z3_06</small></div><p><span class="кл ">надо</span><span>Имей свои добытчики на 2 разных гексах, соседних с гексами, где есть здание врага</span></p><p><span class="кл ">награда</span><span>на выбор: Добыча или Построить энергостанцию</span></p><p><span class="кл о">сверх</span><span>Имей свои добытчики на 3 разных гексах, соседних с гексами, где есть здание врага: 1 карта арсенала и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>Обменяйте 1 келемий на 1 трофей</span></p></div>
+      <div data-k="3b115766d929" class="кк "><div class="имя"><span>Потрать келемий ×2</span><small>z3_07</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД потрать 2 келемия</span></p><p><span class="кл ">награда</span><span>на выбор: Построить добытчик или Построить энергостанцию и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Добыть»</span></p></div>
+      <div data-k="6da6465e64b6" class="кк "><div class="имя"><span>Энергостанция ×3</span><small>z3_08</small></div><p><span class="кл ">надо</span><span>Имей на поле 3 своих энергостанции</span></p><p><span class="кл ">награда</span><span>на выбор: Питание или Снабжение</span></p><p><span class="кл о">сверх</span><span>Имей на поле 4 своих энергостанции: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Переложить энергию» или перенос модулей на планшете войск</span></p></div>
+    </div>
+    <div class="колонцифра"><span>4</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 5–6</p>
+<div class="разворот">
+
+  <div class="стр спр фон2 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="d56e804b40f1" class="кк "><div class="имя"><span>Энергостанция рядом с врагом ×1</span><small>z3_09</small></div><p><span class="кл ">надо</span><span>Имей свою энергостанцию на гексе, соседнем с гексом, где есть добытчик врага</span></p><p><span class="кл ">награда</span><span>на выбор: Построить энергостанцию или Снабжение</span></p><p><span class="кл о">сверх</span><span>Имей свои энергостанции на 2 разных гексах, соседних с гексами, где есть добытчик врага: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>∞ Переложите любые свои модули на планшете войск</span></p></div>
+      <div data-k="7acdf69f23a7" class="кк "><div class="имя"><span>Запитай ×2</span><small>z3_10</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД запитай 2 своих здания</span></p><p><span class="кл ">награда</span><span>на выбор: Питание или Построить военное здание и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Щит на технику или авиацию: снимает первое попадание по жетону этого рода</span></p></div>
+      <div data-k="6e85a248f179" class="кк "><div class="имя"><span>Уровни добытчиков и энергостанций 10+</span><small>z3_11</small></div><p><span class="кл ">надо</span><span>Имей на поле свои добытчики и энергостанции с суммой уровней 10 или больше</span></p><p><span class="кл ">награда</span><span>на выбор: Построить энергостанцию или Построить военное здание и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Переложить энергию» или перенос модулей на планшете войск</span></p></div>
+      <div data-k="c029cd43b5f6" class="кк "><div class="имя"><span>Энергостанции разных уровней ×3</span><small>z3_12</small></div><p><span class="кл ">надо</span><span>Имей на поле свои энергостанции 3 разных уровней</span></p><p><span class="кл ">награда</span><span>на выбор: Питание или Снабжение и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>∞ Переложите любые свои модули на планшете войск</span></p></div>
+      <div data-k="8947998c1a17" class="кк "><div class="имя"><span>Энергия в ячейках ×4</span><small>z3_13</small></div><p><span class="кл ">надо</span><span>Имей в ячейках своих зданий 4 кубика энергии</span></p><p><span class="кл ">награда</span><span>на выбор: Построить энергостанцию или Снабжение и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Щит на технику или авиацию: снимает первое попадание по жетону этого рода</span></p></div>
+      <div data-k="cf14c43d0a56" class="кк "><div class="имя"><span>Все добытчики запитаны</span><small>z3_14</small></div><p><span class="кл ">надо</span><span>Имей на поле не меньше 2 своих добытчиков, и все они запитаны</span></p><p><span class="кл ">награда</span><span>на выбор: Питание или Построить военное здание и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Переложить энергию» или перенос модулей на планшете войск</span></p></div>
+      <div data-k="0eadc301fdf0" class="кк "><div class="имя"><span>Здание 3-го уровня</span><small>z3_15</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД построй добытчик или энергостанцию 3-го уровня или выше</span></p><p><span class="кл ">награда</span><span>на выбор: Построить энергостанцию или Построить военное здание и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>∞ Переложите любые свои модули на планшете войск</span></p></div>
+      <div data-k="0e6bb8d7f967" class="кк "><div class="имя"><span>Запитанная энергостанция ×3</span><small>z3_16</small></div><p><span class="кл ">надо</span><span>Имей на поле 3 своих запитанных энергостанции</span></p><p><span class="кл ">награда</span><span>на выбор: Питание или Снабжение</span></p><p><span class="кл о">сверх</span><span>Имей на поле 4 своих запитанных энергостанции: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Щит на технику или авиацию: снимает первое попадание по жетону этого рода</span></p></div>
+    </div>
+    <div class="колонцифра"><span>5</span></div>
+  </div>
+
+
+  <div class="стр спр фон3 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="bb7b4a8bdf91" class="кк "><div class="имя"><span>Все здания запитаны</span><small>z3_17</small></div><p><span class="кл ">надо</span><span>Имей на поле не меньше 2 своих зданий, и все они запитаны</span></p><p><span class="кл ">награда</span><span>на выбор: Построить энергостанцию или Снабжение и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Переложить энергию» или перенос модулей на планшете войск</span></p></div>
+      <div data-k="c7552c367e46" class="кк "><div class="имя"><span>Военное здание ×2</span><small>z3_18</small></div><p><span class="кл ">надо</span><span>Имей на поле 2 своих военных здания</span></p><p><span class="кл ">награда</span><span>на выбор: Снабжение или Бой</span></p><p><span class="кл о">сверх</span><span>Имей на поле 3 своих военных здания: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Выпустить» одним вашим зданием</span></p></div>
+      <div data-k="102498f64819" class="кк "><div class="имя"><span>Военное здание рядом с врагом ×1</span><small>z3_19</small></div><p><span class="кл ">надо</span><span>Имей своё военное здание на гексе, соседнем с гексом, где есть здание врага</span></p><p><span class="кл ">награда</span><span>на выбор: Построить военное здание или Бой</span></p><p><span class="кл о">сверх</span><span>Имей свои военные здания на 2 разных гексах, соседних с гексами, где есть здание врага: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Поставьте на поле 1 жетон войск из запаса</span></p></div>
+      <div data-k="c35034403682" class="кк "><div class="имя"><span>Боеприпасы ×3</span><small>z3_20</small></div><p><span class="кл ">надо</span><span>Имей не меньше 3 боеприпасов</span></p><p><span class="кл ">награда</span><span>на выбор: Снабжение или Манёвр и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>В чужой ход: когда атакуют ваш жетон, возьмите 2 боеприпаса</span></p></div>
+      <div data-k="840bfc017b27" class="кк "><div class="имя"><span>Выпусти ×2</span><small>z3_21</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД выпусти 2 боеприпаса</span></p><p><span class="кл ">награда</span><span>на выбор: Построить военное здание или Манёвр и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>Щит на пехоту или авиацию: снимает первое попадание по жетону этого рода</span></p></div>
+      <div data-k="5f4f18b5d31c" class="кк "><div class="имя"><span>Рода войск ×3</span><small>z3_22</small></div><p><span class="кл ">надо</span><span>Имей на поле свои войска 3 разных родов</span></p><p><span class="кл ">награда</span><span>на выбор: Снабжение или Бой и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Выпустить» одним вашим зданием</span></p></div>
+      <div data-k="68465e55d5b6" class="кк "><div class="имя"><span>Боеприпасы и войска</span><small>z3_23</small></div><p><span class="кл ">надо</span><span>Имей не меньше 2 боеприпасов и на поле 3 своих войска</span></p><p><span class="кл ">награда</span><span>на выбор: Построить военное здание или Бой и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Поставьте на поле 1 жетон войск из запаса</span></p></div>
+      <div data-k="2c0983559890" class="кк "><div class="имя"><span>Боеприпасы ×2</span><small>z3_24</small></div><p><span class="кл ">надо</span><span>Имей не меньше 2 боеприпасов</span></p><p><span class="кл ">награда</span><span>на выбор: Снабжение или Манёвр и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>В чужой ход: когда атакуют ваш жетон, возьмите 2 боеприпаса</span></p></div>
+      <div data-k="cb4e0545e322" class="кк "><div class="имя"><span>Рода войск ×2</span><small>z3_25</small></div><p><span class="кл ">надо</span><span>Имей на поле свои войска 2 разных родов</span></p><p><span class="кл ">награда</span><span>на выбор: Построить военное здание или Манёвр и 2 монеты</span></p><p><span class="кл о">сжечь</span><span>∞ +1 спец-действие до конца хода</span></p></div>
+      <div data-k="363ca7dd65c9" class="кк "><div class="имя"><span>Военное здание рядом с врагом ×2</span><small>z3_26</small></div><p><span class="кл ">надо</span><span>Имей свои военные здания на 2 разных гексах, соседних с гексами, где есть войско врага</span></p><p><span class="кл ">награда</span><span>на выбор: Снабжение или Бой</span></p><p><span class="кл о">сверх</span><span>Имей свои военные здания на 3 разных гексах, соседних с гексами, где есть войско врага: 1 карта арсенала и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>Щит на пехоту или авиацию: снимает первое попадание по жетону этого рода</span></p></div>
+    </div>
+    <div class="колонцифра"><span>6</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 7–8</p>
+<div class="разворот">
+
+  <div class="стр спр фон4 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="bd775e6e25c9" class="кк "><div class="имя"><span>Техника ×2</span><small>z3_27</small></div><p><span class="кл ">надо</span><span>Имей на поле 2 своих жетона техники</span></p><p><span class="кл ">награда</span><span>на выбор: Бой или Наука и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей на поле 3 своих жетона техники: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Манёвр»</span></p></div>
+      <div data-k="9cafb78a1568" class="кк "><div class="имя"><span>Авиация рядом с врагом ×1</span><small>z3_28</small></div><p><span class="кл ">надо</span><span>Имей свой жетон авиации на гексе, соседнем с гексом, где есть войско врага</span></p><p><span class="кл ">награда</span><span>на выбор: Манёвр или Рынок и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей свои жетоны авиации на 2 разных гексах, соседних с гексами, где есть войско врага: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Бой», в которой атакует один ваш жетон войск</span></p></div>
+      <div data-k="7d2022d93f61" class="кк "><div class="имя"><span>Бой и Наука</span><small>z3_29</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД сыграй «Бой» и «Наука»</span></p><p><span class="кл ">награда</span><span>на выбор: Бой или Рынок и 1 трофей и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>В чужой ход: в чужом Бою уведите один свой жетон с атакуемого гекса на соседний</span></p></div>
+      <div data-k="8c7988a686e0" class="кк "><div class="имя"><span>Уничтожь жетон ×1</span><small>z3_30</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД уничтожь жетон врага</span></p><p><span class="кл ">награда</span><span>на выбор: Манёвр или Наука и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Уничтожь 2 жетона врага: 1 карта арсенала и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>+1 к скорости одного рода войск до конца хода</span></p></div>
+      <div data-k="b35147012063" class="кк "><div class="имя"><span>Авиация ×2</span><small>z3_31</small></div><p><span class="кл ">надо</span><span>Имей на поле 2 своих жетона авиации</span></p><p><span class="кл ">награда</span><span>на выбор: Бой или Наука и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей на поле 3 своих жетона авиации: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Манёвр»</span></p></div>
+      <div data-k="61660bdfb82f" class="кк "><div class="имя"><span>Войско рядом с врагом ×2</span><small>z3_32</small></div><p><span class="кл ">надо</span><span>Имей свои войска на 2 разных гексах, соседних с гексами, где есть добытчик врага</span></p><p><span class="кл ">награда</span><span>на выбор: Манёвр или Рынок и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей свои войска на 3 разных гексах, соседних с гексами, где есть добытчик врага: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Бой», в которой атакует один ваш жетон войск</span></p></div>
+      <div data-k="5695cc8836e7" class="кк "><div class="имя"><span>Уничтожь здание ×1</span><small>z3_33</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД уничтожь здание врага</span></p><p><span class="кл ">награда</span><span>на выбор: Бой или Рынок и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Уничтожь 2 здания врага: 1 карта арсенала и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>В чужой ход: в чужом Бою уведите один свой жетон с атакуемого гекса на соседний</span></p></div>
+      <div data-k="a7a89d143756" class="кк "><div class="имя"><span>Пехота ×2</span><small>z3_34</small></div><p><span class="кл ">надо</span><span>Имей на поле 2 своих жетона пехоты</span></p><p><span class="кл ">награда</span><span>на выбор: Манёвр или Наука и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей на поле 3 своих жетона пехоты: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>+1 к скорости одного рода войск до конца хода</span></p></div>
+      <div data-k="e3bc52321050" class="кк "><div class="имя"><span>Техника рядом с врагом ×1</span><small>z3_35</small></div><p><span class="кл ">надо</span><span>Имей свой жетон техники на гексе, соседнем с гексом, где есть здание врага</span></p><p><span class="кл ">награда</span><span>на выбор: Бой или Наука и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей свои жетоны техники на 2 разных гексах, соседних с гексами, где есть здание врага: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Манёвр»</span></p></div>
+    </div>
+    <div class="колонцифра"><span>7</span></div>
+  </div>
+
+
+  <div class="стр спр фон1 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="84d38b682e5b" class="кк "><div class="имя"><span>Войско ×4</span><small>z3_36</small></div><p><span class="кл ">надо</span><span>Имей на поле 4 своих войска</span></p><p><span class="кл ">награда</span><span>на выбор: Манёвр или Рынок и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей на поле 5 своих войск: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Бой», в которой атакует один ваш жетон войск</span></p></div>
+      <div data-k="3b3b9624554c" class="кк "><div class="имя"><span>Монеты ×8</span><small>z3_37</small></div><p><span class="кл ">надо</span><span>Имей не меньше 8 монет</span></p><p><span class="кл ">награда</span><span>на выбор: Наука или Добыча и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Рынок»</span></p></div>
+      <div data-k="90e4d023ed7b" class="кк "><div class="имя"><span>Арсенал ×2</span><small>z3_38</small></div><p><span class="кл ">надо</span><span>Имей 2 установленные карты арсенала</span></p><p><span class="кл ">награда</span><span>на выбор: Рынок или Построить добытчик</span></p><p><span class="кл о">сверх</span><span>Имей 3 установленные карты арсенала: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Наука»</span></p></div>
+      <div data-k="62d20a3be131" class="кк "><div class="имя"><span>Второе спец-действие</span><small>z3_39</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД выполни это задание вторым спец-действием хода</span></p><p><span class="кл ">награда</span><span>на выбор: Наука или Построить добытчик и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>Один обмен Научного отдела или один обмен планшета рынка</span></p></div>
+      <div data-k="ff7130892ef7" class="кк "><div class="имя"><span>Наука на 2 треках</span><small>z3_40</small></div><p><span class="кл ">надо</span><span>Имей кубики науки на 2 треках</span></p><p><span class="кл ">награда</span><span>на выбор: Рынок или Добыча и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Рынок»</span></p></div>
+      <div data-k="bf9e96e66587" class="кк "><div class="имя"><span>Модули ×2</span><small>z3_41</small></div><p><span class="кл ">надо</span><span>Имей на планшете войск 2 модуля</span></p><p><span class="кл ">награда</span><span>на выбор: Наука или Добыча и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Наука»</span></p></div>
+      <div data-k="0b80b81d742a" class="кк "><div class="имя"><span>Келемий ×2</span><small>z3_42</small></div><p><span class="кл ">надо</span><span>Имей не меньше 2 келемия</span></p><p><span class="кл ">награда</span><span>на выбор: Рынок или Построить добытчик и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Один обмен Научного отдела или один обмен планшета рынка</span></p></div>
+      <div data-k="540a5220de3b" class="кк "><div class="имя"><span>Наука на 1 треке, ступень 3+</span><small>z3_43</small></div><p><span class="кл ">надо</span><span>Имей кубики науки на 1 треке на ступени 3 или выше</span></p><p><span class="кл ">награда</span><span>на выбор: Наука или Построить добытчик и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Рынок»</span></p></div>
+      <div data-k="c4efe90b3c0f" class="кк "><div class="имя"><span>Золотые модули ×1</span><small>z3_44</small></div><p><span class="кл ">надо</span><span>Имей на планшете войск 1 золотой модуль</span></p><p><span class="кл ">награда</span><span>на выбор: Рынок или Добыча и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Наука»</span></p></div>
+      <div data-k="3cdf5666ecc1" class="кк "><div class="имя"><span>Трофеи ×2</span><small>z3_45</small></div><p><span class="кл ">надо</span><span>Имей не меньше 2 трофеев</span></p><p><span class="кл ">награда</span><span>на выбор: Наука или Добыча и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Один обмен Научного отдела или один обмен планшета рынка</span></p></div>
+      <div data-k="e33c5dc0477a" class="кк "><div class="имя"><span>Арсенал ×3</span><small>z3_46</small></div><p><span class="кл ">надо</span><span>Имей 3 установленные карты арсенала</span></p><p><span class="кл ">награда</span><span>на выбор: Рынок или Построить добытчик и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Действие «Рынок»</span></p></div>
+    </div>
+    <div class="колонцифра"><span>8</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 9–10</p>
+<div class="разворот">
+
+  <div class="стр спр фон2 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="def055718f6f" class="кк "><div class="имя"><span>Пехота рядом с врагом ×1</span><small>z3_47</small></div><p><span class="кл ">надо</span><span>Имей свой жетон пехоты на гексе, соседнем с гексом, где есть ЦУ врага</span></p><p><span class="кл ">награда</span><span>на выбор: Бой или Наука и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей свои жетоны пехоты на 2 разных гексах, соседних с гексами, где есть ЦУ врага: 1 карта арсенала и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>В чужой ход: в чужом Бою уведите один свой жетон с атакуемого гекса на соседний</span></p></div>
+      <div data-k="6078af2359bf" class="кк "><div class="имя"><span>Запитанная энергостанция ×4</span><small>z3_48</small></div><p><span class="кл ">надо</span><span>Имей на поле 4 своих запитанных энергостанции</span></p><p><span class="кл ">награда</span><span>на выбор: Питание или Снабжение и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>∞ Переложите любые свои модули на планшете войск</span></p></div>
+      <div data-k="72f4b56b0d69" class="кк "><div class="имя"><span>Энергия в ячейках ×6</span><small>z3_49</small></div><p><span class="кл ">надо</span><span>Имей в ячейках своих зданий 6 кубиков энергии</span></p><p><span class="кл ">награда</span><span>на выбор: Построить энергостанцию или Снабжение и 2 монеты и два спец-действия</span></p><p><span class="кл о">сжечь</span><span>Щит на технику или авиацию: снимает первое попадание по жетону этого рода</span></p></div>
+      <div data-k="d5397e61c8ff" class="кк "><div class="имя"><span>Техника ×3</span><small>z3_50</small></div><p><span class="кл ">надо</span><span>Имей на поле 3 своих жетона техники</span></p><p><span class="кл ">награда</span><span>на выбор: Манёвр или Наука и 1 трофей</span></p><p><span class="кл о">сверх</span><span>Имей на поле 4 своих жетона техники: 1 карта арсенала и три спец-действия</span></p><p><span class="кл о">сжечь</span><span>+1 к скорости одного рода войск до конца хода</span></p></div>
+    </div>
+    <div class="колонцифра"><span>9</span></div>
+  </div>
+
+
+  <div class="стр спр фон3 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил" data-h="В"><span class="бк">В</span><span class="им">Начальные задания</span><span class="счёт">12 карт</span><span class="черта"></span></div>
+    <div class="вступ прил">В первой партии каждый берёт в руку одну карту начального задания. Они проще обычных и учат ходу; в колоду заданий не замешиваются.</div>
+    <div class="карточки">
+      <div data-k="143c5d467b8e" class="кк нач"><div class="имя"><span>Подъём</span><small>n1</small></div><p><span class="кл ">надо</span><span>Имей на поле не меньше трёх своих зданий, считая ЦУ</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 боеприпас</span></p><p><span class="кл"></span><i>Считается и ЦУ, поэтому от подготовки до выполнения ровно две стройки.</i></p></div>
+      <div data-k="8886a52a4d50" class="кк нач"><div class="имя"><span>Первый боец</span><small>n2</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД найми войско любого рода, кроме вышки</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 монета</span></p><p><span class="кл"></span><i>Вышка не считается: её ЦУ собирает даром, и наймом это назвать нельзя.</i></p></div>
+      <div data-k="d082c699d10c" class="кк нач"><div class="имя"><span>Патроны</span><small>n3</small></div><p><span class="кл ">надо</span><span>Имей не менее трёх боеприпасов в хранилище</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 боеприпас</span></p><p><span class="кл"></span><i>Порог три, а не два: один боеприпас у тебя уже есть с подготовки.</i></p></div>
+      <div data-k="08746ddb8cee" class="кк нач"><div class="имя"><span>Первая сделка</span><small>n4</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД в действие Рынок воспользуйся предложением карты на рынке</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 монета</span></p><p><span class="кл"></span><i>Напечатанный обмен планшета не подходит: нужно предложение с открытой карты рынка.</i></p></div>
+      <div data-k="f00f3063dee4" class="кк нач"><div class="имя"><span>Коммутация</span><small>n5</small></div><p><span class="кл ">надо</span><span>Имей на поле запитанное здание на расстоянии в 2 гекса от твоего ЦУ</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 боеприпас</span></p><p><span class="кл"></span><i>Энергия туда сама не дотянется: её надо развести Питанием.</i></p></div>
+      <div data-k="f71cf2bf5fa5" class="кк нач"><div class="имя"><span>Выход</span><small>n6</small></div><p><span class="кл ">надо</span><span>Имей на поле войска на расстоянии в 2 гекса от твоего ЦУ</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 монета</span></p><p><span class="кл"></span><i>Вышка неподвижна, так что выйти придётся кем-то живым.</i></p></div>
+      <div data-k="e5c72488e586" class="кк нач"><div class="имя"><span>Жила</span><small>n7</small></div><p><span class="кл ">надо</span><span>Имей не меньше трёх келемия в хранилище</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 боеприпас</span></p><p><span class="кл"></span><i>Келемий равен победному очку, поэтому держать его дорого, а тратить жалко.</i></p></div>
+      <div data-k="f53072cd889e" class="кк нач"><div class="имя"><span>Первый трофей</span><small>n10</small></div><p><span class="кл ">надо</span><span>Имей у себя на свалке хотя бы один жетон</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 монета</span></p><p><span class="кл"></span><i>Трофей берут только с боя, поэтому карта платит за первый настоящий выстрел.</i></p></div>
+    </div>
+    <div class="колонцифра"><span>10</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 11–12</p>
+<div class="разворот">
+
+  <div class="стр спр фон4 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="c2f0aedcc766" class="кк нач"><div class="имя"><span>Первый шаг</span><small>n9</small></div><p><span class="кл ">надо</span><span>Стой хотя бы на первом шаге любого трека технологий</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 боеприпас</span></p><p><span class="кл"></span><i>За действие Наука больше одного шага на трек не сделать, поэтому начинают все с одного и того же.</i></p></div>
+      <div data-k="80e28247eba7" class="кк нач"><div class="имя"><span>Находка</span><small>n8</small></div><p><span class="кл ">надо</span><span>Имей у себя в запасе хотя бы 2 неоткрытых контейнера</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 монета</span></p><p><span class="кл"></span><i>Вскрытый контейнер сразу уходит, так что придётся терпеть и не открывать.</i></p></div>
+      <div data-k="efe920fabe6a" class="кк нач"><div class="имя"><span>Второй заход</span><small>n11</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД получи действие с нижнего приказа своей карты приказа</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 боеприпас</span></p><p><span class="кл"></span><i>Нижний приказ открывается не всегда, так что карту держат до подходящего раунда.</i></p></div>
+      <div data-k="8e0fe177d4c3" class="кк нач"><div class="имя"><span>В унисон</span><small>n12</small></div><p><span class="кл ">надо</span><span>В ЭТОТ ХОД сыграй тот же основной приказ, что и другой игрок</span></p><p><span class="кл ">награда</span><span>трофей и карта задания</span></p><p><span class="кл о">сжечь</span><span>1 монета</span></p><p><span class="кл"></span><i>Совпавший приказ не срабатывает, так что эта карта — плата за потерянное действие.</i></p></div>
+    </div>
+    <div class="колонцифра"><span>11</span></div>
+  </div>
+
+
+  <div class="стр спр фон1 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил" data-h="Г"><span class="бк">Г</span><span class="им">Карты арсенала</span><span class="счёт">40 карт</span><span class="черта"></span></div>
+    <div class="вступ прил">Спец-действием карту устанавливают в ячейку под планшетом войск — её эффект действует до конца партии — или сжигают ради верха. Двух установленных карт с одним названием у вас быть не может.</div>
+    <div class="карточки">
+      <div data-k="7017c0ba2f7a" class="кк "><div class="имя"><span>Питание → спец-действие</span><small>a9_01</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Питания, получи ещё одно спец-действие. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>2 боеприпаса</span></p></div>
+      <div data-k="790a4973f86e" class="кк "><div class="имя"><span>Бой → спец-действие</span><small>a9_02</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Бой», получи ещё одно спец-действие. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>2 боеприпаса</span></p></div>
+      <div data-k="4a5bc31f4b64" class="кк "><div class="имя"><span>Выпустить → спец-действие</span><small>a9_03</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Выпустить», получи ещё одно спец-действие. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>1 келемий и действие «Добыть» одним добытчиком</span></p></div>
+      <div data-k="1163cd2e94ae" class="кк "><div class="имя"><span>Совпадение → спец-действие</span><small>a9_04</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда твой приказ совпадает с чужим, получи ещё одно спец-действие. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>1 келемий и действие «Добыть» одним добытчиком</span></p></div>
+      <div data-k="ecc1abf6258f" class="кк "><div class="имя"><span>Рынок → спец-действие</span><small>a9_05</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Рынок», получи ещё одно спец-действие. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>1 келемий и действие «Добыть» одним добытчиком</span></p></div>
+      <div data-k="67e8e9339c68" class="кк "><div class="имя"><span>Сжёг карту → спец-действие</span><small>a9_06</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда сжигаешь карту, получи ещё одно спец-действие. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Построй 1 любое здание за 1 монету</span></p></div>
+      <div data-k="bd4db6e6eeb9" class="кк "><div class="имя"><span>Добыча + келемий → урон врагу</span><small>a9_07</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Добычи, можешь заплатить 1 келемий: нанеси 1 урон жетону врага на гексе со своим войском или соседнем с ним. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Построй 1 любое здание за 1 монету</span></p></div>
+      <div data-k="1f1bbd73b6f6" class="кк "><div class="имя"><span>Питание + келемий → Выпустить</span><small>a9_08</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Питания, можешь заплатить 1 келемий: сыграй ветку «Выпустить». Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Построй 1 любое здание за 1 монету</span></p></div>
+      <div data-k="eb08573ab632" class="кк "><div class="имя"><span>Выпустить + келемий → трофей</span><small>a9_09</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Выпустить», можешь заплатить 1 келемий: получи 1 трофей. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Действие «Наука»; ступень оплатите монетами вместо трофеев</span></p></div>
+      <div data-k="9c372719f07e" class="кк "><div class="имя"><span>Командование + келемий → боеприпас</span><small>a9_10</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Командования, можешь заплатить 1 келемий: получи 2 боеприпаса. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Действие «Наука»; ступень оплатите монетами вместо трофеев</span></p></div>
+    </div>
+    <div class="колонцифра"><span>12</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 13–14</p>
+<div class="разворот">
+
+  <div class="стр спр фон2 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="bbe276a62143" class="кк "><div class="имя"><span>Наука + келемий → Манёвр</span><small>a9_11</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Наука», можешь заплатить 1 келемий: сыграй ветку «Манёвр». Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Действие «Бой»</span></p></div>
+      <div data-k="2ae142c04a7d" class="кк "><div class="имя"><span>Сжёг карту + келемий → Переложить энергию</span><small>a9_12</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда сжигаешь карту, можешь заплатить 1 келемий: сыграй ветку «Переложить энергию». Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Действие «Бой»</span></p></div>
+      <div data-k="76be1d0a358f" class="кк "><div class="имя"><span>Построить добытчик → урон врагу</span><small>a9_13</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Построить добытчик», нанеси 1 урон жетону врага на гексе со своим войском или соседнем с ним. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Действие «Выпустить»</span></p></div>
+      <div data-k="adcd2c078109" class="кк "><div class="имя"><span>Питание → шаг войска</span><small>a9_14</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Питания, передвинь своё войско на соседний гекс. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Действие «Выпустить»</span></p></div>
+      <div data-k="d6fc0f11fcd7" class="кк "><div class="имя"><span>Выпустить → монета врага</span><small>a9_15</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Выпустить», забери у одного врага 1 монету. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>3 монеты</span></p></div>
+      <div data-k="d5b00a43d5f5" class="кк "><div class="имя"><span>Манёвр → урон врагу</span><small>a9_16</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Манёвр», нанеси 1 урон жетону врага на гексе со своим войском или соседнем с ним. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>3 монеты</span></p></div>
+      <div data-k="ff35969a5571" class="кк "><div class="имя"><span>Наука → боеприпас врага</span><small>a9_17</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Наука», забери у одного врага 1 боеприпас. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Поставьте из запаса 2 жетона войск разных родов на любой гекс</span></p></div>
+      <div data-k="ea96f7bc7a93" class="кк "><div class="имя"><span>Сжёг карту → шаг войска</span><small>a9_18</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда сжигаешь карту, передвинь своё войско на соседний гекс. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Поставьте из запаса 2 жетона войск разных родов на любой гекс</span></p></div>
+      <div data-k="02cf23e90b9c" class="кк "><div class="имя"><span>Построить добытчик → уровень выше</span><small>a9_19</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Построить добытчик», замени свой добытчик на поле жетоном на уровень выше из запаса за 1 монету. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Заплатите 1 келемий и позолотите свой модуль</span></p></div>
+      <div data-k="72db65e9a0ac" class="кк "><div class="имя"><span>Добыть → боеприпас</span><small>a9_20</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Добыть», получи 1 боеприпас. Не больше 2 раз за ход.</span></p><p><span class="кл о">сжечь</span><span>Заплатите 1 келемий и позолотите свой модуль</span></p></div>
+      <div data-k="0664fc5c5e92" class="кк "><div class="имя"><span>Добыть → келемий за запитанные</span><small>a9_21</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Добыть», получи по келемию за каждый свой запитанный добытчик (не больше 2). Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Заберите у первого игрока фишку первого игрока и 1 монету</span></p></div>
+    </div>
+    <div class="колонцифра"><span>13</span></div>
+  </div>
+
+
+  <div class="стр спр фон3 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="efc34f53f245" class="кк "><div class="имя"><span>Здание 3-го уровня → монеты за запитанные</span><small>a9_22</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, получи по монете за каждый свой запитанный добытчик (не больше 3). Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>До трёх спец-действий</span></p></div>
+      <div data-k="72cd65314936" class="кк "><div class="имя"><span>Здание 3-го уровня → монеты за уровни</span><small>a9_23</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда строишь добытчик или энергостанцию 3-го уровня или выше, получи по монете за каждый уровень своего старшего добытчика. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Заберите у первого игрока фишку первого игрока и 1 монету</span></p></div>
+      <div data-k="7a5ff292ca8e" class="кк "><div class="имя"><span>Добыча → трофей</span><small>a9_24</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Добычи, получи 1 трофей. Не больше 2 раз за ход.</span></p><p><span class="кл о">сжечь</span><span>Заберите у первого игрока фишку первого игрока и 1 монету</span></p></div>
+      <div data-k="4955c85228b1" class="кк "><div class="имя"><span>Построить энергостанцию → трофей</span><small>a9_25</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Построить энергостанцию», получи 1 трофей. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>До трёх спец-действий</span></p></div>
+      <div data-k="c0488929a609" class="кк "><div class="имя"><span>Построить энергостанцию → монеты за запитанные</span><small>a9_26</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Построить энергостанцию», получи по монете за каждый свой запитанный добытчик (не больше 3). Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Заберите у соперника до 2 карт заданий</span></p></div>
+      <div data-k="72a0e5189ede" class="кк "><div class="имя"><span>Переложить энергию → келемий за запитанные</span><small>a9_27</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Переложить энергию», получи по келемию за каждое своё запитанное здание (не больше 2). Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Заберите у соперника до 2 карт заданий</span></p></div>
+      <div data-k="ab845a6524c9" class="кк "><div class="имя"><span>Переложить энергию → монеты за запитанные</span><small>a9_28</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Переложить энергию», получи по монете за каждое своё запитанное здание (не больше 3). Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Замените карту приказа в руке на одну из сыгранных</span></p></div>
+      <div data-k="893b294ce25c" class="кк "><div class="имя"><span>Построить военное здание → монеты</span><small>a9_29</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Построить военное здание», получи 2 монеты. Не больше 2 раз за ход.</span></p><p><span class="кл о">сжечь</span><span>Замените карту приказа в руке на одну из сыгранных</span></p></div>
+      <div data-k="016fc42c55be" class="кк "><div class="имя"><span>Снабжение → боеприпас</span><small>a9_30</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Снабжения, получи 1 боеприпас. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Заберите у соперника закрытую карту арсенала</span></p></div>
+      <div data-k="b310fe24d00d" class="кк "><div class="имя"><span>Построить военное здание → боеприпас</span><small>a9_31</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Построить военное здание», получи 1 боеприпас. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Заберите у соперника закрытую карту арсенала</span></p></div>
+    </div>
+    <div class="колонцифра"><span>14</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 15–16</p>
+<div class="разворот">
+
+  <div class="стр спр фон4 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="352b7f5a1a66" class="кк "><div class="имя"><span>Снабжение → шаг войска</span><small>a9_32</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Снабжения, передвинь своё войско на соседний гекс. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Одно предложение карты рынка из сброса</span></p></div>
+      <div data-k="8291ac72e5bf" class="кк "><div class="имя"><span>Манёвр → монеты за уровни</span><small>a9_33</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь ветку «Манёвр», получи по монете за каждый уровень своего старшего добытчика. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Поставьте из запаса пехоту и технику на пустой гекс</span></p></div>
+      <div data-k="cb6bcba27532" class="кк "><div class="имя"><span>Потеря → монеты</span><small>a9_34</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда твой жетон уничтожают, получи 2 монеты. Не больше 2 раз за ход.</span></p><p><span class="кл о">сжечь</span><span>Поставьте из запаса пехоту и технику на пустой гекс</span></p></div>
+      <div data-k="4a2d2b7fcce3" class="кк "><div class="имя"><span>Потеря → боеприпас</span><small>a9_35</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда твой жетон уничтожают, получи 1 боеприпас. Не больше 2 раз за ход.</span></p><p><span class="кл о">сжечь</span><span>Сбросьте установленную карту арсенала соперника</span></p></div>
+      <div data-k="a8484839d108" class="кк "><div class="имя"><span>Командование → ремонт</span><small>a9_36</small></div><p><span class="кл ">установка</span><span>Каждый раз, когда играешь любую ветку Командования, сними 1 урон со своего жетона. Не больше 1 раза за ход.</span></p><p><span class="кл о">сжечь</span><span>Сбросьте установленную карту арсенала соперника</span></p></div>
+      <div data-k="878a0046d949" class="кк "><div class="имя"><span>Каждый ход → спец-действие</span><small>a9_37</small></div><p><span class="кл ">установка</span><span>В начале своего хода получи ещё одно спец-действие.</span></p><p><span class="кл о">сжечь</span><span>Действие «Бой»</span></p></div>
+      <div data-k="b307ec86e675" class="кк "><div class="имя"><span>Каждый ход → спец-действие</span><small>a9_38</small></div><p><span class="кл ">установка</span><span>В начале своего хода получи ещё одно спец-действие.</span></p><p><span class="кл о">сжечь</span><span>Одно предложение карты рынка, келемий за него — из общего запаса</span></p></div>
+      <div data-k="f478ddabac70" class="кк "><div class="имя"><span>Каждый ход → спец-действие</span><small>a9_39</small></div><p><span class="кл ">установка</span><span>В начале своего хода получи ещё одно спец-действие.</span></p><p><span class="кл о">сжечь</span><span>Одно предложение карты рынка, келемий за него — из общего запаса</span></p></div>
+      <div data-k="af16256dff45" class="кк "><div class="имя"><span>Каждый ход → спец-действие</span><small>a9_40</small></div><p><span class="кл ">установка</span><span>В начале своего хода получи ещё одно спец-действие.</span></p><p><span class="кл о">сжечь</span><span>Действие «Манёвр»</span></p></div>
+    </div>
+    <div class="колонцифра"><span>15</span></div>
+  </div>
+
+
+  <div class="стр спр фон1 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил" data-h="Д"><span class="бк">Д</span><span class="им">Начальный арсенал</span><span class="счёт">8 карт</span><span class="черта"></span></div>
+    <div class="вступ прил">На подготовке каждый получает две карты наугад, одну оставляет, вторую убирает в коробку. Верх оставленной — ваши стартовые ресурсы; карту сразу устанавливают, сжечь её нельзя.</div>
+    <div class="карточки">
+      <div data-k="5daca40e1c91" class="кк нач"><div class="имя"><span>Полевой генератор</span><small>bs72_1</small></div><p><span class="кл о">старт</span><span>1 боеприпас и 1 монета</span></p><p><span class="кл ">установка</span><span>Считай эту карту отдельным источником энергии с одним кубиком. В фазу Обновление заплати 1 монету, иначе удали карту из игры.</span></p></div>
+      <div data-k="41ed4f8397f7" class="кк нач"><div class="имя"><span>Называется нашел</span><small>bs72_2</small></div><p><span class="кл о">старт</span><span>1 келемий и 1 монета</span></p><p><span class="кл ">установка</span><span>Если тебя контратаковали и уничтожили твой жетон — получи 1 боеприпас.</span></p></div>
+      <div data-k="d70b744ab3e7" class="кк нач"><div class="имя"><span>Мародёрка</span><small>bs72_3</small></div><p><span class="кл о">старт</span><span>2 монеты</span></p><p><span class="кл ">установка</span><span>СПЕЦ, −1 монета: Когда твои войска на гексе со зданием противника — забери у него 1 боеприпас или 1 келемий.</span></p></div>
+      <div data-k="f0f9c8de5da8" class="кк нач"><div class="имя"><span>Аварийные щиты</span><small>bs72_4</small></div><p><span class="кл о">старт</span><span>2 карты задания</span></p><p><span class="кл ">установка</span><span>Твои добытчики и энергостанции с прочностью 1 имеют прочность 2. Получив урон, такое здание сразу после боя возвращается тебе в запас.</span></p></div>
+      <div data-k="c2e8263090b5" class="кк нач"><div class="имя"><span>Премия за голову</span><small>bs72_5</small></div><p><span class="кл о">старт</span><span>1 трофей и 1 монета</span></p><p><span class="кл ">установка</span><span>в конце Боя, если уничтожил хотя бы один жетон — 1 монета</span></p></div>
+      <div data-k="8f22622720a8" class="кк нач"><div class="имя"><span>Переформирование</span><small>bs72_6</small></div><p><span class="кл о">старт</span><span>1 модуль из мешочка на выбор</span></p><p><span class="кл ">установка</span><span>СПЕЦ: 2 монеты — замени на поле один свой жетон наземного войска на другой наземный жетон из запаса</span></p></div>
+      <div data-k="4f5b8285376e" class="кк нач"><div class="имя"><span>Задание → трофей</span><small>bs80_1</small></div><p><span class="кл о">старт</span><span>1 монета и 1 карта задания</span></p><p><span class="кл ">установка</span><span>Каждый раз, когда выполняешь задание, получи 1 трофей. Не больше 2 раз за ход.</span></p></div>
+      <div data-k="22cb696ce1f8" class="кк нач"><div class="имя"><span>Установил → монеты</span><small>bs80_2</small></div><p><span class="кл о">старт</span><span>1 келемий и 1 боеприпас</span></p><p><span class="кл ">установка</span><span>Каждый раз, когда устанавливаешь карту арсенала, получи 2 монеты. Не больше 1 раза за ход.</span></p></div>
+    </div>
+    <div class="колонцифра"><span>16</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 17–18</p>
+<div class="разворот">
+
+  <div class="стр спр фон2 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил" data-h="Е"><span class="бк">Е</span><span class="им">Карты контейнеров</span><span class="счёт">14 видов · 32 карты</span><span class="черта"></span></div>
+    <div class="вступ прил">Карту контейнера берут, когда ваш жетон накрыл открытый контейнер поля, ваш добытчик его добыл, ваше здание уничтожено или вы уничтожили нейтральную постройку. Она лежит закрытой под планшетом войск, по две в ячейке. Спец-действием вскройте любые свои контейнеры; вскрытые — в сброс.</div>
+    <div class="карточки">
+      <div data-k="1b51f0c083d5" class="кк "><div class="имя"><span>1 монета</span><small>c01 · ×3</small></div><p><span class="кл">даёт</span><span>Получи 1 монету.</span></p></div>
+      <div data-k="07ff8ddf2c39" class="кк "><div class="имя"><span>1 боеприпас</span><small>c02 · ×3</small></div><p><span class="кл">даёт</span><span>Получи 1 боеприпас.</span></p></div>
+      <div data-k="7f372c9b8b1c" class="кк "><div class="имя"><span>1 карта задания</span><small>c03 · ×3</small></div><p><span class="кл">даёт</span><span>Возьми 1 карту задания.</span></p></div>
+      <div data-k="1644fe2f26f9" class="кк "><div class="имя"><span>1 келемий</span><small>c04 · ×3</small></div><p><span class="кл">даёт</span><span>Получи 1 келемий.</span></p></div>
+      <div data-k="8e29c5c9443b" class="кк "><div class="имя"><span>1 трофей</span><small>c05 · ×3</small></div><p><span class="кл">даёт</span><span>Получи 1 трофей.</span></p></div>
+      <div data-k="a3113b484fc8" class="кк "><div class="имя"><span>1 монета и 1 боеприпас</span><small>c06 · ×3</small></div><p><span class="кл">даёт</span><span>Получи 1 монету и 1 боеприпас.</span></p></div>
+      <div data-k="81a4dae6fa37" class="кк "><div class="имя"><span>1 карта задания и 1 боеприпас</span><small>c07 · ×3</small></div><p><span class="кл">даёт</span><span>Возьми 1 карту задания и получи 1 боеприпас.</span></p></div>
+      <div data-k="40111222f138" class="кк "><div class="имя"><span>1 карта задания и 1 келемий</span><small>c08 · ×2</small></div><p><span class="кл">даёт</span><span>Возьми 1 карту задания и получи 1 келемий.</span></p></div>
+      <div data-k="9a5db4bbce0a" class="кк "><div class="имя"><span>2 карты задания</span><small>c09 · ×2</small></div><p><span class="кл">даёт</span><span>Возьми 2 карты задания.</span></p></div>
+      <div data-k="d6d777284081" class="кк "><div class="имя"><span>2 монеты</span><small>c10 · ×2</small></div><p><span class="кл">даёт</span><span>Получи 2 монеты.</span></p></div>
+      <div data-k="a84fae0dad8a" class="кк "><div class="имя"><span>2 боеприпаса</span><small>c11 · ×2</small></div><p><span class="кл">даёт</span><span>Получи 2 боеприпаса.</span></p></div>
+      <div data-k="2c1ff349a2a4" class="кк "><div class="имя"><span>1 карта арсенала</span><small>c12 · ×1</small></div><p><span class="кл">даёт</span><span>Возьми 1 карту обычного арсенала из колоды.</span></p></div>
+      <div data-k="3a22b5da3998" class="кк "><div class="имя"><span>жетон техники</span><small>c13 · ×1</small></div><p><span class="кл">даёт</span><span>Поставь 1 жетон техники из своего запаса на любой гекс, где нет чужих войск. Запас пуст — ничего не ставится.</span></p></div>
+      <div data-k="d4552127b589" class="кк "><div class="имя"><span>жетон пехоты</span><small>c14 · ×1</small></div><p><span class="кл">даёт</span><span>Поставь 1 жетон пехоты из своего запаса на любой гекс, где нет чужих войск. Запас пуст — ничего не ставится.</span></p></div>
+    </div>
+    <div class="колонцифра"><span>17</span></div>
+  </div>
+
+
+  <div class="стр спр фон3 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил" data-h="Ж"><span class="бк">Ж</span><span class="им">Карты рынка</span><span class="счёт">10 карт</span><span class="черта"></span></div>
+    <div class="вступ прил">Одна карта рынка открыта на раунд. Предложение берут действием «Рынок», положив келемий в его свободную ячейку. Действия из предложений играют сверх приказов.</div>
+    <div class="карточки">
+      <div data-k="0c9c33357ec9" class="кк "><div class="имя"><span>Рынок 01</span><small>m4_01</small></div><p><span class="кл ">слева</span><span>Поставьте из запаса 2 жетона войск разных родов на один гекс</span></p><p><span class="кл ">справа</span><span>5 монет</span></p></div>
+      <div data-k="19ba4940c333" class="кк "><div class="имя"><span>Рынок 02</span><small>m4_02</small></div><p><span class="кл ">слева</span><span>5 монет</span></p><p><span class="кл ">справа</span><span>2 карты арсенала</span></p></div>
+      <div data-k="3f9c8b59cf91" class="кк "><div class="имя"><span>Рынок 03</span><small>m4_03</small></div><p><span class="кл ">слева</span><span>2 карты арсенала</span></p><p><span class="кл ">справа</span><span>Действие «Манёвр»</span></p></div>
+      <div data-k="875deccf9bb6" class="кк "><div class="имя"><span>Рынок 04</span><small>m4_04</small></div><p><span class="кл ">слева</span><span>Действие «Манёвр»</span></p><p><span class="кл ">справа</span><span>Действие «Переложить энергию»</span></p></div>
+      <div data-k="69ac363f0cca" class="кк "><div class="имя"><span>Рынок 05</span><small>m4_05</small></div><p><span class="кл ">слева</span><span>Действие «Переложить энергию»</span></p><p><span class="кл ">справа</span><span>3 боеприпаса</span></p></div>
+      <div data-k="c2835f69cbf8" class="кк "><div class="имя"><span>Рынок 06</span><small>m4_06</small></div><p><span class="кл ">слева</span><span>3 боеприпаса</span></p><p><span class="кл ">справа</span><span>Посмотрите 4 верхние карты заданий, 2 оставьте, 2 сбросьте</span></p></div>
+      <div data-k="dc8a2cbf1d05" class="кк "><div class="имя"><span>Рынок 07</span><small>m4_07</small></div><p><span class="кл ">слева</span><span>Посмотрите 4 верхние карты заданий, 2 оставьте, 2 сбросьте</span></p><p><span class="кл ">справа</span><span>Действие «Бой»</span></p></div>
+      <div data-k="e051dffb174f" class="кк "><div class="имя"><span>Рынок 08</span><small>m4_08</small></div><p><span class="кл ">слева</span><span>Действие «Бой»</span></p><p><span class="кл ">справа</span><span>Поставьте из запаса 2 жетона войск разных родов на один гекс</span></p></div>
+      <div data-k="4dde0bff9389" class="кк "><div class="имя"><span>Рынок 09</span><small>m4_09</small></div><p><span class="кл ">слева</span><span>5 монет</span></p><p><span class="кл ">справа</span><span>Действие «Переложить энергию»</span></p></div>
+      <div data-k="44e80b4eabf1" class="кк "><div class="имя"><span>Рынок 10</span><small>m4_10</small></div><p><span class="кл ">слева</span><span>3 боеприпаса</span></p><p><span class="кл ">справа</span><span>2 карты арсенала</span></p></div>
+    </div>
+    <div class="колонцифра"><span>18</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 19–20</p>
+<div class="разворот">
+
+  <div class="стр спр фон4 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил" data-h="З"><span class="бк">З</span><span class="им">Супер-задания</span><span class="счёт">12 карт</span><span class="черта"></span></div>
+    <div class="вступ прил">Супер-задание не выполняют и не сжигают: оно лежит у вас втайне до конца партии. Одно берут на подготовке, ещё по одному — за третью ступень каждого трека. В подсчёте раздел «по ★» даёт 1 очко за каждую единицу, «по ★★» — 2.</div>
+    <div class="карточки">
+      <div data-k="408657b99c03" class="кк "><div class="имя"><span>Застройка</span><small>s9_01</small></div><p><span class="кл ">по ★</span><span>За каждые 3 своих здания на поле</span></p><p><span class="кл о">по ★★</span><span>За каждое своё здание на гексе с чужим зданием</span></p></div>
+      <div data-k="32774bd1851e" class="кк "><div class="имя"><span>Натиск</span><small>s9_02</small></div><p><span class="кл ">по ★</span><span>За каждые 2 своих войска на поле</span></p><p><span class="кл о">по ★★</span><span>За каждое своё войско на гексе с чужим зданием</span></p></div>
+      <div data-k="fe0351a47d3c" class="кк "><div class="имя"><span>Полный состав</span><small>s9_03</small></div><p><span class="кл ">по ★</span><span>За каждый род своих войск на поле</span></p><p><span class="кл о">по ★★</span><span>За каждую четвёрку своих войск на поле: пехота, техника, авиация и вышка</span></p></div>
+      <div data-k="8c2750140d67" class="кк "><div class="имя"><span>Оружейная</span><small>s9_04</small></div><p><span class="кл ">по ★</span><span>За каждый свой модуль боя и сборки на планшете войск</span></p><p><span class="кл о">по ★★</span><span>За каждый свой модуль золотой стороной вверх</span></p></div>
+      <div data-k="85f043be0844" class="кк "><div class="имя"><span>Лаборатория</span><small>s9_05</small></div><p><span class="кл ">по ★</span><span>За каждый свой кубик на треках технологий</span></p><p><span class="кл о">по ★★</span><span>За каждый свой кубик на третьей ступени и на вершине трека</span></p></div>
+      <div data-k="c4f1cedfa21c" class="кк "><div class="имя"><span>Склад</span><small>s9_06</small></div><p><span class="кл ">по ★</span><span>За каждые 2 кубика в своём хранилище</span></p><p><span class="кл о">по ★★</span><span>За каждую тройку в своём хранилище: келемий, боеприпас и трофей</span></p></div>
+      <div data-k="dee5e6651da0" class="кк "><div class="имя"><span>Арсенал</span><small>s9_07</small></div><p><span class="кл ">по ★</span><span>За каждую свою установленную карту арсенала</span></p><p><span class="кл о">по ★★</span><span>За каждую свою карту супер-арсенала</span></p></div>
+      <div data-k="8707a34f5173" class="кк "><div class="имя"><span>Казна</span><small>s9_08</small></div><p><span class="кл ">по ★</span><span>За каждые 2 монеты в своём запасе</span></p><p><span class="кл о">по ★★</span><span>За каждый келемий в своём хранилище</span></p></div>
+      <div data-k="e857d0eb35b6" class="кк "><div class="имя"><span>Энергосеть</span><small>s9_09</small></div><p><span class="кл ">по ★</span><span>За каждое своё запитанное здание</span></p><p><span class="кл о">по ★★</span><span>За каждое своё запитанное здание с двумя ячейками энергии</span></p></div>
+      <div data-k="480ec77efe59" class="кк "><div class="имя"><span>Жила</span><small>s9_10</small></div><p><span class="кл ">по ★</span><span>За каждый свой добытчик, стоящий на секторе с контейнером</span></p><p><span class="кл о">по ★★</span><span>За каждое своё военное здание или ЦУ, закрывающее сектор с контейнером</span></p></div>
+      <div data-k="e16ecb7676a0" class="кк "><div class="имя"><span>Первенство</span><small>s9_11</small></div><p><span class="кл ">по ★</span><span>За каждые 2 гекса со своими жетонами</span></p><p><span class="кл о">по ★★</span><span>За каждый трек, где твой кубик стоит выше всех чужих</span></p></div>
+      <div data-k="82aa390a4b35" class="кк "><div class="имя"><span>Трофейная команда</span><small>s9_12</small></div><p><span class="кл ">по ★</span><span>За каждую свою казарму, завод и авиабазу на поле</span></p><p><span class="кл о">по ★★</span><span>За каждый жетон на своей свалке</span></p></div>
+    </div>
+    <div class="колонцифра"><span>19</span></div>
+  </div>
+
+
+  <div class="стр спр фон1 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил" data-h="И"><span class="бк">И</span><span class="им">Супер-арсенал</span><span class="счёт">8 карт</span><span class="черта"></span></div>
+    <div class="вступ прил">На подготовке на вершину каждого трека кладут по случайной карте. Её забирает первый, кто встал на вершину, и кладёт открыто до конца партии. Карта войск даёт ещё один жетон этих войск; звёзды на карте — очки.</div>
+    <div class="карточки">
+      <div data-k="241a1d786b58" class="кк "><div class="имя"><span>Супер-пехота</span><small>супер-войско</small></div><p><span class="кл ">карта</span><span>СУПЕР-ПЕХОТА. Атака: 1 боеприпас — 1 урон. Скорость 2.<br>Спец-действие, −1 боеприпас: уничтожь здание на гексе с супер-пехотой.<br>Звезда: 1 победное очко.</span></p><p><span class="кл о">смысл</span><span>Подрывник: заходит на гекс с чужим зданием и за один боеприпас сносит его без боя.</span></p></div>
+      <div data-k="b063d02a5a88" class="кк "><div class="имя"><span>Супер-техника</span><small>супер-войско</small></div><p><span class="кл ">карта</span><span>СУПЕР-ТЕХНИКА. Прочность 3. Атака: 1 боеприпас — 1 урон.<br>Спец-действие: собери келемий с гекса, соседнего с супер-техникой.<br>Звезда: 1 победное очко.</span></p><p><span class="кл о">смысл</span><span>Танк-добытчик: снимает келемий с соседней жилы сам, без добытчика и без энергии.</span></p></div>
+      <div data-k="48190d9ef381" class="кк "><div class="имя"><span>Супер-авиация</span><small>супер-войско</small></div><p><span class="кл ">карта</span><span>СУПЕР-АВИАЦИЯ. Атака: 1 боеприпас — 1 урон.<br>Спец-действие: перемести супер-авиацию и любые жетоны с её гекса на соседний.<br>Звезда: 1 победное очко.</span></p><p><span class="кл о">смысл</span><span>Транспорт: переносит целый гекс войск на соседний — свои отряды за стену или чужие прочь с дороги.</span></p></div>
+      <div data-k="bb21ee6ce5f4" class="кк "><div class="имя"><span>Супер-вышка</span><small>супер-войско</small></div><p><span class="кл ">карта</span><span>СУПЕР-ВЫШКА. Атака: 1 боеприпас — 1 урон.<br>Спец-действие, −1 боеприпас: нанеси супер-вышкой по 1 урону на каждый соседний гекс.<br>Звезда: 1 победное очко.</span></p><p><span class="кл о">смысл</span><span>Кольцевой залп: один боеприпас — и урон по всем соседям разом.</span></p></div>
+      <div data-k="b7c4d679a536" class="кк "><div class="имя"><span>Штабная директива</span><small>способность</small></div><p><span class="кл ">карта</span><span>ШТАБНАЯ ДИРЕКТИВА. ∞<br>При совпадении приказов ты играешь оба действия.<br>За совпадение нижнего приказа ты получаешь ещё 1 спец. действие.<br>Звезда: 1 победное очко.</span></p><p><span class="кл о">смысл</span><span>Штаб, которому не мешают соседи: совпадение верхнего приказа больше не режет ход до одного действия, а открытый нижний приказ добавляет к действию ещё и спец-действие.</span></p></div>
+      <div data-k="c1447decc01c" class="кк "><div class="имя"><span>Келемиевый рудник</span><small>способность</small></div><p><span class="кл ">карта</span><span>КЕЛЕМИЕВЫЙ РУДНИК. ∞<br>Получай 1 келемий из общего запаса каждый раз, когда выполняешь действие «Добыча».<br>Звезда: 1 победное очко.</span></p><p><span class="кл о">смысл</span><span>Своя жила: каждая Добыча приносит кубик сверх того, что взяли добытчики, — даже если добытчики стоят без дела.</span></p></div>
+    </div>
+    <div class="колонцифра"><span>20</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 21–22</p>
+<div class="разворот">
+
+  <div class="стр спр фон2 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="карточки">
+      <div data-k="f095f48b0fc1" class="кк "><div class="имя"><span>Оружейный конвейер</span><small>способность</small></div><p><span class="кл ">карта</span><span>ОРУЖЕЙНЫЙ КОНВЕЙЕР. ∞<br>Получай 1 боеприпас из общего запаса каждый раз, когда выполняешь действие «Снаряжение».<br>Звезда: 1 победное очко.</span></p><p><span class="кл о">смысл</span><span>Пара к «Келемиевому руднику» для военной руки: каждое Снаряжение даёт боеприпас сверх того, что сделали здания.</span></p></div>
+      <div data-k="cc2df4d00bf4" class="кк "><div class="имя"><span>Бронированные цеха</span><small>способность</small></div><p><span class="кл ">карта</span><span>БРОНИРОВАННЫЕ ЦЕХА. ∞<br>Твои здания: +1 прочности.<br>Звезда: 1 победное очко.</span></p><p><span class="кл о">смысл</span><span>Каждое здание держит на одно попадание больше: добытчик и энергостанция переживают одиночный выстрел, ЦУ выдерживает четыре.</span></p></div>
+    </div>
+    <div class="колонцифра"><span>21</span></div>
+  </div>
+
+
+  <div class="стр спр фон3 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил"><span class="бк">К</span><span class="им">Нации: планшеты войск</span><span class="счёт">4 нации</span><span class="черта"></span></div>
+    <div class="вступ">Нации различаются только планшетом войск: как быстры и крепки их войска, кого бьёт специальная атака (1 боеприпас), почём военные здания и сколько они выпускают. Универсальная атака у всех одна: 2 боеприпаса, любой жетон. ЦУ ставят спец-действием, цены у него нет; вышек он не делает, пока на нём нет модуля сборки.</div>
+    <table class="табл нации"><tr><th></th><th class="н-red">Красные</th><th class="н-green">Зелёные</th><th class="н-blue">Синие</th><th class="н-yellow">Жёлтые</th></tr><tr class="разд"><td colspan="5">Войска: скорость · прочность · цель специальной атаки</td></tr><tr><th>Пехота</th><td>3 · 2 · здания и вышки</td><td>2 · 2 · пехота</td><td>2 · 1 · авиация</td><td>2 · 1 · техника</td></tr><tr><th>Техника</th><td>2 · 2 · здания и вышки</td><td>2 · 2 · здания и вышки</td><td>2 · 1 · пехота</td><td>3 · 1 · авиация</td></tr><tr><th>Авиация</th><td>2 · 1 · пехота</td><td>3 · 1 · техника</td><td>2 · 2 · техника</td><td>2 · 1 · здания и вышки</td></tr><tr><th>Вышка</th><td>0 · 1 · техника</td><td>0 · 1 · авиация</td><td>1 · 1 · здания и вышки</td><td>0 · 1 · пехота</td></tr><tr class="разд"><td colspan="5">Здания: цена · ячейки энергии · прочность · выпуск (боеприпасы или войска)</td></tr><tr><th>Казарма</th><td>3 · 1 · 2 · 1/2</td><td>2 · 1 · 1 · 2/1</td><td>2 · 1 · 2 · 1/1</td><td>1 · 2 · 1 · 1/1</td></tr><tr><th>Завод</th><td>2 · 2 · 2 · 1/1</td><td>3 · 1 · 2 · 1/2</td><td>1 · 2 · 2 · 1/1</td><td>3 · 1 · 1 · 1/2</td></tr><tr><th>Авиабаза</th><td>1 · 1 · 2 · 2/1</td><td>1 · 2 · 2 · 1/1</td><td>3 · 2 · 3 · 1/2</td><td>2 · 1 · 1 · 2/1</td></tr><tr><th>ЦУ</th><td>— · 1 · 3 · 2/0</td><td>— · 1 · 3 · 2/0</td><td>— · 1 · 3 · 1/1</td><td>— · 1 · 3 · 2/0</td></tr></table>
+    <div class="вступ" style="margin-top:4mm">Добытчики и энергостанции у всех одинаковые: номер — цена; добытчик №1–2 берёт 1 келемий, №3–4 — 2; энергостанция на круге энергии даёт 1, 2, 2 и 3 кубика. Здание 4-го уровня на поле приносит звезду.</div>
+    <div class="подзаг">Чем нация отличается</div>
+    <div class="портреты"><div class="портрет"><b class="н-red">Красные</b><p>Сильнее всех: пехота со скоростью 3; казарма выпускает 2 войска. Слабее всех: казарма за 3. По зданиям специальной атакой бьют: пехота, техника.</p></div><div class="портрет"><b class="н-green">Зелёные</b><p>Сильнее всех: авиация со скоростью 3; казарма даёт 2 боеприпаса. По зданиям специальной атакой бьют: техника.</p></div><div class="портрет"><b class="н-blue">Синие</b><p>Сильнее всех: авиация с прочностью 2; вышка ходит (скорость 1); завод за 1; авиабаза выпускает 2 войска; авиабаза с прочностью 3. Слабее всех: авиабаза за 3. По зданиям специальной атакой бьют: вышка.</p></div><div class="портрет"><b class="н-yellow">Жёлтые</b><p>Сильнее всех: техника со скоростью 3; казарма за 1. Слабее всех: казарма на 2 энергии; завод с прочностью 1; авиабаза с прочностью 1. По зданиям специальной атакой бьют: авиация.</p></div></div>
+    <div class="колонцифра"><span>22</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 23–24</p>
+<div class="разворот">
+
+  <div class="стр спр фон4 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил"><span class="бк">Л</span><span class="им">Иконки игры</span><span class="счёт">64 значков</span><span class="черта"></span></div>
+    <div class="икс">
+<div class="ряд группа"><div class="тек"><b>Ресурсы и очки</b></div></div>
+<div class="ряд"><img class="ик" src="илл/d6b230d214085c85.png" alt=""><div class="тек"><b>Монета</b><span>платят за здания и спец-плашки</span></div></div>
+<div class="ряд"><img class="ик" src="илл/dfbf2b0358dd4098.png" alt=""><div class="тек"><b>Келемий</b><span>на рынке и за ступени треков</span></div></div>
+<div class="ряд"><img class="ик" src="илл/8c513e8d1fbdfdaa.png" alt=""><div class="тек"><b>Боеприпас</b><span>платят за атаки</span></div></div>
+<div class="ряд"><img class="ик" src="илл/006ad6f5bdbf8440.png" alt=""><div class="тек"><b>Трофей</b><span>платят в Науке</span></div></div>
+<div class="ряд"><img class="ик" src="илл/d0a1e754b0234b26.png" alt=""><div class="тек"><b>Кубик трофея</b><span>трофей в хранилище</span></div></div>
+<div class="ряд"><img class="ик" src="илл/cd929c39722fa5c8.png" alt=""><div class="тек"><b>Шестерёнка</b><span>трофей на обороте жетона</span></div></div>
+<div class="ряд"><img class="ик" src="илл/f764aa2a6f09cffa.png" alt=""><div class="тек"><b>Энергия</b><span>кубик на здании; её перекладывают, а не тратят</span></div></div>
+<div class="ряд"><img class="ик" src="илл/9dddf8e971e32095.png" alt=""><div class="тек"><b>Победное очко</b><span>звезда: одно очко в конце партии</span></div></div>
+<div class="ряд группа"><div class="тек"><b>Карты</b></div></div>
+<div class="ряд"><img class="ик" src="илл/e340a379a4c8a6d9.png" alt=""><div class="тек"><b>Карта задания</b><span>требование и действие-награда</span></div></div>
+<div class="ряд"><img class="ик" src="илл/fd626a6ecfe13055.png" alt=""><div class="тек"><b>Карта арсенала</b><span>технология: установить или сжечь</span></div></div>
+<div class="ряд"><img class="ик" src="илл/3dd97b8123b613a6.png" alt=""><div class="тек"><b>Карта контейнера</b><span>вскрывают спец-действием</span></div></div>
+<div class="ряд"><img class="ик" src="илл/1b974e7750819257.png" alt=""><div class="тек"><b>Закрытый контейнер</b><span>лежит рубашкой вверх под планшетом</span></div></div>
+<div class="ряд"><img class="ик" src="илл/676f6efbc4b40bd4.png" alt=""><div class="тек"><b>Супер-задание</b><span>считается в конце партии</span></div></div>
+<div class="ряд"><img class="ик" src="илл/25c01fc7e704a1f2.png" alt=""><div class="тек"><b>Супер-арсенал</b><span>карта с вершины трека</span></div></div>
+<div class="ряд группа"><div class="тек"><b>Знаки на картах</b></div></div>
+<div class="ряд"><img class="ик" src="илл/002cce66e0bf58d7.png" alt=""><div class="тек"><b>Спец-действие</b><span>одно в ход: карты, контейнеры, плашки</span></div></div>
+<div class="ряд"><img class="ик" src="илл/6bda314938045fd7.png" alt=""><div class="тек"><b>Свободный верх ∞</b><span>сжечь в свой ход без спец-действия</span></div></div>
+<div class="ряд"><img class="ик" src="илл/841e0516bb271424.png" alt=""><div class="тек"><b>Сразу</b><span>срабатывает в тот же миг</span></div></div>
+<div class="ряд"><img class="ик" src="илл/f3da854bd698ff28.png" alt=""><div class="тек"><b>В чужой ход</b><span>реакция на чужое действие</span></div></div>
+<div class="ряд"><img class="ик" src="илл/7726d2310afda1b3.png" alt=""><div class="тек"><b>Низ карты</b><span>открыт, если его карту вскрыли раньше</span></div></div>
+<div class="ряд"><img class="ик" src="илл/79ecf95f5a92e307.png" alt=""><div class="тек"><b>Свалка</b><span>уничтоженный жетон, сожжённая карта</span></div></div>
+<div class="ряд"><img class="ик" src="илл/a42037385760de26.png" alt=""><div class="тек"><b>Конец партии</b><span>проверяют в Возвращении</span></div></div>
+<div class="ряд"><img class="ик" src="илл/dbaa94f35eea62fd.png" alt=""><div class="тек"><b>Первый игрок</b><span>с него начинается круг</span></div></div>
+<div class="ряд группа"><div class="тек"><b>Действия</b></div></div>
+<div class="ряд"><img class="ик" src="илл/c4c56a5013288c41.png" alt=""><div class="тек"><b>Добыча</b><span>Добыть · Построить добытчик</span></div></div>
+<div class="ряд"><img class="ик" src="илл/62101d2f0877484a.png" alt=""><div class="тек"><b>Питание</b><span>Переложить энергию · Построить энергостанцию</span></div></div>
+<div class="ряд"><img class="ик" src="илл/ef1ff25f218382e8.png" alt=""><div class="тек"><b>Снабжение</b><span>Выпустить · Построить военное здание</span></div></div>
+<div class="ряд"><img class="ик" src="илл/ff2b05595f0b0671.png" alt=""><div class="тек"><b>Командование</b><span>Манёвр · Бой</span></div></div>
+<div class="ряд"><img class="ик" src="илл/14d4f9d30a30aa61.png" alt=""><div class="тек"><b>Развитие</b><span>Рынок · Наука</span></div></div>
+<div class="ряд"><img class="ик" src="илл/2b5a94dd761ad062.png" alt=""><div class="тек"><b>Построить</b><span>второе действие Добычи, Питания и Снабжения</span></div></div>
+<div class="ряд"><img class="ик" src="илл/62101d2f0877484a.png" alt=""><div class="тек"><b>Переложить энергию</b><span>действие Питания</span></div></div>
+<div class="ряд"><img class="ик" src="илл/ef1ff25f218382e8.png" alt=""><div class="тек"><b>Выпустить</b><span>действие Снабжения</span></div></div>
+<div class="ряд"><img class="ик" src="илл/54e7267866db3624.png" alt=""><div class="тек"><b>Манёвр</b><span>действие Командования; плашка «Движение»</span></div></div>
+<div class="ряд"><img class="ик" src="илл/5be91ddeec3be910.png" alt=""><div class="тек"><b>Бой</b><span>действие Командования</span></div></div>
+    </div>
+    <div class="колонцифра"><span>23</span></div>
+  </div>
+
+
+  <div class="стр спр фон1 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+
+    <div class="икс">
+<div class="ряд"><img class="ик" src="илл/1532d0023e5c8451.png" alt=""><div class="тек"><b>Рынок</b><span>действие Развития</span></div></div>
+<div class="ряд"><img class="ик" src="илл/0622da1367a548cd.png" alt=""><div class="тек"><b>Наука</b><span>действие Развития</span></div></div>
+<div class="ряд группа"><div class="тек"><b>Войска и бой</b></div></div>
+<div class="ряд"><img class="ик" src="илл/b07ecc659227b39b.png" alt=""><div class="тек"><b>Пехота</b><span>1 сектор</span></div></div>
+<div class="ряд"><img class="ик" src="илл/88c34b138cd05c53.png" alt=""><div class="тек"><b>Техника</b><span>2 соседних сектора</span></div></div>
+<div class="ряд"><img class="ик" src="илл/124bdb217fc553c9.png" alt=""><div class="тек"><b>Авиация</b><span>в небе гекса</span></div></div>
+<div class="ряд"><img class="ик" src="илл/9f727cac582d0f6a.png" alt=""><div class="тек"><b>Вышка</b><span>делает ЦУ с модулем сборки</span></div></div>
+<div class="ряд"><img class="ик" src="илл/1d3187ca4681a7e4.png" alt=""><div class="тек"><b>Жетон войск</b><span>любой род</span></div></div>
+<div class="ряд"><img class="ик" src="илл/1bc70071fd9744ea.png" alt=""><div class="тек"><b>Прочность</b><span>сколько урона держит жетон</span></div></div>
+<div class="ряд"><img class="ик" src="илл/df7e194c85e99acc.png" alt=""><div class="тек"><b>Урон</b><span>кубик боеприпаса на жетоне</span></div></div>
+<div class="ряд группа"><div class="тек"><b>Здания и поле</b></div></div>
+<div class="ряд"><img class="ик" src="илл/35651018aa2bef4c.png" alt=""><div class="тек"><b>Центр управления</b><span>источник и потребитель энергии</span></div></div>
+<div class="ряд"><img class="ик" src="илл/d12185e6703a988c.png" alt=""><div class="тек"><b>Военное здание</b><span>казарма, завод, авиабаза</span></div></div>
+<div class="ряд"><img class="ик" src="илл/ddc42ddbd13ba1cf.png" alt=""><div class="тек"><b>Добытчик</b><span>берёт келемий и контейнеры</span></div></div>
+<div class="ряд"><img class="ик" src="илл/1c00486d8973a66e.png" alt=""><div class="тек"><b>Энергостанция</b><span>источник энергии на круге</span></div></div>
+<div class="ряд"><img class="ик" src="илл/ba297170bf5873df.png" alt=""><div class="тек"><b>Ячейка энергии</b><span>место под кубик на здании</span></div></div>
+<div class="ряд"><img class="ик" src="илл/18fc4e55c360b038.png" alt=""><div class="тек"><b>Ячейка хранилища</b><span>один кубик ресурса</span></div></div>
+<div class="ряд"><img class="ик" src="илл/d32dcf39ebd05c57.png" alt=""><div class="тек"><b>Гекс</b><span>шесть секторов и небо</span></div></div>
+<div class="ряд"><img class="ик" src="илл/9ad223d1240935e5.png" alt=""><div class="тек"><b>Зона стройки</b><span>свой гекс или гекс за стенкой</span></div></div>
+<div class="ряд"><img class="ик" src="илл/d14f806ad8c4a57a.png" alt=""><div class="тек"><b>Стройка на своём гексе</b><span>гекс с вашим зданием</span></div></div>
+<div class="ряд"><img class="ик" src="илл/add082d5d6fd912f.png" alt=""><div class="тек"><b>Стройка за стенкой</b><span>соседний гекс за вашей стенкой</span></div></div>
+<div class="ряд"><img class="ик" src="илл/137749608e8e37a9.png" alt=""><div class="тек"><b>Круг энергии</b><span>только на нём станция даёт энергию</span></div></div>
+<div class="ряд"><img class="ик" src="илл/25f210cd5ae79d91.png" alt=""><div class="тек"><b>Стартовое зарождение</b><span>тайл с келемием</span></div></div>
+<div class="ряд"><img class="ик" src="илл/243b059604f5d013.png" alt=""><div class="тек"><b>Большое зарождение</b><span>тайл с келемием; оборот — шаг трека</span></div></div>
+<div class="ряд"><img class="ик" src="илл/1b6c3e98794d9e21.png" alt=""><div class="тек"><b>Нейтральная постройка</b><span>ничья, стоит стенкой для всех</span></div></div>
+<div class="ряд"><img class="ик" src="илл/1e517c3ded1639a2.png" alt=""><div class="тек"><b>Недоступный гекс</b><span>не встать, не пройти, не пролететь</span></div></div>
+<div class="ряд"><img class="ик" src="илл/64ad84171b49b83f.png" alt=""><div class="тек"><b>Контейнер на поле</b><span>накрыл открытый — бери карту</span></div></div>
+<div class="ряд группа"><div class="тек"><b>Модули и наука</b></div></div>
+<div class="ряд"><img class="ик" src="илл/dc34d0e1195599f7.png" alt=""><div class="тек"><b>Модуль боя</b><span>на специальную атаку</span></div></div>
+<div class="ряд"><img class="ик" src="илл/e20970f017db32ae.png" alt=""><div class="тек"><b>Модуль сборки</b><span>на военное здание или ЦУ</span></div></div>
+<div class="ряд"><img class="ик" src="илл/933ade129dc2fbdb.png" alt=""><div class="тек"><b>Модуль хранилища</b><span>жетон ячейки или энергии</span></div></div>
+<div class="ряд"><img class="ик" src="илл/3049a58a9d867265.png" alt=""><div class="тек"><b>Модуль блокировки боя</b><span>уходит к тому, кто уничтожит ваш ЦУ</span></div></div>
+<div class="ряд"><img class="ик" src="илл/d57ea2e606170eb4.png" alt=""><div class="тек"><b>Позолота</b><span>золотая сторона: звезда</span></div></div>
+<div class="ряд"><img class="ик" src="илл/9034aaf111f1fca5.png" alt=""><div class="тек"><b>Перенос модуля</b><span>обмен Научного отдела</span></div></div>
+<div class="ряд"><img class="ик" src="илл/5d7ffcc5a55bd188.png" alt=""><div class="тек"><b>Оборот жетона</b><span>трофеи и контейнеры за уничтожение</span></div></div>
+    </div>
+    <div class="колонцифра"><span>24</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 25–26</p>
+<div class="разворот">
+
+  <div class="стр спр фон2 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил"><span class="бк">М</span><span class="им">Сценарии · Вдвоём</span><span class="счёт">4 сценария</span><span class="черта"></span></div>
+    <div class="вступ">Сценарий — это раскладка поля: очертание, тайлы зарождения, нейтральные постройки и стартовые гексы. Соберите поле по картинке из блоков; контейнеры и круги энергии напечатаны на самих блоках. Сценарии одного состава нарочно разные: где-то зарождения общие и за них дерутся, где-то у каждого свой угол и узкие проходы между постройками.</div>
+    <div class="раскл">
+      <figure><img src="илл/2ec86dae4dfb5f62.jpg" alt=""><figcaption>Сценарий 1</figcaption></figure>
+      <figure><img src="илл/2f5c65bef478bd70.jpg" alt=""><figcaption>Сценарий 2</figcaption></figure>
+      <figure><img src="илл/86daa93ad5c15d1b.jpg" alt=""><figcaption>Сценарий 3</figcaption></figure>
+      <figure><img src="илл/ed00681244d423a2.jpg" alt=""><figcaption>Сценарий 4</figcaption></figure>
+    </div>
+    <div class="легенда-поля"><img src="илл/1f53c087bf49e18f.png" alt=""></div>
+    <div class="колонцифра"><span>25</span></div>
+  </div>
+
+
+  <div class="стр спр фон3 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил"><span class="бк">М</span><span class="им">Сценарии · Втроём</span><span class="счёт">3 сценария</span><span class="черта"></span></div>
+    <div class="раскл">
+      <figure><img src="илл/331a0c96a416d92a.jpg" alt=""><figcaption>Сценарий 1</figcaption></figure>
+      <figure><img src="илл/45d8d6e41d46af80.jpg" alt=""><figcaption>Сценарий 2</figcaption></figure>
+      <figure><img src="илл/d9a51777761549ba.jpg" alt=""><figcaption>Сценарий 3</figcaption></figure>
+    </div>
+    <div class="легенда-поля"><img src="илл/1f53c087bf49e18f.png" alt=""></div>
+    <div class="колонцифра"><span>26</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 27–28</p>
+<div class="разворот">
+
+  <div class="стр спр фон4 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил"><span class="бк">М</span><span class="им">Сценарии · Вчетвером</span><span class="счёт">3 сценария</span><span class="черта"></span></div>
+    <div class="раскл">
+      <figure><img src="илл/a705b651c2830d5f.jpg" alt=""><figcaption>Сценарий 1</figcaption></figure>
+      <figure><img src="илл/acddf84928f5e9e5.jpg" alt=""><figcaption>Сценарий 2</figcaption></figure>
+      <figure><img src="илл/37f649b8cf6c4188.jpg" alt=""><figcaption>Сценарий 3</figcaption></figure>
+    </div>
+    <div class="легенда-поля"><img src="илл/1f53c087bf49e18f.png" alt=""></div>
+    <div class="колонцифра"><span>27</span></div>
+  </div>
+
+
+  <div class="стр спр фон1 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="прил"><span class="бк">Н</span><span class="им">Словарь игры</span><span class="счёт">41 слов</span><span class="черта"></span></div>
+    <div class="словарь">
+      <div><b>Партия</b><p>Вся игра от подготовки до подсчёта очков: раунды, пока на поле есть келемий и в колоде рынка есть карты.</p></div>
+      <div><b>Раунд</b><p>Три фазы: Обновление, Управление (4 круга) и Возвращение.</p></div>
+      <div><b>Круг</b><p>Все выбирают карту приказа, потом по очереди вскрывают её и делают ход.</p></div>
+      <div><b>Ход</b><p>Действия вскрытой карты приказа и одно спец-действие.</p></div>
+      <div><b>Карта приказа</b><p>Пять у каждого: ОСВОИТЬ, МОБИЛИЗОВАТЬ, НАСТУПАТЬ, КОНТРОЛИРОВАТЬ, ИССЛЕДОВАТЬ. Различаются у цветов только спец-плашки.</p></div>
+      <div><b>Верх карты</b><p>Два действия приказа. При совпадении — одно на выбор.</p></div>
+      <div><b>Совпадение</b><p>В этом круге такую же карту уже вскрыли раньше вас.</p></div>
+      <div><b>Низ карты</b><p>Название другой карты. Открыт, если её вскрыли в этом круге раньше вас: даёт одно её действие.</p></div>
+      <div><b>Действие</b><p>Одно из пяти на карте приказа: Добыча, Питание, Снабжение, Командование, Развитие. Каждое — выбор одного из двух: Добыть или Построить добытчик, Манёвр или Бой и так далее.</p></div>
+      <div><b>Спец-действие</b><p>Одно в ход: выполнить или сжечь задание, установить или сжечь арсенал, вскрыть контейнеры, спец-способность карты, спец-плашка, поставить ЦУ.</p></div>
+      <div><b>Спец-плашка</b><p>Мелкое действие на карте приказа: Монеты, Боеприпас, Задание, Движение. Нет только на НАСТУПАТЬ.</p></div>
+      <div><b>Свалка</b><p>Карта приказа, отложенная в Обновлении рубашкой вверх. На неё кладут уничтоженные вами жетоны.</p></div>
+      <div><b>Оборот</b><p>Сторона уничтоженного жетона: трофеи-шестерёнки и контейнеры.</p></div>
+      <div><b>Гекс</b><p>Шесть наземных секторов по краям и небо в центре.</p></div>
+      <div><b>Стенка</b><p>Сектор здания, обращённый к соседнему гексу. Чужая стенка закрывает сторону для наземных войск.</p></div>
+      <div><b>Зона стройки</b><p>Гексы с вашими зданиями и соседние гексы за вашими стенками.</p></div>
+      <div><b>Тайл зарождения</b><p>Стартовый или большой; на нём келемий. Опустевший даёт награду и переворачивается.</p></div>
+      <div><b>Перемещение</b><p>Шаг за шагом в соседние гексы, не дальше скорости.</p></div>
+      <div><b>Телепортация</b><p>Эффект карты: снять жетон и поставить на другой гекс.</p></div>
+      <div><b>Запас</b><p>Ваши жетоны не на поле. Общий запас — монеты и кубики у поля.</p></div>
+      <div><b>Построить</b><p>Второе действие Добычи, Питания и Снабжения: одно здание своего вида по цене.</p></div>
+    </div>
+    <div class="колонцифра"><span>28</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 29–30</p>
+<div class="разворот">
+
+  <div class="стр спр фон2 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+
+    <div class="словарь">
+      <div><b>Снос</b><p>Перед постройкой можно снести любые ваши здания того же вида, по монете за каждое; снесённое можно тут же поставить.</p></div>
+      <div><b>Срабатывание при постройке</b><p>Новое здание сразу один раз добывает или выпускает, даже без энергии.</p></div>
+      <div><b>Источник</b><p>Даёт энергию: ЦУ и энергостанции на круге энергии.</p></div>
+      <div><b>Потребитель</b><p>Здание с ячейками энергии: ЦУ, военные здания, добытчики.</p></div>
+      <div><b>Запитано</b><p>Во всех ячейках здания лежит энергия. Добывают и выпускают только запитанные.</p></div>
+      <div><b>Уровень здания</b><p>Номер добытчика или энергостанции, 1–4: он же цена. На поле 4-й уровень даёт звезду.</p></div>
+      <div><b>Хранилище</b><p>Ячейки под кубики келемия, боеприпасов и трофеев. Кубик без ячейки не берётся.</p></div>
+      <div><b>Жетон хранилища</b><p>Ячейка (+1 ячейка) или энергия (+1 энергия ЦУ). Золотая сторона: ячейка — ещё спец-действие каждый ход; энергия — +2; обе со звездой.</p></div>
+      <div><b>Атака</b><p>Удар одного жетона войск: универсальная — 2 боеприпаса, любой жетон; специальная — 1 боеприпас, тип с планшета или модуля.</p></div>
+      <div><b>Урон</b><p>Кубик боеприпаса на жетоне. Урона столько, какова прочность, — жетон уничтожен.</p></div>
+      <div><b>Гарнизон</b><p>Место для пехоты в нейтральной постройке на 2 сектора.</p></div>
+      <div><b>Требование</b><p>Что надо сделать для задания. «В этот ход» — успеть до конца своего хода.</p></div>
+      <div><b>Дополнительное требование</b><p>Второе условие задания: выполнено — берите и его награду.</p></div>
+      <div><b>Сжечь</b><p>Сбросить карту ради её верхнего эффекта. Знак ∞ — без спец-действия.</p></div>
+      <div><b>Установленная карта</b><p>Карта арсенала лицом вверх под планшетом войск: эффект до конца партии.</p></div>
+      <div><b>Модуль</b><p>Сборки (синий) — на военное здание, боя (красный) — на специальную атаку; блокировки боя и хранилища — особые.</p></div>
+      <div><b>Позолота</b><p>Перевернуть модуль или жетон хранилища золотой стороной: сильнее и звезда.</p></div>
+      <div><b>Трек технологий</b><p>Красный, синий, зелёный; ступени 1–4, вершина — 4-я. Шаг — поставить кубик на следующую ступень.</p></div>
+      <div><b>Мгновенная победа</b><p>Втроём и вчетвером — второй уничтоженный вами ЦУ; всегда — вершины всех трёх треков.</p></div>
+      <div><b>Победные очки</b><p>Звёзды: треки, карты, золотые модули, забранные модули блокировки боя, супер-задания.</p></div>
+    </div>
+    <div class="колонцифра"><span>29</span></div>
+  </div>
+
+
+  <div class="стр спр фон3 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="для-заметок"><span>Для заметок</span></div>
+    <div class="колонцифра"><span>30</span></div>
+  </div>
+</div>
+
+<p class="подпись-разворота">Разворот · страницы 31–32</p>
+<div class="разворот">
+
+  <div class="стр спр фон4 ">
+    <svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="M9.0,5.0 H211.0 M9.0,215.0 H211.0"/><path class="к-осн к-лев" d="M9.0,5.0 L5.0,9.0 V211.0 L9.0,215.0"/><path class="к-осн к-прав" d="M211.0,5.0 L215.0,9.0 V211.0 L211.0,215.0"/>
+<path class="к-осн к-хвл" d="M9.0,5.0 H0 M9.0,215.0 H0"/><path class="к-осн к-хвп" d="M211.0,5.0 H220.0 M211.0,215.0 H220.0"/>
+<path class="к-тонк" d="M10.0,6.8 H210.0 M10.0,213.2 H210.0"/><path class="к-тонк к-лев" d="M10.0,6.8 L6.8,10.0 V210.0 L10.0,213.2"/><path class="к-тонк к-прав" d="M210.0,6.8 L213.2,10.0 V210.0 L210.0,213.2"/>
+<path class="к-тонк к-хвл" d="M10.0,6.8 H0 M10.0,213.2 H0"/><path class="к-тонк к-хвп" d="M210.0,6.8 H220.0 M210.0,213.2 H220.0"/>
+<path class="к-риски" d="M20,5.0 v1.0 M20,215.0 v-1.0 M30,5.0 v1.0 M30,215.0 v-1.0 M40,5.0 v1.0 M40,215.0 v-1.0 M50,5.0 v1.9 M50,215.0 v-1.9 M60,5.0 v1.0 M60,215.0 v-1.0 M70,5.0 v1.0 M70,215.0 v-1.0 M80,5.0 v1.0 M80,215.0 v-1.0 M90,5.0 v1.0 M90,215.0 v-1.0 M100,5.0 v1.9 M100,215.0 v-1.9 M110,5.0 v1.0 M110,215.0 v-1.0 M120,5.0 v1.0 M120,215.0 v-1.0 M130,5.0 v1.0 M130,215.0 v-1.0 M140,5.0 v1.0 M140,215.0 v-1.0 M150,5.0 v1.9 M150,215.0 v-1.9 M160,5.0 v1.0 M160,215.0 v-1.0 M170,5.0 v1.0 M170,215.0 v-1.0 M180,5.0 v1.0 M180,215.0 v-1.0 M190,5.0 v1.0 M190,215.0 v-1.0 M200,5.0 v1.9 M200,215.0 v-1.9"/>
+<path class="к-скобка к-лев" d="M2.6,13.6 V2.6 H13.6 M2.6,206.4 V217.4 H13.6"/><path class="к-скобка к-прав" d="M206.4,2.6 H217.4 V13.6 M206.4,217.4 H217.4 V206.4"/>
+</svg>
+    <div class="для-заметок"><span>Для заметок</span></div>
+    <div class="колонцифра"><span>31</span></div>
+  </div>
+
+
+  <div class="стр обложка задняя-спр"><div class="рамка-техно"></div><img src="илл/7deae981179929dd.jpg" alt=""></div>
+</div>
+
+</body>
+</html>

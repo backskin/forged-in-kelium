@@ -85,14 +85,14 @@ public final class GameLogger {
         line("=".repeat(70));
         String now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
         if (ru) {
-            line("ЛОГ ПАРТИИ  —  симулятор «Кристаллы Раздора»");
+            line("ЛОГ ПАРТИИ  —  симулятор «Lex Talionis»");
             line("открыт:    " + now);
             line("правила:   " + cfg.ruleset.id);
             line("игроков:   " + state.numPlayers());
             line("сид:       " + cfg.seed);
             line("стороны:   " + sidesStr("игрок"));
         } else {
-            line("GAME LOG  —  Forged in Kelium simulator");
+            line("GAME LOG  —  Lex Talionis simulator");
             line("opened:   " + now);
             line("ruleset:  " + cfg.ruleset.id);
             line("players:  " + state.numPlayers());

@@ -1449,11 +1449,18 @@ cards:
 # боеприпас, либо контейнер, либо келемий, а запитанное — всё сразу, в том
 # объёме, который у него прокачан». Ключи *_one_of и powered_both заменяют
 # прежние unpowered_container / unpowered_ammo (оставлены выключенными).
+# 14.10.2026 ДИЗАЙНЕР: ПЕРЕКЛЮЧАТЕЛИ ВМЕСТО ФЛАГОВ. Добытчик без энергии —
+# mining.unpowered: off / kelium / container / one_of; военное здание и ЦУ без
+# энергии — assembly.unpowered: off / ammo / units / one_of. Ключ задан —
+# флаги *_one_of / unpowered_container / unpowered_ammo не читаются.
+# В правилах: добытчик без энергии — только контейнер, здание — только боеприпас.
 mining:
+  unpowered: container
   unpowered_container: false
   unpowered_one_of: true       # без энергии: 1 келемий ИЛИ 1 карта контейнера
   powered_both: true           # запитан: келемий И контейнеры, сколько напечатано
 assembly:
+  unpowered: ammo
   unpowered_ammo: 0
   unpowered_one_of: true       # без энергии: 1 жетон войск ИЛИ 1 боеприпас
   powered_both: true           # запитано: войска И боеприпасы по печати

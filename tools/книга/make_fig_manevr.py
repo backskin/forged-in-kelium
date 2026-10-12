@@ -24,5 +24,10 @@ subprocess.run(["java", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
                check=True, capture_output=True, cwd=КОРЕНЬ)
 
 vw, vh = Image.open(png).size
-figure("манёвр", png, 1400, vw, vh, [], css_w="92%", pad="0.4mm 0 0.4mm", в_колонке=True)
+figure("манёвр", png, 1400, vw, vh, [], css_w="88%", pad="0 0 .4mm", в_колонке=True)
+# РИСУНОК КРУПНЕЕ (дизайнер 14.10.2026): колонка рисунка шире текстовой —
+# .блок.надвое:has(.шире) в restyle.py
+ф = os.path.join(D, "_манёвр.svg")
+t = open(ф, encoding="utf-8").read()
+open(ф, "w", encoding="utf-8").write(t.replace('class="рисунок-в-колонке"', 'class="рисунок-в-колонке шире"', 1))
 print("ok", (vw, vh))

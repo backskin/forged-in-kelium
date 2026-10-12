@@ -80,7 +80,7 @@ public final class NetClientWindow {
 
     private void build() {
         Theme.applyTable();
-        frame = new JFrame("Кристаллы Раздора — сетевая партия · " + name(seat));
+        frame = new JFrame("Lex Talionis — сетевая партия · " + name(seat));
         frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         frame.getContentPane().setBackground(Theme.bg());
         frame.getContentPane().setLayout(new BorderLayout());

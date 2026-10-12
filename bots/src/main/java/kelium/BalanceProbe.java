@@ -210,7 +210,7 @@ public final class BalanceProbe {
     // ================= отчёт =============================================
     private void writeReport(int players, int nGames, String agentSpec) {
         List<String> L = new ArrayList<>();
-        L.add("# Балансовый зонд — Кристаллы Раздора");
+        L.add("# Балансовый зонд — Lex Talionis");
         L.add("");
         L.add(String.format(Locale.ROOT, "Игроков: **%d**, партий: **%d**, боты: **%s**, ср. раундов: **%.1f**",
             players, nGames, agentSpec, games > 0 ? (double) rounds / games : 0));

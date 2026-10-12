@@ -32,8 +32,8 @@ param(
 
 Set-Location $Корень
 $книги = [ordered]@{
-    "рулбук"     = "РУЛБУК — Кристаллы Раздора"
-    "справочник" = "СПРАВОЧНИК — Кристаллы Раздора"
+    "рулбук"     = "РУЛБУК — Lex Talionis"
+    "справочник" = "СПРАВОЧНИК — Lex Talionis"
 }
 
 Set-Content -Path $Лог -Value "" -Encoding utf8

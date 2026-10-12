@@ -63,7 +63,7 @@ import net.miginfocom.swing.MigLayout;
 public final class CardShop {
 
     private final CardAssets assets = new CardAssets();
-    private final JFrame frame = new JFrame("Мастерская карт — Кристаллы Раздора");
+    private final JFrame frame = new JFrame("Мастерская карт — Lex Talionis");
     private final JPanel form = new WidthPanel();
     private PreviewPane preview;
     private ElementInspector inspector;

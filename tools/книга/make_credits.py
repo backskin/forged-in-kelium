@@ -23,7 +23,7 @@ def логотип(ширина=1400):
     """Логотип игры из экспорта дизайнера, вписанный в ширину."""
     import base64
     from PIL import Image
-    # надпись названия «Кристалл Раздора» (tools/обложка/make_cover.py)
+    # надпись названия «Lex Talionis» (tools/обложка/make_cover.py)
     путь = os.path.join(os.path.dirname(os.path.dirname(D)), "design-docs", "обложка",
                         "надпись названия.png")
     im = Image.open(путь).convert("RGBA")
@@ -45,7 +45,6 @@ def уточнить(что):
     ("Правила и вёрстка", "Владислав Башкин"),
     ("Иллюстрации", "Seedream 5.0 Pro"),
     ("Оформление", "Владислав Башкин"),
-    ("Редактура", "Claude Opus 5"),
 ]
 
 ДРУЗЬЯ = ("Владимиру Григорьеву, Михаилу Денисову, Данилу Шаговскому, "
@@ -73,11 +72,10 @@ def страница():
       <div class="блок">
         <h2>Издание</h2>
         <div class="строки">
-          <div class="кто"><span class="роль">Название</span><span class="имя"><b>Кристалл Раздора</b></span></div>
+          <div class="кто"><span class="роль">Название</span><span class="имя"><b>Lex Talionis</b></span></div>
           <div class="кто"><span class="роль">Игроков</span><span class="имя">2–4</span></div>
           <div class="кто"><span class="роль">Партия</span><span class="имя">120–180 минут</span></div>
           <div class="кто"><span class="роль">Возраст</span><span class="имя">12+</span></div>
-          <div class="кто"><span class="роль">Редакция</span><span class="имя">черновик, сентябрь 2026</span></div>
         </div>
       </div>
 
@@ -122,12 +120,12 @@ def страница():
 CSS = r"""
   /* ---- создатели игры ---- */
   .создатели .строки { margin: .5mm 0 0; }
-  .создатели .кто { display: flex; align-items: baseline; gap: 2mm; padding: .7mm 0;
+  .строки .кто { display: flex; align-items: baseline; gap: 2mm; padding: .7mm 0;
     border-bottom: .2mm dotted var(--пример-кант); }
-  .создатели .кто:last-child { border-bottom: 0; }
-  .создатели .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
+  .строки .кто:last-child { border-bottom: 0; }
+  .строки .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
     color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
-  .создатели .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
+  .строки .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
   .создатели h2 { font-size: 10.5pt; }
   .создатели p, .создатели li { font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
   .создатели .пример p { font-size: 8.4pt; }

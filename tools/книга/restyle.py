@@ -72,9 +72,16 @@ def кайма():
 # ---------------------------------------------------------------- CSS
 
 СКОС = "polygon({c} 0, 100% 0, 100% calc(100% - {c}), calc(100% - {c}) 100%, 0 100%, 0 {c})"
-ГЕКС_СЕТКА = ("url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='52' height='90' "
-              "viewBox='0 0 52 90'><path d='M26 1 L50 15 L50 45 L26 59 L2 45 L2 15 Z M26 61 L50 75 L50 105 "
-              "M26 61 L2 75 L2 105' fill='none' stroke='%232A2318' stroke-opacity='.075' stroke-width='1.1'/></svg>\")")
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import мозаика as _мозаика  # фон внутренних полос — tools/книга/мозаика.py
+
+ГЕКС_СЕТКА = _мозаика.url()
+# плитка штриховки: одна чёрная и одна светлая диагональ на 0,5 мм
+ШТРИХ = ("url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'>"
+         "<path d='M-1 1L1 -1M0 4L4 0M3 5L5 3' stroke='%23000' stroke-opacity='.035' stroke-width='1.42'/>"
+         "<path d='M-1 3L3 -1M1 5L5 1' stroke='%23fff' stroke-opacity='.06' stroke-width='1.42'/></svg>\")")
+ШТРИХ_РАЗМЕР = ".5mm .5mm"
 
 CSS = r"""
   /* Оформление книг игры: квадрат 22×22 см, две колонки, Tektur, охра
@@ -116,10 +123,10 @@ CSS = r"""
     box-shadow: 0 2px 10px rgba(0,0,0,.4);
   }
   ФОНЫ
-  /* Гекс-сетка едва заметной разметкой поверх фона страницы, под текстом. */
+  /* Мозаика едва заметной разметкой поверх фона страницы, под текстом. */
   .стр:not(.обложка)::after {
     content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background-image: ГЕКС_СЕТКА; background-size: 13mm 22.5mm; opacity: .8;
+    background-image: ГЕКС_СЕТКА; background-size: МОЗ_РАЗМЕР; opacity: МОЗ_ПРОЗР;
   }
 
   /* ---- кайма страницы ---- */
@@ -127,6 +134,8 @@ CSS = r"""
   .кайма .к-осн { fill: none; stroke: var(--чернила); stroke-width: .5; stroke-linejoin: round; }
   .кайма .к-тонк { fill: none; stroke: var(--чернила); stroke-width: .16; opacity: .7; }
   .кайма .к-риски { fill: none; stroke: var(--чернила); stroke-width: .25; }
+  /* Цвет уголков на полосах с картинкой задаёт фон_иллюстрации.py —
+     «вывернутый» цвет фона разворота (дизайнер 14.10.2026). */
   .кайма .к-скобка { fill: none; stroke: var(--келемий); stroke-width: 1.05; stroke-linecap: square; }
   .кайма .к-хвл, .кайма .к-хвп { display: none; }
   /* У корешка рамка открыта: левая страница теряет правую сторону, правая — левую,
@@ -163,7 +172,7 @@ CSS = r"""
      отрицательных отступов, из-за которых колонки выглядели по-разному) и
      заливка полупрозрачная, чтобы бумага и гекс-сетка проступали. */
   .блок { background: rgba(247, 241, 225, .66); padding: 1.9mm 2.7mm 1.6mm;
-    margin: 0 0 2.1mm; outline: .18mm solid var(--кант); outline-offset: -.18mm; }
+    margin: 0 0 3mm; outline: .18mm solid var(--кант); outline-offset: -.18mm; }
   .блок > :last-child { margin-bottom: 0; }
   /* РАЗДЕЛ-ПРИМЕР — тот же жёлтый, что у врезки «Пример»: заливка, кант,
      заголовок ярлыком-плашкой (дизайнер 05.10.2026). */
@@ -278,9 +287,9 @@ CSS = r"""
   .стр.левая-подг .столбец { left: 12mm; top: 29mm; }
   .стр.правая-подг .столбец { right: 11mm; width: 80mm; }
   .стр.левая-подг .глава { position: absolute; left: 13mm; right: 13mm; top: 12mm; margin: 0; z-index: 3; }
-  .столбец .блок { margin: 0 0 1.1mm; padding: 1mm 1.8mm; }
+  .столбец .блок { margin: 0 0 1mm; padding: .8mm 1.8mm; }
   .столбец h3 { margin: 0 0 1mm; }
-  .столбец p { font: 9.5pt/1.28 "Tektur Narrow", "Tektur", sans-serif; margin: 0; }
+  .столбец p { font: 9.4pt/1.22 "Tektur Narrow", "Tektur", sans-serif; margin: 0; }
   .шаг { display: inline-flex; align-items: center; justify-content: center; width: 4.4mm; height: 4.4mm;
     border-radius: 50%; background: var(--келемий); color: #fff; font: 700 8.5pt "Tektur Narrow", sans-serif;
     margin-right: 1mm; vertical-align: middle; }
@@ -395,12 +404,12 @@ CSS = r"""
      колонкой не помещается на полосу, а рисунок ужимать уже некуда. */
   /* ---- создатели игры ---- */
   .создатели .строки { margin: .5mm 0 0; }
-  .создатели .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
+  .строки .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
     border-bottom: .2mm dotted var(--пример-кант); }
-  .создатели .кто:last-child { border-bottom: 0; }
-  .создатели .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
+  .строки .кто:last-child { border-bottom: 0; }
+  .строки .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
     color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
-  .создатели .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
+  .строки .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
   .создатели h2 { font-size: 10.5pt; }
   .создатели p, .создатели li { font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
   .создатели .пример p { font-size: 8.4pt; }
@@ -415,7 +424,7 @@ CSS = r"""
     object-fit: contain; display: block; }
   .создатели .марка .заглушка { height: 100%; width: 100%; margin: 0; }
   /* ИКОНКА В СТРОКЕ ТЕКСТА — настоящая иконка игры, не заглушка. */
-  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm; }
+  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm 0 1.2mm; }
   td .и, th .и { vertical-align: -1.3mm; height: 4.8mm; }
   /* Ячейка «иконка + подпись»: иконка крупно, подпись по центру под ней. */
   .дст { display: flex; flex-direction: column; align-items: center;
@@ -432,7 +441,7 @@ CSS = r"""
   .с-заглавной > .блок { flex: 1; margin: 0; }
   .с-заглавной .заглавная { flex: none; display: flex; align-items: center; justify-content: center;
     width: 26mm; }
-  .с-заглавной .заг-и { height: 100%; max-height: 26mm; width: auto; max-width: 26mm; object-fit: contain; }
+  .с-заглавной .заг-и { height: 100%; max-height: 18mm; width: auto; max-width: 18mm; object-fit: contain; }
   /* Блок на ступень крупнее: когда на полосе остаётся воздух, текст
      лучше дать больше, чем растягивать пустоту (15.09.2026). */
   .блок.крупно p, .блок.крупно li { font-size: 10.4pt; line-height: 1.32; }
@@ -441,6 +450,11 @@ CSS = r"""
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  .блок.надвое:has(.широкий) { grid-template-columns: 1fr 1fr; }
+  .блок.надвое:has(.шире) { grid-template-columns: 1.45fr 1fr; }
+  .блок.в-две { column-count: 2; column-gap: 7mm; }
+  .блок.в-две > h2 { column-span: all; }
+  .блок.в-две li { break-inside: avoid; }
   .блок.надвое > .под-низ { grid-column: 1 / -1; }
   /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
      рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
@@ -535,6 +549,21 @@ CSS = r"""
   .карточка ul { margin: 0 0 1.4mm; padding-left: 4mm; }
   .карточка li { margin: 0 0 .8mm; }
   .карточка ol { margin: 0 0 1.4mm; padding-left: 5mm; }
+
+  /* ОТСТУП НАД БЛОКАМИ ВО ВСЮ ШИРИНУ (дизайнер 14.10.2026): нижний отступ
+     блока в колонке обрезается на границе колонок, и следующий широкий блок
+     прилипал к нему (с. 25). Отступ даёт сам широкий блок. */
+  .две > .блок.вовсю, .две > .карточки, .две > .блок.надвое, .две > .блок.пара,
+  .две > .рисунок-во-всю { margin-top: 3mm; }
+  .две > :first-child { margin-top: 0; }
+
+  /* ШТРИХОВКА (дизайнер 14.10.2026): тончайшие диагональные полоски, чёрная
+     и светлая через одну, еле видны — как на картах. Лежит на фоне полосы,
+     мозаике и подложках блоков; текст, значки и рисунки — поверх неё. */
+  .стр:not(.обложка)::after { background-image: ШТРИХ, ГЕКС_СЕТКА;
+    background-size: ШТРИХ_РАЗМЕР, МОЗ_РАЗМЕР; }
+  .блок, .пример::before, .набор, .фаза, .фазы > div, .оглавление, table {
+    background-image: ШТРИХ !important; background-size: ШТРИХ_РАЗМЕР !important; }
 """
 
 
@@ -545,7 +574,7 @@ def собрать_css(старый):
     if i >= 0:
         задняя = старый[i:]
     css = (CSS.replace("ФОНЫ", фоны)
-              .replace("ГЕКС_СЕТКА", ГЕКС_СЕТКА)
+              .replace("ШТРИХ_РАЗМЕР", ШТРИХ_РАЗМЕР).replace("ШТРИХ", ШТРИХ).replace("ГЕКС_СЕТКА", ГЕКС_СЕТКА).replace("МОЗ_РАЗМЕР", "%.2fmm %.2fmm" % (_мозаика.ШИРИНА_ММ, _мозаика.ВЫСОТА_ММ)).replace("МОЗ_ПРОЗР", str(_мозаика.ПРОЗРАЧНОСТЬ))
               .replace("СКОС28", СКОС.format(c="2.8mm"))
               .replace("СКОС25", СКОС.format(c="2.5mm"))
               .replace("СКОС2", СКОС.format(c="2mm")))
@@ -569,10 +598,8 @@ def патч_разметки(t, кайма_svg):
             return m.group(0)
         return m.group(0) + "\n    " + кайма_svg
     t = re.sub(r'<div class="стр ([^"]*)">', вставить, t)
-    # РАМКА НА ПЕРЕДНЕЙ ОБЛОЖКЕ — та же техно-рамка, что на памятке
-    # (просьба дизайнера 15.09.2026). Ставится поверх иллюстрации.
-    t = re.sub(r'(<div class="стр обложка">)(?!<div class="рамка-техно")',
-               r'\1<div class="рамка-техно"></div>', t)
+    # ПЕРЕДНЯЯ ОБЛОЖКА — БЕЗ ТЕХНО-РАМКИ (дизайнер 14.10.2026 убрал её).
+    t = t.replace('<div class="стр обложка"><div class="рамка-техно"></div>', '<div class="стр обложка">')
     return t
 
 

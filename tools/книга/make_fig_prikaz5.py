@@ -11,6 +11,8 @@ import os
 
 from PIL import Image, ImageDraw, ImageFont
 
+from мазок import мазок
+
 D = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(D))
 ns = {"__file__": os.path.join(D, "figs.py")}
@@ -53,7 +55,7 @@ figure("карта-приказа", путь, 560, карта.width, карта.
     ("green_secure", "Виола", "Развитие · Добыча", (1, 2)),
     ("yellow_advance", "Гордон", "Командование", (1,)),
 ]
-ЯЧЕЙКИ = [(0.26, 0.302), (0.735, 0.302), (0.25, 0.788), (0.725, 0.788)]
+ЯЧЕЙКИ = [(0.252, 0.31), (0.742, 0.31), (0.252, 0.777), (0.742, 0.777)]
 Ш = 520
 В = round(Ш * 1028 / 661)
 ЗАЗОР, ШАПКА, ПОДПИСЬ = 64, 96, 110
@@ -70,9 +72,8 @@ for k, (файл, имя, дело, играет) in enumerate(КРУГ):
     for я in играет:
         дx, дy = ЯЧЕЙКИ[я]
         cx, cy = x + Ш * дx, ШАПКА + В * дy
-        r = Ш * 0.165
-        d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(24, 108, 36, 255),
-                  width=round(Ш * 0.018))
+        # КРУЖОК МАЗКОМ КИСТИ (дизайнер 14.10.2026) — tools/книга/мазок.py
+        мазок(холст, cx, cy, Ш * 0.158, толщина=Ш * 0.03, зерно=k * 4 + я)
     r = 38
     cx, cy = x + r + 6, ШАПКА - r - 12
     d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(24, 108, 36, 255))

@@ -675,6 +675,7 @@ public final class Actions {
                 // без энергии добытчик берёт 1 келемий ИЛИ 1 карту контейнера;
                 // запитанный — и келемий, и контейнеры сразу, сколько напечатано.
                 boolean поОдной = false;
+                boolean толькоКелемий = false;
                 boolean запитан = true;
                 if (!ctx.allPowered && !effectivelyPowered(s, player, b, agent, paid)) {
                     if (ctx.freeMinerMoves > 0) {
@@ -682,13 +683,26 @@ public final class Actions {
                     } else {
                         запитан = false;
                         безЭнергии++;
-                        безЭнергииДобывает = kelium.dataio.Ctx.rules(s).getInt("mining.unpowered_yield", 0);
-                        поОдной = kelium.dataio.Ctx.rules(s).getBool("mining.unpowered_one_of", false);
-                        if (поОдной) {
-                            безЭнергииДобывает = 1;
+                        // ПЕРЕКЛЮЧАТЕЛЬ «ДОБЫТЧИК БЕЗ ЭНЕРГИИ» (дизайнер 14.10.2026,
+                        // mining.unpowered): off — ничего; kelium — только 1 келемий;
+                        // container — только 1 карта контейнера; one_of — одно из
+                        // двух, 1 шт. Без ключа — прежние флаги ниже.
+                        String режим = String.valueOf(kelium.dataio.Ctx.rules(s).get("mining.unpowered", ""));
+                        switch (режим) {
+                            case "off" -> { }
+                            case "kelium" -> { безЭнергииДобывает = 1; толькоКелемий = true; }
+                            case "container" -> толькоКонтейнер = true;
+                            case "one_of" -> { безЭнергииДобывает = 1; поОдной = true; }
+                            default -> {
+                                безЭнергииДобывает = kelium.dataio.Ctx.rules(s).getInt("mining.unpowered_yield", 0);
+                                поОдной = kelium.dataio.Ctx.rules(s).getBool("mining.unpowered_one_of", false);
+                                if (поОдной) {
+                                    безЭнергииДобывает = 1;
+                                }
+                                толькоКонтейнер = безЭнергииДобывает <= 0
+                                    && kelium.dataio.Ctx.rules(s).getBool("mining.unpowered_container", false);
+                            }
                         }
-                        толькоКонтейнер = безЭнергииДобывает <= 0
-                            && kelium.dataio.Ctx.rules(s).getBool("mining.unpowered_container", false);
                         if (безЭнергииДобывает <= 0 && !толькоКонтейнер) {
                             continue;
                         }
@@ -724,7 +738,7 @@ public final class Actions {
                 if (contHex != null && Storage.containerCapacity(s, player) <= player.containers) {
                     contHex = null;
                 }
-                if (contHex != null) {
+                if (contHex != null && !толькоКелемий) {
                     opts.add(new Choice("mine", "container", "take container @" + contHex));
                 }
                 if (opts.isEmpty()) {
@@ -882,13 +896,28 @@ public final class Actions {
                 // войск ИЛИ 1 боеприпас (войско — только если здание их вообще
                 // делает); запитанное — и войска, и боеприпасы сразу по печати.
                 boolean поОдной = false;
+                boolean толькоВойскаБезЭнергии = false;
                 boolean запитано = true;
                 if (!ctx.allPowered && !effectivelyPowered(state, player, b, agent, paid)) {
                     запитано = false;
-                    поОдной = kelium.dataio.Ctx.rules(state).getBool("assembly.unpowered_one_of", false);
-                    безЭнергииБоеприпасов = поОдной ? 1
-                        : kelium.dataio.Ctx.rules(state).getInt("assembly.unpowered_ammo", 0);
-                    if (безЭнергииБоеприпасов <= 0 || ctx.сборкаТолькоВойска && !поОдной) {
+                    // ПЕРЕКЛЮЧАТЕЛЬ «ВОЕННОЕ ЗДАНИЕ И ЦУ БЕЗ ЭНЕРГИИ» (дизайнер
+                    // 14.10.2026, assembly.unpowered): off — ничего; ammo — только
+                    // 1 боеприпас; units — только 1 жетон войск; one_of — одно из
+                    // двух, 1 шт. Без ключа — прежние флаги ниже.
+                    String режим = String.valueOf(kelium.dataio.Ctx.rules(state).get("assembly.unpowered", ""));
+                    switch (режим) {
+                        case "off" -> безЭнергииБоеприпасов = 0;
+                        case "ammo" -> безЭнергииБоеприпасов = 1;
+                        case "units" -> { безЭнергииБоеприпасов = 1; толькоВойскаБезЭнергии = true; }
+                        case "one_of" -> { безЭнергииБоеприпасов = 1; поОдной = true; }
+                        default -> {
+                            поОдной = kelium.dataio.Ctx.rules(state).getBool("assembly.unpowered_one_of", false);
+                            безЭнергииБоеприпасов = поОдной ? 1
+                                : kelium.dataio.Ctx.rules(state).getInt("assembly.unpowered_ammo", 0);
+                        }
+                    }
+                    if (безЭнергииБоеприпасов <= 0
+                            || ctx.сборкаТолькоВойска && !поОдной && !толькоВойскаБезЭнергии) {
                         continue;
                     }
                 }
@@ -935,7 +964,10 @@ public final class Actions {
                     .about(b).base(Modules.assemblyOutput(state, player, b.type, "ammo")).ask();
                 if (безЭнергииБоеприпасов > 0) {
                     ammoOut = безЭнергииБоеприпасов;
-                    unitsOut = поОдной ? Math.min(1, unitsOut) : 0;
+                    unitsOut = поОдной || толькоВойскаБезЭнергии ? Math.min(1, unitsOut) : 0;
+                    if (толькоВойскаБезЭнергии && unitsOut <= 0) {
+                        continue;              // войск это здание не делает — пусто
+                    }
                 }
                 // НОЛЬ ВОЙСК — НАНИМАТЬ НЕЧЕГО (печатный выпуск ЦУ 25.09.2026: вышек 0,
                 // пока синий жетон не накрыл число).
@@ -953,7 +985,7 @@ public final class Actions {
                         "units", unitsOut, "fits", встанут),
                         b.type.code + "->" + unitType.code));
                 }
-                if (!ctx.сборкаТолькоВойска) {
+                if (!ctx.сборкаТолькоВойска && !толькоВойскаБезЭнергии) {
                     opts.add(new Choice("assemble", Map.of("kind", "ammo", "building", b.uid),
                         b.type.code + "->ammo"));
                 }

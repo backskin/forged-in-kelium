@@ -195,7 +195,7 @@ public final class HelpWindow {
         }
         HelpWindow w = new HelpWindow(Mode.APP, HelpBook.of(session).sections());
         instance = w;
-        open = w.build(owner, "Справочник — разбор партии «Кристаллы Раздора»");
+        open = w.build(owner, "Справочник — разбор партии «Lex Talionis»");
     }
 
     /**
@@ -235,7 +235,7 @@ public final class HelpWindow {
         show(null, null);
         if (open != null) {
             open.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-            open.setTitle("Справочник «Кристаллы Раздора» — правила и все карты");
+            open.setTitle("Справочник «Lex Talionis» — правила и все карты");
         }
     }
 

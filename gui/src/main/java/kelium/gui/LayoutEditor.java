@@ -1250,7 +1250,7 @@ public final class LayoutEditor {
         JMenu help = new JMenu("Справка");
         help.add(item("Как пользоваться", "F1", null, e -> showGuide()));
         help.add(item("О программе", null, null, e -> JOptionPane.showMessageDialog(frame,
-            Ui.text("Конструктор раскладок «Кристаллы Раздора».\n"
+            Ui.text("Конструктор раскладок «Lex Talionis».\n"
                 + "Сохраняет YAML, который читает симулятор.\n\n"
                 + "Настройки хранятся в файле: " + AppSettings.location(), 520),
             "О программе", JOptionPane.INFORMATION_MESSAGE)));
