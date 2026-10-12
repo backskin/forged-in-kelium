@@ -278,9 +278,9 @@ CSS = r"""
   .стр.левая-подг .столбец { left: 12mm; top: 29mm; }
   .стр.правая-подг .столбец { right: 11mm; width: 80mm; }
   .стр.левая-подг .глава { position: absolute; left: 13mm; right: 13mm; top: 12mm; margin: 0; z-index: 3; }
-  .столбец .блок { margin: 0 0 1.1mm; padding: 1mm 1.8mm; }
+  .столбец .блок { margin: 0 0 1mm; padding: .8mm 1.8mm; }
   .столбец h3 { margin: 0 0 1mm; }
-  .столбец p { font: 9.5pt/1.28 "Tektur Narrow", "Tektur", sans-serif; margin: 0; }
+  .столбец p { font: 9.4pt/1.22 "Tektur Narrow", "Tektur", sans-serif; margin: 0; }
   .шаг { display: inline-flex; align-items: center; justify-content: center; width: 4.4mm; height: 4.4mm;
     border-radius: 50%; background: var(--келемий); color: #fff; font: 700 8.5pt "Tektur Narrow", sans-serif;
     margin-right: 1mm; vertical-align: middle; }
