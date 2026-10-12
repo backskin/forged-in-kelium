@@ -121,7 +121,7 @@ CSS = r"""
   /* Мозаика едва заметной разметкой поверх фона страницы, под текстом. */
   .стр:not(.обложка)::after {
     content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background-image: ГЕКС_СЕТКА; background-size: 9mm 15.59mm; opacity: 1;
+    background-image: ГЕКС_СЕТКА; background-size: МОЗ_РАЗМЕР; opacity: МОЗ_ПРОЗР;
   }
 
   /* ---- кайма страницы ---- */
@@ -548,7 +548,7 @@ def собрать_css(старый):
     if i >= 0:
         задняя = старый[i:]
     css = (CSS.replace("ФОНЫ", фоны)
-              .replace("ГЕКС_СЕТКА", ГЕКС_СЕТКА)
+              .replace("ГЕКС_СЕТКА", ГЕКС_СЕТКА).replace("МОЗ_РАЗМЕР", "%.2fmm %.2fmm" % (_мозаика.ШИРИНА_ММ, _мозаика.ВЫСОТА_ММ)).replace("МОЗ_ПРОЗР", str(_мозаика.ПРОЗРАЧНОСТЬ))
               .replace("СКОС28", СКОС.format(c="2.8mm"))
               .replace("СКОС25", СКОС.format(c="2.5mm"))
               .replace("СКОС2", СКОС.format(c="2mm")))

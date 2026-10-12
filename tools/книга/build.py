@@ -69,6 +69,8 @@ print("несжатая копия: %.1f МБ" % (os.path.getsize(сырой) / 
 # нечем. Поэтому рядом кладётся копия, где каждая полоса — картинка 150 dpi.
 лёгкий = os.path.join(D, "book-lite.pdf")
 мал = pymupdf.open()
+ФАЙЛ_ШРИФТА = "C:/Windows/Fonts/arial.ttf"
+ШРИФТ_СЛОЯ = pymupdf.Font(fontfile=ФАЙЛ_ШРИФТА)
 for i in range(len(doc)):
     pm = doc[i].get_pixmap(dpi=150)
     буфер = io.BytesIO()
@@ -76,6 +78,24 @@ for i in range(len(doc)):
         буфер, "JPEG", quality=78, optimize=True)
     стр = мал.new_page(width=doc[i].rect.width, height=doc[i].rect.height)
     стр.insert_image(стр.rect, stream=буфер.getvalue())
+    # НЕВИДИМЫЙ СЛОЙ ТЕКСТА (дизайнер 14.10.2026): поверх картинки полосы —
+    # её строки режимом 3 (не рисуется), чтобы текст выделялся и копировался.
+    # Шрифт свой у строки не совпадает с Tektur, поэтому каждая строка
+    # растянута по ширине до своей рамки.
+    for блок in doc[i].get_text("dict")["blocks"]:
+        for строка in блок.get("lines", []):
+            текст = "".join(с["text"] for с in строка["spans"])
+            if not текст.strip():
+                continue
+            x0, y0, x1, y1 = строка["bbox"]
+            кегль = max(с["size"] for с in строка["spans"])
+            длина = ШРИФТ_СЛОЯ.text_length(текст, кегль)
+            if длина <= 0 or строка["dir"] != (1.0, 0.0):
+                continue
+            точка = pymupdf.Point(x0, строка["spans"][0]["origin"][1])
+            стр.insert_text(точка, текст, fontsize=кегль, fontname="слой", fontfile=ФАЙЛ_ШРИФТА,
+                            render_mode=3, morph=(точка, pymupdf.Matrix((x1 - x0) / длина, 1)))
+мал.subset_fonts()
 мал.save(лёгкий, deflate=True, garbage=4)
 мал.close()
 print("лёгкая копия: %.1f МБ" % (os.path.getsize(лёгкий) / 1e6))
