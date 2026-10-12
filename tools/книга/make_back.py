@@ -218,6 +218,7 @@ CSS = r"""
   .задняя .пм-кол > .блок:last-child { flex: 1; }
   .задняя .ход li { break-inside: avoid; }
   .задняя .блок { margin: 0; padding: 3mm 3.4mm 2.6mm; background: rgba(247,241,225,.93); }
+  .задняя .блок, .задняя table, .задняя .пример::before { background-image: none !important; }
 
   .задняя h2 { font: 700 10pt/1.2 "Tektur", sans-serif; margin: 0 0 2mm; padding-bottom: .8mm;
     display: flex; align-items: baseline; justify-content: space-between; gap: 2mm; }
