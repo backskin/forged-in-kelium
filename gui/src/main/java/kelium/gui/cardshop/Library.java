@@ -64,6 +64,15 @@ public final class Library {
                             c.fields.putAll((Map<String, Object>) cm);
                             c.fields.put("тип", t.ru);
                             IconNumbers.migrate(c);
+                            // РЕАКЦИЯ СЛЕВА (дизайнер 12.10.2026): у карт с плашкой
+                            // реакции «∞» стоял по умолчанию — один раз меняется на
+                            // значок реакции; выбранное потом остаётся (метка)
+                            if (t.layout == CardSpec.Layout.OBJECTIVE && !c.fields.containsKey("_слот_реакция")) {
+                                if (CardRender.hasPlate(c) && "∞".equals(c.text("слот"))) {
+                                    c.fields.put("слот", "реакция");
+                                }
+                                c.fields.put("_слот_реакция", true);
+                            }
                             out.add(c);
                         }
                     }

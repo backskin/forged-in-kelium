@@ -134,6 +134,16 @@ final class PreviewPane extends JComponent {
         return selected;
     }
 
+    /** Рамка части карты на последнем рисунке (пиксели карты) или null. */
+    Rectangle2D region(String id) {
+        return id == null ? null : regions.get(id);
+    }
+
+    /** Размер карты в пикселях (null — карты ещё нет). */
+    java.awt.Dimension cardSize() {
+        return im == null || back ? null : new java.awt.Dimension(im.getWidth(), im.getHeight());
+    }
+
     /** Самая маленькая область под точкой — так выбирается вложенное, а не фон. */
     private String at(int x, int y) {
         double cx = (x - ox) / k;

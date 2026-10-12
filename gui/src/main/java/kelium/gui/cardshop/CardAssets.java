@@ -380,7 +380,7 @@ public final class CardAssets {
      * {масштаб, сдвиг по x, сдвиг по y} — доли размера места.
      */
     static final Map<String, double[]> LOOK = Map.of(
-        "48", new double[] {1.3, 0.0, 0.07});
+        "48", new double[] {1.45, 0.0, 0.07});
 
     static double lookScale(String key) {
         double[] l = LOOK.get(key(key));
