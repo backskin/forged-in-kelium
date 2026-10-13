@@ -18,6 +18,7 @@ import io
 import os
 import re
 
+import стрелка
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -97,9 +98,7 @@ for k, (имя, запасной) in enumerate(ряды):
     холст.alpha_composite(лицо, (x, y))
     ax = x + Т + round(стрелка_w * 0.15)
     ay = y + Т // 2
-    d.line((ax, ay, ax + round(стрелка_w * 0.55), ay), fill=ЗЕЛ, width=max(4, Т // 28))
-    d.polygon([(ax + round(стрелка_w * 0.5), ay - Т // 12), (ax + round(стрелка_w * 0.72), ay),
-               (ax + round(стрелка_w * 0.5), ay + Т // 12)], fill=ЗЕЛ)
+    стрелка.между(холст, ax, ay, ax + round(стрелка_w * 0.72), ay, высота=Т * .8)
     холст.alpha_composite(золото, (x + Т + стрелка_w, y))
 
 буфер = io.BytesIO()

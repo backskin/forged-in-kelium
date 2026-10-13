@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 
+import стрелка
 from PIL import Image, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -69,8 +70,7 @@ for i, (k, п) in enumerate(zip(кадры, подписи)):
     if i < 2:
         y = ВЫСОТА // 2
         x0 = x + 50
-        d.polygon([(x0, y - 30), (x0 + 120, y - 30), (x0 + 120, y - 66), (x0 + 200, y),
-                   (x0 + 120, y + 66), (x0 + 120, y + 30), (x0, y + 30)], fill=ОХРА)
+        стрелка.между(холст, x0, y, x0 + 200, y, высота=230)
         x += ЗАЗОР
 png = os.path.join(D, "_добыча-пример.png")
 холст.save(png)

@@ -11,6 +11,7 @@ import math
 import os
 
 import yaml
+import стрелка
 from PIL import Image, ImageDraw, ImageFilter
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -63,22 +64,14 @@ for k in range(толщ, 0, -1):
 # дуговая стрелка над ячейками
 d = ImageDraw.Draw(холст)
 ax, bx = cx + с * 0.15, nx - с * 0.15
-верх = min(cy, ny) - с * 0.78
+верх = min(cy, ny) - с * 0.5
 точки = []
 for i in range(41):
     t = i / 40
     x = (1 - t) ** 2 * ax + 2 * (1 - t) * t * (ax + bx) / 2 + t ** 2 * bx
     y = (1 - t) ** 2 * (cy - с * 0.45) + 2 * (1 - t) * t * верх + t ** 2 * (ny - с * 0.55)
     точки.append((x, y))
-d.line(точки[:-3], fill=(255, 255, 255, 230), width=30, joint="curve")
-d.line(точки[:-3], fill=ЦВЕТ, width=18, joint="curve")
-(ex, ey), (px, py) = точки[-1], точки[-4]
-уг = math.atan2(ey - py, ex - px)
-dl, dw = 70, 46
-остриё = [(ex, ey),
-          (ex - dl * math.cos(уг) + dw * math.sin(уг), ey - dl * math.sin(уг) - dw * math.cos(уг)),
-          (ex - dl * math.cos(уг) - dw * math.sin(уг), ey - dl * math.sin(уг) + dw * math.cos(уг))]
-d.polygon(остриё, fill=ЦВЕТ, outline=(255, 255, 255, 230), width=5)
+стрелка.дуга(холст, точки, 50)
 
 png = os.path.join(D, "_перенос-модуля.png")
 холст.save(png)

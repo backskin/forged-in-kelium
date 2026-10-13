@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 
+import стрелка as иконка_стрелки
 from PIL import Image, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -40,8 +41,7 @@ def выс(im, h):
 
 
 def стрелка(d, x, y, подпись=None):
-    d.polygon([(x, y - 34), (x + 130, y - 34), (x + 130, y - 72), (x + 210, y),
-               (x + 130, y + 72), (x + 130, y + 34), (x, y + 34)], fill=ОХРА)
+    иконка_стрелки.между(d._image, x, y, x + 210, y, высота=230)
     if подпись:
         d.text((x + 105, y - 90), подпись, font=шр, fill=ОХРА, anchor="ms")
 

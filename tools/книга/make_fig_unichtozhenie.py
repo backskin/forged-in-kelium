@@ -9,6 +9,7 @@
 import os
 import subprocess
 
+import стрелка as иконка_стрелки
 from PIL import Image, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -45,8 +46,7 @@ def картинка(путь, h):
 
 
 def стрелка(d, x, y):
-    d.polygon([(x, y - 40), (x + 150, y - 40), (x + 150, y - 85), (x + 240, y),
-               (x + 150, y + 85), (x + 150, y + 40), (x, y + 40)], fill=ОХРА)
+    иконка_стрелки.между(d._image, x, y, x + 240, y, высота=260)
 
 
 def ряд(до, после, награды):

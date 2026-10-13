@@ -8,6 +8,7 @@
 import os
 import subprocess
 
+import стрелка
 from PIL import Image, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -93,8 +94,7 @@ H = max(до.height, после.height)
 d = ImageDraw.Draw(холст)
 цв = (107, 68, 19, 255)
 x0, y = до.width + 40, H // 2 - 40
-d.polygon([(x0, y), (x0 + 250, y), (x0 + 250, y - 45), (x0 + 340, y + 40),
-           (x0 + 250, y + 125), (x0 + 250, y + 80), (x0, y + 80)], fill=цв)
+стрелка.между(холст, x0 + 60, y + 40, x0 + 340, y + 40, высота=300)
 d.text((x0 + 10, y - 190), "+2", font=шр, fill=цв)
 холст.alpha_composite(куб, (x0 + 120, y - 200))
 холст.alpha_composite(куб, (x0 + 230, y - 200))

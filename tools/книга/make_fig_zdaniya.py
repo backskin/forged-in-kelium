@@ -11,6 +11,7 @@
 """
 import os
 
+import стрелка
 from PIL import Image, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -62,8 +63,7 @@ for лицо, оборот, имя in ПАРЫ:
     y = H // 2
     x0 = a.width + 18
     x1 = a.width + СТРЕЛКА - 18
-    d.line((x0, y, x1, y), fill=(24, 108, 36, 255), width=9)
-    d.polygon([(x1 + 14, y), (x1 - 8, y - 15), (x1 - 8, y + 15)], fill=(24, 108, 36, 255))
+    стрелка.между(к, x0, y, x1 + 14, y, высота=H * .5)
     ш_п = d.textlength(имя, font=подпись)
     d.text(((ш - ш_п) / 2, H + 14), имя, font=подпись, fill=(42, 35, 24, 255))
     блоки.append(к)
