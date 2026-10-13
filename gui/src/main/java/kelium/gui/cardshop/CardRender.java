@@ -1032,9 +1032,19 @@ public final class CardRender {
             if (c.integer("отступ_слева", 0) <= 0 && lowSize(k, low, 44, leftX, rightX, topY) < 40) {
                 leftX = Math.min(leftX, 150);
             }
-            arsenalLow(k, low, 44, leftX, rightX, th.text(), topY);
+            arsenalLow(k, low, 44, leftX, rightX, th.text(), topY,
+                onInstallTop(k, c, c.integer("отступ_слева", 0) > 0 ? c.integer("отступ_слева", 0) : 150) - 8);
         }
         if (!low.isBlank()) {
+            k.end();
+        }
+        String inst = c.text("при_установке");
+        if (!inst.isBlank()) {
+            double lx = c.integer("отступ_слева", 0) > 0 ? c.integer("отступ_слева", 0) : 150;
+            if (k.begin("при_установке", lx - 12, onInstallTop(k, c, lx), 772 - lx + 12,
+                486 - onInstallTop(k, c, lx))) {
+                onInstallPlate(k, inst, lx, th);
+            }
             k.end();
         }
         if (!c.text("ряд").isBlank()) {
@@ -1238,7 +1248,17 @@ public final class CardRender {
     /** Постоянный эффект: по правому краю, **жирное**, иконки в строке, свой перенос. */
     static void arsenalLow(CardCanvas k, String text, double px, double leftX, double rightX,
                            Color ink, double top) {
-        double bottom = 478;
+        arsenalLow(k, text, px, leftX, rightX, ink, top, 478);
+    }
+
+    /**
+     * Постоянный эффект до нижней границы {@code bottom}. РОВНЫЙ ПЕРЕНОС
+     * (дизайнер 13.10.2026: «зачем перенёс слово на новую строчку, влезло бы в
+     * три»): при том же числе строк ширина ужимается, пока строк не станет
+     * больше, — строки выходят ровными, без одинокого слова в конце.
+     */
+    static void arsenalLow(CardCanvas k, String text, double px, double leftX, double rightX,
+                           Color ink, double top, double bottom) {
         List<String> lines;
         double step;
         Font f;
@@ -1256,12 +1276,96 @@ public final class CardRender {
             }
             px -= 1;
         }
+        lines = balanced(k, text, f, fb, px, (rightX - leftX) * 2, lines.size());
         double y = top + step / 2;
         final double pxF = px;
         for (String l : lines) {
             k.line(l, f, fb, rightX, y, 'r', ink, CardCanvas.WHITE, 2,
                 (t, p) -> arsIcon(k, t, pxF), px, true);
             y += step;
+        }
+    }
+
+    /** Ровный перенос: самая узкая ширина, при которой строк столько же. */
+    static List<String> balanced(CardCanvas k, String text, Font f, Font fb, double px,
+                                 double width, int n) {
+        double lo = width * 0.45;
+        double hi = width;
+        for (int it = 0; it < 18; it++) {
+            double mid = (lo + hi) / 2;
+            int m = 0;
+            for (String para : text.split("\n")) {
+                m += wrapGreedy(k, para, f, fb, px, mid).size();
+            }
+            if (m <= n) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        List<String> out = new ArrayList<>();
+        for (String para : text.split("\n")) {
+            out.addAll(wrapGreedy(k, para, f, fb, px, hi));
+        }
+        return out;
+    }
+
+    /** Верх подложки «при установке»: по числу строк её текста (нет поля — 478). */
+    static double onInstallTop(CardCanvas k, CardSpec c, double leftX) {
+        String inst = c.text("при_установке");
+        if (inst.isBlank()) {
+            return 486;
+        }
+        int n = onInstallLines(k, inst, leftX).size();
+        return 466 - n * 38 * 1.25 - 22;
+    }
+
+    static List<String> onInstallLines(CardCanvas k, String inst, double leftX) {
+        Font f = k.font("TekturNarrow-Medium.ttf", 38);
+        Font fb = k.font("TekturNarrow-Bold.ttf", 38);
+        double w = (762 - (leftX + 74)) * 2;
+        List<String> l = wrapGreedy(k, inst, f, fb, 38, w);
+        return balanced(k, inst, f, fb, 38, w, l.size());
+    }
+
+    /**
+     * ПОДЛОЖКА «ПРИ УСТАНОВКЕ» (дизайнер 13.10.2026): разовый эффект — внизу, на
+     * своей полосе цвета арсенала со значком слева; прочёл раз — дальше её не
+     * читают. Знак — иконка «при-установке» из экспорта (нет — №27).
+     */
+    static void onInstallPlate(CardCanvas k, String inst, double leftX, Theme th) {
+        java.awt.Graphics2D g = (java.awt.Graphics2D) k.g.create();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+            java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        List<String> lines = onInstallLines(k, inst, leftX);
+        double top = 466 - lines.size() * 38 * 1.25 - 22;
+        double x0 = (leftX - 12) * 2;
+        double x1 = 772 * 2;
+        double y0 = top * 2;
+        double y1 = 462 * 2;
+        java.awt.geom.RoundRectangle2D r = new java.awt.geom.RoundRectangle2D.Double(
+            x0, y0, x1 - x0, y1 - y0, 34, 34);
+        g.setPaint(new java.awt.GradientPaint((float) x0, (float) y0, new Color(86, 150, 166, 235),
+            (float) x0, (float) y1, new Color(46, 98, 114, 235)));
+        g.fill(r);
+        g.setStroke(new java.awt.BasicStroke(5f));
+        g.setColor(new Color(214, 236, 242));
+        g.draw(new java.awt.geom.RoundRectangle2D.Double(x0 + 6, y0 + 6, x1 - x0 - 12, y1 - y0 - 12,
+            26, 26));
+        g.setColor(new Color(28, 22, 20));
+        g.setStroke(new java.awt.BasicStroke(4f));
+        g.draw(r);
+        g.dispose();
+        String key = k.icon("при-установке") != null ? "при-установке" : "27";
+        double cy = (top + 462) / 2;
+        k.put(key, leftX + 30, cy, 62, 62);
+        Font f = k.font("TekturNarrow-Medium.ttf", 38);
+        Font fb = k.font("TekturNarrow-Bold.ttf", 38);
+        double y = top + 11 + 38 * 1.25 / 2;
+        for (String l : lines) {
+            k.line(l, f, fb, 757, y, 'r', CardCanvas.WHITE, new Color(28, 50, 58), 3,
+                (t, p) -> arsIcon(k, t, 38), 38, true);
+            y += 38 * 1.25;
         }
     }
 
