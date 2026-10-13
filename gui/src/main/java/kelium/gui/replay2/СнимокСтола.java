@@ -937,12 +937,20 @@ public final class СнимокСтола {
     private static void общийЗапасТ(Graphics2D g, double cx, double cy) {
         double шаг = px(74);
         double строка = px(66);
+        // ОБЪЁМНЫЕ КОМПОНЕНТЫ (рендер Leonardo, дизайнер 14.10.2026), если есть
+        if (объёмный(g, "монеты", cx - шаг, cy - строка / 2, 52)) {
+            объёмный(g, "кубики-келемий", cx, cy - строка / 2, 52);
+            объёмный(g, "кубики-боеприпасы", cx + шаг, cy - строка / 2, 52);
+            объёмный(g, "кубики-трофеи", cx - шаг / 2, cy + строка / 2, 52);
+            объёмный(g, "кубики-энергия", cx + шаг / 2, cy + строка / 2, 52);
+        } else {
         кучка(g, "COIN", cx - шаг, cy - строка / 2, 7, 15);
         кучка(g, "KELIUM", cx, cy - строка / 2, 8, 13);
         кучка(g, "AMMO", cx + шаг, cy - строка / 2, 8, 13);
         кучка(g, "TROPHY", cx - шаг / 2, cy + строка / 2, 7, 13);
         кубики(g, cx + шаг / 2, cy + строка / 2, 8, 13,
             new Color(0xF2C51F), new Color(0x8A6E0B));
+        }
         // Жетоны модулей хранилища — печатные, лежат тем же запасом.
         BufferedImage жет = Textures.module("mod_store_energy");
         if (жет != null) {
@@ -990,6 +998,10 @@ public final class СнимокСтола {
 
     /** Два мешочка модулей: красный для боя, синий для сборки. */
     private static void мешочкиТ(Graphics2D g, double cx, double cy) {
+        if (объёмный(g, "мешочек-красный", cx - px(46), cy, 84)) {
+            объёмный(g, "мешочек-синий", cx + px(46), cy, 84);
+            return;
+        }
         мешочек(g, cx - px(42), cy, new Color(0x9C2B21), new Color(0x63170F));
         мешочек(g, cx + px(42), cy, new Color(0x25538C), new Color(0x14304F));
     }
@@ -1068,7 +1080,31 @@ public final class СнимокСтола {
      * Фишка первого игрока — та же фигурка «#1», что в наборе иконок игры
      * (icons/first_player.png): её рисунок и лежит на столе (дизайнер 30.09.2026).
      */
+    /**
+     * ОБЪЁМНЫЙ КОМПОНЕНТ — вырезанный рендер (illustrations/компоненты-3д/имя.png,
+     * режет вырезать.py), шириной {@code ширинаМм} мм стола, с мягкой тенью.
+     * Нет файла — false, и рисуется прежний плоский вариант.
+     */
+    private static boolean объёмный(Graphics2D g, String имя, double cx, double cy, double ширинаМм) {
+        try {
+            java.nio.file.Path п = java.nio.file.Path.of("illustrations", "компоненты-3д", имя + ".png");
+            if (!java.nio.file.Files.exists(п)) {
+                return false;
+            }
+            BufferedImage im = javax.imageio.ImageIO.read(п.toFile());
+            int w = px(ширинаМм);
+            int h = (int) Math.round(w * im.getHeight() / (double) im.getWidth());
+            положить(g, im, (int) Math.round(cx - w / 2.0), (int) Math.round(cy - h / 2.0), w, h, 2.0);
+            return true;
+        } catch (java.io.IOException e) {
+            return false;
+        }
+    }
+
     private static void фишкаПервогоТ(Graphics2D g, double cx, double cy) {
+        if (объёмный(g, "фишка-первого", cx, cy, 62)) {
+            return;
+        }
         // крупная фишка — из экспорта дизайнера (338 точек), иконка игры всего 128
         BufferedImage фишка = null;
         try {
