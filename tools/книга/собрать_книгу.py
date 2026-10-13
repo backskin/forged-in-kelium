@@ -36,6 +36,7 @@ for г in главы:
     if г.startswith("00"):
         continue                      # план книги — не глава
     if г.startswith("03"):
+        шаг("make_spread.py")         # снимок стола с выносками (стол.png)
         шаг("make_podg_text.py")
     else:
         шаг("reflow.py", г)

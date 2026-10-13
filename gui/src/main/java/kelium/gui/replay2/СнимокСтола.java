@@ -717,7 +717,9 @@ public final class СнимокСтола {
         Graphics2D gg = холст.createGraphics();
         качество(gg);
         PrintedBoards.подписиЗапаса = false;    // на столе цифр «3 из 4» нет
+        PrintedBoards.стопкиЖетонов = true;     // запас войск — стопками жетонов
         лист.печатнаяСцепка(gg, 0, 0, ширина);
+        PrintedBoards.стопкиЖетонов = false;
         PrintedBoards.подписиЗапаса = true;
         gg.dispose();
 
@@ -1029,56 +1031,106 @@ public final class СнимокСтола {
     // ==================== тени ====================
 
     /**
-     * ПОЛОЖИТЬ КОМПОНЕНТ НА СТОЛ: сначала размытая тень по его силуэту, потом
+     * ПОЛОЖИТЬ КОМПОНЕНТ НА СТОЛ: сначала мягкая тень по его силуэту, потом
      * он сам. Без тени картон выглядит наклейкой, а не предметом.
+     *
+     * <p>Тень — настоящее размытие с полями вокруг силуэта (дизайнер 14.10.2026:
+     * прежняя тень, ужатая в 12 раз и растянутая обратно, давала по краям
+     * «кубические остроугольные уродства»).
      *
      * @param мм насколько мягкая и далёкая тень (миллиметры стола); 0 — без тени
      */
     private static void положить(Graphics2D g, BufferedImage art, int x, int y,
                                  int w, int h, double мм) {
         if (мм > 0) {
-            BufferedImage s = силуэт(art);
-            Graphics2D gg = (Graphics2D) g.create();
-            gg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            BufferedImage маска = new BufferedImage(Math.max(1, w), Math.max(1, h),
+                BufferedImage.TYPE_INT_ARGB);
+            Graphics2D m = маска.createGraphics();
+            m.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                 RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            gg.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
-            int р = px(мм);
-            gg.drawImage(s, x - р / 2, y + р / 3, w + р, h + р, null);
-            gg.dispose();
+            m.drawImage(art, 0, 0, w, h, null);
+            m.dispose();
+            мягкаяТень(g, маска, x, y, мм, 0.5f);
         }
         g.drawImage(art, x, y, w, h, null);
     }
 
+    /** Мягкая тень произвольной фигуры (мешочки, подставка фишки). */
     private static void тень(Graphics2D g, java.awt.Shape s, double мм) {
-        Graphics2D gg = (Graphics2D) g.create();
-        gg.translate(px(мм) * 0.4, px(мм) * 0.6);
-        gg.setColor(new Color(0, 0, 0, 90));
-        gg.fill(s);
-        gg.dispose();
+        java.awt.Rectangle b = s.getBounds();
+        BufferedImage маска = new BufferedImage(Math.max(1, b.width + 2), Math.max(1, b.height + 2),
+            BufferedImage.TYPE_INT_ARGB);
+        Graphics2D m = маска.createGraphics();
+        m.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        m.translate(-b.x + 1, -b.y + 1);
+        m.setColor(Color.BLACK);
+        m.fill(s);
+        m.dispose();
+        мягкаяТень(g, маска, b.x - 1, b.y - 1, мм, 0.45f);
     }
 
-    private static final java.util.Map<BufferedImage, BufferedImage> СИЛУЭТЫ =
-        new java.util.WeakHashMap<>();
-
     /**
-     * РАЗМЫТЫЙ ЧЁРНЫЙ СИЛУЭТ картинки. Размывается уменьшением и обратным
-     * растягиванием: свёртка по картинке в четыре мегапикселя стоила бы секунд,
-     * а разницы на мягкой тени не видно.
+     * Размытый чёрный силуэт маски, сдвинутый вниз-вправо. Размытие считается
+     * на копии вчетверо мельче (три прохода прямоугольного ядра — почти
+     * Гаусс), с полями на весь радиус, поэтому края круглые, а не лесенкой.
      */
-    private static BufferedImage силуэт(BufferedImage art) {
-        return СИЛУЭТЫ.computeIfAbsent(art, src -> {
-            int w = Math.max(4, src.getWidth() / 12);
-            int h = Math.max(4, src.getHeight() / 12);
-            BufferedImage мал = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = мал.createGraphics();
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g.drawImage(src, 0, 0, w, h, null);
-            g.setComposite(AlphaComposite.SrcIn);
-            g.setColor(Color.BLACK);
-            g.fillRect(0, 0, w, h);
-            g.dispose();
-            return мал;
-        });
+    private static void мягкаяТень(Graphics2D g, BufferedImage маска, int x, int y,
+                                   double мм, float сила) {
+        final int F = 4;
+        int р = Math.max(2, px(мм));
+        int П = (int) Math.ceil(р / (double) F) + 2;           // поле, мелкие точки
+        int w0 = Math.max(1, маска.getWidth() / F), h0 = Math.max(1, маска.getHeight() / F);
+        int W = w0 + 2 * П, H = h0 + 2 * П;
+        BufferedImage мал = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D gg = мал.createGraphics();
+        gg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        gg.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        gg.drawImage(маска, П, П, w0, h0, null);
+        gg.dispose();
+        int[] a = new int[W * H];
+        for (int yy = 0; yy < H; yy++) {
+            for (int xx = 0; xx < W; xx++) {
+                a[yy * W + xx] = мал.getRGB(xx, yy) >>> 24;
+            }
+        }
+        int радиус = Math.max(1, (int) Math.round(р / (double) F / 2.2));
+        for (int проход = 0; проход < 3; проход++) {
+            a = размыть(a, W, H, радиус, true);
+            a = размыть(a, W, H, радиус, false);
+        }
+        int[] пик = new int[W * H];
+        for (int k = 0; k < пик.length; k++) {
+            пик[k] = Math.min(255, Math.round(a[k] * сила)) << 24;
+        }
+        мал.setRGB(0, 0, W, H, пик, 0, W);
+        double кх = маска.getWidth() / (double) w0, ку = маска.getHeight() / (double) h0;
+        Graphics2D t = (Graphics2D) g.create();
+        t.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        int dx = (int) Math.round(р * 0.15), dy = (int) Math.round(р * 0.45);
+        t.drawImage(мал, (int) Math.round(x - П * кх) + dx, (int) Math.round(y - П * ку) + dy,
+            (int) Math.round(W * кх), (int) Math.round(H * ку), null);
+        t.dispose();
+    }
+
+    /** Один проход прямоугольного ядра по строкам (по) или столбцам. */
+    private static int[] размыть(int[] a, int W, int H, int r, boolean поСтрокам) {
+        int[] b = new int[a.length];
+        int n = поСтрокам ? H : W, len = поСтрокам ? W : H;
+        for (int i = 0; i < n; i++) {
+            int сумма = 0;
+            for (int k = -r; k <= r; k++) {
+                int j = Math.min(len - 1, Math.max(0, k));
+                сумма += a[поСтрокам ? i * W + j : j * W + i];
+            }
+            for (int j = 0; j < len; j++) {
+                b[поСтрокам ? i * W + j : j * W + i] = сумма / (2 * r + 1);
+                int прочь = Math.max(0, j - r), вновь = Math.min(len - 1, j + r + 1);
+                сумма += a[поСтрокам ? i * W + вновь : вновь * W + i]
+                    - a[поСтрокам ? i * W + прочь : прочь * W + i];
+            }
+        }
+        return b;
     }
 }

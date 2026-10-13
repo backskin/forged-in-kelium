@@ -592,6 +592,48 @@ final class PrintedBoards {
         });
     }
 
+    /**
+     * СТОПКИ ЖЕТОНОВ ВМЕСТО ЗНАЧКОВ — только для снимка стола в книге правил
+     * (дизайнер 14.10.2026: «стопарики по 4 жетона»). В игре выключено.
+     */
+    static boolean стопкиЖетонов = false;
+
+    /** Стопка из {@code n} жетонов: каждый следующий выше на толщину картона,
+     *  под каждым — тёмный торец. Возвращает занятый прямоугольник. */
+    private static Rectangle стопкаСТорцом(Graphics2D g, BufferedImage tex, int x, int y,
+                                           int colW, int height, int n) {
+        n = Math.max(1, n);
+        double доля = tex.getWidth() / (double) tex.getHeight();
+        double шаг = 0.10;                       // подъём на жетон, доли высоты жетона
+        double торец = 0.07;                     // толщина картона, доли высоты
+        int th = (int) Math.floor(height / (1 + шаг * (n - 1) + торец));
+        int tw = (int) Math.round(th * доля);
+        if (tw > colW * 0.9) {
+            tw = (int) (colW * 0.9);
+            th = (int) Math.round(tw / доля);
+        }
+        int низ = y + height - (int) Math.round(th * торец);
+        int left = x + (colW - tw) / 2;
+        BufferedImage тёмный = new BufferedImage(tex.getWidth(), tex.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D d = тёмный.createGraphics();
+        d.drawImage(tex, 0, 0, null);
+        d.setComposite(java.awt.AlphaComposite.SrcIn);
+        d.setColor(new Color(40, 34, 28));
+        d.fillRect(0, 0, tex.getWidth(), tex.getHeight());
+        d.dispose();
+        int верх = низ;
+        for (int j = 0; j < n; j++) {
+            int ty = низ - th - (int) Math.round(j * th * шаг);
+            int тол = (int) Math.max(1, Math.round(th * торец));
+            for (int t = тол; t >= 1; t--) {
+                kelium.report.Mips.draw(g, тёмный, left, ty + t, tw, th);
+            }
+            kelium.report.Mips.draw(g, tex, left, ty, tw, th);
+            верх = ty;
+        }
+        return new Rectangle(left, верх, tw, низ - верх + (int) Math.round(th * торец));
+    }
+
     /** Значок рода и число жетонов в запасе — одна колонка запаса на столе. */
     private static Rectangle значокЗапаса(Graphics2D g, String род, int seat, int x, int y,
                                      int colW, int height, int вЗапасе) {
@@ -642,6 +684,12 @@ final class PrintedBoards {
             int строка = подписиЗапаса ? g.getFontMetrics().getHeight() : 0;
             int картинкаH = Math.max(8, height - строка * 2 - 2);
             BufferedImage tex = Textures.unit(роды[i], seat);
+            if (!подписиЗапаса && стопкиЖетонов && tex != null) {
+                // КНИГА (дизайнер 14.10.2026): на снимке стола — настоящие
+                // стопки жетонов рода, а не значок с числом.
+                hit("unit:" + роды[i], стопкаСТорцом(g, tex, x + i * colW, y, colW, height, вЗапасе));
+                continue;
+            }
             if (!подписиЗапаса) {
                 // СТОЛ (решение дизайнера 27.09.2026): вместо стопки жетонов —
                 // печатная иконка жетона рода, перекрашенная в цвет фракции, и
