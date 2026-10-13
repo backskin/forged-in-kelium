@@ -130,9 +130,7 @@ CSS = r"""
   }
 
   /* ---- кайма страницы ---- */
-  /* БЕЗ РАМКИ (дизайнер 14.10.2026): кайма страницы скрыта; вуаль под текстом остаётся */
-  .кайма { display: none !important; }
-  .кайма-было { position: absolute; inset: 0; width: 220mm; height: 220mm; z-index: 5; pointer-events: none; overflow: visible; }
+  .кайма { position: absolute; inset: 0; width: 220mm; height: 220mm; z-index: 5; pointer-events: none; overflow: visible; }
   .кайма .к-осн { fill: none; stroke: var(--чернила); stroke-width: .5; stroke-linejoin: round; }
   .кайма .к-тонк { fill: none; stroke: var(--чернила); stroke-width: .16; opacity: .7; }
   .кайма .к-риски { fill: none; stroke: var(--чернила); stroke-width: .25; }
