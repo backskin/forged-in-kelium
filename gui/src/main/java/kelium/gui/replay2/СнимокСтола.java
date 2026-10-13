@@ -237,7 +237,8 @@ public final class СнимокСтола {
         double мешX = рынок[0] + рынок[2] * 1.45;
         double мешY = рынок[1] + рынок[3] + px(150);
         мешочкиТ(g, мешX, мешY);
-        супергЗадания(g, рынок[0] + рынок[2] + px(30), рынок[1] - px(70));
+        // справа от поля над планшетом рынка: в середине разворота сгиб
+        супергЗадания(g, px(1130), px(318));
         якорьТ("9", запX, запY);
         якорьТ("8", мешX, мешY);
 
@@ -408,6 +409,7 @@ public final class СнимокСтола {
         полеРазмер = size;
         полеDX = dx;
         полеDY = dy;
+        обвестиЗарождения(g, st, size, dx, dy);
         крайПоля(st, size);
         // ШАГ 1 «ПОЛЕ» — В СЕРЕДИНУ ПУСТОГО ГЕКСА у прежней точки: на стыке
         // зарождения и нейтрала выноска читалась как выноска к постройке
@@ -623,7 +625,7 @@ public final class СнимокСтола {
     private static void колодыЗаданий(Graphics2D g, double cx, double cy) {
         колодыТ(g, cx, cy, List.of(
             new Колода("deck_objectives", КАРТА_ЗАДАНИЕ_Ш),
-            new Колода("deck_objectives_start", КАРТА_ЗАДАНИЕ_Ш)));
+            new Колода("deck_objectives_start", КАРТА_ЗАДАНИЕ_Ш)), false, true);
     }
 
     /**
@@ -632,11 +634,15 @@ public final class СнимокСтола {
      * берут.
      */
     private static void супергЗадания(Graphics2D g, double cx, double cy) {
-        колодыТ(g, cx, cy, List.of(
+        // НАБОК И КВАДРАТОМ 2×2 (дизайнер 14.10.2026): колода и три открытые
+        // карты лежат поперёк, их читают все игроки за столом
+        double ряд = КАРТА_ЗАДАНИЕ_Ш + 14;
+        колодыТ(g, cx, cy - px(ряд / 2), List.of(
             new Колода("deck_super_objectives", КАРТА_ЗАДАНИЕ_Ш),
-            new Колода("objective_super/s9_03", КАРТА_ЗАДАНИЕ_Ш),
+            new Колода("objective_super/s9_03", КАРТА_ЗАДАНИЕ_Ш)), true, true);
+        колодыТ(g, cx, cy + px(ряд / 2), List.of(
             new Колода("objective_super/s9_08", КАРТА_ЗАДАНИЕ_Ш),
-            new Колода("objective_super/s9_11", КАРТА_ЗАДАНИЕ_Ш)), true);
+            new Колода("objective_super/s9_11", КАРТА_ЗАДАНИЕ_Ш)), true, true);
     }
 
     /**
@@ -663,14 +669,32 @@ public final class СнимокСтола {
     /** {@code открытые} — после первой колоды идут одиночные карты лицом вверх. */
     private static void колодыТ(Graphics2D g, double cx, double cy, List<Колода> список,
                                 boolean открытые) {
+        колодыТ(g, cx, cy, список, открытые, false);
+    }
+
+    /**
+     * {@code набок} — карты лежат повёрнутыми на 90° (дизайнер 14.10.2026:
+     * общие колоды заданий и супер-задания — набок, чтобы их видели все
+     * игроки за столом, а не только сидящий снизу).
+     */
+    private static void колодыТ(Graphics2D g, double cx, double cy, List<Колода> список,
+                                boolean открытые, boolean набок) {
         double зазор = 16;
         double всего = -зазор;
         List<BufferedImage> арт = new ArrayList<>();
+        java.util.List<Double> ширины = new ArrayList<>();
         for (Колода к : список) {
             BufferedImage a = Textures.card(к.тег());
+            if (a != null && набок) {
+                a = набок(a);
+            }
             арт.add(a);
+            // повёрнутая карта занимает по ширине свою прежнюю высоту
+            double ш = a == null ? 0 : (набок ? к.ширинаМм() * a.getWidth() / (double) a.getHeight()
+                : к.ширинаМм());
+            ширины.add(ш);
             if (a != null) {
-                всего += к.ширинаМм() + зазор;
+                всего += ш + зазор;
             }
         }
         double x = cx - px(всего) / 2.0;
@@ -680,12 +704,52 @@ public final class СнимокСтола {
                 continue;      // печати ещё нет — на столе пусто, врать не будем
             }
             Колода к = список.get(i);
-            int w = px(к.ширинаМм());
+            int w = px(ширины.get(i));
             int h = (int) Math.round(w * a.getHeight() / (double) a.getWidth());
             стопка(g, a, (int) Math.round(x), (int) Math.round(cy) - h / 2, w, h,
-                открытые && i > 0 ? 1 : 4);
-            x += px(к.ширинаМм() + зазор);
+                открытые && (i > 0 || !к.тег().startsWith("deck_")) ? 1 : 4);
+            x += px(ширины.get(i) + зазор);
         }
+    }
+
+    /** Карта, повёрнутая на 90° против часовой стрелки. */
+    private static BufferedImage набок(BufferedImage a) {
+        BufferedImage r = new BufferedImage(a.getHeight(), a.getWidth(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = r.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.translate(0, a.getWidth());
+        g.rotate(-Math.PI / 2);
+        g.drawImage(a, 0, 0, null);
+        g.dispose();
+        return r;
+    }
+
+    /**
+     * ОБВОДКА ТАЙЛОВ ЗАРОЖДЕНИЯ (дизайнер 14.10.2026: «их нихуя не видно»):
+     * яркий зелёный контур келемия по краю гекса со светлым ореолом.
+     */
+    private static void обвестиЗарождения(Graphics2D g, GameState st, double size,
+                                          double dx, double dy) {
+        Graphics2D t = (Graphics2D) g.create();
+        качество(t);
+        for (Hex hex : st.field.hexes.values()) {
+            int[] qr = FieldGeometry.parseQR(hex.id);
+            if (qr == null || !hex.hasSpawnTile()) {
+                continue;
+            }
+            double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
+            java.awt.geom.Path2D.Double путь = FieldGeometry.roundedHexPath(c[0] + dx, c[1] + dy,
+                size * 0.97, 0.08);
+            t.setStroke(new BasicStroke((float) (size * 0.13), BasicStroke.CAP_ROUND,
+                BasicStroke.JOIN_ROUND));
+            t.setColor(new Color(255, 255, 255, 200));
+            t.draw(путь);
+            t.setStroke(new BasicStroke((float) (size * 0.07), BasicStroke.CAP_ROUND,
+                BasicStroke.JOIN_ROUND));
+            t.setColor(new Color(40, 170, 60));
+            t.draw(путь);
+        }
+        t.dispose();
     }
 
     /** Стопка карт: нижние листы выглядывают на волосок. */
