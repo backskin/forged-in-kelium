@@ -41,6 +41,13 @@ def фон(номер):
 СТОЛ = os.path.join(D, "стол-коробка-4.png")
 АРТ = фон(38)                     # харвестер в поле келемия: сцена читается сразу
 ИКОНКИ = os.path.join(КОРЕНЬ, "rules", "иконки-экспорт")
+ПЕРС = os.path.join(КОРЕНЬ, "illustrations", "персонажи-png")   # вырезаны из белого фона: вырезать.py
+# ЛИЦА НАЦИЙ (дизайнер 14.10.2026): шеренгой по низу арта, все одного масштаба
+# (общий холст 1152×1728, одна высота), ровным шагом; стол ниже их не задевает
+персонажи = ["красный", "синий", "зелёный", "жёлтый"]
+перс = "".join(
+    f'<img class="перс" src="{url(os.path.join(ПЕРС, ф + ".png"))}" style="left:{1130 + i * 425}px">'
+    for i, ф in enumerate(персонажи))
 
 рука = ["синий — ОСВОИТЬ", "синий — НАСТУПАТЬ", "синий — ИССЛЕДОВАТЬ", "синий — КОНТРОЛИРОВАТЬ"]
 карты = "".join(
@@ -72,21 +79,27 @@ html, body {{ margin: 0; width: 3000px; height: 3000px; overflow: hidden; backgr
     radial-gradient(ellipse at 60% 20%, #24302a 0%, #1b2420 55%, #151a18 100%); }}
 .лого {{ position: absolute; left: 140px; top: 90px; width: 1000px;
   filter: drop-shadow(0 14px 24px rgba(0,0,0,.8)); }}
-.тексты {{ position: absolute; left: 160px; top: 520px; width: 1120px; font-size: 44px; line-height: 1.4; }}
+.тексты {{ position: absolute; left: 160px; top: 500px; width: 960px; font-size: 44px; line-height: 1.4; }}
+.черты {{ position: absolute; left: 160px; top: 1330px; width: 880px; display: flex; flex-direction: column; gap: 34px; }}
+.черты div {{ font: 400 38px/1.32 N; color: #d8d2c0; padding-left: 34px; border-left: 6px solid #8fe36b; }}
+.черты b {{ display: block; font: 900 40px T; color: #fff; margin-bottom: 6px; }}
 .тексты p {{ margin: 0 0 30px; }}
 .тексты .мир {{ font-size: 50px; color: #ffffff; font-weight: 700; line-height: 1.3; }}
 .тексты b {{ color: #8fe36b; }}
-.стол-обёртка {{ position: absolute; left: 760px; top: 930px; width: 2450px; height: 1560px; perspective: 3000px; }}
+.стол-обёртка {{ position: absolute; left: 1060px; top: 1240px; width: 1940px; height: 1240px; perspective: 3000px; }}
 .стол {{ position: absolute; inset: 0; background: url("{url(СТОЛ)}") center / contain no-repeat;
-  transform: rotateX(44deg) rotateZ(-6deg); transform-origin: 50% 55%;
+  transform: rotateX(30deg); transform-origin: 50% 50%;
   filter: drop-shadow(0 50px 40px rgba(0,0,0,.7)); }}
-.рука {{ position: absolute; left: 150px; top: 1640px; width: 900px; height: 820px; }}
+.рука {{ position: absolute; z-index: 5; left: 1000px; top: 1720px; width: 900px; height: 820px; }}
 .карта {{ position: absolute; left: 300px; top: 60px; width: 330px; border-radius: 16px;
   box-shadow: 0 0 0 4px #2a2318, 0 26px 40px rgba(0,0,0,.75); transform-origin: 50% 170%; }}
 .подпись {{ position: absolute; font: 900 40px T; letter-spacing: .06em; text-transform: uppercase; color: #8fe36b;
   text-shadow: 0 3px 10px rgba(0,0,0,.9); }}
-.подпись.р {{ left: 200px; top: 1560px; }}
-.полоса {{ position: absolute; left: 0; right: 0; top: 2420px; height: 330px; padding: 0 120px;
+.подпись {{ z-index: 7; }}
+.подпись.р {{ left: 1040px; top: 1630px; padding: 10px 26px; border-radius: 12px; background: rgba(15,19,18,.88); }}
+.перс {{ position: absolute; top: 440px; width: 570px; height: 855px; z-index: 3;
+  -webkit-mask-image: linear-gradient(180deg, #000 82%, transparent 100%); filter: drop-shadow(0 20px 30px rgba(0,0,0,.75)); }}
+.полоса {{ z-index: 6; position: absolute; left: 0; right: 0; top: 2420px; height: 330px; padding: 0 120px;
   box-sizing: border-box; display: flex; gap: 24px; align-items: center;
   background: linear-gradient(180deg, rgba(10,13,12,.0), rgba(10,13,12,.86) 18%, rgba(10,13,12,.86)); }}
 .подпись.п {{ left: 160px; top: 2440px; }}
@@ -107,19 +120,24 @@ html, body {{ margin: 0; width: 3000px; height: 3000px; overflow: hidden; backgr
 </style></head><body><div class="з">
 <div class="сукно"></div><div class="арт"></div>
 <div class="стол-обёртка"><div class="стол"></div></div>
+{перс}
 <img class="лого" src="{url(ЛОГО)}">
 <div class="тексты">
-<p class="мир">Келемий прорастает из земли — зелёный кристалл, за который покупают технологии.
-Четыре нации спорят за одно поле. Кристалла хватит не всем.</p>
-<p>В начале круга все разом выбирают карту приказа, потом по очереди вскрывают и сразу ходят.
-Действий пять, и в каждом <b>выбор из двух</b>: добыть келемий или поставить новый добытчик,
-двинуть войска или начать бой, торговать на Рынке или вкладываться в Науку. За разбитые жетоны
-врага вы получаете трофеи — ими же платите за технологии.</p>
-<p>Партия кончается, когда пустеет колода рынка или поле. Побеждает тот, у кого больше очков,
-— или тот, кто раньше займёт вершины всех трёх треков технологий.</p>
+<p class="мир">Келемий — кристалл, который прорастает из земли. Четыре нации — с Венеры,
+Марса, Юпитера и Земли — воюют за него.</p>
+<p>Стройте базу, добывайте келемий, нанимайте войска, уничтожайте чужие здания
+и вкладывайте добытое в технологии.</p>
 </div>
-<div class="подпись р">Ваш ход — одна карта приказа</div>
-<div class="рука">{карты}</div>
+<div class="черты">
+<div><b>Приказ на каждый ход</b>В начале круга все разом выбирают карту приказа,
+потом по очереди вскрывают и сразу ходят.</div>
+<div><b>Война приносит трофеи</b>За уничтоженные жетоны соперников вы получаете
+трофеи — ими платят в Науке.</div>
+<div><b>Длину партии выбираете вы</b>От 4 до 10 раундов: сколько карт в колоде
+рынка, столько раундов.</div>
+<div><b>Две дороги к победе</b>Больше всех очков в конце — или сразу,
+заняв вершины всех трёх треков технологий.</div>
+</div>
 <div class="полоса">{полоса}</div>
 <div class="подпись п">Пять действий — в каждом выбор из двух</div>
 <div class="низ">
