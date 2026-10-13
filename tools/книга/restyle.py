@@ -285,7 +285,7 @@ CSS = r"""
   .подготовка .схема { position: absolute; inset: 0; width: 220mm; height: 220mm; z-index: 1; }
   .подготовка .столбец { position: absolute; top: 13mm; bottom: 14mm; width: 80mm; z-index: 3; }
   .стр.левая-подг .столбец { left: 12mm; top: 29mm; }
-  .стр.правая-подг .столбец { right: 11mm; width: 80mm; }
+  .стр.правая-подг .столбец { right: 11mm; width: 80mm; top: 10.5mm; }  /* выше: совет не лезет на рамку (дизайнер 14.10.2026) */
   .стр.левая-подг .глава { position: absolute; left: 13mm; right: 13mm; top: 12mm; margin: 0; z-index: 3; }
   .столбец .блок { margin: 0 0 1mm; padding: .8mm 1.8mm; }
   .столбец h3 { margin: 0 0 1mm; }
@@ -450,7 +450,7 @@ CSS = r"""
   .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
     column-gap: 5mm; align-items: start; }
   .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
-  .блок.надвое:has(.широкий) { grid-template-columns: 1fr 1fr; }
+  .блок.надвое:has(.широкий) { grid-template-columns: 1.6fr 1fr;  /* рынок крупно, текст уже (дизайнер 14.10.2026) */ }
   .блок.надвое:has(.шире) { grid-template-columns: 1.45fr 1fr; }
   .блок.в-две { column-count: 2; column-gap: 7mm; }
   .блок.в-две > h2 { column-span: all; }
@@ -564,6 +564,18 @@ CSS = r"""
     background-size: ШТРИХ_РАЗМЕР, МОЗ_РАЗМЕР; }
   .блок, .пример::before, .набор, .фаза, .фазы > div, .оглавление, table {
     background-image: ШТРИХ !important; background-size: ШТРИХ_РАЗМЕР !important; }
+
+  /* БЕЗ ПОДЛОЖЕК (дизайнер 14.10.2026: «бежевый на бежевом — лишняя
+     подложка»). Обычный блок — без заливки, канта и штриховки; цветные
+     (примеры, советы) остаются. Разделитель — тонкая линия, и только между
+     двумя блоками подряд: под заголовком главы или раздела его нет. */
+  .стр:not(.задняя) .блок:not(.пример-блок) {
+    background: none !important; background-image: none !important;
+    outline: none !important; box-shadow: none !important;
+    padding-left: 0; padding-right: 0; padding-bottom: 0; padding-top: 0; }
+  .стр:not(.задняя) :is(.блок, .рисунок-во-всю) + .блок:not(.пример-блок):not(.карточка) {
+    border-top: .35mm solid var(--кант); padding-top: 2.6mm; }
+  .столбец .блок:not(.пример-блок) + .блок { border-top: .3mm solid var(--кант); padding-top: 1.6mm; }
 """
 
 
