@@ -581,31 +581,8 @@ public final class СнимокСтола {
         int y = (int) Math.round(цель[1] - НАУКА_ПРАВАЯ[1] * s);
         наука = new int[]{x, y, w, h};
         положить(g, art, x, y, w, h, 2.2);
-        // Карты супер-арсенала на вершинах треков — по якорям печати.
-        BoardAnchors.Science sci = BoardAnchors.science();
-        if (sci == null) {
-            return;
-        }
-        // Лицом вверх, по одной случайной карте на трек (подготовка, шаг 4).
-        String[] лица = {"arsenal_super/sa3_02", "arsenal_super/sa4_06", "arsenal_super/sa4_09"};
-        int номер = 0;
-        double sk = w / (double) sci.artW();
-        for (var e : sci.tracks().entrySet()) {
-            var t = e.getValue();
-            BufferedImage карта = Textures.card(лица[номер++ % лица.length], "deck_super_arsenal");
-            if (карта == null) {
-                continue;
-            }
-            // В НАСТОЯЩИЙ РАЗМЕР КАРТЫ (дизайнер 14.10.2026): ячейка на печати —
-            // лишь значок места, а карта на столе в разы крупнее и лежит поверх
-            // вершины трека. Центр карты — центр ячейки.
-            double цx = x + (t.cx() + t.cw() / 2.0) * sk;
-            double цy = y + (t.cy() + t.ch() / 2.0) * sk;
-            int кw = px(КАРТА_АРСЕНАЛ_Ш);
-            int кh = (int) Math.round(кw * карта.getHeight() / (double) карта.getWidth());
-            положить(g, карта, (int) Math.round(цx - кw / 2.0), (int) Math.round(цy - кh / 2.0),
-                кw, кh, 1.6);
-        }
+        // Карт супер-арсенала на треках НЕТ: это закрытая колода рядом с
+        // колодой арсенала (дизайнер 14.10.2026).
     }
 
     private static void планшетРынка(Graphics2D g, GameState st) {
@@ -663,13 +640,14 @@ public final class СнимокСтола {
     }
 
     /**
-     * Колоды арсенала и контейнеров — «рядом с планшетом науки» (подготовка,
-     * шаг 5). Колоды начального арсенала нет: после раздачи остаток уходит
+     * Колоды арсенала, супер-арсенала и контейнеров — «рядом с планшетом
+     * науки» (подготовка, шаги 4–5). Колоды начального арсенала нет: после раздачи остаток уходит
      * в коробку (дизайнер 14.10.2026).
      */
     private static void колодыАрсенала(Graphics2D g, double cx, double cy) {
         колодыТ(g, cx, cy, List.of(
             new Колода("deck_arsenal", КАРТА_АРСЕНАЛ_Ш),
+            new Колода("deck_super_arsenal", КАРТА_АРСЕНАЛ_Ш),
             new Колода("deck_containers", КАРТА_КОНТЕЙНЕР_Ш)));
     }
 

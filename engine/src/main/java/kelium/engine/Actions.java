@@ -4431,9 +4431,14 @@ public final class Actions {
                     topPrizeWithoutSuperArsenal(player, kind, agent);
                     return;
                 }
-                // Вершина трека: забрать выложенную В ОТКРЫТУЮ карту супер-арсенала
-                // этого трека (одна на трек за партию). Супер-войско сразу в запас.
+                // Вершина трека: 2 верхние карты закрытой колоды супер-арсенала,
+                // одну оставить, вторую под низ колоды (дизайнер 14.10.2026).
+                // Старые записи партий, где карта лежала на треке открыто, —
+                // по-прежнему через superArsenalOffer. Супер-войско сразу в запас.
                 String cid = state.superArsenalOffer.remove(track);
+                if (cid == null) {
+                    cid = суперАрсеналДваОдна(state, player, agent);
+                }
                 if (cid != null) {
                     player.superArsenalCards.add(cid);
                     Map<String, Object> card = cfg.content.get("super_arsenal").find(cid);
@@ -5071,6 +5076,45 @@ public final class Actions {
      * из колоды не тянутся вовсе. Колода и сброс исчерпаны — игрок не получает
      * ничего: это законный конец колоды, а не ошибка.
      */
+    /**
+     * ВЕРШИНА ТРЕКА — КАРТА СУПЕР-АРСЕНАЛА (дизайнер 14.10.2026): две верхние
+     * карты закрытой колоды, одну игрок оставляет, вторая уходит под низ.
+     * Колода кончилась — карты нет.
+     */
+    static String суперАрсеналДваОдна(GameState state, PlayerState player, Agent agent) {
+        kelium.core.Deck deck = state.decks.get("super_arsenal");
+        if (deck == null) {
+            return null;
+        }
+        List<String> пара = new ArrayList<>();
+        for (int i = 0; i < 2 && !deck.drawPile.isEmpty(); i++) {
+            пара.add(deck.drawPile.remove(deck.drawPile.size() - 1));
+        }
+        if (пара.isEmpty()) {
+            return null;
+        }
+        String taken = пара.get(0);
+        if (пара.size() > 1) {
+            List<Choice> opts = new ArrayList<>();
+            for (String cid : пара) {
+                Map<String, Object> card = Ctx.cards(state, "super_arsenal").find(cid);
+                String label = card == null ? cid : String.valueOf(card.getOrDefault("name", cid));
+                opts.add(new Choice("super_arsenal_draw2", cid, label));
+            }
+            Choice pick = agent == null ? opts.get(0)
+                : agent.choose(state, opts, Map.of("kind", "super_arsenal_draw2"));
+            if (pick != null && pick.payload() instanceof String c && пара.contains(c)) {
+                taken = c;
+            }
+            for (String cid : пара) {
+                if (!cid.equals(taken)) {
+                    deck.putUnder(cid);
+                }
+            }
+        }
+        return taken;
+    }
+
     static String takeFromArsenalDisplay(GameState state, PlayerState player, Agent agent) {
         // ЯЧЕЙКИ ПОД ПЛАНШЕТОМ ЗАНЯТЫ — брать некуда, колоду не трогаем.
         if (!kelium.engine.Storage.arsenalCellFree(state, player)) {

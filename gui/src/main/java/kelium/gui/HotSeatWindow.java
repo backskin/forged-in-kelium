@@ -3783,6 +3783,7 @@ public final class HotSeatWindow {
         Map.entry("keep_objective", "какое задание оставить"),
         Map.entry("objective_keep", "какое задание оставить"),
         Map.entry("arsenal_draw2", "какую карту арсенала оставить"),
+        Map.entry("super_arsenal_draw2", "какую карту супер-арсенала оставить"),
         Map.entry("mass_open", "вскрыть контейнер или карту арсенала"),
         Map.entry("cu_hex", "где поставить центр управления"),
         Map.entry("cu_sides", "поворот центра управления"),

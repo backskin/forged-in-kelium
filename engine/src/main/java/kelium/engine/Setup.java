@@ -902,17 +902,18 @@ public final class Setup {
             }
         }
 
-        // Супер-арсенал (треки 2.0): из 9 карт выложить В ОТКРЫТУЮ по одной на
-        // вершину каждого трека; остальные — «в коробку» (не участвуют).
+        // СУПЕР-АРСЕНАЛ — ЗАКРЫТАЯ КОЛОДА (дизайнер 14.10.2026): открытых карт
+        // на вершинах треков нет. Кто встал на вершину, берёт 2 верхние карты,
+        // одну оставляет, вторую кладёт под низ колоды (Actions, ветка
+        // super_arsenal_card). Прежде на подготовке по карте выкладывали
+        // в открытую на каждый трек — superArsenalOffer остаётся пустым и
+        // читается только старыми записями партий.
         // ДОПОЛНЕНИЕ: выключается тумблером, и тогда вершина трека даёт другой
         // приз (см. Actions, ветка super_arsenal_card).
         if (expansionOn(ruleset, "super_arsenal")) {
             try {
-                List<String> saIds = new ArrayList<>(content.get("super_arsenal").ids());
-                Collections.shuffle(saIds, rng);
-                for (int i = 0; i < tech.tracks.size() && i < saIds.size(); i++) {
-                    s.superArsenalOffer.put(tech.tracks.get(i), saIds.get(i));
-                }
+                s.decks.put("super_arsenal", Deck.fromIds("super_arsenal",
+                    new ArrayList<>(content.get("super_arsenal").ids()), rng));
             } catch (RuntimeException e) {
                 // контента может не быть в старых версиях правил — играем без вершин
             }

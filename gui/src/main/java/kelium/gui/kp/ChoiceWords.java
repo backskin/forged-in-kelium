@@ -269,7 +269,7 @@ public final class ChoiceWords {
                     return cap(tokenRu(t)) + " игрока " + (t.owner() + 1);
                 }
             }
-            case "keep_objective", "objective_keep", "arsenal_draw2", "module_keep" -> {
+            case "keep_objective", "objective_keep", "arsenal_draw2", "super_arsenal_draw2", "module_keep" -> {
                 if (p instanceof String id) {
                     return "Оставить «" + cardName.apply(id) + "»";
                 }
