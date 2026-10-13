@@ -1084,7 +1084,7 @@ public final class CardRender {
         List<String> right = CardAssets.tokens(c.text("верх_справа"));
         double rightStart = 785;
         if (!right.isEmpty()) {
-            double big = right.size() == 1 ? 96 : 80;
+            double big = right.size() == 1 ? 96 : 90;
             rightStart = chips(k, right, 775, 62, 'r', big) - 10;
         }
         double width = centred ? 2 * Math.min(rightStart - 420, 420 - 222) : rightStart - leftEnd;
@@ -1121,12 +1121,28 @@ public final class CardRender {
      * Связка фишек в строку: иконки высотой {@code size}, слова — белые с тёмной
      * обводкой. Возвращает дальний край (пиксели карты).
      */
+    /**
+     * РЯД ФИШЕК ВЕРХА (дизайнер 13.10.2026): иконки ресурсов, идущие подряд,
+     * ложатся ВНАХЛЁСТ — теснее и крупнее; знак «+» перед иконками — маленький
+     * белый плюс с жирной чёрной обводкой поверх первой иконки (места в ряду не
+     * занимает): «получи».
+     */
     static double chips(CardCanvas k, List<String> toks, double x, double y, char ax,
                         double size) {
         Font fz = k.font("TekturNarrow-Bold.ttf", 40);
         List<Object> made = new ArrayList<>();
         List<Double> ws = new ArrayList<>();
+        List<Boolean> plus = new ArrayList<>();
+        boolean pending = false;
+        List<String> kept = new ArrayList<>();
         for (String t : toks) {
+            if ("+".equals(t)) {
+                pending = true;
+                continue;
+            }
+            kept.add(t);
+            plus.add(pending && t.startsWith("{"));
+            pending = false;
             if (t.startsWith("{")) {
                 BufferedImage ic = k.icon(t.substring(1, t.length() - 1));
                 BufferedImage f = ic == null ? null : k.a.fitIcon(t, size * 2 * WIDE, size * 2);
@@ -1140,23 +1156,65 @@ public final class CardRender {
                 ws.add(k.len(t, fz) + 8);
             }
         }
-        double total = ws.stream().mapToDouble(Double::doubleValue).sum()
-            + (6 * 2 + k.extraGap() * 2) * Math.max(0, toks.size() - 1);
+        double gap = 12 + k.extraGap() * 2;
+        double[] step = new double[kept.size()];
+        double total = 0;
+        for (int i = 0; i < kept.size(); i++) {
+            boolean overlap = i + 1 < kept.size() && made.get(i) instanceof BufferedImage
+                && made.get(i + 1) instanceof BufferedImage;
+            step[i] = i + 1 < kept.size() ? (overlap ? ws.get(i) * 0.70 : ws.get(i) + gap) : ws.get(i);
+            total += step[i];
+        }
         double cx = ax == 'r' ? x * 2 - total : x * 2;
-        for (int i = 0; i < toks.size(); i++) {
+        double[] xs = new double[kept.size()];
+        for (int i = 0; i < kept.size(); i++) {
+            xs[i] = cx;
+            cx += step[i];
+        }
+        // справа налево: левая иконка ложится поверх правой
+        for (int i = kept.size() - 1; i >= 0; i--) {
             Object o = made.get(i);
+            double xi = xs[i];
             if (o instanceof BufferedImage f) {
-                k.g.drawImage(f, (int) cx, (int) (y * 2 - f.getHeight() / 2.0), null);
+                k.g.drawImage(f, (int) xi, (int) (y * 2 - f.getHeight() / 2.0), null);
             } else if (o instanceof String s && isArrow(s)) {
-                arrow(k, (cx + ws.get(i) / 2) / 2, y, size, new Color(110, 70, 70));
+                arrow(k, (xi + ws.get(i) / 2) / 2, y, size, new Color(110, 70, 70));
             } else if (o instanceof String s) {
-                k.text(s, fz, cx + 4, y * 2, 'l', CardCanvas.WHITE, DARK, 4 * 2);
+                k.text(s, fz, xi + 4, y * 2, 'l', CardCanvas.WHITE, DARK, 4 * 2);
             } else {
-                k.missing((cx + ws.get(i) / 2) / 2, y, size, size, toks.get(i));
+                k.missing((xi + ws.get(i) / 2) / 2, y, size, size, kept.get(i));
             }
-            cx += ws.get(i) + 12 + k.extraGap() * 2;
+        }
+        for (int i = 0; i < kept.size(); i++) {
+            if (plus.get(i)) {
+                double h = size * 2;
+                plusBadge(k, xs[i] + h * 0.10, y * 2 - h * 0.30, h * 0.46);
+            }
         }
         return ax == 'r' ? (x * 2 - total) / 2 : (x * 2 + total) / 2;
+    }
+
+    /** Маленький плюс «получи»: белый, острые углы, жирная чёрная обводка. */
+    static void plusBadge(CardCanvas k, double cx, double cy, double d) {
+        java.awt.Graphics2D g = (java.awt.Graphics2D) k.g.create();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+            java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        double L = d / 2, T = d * 0.17;
+        java.awt.geom.Path2D p = new java.awt.geom.Path2D.Double();
+        double[][] pt = {{-T, -L}, {T, -L}, {T, -T}, {L, -T}, {L, T}, {T, T}, {T, L}, {-T, L},
+            {-T, T}, {-L, T}, {-L, -T}, {-T, -T}};
+        p.moveTo(cx + pt[0][0], cy + pt[0][1]);
+        for (int i = 1; i < pt.length; i++) {
+            p.lineTo(cx + pt[i][0], cy + pt[i][1]);
+        }
+        p.closePath();
+        g.setStroke(new java.awt.BasicStroke((float) (d * 0.20), java.awt.BasicStroke.CAP_BUTT,
+            java.awt.BasicStroke.JOIN_MITER, 10f));
+        g.setColor(new Color(28, 22, 20));
+        g.draw(p);
+        g.setColor(Color.WHITE);
+        g.fill(p);
+        g.dispose();
     }
 
     /** Каким кеглем встанет постоянный эффект в этих границах. */
