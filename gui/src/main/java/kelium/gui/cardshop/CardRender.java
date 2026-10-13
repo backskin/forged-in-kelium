@@ -1310,62 +1310,69 @@ public final class CardRender {
         return out;
     }
 
-    /** Верх подложки «при установке»: по числу строк её текста (нет поля — 478). */
+    /** Кегль, отступы и значок подложки «при установке». */
+    static final double INST_PX = 38;
+    static final double INST_ICON = 84;
+    static final double INST_RIGHT = 772;
+    static final double INST_BOTTOM = 462;
+
+    /** Верх подложки «при установке» по числу строк её текста (нет поля — 486). */
     static double onInstallTop(CardCanvas k, CardSpec c, double leftX) {
         String inst = c.text("при_установке");
         if (inst.isBlank()) {
             return 486;
         }
-        int n = onInstallLines(k, inst, leftX).size();
-        return 466 - n * 38 * 1.25 - 22;
+        return INST_BOTTOM - onInstallLines(k, inst, leftX).size() * INST_PX * 1.22 - 20;
     }
 
     static List<String> onInstallLines(CardCanvas k, String inst, double leftX) {
-        Font f = k.font("TekturNarrow-Medium.ttf", 38);
-        Font fb = k.font("TekturNarrow-Bold.ttf", 38);
-        double w = (762 - (leftX + 74)) * 2;
-        List<String> l = wrapGreedy(k, inst, f, fb, 38, w);
-        return balanced(k, inst, f, fb, 38, w, l.size());
+        Font f = k.font("TekturNarrow-Medium.ttf", INST_PX);
+        Font fb = k.font("TekturNarrow-Bold.ttf", INST_PX);
+        double w = (INST_RIGHT - 16 - (leftX + INST_ICON + 14)) * 2;
+        List<String> l = wrapGreedy(k, inst, f, fb, INST_PX, w);
+        return balanced(k, inst, f, fb, INST_PX, w, l.size());
     }
 
     /**
      * ПОДЛОЖКА «ПРИ УСТАНОВКЕ» (дизайнер 13.10.2026): разовый эффект — внизу, на
-     * своей полосе цвета арсенала со значком слева; прочёл раз — дальше её не
-     * читают. Знак — иконка «при-установке» из экспорта (нет — №27).
+     * светлой полупрозрачной полосе в стиле полосы названия (одна тонкая
+     * бирюзовая рамка), крупный значок слева, тёмный текст; ширина — по тексту,
+     * полоса прижата к правому краю. Слов «при установке» нет: их роль играют
+     * подложка и значок (объяснено в правилах). Знак — иконка «при-установке»
+     * из экспорта (нет — №27).
      */
     static void onInstallPlate(CardCanvas k, String inst, double leftX, Theme th) {
+        List<String> lines = onInstallLines(k, inst, leftX);
+        Font f = k.font("TekturNarrow-Medium.ttf", INST_PX);
+        Font fb = k.font("TekturNarrow-Bold.ttf", INST_PX);
+        double tw = 0;
+        for (String l : lines) {
+            tw = Math.max(tw, k.line(l, f, fb, 0, 0, 'r', th.text(), CardCanvas.WHITE, 2,
+                (t, p) -> arsIcon(k, t, INST_PX), INST_PX, false));
+        }
+        double textRight = INST_RIGHT - 16;
+        double left = Math.max(leftX - 12, textRight - tw - INST_ICON - 22);
+        double top = INST_BOTTOM - lines.size() * INST_PX * 1.22 - 20;
         java.awt.Graphics2D g = (java.awt.Graphics2D) k.g.create();
         g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
             java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-        List<String> lines = onInstallLines(k, inst, leftX);
-        double top = 466 - lines.size() * 38 * 1.25 - 22;
-        double x0 = (leftX - 12) * 2;
-        double x1 = 772 * 2;
-        double y0 = top * 2;
-        double y1 = 462 * 2;
         java.awt.geom.RoundRectangle2D r = new java.awt.geom.RoundRectangle2D.Double(
-            x0, y0, x1 - x0, y1 - y0, 34, 34);
-        g.setPaint(new java.awt.GradientPaint((float) x0, (float) y0, new Color(86, 150, 166, 235),
-            (float) x0, (float) y1, new Color(46, 98, 114, 235)));
+            left * 2, top * 2, (INST_RIGHT - left) * 2, (INST_BOTTOM - top) * 2, 30, 30);
+        g.setPaint(new java.awt.GradientPaint(0f, (float) (top * 2), new Color(236, 248, 251, 190),
+            0f, (float) (INST_BOTTOM * 2), new Color(200, 230, 238, 190)));
         g.fill(r);
-        g.setStroke(new java.awt.BasicStroke(5f));
-        g.setColor(new Color(214, 236, 242));
-        g.draw(new java.awt.geom.RoundRectangle2D.Double(x0 + 6, y0 + 6, x1 - x0 - 12, y1 - y0 - 12,
-            26, 26));
-        g.setColor(new Color(28, 22, 20));
         g.setStroke(new java.awt.BasicStroke(4f));
+        g.setColor(new Color(64, 128, 144, 230));
         g.draw(r);
         g.dispose();
         String key = k.icon("при-установке") != null ? "при-установке" : "27";
-        double cy = (top + 462) / 2;
-        k.put(key, leftX + 30, cy, 62, 62);
-        Font f = k.font("TekturNarrow-Medium.ttf", 38);
-        Font fb = k.font("TekturNarrow-Bold.ttf", 38);
-        double y = top + 11 + 38 * 1.25 / 2;
+        double cy = (top + INST_BOTTOM) / 2;
+        k.put(key, left + 10 + INST_ICON / 2, cy, INST_ICON, INST_ICON);
+        double y = top + 10 + INST_PX * 1.22 / 2;
         for (String l : lines) {
-            k.line(l, f, fb, 757, y, 'r', CardCanvas.WHITE, new Color(28, 50, 58), 3,
-                (t, p) -> arsIcon(k, t, 38), 38, true);
-            y += 38 * 1.25;
+            k.line(l, f, fb, textRight, y, 'r', th.text(), CardCanvas.WHITE, 2,
+                (t, p) -> arsIcon(k, t, INST_PX), INST_PX, true);
+            y += INST_PX * 1.22;
         }
     }
 
