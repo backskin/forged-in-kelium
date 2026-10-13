@@ -18,6 +18,21 @@ for имя, н in ВЫБОР.items():
     n, lab = cv2.connectedComponents(светлый, connectivity=4)
     края = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
     фон = np.isin(lab, list(края)).astype(np.uint8)
+    # ДЫРЫ между рукой и телом (дизайнер 14.10.2026): замкнутые чисто белые
+    # области. Отличие от бликов на белом костюме синей: дыра толстая (в неё
+    # влезает круг 31 px), почти без оттенка и лежит ниже плеч (блики — на
+    # голове и плечах).
+    sd = im.max(axis=2) - mn
+    чисто = ((mn > 236) & (sd < 10)).astype(np.uint8)
+    n2, lab2, st2, цт = cv2.connectedComponentsWithStats(чисто, connectivity=4)
+    края2 = set(np.unique(np.concatenate([lab2[0], lab2[-1], lab2[:, 0], lab2[:, -1]])))
+    ядро = cv2.erode(чисто, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31)))
+    for k in range(1, n2):
+        if k in края2 or st2[k, 4] < 400 or цт[k][1] < 0.42 * im.shape[0]:
+            continue
+        m = lab2 == k
+        if mn[m].mean() >= 246 and ядро[m].any():
+            фон[m] = 1
     фон = cv2.morphologyEx(фон, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     alpha = (1 - фон).astype(np.float32)
     кромка = (cv2.dilate(фон, np.ones((7, 7), np.uint8)) > 0) & (alpha > 0)
