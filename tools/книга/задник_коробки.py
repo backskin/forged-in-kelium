@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
-"""ЗАДНИК КОРОБКИ «Lex Talionis» (дизайнер 14.10.2026; образцы — Дюна. Империя,
-Civilization, Серп, Прага, Комната 25, Yellow & Yangtze, Fallout).
+"""ЗАДНИК КОРОБКИ «Lex Talionis», версия 2 (дизайнер 14.10.2026; образцы — Дюна.
+Империя, Civilization, Серп, Прага, Комната 25, Yellow & Yangtze, Fallout;
+по разбору агента-критика).
 
-Слои, сверху вниз:
-  1. фон — арт поля келемия во всю коробку, книзу уходит в тёмную сталь;
-  2. логотип и две вводки: мир (зачем вы здесь) и игра (что вы делаете);
-  3. крупно — подготовленный стол в перспективе (снимок стола из книги);
-  4. веер карт поверх стола; пять действий значками;
-  5. «Особенности» и «Состав игры» плашками;
-  6. нижняя полоса: игроки, возраст, время, места под маркировку и штрихкод.
+Зоны квадрата 300×300 мм (10 точек на мм):
+  0–45 %   арт: харвестер вгрызается в поле келемия; слева логотип и тексты
+           на тёмном градиенте — ни одна строка не идёт по фигурам;
+  40–80 %  разложенная партия в перспективе на сукне, крупно; на переднем
+           плане — рука из 4 карт приказа с подписью;
+  80–91 %  полоса «Пять действий — в каждом выбор из двух»: значок, название, А / Б;
+  91–100 % игроки, возраст, время, состав одной строкой; места под маркировку.
+Тексты — только то, что есть в правилах (гл. 1 книги).
 
-Квадрат 300×300 мм, 10 точек на мм. Запуск: python задник_коробки.py
-Итог: design-docs/обложка/задник коробки.png (+ .pdf)
+Запуск: python задник_коробки.py → design-docs/обложка/задник коробки.png (+ .pdf)
 """
 import os
 import subprocess
@@ -22,6 +23,7 @@ D = os.path.dirname(os.path.abspath(__file__))
 КОРЕНЬ = os.path.dirname(os.path.dirname(D))
 ДИСК = os.path.join(os.path.expanduser("~"), "Yandex.Disk", "Forged in Kelium")
 ФОНЫ = os.path.join(ДИСК, "Иллюстрации", "фоны и сцены")
+ПРИКАЗЫ = os.path.join(ДИСК, "Компоненты игрока", "экспорт-карты-приказов", "выпуск 27.09.2026 — пять развилок")
 ВЫХОД = os.path.join(КОРЕНЬ, "design-docs", "обложка")
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
@@ -35,113 +37,100 @@ def фон(номер):
 
 
 ЛОГО = os.path.join(КОРЕНЬ, "design-docs", "логотип-лекс", "LEX TALIONIS — логотип (рамка).png")
-СТОЛ = os.path.join(D, "стол.png")
-АРТ = фон(75)                     # поле келемия, войска в окопе
-КАРТЫ = os.path.join(КОРЕНЬ, "data", "textures", "card")
+# стол — отдельный снимок для коробки: другое поле, чем в книге
+СТОЛ = os.path.join(D, "стол-коробка-4.png")
+АРТ = фон(38)                     # харвестер в поле келемия: сцена читается сразу
 ИКОНКИ = os.path.join(КОРЕНЬ, "rules", "иконки-экспорт")
 
-# веер — только вертикальные карты одного размера: задание, супер-задание, задание
-веер = ["objective/o07.png", "objective_super/s9_03.png", "objective/o03.png"]
+рука = ["синий — ОСВОИТЬ", "синий — НАСТУПАТЬ", "синий — ИССЛЕДОВАТЬ", "синий — КОНТРОЛИРОВАТЬ"]
 карты = "".join(
-    f'<img class="карта" src="{url(os.path.join(КАРТЫ, к))}" '
-    f'style="transform: rotate({-15 + i * 15}deg)">'
-    for i, к in enumerate(веер))
-действия = [("добыча", "Добыча"), ("питание", "Питание"), ("снабжение", "Снабжение"),
-            ("командование", "Командование"), ("развитие", "Развитие")]
-значки = "".join(f'<div class="дейст"><img src="{url(os.path.join(ИКОНКИ, f + ".png"))}">'
-                 f'<span>{и}</span></div>' for f, и in действия)
+    f'<img class="карта" src="{url(os.path.join(ПРИКАЗЫ, к + ".png"))}" '
+    f'style="transform: rotate({-18 + i * 12}deg)">' for i, к in enumerate(рука))
+действия = [("добыча", "Добыча", "Добыть", "Построить добытчик"),
+            ("питание", "Питание", "Переложить энергию", "Построить энергостанцию"),
+            ("снабжение", "Снабжение", "Нанять", "Построить военное здание"),
+            ("командование", "Командование", "Манёвр", "Бой"),
+            ("развитие", "Развитие", "Рынок", "Наука")]
+полоса = "".join(
+    f'<div class="дейст"><img src="{url(os.path.join(ИКОНКИ, f + ".png"))}"><div>'
+    f'<b>{и}</b><span>{а}<i>или</i>{б}</span></div></div>' for f, и, а, б in действия)
 
 HTML = f"""<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face {{ font-family: T; src: url("{url(r'C:/Windows/Fonts/Tektur-Bold.ttf')}"); font-weight: 700; }}
-@font-face {{ font-family: T; src: url("{url(r'C:/Windows/Fonts/Tektur-Black.ttf')}"); font-weight: 900; }}
-@font-face {{ font-family: N; src: url("{url(r'C:/Windows/Fonts/TekturNarrow-Regular.ttf')}"); font-weight: 400; }}
-@font-face {{ font-family: N; src: url("{url(r'C:/Windows/Fonts/TekturNarrow-Bold.ttf')}"); font-weight: 700; }}
-html, body {{ margin: 0; width: 3000px; height: 3000px; overflow: hidden; background: #14181a; }}
+@font-face {{ font-family: T; src: url("{url('C:/Windows/Fonts/Tektur-Bold.ttf')}"); font-weight: 700; }}
+@font-face {{ font-family: T; src: url("{url('C:/Windows/Fonts/Tektur-Black.ttf')}"); font-weight: 900; }}
+@font-face {{ font-family: N; src: url("{url('C:/Windows/Fonts/TekturNarrow-Regular.ttf')}"); font-weight: 400; }}
+@font-face {{ font-family: N; src: url("{url('C:/Windows/Fonts/TekturNarrow-Bold.ttf')}"); font-weight: 700; }}
+html, body {{ margin: 0; width: 3000px; height: 3000px; overflow: hidden; background: #171b1c; }}
 .з {{ position: relative; width: 3000px; height: 3000px; overflow: hidden; color: #efe9d8; font-family: N; }}
-.арт {{ position: absolute; inset: 0 0 auto 0; height: 2050px;
-  background: url("{url(АРТ)}") center 30% / cover; }}
-.арт::after {{ content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(12,16,18,.80) 0%, rgba(12,16,18,.45) 34%, rgba(12,16,18,.15) 55%,
-    rgba(20,24,26,.85) 82%, #14181a 100%); }}
-.сталь {{ position: absolute; inset: 2000px 0 0 0;
-  background: repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 6px, transparent 6px 14px), #14181a; }}
-.лого {{ position: absolute; left: 150px; top: 120px; width: 1250px;
-  filter: drop-shadow(0 18px 30px rgba(0,0,0,.7)); }}
-.вводка {{ position: absolute; left: 160px; top: 640px; width: 1180px; font-size: 46px; line-height: 1.38; }}
-.вводка p {{ margin: 0 0 36px; text-shadow: 0 3px 10px rgba(0,0,0,.85); }}
-.вводка .мир {{ font-style: normal; color: #d9f0c8; }}
-.вводка b {{ color: #8fe36b; font-weight: 700; }}
-.девиз {{ position: absolute; left: 160px; top: 1450px; font: 900 64px T; letter-spacing: .04em;
-  color: #fff; text-shadow: 0 4px 16px rgba(0,0,0,.9); }}
-.девиз span {{ color: #7ee05a; }}
-.стол-обёртка {{ position: absolute; left: 1180px; top: 300px; width: 1900px; height: 1900px;
-  perspective: 2600px; }}
+.арт {{ position: absolute; inset: 0 0 auto 0; height: 1500px;
+  background: url("{url(АРТ)}") 70% 40% / cover; }}
+.арт::after {{ content: ""; position: absolute; inset: 0; background:
+  linear-gradient(180deg, rgba(29,38,34,0) 55%, rgba(29,38,34,.85) 88%, #1d2622 100%),
+  linear-gradient(90deg, rgba(29,38,34,.96) 0%, rgba(29,38,34,.88) 34%, rgba(29,38,34,.25) 52%, rgba(29,38,34,0) 64%); }}
+.сукно {{ position: absolute; inset: 1490px 0 0 0;
+  background: linear-gradient(180deg, #1d2622 0%, #1d2622 6%, rgba(29,38,34,0) 40%),
+    radial-gradient(ellipse at 60% 20%, #24302a 0%, #1b2420 55%, #151a18 100%); }}
+.лого {{ position: absolute; left: 140px; top: 90px; width: 1000px;
+  filter: drop-shadow(0 14px 24px rgba(0,0,0,.8)); }}
+.тексты {{ position: absolute; left: 160px; top: 520px; width: 1120px; font-size: 44px; line-height: 1.4; }}
+.тексты p {{ margin: 0 0 30px; }}
+.тексты .мир {{ font-size: 50px; color: #ffffff; font-weight: 700; line-height: 1.3; }}
+.тексты b {{ color: #8fe36b; }}
+.стол-обёртка {{ position: absolute; left: 760px; top: 930px; width: 2450px; height: 1560px; perspective: 3000px; }}
 .стол {{ position: absolute; inset: 0; background: url("{url(СТОЛ)}") center / contain no-repeat;
-  transform: rotateX(46deg) rotateZ(-9deg) scale(.98); transform-origin: 50% 60%;
-  filter: drop-shadow(0 40px 40px rgba(0,0,0,.75)) saturate(1.08); }}
-.веер {{ position: absolute; left: 60px; top: 1600px; width: 1100px; height: 640px; }}
-.карта {{ position: absolute; left: 380px; top: 30px; width: 330px; border-radius: 16px;
-  box-shadow: 0 0 0 4px #3c3020, 0 22px 40px rgba(0,0,0,.7); transform-origin: 50% 150%; }}
-.действия {{ position: absolute; left: 160px; top: 2390px; display: flex; gap: 26px; }}
-.дейст {{ width: 196px; text-align: center; font: 700 30px N; letter-spacing: .02em; }}
-.дейст img {{ width: 150px; height: 150px; object-fit: contain; display: block; margin: 0 auto 8px;
-  filter: drop-shadow(0 8px 12px rgba(0,0,0,.6)); }}
-.подпись-дейст {{ position: absolute; left: 160px; top: 2320px; font: 700 34px T; color: #8fe36b;
-  text-transform: uppercase; letter-spacing: .08em; }}
-.плашка {{ position: absolute; background: rgba(20,26,28,.88); border: 3px solid #4f6b3c;
-  clip-path: polygon(28px 0, 100% 0, 100% calc(100% - 28px), calc(100% - 28px) 100%, 0 100%, 0 28px);
-  padding: 34px 44px 30px; }}
-.плашка h3 {{ margin: 0 0 18px; font: 900 40px T; letter-spacing: .08em; text-transform: uppercase; color: #8fe36b; }}
-.особ {{ left: 1650px; top: 2000px; width: 1180px; }}
-.особ ul {{ margin: 0; padding: 0; list-style: none; font-size: 36px; line-height: 1.32; }}
-.особ li {{ padding-left: 44px; position: relative; margin-bottom: 10px; }}
-.особ li::before {{ content: ""; position: absolute; left: 0; top: 13px; width: 20px; height: 20px;
-  background: #7ee05a; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }}
-.состав {{ left: 1650px; top: 2410px; width: 1180px; font-size: 27px; line-height: 1.36; color: #d8d2c0; }}
-.состав h3 {{ font-size: 32px; margin-bottom: 10px; }}
-.низ {{ position: absolute; left: 0; right: 0; bottom: 0; height: 260px; display: flex; align-items: center;
-  gap: 60px; padding: 0 160px; box-sizing: border-box;
-  background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.35)); }}
-.знак {{ display: flex; flex-direction: column; align-items: center; gap: 10px; font: 700 34px N; }}
-.знак .к {{ width: 120px; height: 120px; border: 5px solid #8fe36b; border-radius: 18px;
-  display: flex; align-items: center; justify-content: center; font: 900 46px T; color: #8fe36b; }}
-.место {{ border: 3px dashed rgba(239,233,216,.35); color: rgba(239,233,216,.5); font: 700 26px N;
-  display: flex; align-items: center; justify-content: center; text-align: center; }}
+  transform: rotateX(44deg) rotateZ(-6deg); transform-origin: 50% 55%;
+  filter: drop-shadow(0 50px 40px rgba(0,0,0,.7)); }}
+.рука {{ position: absolute; left: 150px; top: 1640px; width: 900px; height: 820px; }}
+.карта {{ position: absolute; left: 300px; top: 60px; width: 330px; border-radius: 16px;
+  box-shadow: 0 0 0 4px #2a2318, 0 26px 40px rgba(0,0,0,.75); transform-origin: 50% 170%; }}
+.подпись {{ position: absolute; font: 900 40px T; letter-spacing: .06em; text-transform: uppercase; color: #8fe36b;
+  text-shadow: 0 3px 10px rgba(0,0,0,.9); }}
+.подпись.р {{ left: 200px; top: 1560px; }}
+.полоса {{ position: absolute; left: 0; right: 0; top: 2420px; height: 330px; padding: 0 120px;
+  box-sizing: border-box; display: flex; gap: 24px; align-items: center;
+  background: linear-gradient(180deg, rgba(10,13,12,.0), rgba(10,13,12,.86) 18%, rgba(10,13,12,.86)); }}
+.подпись.п {{ left: 160px; top: 2440px; }}
+.дейст {{ flex: 1; display: flex; gap: 18px; align-items: center; margin-top: 60px; }}
+.дейст img {{ width: 140px; height: 140px; object-fit: contain; filter: drop-shadow(0 8px 12px rgba(0,0,0,.6)); }}
+.дейст b {{ display: block; font: 900 38px T; color: #fff; margin-bottom: 6px; }}
+.дейст span {{ display: block; font: 700 31px/1.18 N; color: #d8d2c0; }}
+.дейст i {{ display: block; font: 400 26px N; color: #8fe36b; font-style: normal; }}
+.низ {{ position: absolute; left: 0; right: 0; bottom: 0; height: 250px; padding: 0 120px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 44px; background: #0f1312; border-top: 4px solid #4f6b3c; }}
+.знак {{ display: flex; flex-direction: column; align-items: center; gap: 8px; font: 700 30px N; }}
+.знак .к {{ min-width: 116px; height: 100px; padding: 0 14px; box-sizing: border-box; border: 5px solid #8fe36b;
+  border-radius: 16px; display: flex; align-items: center; justify-content: center; font: 900 42px T; color: #8fe36b; }}
+.состав {{ flex: 1; font: 400 28px/1.35 N; color: #d8d2c0; }}
+.состав b {{ font: 900 30px T; color: #8fe36b; letter-spacing: .06em; text-transform: uppercase; margin-right: 12px; }}
+.место {{ border: 3px dashed rgba(239,233,216,.3); color: rgba(239,233,216,.45); font: 700 24px N;
+  display: flex; align-items: center; justify-content: center; text-align: center; height: 160px; }}
 </style></head><body><div class="з">
-<div class="арт"></div><div class="сталь"></div>
+<div class="сукно"></div><div class="арт"></div>
 <div class="стол-обёртка"><div class="стол"></div></div>
 <img class="лого" src="{url(ЛОГО)}">
-<div class="вводка">
-<p class="мир">Из выжженной земли прорастает <b>келемий</b> — кристалл, ради которого четыре
-нации пришли на одну равнину. Здесь каждый удар возвращается: за снесённый завод — завод,
-за разбитый взвод — взвод. Это и есть закон возмездия.</p>
-<p>«Lex Talionis» — стратегия на 2–4 игроков о войне за ресурс. Стройте базу, добывайте келемий,
-нанимайте войска, сносите чужие здания и вкладывайте добытое в технологии. Каждый ход — одна карта
-приказа и <b>выбор из двух</b>: добыть или построить, двинуть войска или ударить. Приказы
-вскрывают по кругу, и каждое ваше решение ломает чей-то план.</p>
+<div class="тексты">
+<p class="мир">Келемий прорастает из земли — зелёный кристалл, за который покупают технологии.
+Четыре нации спорят за одно поле. Кристалла хватит не всем.</p>
+<p>В начале круга все разом выбирают карту приказа, потом по очереди вскрывают и сразу ходят.
+Действий пять, и в каждом <b>выбор из двух</b>: добыть келемий или поставить новый добытчик,
+двинуть войска или начать бой, торговать на Рынке или вкладываться в Науку. За разбитые жетоны
+врага вы получаете трофеи — ими же платите за технологии.</p>
+<p>Партия кончается, когда пустеет колода рынка или поле. Побеждает тот, у кого больше очков,
+— или тот, кто раньше займёт вершины всех трёх треков технологий.</p>
 </div>
-<div class="девиз">Око за око. <span>Кристалл за кристалл.</span></div>
-<div class="веер">{карты}</div>
-<div class="подпись-дейст">Пять действий — каждое на выбор из двух</div>
-<div class="действия">{значки}</div>
-<div class="плашка особ"><h3>Особенности</h3><ul>
-<li>Приказы в открытую по кругу: 4 хода за раунд, без простоя</li>
-<li>Три трека технологий, модули и золотые улучшения</li>
-<li>Поле из блоков — каждая партия на новой карте</li>
-<li>Пять путей к победным очкам и две мгновенные победы</li>
-</ul></div>
-<div class="плашка состав"><h3>Состав игры</h3>
-10 блоков поля • 8 тайлов зарождения • 8 тайлов недоступных гексов • 14 нейтральных построек •
-планшет науки • планшет рынка • 4 планшета войск • 4 планшета хранилища • 48 жетонов зданий •
-64 жетона войск • 4 жетона супер-войск • 28 модулей • 8 жетонов хранилища • 196 карт •
-192 кубика • 50 монет • фишка первого игрока • 2 мешочка • книга правил • справочник
-</div>
+<div class="подпись р">Ваш ход — одна карта приказа</div>
+<div class="рука">{карты}</div>
+<div class="полоса">{полоса}</div>
+<div class="подпись п">Пять действий — в каждом выбор из двух</div>
 <div class="низ">
 <div class="знак"><div class="к">2–4</div>игрока</div>
 <div class="знак"><div class="к">14+</div>лет</div>
-<div class="знак"><div class="к" style="width:220px">90–120</div>минут</div>
-<div class="место" style="width:520px;height:170px;margin-left:auto">издатель, адрес,<br>маркировка</div>
-<div class="место" style="width:360px;height:170px">штрихкод</div>
+<div class="знак"><div class="к">90–120</div>минут</div>
+<div class="состав"><b>В коробке</b>10 блоков поля • 30 тайлов и нейтральных построек • 10 планшетов •
+116 жетонов зданий и войск • 36 модулей • 196 карт • 192 кубика • 50 монет • фишка первого игрока •
+2 мешочка • книга правил и справочник</div>
+<div class="место" style="width:380px">издатель,<br>маркировка</div>
+<div class="место" style="width:300px">штрихкод</div>
 </div>
 </div></body></html>"""
 
@@ -153,6 +142,7 @@ subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
                 "--user-data-dir=" + os.path.join(D, "chr"), "--virtual-time-budget=8000",
                 "--window-size=3000,3000", "--screenshot=" + png, url(html)], check=True,
                capture_output=True)
+os.remove(html)
 pdf = pymupdf.open()
 стр = pdf.new_page(width=300 / 25.4 * 72, height=300 / 25.4 * 72)
 стр.insert_image(стр.rect, filename=png)
