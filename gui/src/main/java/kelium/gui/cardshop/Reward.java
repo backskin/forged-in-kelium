@@ -120,22 +120,34 @@ public final class Reward {
         }
         boolean either = EITHER.equals(choice) && items.size() == 2;
         if (ACTION.equals(kind)) {
+            // СМЕШАННАЯ НАГРАДА (13.10.2026): «действие / ресурс» — действие
+            // кольцом, ресурс стопкой со счётом
             double ring = size;
             double gap = either ? 40 : 14;
             int n = items.size();
-            double total = n * ring + (n - 1) * gap;
-            if (total > width) {
-                ring = (width - (n - 1) * gap) / n;
-                total = width;
-            }
-            double x = cx - total / 2 + ring / 2;
+            double[] w = new double[n];
+            double total = 0;
             for (int i = 0; i < n; i++) {
-                k.put("25", x, cy, ring, ring);
-                k.put(items.get(i).icon(), x, cy - ring * 0.02, ring * 0.945, ring * 0.945);
-                if (either && i == 0) {
-                    slash(k, x + ring / 2 + gap / 2, cy, ring);
+                w[i] = isAction(items.get(i)) ? ring : stackWidth(items.get(i), ring * 0.8);
+                total += w[i];
+            }
+            total += (n - 1) * gap;
+            double scale = total > width ? width / total : 1;
+            double x = cx - total * scale / 2;
+            for (int i = 0; i < n; i++) {
+                double wi = w[i] * scale;
+                if (isAction(items.get(i))) {
+                    k.put("25", x + wi / 2, cy, ring * scale, ring * scale);
+                    k.put(items.get(i).icon(), x + wi / 2, cy - ring * 0.02, ring * 0.945 * scale,
+                        ring * 0.945 * scale);
+                } else {
+                    drawStack(k, items.get(i), x, cy, ring * 0.8 * scale);
                 }
-                x += ring + gap;
+                x += wi;
+                if (either && i == 0) {
+                    slash(k, x + gap * scale / 2, cy, ring * scale);
+                }
+                x += gap * scale;
             }
             return;
         }
@@ -165,6 +177,15 @@ public final class Reward {
             }
             x += gap;
         }
+    }
+
+    /** Иконки пяти действий (и прежних действий) — рисуются кольцом. */
+    static final java.util.Set<String> ACTION_ICONS = java.util.Set.of(
+        "34", "35", "36", "37", "38", "39", "40", "41", "42", "33",
+        "действие — снабжение", "действие — командование", "действие — развитие");
+
+    private static boolean isAction(Item it) {
+        return ACTION_ICONS.contains(it.icon());
     }
 
     private static int shown(Item it) {

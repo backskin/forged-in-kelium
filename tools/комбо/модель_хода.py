@@ -29,7 +29,7 @@ from functools import lru_cache
 
 ПОЛЯ = ['coins', 'kel', 'ammo', 'troph', 'units', 'adj', 'mil', 'milp', 'miners',
         'minp', 'cubes', 'charge', 'proj', 'steps', 'dmg', 'objdone', 'vp', 'spec',
-        'cont', 'journal', 'enemy_near', 'hobj', 'hars', 'objturn', 'inst_turn']
+        'cont', 'journal', 'enemy_near', 'hobj', 'hars', 'objturn', 'inst_turn', 'spec_got']
 
 
 def стоимость(s):
@@ -205,6 +205,12 @@ def ходы(s):
     return out
 
 
+def _предел(s):
+    if s.get('spec', 0) > 1 and s.get('spec_got', 0) >= 1:
+        s = dict(s, spec=1)
+    return s
+
+
 def лучший(s0):
     memo = {}
 
@@ -214,6 +220,9 @@ def лучший(s0):
             return memo[k]
         best = стоимость(s)
         for n in ходы(s):
+            if n['spec'] > s['spec']:
+                n = dict(n, spec=min(n['spec'], s['spec'] + max(0, 1 - s.get('spec_got', 0))),
+                         spec_got=s.get('spec_got', 0) + 1)
             best = max(best, rec(n))
         memo[k] = best
         return best
@@ -225,7 +234,7 @@ def лучший(s0):
 def положение(**kw):
     s = dict(coins=0, kel=0, ammo=0, troph=0, units=0, adj=0, mil=0, milp=0, miners=0,
              minp=0, cubes=0, charge=0, proj=0, steps=0, dmg=0, objdone=0, vp=0, spec=1,
-             cont=0, journal=0, enemy_near=1, hobj=0, hars=0, objturn=0, inst_turn=0)
+             cont=0, journal=0, enemy_near=1, hobj=0, hars=0, objturn=0, inst_turn=0, spec_got=0)
     s.update(kw)
     s.setdefault('acts', ())
     s['acts'] = tuple(s['acts'])

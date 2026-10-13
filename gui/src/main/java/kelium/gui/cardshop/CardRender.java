@@ -1024,7 +1024,7 @@ public final class CardRender {
         if (!low.isBlank() && k.begin("свойство", 150, sup ? 110 : 222, 600, (sup ? 368 : 256))) {
             // длинный текст не мельчит, а занимает поле шире — как на печати
             double rightX = c.bool("контейнер") ? 322 : 749;
-            double leftX = withFig ? 360 : c.bool("контейнер") ? 150 : 190;
+            double leftX = withFig ? 360 : c.bool("контейнер") ? 150 : 122;
             if (c.integer("отступ_слева", 0) > 0) {
                 leftX = c.integer("отступ_слева", 0);      // место под свои иконки слева
             }
@@ -1033,14 +1033,14 @@ public final class CardRender {
                 leftX = Math.min(leftX, 150);
             }
             arsenalLow(k, low, 44, leftX, rightX, th.text(), topY,
-                onInstallTop(k, c, c.integer("отступ_слева", 0) > 0 ? c.integer("отступ_слева", 0) : 150) - 8);
+                onInstallTop(k, c, c.integer("отступ_слева", 0) > 0 ? c.integer("отступ_слева", 0) : 122) - 8);
         }
         if (!low.isBlank()) {
             k.end();
         }
         String inst = c.text("при_установке");
         if (!inst.isBlank()) {
-            double lx = c.integer("отступ_слева", 0) > 0 ? c.integer("отступ_слева", 0) : 150;
+            double lx = c.integer("отступ_слева", 0) > 0 ? c.integer("отступ_слева", 0) : 122;
             if (k.begin("при_установке", lx - 12, onInstallTop(k, c, lx), 772 - lx + 12,
                 486 - onInstallTop(k, c, lx))) {
                 onInstallPlate(k, inst, lx, th);
@@ -1271,7 +1271,11 @@ public final class CardRender {
                 lines.addAll(wrapGreedy(k, para, f, fb, px, (rightX - leftX) * 2));
             }
             step = px * 1.28 * k.leading();
-            if (lines.size() * step <= bottom - top || px <= 26) {
+            if (lines.size() * step <= bottom - top) {
+                break;
+            }
+            if (px <= 36) {
+                System.out.println("НЕ ВЛЕЗАЕТ: " + text);
                 break;
             }
             px -= 1;
@@ -1326,11 +1330,35 @@ public final class CardRender {
     }
 
     static List<String> onInstallLines(CardCanvas k, String inst, double leftX) {
+        double w = (INST_RIGHT - 16 - (leftX + INST_ICON + 14)) * 2;
+        return wrapMeasured(k, inst, w);
+    }
+
+    /** Ширина строки подложки — тем же кодом, что и рисует её. */
+    static double instWidth(CardCanvas k, String line) {
         Font f = k.font("TekturNarrow-Medium.ttf", INST_PX);
         Font fb = k.font("TekturNarrow-Bold.ttf", INST_PX);
-        double w = (INST_RIGHT - 16 - (leftX + INST_ICON + 14)) * 2;
-        List<String> l = wrapGreedy(k, inst, f, fb, INST_PX, w);
-        return balanced(k, inst, f, fb, INST_PX, w, l.size());
+        return k.line(line, f, fb, 0, 0, 'r', Color.BLACK, Color.WHITE, 2,
+            (t, p) -> arsIcon(k, t, INST_PX), INST_PX, false);
+    }
+
+    /** Перенос по словам с замером k.line (иконки и жирное — как при рисовании). */
+    static List<String> wrapMeasured(CardCanvas k, String text, double width) {
+        List<String> out = new ArrayList<>();
+        String cur = "";
+        for (String word : text.trim().split("\\s+")) {
+            String next = cur.isEmpty() ? word : cur + " " + word;
+            if (!cur.isEmpty() && instWidth(k, next) * 2 > width) {
+                out.add(cur);
+                cur = word;
+            } else {
+                cur = next;
+            }
+        }
+        if (!cur.isEmpty()) {
+            out.add(cur);
+        }
+        return out;
     }
 
     /**
@@ -1347,8 +1375,7 @@ public final class CardRender {
         Font fb = k.font("TekturNarrow-Bold.ttf", INST_PX);
         double tw = 0;
         for (String l : lines) {
-            tw = Math.max(tw, k.line(l, f, fb, 0, 0, 'r', th.text(), CardCanvas.WHITE, 2,
-                (t, p) -> arsIcon(k, t, INST_PX), INST_PX, false));
+            tw = Math.max(tw, instWidth(k, l));
         }
         double textRight = INST_RIGHT - 16;
         double left = Math.max(leftX - 12, textRight - tw - INST_ICON - 22);
@@ -1358,8 +1385,8 @@ public final class CardRender {
             java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
         java.awt.geom.RoundRectangle2D r = new java.awt.geom.RoundRectangle2D.Double(
             left * 2, top * 2, (INST_RIGHT - left) * 2, (INST_BOTTOM - top) * 2, 30, 30);
-        g.setPaint(new java.awt.GradientPaint(0f, (float) (top * 2), new Color(236, 248, 251, 190),
-            0f, (float) (INST_BOTTOM * 2), new Color(200, 230, 238, 190)));
+        g.setPaint(new java.awt.GradientPaint(0f, (float) (top * 2), new Color(208, 232, 240, 215),
+            0f, (float) (INST_BOTTOM * 2), new Color(160, 204, 218, 220)));
         g.fill(r);
         g.setStroke(new java.awt.BasicStroke(4f));
         g.setColor(new Color(64, 128, 144, 230));
@@ -1374,6 +1401,22 @@ public final class CardRender {
                 (t, p) -> arsIcon(k, t, INST_PX), INST_PX, true);
             y += INST_PX * 1.22;
         }
+    }
+
+    /** Ширина строки (в точках холста ×2) — тем же счётом, что и перенос. */
+    static double lineWidth(CardCanvas k, String line, Font f, Font fb, double px) {
+        double w = 0;
+        double space = k.len(" ", f);
+        boolean first = true;
+        for (CardCanvas.Part p : CardCanvas.parts(line)) {
+            double pw = p.kind() == 'i' ? px * 1.15 * 2 : k.len(p.value(), p.kind() == 'b' ? fb : f);
+            if (!first && !CardCanvas.sticks(p)) {
+                w += space;
+            }
+            w += pw;
+            first = false;
+        }
+        return w;
     }
 
     static List<String> wrapGreedy(CardCanvas k, String para, Font f, Font fb, double px,
