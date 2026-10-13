@@ -4,6 +4,7 @@ import os
 from PIL import Image
 
 import стрелка
+from объём import объём
 
 D = os.path.dirname(os.path.abspath(__file__))
 ns = {"__file__": os.path.join(D, "figs.py")}
@@ -31,9 +32,11 @@ for k, im in enumerate(ims):
     xs.append(x)
     x += im.width + (GAP * 3 if k == 1 else ПАРА)
 W = x - GAP
-canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-for im, x0 in zip(ims, xs):
-    canvas.paste(im, (x0, 0), im)
+# жетоны с торцом и тенью (дизайнер 14.10.2026): холст ниже на толщину
+объёмные = [объём(im) for im in ims]
+canvas = Image.new("RGBA", (W + объёмные[-1].width - ims[-1].width, max(o.height for o in объёмные)), (0, 0, 0, 0))
+for im, x0 in zip(объёмные, xs):
+    canvas.alpha_composite(im, (x0, 0))
 for пара in (0, 2):
     стрелка.нарисовать(canvas, xs[пара] + ims[пара].width + round(ПАРА * 0.22),
                        xs[пара + 1] - round(ПАРА * 0.18), H // 2)

@@ -156,6 +156,9 @@ public final class СнимокЖетонов {
             }
             FieldPainter.paintHex(new Java2DCanvas(g, 1, шрифт), size, hi, st,
                 к.жетоны(), cx, cy, false);
+            // ТЁМНЫЙ КОНТУР ГЕКСА, как на с. 10 (дизайнер 14.10.2026): по краю
+            // печатного гекса, вычисленному по непрозрачности, — снаружи
+            контурГекса(img, g, cx, cy, size);
             // ДОРИСОВЫВАЕМ ЛУЧИ, ТОЛЬКО ЕСЛИ ПЕЧАТНОГО ГЕКСА НЕТ. С 16.09.2026
             // гекс рисуется настоящей печатью дизайнера
             // (data/textures/field/hex.png) — сектора на ней уже разделены,
@@ -188,6 +191,48 @@ public final class СнимокЖетонов {
             double r1 = size * 0.965;
             g.draw(new java.awt.geom.Line2D.Double(cx + r0 * Math.cos(a), cy + r0 * Math.sin(a),
                 cx + r1 * Math.cos(a), cy + r1 * Math.sin(a)));
+        }
+    }
+
+    /**
+     * Контур по краю нарисованного гекса: в квадрате вокруг (cx, cy) ищем
+     * непрозрачные точки, у которых сосед прозрачен, и красим кольцо на
+     * {@code т} точек наружу. Так линия ложится точно по краю печати, какого
+     * бы размера ни была текстура.
+     */
+    private static void контурГекса(BufferedImage img, Graphics2D g, double cx, double cy, double size) {
+        int r = (int) Math.ceil(size * 1.25);
+        int x0 = Math.max(0, (int) cx - r), y0 = Math.max(0, (int) cy - r);
+        int x1 = Math.min(img.getWidth() - 1, (int) cx + r), y1 = Math.min(img.getHeight() - 1, (int) cy + r);
+        int т = Math.max(2, (int) Math.round(size * 0.022));
+        boolean[][] есть = new boolean[y1 - y0 + 1][x1 - x0 + 1];
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) {
+                // подписи под гексом не трогаем: только круг радиусом гекса
+                есть[y - y0][x - x0] = Math.hypot(x - cx, y - cy) < size * 1.08
+                    && (img.getRGB(x, y) >>> 24) > 60;
+            }
+        }
+        int цвет = new Color(60, 48, 32).getRGB();
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) {
+                if (есть[y - y0][x - x0]) {
+                    continue;
+                }
+                boolean рядом = false;
+                for (int dy = -т; dy <= т && !рядом; dy++) {
+                    for (int dx = -т; dx <= т && !рядом; dx++) {
+                        int yy = y + dy - y0, xx = x + dx - x0;
+                        if (dx * dx + dy * dy <= т * т && yy >= 0 && xx >= 0
+                                && yy < есть.length && xx < есть[0].length && есть[yy][xx]) {
+                            рядом = true;
+                        }
+                    }
+                }
+                if (рядом) {
+                    img.setRGB(x, y, цвет);
+                }
+            }
         }
     }
 

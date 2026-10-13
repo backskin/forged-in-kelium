@@ -20,6 +20,8 @@ import re
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from объём import объём
+
 D = os.path.dirname(os.path.abspath(__file__))
 КОРЕНЬ = os.path.dirname(os.path.dirname(D))
 ЖЕТОНЫ = os.path.join(КОРЕНЬ, "rules", "жетоны модулей")
@@ -76,7 +78,7 @@ vb_w, vb_h = [float(x) for x in re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', sv
 css_w = float(re.search(r'class="рис" style="width:([\d.]+)%"', svg).group(1))
 W0, H0 = база.size
 
-Т = round(H0 * 0.30)                    # сторона жетона хранилища
+Т = round(H0 * 0.42)                    # сторона жетона хранилища (крупнее — дизайнер 14.10.2026)
 стрелка_w, поле = round(Т * 0.55), round(Т * 0.25)
 шр = ImageFont.truetype(ШРИФТ, round(Т * 0.2))
 подпись_w = round(Т * 0.95)
@@ -86,7 +88,8 @@ W0, H0 = база.size
 d = ImageDraw.Draw(холст)
 ЗЕЛ = (24, 108, 36, 255)
 ряды = [("ячейка", "mod_store_cells.png"), ("энергия", "mod_store_energy.png")]
-верх = (H0 - (2 * Т + поле)) // 2
+поле = round(Т * 0.12)                  # между под-рядами
+верх = max(0, (H0 - (2 * Т + поле)) // 2 - round(Т * 0.04))
 for k, (имя, запасной) in enumerate(ряды):
     y = верх + k * (Т + поле)
     x = W0 + поле
@@ -94,13 +97,13 @@ for k, (имя, запасной) in enumerate(ряды):
     x += подпись_w
     лицо = жетон(имя, запасной).resize((Т, Т), Image.LANCZOS)
     золото = жетон(имя + "-золото", запасной, True).resize((Т, Т), Image.LANCZOS)
-    холст.alpha_composite(лицо, (x, y))
+    холст.alpha_composite(объём(лицо), (x, y))
     ax = x + Т + round(стрелка_w * 0.15)
     ay = y + Т // 2
     d.line((ax, ay, ax + round(стрелка_w * 0.55), ay), fill=ЗЕЛ, width=max(4, Т // 28))
     d.polygon([(ax + round(стрелка_w * 0.5), ay - Т // 12), (ax + round(стрелка_w * 0.72), ay),
                (ax + round(стрелка_w * 0.5), ay + Т // 12)], fill=ЗЕЛ)
-    холст.alpha_composite(золото, (x + Т + стрелка_w, y))
+    холст.alpha_composite(объём(золото), (x + Т + стрелка_w, y))
 
 буфер = io.BytesIO()
 холст.save(буфер, "PNG", optimize=True)

@@ -573,8 +573,11 @@ CSS = r"""
     background: none !important; background-image: none !important;
     outline: none !important; box-shadow: none !important;
     padding-left: 0; padding-right: 0; padding-bottom: 0; padding-top: 0; }
+  /* Сплошных линий между блоками нет (дизайнер 14.10.2026: «тонкие чёрточки
+     лишние»): у заголовка своё подчёркивание, подписи под рисунком — его
+     часть. Линия остаётся только между шагами подготовки (.столбец). */
   .стр:not(.задняя) :is(.блок, .рисунок-во-всю) + .блок:not(.пример-блок):not(.карточка) {
-    border-top: .35mm solid var(--кант); padding-top: 2.6mm; }
+    padding-top: 1.2mm; }
   .столбец .блок:not(.пример-блок) + .блок { border-top: .3mm solid var(--кант); padding-top: 1.6mm; }
 """
 

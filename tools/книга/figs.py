@@ -16,7 +16,10 @@ SRC = r"C:\shared\Yandex.Disk\Forged in Kelium\Компоненты игрока
 СКРУГЛЕНИЕ_ММ = 3.0
 
 
-def скруглить(im, ширина_мм, радиус_мм=СКРУГЛЕНИЕ_ММ):
+КАНТ_ММ = 0.45
+
+
+def скруглить(im, ширина_мм, радиус_мм=СКРУГЛЕНИЕ_ММ, кант=True):
     """Скруглить углы карты. Радиус — в миллиметрах ПЕЧАТНОЙ карты, а не в
     пикселях: иначе у мелкого контейнера и крупного арсенала углы разные."""
     im = im.convert("RGBA")
@@ -26,6 +29,12 @@ def скруглить(im, ширина_мм, радиус_мм=СКРУГЛЕН
                                             radius=r, fill=255)
     out = im.copy()
     out.putalpha(ImageChops.multiply(im.split()[3], маска))
+    if кант:
+        # ОБВОДКА КАРТЫ (дизайнер 14.10.2026: «иначе сливается с фоном») —
+        # тёмный кант по скруглённому краю, как у карт в тексте книги
+        т = max(2, round(КАНТ_ММ * im.width / ширина_мм))
+        ImageDraw.Draw(out).rounded_rectangle([т // 2, т // 2, im.width - 1 - т // 2, im.height - 1 - т // 2],
+                                              radius=max(1, r - т / 2), outline=(60, 48, 32, 255), width=т)
     return out
 
 
@@ -121,7 +130,7 @@ def расширить(path, vw, vh, поля):
 
 def figure(name, path, width, vw, vh, marks, r=None, fs=None, css_w="93%", pad="1.2mm 0 1.2mm",
            значок_мм=ЗНАЧОК_ММ, угол=45.0, в_колонке=False, поле_мм=None, черты=(),
-           карта_мм=None):
+           карта_мм=None, контур=0):
     """Рисунок с выносками.
 
     marks: (буква, x точки, y точки, x значка, y значка[, (dx, dy) отвод]).
@@ -132,6 +141,18 @@ def figure(name, path, width, vw, vh, marks, r=None, fs=None, css_w="93%", pad="
     черты: (x1, y1, x2, y2) — жирная прямая, которой подчёркивают элемент
     (например, сторону гекса).
     """
+    if контур:
+        # ТЁМНЫЙ КОНТУР ПО КРАЮ ПЛАНШЕТА (дизайнер 14.10.2026, с. 15: «сливается
+        # с фоном») — внутрь силуэта, размер картинки и выноски не меняются
+        from PIL import ImageFilter
+        im = (Image.open(path) if not isinstance(path, Image.Image) else path).convert("RGBA")
+        a = im.getchannel("A").point(lambda v: 255 if v > 40 else 0)
+        внутр = a.filter(ImageFilter.MinFilter(2 * контур + 1))
+        край = ImageChops.subtract(a, внутр)
+        слой = Image.new("RGBA", im.size, (60, 48, 32, 255))
+        слой.putalpha(край)
+        im.alpha_composite(слой)
+        path = im
     if карта_мм:
         path = скруглить(Image.open(path) if not isinstance(path, Image.Image) else path,
                          карта_мм)
@@ -217,7 +238,7 @@ figure("планшет-хранилища", os.path.join(SRC, "экспорт-п
     ("Д", 1300, 360, 1640, 360),
     ("Г", 780, 350, 1640, 150),
     ("Е", 772, 590, 1640, 620),
-], css_w="54%", pad="1.0mm 0 1.4mm")
+], css_w="54%", pad="1.0mm 0 1.4mm", контур=5)
 
 # карта приказа: 661×1028
 figure("карта-приказа", os.path.join(SRC, "экспорт-карты-приказов", "карты-приказов-new-6.png"), 560, 661, 1028, [
