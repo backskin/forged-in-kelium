@@ -14,7 +14,6 @@ import math
 import os
 
 import yaml
-import стрелка
 from PIL import Image, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -90,7 +89,18 @@ for i in range(41):
     точки.append((x, y))
 # обрезать концы у кубиков
 точки = [p for p in точки if math.dist(p, откуда) > С * 0.6 and math.dist(p, куда) > С * 0.7]
-стрелка.дуга(холст, точки, 36)
+x2, y2 = точки[-1]
+x1, y1 = точки[-4]
+a = math.atan2(y2 - y1, x2 - x1)
+L = 46
+нос = [(x2 + math.cos(a) * 20, y2 + math.sin(a) * 20),
+       (x2 + math.cos(a + 2.5) * L, y2 + math.sin(a + 2.5) * L),
+       (x2 + math.cos(a - 2.5) * L, y2 + math.sin(a - 2.5) * L)]
+# одной фигурой: общая светлая подложка, остриё поверх конца дуги без каймы
+d.line(точки, fill=СВЕТ, width=22, joint="curve")
+d.polygon(нос, fill=СВЕТ, outline=СВЕТ, width=14)
+d.line(точки, fill=ОХРА, width=8, joint="curve")
+d.polygon(нос, fill=ОХРА)
 
 # подписи
 d.text((откуда[0], откуда[1] + С / 2 + 14), "запас\nБастиана", font=шр, fill=ОХРА, anchor="ma",

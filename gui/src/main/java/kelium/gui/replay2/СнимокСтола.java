@@ -237,8 +237,7 @@ public final class СнимокСтола {
         double мешX = рынок[0] + рынок[2] * 1.45;
         double мешY = рынок[1] + рынок[3] + px(150);
         мешочкиТ(g, мешX, мешY);
-        // справа от поля над планшетом рынка: в середине разворота сгиб
-        супергЗадания(g, px(1130), px(318));
+        супергЗадания(g, рынок[0] + рынок[2] + px(62), рынок[1] + рынок[3] * 0.5);
         якорьТ("9", запX, запY);
         якорьТ("8", мешX, мешY);
 
@@ -578,7 +577,8 @@ public final class СнимокСтола {
         int w = (int) Math.round(art.getWidth() * s);
         int h = (int) Math.round(art.getHeight() * s);
         // Правая доля планшета встаёт в клетку слева-сверху от края поля.
-        double[] цель = клетка(крайЛево[0] - 1, крайЛево[1]);
+        // ВПРИТЫК К ПОЛЮ (дизайнер 14.10.2026): на клетку правее и выше прежнего
+        double[] цель = клетка(крайЛево[0], крайЛево[1] - 1);
         int x = (int) Math.round(цель[0] - НАУКА_ПРАВАЯ[0] * s);
         int y = (int) Math.round(цель[1] - НАУКА_ПРАВАЯ[1] * s);
         наука = new int[]{x, y, w, h};
@@ -601,20 +601,20 @@ public final class СнимокСтола {
         int y = (int) Math.round(цель[1] - РЫНОК_ЛЕВАЯ[1] * s);
         рынок = new int[]{x, y, w, h};
         положить(g, art, x, y, w, h, 2.2);
+        // КОЛОДА РЫНКА ЛЕЖИТ НА ПЛАНШЕТЕ (дизайнер 14.10.2026): рубашкой вверх
+        // в окне карты, верхняя открыта и лежит лицом вверх на той же колоде.
         int[] рамка = BoardAnchors.marketCard();
         BufferedImage лицо = Textures.card("market_face", "deck_market");
+        BufferedImage рубашка = Textures.card("deck_market");
         if (рамка != null && лицо != null) {
             double sk = w / (double) art.getWidth();
-            положить(g, лицо, x + (int) Math.round(рамка[0] * sk),
-                y + (int) Math.round(рамка[1] * sk),
-                (int) Math.round(рамка[2] * sk), (int) Math.round(рамка[3] * sk), 1.2);
-        }
-        // Колода рынка рубашкой вверх — рядом с планшетом, откуда её и открывают.
-        BufferedImage рубашка = Textures.card("deck_market");
-        if (рубашка != null) {
-            int кw = px(КАРТА_РЫНКА_Ш);
-            int кh = (int) Math.round(кw * рубашка.getHeight() / (double) рубашка.getWidth());
-            стопка(g, рубашка, x + w / 2 - кw / 2, y + h + px(14), кw, кh, 5);
+            int кx = x + (int) Math.round(рамка[0] * sk), кy = y + (int) Math.round(рамка[1] * sk);
+            int кw = (int) Math.round(рамка[2] * sk), кh = (int) Math.round(рамка[3] * sk);
+            int сдвиг = Math.max(1, px(0.6));
+            if (рубашка != null) {
+                стопка(g, рубашка, кx + сдвиг, кy + сдвиг, кw, кh, 6);
+            }
+            положить(g, лицо, кx, кy, кw, кh, 1.2);
         }
     }
 
@@ -634,15 +634,29 @@ public final class СнимокСтола {
      * берут.
      */
     private static void супергЗадания(Graphics2D g, double cx, double cy) {
-        // НАБОК И КВАДРАТОМ 2×2 (дизайнер 14.10.2026): колода и три открытые
-        // карты лежат поперёк, их читают все игроки за столом
-        double ряд = КАРТА_ЗАДАНИЕ_Ш + 14;
-        колодыТ(g, cx, cy - px(ряд / 2), List.of(
-            new Колода("deck_super_objectives", КАРТА_ЗАДАНИЕ_Ш),
-            new Колода("objective_super/s9_03", КАРТА_ЗАДАНИЕ_Ш)), true, true);
-        колодыТ(g, cx, cy + px(ряд / 2), List.of(
-            new Колода("objective_super/s9_08", КАРТА_ЗАДАНИЕ_Ш),
-            new Колода("objective_super/s9_11", КАРТА_ЗАДАНИЕ_Ш)), true, true);
+        // ОДНОЙ ВЕРТИКАЛЬНОЙ ЛИНИЕЙ И НАБОК (дизайнер 14.10.2026): колода и три
+        // открытые карты столбцом справа от планшета рынка, поперёк — их
+        // читают все игроки за столом. (cx, cy) — середина столбца.
+        String[] теги = {"deck_super_objectives", "objective_super/s9_03",
+            "objective_super/s9_08", "objective_super/s9_11"};
+        double зазор = 10;
+        BufferedImage первая = Textures.card(теги[0]);
+        if (первая == null) {
+            return;
+        }
+        int w = px(КАРТА_ЗАДАНИЕ_Ш * первая.getHeight() / (double) первая.getWidth());
+        int h = px(КАРТА_ЗАДАНИЕ_Ш);
+        double всего = теги.length * h + (теги.length - 1) * px(зазор);
+        double y = cy - всего / 2;
+        for (int i = 0; i < теги.length; i++) {
+            BufferedImage a = Textures.card(теги[i]);
+            if (a != null) {
+                стопка(g, набок(a), (int) Math.round(cx - w / 2.0), (int) Math.round(y), w, h,
+                    i == 0 ? 4 : 1);
+            }
+            y += h + px(зазор);
+        }
+        якорьТ("7·2", cx - w * 0.30, cy - всего / 2 + h * 0.5);
     }
 
     /**

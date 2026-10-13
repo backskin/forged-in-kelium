@@ -9,7 +9,6 @@ import os
 import sys
 
 import yaml
-import стрелка
 from PIL import Image, ImageDraw, ImageFont
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -105,7 +104,8 @@ for i, (имя, зд, вых, подп) in enumerate(ряды):
     ц = y + РЯД // 2
     холст.alpha_composite(зд, (ЛЕВО + ш_зд - зд.width, ц - зд.height // 2))
     x = ЛЕВО + ш_зд + 40
-    стрелка.между(холст, x, ц, x + 180, ц, высота=170)
+    d.polygon([(x, ц - 26), (x + 120, ц - 26), (x + 120, ц - 56), (x + 180, ц),
+               (x + 120, ц + 56), (x + 120, ц + 26), (x, ц + 26)], fill=ОХРА)
     x += 220
     вв = max(im.height for im in вых)
     верх = ц - (вв + 80) // 2

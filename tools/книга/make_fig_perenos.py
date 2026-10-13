@@ -11,7 +11,6 @@ import math
 import os
 
 import yaml
-import стрелка
 from PIL import Image, ImageDraw, ImageFilter
 
 D = os.path.dirname(os.path.abspath(__file__))
@@ -64,14 +63,26 @@ for k in range(толщ, 0, -1):
 # дуговая стрелка над ячейками
 d = ImageDraw.Draw(холст)
 ax, bx = cx + с * 0.15, nx - с * 0.15
-верх = min(cy, ny) - с * 0.5
+верх = min(cy, ny) - с * 0.55
 точки = []
 for i in range(41):
     t = i / 40
     x = (1 - t) ** 2 * ax + 2 * (1 - t) * t * (ax + bx) / 2 + t ** 2 * bx
     y = (1 - t) ** 2 * (cy - с * 0.45) + 2 * (1 - t) * t * верх + t ** 2 * (ny - с * 0.55)
     точки.append((x, y))
-стрелка.дуга(холст, точки, 50)
+(ex, ey), (px, py) = точки[-1], точки[-4]
+уг = math.atan2(ey - py, ex - px)
+dl, dw = 70, 46
+остриё = [(ex, ey),
+          (ex - dl * math.cos(уг) + dw * math.sin(уг), ey - dl * math.sin(уг) - dw * math.cos(уг)),
+          (ex - dl * math.cos(уг) - dw * math.sin(уг), ey - dl * math.sin(уг) + dw * math.cos(уг))]
+# ОДНОЙ ФИГУРОЙ (дизайнер 14.10.2026): белая подложка общая у дуги и острия,
+# остриё ложится на конец дуги без своей каймы — нет «палочки и треугольника»
+БЕЛ = (255, 255, 255, 230)
+d.line(точки[:-3], fill=БЕЛ, width=30, joint="curve")
+d.polygon(остриё, fill=БЕЛ, outline=БЕЛ, width=12)
+d.line(точки[:-3], fill=ЦВЕТ, width=18, joint="curve")
+d.polygon(остриё, fill=ЦВЕТ)
 
 png = os.path.join(D, "_перенос-модуля.png")
 холст.save(png)
