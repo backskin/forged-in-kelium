@@ -20,6 +20,7 @@
 Тексты — по канону мира (rules/КНИГА МИРА) и главе 1 книги правил.
 
 Запуск: python задник_коробки.py → design-docs/обложка/задник коробки.png (+ .pdf)
+        и «задник коробки — с вылетами 10 мм» (.png, .pdf 320×320 мм с TrimBox) для типографии
 """
 import os
 import subprocess
@@ -69,17 +70,23 @@ def лидер(i, ф):
 
 лидеры = "".join(лидер(i, ф) for i, ф in enumerate(["красный", "синий", "зелёный", "жёлтый"]))
 
+В = 100                 # вылет 10 мм (10 точек на мм)
+П = 3000 + 2 * В        # сторона листа с вылетами
+
 HTML = f"""<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face {{ font-family: T; src: url("{url('C:/Windows/Fonts/Tektur-Bold.ttf')}"); font-weight: 700; }}
 @font-face {{ font-family: T; src: url("{url('C:/Windows/Fonts/Tektur-Black.ttf')}"); font-weight: 900; }}
 @font-face {{ font-family: N; src: url("{url('C:/Windows/Fonts/TekturNarrow-Regular.ttf')}"); font-weight: 400; }}
 @font-face {{ font-family: N; src: url("{url('C:/Windows/Fonts/TekturNarrow-Bold.ttf')}"); font-weight: 700; }}
-html, body {{ margin: 0; width: 3000px; height: 3000px; overflow: hidden; background: #141a18; }}
-.з {{ position: relative; width: 3000px; height: 3000px; overflow: hidden; color: #efe9d8; font-family: N; }}
-.земля {{ position: absolute; inset: 1150px 0 0 0;
+html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; background: #141a18; }}
+/* ВЫЛЕТЫ (дизайнер 14.10.2026): лист {П}×{П}, обрезной формат 3000×3000 сдвинут
+   на {В} точек; фоны уходят под обрез, вся вёрстка — внутри формата */
+.з {{ position: absolute; left: {В}px; top: {В}px; width: 3000px; height: 3000px; overflow: visible;
+  color: #efe9d8; font-family: N; }}
+.земля {{ position: absolute; inset: 1150px -{В}px -{В}px -{В}px;
   background: linear-gradient(180deg, rgba(20,26,24,.85) 0%, rgba(20,26,24,.5) 30%, rgba(20,26,24,.6) 100%),
     url("{url(ЗЕМЛЯ)}") 0 0 / 1100px auto repeat; filter: saturate(.75) brightness(.62); }}
-.арт {{ position: absolute; inset: 0 0 auto 0; height: 1700px;
+.арт {{ position: absolute; inset: -{В}px -{В}px auto -{В}px; height: {1700 + В}px;
   background: url("{url(АРТ)}") 50% 30% / cover;
   -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent 98%); }}
 .арт::after {{ content: ""; position: absolute; inset: 0; background:
@@ -188,14 +195,26 @@ html, body {{ margin: 0; width: 3000px; height: 3000px; overflow: hidden; backgr
 os.makedirs(ВЫХОД, exist_ok=True)
 html = os.path.join(D, "_задник.html")
 open(html, "w", encoding="utf-8").write(HTML)
-png = os.path.join(ВЫХОД, "задник коробки.png")
+лист = os.path.join(ВЫХОД, "задник коробки — с вылетами 10 мм.png")
 subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
                 "--user-data-dir=" + os.path.join(D, "chr"), "--virtual-time-budget=8000",
-                "--window-size=3000,3000", "--screenshot=" + png, url(html)], check=True,
+                f"--window-size={П},{П}", "--screenshot=" + лист, url(html)], check=True,
                capture_output=True)
 os.remove(html)
+# обрезной формат — для просмотра
+from PIL import Image
+png = os.path.join(ВЫХОД, "задник коробки.png")
+Image.open(лист).crop((В, В, В + 3000, В + 3000)).save(png)
+ММ = 72 / 25.4
 pdf = pymupdf.open()
-стр = pdf.new_page(width=300 / 25.4 * 72, height=300 / 25.4 * 72)
+стр = pdf.new_page(width=300 * ММ, height=300 * ММ)
 стр.insert_image(стр.rect, filename=png)
 pdf.save(os.path.join(ВЫХОД, "задник коробки.pdf"), deflate=True)
-print("готово:", png)
+# печатный: 320×320 мм, TrimBox — формат 300×300 мм, BleedBox — весь лист
+pdf = pymupdf.open()
+стр = pdf.new_page(width=320 * ММ, height=320 * ММ)
+стр.insert_image(стр.rect, filename=лист)
+стр.set_bleedbox(стр.rect)
+стр.set_trimbox(pymupdf.Rect(10 * ММ, 10 * ММ, 310 * ММ, 310 * ММ))
+pdf.save(os.path.join(ВЫХОД, "задник коробки — с вылетами 10 мм.pdf"), deflate=True)
+print("готово:", png, "и", лист)
