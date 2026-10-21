@@ -103,7 +103,7 @@ public final class Objectives {
                 return p.arsenalHand.size();
             case "buildings_off_cu":
                 // o47 «Демонтаж»: своё здание уходит в запас БЕЗ компенсации
-                // (обычный снос даёт монету, здесь не даёт).
+                // (как и при обычном сносе, платы за это нет).
                 return ownBuildingsOffCu(p).size();
             default:
                 try {

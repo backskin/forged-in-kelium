@@ -226,8 +226,10 @@ public final class RuleWords {
                 "устаревший ключ: потолок операций Стройки снят 06.09.2026";
             case "actions.build.surcharge_coins" ->
                 "устаревший ключ: надбавки за объём в Стройке нет";
-            case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
-            case "actions.build.demolish_cost_coins" -> "сколько стоит снос своего здания";
+            case "actions.build.demolish_refund_coins" ->
+                "устаревший ключ: за снос своего здания не платят и не получают";
+            case "actions.build.demolish_cost_coins" ->
+                "устаревший ключ: снос своего здания бесплатен";
             case "actions.combat.token_surcharge_ammo" ->
                 "доплата боеприпасами за жетон, бьющий не из выбранного гекса";
             case "actions.build.move_enabled" ->

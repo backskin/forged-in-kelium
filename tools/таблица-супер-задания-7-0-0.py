@@ -13,7 +13,7 @@
 базовых курсов нарочно — источник работает не у всех четверых, а только у того,
 кто взял карту, и она у него одна на партию.
 
-Данные берутся из data/cards/super_objectives.7.0.0.yaml — файл и есть источник.
+Данные берутся из data/cards/super_objectives.7.1.0.yaml — файл и есть источник.
 
 Запуск: python tools/таблица-супер-задания-7-0-0.py
 """
@@ -24,7 +24,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-ИСТОЧНИК = 'data/cards/super_objectives.7.0.0.yaml'
+ИСТОЧНИК = 'data/cards/super_objectives.7.1.0.yaml'
 ЦЕЛЬ = 'docs/СУПЕР ЗАДАНИЯ 7.0.0 — карты целиком.xlsx'
 
 ТОНКАЯ = Side(style='thin', color='FFB0B0B0')
