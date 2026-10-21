@@ -66,7 +66,10 @@ public final class НастройкиСтола {
         }
         List<Integer> out = new ArrayList<>();
         for (Object o : список) {
-            out.add(o instanceof Number n ? n.intValue() : 0);
+            // ПУСТОТА ОСТАЁТСЯ ПУСТОТОЙ. В поворотах ЦУ null значит «не
+            // задан», а ноль — «стенками 1–2»: подменить одно другим значит
+            // развернуть кому-то штаб и развалить партию на подготовке.
+            out.add(o instanceof Number n ? n.intValue() : null);
         }
         return out;
     }

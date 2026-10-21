@@ -2,6 +2,7 @@ package kelium.gui.net;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -78,6 +79,51 @@ class СетевойСтолTest {
             assertEquals(строки(а), строки(б),
                 "журналы партии у хозяина и гостя разошлись");
         }
+    }
+
+    /**
+     * НАСТРОЙКИ ПЕРЕЖИВАЮТ ПРОВОД ЦЕЛИКОМ. Разойдись у хозяина и гостя хоть
+     * одно поле — сид, свод, состав, раскладка, тренировочные значения, — и
+     * копии движка разъедутся на первом же решении, причём молча.
+     */
+    @Test
+    void настройкиСтолаПереживаютПровод() {
+        HotSeatWindow.Options было = new HotSeatWindow.Options(
+            "1.43.0", 3, -7788L, List.of("human", "balanced:2", "human"),
+            "карта-4", null, java.util.Arrays.asList(2, null, 5), List.of(1, 0, 3), 9, null, 4);
+
+        HotSeatWindow.Options стало = НастройкиСтола.изСообщения(
+            НастройкиСтола.вСообщение(было));
+
+        assertEquals(было.rulesetId(), стало.rulesetId(), "свод");
+        assertEquals(было.players(), стало.players(), "число игроков");
+        assertEquals(было.seed(), стало.seed(), "сид");
+        assertEquals(было.seatSpecs(), стало.seatSpecs(), "состав мест");
+        assertEquals(было.scenarioId(), стало.scenarioId(), "раскладка");
+        assertEquals(было.seatColors(), стало.seatColors(), "краски мест");
+        assertEquals(было.cuFacing(), стало.cuFacing(), "повороты ЦУ, вместе с незаданными");
+        assertEquals(было.startCoins(), стало.startCoins(), "стартовые монеты");
+        assertEquals(было.startKelium(), стало.startKelium(), "стартовый келемий");
+        assertEquals(было.startAmmo(), стало.startAmmo(), "стартовые боеприпасы");
+        assertTrue(стало.training(), "тренировочная партия обязана остаться тренировочной");
+    }
+
+    /**
+     * СВОЯ РАСКЛАДКА ИЗ ФАЙЛА ПО СЕТИ НЕ ЕДЕТ: это путь на диске хозяина, и у
+     * гостя такого файла нет. Сказать это надо в лобби, а не дать партии
+     * развалиться на подготовке у гостя.
+     */
+    @Test
+    void столСоСвоимФайломРаскладкиНеПоднимается() {
+        HotSeatWindow.Options своя = new HotSeatWindow.Options(
+            "1.43.0", 2, 1L, List.of("human", "human"),
+            null, java.nio.file.Path.of("data", "scenarios", "своя.kmap"),
+            null, null, null, null, null);
+        assertNotNull(НастройкиСтола.почемуНельзя(своя),
+            "стол со своим файлом раскладки обязан отказаться подниматься");
+        assertNull(НастройкиСтола.почемуНельзя(
+                HotSeatWindow.Options.simple(2, 1L, List.of("human", "balanced"))),
+            "обычный стол поднимается без оговорок");
     }
 
     private static Thread партия(HotSeatWindow.Options настройки, ЛентаРешений лента,
