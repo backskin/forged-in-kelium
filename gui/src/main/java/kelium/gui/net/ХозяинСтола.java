@@ -77,12 +77,40 @@ public final class ХозяинСтола implements AutoCloseable {
         for (int i = 0; i < места.size(); i++) {
             String кто = switch (места.get(i)) {
                 case Я -> "вы";
-                case БОТ -> "бот " + настройки.seatSpecs().get(i);
+                // ИМЯ БОТА ПО-ЧЕЛОВЕЧЕСКИ, а не составом из кода: за столом
+                // сидит «Ровный · мастер», а не balanced:2.
+                case БОТ -> "бот " + поЧеловечески(настройки.seatSpecs().get(i));
                 case СЕТЬ -> занято(i) ? "игрок по сети" : "ждём игрока";
             };
             out.add("Место " + (i + 1) + ": " + кто);
         }
         return out;
+    }
+
+    /**
+     * СОСТАВ БОТА ЧЕЛОВЕЧЕСКИМИ СЛОВАМИ: «balanced:2» → «Ровный · мастер».
+     * Названия берутся из справочника ботов — того же, что показывает «Штаб».
+     */
+    private static String поЧеловечески(String состав) {
+        if (состав == null) {
+            return "?";
+        }
+        int двоеточие = состав.indexOf(':');
+        String характер = двоеточие < 0 ? состав : состав.substring(0, двоеточие);
+        String уровень = двоеточие < 0 ? null : состав.substring(двоеточие + 1);
+        String имя = подпись(kelium.agents.BotCatalog.ХАРАКТЕРЫ, характер, характер);
+        return уровень == null ? имя
+            : имя + " · " + подпись(kelium.agents.BotCatalog.УРОВНИ, уровень, уровень);
+    }
+
+    private static String подпись(List<kelium.agents.BotCatalog.Entry> где,
+                                   String id, String запасное) {
+        for (kelium.agents.BotCatalog.Entry e : где) {
+            if (e.id().equals(id)) {
+                return e.label();
+            }
+        }
+        return запасное;
     }
 
     /** Подписаться на изменения рассадки (экран лобби перерисовывается). */

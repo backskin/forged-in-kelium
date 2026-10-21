@@ -1238,7 +1238,7 @@ public final class HotSeatWindow {
             boards.show(r, f.snapshot);
         }
         if (f.log != null && !f.log.isBlank()) {
-            feedLine(f.seat, f.log);
+            feedLine(f.seat, наЭкран(f));
         }
         trackSteps(f);
         refreshHands(f);
@@ -1288,6 +1288,44 @@ public final class HotSeatWindow {
             }
             opponents.update(rows);
         }
+    }
+
+    /**
+     * СТРОКА ЛЕНТЫ ДЛЯ ЭКРАНА — не всегда та, что уходит в журнал.
+     *
+     * <p>Журнал по заказу знает ВСЁ, включая закрытые руки: он пишется для
+     * разбора после партии. А на экране сидит живой человек, и рядом с ним за
+     * столом (или на другом конце провода) сидят соперники, чьи карты закрыты
+     * правилами. Две строки, которые это нарушали:
+     *
+     * <ul>
+     *   <li>«Отложенные приказы: Игрок 2 отложил НАСТУПЛЕНИЕ» — отложенный
+     *       приказ лежит рубашкой вверх, и видеть его может только владелец;</li>
+     *   <li>«Игрок 2 получил задание „Засада“» — добранная карта уходит в
+     *       закрытую руку.</li>
+     * </ul>
+     *
+     * <p>Когда за столом один живой и остальные боты, резать нечего: прятать
+     * не от кого, а подробная лента — половина удовольствия от разбора.
+     */
+    private String наЭкран(ReplayRecord.Frame f) {
+        return наЭкран(f, лента != null || humansBySeat.size() > 1, viewedSeat,
+            f.seat == null ? "Игрок" : seatName(f.seat));
+    }
+
+    /** То же без окна — чтобы правило можно было проверить тестом. */
+    static String наЭкран(ReplayRecord.Frame f, boolean естьОтКогоПрятать,
+                           int своёМесто, String имяМеста) {
+        if (!естьОтКогоПрятать || f.type == null) {
+            return f.log;
+        }
+        return switch (f.type) {
+            case "blind_discard" -> "Отложенные приказы: отложили все, лица закрыты";
+            case "objective_drawn" -> f.seat != null && f.seat == своёМесто ? f.log
+                : (f.seat == null ? "Карта задания ушла в руку"
+                    : имяМеста + " получил карту задания");
+            default -> f.log;
+        };
     }
 
     private static int vpTotal(ReplayRecord.Player p) {
@@ -1371,6 +1409,11 @@ public final class HotSeatWindow {
             lastAgentLabels = new ArrayList<>();
             lockedSteps.add("Приказ вскрыт");
             stepsCaption.setText("ШАГИ ХОДА — ИГРОК " + (f.seat + 1));
+            if (лента != null) {
+                stepsCaption.setToolTipText("За сетевым столом отката нет: ваше решение "
+                    + "уже ушло соседям, и размотать его у себя значило бы играть "
+                    + "дальше другую партию");
+            }
             actionBar.turnStarted();
             // ВСКРЫТЫЙ ПРИКАЗ — К КНОПКАМ ДЕЙСТВИЙ: действия берутся с этой
             // карты, и держать её в голове игрок не должен.
@@ -1428,8 +1471,14 @@ public final class HotSeatWindow {
         if (agent != null) {
             // Откат безопасен только на границе действий: пока движок стоит на
             // точке вида action этого же хода (см. javadoc UndoableAgent).
+            //
+            // ЗА СЕТЕВЫМ СТОЛОМ ОТКАТА НЕТ ВОВСЕ. Откат разворачивает состояние
+            // НА ЭТОМ компьютере, а решение уже ушло соседям и легло в их
+            // копии; размотать у себя — значит играть дальше другую партию с
+            // общим счётом. Соседям это видно не будет, и поймают они это
+            // через десять ходов, когда сверка скажет «столы разъехались».
             boolean undoNow = awaitingSeat != null && awaitingSeat.equals(turnSeat)
-                && "action".equals(pendingKind);
+                && "action".equals(pendingKind) && лента == null;
             List<String> labels = agent.checkpointLabels();
             for (int i = 0; i < labels.size(); i++) {
                 String ru = ActionBar.ACTIONS.getOrDefault(labels.get(i), labels.get(i));
@@ -1627,7 +1676,10 @@ public final class HotSeatWindow {
      * а разбирать партию удобнее целиком.
      */
     private void refreshSheetSeats() {
-        boolean общийСтол = humansBySeat.size() > 1;
+        // СЕТЕВОЙ СТОЛ — ТОЖЕ ОБЩИЙ. Живой за этим компьютером один, но
+        // остальные места заняты людьми за другими экранами, и смотреть их
+        // планшеты с их закрытыми картами нельзя ровно по той же причине.
+        boolean общийСтол = humansBySeat.size() > 1 || лента != null;
         sheetSeatBtns.forEach((s, b) -> {
             boolean свой = !общийСтол || s == viewedSeat;
             b.setEnabled(свой);
