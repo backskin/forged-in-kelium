@@ -48,8 +48,10 @@ import kelium.report.Textures;
  * <p>Запуск:
  * <pre>
  *   java -cp gui/target/kelium-runner.jar kelium.gui.replay2.СнимокСтола \
- *        &lt;куда.png&gt; [ширина в точках] [раскладка.kmap] [сид]
+ *        &lt;куда.png&gt; [ширина в точках] [раскладка.kmap] [сид] [сукно] [игроков]
  * </pre>
+ * Игроков по умолчанию трое (разворот книги). Задник коробки снимает партию на
+ * четверых ради раскладки поля; зоны рисуются только у первых трёх мест.
  */
 public final class СнимокСтола {
 
@@ -147,8 +149,9 @@ public final class СнимокСтола {
         if (args.length > 4 && !args[4].isBlank()) {
             сукно = args[4];
         }
+        int игроков = args.length > 5 ? Integer.parseInt(args[5]) : 3;
 
-        GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 3, сид,
+        GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, игроков, сид,
             root, null, null, null, раскладка);
         GameState st = Setup.buildGame(cfg);
         // ПОДГОТОВКА ДОИГРЫВАЕТСЯ ДО КОНЦА: глухие жетоны раздаются на шаге 14
@@ -160,7 +163,7 @@ public final class СнимокСтола {
             st.marketActive = st.decks.get("market").draw(st.rng);
         }
         ReplayRecord rec = GameRecorder.setupOnly(cfg, st, сид,
-            List.of("human", "human", "human"));
+            java.util.Collections.nCopies(игроков, "human"));
 
         Session session = new Session();
         session.setContent(ContentLibrary.forRuleset(cfg.ruleset, root));
