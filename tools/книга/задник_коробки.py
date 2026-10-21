@@ -70,10 +70,11 @@ else:
 
 ЛОГО = os.path.join(КОРЕНЬ, "design-docs", "логотип-лекс", "LEX TALIONIS — логотип (рамка).png")
 СТОЛ_ВЕСЬ = os.path.join(D, "стол-коробка-4.png")
-# Верхние планшеты двух игроков отрезаны по пустой полосе над полем: в кадре
-# поле, колоды и ближний игрок — иначе планшеты налезают на текст и лидеров.
+# В кадре только середина стола — поле, колоды, наука, рынок и общий запас;
+# планшеты игроков отрезаны (сверху по пустой полосе, снизу — гаснут), чтобы
+# поле было крупным и ни на что не налезало.
 СТОЛ = os.path.join(D, "_стол-задник.png")
-СТОЛ_ВЕРХ = 600
+СТОЛ_РАМКА = (170, 600, 2312, 1600)
 КУЧА = os.path.join(D, "куча-жетонов.png")            # куча_жетонов.py
 ПЕРС = os.path.join(КОРЕНЬ, "illustrations", "персонажи-png")   # вырезать.py
 
@@ -85,9 +86,9 @@ else:
     "зелёный": (89, 375, 532, 302, 554),
     "жёлтый":  (120, 375, 525, 320, 584),
 }
-ГОЛОВА = 245                     # «размер головы» в точках задника
-ГЛАЗА_Y = 640                    # линия глаз
-ЦЕНТРЫ = (1500, 1950, 2400, 2830)  # середины голов по x
+ГОЛОВА = 190                     # «размер головы» в точках задника
+ГЛАЗА_Y = 830                    # линия глаз
+ЦЕНТРЫ = (1600, 1975, 2350, 2725)  # середины голов по x
 
 
 def лидер(i, ф):
@@ -130,12 +131,16 @@ HTML = f"""<!doctype html><html><head><meta charset="utf-8"><style>
 html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; background: #141a18; }}
 .з {{ position: absolute; left: {В}px; top: {В}px; width: 3000px; height: 3000px; overflow: visible;
   color: #efe9d8; font-family: N; }}
-.земля {{ position: absolute; inset: 1100px -{В}px -{В}px -{В}px;
+.земля {{ position: absolute; inset: 1150px -{В}px -{В}px -{В}px;
   background: linear-gradient(180deg, rgba(20,26,24,.9) 0%, rgba(20,26,24,.45) 30%, rgba(20,26,24,.65) 100%),
     {ЗЕМЛЯ_CSS}; filter: saturate(.75) brightness(.62); }}
-.арт {{ position: absolute; inset: -{В}px -{В}px auto -{В}px; height: {1600 + В}px;
+.арт {{ position: absolute; inset: -{В}px -{В}px auto -{В}px; height: {1330 + В}px;
   background: url("{url(АРТ)}") 50% 30% / cover;
-  -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent 98%); }}
+  -webkit-mask-image: linear-gradient(180deg, #000 80%, transparent 100%); }}
+/* ЗОНЫ НЕ ПЕРЕКРЫВАЮТСЯ (дизайнер 21.10.2026): лидеры обрезаны низом сцены,
+   стол лежит ниже, тезисы — слева от стола, куча — в полосе состава */
+.шеренга {{ position: absolute; left: 0; top: 0; width: 3000px; height: 1300px; overflow: hidden; z-index: 3;
+  -webkit-mask-image: linear-gradient(180deg, #000 82%, transparent 100%); }}
 .арт::after {{ content: ""; position: absolute; inset: 0; background:
   linear-gradient(180deg, rgba(20,26,24,0) 50%, rgba(20,26,24,.55) 90%),
   linear-gradient(90deg, rgba(20,26,24,.97) 0%, rgba(20,26,24,.88) 32%, rgba(20,26,24,.25) 46%, rgba(20,26,24,0) 56%); }}
@@ -148,23 +153,23 @@ html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; backgr
 .мир p {{ margin: 0; font: 400 40px/1.4 N; color: #e2dccb; text-shadow: 0 2px 8px rgba(0,0,0,.9); }}
 .мир b {{ color: #8fe36b; font-weight: 700; }}
 .перс {{ position: absolute;
-  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 90%);
   filter: drop-shadow(0 24px 30px rgba(0,0,0,.7)); }}
-.стол-обёртка {{ position: absolute; left: 700px; top: 1020px; width: 3150px; height: 2100px;
+.стол-обёртка {{ position: absolute; left: 980px; top: 1300px; width: 2350px; height: 1100px;
   perspective: 3400px; z-index: 5; }}
 .стол {{ position: absolute; inset: 0; background: url("{url(СТОЛ)}") center / contain no-repeat;
-  transform: rotateX(38deg) rotateZ(-7deg); transform-origin: 50% 40%;
+  transform: rotateX(24deg) rotateZ(-3deg); transform-origin: 50% 50%;
+  -webkit-mask-image: linear-gradient(180deg, #000 80%, transparent 100%);
   filter: drop-shadow(0 50px 40px rgba(0,0,0,.8)); }}
-.тезисы {{ position: absolute; left: 110px; top: 1000px; width: 1000px; z-index: 7;
+.тезисы {{ position: absolute; left: 100px; top: 1330px; width: 900px; z-index: 7;
   display: flex; flex-direction: column; gap: 30px; }}
 .тезис {{ padding: 0 0 0 34px; border-left: 9px solid #8fe36b; }}
 .тезис h3 {{ margin: 0 0 8px; font: 900 48px/1.1 T; color: #fff; text-transform: uppercase;
   text-shadow: 0 3px 12px rgba(0,0,0,.95); }}
 .тезис p {{ margin: 0; font: 400 37px/1.36 N; color: #ddd7c5; text-shadow: 0 2px 8px rgba(0,0,0,.95); }}
-.итог {{ position: absolute; left: 110px; top: 1815px; width: 980px; z-index: 7;
+.итог {{ margin-top: 6px;
   font: 700 40px/1.32 N; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.95); }}
 .итог b {{ color: #8fe36b; }}
-.куча {{ position: absolute; left: 50px; top: 1975px; width: 760px; z-index: 8;
+.куча {{ position: relative; width: 640px; align-self: center;
   filter: drop-shadow(0 26px 26px rgba(0,0,0,.8)); }}
 .куча img {{ width: 100%; display: block; }}
 .куча div {{ position: absolute; left: -20px; right: -20px; bottom: 20px; text-align: center; padding: 16px 0 12px;
@@ -176,9 +181,9 @@ html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; backgr
 .состав {{ flex: 1; border: 5px solid #8fe36b; border-radius: 30px; padding: 20px 40px 20px;
   background: rgba(16,22,19,.95); box-shadow: 0 20px 40px rgba(0,0,0,.5); }}
 .состав h2 {{ margin: 0 0 12px; font: 900 46px T; color: #8fe36b; letter-spacing: .08em; text-transform: uppercase; text-align: center; }}
-.столбцы {{ display: grid; grid-template-columns: 1fr 1.1fr 1.1fr; gap: 0 40px; }}
+.столбцы {{ display: grid; grid-template-columns: 1fr 1.05fr 1.15fr; gap: 0 30px; }}
 .столбцы h3 {{ margin: 0 0 6px; font: 900 32px T; color: #fff; text-transform: uppercase; letter-spacing: .05em; }}
-.столбцы ul {{ margin: 0; padding: 0; list-style: none; font: 400 31px/1.27 N; color: #d8d2c0; }}
+.столбцы ul {{ margin: 0; padding: 0; list-style: none; font: 400 28px/1.27 N; color: #d8d2c0; }}
 .столбцы li {{ margin-bottom: 3px; padding-left: 24px; text-indent: -24px; }}
 .столбцы li::before {{ content: "◆ "; color: #8fe36b; font-size: 20px; vertical-align: 4px; }}
 .столбцы b {{ color: #fff; font-weight: 700; }}
@@ -195,7 +200,7 @@ html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; backgr
   background: rgba(0,0,0,.6); padding: 6px 16px; }}
 </style></head><body><div class="з">
 <div class="земля"></div><div class="арт"></div>
-{лидеры}
+<div class="шеренга">{лидеры}</div>
 <div class="стол-обёртка"><div class="стол"></div></div>
 <img class="лого" src="{url(ЛОГО)}">
 <div class="мир">
@@ -205,11 +210,11 @@ html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; backgr
 виде, — и колонии, у которых кончаются силы, летят домой забрать его.
 На поле боя выясняется: никто не отстал, и у каждого своё оружие.</p>
 </div>
-<div class="тезисы">{тезисы}</div>
+<div class="тезисы">{тезисы}
 <div class="итог">Побеждает тот, у кого больше очков. Или сразу — кто первым возьмёт
-<b>вершины всех трёх технологий</b> либо уничтожит <b>второй центр управления</b> соперников.</div>
-<div class="куча"><img src="{url(КУЧА)}"><div>Более 150 жетонов<small>зданий, войск и модулей — и 192 кубика</small></div></div>
+<b>вершины всех трёх технологий</b> либо уничтожит <b>второй центр управления</b> соперников.</div></div>
 <div class="низ">
+<div class="куча"><img src="{url(КУЧА)}"><div>Более 150 жетонов<small>зданий, войск и модулей — и 192 кубика</small></div></div>
 <div class="состав"><h2>Состав игры</h2><div class="столбцы">
 <div><h3>Поле</h3><ul>
 <li><b>10</b> блоков поля: 5 больших и 5 малых</li>
@@ -247,7 +252,7 @@ html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; backgr
 os.makedirs(ВЫХОД, exist_ok=True)
 from PIL import Image
 _с = Image.open(СТОЛ_ВЕСЬ)
-_с.crop((0, СТОЛ_ВЕРХ, _с.width, _с.height)).save(СТОЛ)
+_с.crop(СТОЛ_РАМКА).save(СТОЛ)
 html = os.path.join(D, "_задник.html")
 open(html, "w", encoding="utf-8").write(HTML)
 лист = os.path.join(ВЫХОД, "задник коробки — с вылетами 10 мм.png")
