@@ -125,6 +125,8 @@ public final class StartMenuWindow {
     private JLabel hint;
     private JLabel readyLine;
     KpButton startBtn;
+    /** «Подключиться к столу» — видна только в сетевом режиме. */
+    KpButton joinBtn;
     KpChooser rulesBox;
     KpChooser mapBox;
     SeedBox seedBox;
@@ -156,6 +158,19 @@ public final class StartMenuWindow {
      */
     private boolean soloHuman() {
         return humans() == 1;
+    }
+
+    /**
+     * ЕСТЬ ЛИ ЗА СТОЛОМ МЕСТО ИМЕННО МОЁ — то, которое выбирают на поле и
+     * подписывают «ВЫ».
+     *
+     * <p>За одним компьютером такое место есть, только если живой игрок один:
+     * иначе живые равны между собой. ПО СЕТИ всё наоборот — своё место есть
+     * всегда, сколько бы живых ни село: остальные живые сидят за другими
+     * компьютерами, и путать их со своим нельзя.
+     */
+    private boolean естьМоёМесто() {
+        return mode == Mode.NET || soloHuman();
     }
     private int players = 2;
     private long seed = 100000 + new Random().nextInt(900000);
@@ -409,18 +424,8 @@ public final class StartMenuWindow {
         b.setPreferredSize(new Dimension(Theme.px(280), Theme.px(44)));
         b.setMaximumSize(new Dimension(Integer.MAX_VALUE, Theme.px(44)));
         b.setAlignmentX(Component.LEFT_ALIGNMENT);
-        // Сетевой стол в движке есть (GameServer/Lobby), а ЭКРАНА лобби ещё нет —
-        // плитка честно говорит об этом, вместо того чтобы вести в никуда.
-        boolean ready = m != Mode.NET;
-        b.setState(!ready ? KpButton.State.DISABLED
-            : m == mode ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
-        if (!ready) {
-            b.setTexts(title, "экран лобби ещё не сделан");
-        }
+        b.setState(m == mode ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
         b.onClick(() -> {
-            if (!ready) {
-                return;
-            }
             mode = m;
             modeTiles.forEach((k, t) -> {
                 if (t.state() != KpButton.State.DISABLED) {
@@ -547,7 +552,7 @@ public final class StartMenuWindow {
      */
     private void applyBotCount() {
         ensureBots();
-        if (!soloHuman()) {
+        if (!естьМоёМесто()) {
             // Живых несколько (или все) — своё место не выбирают: за столом
             // заняты все, и «ВЫ» ни за одним из них не закреплено.
             mySeat = null;
@@ -681,6 +686,21 @@ public final class StartMenuWindow {
         startBtn.setAlignmentX(Component.RIGHT_ALIGNMENT);
         startBtn.onClick(this::launch);
         right.add(startBtn);
+
+        // ПОДКЛЮЧИТЬСЯ К ЧУЖОМУ СТОЛУ — вторая, тихая кнопка: стол поднимает
+        // один, а садятся за него остальные, и им настройки собирать не нужно
+        // вовсе — у них всё придёт от хозяина.
+        joinBtn = new KpButton("Подключиться к столу", "сесть за чужой", null);
+        joinBtn.setPreferredSize(new Dimension(Theme.px(220), Theme.px(38)));
+        joinBtn.setMaximumSize(new Dimension(Theme.px(220), Theme.px(38)));
+        joinBtn.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        joinBtn.setToolTipText("Адрес и порт диктует хозяин стола — он видит их у себя");
+        joinBtn.onClick(() -> {
+            frame.dispose();
+            kelium.gui.net.ОкноЛобби.спроситьАдрес();
+        });
+        right.add(javax.swing.Box.createVerticalStrut(Theme.px(4)));
+        right.add(joinBtn);
         foot.add(right, BorderLayout.EAST);
         refreshSeats();
         return foot;
@@ -744,7 +764,7 @@ public final class StartMenuWindow {
         boolean живой = HUMAN.equals(bots.get(seat));
         // «ВЫ» — только когда живой за столом ОДИН. Иначе живые равны, и
         // выделять одного из них не за что.
-        boolean этоЯ = живой && soloHuman();
+        boolean этоЯ = живой && естьМоёМесто();
         JLabel who = new JLabel(этоЯ ? "ВЫ · место " + (seat + 1) : "место " + (seat + 1));
         who.setFont(Theme.font(11, Font.BOLD));
         who.setForeground(этоЯ ? Theme.seatInk(seat) : Theme.ink3());
@@ -762,7 +782,9 @@ public final class StartMenuWindow {
                 подпись += myFacing == null ? " · ЦУ не повёрнут"
                     : " · ЦУ стенками " + (myFacing + 1) + "–" + ((myFacing + 1) % 6 + 1);
             } else {
-                подпись += " · ходит по очереди";
+                // В СЕТЕВОМ СТОЛЕ чужое живое место ждёт игрока с другого
+                // компьютера, а не соседа по дивану: очередь тут ни при чём.
+                подпись = mode == Mode.NET ? "игрок по сети" : подпись + " · ходит по очереди";
             }
             JLabel me = new JLabel(подпись);
             me.setFont(Theme.font(12, Font.PLAIN));
@@ -1118,7 +1140,7 @@ public final class StartMenuWindow {
     private void applyFieldPicking() {
         field.clearSelectable();
         field.clearFacingChoice();
-        if (!soloHuman()) {
+        if (!естьМоёМесто()) {
             hint.setText("Живых игроков " + humans()
                 + " — места заняты все, выбирать нечего; ходят по очереди");
             hint.setForeground(Theme.ink2());
@@ -1163,7 +1185,15 @@ public final class StartMenuWindow {
         }
         boolean training = coinStep != null
             && (coinStep.changed() || keliumStep.changed() || ammoStep.changed());
-        if (soloHuman() && mySeat == null) {
+        // ПО СЕТИ КНОПКА ОБЕЩАЕТ ДРУГОЕ: не партию прямо сейчас, а поднятый
+        // стол, за который ещё должны сесть. Обещать «начать партию» и
+        // показать вместо неё лобби — то же, что соврать.
+        startBtn.setTexts(mode == Mode.NET ? "Поднять стол" : "Начать партию",
+            mode == Mode.NET ? "и ждать игроков" : "");
+        if (joinBtn != null) {
+            joinBtn.setVisible(mode == Mode.NET);
+        }
+        if (естьМоёМесто() && mySeat == null) {
             readyLine.setText("осталось: выбрать своё место на поле");
             startBtn.setState(KpButton.State.DISABLED);
         } else {
@@ -1174,10 +1204,23 @@ public final class StartMenuWindow {
         readyLine.setForeground(training ? Theme.points() : Theme.ink2());
     }
 
-    /** Собрать настройки и открыть окно партии. */
+    /** Собрать настройки и открыть окно партии (по сети — сперва лобби). */
     void launch() {
         HotSeatWindow.Options opts = optionsNow();
         if (opts == null) {
+            return;
+        }
+        if (mode == Mode.NET) {
+            // ПО СЕТИ ПАРТИЯ НАЧИНАЕТСЯ НЕ СРАЗУ: сперва стол поднимается и
+            // ждёт, пока сетевые места займут живые игроки. Это и есть лобби.
+            String нельзя = kelium.gui.net.НастройкиСтола.почемуНельзя(opts);
+            if (нельзя != null) {
+                readyLine.setText(нельзя);
+                readyLine.setForeground(Theme.accent());
+                return;
+            }
+            frame.dispose();
+            kelium.gui.net.ОкноЛобби.поднять(opts, mySeat == null ? -1 : mySeat);
             return;
         }
         frame.dispose();
@@ -1186,7 +1229,7 @@ public final class StartMenuWindow {
 
     /** Настройки стола, как он собран сейчас; null — место ещё не выбрано. */
     HotSeatWindow.Options optionsNow() {
-        if (soloHuman() && mySeat == null) {
+        if (естьМоёМесто() && mySeat == null) {
             return null;                 // одинокий живой обязан выбрать место
         }
         List<String> specs = new ArrayList<>();

@@ -209,6 +209,17 @@ public final class HotSeatWindow {
         new ArrayList<>());
     /** Лента загруженного сохранения: её надо доиграть, прежде чем спрашивать игрока. */
     private final List<Integer> replay = new ArrayList<>();
+    /**
+     * СЕТЕВАЯ ПОДАЧА. Не {@code null} — партия идёт за сетевым столом: свои
+     * места спрашиваются как обычно, чужие ждут номер варианта из сети. Всё
+     * остальное окно сетевой игры не замечает: движок, отрисовка, ящики и
+     * лента шагов те же, что в игре за одним компьютером.
+     */
+    private kelium.gui.net.ЛентаРешений лента;
+    /** Место, за которым сижу Я, когда партия сетевая; иначе −1. */
+    private int сетевоеМесто = -1;
+    /** Что закрыть вместе с окном: сетевой стол или подключение к нему. */
+    private Runnable наЗакрытие;
     /** Партия ещё догоняет сохранение — окно не мешает и ничего не спрашивает. */
     private volatile boolean catchingUp;
 
@@ -226,6 +237,21 @@ public final class HotSeatWindow {
     /** Открыть окно партии по собранным настройкам (зовёт меню запуска). */
     public static void open(Options options) {
         SwingUtilities.invokeLater(() -> new HotSeatWindow(options).start());
+    }
+
+    /**
+     * ОТКРЫТЬ ОКНО СЕТЕВОЙ ПАРТИИ. Настройки у всех за столом одинаковые, своё
+     * место — своё у каждого, а решения чужих мест приходят лентой.
+     */
+    public static void открытьПоСети(Options options, kelium.gui.net.ЛентаРешений лента,
+                                      int моёМесто, Runnable наЗакрытие) {
+        SwingUtilities.invokeLater(() -> {
+            HotSeatWindow w = new HotSeatWindow(options);
+            w.лента = лента;
+            w.сетевоеМесто = моёМесто;
+            w.наЗакрытие = наЗакрытие;
+            w.start();
+        });
     }
 
     /**
@@ -831,6 +857,16 @@ public final class HotSeatWindow {
         List<String> labels = new ArrayList<>();
         for (int seat = 0; seat < players; seat++) {
             String spec = seatSpecs.get(seat);
+            // ЧУЖОЕ ЖИВОЕ МЕСТО ЗА СЕТЕВЫМ СТОЛОМ не заводит интерактивного
+            // агента вовсе: его решения придут лентой, спрашивать здесь некого.
+            // Если завести — место попадёт в humansBySeat, и окно решит, что за
+            // компьютером несколько живых, и станет поднимать между ходами
+            // шторку передачи устройства там, где передавать нечего.
+            if ("human".equals(spec) && лента != null && seat != сетевоеМесто) {
+                agents.add(new ЧужоеМесто(seat));
+                labels.add("human");
+                continue;
+            }
             if ("human".equals(spec)) {
                 int seatFinal = seat;
                 kelium.core.UndoableAgent ia = new kelium.core.UndoableAgent(
@@ -853,7 +889,10 @@ public final class HotSeatWindow {
                 labels.add(spec);
             }
         }
-        mySeat = meSeat(seatSpecs);
+        mySeat = лента != null ? сетевоеМесто : meSeat(seatSpecs);
+        if (лента != null && сетевоеМесто >= 0) {
+            viewedSeat = сетевоеМесто;
+        }
 
         if (options.training()) {
             SwingUtilities.invokeLater(() -> feedLine(null,
@@ -871,6 +910,13 @@ public final class HotSeatWindow {
                 "Доигрываем сохранённое — " + replay.size() + " решений…"));
             playing = MoveLog.playback(playing, replay,
                 () -> SwingUtilities.invokeLater(this::onCaughtUp));
+        }
+        // СЕТЕВАЯ ОБЁРТКА — между настоящими агентами и пишущей: свои места
+        // она спрашивает и отправляет их выбор, чужие ждёт из сети. Пишущая
+        // поверх неё записывает И ЧУЖИЕ решения тоже — поэтому сетевую партию
+        // можно сохранить и доиграть потом за одним компьютером.
+        if (лента != null) {
+            playing = лента.обернуть(playing);
         }
         // ПИШУЩАЯ ОБЁРТКА — САМАЯ ВЕРХНЯЯ, поверх проигрывающей: иначе
         // доигранные по сохранению ходы мимо ленты пройдут, и сохранить
@@ -954,6 +1000,26 @@ public final class HotSeatWindow {
      * Живых несколько — компьютер просто передаёт ход каждому по очереди, и
      * который из них «я», не значит ничего: отмечать некого.
      */
+    /**
+     * ЧУЖОЕ ЖИВОЕ МЕСТО ЗА СЕТЕВЫМ СТОЛОМ. Агент-пустышка: его решения всегда
+     * перехватывает сетевая обёртка и берёт их из ленты, а сюда управление
+     * дойти не может. Если всё-таки дошло — это поломка подачи, и партия
+     * обязана встать вслух: молча сходить за соседа — худшее из возможного.
+     */
+    private static final class ЧужоеМесто extends Agent {
+
+        ЧужоеМесто(int seat) {
+            super(seat, "Игрок " + (seat + 1));
+        }
+
+        @Override
+        public Choice choose(GameState state, List<Choice> options,
+                             Map<String, Object> context) {
+            throw new IllegalStateException("Сетевой стол: спросили место " + (seat + 1)
+                + ", за которое решает другой компьютер.");
+        }
+    }
+
     public static int meSeat(List<String> seatSpecs) {
         int found = -1;
         for (int i = 0; i < seatSpecs.size(); i++) {
@@ -1091,6 +1157,15 @@ public final class HotSeatWindow {
         confirm.close();
         for (kelium.core.UndoableAgent a : humansBySeat.values()) {
             a.abort();
+        }
+        // СЕТЕВОЙ СТОЛ РАЗБИРАЕТСЯ ВМЕСТЕ С ОКНОМ. Иначе у остальных партия
+        // просто встанет на ожидании решения, которое уже некому принять, — и
+        // они узнают об этом только по таймауту в десять минут.
+        if (лента != null) {
+            лента.оборвать("игрок вышел из партии");
+        }
+        if (наЗакрытие != null) {
+            наЗакрытие.run();
         }
         frame.dispose();
         StartMenuWindow.open(options);
