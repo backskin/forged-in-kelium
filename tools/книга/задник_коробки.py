@@ -1,26 +1,31 @@
 # -*- coding: utf-8 -*-
-"""ЗАДНИК КОРОБКИ «Lex Talionis», версия 3 (дизайнер 14.10.2026).
+"""ЗАДНИК КОРОБКИ «Lex Talionis», версия 5 (дизайнер 21.10.2026).
 
-Образцы дизайнера: «Звёздные войны: Восстание» (главный), «Сумерки Империи»,
-«Эверделл», Ankh, Blood Rage, Дюна. Империя, Civilization, Серп, Прага,
-Комната 25, Yellow & Yangtze, Fallout. Схема у всех одна:
-  — заголовок-крючок, абзац мира от второго лица («вы…» и что на кону),
-    абзац об игре простыми словами (что вы делаете и как устроен ход),
-    итог в конце;
-  — чистая сцена, на её фоне разложены компоненты;
-  — выноска о главном богатстве коробки (там — «Более 150 пластиковых
-    фигурок!», у нас — куча объёмных жетонов: куча_жетонов.py);
-  — рамка состава, значки игроков/возраста/времени, место под маркировку.
+Разбор дизайнера по версии 4: лидеры разного размера (у синей голова
+заметно меньше), много пустого места — снимок поля можно сильно увеличить,
+пусть уходит за край; текст «по-дебильному», шаблонный.
 
-Раскладка квадрата 300×300 мм (10 точек на мм):
-  верх      — сцена с харвестером; слева логотип и тексты на затемнении,
-              справа шеренга лидеров четырёх наций (лица с планшетов войск);
-  середина  — слева выноска с кучей жетонов, справа стол в перспективе;
-  низ       — значки, рамка состава, маркировка.
-Тексты — по канону мира (rules/КНИГА МИРА) и главе 1 книги правил.
+Что сделано:
+  — лидеры выровнены по РАЗМЕРУ ГОЛОВЫ (корень из «макушка–подбородок» ×
+    ширина головы на линии глаз), а не по «глаза–подбородок»: у синей голова
+    уже и без волос, и по прежнему замеру выходила на 10–15 % меньше
+    остальных; все четверо крупнее;
+  — стол — главная картинка: во всю ширину, в перспективе, уходит под правый
+    обрез;
+  — текст по образцу оборотов «Звёздные войны: Восстание», Root, Kemet,
+    «Серп»: заголовок-крючок, три предложения мира, четыре коротких тезиса
+    «чем игра особенная» (заголовок и строка-две), итог про победу. Правила
+    по шагам на обороте не пересказываются.
+
+Раскладка квадрата 300×300 мм (10 точек на мм): верх — сцена, логотип и
+мир слева, лидеры справа; середина — тезисы слева, огромный стол справа под
+обрез, куча жетонов; низ — состав, значки, маркировка.
 
 Запуск: python задник_коробки.py → design-docs/обложка/задник коробки.png (+ .pdf)
-        и «задник коробки — с вылетами 10 мм» (.png, .pdf 320×320 мм с TrimBox) для типографии
+        и «задник коробки — с вылетами 10 мм» (.png, .pdf 320×320 мм с TrimBox).
+Без Яндекс.Диска (облако) вместо картины высадки и текстуры земли берутся
+подставки из репозитория — это только ПРЕВЬЮ; печатный задник собирать там,
+где есть Диск.
 """
 import os
 import subprocess
@@ -31,41 +36,66 @@ D = os.path.dirname(os.path.abspath(__file__))
 КОРЕНЬ = os.path.dirname(os.path.dirname(D))
 ДИСК = os.path.join(os.path.expanduser("~"), "Yandex.Disk", "Forged in Kelium")
 ФОНЫ = os.path.join(ДИСК, "Иллюстрации", "фоны и сцены")
-ВЫХОД = os.path.join(КОРЕНЬ, "design-docs", "обложка")
-CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+ВЫХОД = os.environ.get("ZADNIK_OUT") or os.path.join(КОРЕНЬ, "design-docs", "обложка")
+CHROME = next((п for п in (r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                           "/opt/pw-browsers/chromium/chrome-linux/chrome",
+                           "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
+               if os.path.exists(п)), "chromium")
 
 
 def url(п):
-    return "file:///" + п.replace("\\", "/")
+    return "file:///" + п.replace("\\", "/").lstrip("/")
 
 
-def фон(номер):
-    return os.path.join(ФОНЫ, sorted(x for x in os.listdir(ФОНЫ) if x.lower().endswith(".jpg"))[номер])
+def шрифт(*имена):
+    """Первый найденный файл шрифта: Windows, затем копии в репозитории."""
+    for и in имена:
+        for папка in (r"C:\Windows\Fonts", os.path.join(КОРЕНЬ, "tools", "fonts"),
+                      os.path.join(КОРЕНЬ, "gui", "src", "main", "resources", "fonts")):
+            п = os.path.join(папка, и)
+            if os.path.exists(п):
+                return п
+    return ""
 
+
+ПРЕВЬЮ = not os.path.isdir(ФОНЫ)
+if ПРЕВЬЮ:
+    АРТ = os.path.join(КОРЕНЬ, "rules", "иллюстрации", "задник рулбука.jpg")
+    ЗЕМЛЯ = ""
+else:
+    АРТ = os.path.join(ФОНЫ, sorted(x for x in os.listdir(ФОНЫ) if x.lower().endswith(".jpg"))[75])
+    ИЛЛ = os.path.dirname(ФОНЫ)
+    ЗЕМЛЯ = os.path.join(ИЛЛ, sorted(x for x in os.listdir(ИЛЛ)
+                                     if x.lower().endswith((".jpg", ".png", ".webp")))[10])
 
 ЛОГО = os.path.join(КОРЕНЬ, "design-docs", "логотип-лекс", "LEX TALIONIS — логотип (рамка).png")
-СТОЛ = os.path.join(D, "стол-коробка-4.png")          # другое поле, чем в книге
+СТОЛ_ВЕСЬ = os.path.join(D, "стол-коробка-4.png")
+# Верхние планшеты двух игроков отрезаны по пустой полосе над полем: в кадре
+# поле, колоды и ближний игрок — иначе планшеты налезают на текст и лидеров.
+СТОЛ = os.path.join(D, "_стол-задник.png")
+СТОЛ_ВЕРХ = 600
 КУЧА = os.path.join(D, "куча-жетонов.png")            # куча_жетонов.py
-АРТ = фон(75)            # высадка у стены келемия (дизайнер 14.10.2026: фон поинтереснее)
-ИЛЛ = os.path.dirname(ФОНЫ)
-# низ — не голый чёрный: пустыня с кристаллами (текстура тайлов), притемнённая
-ЗЕМЛЯ = os.path.join(ИЛЛ, sorted(x for x in os.listdir(ИЛЛ) if x.lower().endswith((".jpg", ".png", ".webp")))[10])
 ПЕРС = os.path.join(КОРЕНЬ, "illustrations", "персонажи-png")   # вырезать.py
 
-# ЛИДЕРЫ НАЦИЙ — как люди, стоящие рядом (дизайнер 14.10.2026: «равных
-# размеров»). Замер на холсте 1152×1728: (y глаз, y подбородка). Масштаб
-# каждого — чтобы «глаза–подбородок» было одинаковым, и глаза на одной линии.
-ЗАМЕР = {"красный": (402, 567), "синий": (319, 483), "зелёный": (375, 532), "жёлтый": (375, 525)}
-ГЛАЗА_Y, ЛИЦО, ШАГ = 760, 80, 380          # линия глаз, глаза–подбородок, шаг шеренги (точки задника)
+# ЛИДЕРЫ — РАВНЫЕ ГОЛОВЫ. Замер на холсте 1152×1728: y макушки, y глаз,
+# y подбородка, ширина головы на линии глаз, x середины головы.
+ЗАМЕР = {
+    "красный": (136, 402, 567, 311, 607),
+    "синий":   (104, 319, 483, 285, 548),
+    "зелёный": (89, 375, 532, 302, 554),
+    "жёлтый":  (120, 375, 525, 320, 584),
+}
+ГОЛОВА = 245                     # «размер головы» в точках задника
+ГЛАЗА_Y = 640                    # линия глаз
+ЦЕНТРЫ = (1500, 1950, 2400, 2830)  # середины голов по x
 
 
 def лидер(i, ф):
-    глаз, подб = ЗАМЕР[ф]
-    k = ЛИЦО / (подб - глаз)                  # точек задника на точку холста
-    w, h = 1152 * k, 1728 * k
+    макушка, глаз, подб, ширина, сер = ЗАМЕР[ф]
+    k = ГОЛОВА / ((подб - макушка) * ширина) ** 0.5
     return (f'<img class="перс" src="{url(os.path.join(ПЕРС, ф + ".png"))}" '
-            f'style="left:{1340 + i * ШАГ:.0f}px; top:{ГЛАЗА_Y - глаз * k:.0f}px; '
-            f'width:{w:.0f}px; height:{h:.0f}px">')
+            f'style="left:{ЦЕНТРЫ[i] - сер * k:.0f}px; top:{ГЛАЗА_Y - глаз * k:.0f}px; '
+            f'width:{1152 * k:.0f}px; height:{1728 * k:.0f}px; z-index:{3 + (i == 1)}">')
 
 
 лидеры = "".join(лидер(i, ф) for i, ф in enumerate(["красный", "синий", "зелёный", "жёлтый"]))
@@ -73,60 +103,86 @@ def лидер(i, ф):
 В = 100                 # вылет 10 мм (10 точек на мм)
 П = 3000 + 2 * В        # сторона листа с вылетами
 
+ЗЕМЛЯ_CSS = (f'url("{url(ЗЕМЛЯ)}") 0 0 / 1100px auto repeat' if ЗЕМЛЯ
+             else "radial-gradient(ellipse at 60% 30%, #3a4a3c, #1a221e 70%)")
+
+ТЕЗИСЫ = [
+    ("Читай соперника",
+     "Все тайно выбирают приказ и вскрывают по очереди. Повторил чужой ход — "
+     "потерял действие. Угадал его — сыграл больше."),
+    ("Энергии на всех не хватит",
+     "Поле собирается из блоков, раскладок много. Мест под энергостанции "
+     "мало, и за каждое придётся драться."),
+    ("Чужие технологии — в обломках",
+     "Разбитый враг оставляет трофеи. На них растёт ваша наука: модули боя, "
+     "сборки и хранилища."),
+    ("От шахты до армады",
+     "Начинаете с центра управления и одного войска. К концу партии войска "
+     "идут пачками, а чужие заводы горят."),
+]
+тезисы = "".join(f'<div class="тезис"><h3>{з}</h3><p>{т}</p></div>' for з, т in ТЕЗИСЫ)
+
 HTML = f"""<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face {{ font-family: T; src: url("{url('C:/Windows/Fonts/Tektur-Bold.ttf')}"); font-weight: 700; }}
-@font-face {{ font-family: T; src: url("{url('C:/Windows/Fonts/Tektur-Black.ttf')}"); font-weight: 900; }}
-@font-face {{ font-family: N; src: url("{url('C:/Windows/Fonts/TekturNarrow-Regular.ttf')}"); font-weight: 400; }}
-@font-face {{ font-family: N; src: url("{url('C:/Windows/Fonts/TekturNarrow-Bold.ttf')}"); font-weight: 700; }}
+@font-face {{ font-family: T; src: url("{url(шрифт('Tektur-Bold.ttf'))}"); font-weight: 700; }}
+@font-face {{ font-family: T; src: url("{url(шрифт('Tektur-Black.ttf', 'Tektur-Bold.ttf'))}"); font-weight: 900; }}
+@font-face {{ font-family: N; src: url("{url(шрифт('TekturNarrow-Regular.ttf'))}"); font-weight: 400; }}
+@font-face {{ font-family: N; src: url("{url(шрифт('TekturNarrow-Bold.ttf'))}"); font-weight: 700; }}
 html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; background: #141a18; }}
-/* ВЫЛЕТЫ (дизайнер 14.10.2026): лист {П}×{П}, обрезной формат 3000×3000 сдвинут
-   на {В} точек; фоны уходят под обрез, вся вёрстка — внутри формата */
 .з {{ position: absolute; left: {В}px; top: {В}px; width: 3000px; height: 3000px; overflow: visible;
   color: #efe9d8; font-family: N; }}
-.земля {{ position: absolute; inset: 1150px -{В}px -{В}px -{В}px;
-  background: linear-gradient(180deg, rgba(20,26,24,.85) 0%, rgba(20,26,24,.5) 30%, rgba(20,26,24,.6) 100%),
-    url("{url(ЗЕМЛЯ)}") 0 0 / 1100px auto repeat; filter: saturate(.75) brightness(.62); }}
-.арт {{ position: absolute; inset: -{В}px -{В}px auto -{В}px; height: {1700 + В}px;
+.земля {{ position: absolute; inset: 1100px -{В}px -{В}px -{В}px;
+  background: linear-gradient(180deg, rgba(20,26,24,.9) 0%, rgba(20,26,24,.45) 30%, rgba(20,26,24,.65) 100%),
+    {ЗЕМЛЯ_CSS}; filter: saturate(.75) brightness(.62); }}
+.арт {{ position: absolute; inset: -{В}px -{В}px auto -{В}px; height: {1600 + В}px;
   background: url("{url(АРТ)}") 50% 30% / cover;
-  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent 98%); }}
+  -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent 98%); }}
 .арт::after {{ content: ""; position: absolute; inset: 0; background:
-  linear-gradient(180deg, rgba(20,26,24,0) 55%, rgba(20,26,24,.5) 90%),
-  linear-gradient(90deg, rgba(20,26,24,.97) 0%, rgba(20,26,24,.9) 33%, rgba(20,26,24,.3) 47%, rgba(20,26,24,0) 58%); }}
-.лого {{ position: absolute; left: 120px; top: 70px; width: 1000px; filter: drop-shadow(0 14px 24px rgba(0,0,0,.8)); }}
-.текст {{ position: absolute; left: 140px; top: 470px; width: 1150px; }}
-.текст h1 {{ margin: 0 0 26px; font: 900 64px/1.1 T; color: #fff; letter-spacing: .02em; text-transform: uppercase;
-  text-shadow: 0 4px 14px rgba(0,0,0,.8); }}
-.текст p {{ margin: 0 0 24px; font: 400 37px/1.38 N; color: #ddd7c5; }}
-.текст p.мир {{ font-style: italic; color: #c9c3b1; }}
-.текст p.итог {{ font: 700 39px/1.35 N; color: #fff; }}
-.текст b {{ color: #8fe36b; font-weight: 700; }}
-.перс {{ position: absolute; z-index: 3;
-  -webkit-mask-image: linear-gradient(180deg, #000 74%, transparent 92%);
+  linear-gradient(180deg, rgba(20,26,24,0) 50%, rgba(20,26,24,.55) 90%),
+  linear-gradient(90deg, rgba(20,26,24,.97) 0%, rgba(20,26,24,.88) 32%, rgba(20,26,24,.25) 46%, rgba(20,26,24,0) 56%); }}
+.лого {{ position: absolute; left: 90px; top: 50px; width: 960px; z-index: 6;
+  filter: drop-shadow(0 14px 24px rgba(0,0,0,.8)); }}
+.мир {{ position: absolute; left: 120px; top: 420px; width: 1130px; z-index: 6; }}
+.мир h1 {{ margin: 0 0 30px; font: 900 76px/1.08 T; color: #fff; text-transform: uppercase;
+  text-shadow: 0 4px 14px rgba(0,0,0,.85); }}
+.мир h1 em {{ font-style: normal; color: #8fe36b; }}
+.мир p {{ margin: 0; font: 400 40px/1.4 N; color: #e2dccb; text-shadow: 0 2px 8px rgba(0,0,0,.9); }}
+.мир b {{ color: #8fe36b; font-weight: 700; }}
+.перс {{ position: absolute;
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 90%);
   filter: drop-shadow(0 24px 30px rgba(0,0,0,.7)); }}
-.стол-обёртка {{ position: absolute; left: 1300px; top: 1300px; width: 1680px; height: 1040px; perspective: 2600px; z-index: 4; }}
+.стол-обёртка {{ position: absolute; left: 700px; top: 1020px; width: 3150px; height: 2100px;
+  perspective: 3400px; z-index: 5; }}
 .стол {{ position: absolute; inset: 0; background: url("{url(СТОЛ)}") center / contain no-repeat;
-  transform: rotateX(46deg) rotateZ(-10deg); transform-origin: 50% 50%;
-  filter: drop-shadow(0 40px 34px rgba(0,0,0,.75)); }}
-.выноска {{ position: absolute; left: 70px; top: 1520px; width: 1160px; height: 820px; z-index: 5;
-  border: 7px solid #8fe36b; border-radius: 60px;
-  background: radial-gradient(ellipse at 50% 35%, rgba(60,80,50,.55), rgba(15,20,18,.92) 75%);
-  box-shadow: 0 30px 50px rgba(0,0,0,.6), inset 0 0 60px rgba(0,0,0,.5); }}
-.куча {{ position: absolute; left: 50px; top: 20px; width: 1060px; }}
-.выноска .надпись {{ position: absolute; left: 0; right: 0; bottom: 46px; text-align: center;
-  font: 900 70px/1.05 T; color: #fff; text-transform: uppercase; text-shadow: 0 5px 16px rgba(0,0,0,.95); }}
-.выноска .надпись small {{ display: block; font: 700 38px N; color: #8fe36b; text-transform: none; margin-top: 10px; }}
-.низ {{ position: absolute; left: 60px; right: 60px; top: 2390px; bottom: 50px; z-index: 6;
+  transform: rotateX(38deg) rotateZ(-7deg); transform-origin: 50% 40%;
+  filter: drop-shadow(0 50px 40px rgba(0,0,0,.8)); }}
+.тезисы {{ position: absolute; left: 110px; top: 1000px; width: 1000px; z-index: 7;
+  display: flex; flex-direction: column; gap: 30px; }}
+.тезис {{ padding: 0 0 0 34px; border-left: 9px solid #8fe36b; }}
+.тезис h3 {{ margin: 0 0 8px; font: 900 48px/1.1 T; color: #fff; text-transform: uppercase;
+  text-shadow: 0 3px 12px rgba(0,0,0,.95); }}
+.тезис p {{ margin: 0; font: 400 37px/1.36 N; color: #ddd7c5; text-shadow: 0 2px 8px rgba(0,0,0,.95); }}
+.итог {{ position: absolute; left: 110px; top: 1815px; width: 980px; z-index: 7;
+  font: 700 40px/1.32 N; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.95); }}
+.итог b {{ color: #8fe36b; }}
+.куча {{ position: absolute; left: 50px; top: 1975px; width: 760px; z-index: 8;
+  filter: drop-shadow(0 26px 26px rgba(0,0,0,.8)); }}
+.куча img {{ width: 100%; display: block; }}
+.куча div {{ position: absolute; left: -20px; right: -20px; bottom: 20px; text-align: center; padding: 16px 0 12px;
+  background: linear-gradient(90deg, rgba(14,18,16,0), rgba(14,18,16,.82) 18%, rgba(14,18,16,.82) 82%, rgba(14,18,16,0));
+  font: 900 54px/1 T; color: #fff; text-transform: uppercase; text-shadow: 0 4px 14px rgba(0,0,0,1), 0 0 30px rgba(0,0,0,.9); }}
+.куча small {{ display: block; margin-top: 6px; font: 700 32px N; color: #8fe36b; text-transform: none; }}
+.низ {{ position: absolute; left: 60px; right: 60px; top: 2440px; bottom: 50px; z-index: 9;
   display: flex; gap: 36px; }}
-.состав {{ flex: 1; border: 5px solid #8fe36b; border-radius: 30px; padding: 22px 40px 24px;
-  background: rgba(16,22,19,.93); box-shadow: 0 20px 40px rgba(0,0,0,.5); }}
-.состав h2 {{ margin: 0 0 16px; font: 900 50px T; color: #8fe36b; letter-spacing: .08em; text-transform: uppercase; text-align: center; }}
-.столбцы {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 44px; }}
-.столбцы h3 {{ margin: 0 0 8px; font: 900 36px T; color: #fff; text-transform: uppercase; letter-spacing: .05em; }}
-.столбцы ul {{ margin: 0; padding: 0; list-style: none; font: 400 35px/1.3 N; color: #d8d2c0; }}
-.столбцы li {{ margin-bottom: 4px; padding-left: 26px; text-indent: -26px; }}
-.столбцы li::before {{ content: "◆ "; color: #8fe36b; font-size: 22px; vertical-align: 4px; }}
+.состав {{ flex: 1; border: 5px solid #8fe36b; border-radius: 30px; padding: 20px 40px 20px;
+  background: rgba(16,22,19,.95); box-shadow: 0 20px 40px rgba(0,0,0,.5); }}
+.состав h2 {{ margin: 0 0 12px; font: 900 46px T; color: #8fe36b; letter-spacing: .08em; text-transform: uppercase; text-align: center; }}
+.столбцы {{ display: grid; grid-template-columns: 1fr 1.1fr 1.1fr; gap: 0 40px; }}
+.столбцы h3 {{ margin: 0 0 6px; font: 900 32px T; color: #fff; text-transform: uppercase; letter-spacing: .05em; }}
+.столбцы ul {{ margin: 0; padding: 0; list-style: none; font: 400 31px/1.27 N; color: #d8d2c0; }}
+.столбцы li {{ margin-bottom: 3px; padding-left: 24px; text-indent: -24px; }}
+.столбцы li::before {{ content: "◆ "; color: #8fe36b; font-size: 20px; vertical-align: 4px; }}
 .столбцы b {{ color: #fff; font-weight: 700; }}
-.справа {{ width: 380px; display: flex; flex-direction: column; gap: 22px; }}
+.справа {{ width: 380px; display: flex; flex-direction: column; gap: 20px; }}
 .знаки {{ display: flex; justify-content: space-between; }}
 .знак {{ display: flex; flex-direction: column; align-items: center; gap: 6px; font: 700 26px N; }}
 .знак .к {{ width: 112px; height: 96px; box-sizing: border-box; border: 5px solid #8fe36b;
@@ -134,51 +190,46 @@ html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; backgr
   background: rgba(16,22,19,.9); }}
 .знак .к.д {{ font-size: 25px; letter-spacing: -.02em; }}
 .место {{ flex: 1;  border: 3px dashed rgba(239,233,216,.3); color: rgba(239,233,216,.45); font: 700 24px N;
-  display: flex; align-items: center; justify-content: center; text-align: center; background: rgba(16,22,19,.6); }}
+  display: flex; align-items: center; justify-content: center; text-align: center; background: rgba(16,22,19,.95); }}
+.превью {{ position: absolute; right: 40px; top: 30px; z-index: 20; font: 700 30px N; color: #ff8;
+  background: rgba(0,0,0,.6); padding: 6px 16px; }}
 </style></head><body><div class="з">
 <div class="земля"></div><div class="арт"></div>
 {лидеры}
 <div class="стол-обёртка"><div class="стол"></div></div>
 <img class="лого" src="{url(ЛОГО)}">
-<div class="текст">
-<h1>Из Земли пророс кристалл…</h1>
-<p class="мир">Люди давно расселились по Солнечной системе: одни живут на корабле у Венеры,
-другие — на Марсе, третьи — на спутнике Юпитера, а земляне остались дома. Каждая нация
-уверена, что остальные — отсталые дикари. Но из недр Земли пророс <b>келемий</b> — чистая
-энергия в твёрдом виде. Земляне начали процветать, и космические нации, у которых силы на
-исходе, возвращаются домой, чтобы забрать кристалл себе.</p>
-<p>В игре «Lex Talionis» вы возглавите одну из четырёх наций. Стройте базу, добывайте келемий,
-нанимайте пехоту, технику и авиацию, уничтожайте чужие здания и войска. Обломки разбитого
-врага — <b>трофеи</b>: на них вы двигаете вперёд свои технологии.</p>
-<p>В начале каждого круга все разом выбирают <b>карту приказа</b>, а потом по очереди вскрывают
-их и сразу ходят. Действий всего пять, и в каждом — выбор из двух: добыть или построить
-добытчик, двинуть войска или начать бой, торговать на Рынке или вкладываться в Науку.</p>
-<p class="итог">Победит тот, у кого больше очков, — или тот, кто первым поднимется на вершины
-всех трёх треков технологий.</p>
+<div class="мир">
+<h1>Кристалл пророс на Земле.<br><em>За ним вернулись все.</em></h1>
+<p>Марс, Венера, Юпитер и Земля давно живут порознь и считают друг друга
+дикарями. Потом из земных недр полез <b>келемий</b> — чистая энергия в твёрдом
+виде, — и колонии, у которых кончаются силы, летят домой забрать его.
+На поле боя выясняется: никто не отстал, и у каждого своё оружие.</p>
 </div>
-<div class="выноска"><img class="куча" src="{url(КУЧА)}">
-<div class="надпись">Более 150 жетонов<small>зданий, войск и модулей — и 192 кубика</small></div></div>
+<div class="тезисы">{тезисы}</div>
+<div class="итог">Побеждает тот, у кого больше очков. Или сразу — кто первым возьмёт
+<b>вершины всех трёх технологий</b> либо уничтожит <b>второй центр управления</b> соперников.</div>
+<div class="куча"><img src="{url(КУЧА)}"><div>Более 150 жетонов<small>зданий, войск и модулей — и 192 кубика</small></div></div>
 <div class="низ">
 <div class="состав"><h2>Состав игры</h2><div class="столбцы">
 <div><h3>Поле</h3><ul>
 <li><b>10</b> блоков поля: 5 больших и 5 малых</li>
-<li><b>8</b> тайлов зарождения: 4 стартовых и 4 больших</li>
+<li><b>8</b> тайлов зарождения</li>
 <li><b>8</b> тайлов недоступных гексов</li>
 <li><b>14</b> нейтральных построек</li>
 <li>планшет науки и планшет рынка</li>
 <li>фишка первого игрока, 2 мешочка</li></ul></div>
 <div><h3>Наборы четырёх наций</h3><ul>
 <li><b>4</b> планшета войск и <b>4</b> планшета хранилища</li>
-<li><b>48</b> жетонов зданий: ЦУ, казармы, заводы, авиабазы, добытчики, энергостанции</li>
+<li><b>48</b> жетонов зданий</li>
 <li><b>64</b> жетона войск: пехота, техника, авиация, вышки</li>
 <li><b>20</b> карт приказов, <b>32</b> кубика технологий</li>
-<li><b>4</b> памятки хода и <b>4</b> памятки действий</li></ul></div>
+<li><b>8</b> памяток</li></ul></div>
 <div><h3>Общий запас</h3><ul>
-<li><b>28</b> модулей: 12 сборки, 12 боя, 4 блокировки боя</li>
-<li><b>4</b> жетона супер-войск, <b>8</b> жетонов хранилища</li>
+<li><b>28</b> модулей, <b>8</b> жетонов хранилища</li>
+<li><b>4</b> жетона супер-войск</li>
 <li><b>176</b> карт: 74 задания, 56 арсенала, 10 рынка, 36 контейнеров</li>
-<li><b>160</b> кубиков: келемий, боеприпасы, трофеи, энергия</li>
-<li><b>50</b> монет, книга правил, справочник</li></ul></div>
+<li><b>160</b> кубиков и <b>50</b> монет</li>
+<li>книга правил и справочник</li></ul></div>
 </div></div>
 <div class="справа">
 <div class="знаки">
@@ -190,17 +241,23 @@ html, body {{ margin: 0; width: {П}px; height: {П}px; overflow: hidden; backgr
 <div class="место">штрихкод</div>
 </div>
 </div>
+{'<div class="превью">ПРЕВЬЮ: фон — подставка</div>' if ПРЕВЬЮ else ''}
 </div></body></html>"""
 
 os.makedirs(ВЫХОД, exist_ok=True)
+from PIL import Image
+_с = Image.open(СТОЛ_ВЕСЬ)
+_с.crop((0, СТОЛ_ВЕРХ, _с.width, _с.height)).save(СТОЛ)
 html = os.path.join(D, "_задник.html")
 open(html, "w", encoding="utf-8").write(HTML)
 лист = os.path.join(ВЫХОД, "задник коробки — с вылетами 10 мм.png")
-subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-sandbox",
+                "--allow-file-access-from-files",
                 "--user-data-dir=" + os.path.join(D, "chr"), "--virtual-time-budget=8000",
                 f"--window-size={П},{П}", "--screenshot=" + лист, url(html)], check=True,
                capture_output=True)
 os.remove(html)
+os.remove(СТОЛ)
 # обрезной формат — для просмотра
 from PIL import Image
 png = os.path.join(ВЫХОД, "задник коробки.png")
