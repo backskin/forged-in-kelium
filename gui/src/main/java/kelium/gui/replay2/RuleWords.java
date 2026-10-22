@@ -252,8 +252,16 @@ public final class RuleWords {
                 "устаревший ключ: потолок операций Стройки снят 06.09.2026";
             case "actions.build.surcharge_coins" ->
                 "устаревший ключ: надбавки за объём в Стройке нет";
-            case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
-            case "actions.build.demolish_cost_coins" -> "сколько стоит снос своего здания";
+            // О МОНЕТЕ ЗА СНОС В ПРАВИЛАХ НЕ ЗАИКАТЬСЯ (дизайнер 18.10.2026): в
+            // действующем своде оба ключа нули, и подпись говорит, что снос
+            // бесплатен, а не «возврат монет: 0».
+            case "actions.build.demolish_refund_coins" ->
+                "снос своего здания ничего не приносит (ключ старых сводов)";
+            case "actions.build.demolish_cost_coins" -> "снос своего здания бесплатен";
+            case "actions.build.branch_demolish_max" ->
+                "сколько своих зданий можно снести перед стройкой в одной ветке";
+            case "actions.combat.kelium_for_ammo" ->
+                "за атаку можно платить келемием вместо боеприпаса, 1 к 1";
             case "actions.combat.token_surcharge_ammo" ->
                 "доплата боеприпасами за жетон, бьющий не из выбранного гекса";
             case "actions.build.move_enabled" ->
@@ -416,7 +424,7 @@ public final class RuleWords {
             case "storage.module_slots" ->
                 "ячеек под жетон модуля хранилища на планшете";
             case "actions.build.branch_demolish_before_build" ->
-                "в ветке «построить» сначала снеси сколько угодно своих зданий её вида, потом поставь одно";
+                "в ветке «построить» сначала можно снести своё здание её вида, потом поставить одно";
             case "storage.gild_tokens" ->
                 "жетоны хранилища улучшаются позолотой, как модули";
             case "storage.cell_star_when_empty" ->

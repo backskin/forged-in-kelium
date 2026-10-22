@@ -690,7 +690,24 @@ public final class CombatResolver {
                 .get("economy.kelium_is_joker", Boolean.FALSE))) {
             return true;
         }
+        // КЕЛЕМИЙ ВМЕСТО БОЕПРИПАСА В БОЮ — базовое правило (свод 1.52.0,
+        // решение дизайнера 18.10.2026), а не только способность карты.
+        if (Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                .get("actions.combat.kelium_for_ammo", Boolean.FALSE))) {
+            return true;
+        }
         return Passives.hasPassive(state, seat, "kelium_instead_of_ammo_in_operation");
+    }
+
+    /**
+     * ВПЕРЕМЕШКУ ЛИ: недостающие боеприпасы добираются келемием 1 к 1 (свод
+     * 1.52.0: «можно платить за атаку 1 келемием вместо 1 боеприпаса»). Прежний
+     * путь — «Военный подряд» и правило-вариант джокера — платил ЛИБО целиком
+     * боеприпасами, ЛИБО целиком келемием; там и остаётся как было.
+     */
+    private boolean вперемешку() {
+        return Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+            .get("actions.combat.kelium_for_ammo", Boolean.FALSE));
     }
 
     /**
@@ -704,6 +721,9 @@ public final class CombatResolver {
         }
         if (p.resources.canPay(Resource.AMMO, cost)) {
             return true;
+        }
+        if (вперемешку()) {
+            return p.resources.ammo() + p.resources.get(Resource.KELIUM) >= cost;
         }
         return келемийВместоБоеприпасов(p.seat)
             && p.resources.canPay(Resource.KELIUM, cost);
@@ -722,6 +742,22 @@ public final class CombatResolver {
         }
         if (p.resources.canPay(Resource.AMMO, cost)) {
             p.resources.pay(Resource.AMMO, cost);
+            return;
+        }
+        if (вперемешку()) {
+            // Сперва все боеприпасы, недостающее — келемием. Порядок нарочно
+            // такой: келемий нужен ещё на Рынке и в Науке, и тратить его там, где
+            // хватает боеприпасов, значило бы решать за игрока.
+            int боеприпасами = Math.min(cost, p.resources.ammo());
+            int келемием = cost - боеприпасами;
+            if (боеприпасами > 0) {
+                p.resources.pay(Resource.AMMO, боеприпасами);
+            }
+            if (келемием > 0) {
+                p.resources.pay(Resource.KELIUM, келемием);
+                emit("type", "ability_reaction", "seat", p.seat,
+                    "ability", "kelium_for_ammo", "kelium", келемием, "ammo", боеприпасами);
+            }
             return;
         }
         if (келемийВместоБоеприпасов(p.seat)
