@@ -50,6 +50,7 @@ public final class RuleWords {
             case "return_step" -> "Конец раунда";
             case "expansions" -> "Дополнения";
             case "super_objectives" -> "Супер-задания";
+            case "starting_objectives" -> "Начальные задания";
             case "modules" -> "Модули";
             case "content_versions" -> "Версии наборов карт";
             default -> "не описано";
@@ -544,6 +545,9 @@ public final class RuleWords {
                 "дополнение «Начальные задания»: простые карты первого раунда";
             case "expansions.super_arsenal" ->
                 "дополнение «Супер-арсенал»: карты на вершинах треков технологий";
+            // НАЧАЛЬНОЕ ЗАДАНИЕ НА ВЫБОР (дизайнер 14.10.2026): две карты,
+            // одну оставить, как с начальным арсеналом.
+            case "starting_objectives.deal" -> "сколько начальных заданий раздаётся на выбор";
             case "super_objectives.enabled" -> "супер-задания в игре";
             case "super_objectives.mode" -> "режим супер-заданий";
             case "super_objectives.deal" -> "сколько карт раздаётся игроку";

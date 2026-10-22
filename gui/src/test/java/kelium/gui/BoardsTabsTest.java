@@ -21,11 +21,13 @@ import kelium.report.ReplayRecord;
 class BoardsTabsTest {
 
     /**
-     * ДЕЙСТВУЮЩИЙ СВОД. Он раздаёт супер-задание с подготовки и выкладывает
-     * карту супер-арсенала на каждую вершину трека — ровно то, что здесь и
-     * проверяется.
+     * ДЕЙСТВУЮЩИЙ СВОД. Он выкладывает супер-задания открыто на стол и держит
+     * супер-арсенал закрытой колодой — ровно то, что здесь и проверяется.
      */
-    private static final String СВОД = kelium.dataio.GameConfig.DEFAULT_RULESET;
+    // ИГРОВОЙ СВОД, А НЕ ОПОРА СТЕНДОВ: DEFAULT_RULESET держит 1.46.0 ради
+    // сравнимости замеров, а у игрока партия открывается GAME_RULESET. Панели
+    // проверяются на том, что игрок видит.
+    private static final String СВОД = kelium.dataio.GameConfig.GAME_RULESET;
 
     /**
      * ДОПОЛНЕНИЯ ЗАДАЮТСЯ ЯВНО, А НЕ БЕРУТСЯ ИЗ НАСТРОЕК ПРИЛОЖЕНИЯ.
@@ -59,30 +61,40 @@ class BoardsTabsTest {
             List.of("strat:hawk", "strat:dove", "strat:balanced", "strat:opportunist"), null);
     }
 
+    /**
+     * СУПЕР-КАРТЫ В ЗАПИСИ ПАРТИИ — ПО ДЕЙСТВУЮЩИМ ПРАВИЛАМ.
+     *
+     * <p>Прежде тест ждал по открытой карте супер-арсенала на каждой вершине
+     * трека и супер-задание в руке у каждого с подготовки. Оба правила сменил
+     * дизайнер, а тест остался под старые:
+     * <ul>
+     *   <li>14.10.2026 — СУПЕР-АРСЕНАЛ ЗАКРЫТАЯ КОЛОДА: открытых карт на треках
+     *       нет; вставший на вершину берёт две верхние, одну оставляет;</li>
+     *   <li>05.10.2026 — СУПЕР-ЗАДАНИЯ ЛЕЖАТ ОТКРЫТО НА СТОЛЕ, в руку с
+     *       подготовки их не раздают.</li>
+     * </ul>
+     */
     @Test
     void recordCarriesSuperArsenalOfferAndPartProgress() {
         ReplayRecord rec = gameWithSupers();
         ReplayRecord.Snapshot first = rec.frames.get(0).snapshot;
-        assertTrue(first.superArsenalOffer.size() == 3,
-            "с подготовки на каждый трек выложена карта супер-арсенала, а есть "
+        assertTrue(first.superArsenalOffer.isEmpty(),
+            "супер-арсенал — закрытая колода, на треках открытых карт нет, а лежат "
                 + first.superArsenalOffer);
+        assertTrue(!first.superDisplay.isEmpty(),
+            "супер-задания с подготовки лежат открыто на столе");
 
+        // Карта супер-арсенала, взятая с вершины, обязана быть из набора: иначе
+        // запись несёт то, чего в колоде не было.
+        GameConfig cfg = GameConfig.buildCached(СВОД, 4, 0L, null, null);
+        java.util.Set<String> набор = new java.util.HashSet<>(
+            cfg.content.get("super_arsenal").ids());
         ReplayRecord.Snapshot last = rec.frames.get(rec.frames.size() - 1).snapshot;
-        // К концу партии карт может стать меньше: вставший на вершину игрок
-        // забирает карту трека себе. Значит пропавшая карта обязана быть у него.
-        for (String track : first.superArsenalOffer.keySet()) {
-            if (last.superArsenalOffer.containsKey(track)) {
-                continue;
-            }
-            String card = first.superArsenalOffer.get(track);
-            boolean held = last.players.stream().anyMatch(p -> p.superArsenal.contains(card));
-            assertTrue(held, "карта " + card + " ушла с трека " + track + ", но ни у кого нет");
-        }
         for (ReplayRecord.Player p : last.players) {
-            // Карта супер-задания выдаётся с подготовки и никуда не уходит:
-            // она не сжигается и не вскрывается — верх это множитель очков в
-            // финале, низ — требование с разовой наградой.
-            assertTrue(!p.superObjectives.isEmpty(), "супер-задание выдаётся с подготовки");
+            for (String card : p.superArsenal) {
+                assertTrue(набор.contains(card),
+                    "у игрока " + (p.seat + 1) + " карта супер-арсенала не из набора: " + card);
+            }
         }
     }
 

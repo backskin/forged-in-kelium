@@ -108,7 +108,11 @@ class Свод151Test {
         List<String> варианты = new ArrayList<>();
         int было = p.resources.ammo();
         Actions.create("assembly", s).perform(p, new TurnContext(p.seat, 1), сборщик(p.seat, варианты, "ammo"));
-        assertEquals(List.of("unit", "ammo"), варианты, "без энергии — 1 войско или 1 боеприпас");
+        // РЕШЕНИЕ ДИЗАЙНЕРА 14.10.2026 (переключатель assembly.unpowered: ammo):
+        // военное здание без энергии даёт ТОЛЬКО боеприпас. Прежде, по решению
+        // 13.10, был выбор «войско или боеприпас» — этот тест его и сторожил, а
+        // свод сменили, тест не тронув.
+        assertEquals(List.of("ammo"), варианты, "без энергии — только 1 боеприпас");
         assertEquals(было + 1, p.resources.ammo(), "ровно 1 боеприпас");
     }
 
@@ -220,7 +224,13 @@ class Свод151Test {
                         continue;
                     }
                     if (h.spawnTile.isStart) {
-                        assertTrue(h.spawnTile.kelium >= 4, "стартовый тайл: 3 + 1 келемия");
+                        // НА ЛИЦЕ СТАРТОВОГО ТАЙЛА НАПЕЧАТАНО 3 КЕЛЕМИЯ, сверху —
+                        // надбавка из свода. Решением 13.10 она была +1, решением
+                        // 14.10 снята (spawn_face_kelium_bonus: 0); число читается
+                        // из свода, чтобы следующая правка не уронила тест молча.
+                        int надбавка = kelium.dataio.Ctx.rules(s).getInt("field.spawn_face_kelium_bonus", 0);
+                        assertTrue(h.spawnTile.kelium >= 3 + надбавка,
+                            "стартовый тайл: 3 напечатано + " + надбавка + " по своду");
                     } else {
                         больших++;
                     }

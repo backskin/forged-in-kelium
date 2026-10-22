@@ -302,6 +302,25 @@ public final class RulesMarkdown {
                     i = quote(lines, i);
                     continue;
                 }
+                // БЛОК КАРТОЧЕК КНИГИ (разметка чата книги, tools/книга/md2page.py):
+                //   :карточки: 16
+                //   картинки: token/command_center_p1.png, [[анатомия-карты]]
+                //   ## Центр управления
+                //   текст…
+                //   :конец:
+                // В печати это сетка в две колонки; в окне справочника карточки
+                // идут одна под другой, поэтому скобки блока просто снимаются, а
+                // заголовки и текст карточек читаются обычным разбором. Раньше
+                // строки «картинки: [[…]]» протекали в главу как есть.
+                if (t.startsWith(":карточки:") || t.equals(":конец:")) {
+                    i++;
+                    continue;
+                }
+                if (t.startsWith("картинки:")) {
+                    картинки(t.substring("картинки:".length()));
+                    i++;
+                    continue;
+                }
                 if (t.matches("\\[\\[[^\\]]+\\]\\]")) {
                     figure(t.substring(2, t.length() - 2).trim());
                     i++;
@@ -511,6 +530,37 @@ public final class RulesMarkdown {
             sb.append("<p style='margin:6px 0;color:").append(st.ink3()).append("'><i>[")
                 .append(inline(inner)).append("]</i></p>");
             return i;
+        }
+
+        /**
+         * КАРТИНКИ КАРТОЧКИ через запятую: {@code [[рисунок]]} — рисунок книги с
+         * выносками, как в печати; иначе путь к печатной картинке компонента
+         * под {@code data/textures} (с хвостом {@code @доля} — мельче соседей).
+         * Картинки, которой нет на диске, в окне просто нет: подпись карточки
+         * ниже и так называет вещь.
+         */
+        private void картинки(String список) {
+            StringBuilder ряд = new StringBuilder();
+            for (String часть : список.split(",")) {
+                String r = часть.trim();
+                if (r.isEmpty()) {
+                    continue;
+                }
+                if (r.startsWith("[[") && r.endsWith("]]")) {
+                    figure(r.substring(2, r.length() - 2).trim());
+                    continue;
+                }
+                String путь = r.contains("@") ? r.substring(0, r.indexOf('@')).trim() : r;
+                Path картинка = kelium.dataio.GameConfig.resolveDataRoot(null)
+                    .resolve("textures").resolve(путь);
+                if (java.nio.file.Files.isRegularFile(картинка)) {
+                    ряд.append("<img src='").append(картинка.toUri())
+                        .append("' height='").append(Theme.px(64)).append("'>&nbsp;");
+                }
+            }
+            if (ряд.length() > 0) {
+                sb.append("<p style='margin:6px 0'>").append(ряд).append("</p>");
+            }
         }
 
         private void figure(String name) {
