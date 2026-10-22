@@ -270,6 +270,13 @@ public final class ReplayRecord {
          * показывал спрятанными войска, которые ими не были.
          */
         public Integer insideBuildingUid;
+        /**
+         * СЕКТОРЫ ВОЙСКА на гексе — ровно та раскладка, по которой движок
+         * считает контейнеры и соседство ({@code СекторыВойск}); с 26.09.2026
+         * игрок выбирает их сам. null — старая запись: рисовальщик рассаживает
+         * войска сам, как раньше.
+         */
+        public List<Integer> sides;
     }
 
     /** Полное состояние одного игрока (всё, что показывает его зона). */
@@ -330,17 +337,18 @@ public final class ReplayRecord {
          */
         public final List<String> shieldedKinds = new ArrayList<>();
         public int containers;
-
-        /**
-         * КАКИЕ ИМЕННО КОНТЕЙНЕРЫ ЛЕЖАТ У ИГРОКА, рубашкой вверх. Карта берётся
-         * из колоды в момент получения контейнера, поэтому разбор партии знает
-         * её ещё до вскрытия — и может показать лицом по щелчку.
-         */
-        public final List<String> containerHand = new ArrayList<>();
+        /** Карты контейнеров под планшетом (видит владелец; с 27.09.2026). */
+        public final List<String> containerCards = new ArrayList<>();
         public int containerCap;
         public int keliumCap;
         public int ammoCap;
         public int storeCap;
+        /**
+         * ЯЧЕЙКИ СКЛАДА НА КАРТАХ: установленная карта → сколько ячеек она даёт
+         * (способности «+1 ячейка»). Окну — чтобы кубик в такой ячейке был
+         * виден на самой карте, а не пропадал (жалоба 27.09.2026).
+         */
+        public final Map<String, Integer> cellCards = new LinkedHashMap<>();
         public final Map<String, Integer> tech = new LinkedHashMap<>();
         /**
          * КУБИКИ НАУКИ, ОСТАВШИЕСЯ В ЛИЧНОМ ЗАПАСЕ. В сводах, где кубик занимает
@@ -383,10 +391,10 @@ public final class ReplayRecord {
         public String orderSetAside;
         public String orderColor;
         public final List<String> storageTokens = new ArrayList<>();
-        /** Карта супер-задания игрока: множитель очков в финале плюс требование. */
-        public String superObjective;
-        /** Низ карты отработан: разовая награда за жёсткое требование взята. */
-        public boolean superComplete;
+        /** Супер-задания игрока: множитель очков в финале плюс требование у каждой. */
+        public final List<String> superObjectives = new ArrayList<>();
+        /** Карты, у которых низ отработал: разовая награда за требование взята. */
+        public final List<String> superDone = new ArrayList<>();
         public int cuTokens;
         public boolean ownCuToken = true;
         public String startHex = "";
@@ -466,6 +474,7 @@ public final class ReplayRecord {
          * Первая в списке лежит слева.
          */
         public final List<String> arsenalDisplay = new ArrayList<>();
+        public final List<String> superDisplay = new ArrayList<>();
     }
 
     /**
@@ -562,6 +571,47 @@ public final class ReplayRecord {
     /** Все карты приказов, разыгранные к этому шагу (в порядке розыгрыша). */
     public final List<OrderPlay> orderPlays = new ArrayList<>();
 
+    /**
+     * РЕШЕНИЕ ИГРОКА — ЧТО ЕМУ ПРЕДЛОЖИЛИ И ЧТО ОН ВЫБРАЛ (разбор партии,
+     * 26.09.2026: «всё, что игрок решает, должно быть видно в реплее так же,
+     * как в игре»). Движок пишет событие уже после решения, и по одному
+     * событию не узнать, из чего выбирали: какие карты лежали на выбор, какие
+     * гексы подсвечивались. Решение кладётся в кадр, который оно породило.
+     *
+     * <p>Всё уже словами: запись читает человек, а не движок.
+     */
+    public static final class Decision {
+        public int seat;
+        /** Вид точки решения движка ({@code reveal_order}, {@code build_hex}…). */
+        public String kind = "";
+        /** Вопрос словами — тот же, что в карточке вопроса окна партии. */
+        public String title = "";
+        /** Номер выбранного варианта; −1 — неизвестно. */
+        public int picked = -1;
+        /** Сколько вариантов было всего (в записи может лежать не больше {@link #KEEP}). */
+        public int total;
+        public final List<DecisionOption> options = new ArrayList<>();
+        /**
+         * ЗАЧЕМ — намерение бота словами («бью лидера — Игрока 2»), или
+         * {@code null}: живой игрок и боты без объяснений его не дают (заказ
+         * дизайнера 27.09.2026).
+         */
+        public String intent;
+
+        /** Больше вариантов не храним: хватит, чтобы показать выбор, и файл не пухнет. */
+        public static final int KEEP = 24;
+    }
+
+    /** Вариант решения: слова, пояснение, карта или гекс, если вариант о них. */
+    public static final class DecisionOption {
+        public String text = "";
+        public String sub;
+        /** Id карты, если вариант — карта (лицо показывается печатью). */
+        public String card;
+        /** Гекс, если вариант — гекс поля. */
+        public String hex;
+    }
+
     public static final class Frame {
         public String type = "";
         public int round;
@@ -576,6 +626,15 @@ public final class ReplayRecord {
         public Snapshot snapshot;
         /** Шаг относится к бою (для перехода «к следующему бою»). */
         public boolean combat;
+        /**
+         * Ветка ничего не сделала — по суду движка ({@code Срабатывания.сделала}),
+         * а не по плашкам окна: кубик энергии мог переехать на промежуточном шаге
+         * действия, и сравнение соседних кадров его не видело (01.10.2026).
+         * {@code null} — шаг не ветка или запись старая.
+         */
+        public Boolean впустую;
+        /** Решения игроков, принятые перед этим шагом (в порядке принятия). */
+        public final List<Decision> decisions = new ArrayList<>();
     }
 
     // ==================== удобные выборки ====================
@@ -724,6 +783,10 @@ public final class ReplayRecord {
                 t.alive = u.alive();
                 t.capturedBy = u.capturedBy;
                 t.insideBuildingUid = u.insideBuildingUid;
+                if (u.hexId != null && !u.inside()) {
+                    List<Integer> сек = kelium.engine.СекторыВойск.секторыЖетона(s, u);
+                    t.sides = сек == null ? null : new ArrayList<>(сек);
+                }
                 snap.tokens.add(t);
             }
             snap.players.add(playerView(s, p));
@@ -750,6 +813,7 @@ public final class ReplayRecord {
             }
         }
         snap.arsenalDisplay.addAll(s.arsenalDisplay);
+        snap.superDisplay.addAll(s.superDisplay);
         return snap;
     }
 
@@ -799,7 +863,7 @@ public final class ReplayRecord {
             v.shieldedKinds.add(u.code);
         }
         v.containers = p.containers;
-        v.containerHand.addAll(p.containerHand);
+        v.containerCards.addAll(p.containerCards);
         int cap = Storage.containerCapacity(s, p);
         v.containerCap = cap == Integer.MAX_VALUE ? -1 : cap;
         // раскладка ячеек склада по складским зданиям — см. Player.storageCells
@@ -819,6 +883,19 @@ public final class ReplayRecord {
         v.keliumCap = Storage.keliumMax(s, p);
         v.ammoCap = Storage.ammoMax(s, p);
         v.storeCap = Storage.totalMax(s, p);
+        for (String cid : p.allInstalledArsenal()) {
+            int n = kelium.engine.ability.Abilities.storageCellsOnCard(s, p.seat, "arsenal", cid);
+            if (n > 0) {
+                v.cellCards.put(cid, n);
+            }
+        }
+        for (String cid : p.superArsenalCards) {
+            int n = kelium.engine.ability.Abilities.storageCellsOnCard(s, p.seat,
+                "super_arsenal", cid);
+            if (n > 0) {
+                v.cellCards.put(cid, n);
+            }
+        }
         v.tech.putAll(new TreeMap<>(p.techSteps));
         v.techCubes = p.techCubesLeft;
         v.redModules = p.redModules;
@@ -843,8 +920,8 @@ public final class ReplayRecord {
         v.orderSetAside = p.orderSetAside;
         v.orderColor = p.orderColor;
         v.storageTokens.addAll(p.storageTokens);
-        v.superObjective = p.superObjective;
-        v.superComplete = p.superObjectiveComplete;
+        v.superObjectives.addAll(p.superObjectives);
+        v.superDone.addAll(p.superObjectivesDone);
         v.cuTokens = p.cuDestructionTokens;
         v.ownCuToken = p.ownCuTokenAvailable;
         v.startHex = p.startHex;
@@ -907,7 +984,7 @@ public final class ReplayRecord {
         @SuppressWarnings("unchecked")
         Map<String, Object> m = (Map<String, Object>) root;
         if (!FORMAT_TAG.equals(Json.s(m, "format"))) {
-            throw new IOException("это не запись партии «Кристаллов Раздора» "
+            throw new IOException("это не запись партии «Lex Talionis» "
                 + "(ожидался формат " + FORMAT_TAG + ")");
         }
         int ver = Json.i(m, "version");
@@ -920,6 +997,14 @@ public final class ReplayRecord {
         } catch (RuntimeException e) {
             throw new IOException("запись читается, но она неполная: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Запись из уже разобранной структуры JSON — сетевой клиент получает её
+     * кусками по проводу, а не из файла.
+     */
+    public static ReplayRecord fromJsonMap(Map<String, Object> m) {
+        return fromMap(m);
     }
 
     // -------------------- запись в структуру --------------------
@@ -1009,6 +1094,13 @@ public final class ReplayRecord {
                 th.add(to);
             }
             o.put("thoughts", th);
+            if (!f.decisions.isEmpty()) {
+                List<Object> ds = new ArrayList<>();
+                for (Decision d : f.decisions) {
+                    ds.add(decisionToMap(d));
+                }
+                o.put("decisions", ds);
+            }
             o.put("hl", highlightToMap(f.highlight));
             // Снимок повторяется дословно — не дублируем: null значит «как в
             // предыдущем кадре». На длинной партии это заметно уменьшает файл.
@@ -1033,6 +1125,57 @@ public final class ReplayRecord {
         }
         m.put("frames", fs);
         return m;
+    }
+
+    private static Map<String, Object> decisionToMap(Decision d) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("seat", d.seat);
+        m.put("kind", d.kind);
+        m.put("title", d.title);
+        m.put("picked", d.picked);
+        m.put("total", d.total);
+        if (d.intent != null && !d.intent.isBlank()) {
+            m.put("intent", d.intent);
+        }
+        List<Object> os = new ArrayList<>();
+        for (DecisionOption o : d.options) {
+            Map<String, Object> om = new LinkedHashMap<>();
+            om.put("text", o.text);
+            if (o.sub != null) {
+                om.put("sub", o.sub);
+            }
+            if (o.card != null) {
+                om.put("card", o.card);
+            }
+            if (o.hex != null) {
+                om.put("hex", o.hex);
+            }
+            os.add(om);
+        }
+        m.put("options", os);
+        return m;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Decision decisionFromMap(Map<String, Object> m) {
+        Decision d = new Decision();
+        d.seat = Json.i(m, "seat");
+        d.kind = orEmpty(Json.s(m, "kind"));
+        d.title = orEmpty(Json.s(m, "title"));
+        Integer p = Json.io(m, "picked");
+        d.picked = p == null ? -1 : p;
+        d.total = Json.i(m, "total");
+        d.intent = Json.s(m, "intent");
+        for (Object o : Json.list(m, "options")) {
+            Map<String, Object> om = (Map<String, Object>) o;
+            DecisionOption opt = new DecisionOption();
+            opt.text = orEmpty(Json.s(om, "text"));
+            opt.sub = Json.s(om, "sub");
+            opt.card = Json.s(om, "card");
+            opt.hex = Json.s(om, "hex");
+            d.options.add(opt);
+        }
+        return d;
     }
 
     private static Map<String, Object> highlightToMap(Highlight h) {
@@ -1094,6 +1237,7 @@ public final class ReplayRecord {
         }
         o.put("decks", dk);
         o.put("arsDisplay", new ArrayList<>(s.arsenalDisplay));
+        o.put("superDisplay", new ArrayList<>(s.superDisplay));
         List<Object> hx = new ArrayList<>();
         for (HexState h : s.hexes) {
             Map<String, Object> ho = new LinkedHashMap<>();
@@ -1143,6 +1287,9 @@ public final class ReplayRecord {
             to.put("alive", t.alive);
             to.put("cap", t.capturedBy);
             to.put("in", t.insideBuildingUid);   // войско внутри этого здания
+            if (t.sides != null) {
+                to.put("us", t.sides);           // секторы войска на гексе
+            }
             tk.add(to);
         }
         o.put("tokens", tk);
@@ -1214,11 +1361,13 @@ public final class ReplayRecord {
             o.put("shields", p.shieldedKinds);
         }
         o.put("containers", p.containers);
-        o.put("contHand", p.containerHand);
         o.put("containerCap", p.containerCap);
         o.put("keliumCap", p.keliumCap);
         o.put("ammoCap", p.ammoCap);
         o.put("storeCap", p.storeCap);
+        if (!p.cellCards.isEmpty()) {
+            o.put("cellCards", p.cellCards);
+        }
         o.put("tech", p.tech);
         o.put("techCubes", p.techCubes);
         o.put("red", p.redModules);
@@ -1233,6 +1382,9 @@ public final class ReplayRecord {
             o.put("bluePlaced", modulesToMap(p.bluePlaced));
         }
         o.put("arsHand", p.arsenalHand);
+        if (!p.containerCards.isEmpty()) {
+            o.put("contCards", p.containerCards);
+        }
         o.put("arsInst", p.arsenalInstalled);
         if (p.mandateArsenalCard != null) {
             o.put("mandCard", p.mandateArsenalCard);
@@ -1247,8 +1399,8 @@ public final class ReplayRecord {
         o.put("ordAside", p.orderSetAside);
         o.put("ordColor", p.orderColor);
         o.put("store", p.storageTokens);
-        o.put("super", p.superObjective);
-        o.put("superComplete", p.superComplete);
+        o.put("super", p.superObjectives);
+        o.put("superDone", p.superDone);
         o.put("cuTokens", p.cuTokens);
         o.put("ownCu", p.ownCuToken);
         o.put("startHex", p.startHex);
@@ -1352,6 +1504,9 @@ public final class ReplayRecord {
                 Map<String, Object> to = (Map<String, Object>) t;
                 f.thoughts.add(new Thought(Json.i(to, "seat"), orEmpty(Json.s(to, "text"))));
             }
+            for (Object d : Json.list(fo, "decisions")) {
+                f.decisions.add(decisionFromMap((Map<String, Object>) d));
+            }
             f.highlight = highlightFromMap(Json.map(fo, "hl"));
             Map<String, Object> so = Json.map(fo, "snap");
             if (so != null) {
@@ -1451,6 +1606,9 @@ public final class ReplayRecord {
         for (Object x : Json.list(o, "arsDisplay")) {
             s.arsenalDisplay.add(String.valueOf(x));
         }
+        for (Object x : Json.list(o, "superDisplay")) {
+            s.superDisplay.add(String.valueOf(x));
+        }
         for (Object ho : Json.list(o, "hexes")) {
             Map<String, Object> h = (Map<String, Object>) ho;
             HexState st = new HexState();
@@ -1506,6 +1664,12 @@ public final class ReplayRecord {
             tok.alive = Json.b(t, "alive");
             tok.capturedBy = Json.io(t, "cap");
             tok.insideBuildingUid = Json.io(t, "in");
+            if (t.get("us") instanceof List<?> us) {
+                tok.sides = new ArrayList<>();
+                for (Object o2 : us) {
+                    tok.sides.add(((Number) o2).intValue());
+                }
+            }
             s.tokens.add(tok);
         }
         for (Object po : Json.list(o, "players")) {
@@ -1524,6 +1688,14 @@ public final class ReplayRecord {
         p.ammo = Json.i(o, "ammo");
         p.trophy = Json.i(o, "trophy");
         p.trophyCap = Json.i(o, "trophyCap");
+        Map<String, Object> cellCards = Json.map(o, "cellCards");
+        if (cellCards != null) {
+            for (Map.Entry<String, Object> e : cellCards.entrySet()) {
+                if (e.getValue() instanceof Number n) {
+                    p.cellCards.put(e.getKey(), n.intValue());
+                }
+            }
+        }
         Map<String, Object> cells = Json.map(o, "storageCells");
         if (cells != null) {
             for (Map.Entry<String, Object> e : cells.entrySet()) {
@@ -1567,7 +1739,7 @@ public final class ReplayRecord {
         }
         p.shieldedKinds.addAll(Json.strings(o, "shields"));
         p.containers = Json.i(o, "containers");
-        p.containerHand.addAll(Json.strings(o, "contHand"));
+        p.containerCards.addAll(Json.strings(o, "contCards"));
         p.containerCap = Json.i(o, "containerCap");
         p.keliumCap = Json.i(o, "keliumCap");
         p.ammoCap = Json.i(o, "ammoCap");
@@ -1594,8 +1766,8 @@ public final class ReplayRecord {
         p.orderSetAside = Json.s(o, "ordAside");
         p.orderColor = Json.s(o, "ordColor");
         p.storageTokens.addAll(Json.strings(o, "store"));
-        p.superObjective = Json.s(o, "super");
-        p.superComplete = Json.b(o, "superComplete");
+        p.superObjectives.addAll(Json.strings(o, "super"));
+        p.superDone.addAll(Json.strings(o, "superDone"));
         p.cuTokens = Json.i(o, "cuTokens");
         p.ownCuToken = Json.b(o, "ownCu");
         p.startHex = orEmpty(Json.s(o, "startHex"));

@@ -201,7 +201,7 @@ public final class KpButton extends JComponent {
             : (h + fm.getAscent() - fm.getDescent()) / 2;
         g.drawString(t, x, titleY);
         if (twoLines) {
-            g.setFont(Theme.font(10, Font.PLAIN));
+            g.setFont(Theme.font(12.5, Font.PLAIN));
             g.setColor(state == State.PLAYED ? Theme.kelium()
                 : primary && clickable()
                     ? (Theme.isDark() ? new Color(0x0D, 0x14, 0x20, 190)

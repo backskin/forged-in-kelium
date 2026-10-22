@@ -649,9 +649,11 @@ public final class PlayerStrip extends JComponent {
         items.add(markItem("arsenal", "ARSENAL",
             p.arsenalHand.size() + "+" + p.arsenalInstalled.size(), Theme.ink3(), "00+00"));
         items.add(ordersItem(played));
-        if (p.superObjective != null) {
-            items.add(markItem("super", "SUPER", p.superComplete ? "✓" : "—",
-                p.superComplete ? Theme.points() : Theme.ink3(), "00"));
+        if (!p.superObjectives.isEmpty()) {
+            boolean естьОтработавшие = !p.superDone.isEmpty();
+            items.add(markItem("super", "SUPER",
+                p.superDone.size() + "/" + p.superObjectives.size(),
+                естьОтработавшие ? Theme.points() : Theme.ink3(), "00"));
         }
 
         // ОДНА СТРОКА ВАЖНЕЕ СЛОВА «НАУКА». Если ряд со словом в строку не
@@ -948,8 +950,9 @@ public final class PlayerStrip extends JComponent {
                         ? " Под Мандатом (sa8): " + p.mandateContainers + " места под контейнеры."
                         : "");
             case "orders" -> "Сейчас сыграно " + p.orderPlayed.size() + " из 4.";
-            case "super" -> p.superComplete ? "Задание ЗАКРЫТО — потому значок золотой."
-                : "Низ карты ещё не отработан.";
+            case "super" -> "Супер-заданий " + p.superObjectives.size()
+                + ", низов отработало " + p.superDone.size()
+                + (p.superDone.isEmpty() ? "." : " — потому значок золотой.");
             default -> "";
         };
         return head + "\n\n" + what + (now.isEmpty() ? "" : "\n\n" + now);
@@ -1125,10 +1128,21 @@ public final class PlayerStrip extends JComponent {
      */
     private static String setupLineBoards(ReplayRecord.Player p) {
         java.util.List<String> bits = new java.util.ArrayList<>();
-        if (p.side != null && !p.side.isBlank()) {
+        // ФРАКЦИИ (22.09.2026): сторона планшета войск — это цвет; хранилище у
+        // всех одно, и повторять за ним тот же цвет незачем.
+        String фракция = p.side == null ? "" : switch (p.side) {
+            case "red" -> "красные";
+            case "green" -> "зелёные";
+            case "blue" -> "синие";
+            case "yellow" -> "жёлтые";
+            default -> "";
+        };
+        if (!фракция.isEmpty()) {
+            bits.add("войска: " + фракция);
+        } else if (p.side != null && !p.side.isBlank()) {
             bits.add("войска " + p.side);
         }
-        if (p.storageSide != null && !p.storageSide.isBlank()) {
+        if (фракция.isEmpty() && p.storageSide != null && !p.storageSide.isBlank()) {
             bits.add("склад " + p.storageSide);
         }
         return String.join(" · ", bits);

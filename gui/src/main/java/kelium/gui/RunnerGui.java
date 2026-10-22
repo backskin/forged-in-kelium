@@ -209,7 +209,7 @@ public final class RunnerGui {
 
     // ==================== окно ====================
     private void createAndShow() {
-        frame = new JFrame("Кристаллы Раздора — прогоны ботов и нейросетей");
+        frame = new JFrame("Lex Talionis — прогоны ботов и нейросетей");
         Ui.setAppIcon(frame, "runner");
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -973,9 +973,8 @@ public final class RunnerGui {
                     ru.record(event);
                 }
                 col.record(event);
-                // Кадр рисуем в КОНЦЕ раунда (событие «return»), а не в начале:
-                // Обновление восстанавливает келемий на тайлах и снимает урон,
-                // поэтому кадр из начала раунда всегда выглядел «нетронутым».
+                // Кадр рисуем в КОНЦЕ раунда (событие «return»): на нём видно
+                // всё, что раунд сделал с полем.
                 if (vizDir != null && "return".equals(event.get("type"))) {
                     int rnd = event.get("round") instanceof Number nn ? nn.intValue() : 0;
                     writeSvg(vizDir.resolve(String.format("round%02d.svg", rnd)),

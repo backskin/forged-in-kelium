@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import kelium.core.Agent;
 import kelium.core.GameState;
 import kelium.core.PlayerState;
 import kelium.core.Resource;
@@ -18,10 +19,24 @@ import kelium.dataio.Ctx;
  * forge/engine/objectives.py.
  *
  * <p>Задание в руке играбельно, если выполнено его базовое требование (предикат
- * по состоянию + журналу). При розыгрыше базовая награда даётся всегда
- * (расходники — правило цепочки); если выполнено и усиленное требование,
- * дополнительно даётся особая награда (очковая вещь + свежая карта задания) —
- * награды СКЛАДЫВАЮТСЯ. Задания-жертвы (Ж) сначала платят цену.
+ * по состоянию + журналу). Задания-жертвы (Ж) сначала платят цену.
+ *
+ * <p><b>УСИЛЕННАЯ НАГРАДА — ВМЕСТО БАЗОВОЙ, А НЕ СВЕРХ НЕЁ</b> (правило
+ * дизайнера 16.09.2026). Игрок, выполнивший усиленное требование, получает
+ * ОДНУ награду НА ВЫБОР: базовую или усиленную. Прежде награды складывались, и
+ * усиление было чистой прибавкой — теперь это развилка: усиленная награда
+ * обычно очковая и дальняя, базовая — ресурсная и сейчас.
+ *
+ * <p>Выбор делается ДО оплаты: у заданий-жертв усиление стоит доплаты, и
+ * платить её, не собираясь брать усиленную награду, незачем. Поэтому движок
+ * предлагает две отдельные возможности — «выполнить» и «выполнить усиленно», —
+ * а не спрашивает после.
+ *
+ * <p>Ключ свода {@code objectives.enhanced_reward_replaces_base}. Выключенный
+ * возвращает прежнее сложение: это нужно, чтобы мерить правку отдельно.
+ *
+ * <p>У карт, где блока {@code enhanced} нет вовсе (начальные задания), развилки
+ * нет: обе награды выдаются вместе, как и раньше.
  */
 public final class Objectives {
 
@@ -103,7 +118,7 @@ public final class Objectives {
                 return p.arsenalHand.size();
             case "buildings_off_cu":
                 // o47 «Демонтаж»: своё здание уходит в запас БЕЗ компенсации
-                // (как и при обычном сносе, платы за это нет).
+                // (обычный снос даёт монету, здесь не даёт).
                 return ownBuildingsOffCu(p).size();
             default:
                 try {
@@ -167,12 +182,13 @@ public final class Objectives {
                                      String playedCid) {
         switch (res) {
             case "container" -> {
-                int было = p.containers;
                 p.containers = Math.max(0, p.containers - amt);
-                // СГОРАЮТ КОНКРЕТНЫЕ КАРТЫ и уходят в сброс своей колоды,
-                // иначе колода тает молча и по ней не сойдётся счёт.
-                for (int i = было - p.containers; i > 0 && !p.containerHand.isEmpty(); i--) {
-                    s.decks.get("containers").discard(p.containerHand.remove(0));
+                // сданные карты — в сброс колоды контейнеров, лишних на руке не остаётся
+                while (p.containerCards.size() > p.containers) {
+                    String сдан = p.containerCards.remove(p.containerCards.size() - 1);
+                    if (s.decks.get("containers") != null) {
+                        s.decks.get("containers").discard(сдан);
+                    }
                 }
             }
             case "objective_cards" -> {
@@ -362,10 +378,58 @@ public final class Objectives {
         return out;
     }
 
-    /** Завершить задание: оплатить жертву, выдать базовую (+особую) награду. */
+    /**
+     * ДОСТУПНО ЛИ УСИЛЕНИЕ этой карты прямо сейчас — то есть надо ли предлагать
+     * игроку вторую возможность, «выполнить усиленно».
+     *
+     * <p>Для жертвы усиление доступно, когда игроку есть чем доплатить разницу;
+     * для остальных — когда выполнено усиленное требование. У карты без блока
+     * {@code enhanced} усиления нет: развилки не будет.
+     */
     @SuppressWarnings("unchecked")
+    public static boolean enhancedAvailable(GameState s, int seat, TurnJournal j, String cid) {
+        Map<String, Object> card = Ctx.cards(s, "objectives").byId(cid);
+        if (card == null) {
+            return false;
+        }
+        Object enh = card.get("enhanced");
+        if (!(enh instanceof Map<?, ?> enhMap)) {
+            return false;
+        }
+        if ("sacrifice_enhanced".equals(enhMap.get("predicate"))) {
+            Object sacObj = card.get("sacrifice");
+            if (!(sacObj instanceof Map<?, ?> sac) || sac.get("resource") == null) {
+                return false;
+            }
+            int sacBase = sac.get("amount") instanceof Number n ? n.intValue() : 0;
+            Object ep = enhMap.get("params");
+            int enhAmt = ep instanceof Map<?, ?> em && em.get("amount") instanceof Number en
+                ? en.intValue() : sacBase;
+            int diff = enhAmt - sacBase;
+            return diff <= 0
+                || sacrificeCapacity(s, s.player(seat), sac.get("resource").toString()) >= diff;
+        }
+        return "card".equals(card.get("checked_by"))
+            ? cardRequirementMet(s, seat, cid, true)
+            : requirementMet(s, seat, j, (Map<String, Object>) enh);
+    }
+
+    /** Завершить задание базовой наградой. */
     public static Map<String, Object> playObjective(GameState s, int seat, TurnJournal j,
                                                      String cid, Consumer<Map<String, Object>> emit) {
+        return playObjective(s, seat, j, cid, emit, false);
+    }
+
+    /**
+     * Завершить задание: оплатить жертву и выдать награду.
+     *
+     * @param усиленно взять УСИЛЕННУЮ награду вместо базовой (и доплатить, если
+     *                 усиление карты — доплата жертвы)
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> playObjective(GameState s, int seat, TurnJournal j,
+                                                     String cid, Consumer<Map<String, Object>> emit,
+                                                     boolean усиленно) {
         PlayerState p = s.player(seat);
         var content = Ctx.cards(s, "objectives");
         Map<String, Object> card = content.byId(cid);
@@ -386,34 +450,51 @@ public final class Objectives {
 
         Map<String, Object> base = new HashMap<>();
         Map<String, Object> special = new HashMap<>();
-        grantBase(s, p, (Map<String, Object>) card.getOrDefault("base_reward", Map.of()), base);
+
+        // ВМЕСТО ИЛИ СВЕРХ. По правилу 16.09.2026 усиленная награда заменяет
+        // базовую, и тогда выдаётся ровно одна из двух. Ключ свода оставлен,
+        // чтобы прежнее сложение можно было померить отдельно.
+        boolean вместо = Boolean.TRUE.equals(Ctx.rules(s)
+                .get("objectives.enhanced_reward_replaces_base", Boolean.TRUE));
 
         boolean enhancedOk = false;
         Object enh = card.get("enhanced");
-        if (enh instanceof Map<?, ?> enhMap && "sacrifice_enhanced".equals(enhMap.get("predicate"))
-                && sacRes != null) {
-            // Усиленная жертва: ДОПЛАТА разницы до усиленной суммы (а не
-            // фантомная проверка «можешь ли»). Бот доплачивает всегда, когда может.
-            Object ep = enhMap.get("params");
-            int enhAmt = ep instanceof Map<?, ?> em && em.get("amount") instanceof Number en
-                ? en.intValue() : sacBase;
-            int diff = enhAmt - sacBase;
-            if (diff > 0 && sacrificeCapacity(s, p, sacRes) >= diff) {
-                paySacrifice(s, p, sacRes, diff, cid);
-                enhancedOk = true;
-            }
-        } else if (enh instanceof Map<?, ?> && ("card".equals(card.get("checked_by"))
-                ? cardRequirementMet(s, seat, cid, true)
-                : requirementMet(s, seat, j, (Map<String, Object>) enh))) {
-            enhancedOk = true;
-        } else if (enh == null) {
+        if (enh == null) {
             // У НАЧАЛЬНЫХ карт усиления нет вовсе (каталог: «без усиления и
             // верха»), и их награда лежит в special_reward. Без этой ветки она
             // не выдавалась НИКОГДА — все восемь начальных заданий выполнялись
-            // впустую. Нет блока enhanced => награда положена за выполнение.
+            // впустую. Нет блока enhanced => развилки нет, выдаётся всё.
             enhancedOk = true;
+            усиленно = false;
+        } else if (усиленно || !вместо) {
+            if (enh instanceof Map<?, ?> enhMap && "sacrifice_enhanced".equals(enhMap.get("predicate"))
+                    && sacRes != null) {
+                // Усиленная жертва: ДОПЛАТА разницы до усиленной суммы (а не
+                // фантомная проверка «можешь ли»).
+                Object ep = enhMap.get("params");
+                int enhAmt = ep instanceof Map<?, ?> em && em.get("amount") instanceof Number en
+                    ? en.intValue() : sacBase;
+                int diff = enhAmt - sacBase;
+                if (diff <= 0) {
+                    enhancedOk = true;
+                } else if (sacrificeCapacity(s, p, sacRes) >= diff) {
+                    paySacrifice(s, p, sacRes, diff, cid);
+                    enhancedOk = true;
+                }
+            } else if (enh instanceof Map<?, ?> && ("card".equals(card.get("checked_by"))
+                    ? cardRequirementMet(s, seat, cid, true)
+                    : requirementMet(s, seat, j, (Map<String, Object>) enh))) {
+                enhancedOk = true;
+            }
         }
-        if (enhancedOk) {
+        // ЗАПРОСИЛИ УСИЛЕНИЕ, А ОНО НЕ ВЫШЛО — карта всё равно выполняется, но
+        // по базовой награде: игрок не должен остаться ни с чем из-за того, что
+        // между предложением и розыгрышем что-то изменилось.
+        boolean толькоУсиленная = вместо && усиленно && enhancedOk;
+        if (!толькоУсиленная) {
+            grantBase(s, p, (Map<String, Object>) card.getOrDefault("base_reward", Map.of()), base);
+        }
+        if (enhancedOk && (!вместо || усиленно)) {
             grantSpecial(s, p, (Map<String, Object>) card.getOrDefault("special_reward", Map.of()), special);
         }
 
@@ -424,15 +505,50 @@ public final class Objectives {
         Map<String, Object> granted = new HashMap<>();
         granted.put("base", base);
         granted.put("special", special);
+        // «БОЕВОЕ ДОВОЛЬСТВИЕ» (арсенал 7.1.0, №33): «Выполнив задание, получи
+        // 1 боеприпас». Только за выполненное задание — сожжённое ради верха
+        // идёт другим путём и сюда не попадает. Боеприпас ложится в хранилище
+        // по общим правилам: нет ячейки — не берётся.
+        if (Passives.hasPassive(s, seat, "ammo_on_objective_done")) {
+            granted.put("arsenal_bonus_ammo", Storage.addAmmoCapped(s, p, 1));
+        }
         Map<String, Object> ev = new HashMap<>();
         ev.put("type", "objective");
         ev.put("seat", seat);
         ev.put("card", cid);
-        ev.put("enhanced", enhancedOk);
+        ev.put("enhanced", enhancedOk && (!вместо || усиленно));
+        ev.put("enhanced_instead", толькоУсиленная);
         ev.put("round", s.round);
         ev.put("granted", granted);
         emit.accept(ev);
         return granted;
+    }
+
+
+    /**
+     * ГОТОВЫЕ РЕЗУЛЬТАТЫ НАГРАДЫ (Задания 4.0, дизайнер 06.10.2026): каждый —
+     * эффект реестра {@link Effects#apply}, {@code {id, …параметры}}. Так задание
+     * даёт то, что обычно стоит нескольких звеньев конвейера: войско без
+     * энергии, здание без цены, шаг по треку без трофеев, урон без боя.
+     */
+    @SuppressWarnings("unchecked")
+    private static void выдатьЭффекты(GameState s, PlayerState p, Object список,
+                                      Map<String, Object> into) {
+        if (!(список instanceof java.util.List<?> l)) {
+            return;
+        }
+        java.util.List<Object> итоги = new java.util.ArrayList<>();
+        for (Object o : l) {
+            if (!(o instanceof Map<?, ?> m)) {
+                continue;
+            }
+            Map<String, Object> пар = new HashMap<>((Map<String, Object>) m);
+            String id = String.valueOf(пар.remove("id"));
+            Map<String, Object> итог = new HashMap<>(Effects.apply(id, s, p.seat, пар));
+            итог.put("effect", id);
+            итоги.add(итог);
+        }
+        into.put("effects", итоги);
     }
 
     private static void grantBase(GameState s, PlayerState p, Map<String, Object> reward,
@@ -475,9 +591,99 @@ public final class Objectives {
                     into.merge("objective_card", drawn,
                         (a, b) -> ((Number) a).intValue() + ((Number) b).intValue());
                 }
+                // === НАГРАДА-ДЕЙСТВИЕ (ревизия заданий 18.09.2026) ===
+                //
+                // Дизайнер: «не ресурсы ебаные давать заданием, а именно
+                // действия — те, которые ты не успел отыграть». Выполнил
+                // задание — играешь полноценное действие прямо сейчас, сверх
+                // двух своих приказов. Ресурс остаётся только в усиленной
+                // награде, и она теперь берётся ВМЕСТЕ с базовой.
+                //
+                // Почему через freeAction, а не своей веткой: это ровно тот же
+                // подарок, что раздаёт утиль и карты арсенала, — со своим
+                // контекстом, своим журналом и своей телеметрией. Вторая правда
+                // о бесплатном действии здесь никому не нужна.
+                case "action" -> {
+                    // ВЫБОР ОДНОГО ИЗ ДВУХ ДЕЙСТВИЙ (решение дизайнера 22.09.2026).
+                    // Награда кодирует пару через «|» («combat|energy_swap»):
+                    // игрок выбирает, какое сыграть. Одиночное действие (без «|»)
+                    // играется как раньше.
+                    String имя = String.valueOf(e.getValue());
+                    if (имя.contains("|")) {
+                        String[] пара = имя.split("\\|", 2);
+                        имя = выбратьДействиеНаграды(s, p.seat, пара[0], пара[1]);
+                    }
+                    Map<String, Object> итог = Effects.freeAction(s, p.seat,
+                        java.util.Map.of("action", имя));
+                    into.put("action", имя);
+                    into.put("action_ran", итог.get("ran"));
+                    // ЧТО ДЕЙСТВИЕ НАСЧИТАЛО — наружу целиком. Награда может
+                    // «состояться» и не дать ничего: Бой без залпа, Стройка без
+                    // операции, Рынок без сделки. Замер пользы считается по этим
+                    // числам, а не по признаку «сыграно».
+                    if (итог.get("telemetry") instanceof Map<?, ?> тел) {
+                        into.put("action_telemetry", тел);
+                    }
+                }
+                // ПОЗОЛОЧЕНИЕ МОДУЛЯ — восьмая награда ревизии. Не действие, но и
+                // не ресурс: это прогресс, который дизайнер просил в награды
+                // отдельно. Золотить нечего — награда пропадает, как всякая
+                // недоступная (то же делает вершина зелёного трека).
+                // ДВА СПЕЦ-ДЕЙСТВИЯ (решение дизайнера 19.09.2026, вместо
+                // позолоты). Спец-действие — самый дефицитный ресурс хода: оно
+                // одно, и через него идут и задания, и карты арсенала. Замер
+                // показал, что за ход выполняется максимум ОДНО задание, ходов
+                // с двумя не бывает вовсе; эта награда снимает ровно то горлышко.
+                //
+                // Прибавка кладётся в журнал хода, как и у одноимённого утиля
+                // арсенала: предел спец-действий считается на входе в ход, а
+                // награда приходит в середине.
+                case "spec_actions" -> {
+                    int сколько = e.getValue() instanceof Number сп ? сп.intValue() : 2;
+                    s.journal.of(p.seat).specBonus += Math.max(0, сколько);
+                    into.put("spec_actions", сколько);
+                }
+                case "effects" -> выдатьЭффекты(s, p, e.getValue(), into);
+                case "gild" -> {
+                    Agent агент = s.agents == null || p.seat >= s.agents.size()
+                        ? null : s.agents.get(p.seat);
+                    boolean позолотил = Modules.gildOne(s, p, агент);
+                    into.put("gild", позолотил ? 1 : 0);
+                }
+                // СУПЕР-ЗАДАНИЕ В НАГРАДУ (решение дизайнера 13.10.2026: «выполнил
+                // задание — получил супер-задание»): одно из открытых на столе.
+                case "super_objective" -> {
+                    Agent агент = s.agents == null || p.seat >= s.agents.size()
+                        ? null : s.agents.get(p.seat);
+                    int взято = 0;
+                    for (int i = 0; i < Math.max(1, e.getValue() instanceof Number сз ? сз.intValue() : 1); i++) {
+                        if (Actions.ScienceAction.взятьСуперЗадание(s, Ctx.rules(s), p, агент)) {
+                            взято++;
+                        }
+                    }
+                    into.put("super_objective", взято);
+                }
                 default -> { }
             }
         }
+    }
+
+    /**
+     * ВЫБОР ОДНОГО ИЗ ДВУХ ДЕЙСТВИЙ НАГРАДЫ. Спрашивает агента; если агента нет
+     * (тест, авторасстановка) — берёт первое. Возвращает код выбранного действия.
+     */
+    private static String выбратьДействиеНаграды(GameState s, int seat, String a, String b) {
+        Agent агент = s.agents == null || seat >= s.agents.size()
+            ? null : s.agents.get(seat);
+        if (агент == null) {
+            return a;
+        }
+        java.util.List<kelium.core.Choice> opts = java.util.List.of(
+            new kelium.core.Choice("reward_action", a, a),
+            new kelium.core.Choice("reward_action", b, b));
+        kelium.core.Choice ch = агент.choose(s, opts,
+            java.util.Map.of("kind", "objective_reward_action"));
+        return ch != null && ch.payload() instanceof String выбр ? выбр : a;
     }
 
     private static void grantSpecial(GameState s, PlayerState p, Map<String, Object> reward,
@@ -487,6 +693,7 @@ public final class Objectives {
             Object v = e.getValue();
             int n = v instanceof Number num ? num.intValue() : 0;
             switch (k) {
+                case "effects" -> выдатьЭффекты(s, p, v, into);
                 case "kelium" -> {
                     int added = Storage.addKeliumCapped(s, p, n);
                     into.put("kelium", added);
@@ -509,17 +716,55 @@ public final class Objectives {
                 case "storage_token" -> {
                     // o13 «Расчистка» (решение 8.0): жетон хранилища как особая
                     // награда; слотов на планшете два — лишний жетон пропадает.
-                    if (p.storageTokens.size() < 2) {
-                        p.storageTokens.add("+1_universal_cell");
+                    int ячеек = Ctx.rules(s).get("storage.module_slots", null)
+                        instanceof Number сколько ? сколько.intValue() : 3;
+                    if (p.storageTokens.size() < ячеек) {
+                        ЖетоныХранилища.положить(s, p, ЖетоныХранилища.ЯЧЕЙКА);
                         into.put("storage_token", 1);
                     }
                 }
-                case "arsenal" -> {
-                    String c = s.decks.get("arsenal").draw(s.rng);
-                    if (c != null) {
-                        kelium.engine.Storage.takeArsenalCard(s, p, c);
+                // СУПЕР-ЗАДАНИЕ В НАГРАДУ (решение дизайнера 13.10.2026: «выполнил
+                // задание — получил супер-задание»): одно из открытых на столе.
+                case "super_objective" -> {
+                    Agent агент = s.agents == null || p.seat >= s.agents.size()
+                        ? null : s.agents.get(p.seat);
+                    int взято = 0;
+                    for (int i = 0; i < Math.max(1, n); i++) {
+                        if (Actions.ScienceAction.взятьСуперЗадание(s, Ctx.rules(s), p, агент)) {
+                            взято++;
+                        }
                     }
-                    into.put("arsenal", 1);
+                    into.put("super_objective", взято);
+                }
+                case "arsenal" -> {
+                    // СКОЛЬКО НАПЕЧАТАНО, СТОЛЬКО И КАРТ (печатные задания
+                    // 1.19.0: «две карты арсенала»). Прежде бралась ровно одна
+                    // при любом числе.
+                    int взято = 0;
+                    for (int i = 0; i < Math.max(1, n); i++) {
+                        String c = s.decks.get("arsenal").draw(s.rng);
+                        if (c == null) {
+                            break;
+                        }
+                        kelium.engine.Storage.takeArsenalCard(s, p, c);
+                        взято++;
+                    }
+                    into.put("arsenal", взято);
+                }
+                // СПЕЦ-ДЕЙСТВИЕ И ПОЗОЛОТА В УСИЛЕННОЙ НАГРАДЕ. С 22.09.2026 почти
+                // каждая усиленная награда несёт «и спец-действие», но эта ветка
+                // ключа spec_actions не знала, и прибавка молча терялась —
+                // выдавалась только базовая ветка grantBase. Позолота на
+                // печатных картах 1.19.0 тоже стоит в усиленной награде.
+                case "spec_actions" -> {
+                    int сколько = Math.max(0, n);
+                    s.journal.of(p.seat).specBonus += сколько;
+                    into.put("spec_actions", сколько);
+                }
+                case "gild" -> {
+                    Agent агент = s.agents == null || p.seat >= s.agents.size()
+                        ? null : s.agents.get(p.seat);
+                    into.put("gild", Modules.gildOne(s, p, агент) ? 1 : 0);
                 }
                 case "arsenal_from_display" -> {
                     // КАРТА С ВИТРИНЫ — ВЫБОР ИЗ ДВУХ ОТКРЫТЫХ, а не слепая тяга

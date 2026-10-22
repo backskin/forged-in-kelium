@@ -2,6 +2,7 @@ package kelium;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -100,15 +101,35 @@ class DesignerFixesTest {
     }
 
     @Test
-    void endConditionByAllPeaksOccupied() {
-        // Искусственно занимаем верхние шаги всех треков -> мирный конец.
+    void endConditionByAllPeaksOfOnePlayer() {
+        // ВЕРШИНЫ ОДНОГО ИГРОКА — конец партии (правило дизайнера
+        // 17.09.2026). Занимаем все три вершины одним местом.
         GameConfig cfg = GameConfig.build(2, 1L);
         GameState s = Setup.buildGame(cfg);
         int top = s.tech.steps - 1;
         for (String track : s.tech.tracks) {
             s.tech.occupancy.get(track).get(top).add(0);
         }
-        assertTrue(s.tech.allPeaksOccupied(), "все вершины заняты");
+        assertTrue(s.tech.allPeaksByOneSeat(), "вершины взяты одним игроком");
+        assertEquals(0, s.tech.seatOnAllPeaks(), "и это место 0");
+    }
+
+    @Test
+    void peaksOfDifferentPlayersDoNotEndTheGame() {
+        // ВЕРШИНЫ ВРАЗНОБОЙ ПАРТИЮ НЕ КОНЧАЮТ. До 17.09.2026 кончали:
+        // достаточно было трёх занятых вершин, чьих угодно, и условие складывалось
+        // само собой — партия обрывалась ни для кого. Сторож ломается, если правило
+        // откатят к «заняты кем угодно».
+        GameConfig cfg = GameConfig.build(2, 1L);
+        GameState s = Setup.buildGame(cfg);
+        int top = s.tech.steps - 1;
+        int seat = 0;
+        for (String track : s.tech.tracks) {
+            s.tech.occupancy.get(track).get(top).add(seat);
+            seat = 1 - seat;                  // вершины чередуются между двумя
+        }
+        assertNull(s.tech.seatOnAllPeaks(), "ни одно место не стоит на всех вершинах");
+        assertTrue(!s.tech.allPeaksByOneSeat(), "такая расстановка партию не кончает");
     }
 
     @Test

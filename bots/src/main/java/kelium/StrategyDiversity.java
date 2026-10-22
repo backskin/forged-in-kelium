@@ -59,7 +59,7 @@ public final class StrategyDiversity {
         "kelium", "coins", "trophy", "buildings_on_field", "units_on_field", "tech",
         "gold_modules", "spawn_tiles", "cu_tokens", "kills", "war_track",
         "objective_card_vp", "super_arsenal", "super_first_part", "arsenal_vp",
-        "level4_stars");
+        "arsenal_stars", "level4_stars");
 
     /** Человеческие подписи источников очков — для таблиц. */
     private static final Map<String, String> VP_LABEL = Map.ofEntries(
@@ -78,6 +78,7 @@ public final class StrategyDiversity {
         Map.entry("super_arsenal", "супер-арсенал"),
         Map.entry("super_first_part", "1-я часть супер-задания"),
         Map.entry("arsenal_vp", "очки от карт арсенала"),
+        Map.entry("arsenal_stars", "звёзды на картах арсенала"),
         Map.entry("level4_stars", "звёзды склада 4-го уровня"));
 
     public static void main(String[] args) throws Exception {

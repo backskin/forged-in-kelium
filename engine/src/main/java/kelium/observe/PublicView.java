@@ -129,6 +129,8 @@ public final class PublicView {
         public int ammoCap;
         public int trophyCap;
         public int storeCap;
+        /** Ячейки склада на установленных картах (карты открыты — это публично). */
+        public final Map<String, Integer> cellCards = new java.util.LinkedHashMap<>();
         /** Занятость ячеек склада: ячейка → что в ней лежит. */
         public final Map<String, String> storageCells = new LinkedHashMap<>();
         /** Жетоны модуля хранилища (какой стороной положены). */
@@ -187,9 +189,9 @@ public final class PublicView {
          */
         public final Map<String, Integer> vp = new LinkedHashMap<>();
 
-        // --- супер-задание (открыто с подготовки) ---
-        public String superObjective;
-        public boolean superComplete;
+        // --- супер-задания (открыты с подготовки) ---
+        public final List<String> superObjectives = new ArrayList<>();
+        public final List<String> superDone = new ArrayList<>();
         /** Ячеек счётчика запуска ещё не погашено (−1 — вторая часть не начата). */
         /** Символы на ячейках счётчика. */
         /** Части первой половины: часть → сколько положено. */
@@ -216,15 +218,8 @@ public final class PublicView {
         public List<String> orderHand;
         public List<String> objectiveHand;
         public List<String> arsenalHand;
-
-        /**
-         * КАКИЕ КОНТЕЙНЕРЫ ЛЕЖАТ У ИГРОКА — только СВОЕМУ. Контейнер берётся
-         * из колоды сразу и лежит рубашкой вверх: соседу видно, что он есть, но
-         * не что в нём. Число для всех — {@link #containerHandCount}.
-         */
-        public List<String> containerHand;
-
-        public int containerHandCount;
+        /** Карты своих контейнеров (с 27.09.2026 владелец их видит). */
+        public List<String> containerCards;
         public String setAsideOrder;
         /**
          * Свои подложенные карты-символы ЦЕЛИКОМ (kind/card/rev) — владелец
@@ -314,6 +309,7 @@ public final class PublicView {
         st.ammoCap = p.ammoCap;
         st.trophyCap = p.trophyCap;
         st.storeCap = p.storeCap;
+        st.cellCards.putAll(p.cellCards);
         st.storageCells.putAll(p.storageCells);
         st.storageTokens.addAll(p.storageTokens);
 
@@ -351,8 +347,8 @@ public final class PublicView {
         st.startHex = p.startHex;
         st.vp.putAll(p.vp);
 
-        st.superObjective = p.superObjective;
-        st.superComplete = p.superComplete;
+        st.superObjectives.addAll(p.superObjectives);
+        st.superDone.addAll(p.superDone);
         st.superArsenal.addAll(p.superArsenal);
 
         st.arsenalInstalled.addAll(p.arsenalInstalled);
@@ -363,14 +359,13 @@ public final class PublicView {
         st.objectiveHandCount = p.objectiveHand.size();
         st.arsenalHandCount = p.arsenalHand.size();
         st.containers = p.containers;
-        st.containerHandCount = p.containerHand.size();
         st.containerCap = p.containerCap;
         st.hasSetAsideOrder = p.orderSetAside != null;
         if (mine) {
             st.orderHand = List.copyOf(p.orderHand);
             st.objectiveHand = List.copyOf(p.objectiveHand);
             st.arsenalHand = List.copyOf(p.arsenalHand);
-            st.containerHand = List.copyOf(p.containerHand);
+            st.containerCards = List.copyOf(p.containerCards);
             st.setAsideOrder = p.orderSetAside;
             st.tucked = new ArrayList<>();
             for (ReplayRecord.Tucked t : p.tucked) {
@@ -533,6 +528,7 @@ public final class PublicView {
         o.put("ammoCap", st.ammoCap);
         o.put("trophyCap", st.trophyCap);
         o.put("storeCap", st.storeCap);
+        o.put("cellCards", st.cellCards);
         o.put("storageCells", st.storageCells);
         o.put("storageTokens", st.storageTokens);
         o.put("destroyedCount", st.destroyedCount);
@@ -553,8 +549,8 @@ public final class PublicView {
         o.put("ownCuToken", st.ownCuToken);
         o.put("startHex", st.startHex);
         o.put("vp", st.vp);
-        o.put("superObjective", st.superObjective);
-        o.put("superComplete", st.superComplete);
+        o.put("superObjectives", st.superObjectives);
+        o.put("superDone", st.superDone);
         o.put("superArsenal", st.superArsenal);
         o.put("arsenalInstalled", st.arsenalInstalled);
         o.put("orderPlayed", st.orderPlayed);
@@ -567,8 +563,6 @@ public final class PublicView {
         o.put("orderHand", st.orderHand);
         o.put("objectiveHand", st.objectiveHand);
         o.put("arsenalHand", st.arsenalHand);
-        o.put("containerHand", st.containerHand);
-        o.put("containerHandCount", st.containerHandCount);
         o.put("setAsideOrder", st.setAsideOrder);
         o.put("tucked", st.tucked);
         return o;

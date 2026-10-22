@@ -106,19 +106,26 @@ blue_sets:
   - id: C30
     name: "Полный набор (без масштаба по игрокам)"
     fixed: true   # уже полный сам по себе — не множится на число игроков
+    # АССОРТИМЕНТ ПО ЖЕТОНАМ ДИЗАЙНЕРА (экспорт 23.09.2026, «Жетоны модулей
+    # сборки 1-8»): четыре вида по три. Лицо / позолота (стрелка — что растёт):
+    #   2 БПР / 2 войска → 2/3   (растут войска)
+    #   2 БПР / 2 войска → 3/2   (растёт боеприпас)
+    #   3 БПР / 1 войско → 3/2   (растут войска)
+    #   1 БПР / 3 войска → 2/3   (растёт боеприпас)
+    # Позолоченная сторона несёт звезду — 1 победное очко (gold_modules).
     tokens:
-      - {id: C30-1, ammo: 2, units: 1, gild: units}
-      - {id: C30-2, ammo: 2, units: 1, gild: units}
-      - {id: C30-3, ammo: 2, units: 1, gild: units}
-      - {id: C30-4, ammo: 2, units: 1, gild: ammo}
-      - {id: C30-5, ammo: 2, units: 1, gild: ammo}
-      - {id: C30-6, ammo: 2, units: 1, gild: ammo}
-      - {id: C30-7, ammo: 1, units: 2, gild: units}
-      - {id: C30-8, ammo: 1, units: 2, gild: units}
-      - {id: C30-9, ammo: 1, units: 2, gild: units}
-      - {id: C30-10, ammo: 1, units: 2, gild: ammo}
-      - {id: C30-11, ammo: 1, units: 2, gild: ammo}
-      - {id: C30-12, ammo: 1, units: 2, gild: ammo}
+      - {id: C30-1, ammo: 2, units: 2, gild: units}
+      - {id: C30-2, ammo: 2, units: 2, gild: units}
+      - {id: C30-3, ammo: 2, units: 2, gild: units}
+      - {id: C30-4, ammo: 2, units: 2, gild: ammo}
+      - {id: C30-5, ammo: 2, units: 2, gild: ammo}
+      - {id: C30-6, ammo: 2, units: 2, gild: ammo}
+      - {id: C30-7, ammo: 3, units: 1, gild: units}
+      - {id: C30-8, ammo: 3, units: 1, gild: units}
+      - {id: C30-9, ammo: 3, units: 1, gild: units}
+      - {id: C30-10, ammo: 1, units: 3, gild: ammo}
+      - {id: C30-11, ammo: 1, units: 3, gild: ammo}
+      - {id: C30-12, ammo: 1, units: 3, gild: ammo}
 
   - id: C
     name: "Сборка (прежний набор)"

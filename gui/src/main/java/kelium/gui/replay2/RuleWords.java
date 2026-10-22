@@ -31,13 +31,20 @@ public final class RuleWords {
             case "asymmetry" -> "Асимметрия планшетов";
             case "actions" -> "Действия";
             case "combat_model" -> "Бой";
+            case "field" -> "Поле: чужие войска и небо гекса";
+            case "objectives" -> "Задания";
             case "command_center" -> "Центр управления";
             case "building_compensation_containers" -> "Контейнеры за снесённые здания";
             case "containers" -> "Контейнеры";
             case "containers_storage" -> "Где держат контейнеры";
+            case "storage" -> "Планшет хранилища";
+            case "cards" -> "Карты: срабатывания и ветки";
+            case "mining" -> "Добыча";
+            case "assembly" -> "Снабжение";
             case "symbols" -> "Символы супер-заданий";
             case "contested_cards" -> "Спорные карты";
             case "market" -> "Рынок";
+            case "orders" -> "Карты приказов";
             case "tech" -> "Наука";
             case "energy" -> "Энергия";
             case "return_step" -> "Конец раунда";
@@ -58,6 +65,11 @@ public final class RuleWords {
         String known = fixed(path);
         if (known != null) {
             return known;
+        }
+        // Кубиков науки по составу: tech.cube_supply_by_players.<игроков>.
+        if (path.startsWith("tech.cube_supply_by_players.")) {
+            String n = path.substring("tech.cube_supply_by_players.".length());
+            return "кубиков науки у каждого при " + n + " игроках";
         }
         // Приз за первый шаг трека: путь собран из трека, очереди и ресурса.
         if (path.startsWith("tech.step1_prize.")) {
@@ -167,6 +179,13 @@ public final class RuleWords {
             // ---------- Подготовка ----------
             case "setup.start_miner" -> "добытчик стоит на поле с самого начала";
             case "setup.start_coins" -> "монеты на старте, по местам";
+            case "setup.start_kelium" -> "келемий на старте, по местам";
+            case "setup.start_ammo" -> "боеприпасы на старте";
+            case "setup.start_containers" -> "карты контейнера на старте";
+            case "setup.start_arsenal_offer" ->
+                "начальный арсенал: столько карт наугад, одну оставить, остальные в коробку";
+            case "setup.start_arsenal_installed" ->
+                "начальный арсенал открывают на подготовке: верх — стартовые ресурсы";
 
             // ---------- Экономика ----------
             case "economy.coins_per_vp" -> "монет за одно победное очко";
@@ -184,6 +203,8 @@ public final class RuleWords {
                 "трофеев за исчерпанное лицо большого тайла зарождения";
             case "economy.spawn_face_trophy_small" ->
                 "трофеев за исчерпанное лицо малого тайла зарождения";
+            case "economy.spawn_back_big_free_tech_step" ->
+                "оборот большого тайла даёт даровое исследование";
             case "economy.spawn_back_trophy_big" ->
                 "трофеев за исчерпанный оборот большого тайла";
             case "economy.spawn_back_trophy_small" ->
@@ -201,9 +222,13 @@ public final class RuleWords {
             case "rounds.circles_per_round" -> "кругов в раунде";
             case "rounds.reserve_cap" ->
                 "предел раундов: сколько кругов вообще отпущено партии";
+            case "energy.cu_powered_by_any_cube" ->
+                "ЦУ запитано любым кубиком на своём жетоне";
             case "energy.plant_off_cell_gives" ->
                 "сколько энергии даёт станция ВНЕ жёлтой ячейки (на ней — номинал уровня)";
             case "rounds.order_hand_size" -> "приказов в руке";
+            case "rounds.scrapyard_first" ->
+                "свалка — первый шаг Обновления, до новой карты рынка";
             case "rounds.objective_hand_limit" -> "предел заданий в руке";
             case "rounds.blind_discard_choice" ->
                 "отложенный приказ игрок выбирает сам, а не наугад";
@@ -226,10 +251,8 @@ public final class RuleWords {
                 "устаревший ключ: потолок операций Стройки снят 06.09.2026";
             case "actions.build.surcharge_coins" ->
                 "устаревший ключ: надбавки за объём в Стройке нет";
-            case "actions.build.demolish_refund_coins" ->
-                "устаревший ключ: за снос своего здания не платят и не получают";
-            case "actions.build.demolish_cost_coins" ->
-                "устаревший ключ: снос своего здания бесплатен";
+            case "actions.build.demolish_refund_coins" -> "возврат монет за снос своего здания";
+            case "actions.build.demolish_cost_coins" -> "сколько стоит снос своего здания";
             case "actions.combat.token_surcharge_ammo" ->
                 "доплата боеприпасами за жетон, бьющий не из выбранного гекса";
             case "actions.build.move_enabled" ->
@@ -297,10 +320,52 @@ public final class RuleWords {
 
             // ---------- Бой ----------
             case "combat_model.all_attacks_damage" -> "любая атака наносит урон";
-            case "combat_model.damage_persists_until_refresh" ->
-                "урон держится до этапа обновления";
-            case "combat_model.heal_per_refresh" -> "сколько урона снимается в обновление";
             case "combat_model.walls_block_shots" -> "стенка не пропускает выстрел";
+
+            // ---------- Поле ----------
+            case "objectives.enhanced_reward_replaces_base" ->
+                "усиленная награда задания даётся ВМЕСТО базовой, на выбор";
+            case "field.enemy_air_blocks_ground" -> "чужая авиация запирает гекс для наземных";
+            case "field.sky_single_owner" ->
+                "в небе гекса сколько угодно авиации, но одного игрока";
+            case "field.enemy_units_block_build" ->
+                "чужие войска на гексе не дают строить, сносить и выводить нанятых";
+            case "field.units_hold_sectors" ->
+                "войско стоит на выбранном секторе, как здание, пока не уйдёт с гекса";
+            case "modules.red_gold_damage" ->
+                "золотой модуль боя: атака за 1 боеприпас наносит столько урона; урон можно разделить";
+            case "modules.red_gold_universal" ->
+                "золотой модуль боя: универсальная атака за 1 боеприпас по любой цели";
+            case "combat_model.super_unit_damage" ->
+                "атака супер-войска за 1 боеприпас наносит столько урона; урон можно разделить";
+            case "mining.unpowered" ->
+                "добытчик без энергии: off — ничего, kelium — 1 келемий, container — 1 карта контейнера, one_of — одно из двух";
+            case "assembly.unpowered" ->
+                "военное здание и ЦУ без энергии: off — ничего, ammo — 1 боеприпас, units — 1 жетон войск, one_of — одно из двух";
+            case "mining.unpowered_yield" ->
+                "добытчик без энергии всё же добывает столько келемия";
+            case "mining.unpowered_one_of" ->
+                "добытчик без энергии берёт 1 келемий или 1 карту контейнера";
+            case "mining.powered_both" ->
+                "запитанный добытчик берёт и келемий, и контейнеры по печати";
+            case "assembly.unpowered_one_of" ->
+                "военное здание и ЦУ без энергии делают 1 жетон войск или 1 боеприпас";
+            case "assembly.powered_both" ->
+                "запитанное военное здание и ЦУ делают и войска, и боеприпасы по печати";
+            case "setup.start_unit_from_seal" ->
+                "стартовое войско — род с модуля блокировки боя, а не пехота";
+            case "field.spawn_face_kelium_bonus" ->
+                "столько келемия добавить на лицо каждого тайла зарождения";
+            case "field.big_spawn_tiles_minus_players" ->
+                "больших тайлов зарождения не больше, чем игроков минус столько";
+            case "mining.unpowered_container" ->
+                "добытчик без энергии берёт ровно 1 контейнер со своего гекса";
+            case "assembly.unpowered_ammo" ->
+                "военное здание и ЦУ без энергии дают столько боеприпасов";
+            case "tech.kelium_not_more_than_trophies" ->
+                "в оплате шага науки келемия не больше, чем трофеев";
+            case "cards.branch_must_act" ->
+                "ветка считается сыгранной, только если что-то сделала: бой без выстрела не в счёт";
 
             // ---------- Центр управления ----------
             case "command_center.build_price_coins" -> "цена постройки центра управления";
@@ -333,12 +398,48 @@ public final class RuleWords {
             case "building_compensation_containers.power_station_by_level" ->
                 "контейнеров за энергостанцию, по уровням";
 
+            case "rounds.first_player_counterclockwise" ->
+                "жетон первого игрока идёт против часовой, вскрытие — по часовой";
+            case "tech.token_on_step1" ->
+                "жетон трека выдаётся уже на первом шаге";
+            case "objectives.util_limited" ->
+                "утиль даёт действие ОДНИМ жетоном, а не полное";
+            case "objectives.play_is_free_action" ->
+                "выполнение задания не тратит спец-действие";
+            case "build.military_copies", "actions.build.military_copies" ->
+                "сколько военных зданий одного типа можно иметь";
+            case "economy.kelium_is_joker" ->
+                "келемий платит и за атаку, и за науку, и ложится как энергия";
+            case "storage.open_cells" ->
+                "ячеек хранилища, открытых всегда (на печати планшета — одна)";
+            case "storage.module_slots" ->
+                "ячеек под жетон модуля хранилища на планшете";
+            case "actions.build.branch_demolish_before_build" ->
+                "в ветке «построить» сначала снеси сколько угодно своих зданий её вида, потом поставь одно";
+            case "storage.gild_tokens" ->
+                "жетоны хранилища улучшаются позолотой, как модули";
+            case "storage.cell_star_when_empty" ->
+                "обычная сторона ячейки хранилища даёт звезду, если ячейка пуста";
+
+            case "actions.assembly.ammo_base" ->
+                "сколько боеприпасов даёт здание за Снаряжение";
+            case "actions.assembly.return_units_to_reserve" ->
+                "в Снаряжении можно вернуть в запас любое число своих войск";
+
             // ---------- Контейнеры ----------
             case "containers.mode" -> "откуда берутся контейнеры";
+            case "containers.cover_by_action" -> "контейнер — за ячейку, открытую до действия и закрытую после";
+            case "containers.miner_by_yield" -> "добытчик берёт контейнеры со своего гекса по выработке";
             case "containers.printed_requires_empty_hex" ->
                 "печатный контейнер берут только с пустого гекса";
+            case "containers.mining_needs_adjacent_sector" ->
+                "Добыча смотрит на сектор контейнера, а не только на гекс";
+            case "containers.mining_air_cell" ->
+                "Добыча берёт и воздушную ячейку";
             case "containers_storage.arsenal_cells" ->
                 "ячеек под контейнеры на картах арсенала";
+            case "containers_storage.closed_arsenal_in_cells" ->
+                "закрытая карта арсенала занимает ячейку (нет — лежит стопкой без предела)";
             case "symbols.tuck_is_free" ->
                 "подсунуть карту под планшет — свободное решение, не действие";
             case "symbols.reveal_is_spec" ->
@@ -361,13 +462,30 @@ public final class RuleWords {
                 "энергия без источника разрешена";
 
             // ---------- Рынок ----------
+            case "market.deck_size" -> "карт рынка кладут на планшет";
+            case "market.preparatory_round" -> "первый раунд подготовительный — без карты рынка";
+            case "market.refresh_to_bottom" -> "обновлённая карта рынка уходит под низ колоды";
+            case "tech.peak_unlimited" -> "вершину трека занимает сколько угодно игроков";
+            case "end_conditions.peaks_instant_win" -> "вершины всех трёх треков — мгновенная победа";
+            case "actions.build.demolish_cu_gives_token" ->
+                "снос своего ЦУ — без монеты, модуль блокировки боя уходит сопернику";
+            case "command_center.military_win_counts_kills" ->
+                "военная победа — за второе уничтожение ЦУ";
+            case "command_center.military_win_min_players" -> "военная победа — с какого числа игроков";
             case "market.cell_cost_kelium" -> "келемия за одну ячейку предложения";
             case "market.base_exchanges" -> "печатные обмены рынка";
             case "market.pair_bonus_coin" -> "монет за парный обмен";
+            case "market.zero_kelium_coin" -> "монет за рынок без сданного келемия";
+            case "market.exchange_once_per_action" -> "каждый обмен рынка — раз за действие";
+            case "energy.lost_source_owner_chooses" -> "ушёл источник — владелец выбирает, какие кубики убрать";
+            case "actions.build.building_fires_on_build" -> "здание срабатывает при постройке";
+            case "tech.exchange_once_per_action" -> "каждый обмен научного отдела — раз за действие";
+            case "orders.spec_coin" -> "монет с плашки «+монета» карты приказа";
 
             // ---------- Наука ----------
             case "tech.tracks" -> "треки науки";
             case "tech.steps_per_track" -> "шагов на треке";
+            case "tech.steps_in_order" -> "шаги трека берутся подряд, с первого";
             case "tech.step_cells" -> "ячеек на шагах";
             case "tech.step_capacity" -> "сколько игроков влезает на шаг";
             case "tech.step_cost_trophy" -> "трофеев за шаг (тратится общий пул)";
@@ -375,6 +493,8 @@ public final class RuleWords {
             case "tech.step_rewards" -> "награды шагов трека (перебивает доску)";
             case "end_conditions.last_spawn_tile_threshold" ->
                 "сколько источников келемия осталось, когда партия кончается";
+            case "end_conditions.peaks_by_one_player" ->
+                "вершины треков кончают партию только у одного игрока";
             case "tech.science_exchanges" -> "постоянные обмены научного отдела";
             case "tech.science_one_step_per_track_per_action" ->
                 "за одно действие — не больше шага на трек";
@@ -382,6 +502,14 @@ public final class RuleWords {
                 "сколько РАЗНЫХ треков берёт одно действие Науки";
             case "tech.super_objective_on_step" ->
                 "на каком шаге трека дают ещё и карту супер-задания (0 — не дают)";
+            case "tech.objective_card_on_step" ->
+                "на каком шаге трека дают ещё и карту задания в руку (0 — не дают)";
+            case "actions.build.military_fires_only_on_container" ->
+                "военное здание при постройке даёт войско, только если накрыло ячейку контейнера";
+            case "tech.step_coin_prize" ->
+                "монеты за ячейку ступени трека науки, по ступеням и номеру ячейки";
+            case "tech.pay_with_kelium" ->
+                "шаги треков науки можно оплатить келемием вместо трофеев, сколько чего — решает игрок";
             case "tech.pay_with_trophy_only" ->
                 "за науку платят только трофеями, уничтоженный жетон не сдаётся";
             case "actions.combat.as_spec_ammo" ->
@@ -404,6 +532,8 @@ public final class RuleWords {
                 "уничтоженные жетоны возвращаются в запас";
             case "return_step.refill_objectives_to_limit" ->
                 "задания добираются до предела руки";
+            case "return_step.refill_objectives" ->
+                "шаг «Задания» в Возвращении: карты заданий добираются";
             case "return_step.trophy_to_upgrade_exchange_enabled" ->
                 "трофеи можно обменять на улучшение";
 
@@ -418,6 +548,8 @@ public final class RuleWords {
             case "super_objectives.mode" -> "режим супер-заданий";
             case "super_objectives.deal" -> "сколько карт раздаётся игроку";
             case "super_objectives.choose" -> "сколько из них он оставляет";
+            case "super_objectives.display" ->
+                "сколько супер-заданий лежит открытыми на столе (0 — раздача в руку)";
             case "super_objectives.require_symbols" ->
                 "для развёртывания нужен набор символов";
 

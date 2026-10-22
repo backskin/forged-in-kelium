@@ -417,6 +417,7 @@ public final class ОтчётПоПартиям {
             case "installed_super_arsenal" -> "установленный супер-арсенал";
             case "objective_card_vp" -> "очки прямо с карты задания";
             case "arsenal_vp" -> "очки карт-целей арсенала";
+            case "arsenal_stars" -> "звёзды на картах арсенала";
             default -> ключ;
         };
     }

@@ -133,6 +133,9 @@ public final class Session {
     }
 
     public void setRecord(ReplayRecord rec) {
+        // КРАСКИ МЕСТ — ИЗ ЗАПИСИ: за столом сидели в выбранных цветах (фракции),
+        // и разбор обязан показать партию в них же — поле, жетоны, планшеты.
+        kelium.report.FieldGeometry.useSeatColors(rec == null ? null : rec.seatColors);
         this.record = rec;
         this.cursor = 0;
         this.selectedHex = null;
@@ -357,7 +360,7 @@ public final class Session {
             return false;
         }
         for (ReplayRecord.Player p : f.snapshot.players) {
-            if (p.superComplete) {
+            if (!p.superDone.isEmpty()) {
                 return true;
             }
         }
@@ -486,9 +489,19 @@ public final class Session {
         if (record == null || record.frames.isEmpty()) {
             return;
         }
-        int n = record.frames.size();
+        // СНИМОК КАДРОВ, А НЕ ЖИВОЙ СПИСОК. В живой партии «Командного пункта»
+        // кадры дописывает поток движка, а разбор идёт на потоке Swing: обход
+        // итератором ловил ConcurrentModificationException прямо посреди партии
+        // (поймано роботом за экраном 15.09.2026). Копия снимается ИНДЕКСОМ —
+        // список только растёт, поэтому такой обход не спотыкается ни о
+        // дописанный кадр, ни о выход за край.
+        List<ReplayRecord.Frame> frames = new ArrayList<>();
+        for (int i = 0; i < record.frames.size(); i++) {
+            frames.add(record.frames.get(i));
+        }
+        int n = frames.size();
         int maxRound = 0;
-        for (ReplayRecord.Frame f : record.frames) {
+        for (ReplayRecord.Frame f : frames) {
             maxRound = Math.max(maxRound, f.round);
         }
         roundStart = new int[maxRound + 2];
@@ -501,7 +514,7 @@ public final class Session {
         int prevTotal = -1;
         int lastCircle = -1;
         for (int i = 0; i < n; i++) {
-            ReplayRecord.Frame f = record.frames.get(i);
+            ReplayRecord.Frame f = frames.get(i);
             if (f.round >= 0 && f.round < roundStart.length && roundStart[f.round] < 0) {
                 roundStart[f.round] = i;
             }
@@ -545,7 +558,7 @@ public final class Session {
                     // Значок ставим на ПЕРВЫЙ кадр, где задание собралось: дальше
                     // флаг остаётся поднятым до конца партии, и значок печатался бы
                     // на каждом кадре, заливая дорожку сплошной полосой.
-                    if (p.superComplete && superDoneAt.add(p.seat)) {
+                    if (!p.superDone.isEmpty() && superDoneAt.add(p.seat)) {
                         marks.add(new Mark(i, Mark.Kind.SUPER, p.seat, 2));
                     }
                 }
@@ -638,7 +651,7 @@ public final class Session {
                 }
             }
             for (ReplayRecord.Player p : f.snapshot.players) {
-                if (p.superComplete && found.stream().noneMatch(
+                if (!p.superDone.isEmpty() && found.stream().noneMatch(
                         m -> m.text().contains("супер-задание игрока " + (p.seat + 1)))) {
                     found.add(new Moment(i, "шаг " + (i + 1) + " · Р" + f.round
                         + " · закрыто супер-задание игрока " + (p.seat + 1)));
@@ -673,7 +686,7 @@ public final class Session {
             sb.append(" · круг ").append(f.snapshot.circle);
         }
         sb.append(f.snapshot.active != null
-            ? " · ходит " + record.playerName(f.snapshot.active)
+            ? " · ходит " + ReplayTable.seatName(record, f.snapshot.active)
             : " · общая фаза раунда");
         return sb.toString();
     }

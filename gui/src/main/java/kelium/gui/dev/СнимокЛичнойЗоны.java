@@ -6,6 +6,7 @@ import java.io.File;
 
 import javax.imageio.ImageIO;
 
+import kelium.gui.replay2.BoardSheet;
 import kelium.gui.replay2.Session;
 import kelium.report.ReplayRecord;
 
@@ -35,29 +36,14 @@ public final class СнимокЛичнойЗоны {
         int w = args.length > 3 ? Integer.parseInt(args[3]) : 980;
 
         Session session = new Session();
-        // НАБОР КАРТ ПАРТИИ: по нему на вставленной карте арсенала пишут обе
-        // её половины. Без него виднелось бы одно название.
-        try {
-            var правила = kelium.rules.Ruleset.loadById(
-                rec.ruleset == null || rec.ruleset.isBlank()
-                    ? kelium.dataio.GameConfig.DEFAULT_RULESET : rec.ruleset,
-                kelium.dataio.GameConfig.resolveDataRoot(null).resolve("rulesets"));
-            session.setContent(kelium.dataio.ContentLibrary.forRuleset(правила,
-                kelium.dataio.GameConfig.resolveDataRoot(null)));
-        } catch (RuntimeException e) {
-            System.out.println("набор карт не открылся: " + e.getMessage());
-        }
         session.setRecord(rec);
         // Середина партии: часть зданий уже на поле, часть ещё лежит на
         // планшете — видно и жетоны поверх ячеек, и открытые ячейки с ресурсами.
         session.seek(rec.frames.size() / 2);
 
-        // ЛИЧНАЯ ЗОНА ЦЕЛИКОМ: сверху лента печатных планшетов, снизу лист.
-        // Снимать один лист значило бы показывать зону без планшетов вовсе.
-        kelium.gui.replay2.ЛичнаяЗона sheet = new kelium.gui.replay2.ЛичнаяЗона(
-            session, seat);
+        BoardSheet sheet = new BoardSheet(session, seat);
         sheet.setSize(w, 3000);
-        разложить(sheet);
+        sheet.doLayout();
         // ПЕРВЫЙ ПРОХОД ВХОЛОСТУЮ: лист считает свою высоту по содержимому во
         // время рисования, и до первой отрисовки предпочтительный размер ещё
         // не знает, что на нём поместилось.
@@ -68,7 +54,6 @@ public final class СнимокЛичнойЗоны {
         wg.dispose();
         int h = Math.max(600, sheet.getPreferredSize().height);
         sheet.setSize(w, h);
-        разложить(sheet);
         BufferedImage im = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = im.createGraphics();
         kelium.report.Сглаживание.включить(g);
@@ -77,15 +62,5 @@ public final class СнимокЛичнойЗоны {
         File out = new File(dir, "личная-зона-место" + seat + ".png");
         ImageIO.write(im, "png", out);
         System.out.println("снято: " + out.getAbsolutePath() + " " + w + "x" + h);
-    }
-
-    /** Разложить дерево руками: без окна менеджеры сами этого не делают. */
-    private static void разложить(java.awt.Component c) {
-        c.doLayout();
-        if (c instanceof java.awt.Container box) {
-            for (java.awt.Component ch : box.getComponents()) {
-                разложить(ch);
-            }
-        }
     }
 }

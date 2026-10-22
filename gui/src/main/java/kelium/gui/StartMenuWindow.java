@@ -51,6 +51,10 @@ import kelium.report.ReplayRecord;
 public final class StartMenuWindow {
 
     public static void main(String[] args) {
+        // МАСШТАБ ИГРЫ — ПО ЭКРАНУ (жалоба дизайнера 26.09.2026: «на Full HD всё
+        // мелко, ничего не прочитать»). До первого окна: размеры запекаются в
+        // компоненты при создании.
+        kelium.gui.replay2.Theme.useGameScale();
         SwingUtilities.invokeLater(() -> new StartMenuWindow().start());
     }
 
@@ -82,6 +86,8 @@ public final class StartMenuWindow {
         restoreCoins = o.startCoins();
         restoreKelium = o.startKelium();
         restoreAmmo = o.startAmmo();
+        restorePrep = o.prepRound();
+        restoreMarketCards = o.marketCards();
         // Место игрока и поворот ЦУ — из состава мест прошлой партии, по тому
         // же правилу, что и пометка «вы» в окне партии: живой был один — его
         // место и есть ваше; живых было несколько — своего места нет ни у кого.
@@ -108,6 +114,8 @@ public final class StartMenuWindow {
     private Integer restoreCoins;
     private Integer restoreKelium;
     private Integer restoreAmmo;
+    private Boolean restorePrep;
+    private Integer restoreMarketCards;
 
     private static final int RAIL_W = 320;
 
@@ -125,8 +133,6 @@ public final class StartMenuWindow {
     private JLabel hint;
     private JLabel readyLine;
     KpButton startBtn;
-    /** «Подключиться к столу» — видна только в сетевом режиме. */
-    KpButton joinBtn;
     KpChooser rulesBox;
     KpChooser mapBox;
     SeedBox seedBox;
@@ -136,6 +142,12 @@ public final class StartMenuWindow {
     private Stepper coinStep;
     private Stepper keliumStep;
     private Stepper ammoStep;
+    /** Сколько карт рынка кладут на планшет — столько раундов с рынком. */
+    private Stepper marketStep;
+    /** Первый раунд подготовительный — без карты рынка. */
+    private kelium.gui.replay2.Toggle prepToggle;
+    private boolean prepRound;
+    private JLabel roundsLine;
 
     private Mode mode = Mode.OFFLINE;
     /**
@@ -159,22 +171,9 @@ public final class StartMenuWindow {
     private boolean soloHuman() {
         return humans() == 1;
     }
-
-    /**
-     * ЕСТЬ ЛИ ЗА СТОЛОМ МЕСТО ИМЕННО МОЁ — то, которое выбирают на поле и
-     * подписывают «ВЫ».
-     *
-     * <p>За одним компьютером такое место есть, только если живой игрок один:
-     * иначе живые равны между собой. ПО СЕТИ всё наоборот — своё место есть
-     * всегда, сколько бы живых ни село: остальные живые сидят за другими
-     * компьютерами, и путать их со своим нельзя.
-     */
-    private boolean естьМоёМесто() {
-        return mode == Mode.NET || soloHuman();
-    }
     private int players = 2;
     private long seed = 100000 + new Random().nextInt(900000);
-    private String rulesetId = GameConfig.DEFAULT_RULESET;
+    private String rulesetId = GameConfig.GAME_RULESET;
     private FieldOption map = new FieldOption(null, "любая — по сиду", null);
     /** Место игрока за столом; null — ещё не выбрано. */
     Integer mySeat;
@@ -198,21 +197,42 @@ public final class StartMenuWindow {
     // ==================== сборка окна ====================
 
     void start() {
-        Theme.apply(false);
-        frame = new JFrame("Кристаллы Раздора — Штаб");
+        // ОДИН СТИЛЬ С ОКНОМ ПАРТИИ (сдача под ключ 25.09.2026): «Штаб» в той
+        // же тёмной палитре стола, что и партия, а не светлый «вордовский».
+        // «ШТАБ» — СЕРЫЙ МЕТАЛЛ (26.09.2026): цвет появится, когда игрок выберет
+        // место и сядет за стол
+        Theme.applyTable(null);
+        frame = new JFrame("Lex Talionis — Штаб");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new BorderLayout());
         frame.getContentPane().setBackground(Theme.bg());
 
         frame.add(buildHead(), BorderLayout.NORTH);
-        frame.add(buildRail(), BorderLayout.WEST);
+        // Колонка решений прокручивается: на экране 768 точек высотой она не
+        // влезает, и BoxLayout сплющивал списки до нечитаемых полосок.
+        javax.swing.JScrollPane railScroll = new javax.swing.JScrollPane(buildRail(),
+            javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+            javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        railScroll.setBorder(null);
+        railScroll.setPreferredSize(new Dimension(Theme.px(RAIL_W) + Theme.px(14), Theme.px(10)));
+        railScroll.getVerticalScrollBar().setUnitIncrement(Theme.px(24));
+        frame.add(railScroll, BorderLayout.WEST);
         frame.add(buildStage(), BorderLayout.CENTER);
         frame.add(buildFoot(), BorderLayout.SOUTH);
 
         frame.setSize(Theme.px(1280), Theme.px(860));
         frame.setLocationRelativeTo(null);
+        gallery = new FieldGallery();
+        frame.getLayeredPane().add(gallery, javax.swing.JLayeredPane.POPUP_LAYER);
+        frame.getLayeredPane().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                gallery.setBounds(frame.getContentPane().getBounds());
+            }
+        });
         Offscreen.show(frame);
         applyRestored();
+        refreshFieldButton();
         rebuildPreview();
     }
 
@@ -245,6 +265,7 @@ public final class StartMenuWindow {
                     || restoreMapId == null && restoreMapFile == null && f.id() == null) {
                 map = f;
                 mapBox.select(f.label());
+                refreshFieldButton();
                 break;
             }
         }
@@ -266,6 +287,12 @@ public final class StartMenuWindow {
         if (restoreAmmo != null) {
             ammoStep.step(restoreAmmo - ammoStep.value());
         }
+        if (restoreMarketCards != null) {
+            marketStep.step(restoreMarketCards - marketStep.value());
+        }
+        if (restorePrep != null) {
+            setPrep(restorePrep);
+        }
     }
 
     private JComponent buildHead() {
@@ -284,6 +311,20 @@ public final class StartMenuWindow {
         sub.setForeground(Theme.ink2());
         sub.setBorder(BorderFactory.createEmptyBorder(0, Theme.px(16), 0, 0));
         bar.add(sub, BorderLayout.CENTER);
+        // СПРАВОЧНИК ПРАВИЛ — главы книги с поиском (заказ 25.09.2026), и на F1.
+        KpButton rules = new KpButton("Правила", "справочник · F1", null);
+        rules.setPreferredSize(new Dimension(Theme.px(150), Theme.px(38)));
+        rules.setToolTipText("Книга правил по главам, с поиском по словам");
+        rules.onClick(() -> kelium.gui.replay2.HelpWindow.showRules(frame));
+        bar.add(rules, BorderLayout.EAST);
+        bar.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+            .put(javax.swing.KeyStroke.getKeyStroke("F1"), "rulesBook");
+        bar.getActionMap().put("rulesBook", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                kelium.gui.replay2.HelpWindow.showRules(frame);
+            }
+        });
         return bar;
     }
 
@@ -293,7 +334,6 @@ public final class StartMenuWindow {
         JPanel rail = new JPanel();
         rail.setLayout(new BoxLayout(rail, BoxLayout.Y_AXIS));
         rail.setBackground(Theme.panel());
-        rail.setPreferredSize(new Dimension(Theme.px(RAIL_W), Theme.px(10)));
         rail.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 0, Theme.px(1), Theme.border()),
             BorderFactory.createEmptyBorder(Theme.px(12), Theme.px(12),
@@ -304,6 +344,8 @@ public final class StartMenuWindow {
         rail.add(section("РЕЖИМ", buildModes()));
         rail.add(javax.swing.Box.createVerticalStrut(Theme.px(14)));
         rail.add(section("СТОЛ", buildTable()));
+        rail.add(javax.swing.Box.createVerticalStrut(Theme.px(14)));
+        rail.add(section("РАУНДЫ", buildRounds()));
         rail.add(javax.swing.Box.createVerticalStrut(Theme.px(14)));
         rail.add(section("СТАРТОВЫЕ ЗНАЧЕНИЯ", buildTraining()));
         rail.add(javax.swing.Box.createVerticalGlue());
@@ -405,6 +447,12 @@ public final class StartMenuWindow {
         if (chosenSave == null || chosenSave.checkCompatible() != null) {
             return;
         }
+        // СЕТЕВАЯ ПАРТИЯ (29.09.2026) — снова через сетевой стол: друзья входят,
+        // и она доигрывается до места сохранения (без этого их места занял бы бот)
+        if (kelium.gui.net.LobbyWindow.isNetSave(chosenSave)) {
+            kelium.gui.net.LobbyWindow.openContinued(chosenSave, frame);
+            return;
+        }
         frame.dispose();
         HotSeatWindow.open(chosenSave);
     }
@@ -424,8 +472,14 @@ public final class StartMenuWindow {
         b.setPreferredSize(new Dimension(Theme.px(280), Theme.px(44)));
         b.setMaximumSize(new Dimension(Integer.MAX_VALUE, Theme.px(44)));
         b.setAlignmentX(Component.LEFT_ALIGNMENT);
+        // СЕТЕВОЙ СТОЛ (26.09.2026): плитка открывает окно «Сетевой стол» —
+        // создать стол по тому, что собрано здесь, или войти к другу.
         b.setState(m == mode ? KpButton.State.ACTIVE : KpButton.State.AVAILABLE);
         b.onClick(() -> {
+            if (m == Mode.NET) {
+                kelium.gui.net.LobbyWindow.open(netOptions(), frame);
+                return;
+            }
             mode = m;
             modeTiles.forEach((k, t) -> {
                 if (t.state() != KpButton.State.DISABLED) {
@@ -439,7 +493,8 @@ public final class StartMenuWindow {
         b.setToolTipText(switch (m) {
             case OFFLINE -> "Все за одним экраном: сколько из игроков боты, "
                 + "выбирается ниже; живые ходят по очереди, между ними опускается шторка";
-            default -> "Стол поднимается на этом компьютере, соперники подключаются по сети";
+            default -> "Создать стол на этом компьютере (по тому, что собрано в Штабе) "
+                + "или войти к другу по адресу";
         });
         modeTiles.put(m.name(), b);
         col.add(b);
@@ -552,7 +607,7 @@ public final class StartMenuWindow {
      */
     private void applyBotCount() {
         ensureBots();
-        if (!естьМоёМесто()) {
+        if (!soloHuman()) {
             // Живых несколько (или все) — своё место не выбирают: за столом
             // заняты все, и «ВЫ» ни за одним из них не закреплено.
             mySeat = null;
@@ -574,6 +629,87 @@ public final class StartMenuWindow {
                 bots.set(i, HUMAN);
             }
         }
+    }
+
+    /**
+     * РАУНДЫ ПАРТИИ (заказ дизайнера 25.09.2026): сколько карт рынка лежит на
+     * планшете — столько раундов с рынком, и переключатель «подготовительный
+     * раунд»: первый раунд без карты рынка, партия на раунд длиннее.
+     */
+    /** Меньше карт рынка на партию класть нельзя. */
+    public static final int MIN_MARKET_CARDS = 4;
+
+    private JComponent buildRounds() {
+        JPanel col = new JPanel();
+        col.setOpaque(false);
+        col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
+        int[] m = printedMarket();
+        // от 4 до 10 карт (решение дизайнера 25.09.2026): меньше четырёх —
+        // партия не успевает развернуться
+        marketStep = new Stepper("карт рынка", null, Math.max(MIN_MARKET_CARDS, m[0]),
+            MIN_MARKET_CARDS, Math.max(MIN_MARKET_CARDS, m[1]),
+            v -> refreshRounds());
+        marketStep.setAlignmentX(Component.LEFT_ALIGNMENT);
+        col.add(marketStep);
+        col.add(javax.swing.Box.createVerticalStrut(Theme.px(6)));
+        prepRound = m[2] == 1;
+        prepToggle = new kelium.gui.replay2.Toggle("Подготовительный раунд", prepRound,
+            "Первый раунд без карты рынка: на планшете рынка работает только обмен, "
+                + "первая карта открывается в Обновлении второго раунда.")
+            .onChange(this::setPrep);
+        prepToggle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        col.add(prepToggle);
+        col.add(javax.swing.Box.createVerticalStrut(Theme.px(4)));
+        roundsLine = new JLabel();
+        roundsLine.setFont(Theme.font(11, Font.PLAIN));
+        roundsLine.setForeground(Theme.ink3());
+        roundsLine.setAlignmentX(Component.LEFT_ALIGNMENT);
+        col.add(roundsLine);
+        setPrep(prepRound);
+        return col;
+    }
+
+    private void setPrep(boolean on) {
+        prepRound = on;
+        if (prepToggle != null && prepToggle.isSelected() != on) {
+            prepToggle.setSelected(on);
+        }
+        refreshRounds();
+    }
+
+    private void refreshRounds() {
+        if (roundsLine == null || marketStep == null) {
+            return;
+        }
+        int n = marketStep.value() + (prepRound ? 1 : 0);
+        roundsLine.setText("раундов в партии не больше " + n
+            + (prepRound ? " (подготовительный + " + marketStep.value() + ")" : ""));
+    }
+
+    /** Из свода: {карт рынка на планшет, карт в колоде, подготовительный 0/1}. */
+    private int[] printedMarket() {
+        try {
+            var cfg = GameConfig.buildCached(rulesetId, players, seed, null, null);
+            int printed = cfg.content.get("market").entries.size();
+            int deck = ((Number) cfg.ruleset.get("market.deck_size", 0)).intValue();
+            if (deck <= 0 || deck > printed) {
+                deck = printed;
+            }
+            boolean prep = Boolean.TRUE.equals(cfg.ruleset.get("market.preparatory_round", false));
+            return new int[]{deck, printed, prep ? 1 : 0};
+        } catch (RuntimeException e) {
+            return new int[]{8, 10, 0};
+        }
+    }
+
+    /** Число карт рынка, если оно отличается от свода; иначе null. */
+    private Integer marketCardsChoice() {
+        return marketStep == null || !marketStep.changed() ? null : marketStep.value();
+    }
+
+    /** Подготовительный раунд, если он отличается от свода; иначе null. */
+    private Boolean prepChoice() {
+        return prepToggle == null || (printedMarket()[2] == 1) == prepRound ? null : prepRound;
     }
 
     private JComponent buildTraining() {
@@ -639,7 +775,16 @@ public final class StartMenuWindow {
             rebuildPreview();
         });
         mapBox.setPreferredSize(new Dimension(Theme.px(320), Theme.px(40)));
-        top.add(mapBox, BorderLayout.WEST);
+        // ВЫБОР ПОЛЯ ПО КАРТИНКЕ (просьба дизайнера 25.09.2026): кнопка открывает
+        // галерею с отрисованными полями; список-выпадашка остаётся для тех,
+        // кто знает имя раскладки.
+        fieldBtn = new KpButton("Выбрать поле", "по картинке", null).onClick(this::openGallery);
+        fieldBtn.setPreferredSize(new Dimension(Theme.px(200), Theme.px(40)));
+        JPanel pick = new JPanel(new BorderLayout(Theme.px(8), 0));
+        pick.setOpaque(false);
+        pick.add(fieldBtn, BorderLayout.WEST);
+        pick.add(mapBox, BorderLayout.CENTER);
+        top.add(pick, BorderLayout.WEST);
 
         hint = new JLabel("Кликните стартовый гекс — это будет ваше место");
         hint.setFont(Theme.font(13, Font.BOLD));
@@ -649,6 +794,7 @@ public final class StartMenuWindow {
         stage.add(top, BorderLayout.NORTH);
 
         field = new FieldView();
+        field.setTableBackdrop(true);
         field.setShowIds(false);
         field.setShowTurnCaption(false);
         stage.add(field, BorderLayout.CENTER);
@@ -686,21 +832,6 @@ public final class StartMenuWindow {
         startBtn.setAlignmentX(Component.RIGHT_ALIGNMENT);
         startBtn.onClick(this::launch);
         right.add(startBtn);
-
-        // ПОДКЛЮЧИТЬСЯ К ЧУЖОМУ СТОЛУ — вторая, тихая кнопка: стол поднимает
-        // один, а садятся за него остальные, и им настройки собирать не нужно
-        // вовсе — у них всё придёт от хозяина.
-        joinBtn = new KpButton("Подключиться к столу", "сесть за чужой", null);
-        joinBtn.setPreferredSize(new Dimension(Theme.px(220), Theme.px(38)));
-        joinBtn.setMaximumSize(new Dimension(Theme.px(220), Theme.px(38)));
-        joinBtn.setAlignmentX(Component.RIGHT_ALIGNMENT);
-        joinBtn.setToolTipText("Адрес и порт диктует хозяин стола — он видит их у себя");
-        joinBtn.onClick(() -> {
-            frame.dispose();
-            kelium.gui.net.ОкноЛобби.спроситьАдрес();
-        });
-        right.add(javax.swing.Box.createVerticalStrut(Theme.px(4)));
-        right.add(joinBtn);
         foot.add(right, BorderLayout.EAST);
         refreshSeats();
         return foot;
@@ -764,7 +895,7 @@ public final class StartMenuWindow {
         boolean живой = HUMAN.equals(bots.get(seat));
         // «ВЫ» — только когда живой за столом ОДИН. Иначе живые равны, и
         // выделять одного из них не за что.
-        boolean этоЯ = живой && естьМоёМесто();
+        boolean этоЯ = живой && soloHuman();
         JLabel who = new JLabel(этоЯ ? "ВЫ · место " + (seat + 1) : "место " + (seat + 1));
         who.setFont(Theme.font(11, Font.BOLD));
         who.setForeground(этоЯ ? Theme.seatInk(seat) : Theme.ink3());
@@ -782,9 +913,7 @@ public final class StartMenuWindow {
                 подпись += myFacing == null ? " · ЦУ не повёрнут"
                     : " · ЦУ стенками " + (myFacing + 1) + "–" + ((myFacing + 1) % 6 + 1);
             } else {
-                // В СЕТЕВОМ СТОЛЕ чужое живое место ждёт игрока с другого
-                // компьютера, а не соседа по дивану: очередь тут ни при чём.
-                подпись = mode == Mode.NET ? "игрок по сети" : подпись + " · ходит по очереди";
+                подпись += " · ходит по очереди";
             }
             JLabel me = new JLabel(подпись);
             me.setFont(Theme.font(12, Font.PLAIN));
@@ -1001,8 +1130,8 @@ public final class StartMenuWindow {
             // список не прочитан — остаётся действующий свод
         }
         if (out.isEmpty()) {
-            out.add(new KpChooser.Item(GameConfig.DEFAULT_RULESET,
-                "свод " + GameConfig.DEFAULT_RULESET));
+            out.add(new KpChooser.Item(GameConfig.GAME_RULESET,
+                "свод " + GameConfig.GAME_RULESET));
         }
         return out;
     }
@@ -1050,11 +1179,31 @@ public final class StartMenuWindow {
         } catch (RuntimeException ignore) {
             // авторских нет — остаются свои и «любая»
         }
+        // НОВЫЕ РАСКЛАДКИ ИЗ КОНСТРУКТОРА — первыми, самые свежие сверху
+        // (просьба дизайнера 25.09.2026: «чтобы поле собиралось согласно
+        // текущим раскладкам»). Конструктор сохраняет их в scenarios/new, а
+        // библиотека замеров по решению 20.09 смотрит в scenarios/old — в
+        // игре должны быть видны обе.
+        Set<java.nio.file.Path> seen = new java.util.HashSet<>();
+        try {
+            java.nio.file.Path fresh = GameConfig.resolveDataRoot(null)
+                .resolve("scenarios").resolve("new");
+            List<kelium.engine.LayoutLibrary.Entry> news =
+                new ArrayList<>(kelium.engine.LayoutLibrary.scanFolder(fresh, players, null));
+            java.util.Collections.reverse(news);
+            for (kelium.engine.LayoutLibrary.Entry e : news) {
+                if (!authors.contains(e.id()) && seen.add(e.file())) {
+                    maps.add(new FieldOption(e.id(), "новая · " + e.id(), e.file()));
+                }
+            }
+        } catch (RuntimeException ignore) {
+            // папки новых раскладок нет — не беда
+        }
         try {
             List<String> problems = new ArrayList<>();
             for (kelium.engine.LayoutLibrary.Entry e
                     : kelium.engine.LayoutLibrary.scan(players, problems)) {
-                if (!authors.contains(e.id())) {
+                if (!authors.contains(e.id()) && seen.add(e.file())) {
                     maps.add(new FieldOption(e.id(), "своя · " + e.id(), e.file()));
                 }
             }
@@ -1075,6 +1224,110 @@ public final class StartMenuWindow {
             }
         }
         return maps.isEmpty() ? new FieldOption(null, "любая — по сиду", null) : maps.get(0);
+    }
+
+    /** Галерея полей поверх окна. */
+    FieldGallery gallery;
+    private KpButton fieldBtn;
+    /** Картинки полей: ключ раскладки и числа мест → картинка. */
+    private final Map<String, java.awt.image.BufferedImage> thumbs =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void refreshFieldButton() {
+        if (fieldBtn != null && map != null) {
+            fieldBtn.setTexts("Выбрать поле", "по картинке");
+        }
+    }
+
+    /** Открыть галерею полей для текущего числа мест. */
+    void openGallery() {
+        List<FieldOption> opts = new ArrayList<>(maps);
+        List<FieldGallery.Tile> tiles = new ArrayList<>();
+        int current = -1;
+        for (int i = 0; i < opts.size(); i++) {
+            FieldOption f = opts.get(i);
+            String label = f.label();
+            int dot = label.indexOf(" · ");
+            String title = f.id() == null ? "Любое поле" : dot > 0 ? label.substring(dot + 3) : label;
+            String note = f.id() == null ? "собирается по сиду партии"
+                : dot > 0 ? label.substring(0, dot) + " раскладка" : null;
+            FieldGallery.Tile t = new FieldGallery.Tile(title, note);
+            t.thumb = thumbs.get(thumbKey(f));
+            tiles.add(t);
+            if (map != null && f.label().equals(map.label())) {
+                current = i;
+            }
+        }
+        gallery.setBounds(frame.getContentPane().getBounds());
+        int ps = players;
+        long sd = seed;
+        String rs = rulesetId;
+        gallery.open(tiles, current, i -> renderThumb(opts.get(i), rs, ps, sd), i -> {
+            map = opts.get(i);
+            mapBox.select(map.label());
+            mySeat = null;
+            myFacing = null;
+            refreshFieldButton();
+            rebuildPreview();
+        });
+    }
+
+    private String thumbKey(FieldOption f) {
+        return players + "|" + seed + "|" + rulesetId + "|" + f.label();
+    }
+
+    /**
+     * КАРТИНКА ПОЛЯ ДЛЯ ГАЛЕРЕИ: стол собирается тем же {@link Setup#buildGame}
+     * и рисуется тем же {@link FieldView}, что и в партии, — только в память
+     * и без подписей. Вызывается в фоновом потоке.
+     */
+    private java.awt.image.BufferedImage renderThumb(FieldOption f, String rs, int ps, long sd) {
+        String key = ps + "|" + sd + "|" + rs + "|" + f.label();
+        java.awt.image.BufferedImage have = thumbs.get(key);
+        if (have != null) {
+            return have;
+        }
+        GameConfig cfg = GameConfig.buildCached(rs, ps, sd, null, null, f.id(), null, f.file());
+        GameState state = Setup.buildGame(cfg);
+        ReplayRecord rec = new ReplayRecord();
+        rec.players = ps;
+        rec.seed = sd;
+        rec.ruleset = rs;
+        for (int i = 0; i < ps; i++) {
+            rec.seatLabels.add("место " + (i + 1));
+            rec.sides.add(state.player(i).board.troop.side);
+        }
+        rec.seatColors.addAll(colors.subList(0, ps));
+        GameRecorder.fillTableAndField(rec, cfg, state);
+        ReplayRecord.Frame fr = new ReplayRecord.Frame();
+        fr.type = "setup";
+        fr.snapshot = ReplayRecord.snapshotOf(state, 0);
+        rec.frames.add(fr);
+        int w = Theme.px(560);
+        int h = Theme.px(380);
+        FieldView fv = new FieldView();
+        fv.setTableBackdrop(true);
+        fv.setShowIds(false);
+        fv.setShowTurnCaption(false);
+        fv.setSize(w, h);
+        fv.setRecord(rec);
+        fv.setFrame(fr);
+        fv.fitToWindow();
+        java.awt.image.BufferedImage img =
+            new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2DPaint.paint(fv, img);
+        thumbs.put(key, img);
+        return img;
+    }
+
+    /** Нарисовать компонент в картинку, без окна. */
+    private static final class Graphics2DPaint {
+        static void paint(JComponent c, java.awt.image.BufferedImage img) {
+            java.awt.Graphics2D g = img.createGraphics();
+            c.setOpaque(false);
+            c.paint(g);
+            g.dispose();
+        }
     }
 
     private void refreshMaps() {
@@ -1140,7 +1393,8 @@ public final class StartMenuWindow {
     private void applyFieldPicking() {
         field.clearSelectable();
         field.clearFacingChoice();
-        if (!естьМоёМесто()) {
+        field.clearGhost();
+        if (!soloHuman()) {
             hint.setText("Живых игроков " + humans()
                 + " — места заняты все, выбирать нечего; ходят по очереди");
             hint.setForeground(Theme.ink2());
@@ -1171,6 +1425,14 @@ public final class StartMenuWindow {
             myFacing = i;
             rebuildPreview();
         });
+        // ПРИЗРАК ЦУ под курсором (просьба дизайнера 25.09.2026): пока поворот
+        // не выбран, полупрозрачный ЦУ цвета места стоит на наведённой паре
+        // стенок — видно, как именно встанет центр управления.
+        if (myFacing == null) {
+            field.setGhost("command_center", mySeat);
+        } else {
+            field.clearGhost();
+        }
         hint.setText(myFacing == null
             ? "Наведите на сектор своего гекса — так встанет центр управления"
             : "Место выбрано, ЦУ повёрнут — можно начинать");
@@ -1185,15 +1447,7 @@ public final class StartMenuWindow {
         }
         boolean training = coinStep != null
             && (coinStep.changed() || keliumStep.changed() || ammoStep.changed());
-        // ПО СЕТИ КНОПКА ОБЕЩАЕТ ДРУГОЕ: не партию прямо сейчас, а поднятый
-        // стол, за который ещё должны сесть. Обещать «начать партию» и
-        // показать вместо неё лобби — то же, что соврать.
-        startBtn.setTexts(mode == Mode.NET ? "Поднять стол" : "Начать партию",
-            mode == Mode.NET ? "и ждать игроков" : "");
-        if (joinBtn != null) {
-            joinBtn.setVisible(mode == Mode.NET);
-        }
-        if (естьМоёМесто() && mySeat == null) {
+        if (soloHuman() && mySeat == null) {
             readyLine.setText("осталось: выбрать своё место на поле");
             startBtn.setState(KpButton.State.DISABLED);
         } else {
@@ -1204,23 +1458,10 @@ public final class StartMenuWindow {
         readyLine.setForeground(training ? Theme.points() : Theme.ink2());
     }
 
-    /** Собрать настройки и открыть окно партии (по сети — сперва лобби). */
+    /** Собрать настройки и открыть окно партии. */
     void launch() {
         HotSeatWindow.Options opts = optionsNow();
         if (opts == null) {
-            return;
-        }
-        if (mode == Mode.NET) {
-            // ПО СЕТИ ПАРТИЯ НАЧИНАЕТСЯ НЕ СРАЗУ: сперва стол поднимается и
-            // ждёт, пока сетевые места займут живые игроки. Это и есть лобби.
-            String нельзя = kelium.gui.net.НастройкиСтола.почемуНельзя(opts);
-            if (нельзя != null) {
-                readyLine.setText(нельзя);
-                readyLine.setForeground(Theme.accent());
-                return;
-            }
-            frame.dispose();
-            kelium.gui.net.ОкноЛобби.поднять(opts, mySeat == null ? -1 : mySeat);
             return;
         }
         frame.dispose();
@@ -1229,7 +1470,7 @@ public final class StartMenuWindow {
 
     /** Настройки стола, как он собран сейчас; null — место ещё не выбрано. */
     HotSeatWindow.Options optionsNow() {
-        if (естьМоёМесто() && mySeat == null) {
+        if (soloHuman() && mySeat == null) {
             return null;                 // одинокий живой обязан выбрать место
         }
         List<String> specs = new ArrayList<>();
@@ -1251,7 +1492,30 @@ public final class StartMenuWindow {
             List.copyOf(colors.subList(0, players)),
             training && coinStep.changed() ? coinStep.value() : null,
             training && keliumStep.changed() ? keliumStep.value() : null,
-            training && ammoStep.changed() ? ammoStep.value() : null);
+            training && ammoStep.changed() ? ammoStep.value() : null,
+            prepChoice(), marketCardsChoice());
+    }
+
+    /**
+     * СТОЛ ДЛЯ СЕТИ: как собран, но своё место можно не выбирать — хост
+     * садится на первое живое место, остальные живые открываются друзьям.
+     */
+    HotSeatWindow.Options netOptions() {
+        HotSeatWindow.Options o = optionsNow();
+        if (o != null) {
+            return o;
+        }
+        List<String> specs = new ArrayList<>();
+        for (int i = 0; i < players; i++) {
+            specs.add(HUMAN.equals(bots.get(i)) ? HUMAN : bots.get(i));
+        }
+        if (!specs.contains(HUMAN)) {
+            specs.set(0, HUMAN);
+        }
+        return new HotSeatWindow.Options(rulesetId, players, seed,
+            specs, map == null ? null : map.id(), map == null ? null : map.file(), null,
+            List.copyOf(colors.subList(0, players)), null, null, null,
+            prepChoice(), marketCardsChoice());
     }
 
     /** Взять месту краску — для прогонщиков и тестов, то же что клик по кружку. */

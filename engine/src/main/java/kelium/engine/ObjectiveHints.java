@@ -81,7 +81,7 @@ public final class ObjectiveHints {
      * @param reachable      не готово, но закрывается в этот ход (есть план)
      * @param plans          все найденные планы, сильные первыми
      * @param value          цена награды, если разыграть карту сейчас
-     * @param maxValue       цена награды с усилением (потолок этой карты)
+     * @param maxValue       лучшее, что эта карта может дать (потолок)
      * @param needed         чего не хватает — человеческой строкой
      */
     public record Hint(String cardId, boolean ready, boolean enhancedReady,
@@ -110,6 +110,12 @@ public final class ObjectiveHints {
         PRICE.put("arsenal", 3.0);
         PRICE.put("storage_token", 4.0);
         PRICE.put("module", 6.0);
+        // НАГРАДА-ДЕЙСТВИЕ и ГОТОВЫЕ РЕЗУЛЬТАТЫ (Задания 4.0): каждый результат —
+        // это несколько звеньев конвейера разом (войско без энергии, шаг по
+        // треку без трофеев), поэтому дороже одной монеты-боеприпаса.
+        PRICE.put("action", 4.0);
+        PRICE.put("spec_actions", 2.0);
+        PRICE.put("effects", 4.5);
     }
 
     /** Цена одной записи награды из данных карты. */
@@ -124,7 +130,8 @@ public final class ObjectiveHints {
                 continue;
             }
             // «module: attack» — не число: жетон один, но дорогой.
-            int n = e.getValue() instanceof Number num ? num.intValue() : 1;
+            int n = e.getValue() instanceof Number num ? num.intValue()
+                : e.getValue() instanceof java.util.List<?> список ? список.size() : 1;
             sum += price * n;
         }
         return sum;
@@ -181,9 +188,16 @@ public final class ObjectiveHints {
         boolean ready = Objectives.playableObjectives(s, seat, j).contains(cid);
         boolean enhancedReady = ready && enhancedMet(s, seat, j, cid, card);
 
+        // НАГРАДА ОДНА ИЗ ДВУХ, А НЕ СУММА (правило дизайнера 16.09.2026):
+        // усиленная даётся ВМЕСТО базовой. Поэтому цена карты — не base+special,
+        // а лучшая из доступных: иначе подсказка обещает вдвое больше, чем
+        // карта на самом деле приносит, и бот переоценивает всю руку.
+        boolean вместо = Boolean.TRUE.equals(Ctx.rules(s)
+                .get("objectives.enhanced_reward_replaces_base", Boolean.TRUE));
         double base = rewardValue(card.get("base_reward"));
         double special = rewardValue(card.get("special_reward"));
-        double value = ready ? base + (enhancedReady ? special : 0.0) : 0.0;
+        double обе = вместо ? Math.max(base, special) : base + special;
+        double value = ready ? (enhancedReady ? обе : base) : 0.0;
 
         List<Plan> plans = new ArrayList<>();
         if (!ready) {
@@ -195,7 +209,7 @@ public final class ObjectiveHints {
             plans.removeIf(pl -> !pl.enhanced());
         }
         return new Hint(cid, ready, enhancedReady, !ready && !plans.isEmpty(),
-            List.copyOf(plans), value, base + special, needed(s, seat, j, cid, card));
+            List.copyOf(plans), value, обе, needed(s, seat, j, cid, card));
     }
 
     @SuppressWarnings("unchecked")

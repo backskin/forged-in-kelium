@@ -2,6 +2,7 @@ package kelium;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -106,164 +107,247 @@ class PrintedContainersTest {
         return true;
     }
 
-    @Test
-    void groundUnitTakesGroundContainerAndAircraftTakesAirOne() {
-        // ГЕКСЫ ОБЯЗАНЫ БЫТЬ СВОБОДНЫ. По правилу занятый сектор контейнера не
-        // отдаёт никому, а на стартовом гексе стоят ЦУ с пехотой: беря ПЕРВЫЙ
-        // подходящий гекс, тест держался на том, что в наборе 1.4.0 он случайно
-        // оказывался пустым. С набором 5.0.0 первым пошёл занятый — тест упал,
-        // и правильно упал.
-        //
-        // ПОЛЕ ПОДБИРАЕТСЯ, А НЕ ЗАДАЁТСЯ ОДНИМ СИДОМ (08.09.2026). Тест
-        // проверяет МЕХАНИКУ: наземный жетон берёт наземный контейнер, авиация
-        // воздушный. Ему нужен лишь расклад, где есть свободный гекс с
-        // наземной ячейкой и свободный с воздушной. Держаться одного сида
-        // нельзя: поле кроется настоящими картонками, и от смены набора или
-        // укладки одного из двух видов на этом сиде может не оказаться — тест
-        // упадёт не потому, что механика сломалась.
-        GameState s = null;
-        PlayerState p = null;
-        Hex ground = null;
-        Hex sky = null;
-        for (long seed = 23; seed < 60 && (ground == null || sky == null); seed++) {
-            s = game(seed);
-            p = s.player(0);
-            ground = null;
-            sky = null;
+    /** Найти поле, где есть свободные гексы с открытым наземным и воздушным контейнером. */
+    private static Object[] полеСКонтейнерами() {
+        for (long seed = 23; seed < 90; seed++) {
+            GameState s = game(seed);
+            List<Hex> наземные = new ArrayList<>();
+            Hex небо = null;
             for (Hex h : s.field.hexes.values()) {
                 if (!PrintedContainers.visibleContainer(s, h) || !чистыйГекс(s, h)) {
                     continue;
                 }
-                if (h.containerCell != BlockStamp.AIR && ground == null) {
-                    ground = h;
-                }
-                if (h.containerCell == BlockStamp.AIR && sky == null) {
-                    sky = h;
+                if (h.containerCell != BlockStamp.AIR) {
+                    наземные.add(h);
+                } else if (небо == null) {
+                    небо = h;
                 }
             }
+            if (наземные.size() >= 2 && небо != null) {
+                return new Object[]{s, наземные.get(0), наземные.get(1), небо};
+            }
         }
-        assertTrue(ground != null && sky != null,
-            "ни на одном поле не нашлось сразу двух видов открытых ячеек");
-
-        int before = p.containers;
-        assertEquals(1, PrintedContainers.onUnitPlaced(s, p, ground.id, UnitType.INFANTRY),
-            "пехота встала на наземный печатный контейнер — берёт карту");
-        assertEquals(before + 1, p.containers);
-
-        assertEquals(0, PrintedContainers.onUnitPlaced(s, p, sky.id, UnitType.INFANTRY),
-            "наземному до воздушной ячейки не дотянуться");
-        assertEquals(0, PrintedContainers.onUnitPlaced(s, p, ground.id, UnitType.AIRCRAFT),
-            "авиация садится только в воздушную ячейку");
-        assertEquals(1, PrintedContainers.onUnitPlaced(s, p, sky.id, UnitType.AIRCRAFT),
-            "авиация берёт воздушный контейнер");
+        throw new AssertionError("ни на одном поле нет нужных открытых ячеек");
     }
 
+    private static kelium.core.UnitToken поставить(GameState s, PlayerState p, UnitType t,
+                                                   Hex h, int uid) {
+        kelium.core.UnitToken u = s.tokenStats.makeUnit(t, p.seat, uid);
+        p.units.add(u);
+        переставить(u, null, h);
+        return u;
+    }
+
+    private static void переставить(kelium.core.UnitToken u, Hex из, Hex в) {
+        if (из != null) {
+            if (u.type == UnitType.AIRCRAFT) {
+                из.airToken = null;
+            } else {
+                из.groundTokens.remove(Integer.valueOf(u.uid));
+            }
+        }
+        u.hexId = в == null ? null : в.id;
+        if (в != null) {
+            if (u.type == UnitType.AIRCRAFT) {
+                в.airToken = u.uid;
+            } else {
+                в.groundTokens.add(u.uid);
+            }
+        }
+    }
+
+    /**
+     * НАКРЫТИЕ ЗА ДЕЙСТВИЕ (решение дизайнера 23.09.2026): открыт до действия и
+     * закрыт жетоном игрока после — контейнер ему. Наземный жетон закрывает
+     * наземную ячейку, авиация — воздушную.
+     */
     @Test
-    void printedCellDoesNotBurnOut() {
-        GameState s = game(24L);
+    void накрытиеЗаДействиеНаземноеИВоздушное() {
+        Object[] f = полеСКонтейнерами();
+        GameState s = (GameState) f[0];
+        Hex земля = (Hex) f[1];
+        Hex небо = (Hex) f[3];
         PlayerState p = s.player(0);
-        // ГЕКС ОБЯЗАН БЫТЬ ПУСТЫМ. Брать первый попавшийся с контейнером нельзя:
-        // по правилу занятый сектор контейнера не отдаёт никому, и на стартовом
-        // гексе стоят ЦУ с пехотой. Прежняя редакция теста брала первый и
-        // держалась на том, что в наборе 1.4.0 он случайно оказывался пустым —
-        // с эталонным набором 4.0.0 первым пошёл занятый, и тест упал.
-        Hex ground = null;
-        for (Hex h : s.field.hexes.values()) {
-            if (h.containerCell >= 0 && h.containerCell != BlockStamp.AIR
-                    && PrintedContainers.visibleContainer(s, h) && чистыйГекс(s, h)) {
-                ground = h;
+        assertTrue(PrintedContainers.поДействию(s), "в своде действует накрытие за действие");
+
+        java.util.Set<String> до = PrintedContainers.открытые(s);
+        поставить(s, p, UnitType.INFANTRY, земля, 9301);
+        поставить(s, p, UnitType.INFANTRY, небо, 9302);     // пехота воздушную не закрывает
+        assertEquals(1, PrintedContainers.накрытия(s, p, до),
+            "пехота закрыла наземный контейнер — одна карта, воздушный остался открыт");
+        assertTrue(PrintedContainers.visibleContainer(s, небо), "воздушный контейнер открыт");
+
+        до = PrintedContainers.открытые(s);
+        поставить(s, p, UnitType.AIRCRAFT, небо, 9303);
+        assertEquals(1, PrintedContainers.накрытия(s, p, до), "авиация закрыла воздушный");
+    }
+
+    /**
+     * ДЁРГАНИЯ ВНУТРИ ДЕЙСТВИЯ НЕ СЧИТАЮТСЯ: сколько раз ни ставь и ни снимай —
+     * одна карта за действие; а если ячейка до действия уже была закрыта —
+     * ничего.
+     */
+    @Test
+    void дёрганияВнутриДействияНеСчитаются() {
+        Object[] f = полеСКонтейнерами();
+        GameState s = (GameState) f[0];
+        Hex земля = (Hex) f[1];
+        PlayerState p = s.player(0);
+
+        java.util.Set<String> до = PrintedContainers.открытые(s);
+        kelium.core.UnitToken u = поставить(s, p, UnitType.INFANTRY, земля, 9311);
+        переставить(u, земля, null);
+        переставить(u, null, земля);
+        assertEquals(1, PrintedContainers.накрытия(s, p, до), "одна карта за действие");
+
+        до = PrintedContainers.открытые(s);
+        переставить(u, земля, null);
+        переставить(u, null, земля);
+        assertEquals(0, PrintedContainers.накрытия(s, p, до),
+            "до действия ячейка была закрыта — снять и вернуть ничего не даёт");
+    }
+
+    /**
+     * С КОНТЕЙНЕРА НА КОНТЕЙНЕР — МОЖНО: сошёл с одного и накрыл другой на
+     * другом гексе — получил (решение дизайнера 23.09.2026, прежний запрет
+     * отменён).
+     */
+    @Test
+    void сКонтейнераНаКонтейнерДаётКарту() {
+        Object[] f = полеСКонтейнерами();
+        GameState s = (GameState) f[0];
+        Hex a = (Hex) f[1];
+        Hex b = (Hex) f[2];
+        PlayerState p = s.player(0);
+        java.util.Set<String> до = PrintedContainers.открытые(s);
+        kelium.core.UnitToken u = поставить(s, p, UnitType.INFANTRY, a, 9321);
+        assertEquals(1, PrintedContainers.накрытия(s, p, до));
+        до = PrintedContainers.открытые(s);
+        переставить(u, a, b);
+        assertEquals(1, PrintedContainers.накрытия(s, p, до),
+            "перешёл с контейнера на другой открытый — карта");
+    }
+
+    /**
+     * СЕКТОР ВОЙСКА РЕШАЕТ (выбор сектора, 26.09.2026): войско, поставленное
+     * игроком НЕ на ячейку контейнера, её не накрывает — контейнер остаётся
+     * открытым; поставленное НА ячейку — накрывает, карта его.
+     */
+    @Test
+    void контейнерБерётТолькоВойскоНаЕгоСекторе() {
+        Object[] f = полеСКонтейнерами();
+        GameState s = (GameState) f[0];
+        Hex земля = (Hex) f[1];
+        PlayerState p = s.player(0);
+        int ячейка = земля.containerCell;
+        int другой = -1;
+        for (int i = 0; i < 6; i++) {
+            if (i != ячейка && земля.sideOwner[i] == null) {
+                другой = i;
                 break;
             }
         }
-        assertTrue(ground != null, "на поле есть открытый наземный контейнер");
-        // «Срабатывает каждый раз при заходе» — решение дизайнера
-        assertEquals(1, PrintedContainers.onUnitPlaced(s, p, ground.id, UnitType.INFANTRY));
-        assertEquals(1, PrintedContainers.onUnitPlaced(s, p, ground.id, UnitType.INFANTRY));
-        assertTrue(ground.containerCell >= 0, "ячейка не выгорает");
+        assertTrue(другой >= 0, "на гексе нашёлся другой свободный сектор");
+
+        java.util.Set<String> до = PrintedContainers.открытые(s);
+        kelium.core.UnitToken u = s.tokenStats.makeUnit(UnitType.INFANTRY, p.seat, 9341);
+        p.units.add(u);
+        u.hexId = земля.id;
+        u.chooseSides(List.of(другой));
+        assertTrue(PrintedContainers.visibleContainer(s, земля),
+            "пехота на соседнем секторе ячейку не накрыла");
+        assertEquals(0, PrintedContainers.накрытия(s, p, до), "карты нет");
+
+        до = PrintedContainers.открытые(s);
+        u.chooseSides(List.of(ячейка));
+        assertFalse(PrintedContainers.visibleContainer(s, земля), "ячейка накрыта пехотой");
+        assertEquals(1, PrintedContainers.накрытия(s, p, до), "пехота встала на контейнер");
+    }
+
+    /** Бот ставит войско сам — на свободный контейнер, как поставил бы человек. */
+    @Test
+    void ботСтавитВойскоНаКонтейнер() {
+        Object[] f = полеСКонтейнерами();
+        GameState s = (GameState) f[0];
+        Hex земля = (Hex) f[1];
+        PlayerState p = s.player(0);
+        kelium.core.UnitToken u = s.tokenStats.makeUnit(UnitType.INFANTRY, p.seat, 9351);
+        p.units.add(u);
+        u.hexId = земля.id;
+        kelium.engine.СекторыВойск.поставить(s, null, u);
+        assertEquals(List.of(земля.containerCell), u.chosenSides());
     }
 
     @Test
-    void everyPlayerAlwaysStartsWithExactlyOneContainer() {
-        // Стартовая карта выдаётся ИЗ ЗАПАСА и не зависит от того, что легло на
-        // стартовый гекс: иначе старт был бы неравным из-за случайной раскладки.
+    void никакихСтартовыхКонтейнеров() {
+        // ПРАВИЛО ДИЗАЙНЕРА 13.09.2026: «карты контейнера на старте нет».
+        // Прежняя раздача (по одной каждому) была тестовой и расходилась с
+        // книгой правил — ключ setup.start_containers теперь ноль.
+        // Контейнеры с верха начального арсенала (его открывают на подготовке,
+        // решение 30.09.2026) — не раздача, а напечатанный набор карты.
         for (long seed : new long[]{25L, 26L, 27L}) {
             GameState s = game(seed);
             for (int seat = 0; seat < 4; seat++) {
-                assertEquals(1, s.player(seat).containers,
+                int сВерха = 0;
+                for (String cid : s.player(seat).arsenalInstalled) {
+                    var top = GameEngine.стартовыйНабор(s, cid);
+                    if (top != null && top.get("params") instanceof java.util.Map<?, ?> m
+                            && m.get("containers") instanceof Number n) {
+                        сВерха += n.intValue();
+                    }
+                }
+                assertEquals(сВерха, s.player(seat).containers,
                     "сид " + seed + ", место " + (seat + 1)
-                        + ": стартовый контейнер получают все и ровно один");
+                        + ": на подготовке карт контейнера не выдают");
             }
         }
-    }
-
-    @Test
-    void shuttlingBetweenTwoContainerCellsGivesNothing() {
-        // Правило дизайнера: вышел С контейнерной ячейки и пришёл НА
-        // контейнерную — карту не получаешь. Маятник «туда-сюда» бесполезен.
-        GameState s = game(28L);
-        PlayerState p = s.player(0);
-        List<Hex> ground = new ArrayList<>();
-        for (Hex h : s.field.hexes.values()) {
-            if (PrintedContainers.groundContainerFree(s, h)) {
-                ground.add(h);
-            }
-            if (ground.size() == 2) {
-                break;
-            }
-        }
-        assertEquals(2, ground.size(), "нашлись две контейнерные ячейки");
-        Hex a = ground.get(0);
-        Hex b = ground.get(1);
-
-        Hex plain = null;
-        for (Hex h : s.field.hexes.values()) {
-            if (h.containerCell < 0 && h.kind != HexKind.FORBIDDEN && h.spawnTile == null) {
-                plain = h;
-                break;
-            }
-        }
-        assertTrue(plain != null, "нашёлся гекс без печатного контейнера");
-
-        assertEquals(1, PrintedContainers.onUnitMoved(s, p, plain.id, a.id, UnitType.INFANTRY, false),
-            "пришёл с обычной ячейки на контейнерную — карта есть");
-        assertEquals(0, PrintedContainers.onUnitMoved(s, p, a.id, b.id, UnitType.INFANTRY, false),
-            "с контейнера на контейнер — карты нет");
-        assertEquals(0, PrintedContainers.onUnitMoved(s, p, b.id, a.id, UnitType.INFANTRY, false),
-            "и обратно тоже нет: маятник не работает");
-        assertEquals(1, PrintedContainers.onUnitMoved(s, p, plain.id, b.id, UnitType.INFANTRY, false),
-            "а вот заход с обычной ячейки снова даёт карту");
     }
 
     @Test
     void minerSeesContainersOnItsOwnHexAndOnNeighbours() {
-        // Правило дизайнера: добытчик берёт контейнер, только если тот нарисован
-        // и ОТКРЫТ на его гексе либо на примыкающем стенкой.
-        GameState s = game(29L);
+        // ПРАВИЛО ДИЗАЙНЕРА (12.08.2026, возвращено 18.09.2026): добытчик берёт
+        // ОТКРЫТЫЙ контейнер со своего гекса, а если своего нет — с гекса,
+        // к которому стоит стенкой. Сектор контейнера не смотрят вовсе.
+        //
+        // 16.09.2026 правило сужали до «сектор контейнера соседний с сектором
+        // добытчика», и этот тест охранял сужение. Онлайн-тест 18.09.2026 его
+        // отменил, поэтому проверки перевёрнуты: теперь дальний сектор ОБЯЗАН
+        // добываться. Что осталось неизменным — накрытый контейнер не виден.
+        GameState s = null;
         Hex withContainer = null;
-        for (Hex h : s.field.hexes.values()) {
-            if (PrintedContainers.visibleContainer(s, h)) {
-                withContainer = h;
-                break;
+        for (long seed = 29; seed < 90 && withContainer == null; seed++) {
+            s = game(seed);
+            for (Hex h : s.field.hexes.values()) {
+                if (h.containerCell >= 0 && h.containerCell != BlockStamp.AIR
+                        && PrintedContainers.visibleContainer(s, h)) {
+                    withContainer = h;
+                    break;
+                }
             }
         }
-        assertTrue(withContainer != null, "на поле есть открытые контейнеры");
+        assertTrue(withContainer != null, "на поле есть открытый наземный контейнер");
+        int cell = withContainer.containerCell;
 
-        // стоя на самом гексе — видит его
+        // СВОЙ ГЕКС, ЛЮБОЙ СЕКТОР — добывается, и соседний, и дальний.
         kelium.core.BuildingToken here = s.tokenStats.makeBuilding(
             kelium.core.BuildingType.MINER, 0, 9200, 2);
         here.hexId = withContainer.id;
-        assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, here));
+        for (int сдвиг : new int[] {1, 2, 3}) {
+            withContainer.sideOwner[(cell + сдвиг) % 6] = here.uid;
+            assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, here),
+                "на своём гексе добытчик дотягивается до любого сектора (сдвиг "
+                    + сдвиг + ")");
+            withContainer.sideOwner[(cell + сдвиг) % 6] = null;
+        }
 
-        // стоя на соседнем — видит ТОЛЬКО через свою стенку (правило дизайнера)
-        // У СОСЕДА СВОЕГО КОНТЕЙНЕРА БЫТЬ НЕ ДОЛЖНО, иначе проверка бессмысленна:
-        // добытчик увидит контейнер на СВОЁМ гексе, и это правильный ответ, а не
-        // ошибка. Прежняя редакция брала первого соседа со свободной стенкой и
-        // держалась на удаче набора 1.4.0.
+        // СОСЕДНИЙ ГЕКС — тоже любой сектор, важна только общая стенка. Сосед
+        // берётся такой, у которого своего контейнера нет: иначе добытчик
+        // увидит контейнер на своём гексе, и это будет верный ответ, а не ошибка.
         Hex nbHex = null;
         int facing = -1;
         for (String nb : s.field.neighbors(withContainer.id)) {
             Hex cand = s.field.get(nb);
-            if (PrintedContainers.visibleContainer(s, cand)) {
+            if (cand == null || PrintedContainers.visibleContainer(s, cand)) {
                 continue;
             }
             for (int i = 0; i < 6; i++) {
@@ -283,15 +367,18 @@ class PrintedContainersTest {
             kelium.core.BuildingType.MINER, 0, 9201, 2);
         next.hexId = nbHex.id;
         nbHex.occupySides(next.uid, java.util.List.of(facing));
+        withContainer.containerCell = (facing + 3) % 6;      // смотрит на добытчика
         assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, next),
-            "с соседнего гекса контейнер добывается, если добытчик к нему повёрнут");
+            "с соседнего гекса контейнер добывается");
+        withContainer.containerCell = ((facing + 3) % 6 + 2) % 6;   // дальний сектор
+        assertEquals(withContainer.id, PrintedContainers.minableContainerHex(s, next),
+            "сектор на соседнем гексе не важен: добытчик стоит к нему стенкой");
 
         // накрыли ячейку зданием — контейнер больше не виден
-        if (withContainer.containerCell != BlockStamp.AIR) {
-            withContainer.sideOwner[withContainer.containerCell] = 4242;
-            assertFalse(PrintedContainers.visibleContainer(s, withContainer),
-                "накрытый жетоном контейнер не виден и не добывается");
-        }
+        withContainer.containerCell = cell;
+        withContainer.sideOwner[cell] = 4242;
+        assertFalse(PrintedContainers.visibleContainer(s, withContainer),
+            "накрытый жетоном контейнер не виден и не добывается");
     }
 
     @Test

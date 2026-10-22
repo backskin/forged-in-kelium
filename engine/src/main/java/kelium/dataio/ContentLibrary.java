@@ -83,12 +83,11 @@ public final class ContentLibrary {
      * Прежние явные вызовы в {@code Setup.buildGame} стали избыточны и убраны.
      */
     private static void bindCardsInCode(Map<String, ContentSet> sets) {
-        // "containers" ИСКЛЮЧЕНЫ 18.08.2026 (заказ дизайнера): контейнеры
-        // возвращены к чистым данным (containers.4.0.0.yaml и новее) — без
-        // выбора стороны, только один печатаемый ресурс/пара. Код-класс
-        // остаётся в дереве (ContainerPack и т.д.), но больше не подключён
-        // сюда и не перетирает YAML; если понадобится вернуть — просто
-        // дописать "containers" обратно в этот список.
+        // "containers" ИСКЛЮЧЕНЫ 18.08.2026 (заказ дизайнера): контейнеры —
+        // чистые данные (containers.*.yaml) без выбора стороны, только
+        // напечатанная награда; поведения у карты нет, и класса ей не нужно.
+        // Прежняя колода в коде (c01-c32 с названиями и двумя сторонами)
+        // отменена дизайнером и снесена 13.09.2026 вместе с ContainerPack.
         for (String type : java.util.List.of("objectives", "arsenal",
                 "market", "super_objectives", "super_arsenal")) {
             ContentSet cs = sets.get(type);
@@ -102,17 +101,19 @@ public final class ContentLibrary {
     /**
      * ОТБРОСИТЬ КАРТЫ, У КОТОРЫХ КЛАССА НЕТ ПО УСТРОЙСТВУ.
      *
-     * <p>Супер-задания семейства «одна карта втайне» (поля {@code multiplier} и
-     * {@code stockpile}) разыгрывает {@code kelium.engine.Super5}, разбирая
-     * номер карты: классов-карт у них нет и не задумывалось. Просить реестр
-     * связать их значило бы записать их в «карты без кода» — и сторож, который
-     * ищет НАСТОЯЩИЕ пропуски кода, начинал бы врать на каждой партии.
+     * <p>СУПЕР-ЗАДАНИЯ 8.0 (поле {@code categories}) — это пара категорий
+     * счёта и ничего больше: карту нельзя ни выполнить, ни сжечь, поэтому и
+     * класса у неё нет. Прежние редакции («множитель верха» {@code multiplier},
+     * «накопитель» {@code stockpile}) тоже играл сам движок. Просить реестр
+     * связать такие карты значило бы записать их в «карты без кода» — и сторож,
+     * который ищет НАСТОЯЩИЕ пропуски кода, начинал бы врать на каждой партии.
      */
     private static java.util.List<Map<String, Object>> безКлассов(
             java.util.List<Map<String, Object>> entries) {
         java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
         for (Map<String, Object> e : entries) {
-            if (!e.containsKey("multiplier") && !e.containsKey("stockpile")) {
+            if (!e.containsKey("categories") && !e.containsKey("multiplier")
+                    && !e.containsKey("stockpile")) {
                 out.add(e);
             }
         }

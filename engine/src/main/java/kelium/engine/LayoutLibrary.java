@@ -88,12 +88,17 @@ public final class LayoutLibrary {
 
     // Список читается ОДИН раз на процесс: обучение делает сотни тысяч партий, и
     // лезть на диск в каждой — чистая потеря времени.
-    private static final java.util.Map<Integer, List<Entry>> POOL =
+    // Ключ включает ПАПКУ, а не только число игроков: стенд гоняет старые и
+    // новые поля в одном процессе, и на одном лишь числе игроков второй набор
+    // достался бы из кэша первого.
+    private static final java.util.Map<String, List<Entry>> POOL =
         new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Раскладки для замеров и обучения на {@code players} игроков. */
     public static List<Entry> pool(int players) {
-        return POOL.computeIfAbsent(players, n -> {
+        String ключ = players + "@" + poolFolders();
+        return POOL.computeIfAbsent(ключ, k -> {
+            int n = players;
             List<Entry> out = new ArrayList<>();
             for (Path dir : poolFolders()) {
                 if (!Files.isDirectory(dir)) {
@@ -199,26 +204,33 @@ public final class LayoutLibrary {
     public static List<Entry> scan(int players, List<String> problems) {
         List<Entry> out = new ArrayList<>();
         for (Path dir : folders()) {
-            if (!Files.isDirectory(dir)) {
-                continue;
+            out.addAll(scanFolder(dir, players, problems));
+        }
+        return out;
+    }
+
+    /** Раскладки одной папки на этот состав (пусто — папки нет). */
+    public static List<Entry> scanFolder(Path dir, int players, List<String> problems) {
+        List<Entry> out = new ArrayList<>();
+        if (!Files.isDirectory(dir)) {
+            return out;
+        }
+        List<Path> files = new ArrayList<>();
+        try (var s = Files.list(dir)) {
+            // свой формат .kmap и старые .yaml — см. kelium.dataio.FieldFile
+            s.filter(p -> Files.isRegularFile(p)
+                    && kelium.dataio.FieldFile.isField(p))
+                .sorted((a, b) -> kelium.dataio.VersionOrder.compare(
+                    a.getFileName().toString(), b.getFileName().toString()))
+                .forEach(files::add);
+        } catch (java.io.IOException e) {
+            if (problems != null) {
+                problems.add("папка не читается: " + dir);
             }
-            List<Path> files = new ArrayList<>();
-            try (var s = Files.list(dir)) {
-                // свой формат .kmap и старые .yaml — см. kelium.dataio.FieldFile
-                s.filter(p -> Files.isRegularFile(p)
-                        && kelium.dataio.FieldFile.isField(p))
-                    .sorted((a, b) -> kelium.dataio.VersionOrder.compare(
-                        a.getFileName().toString(), b.getFileName().toString()))
-                    .forEach(files::add);
-            } catch (java.io.IOException e) {
-                if (problems != null) {
-                    problems.add("папка не читается: " + dir);
-                }
-                continue;
-            }
-            for (Path f : files) {
-                readFile(f, dir, players, out, problems);
-            }
+            return out;
+        }
+        for (Path f : files) {
+            readFile(f, dir, players, out, problems);
         }
         return out;
     }

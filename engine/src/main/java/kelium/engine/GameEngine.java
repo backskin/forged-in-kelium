@@ -100,13 +100,34 @@ public final class GameEngine {
         // зависеть от того, что мы успели запрограммировать.
         try {
             int printed = kelium.dataio.Ctx.cfg(state).content.get("market").entries.size();
+            // НА ПЛАНШЕТ КЛАДУТ НЕ ВСЮ КОЛОДУ (решение дизайнера 15.09.2026):
+            // карт напечатано десять, в партию идут восемь. Предел раундов
+            // считается по тому, сколько карт ЛЕЖИТ НА ПЛАНШЕТЕ, иначе партия
+            // тянулась бы до числа печатных карт, а карты кончились бы раньше.
+            int вКолоду = ((Number) rs().get("market.deck_size", 0)).intValue();
+            // ПОДГОТОВИТЕЛЬНЫЙ РАУНД (решение дизайнера 25.09.2026) идёт без
+            // карты рынка и потому добавляет к партии один раунд сверху колоды.
+            int подготовка = подготовительныйРаунд() ? 1 : 0;
+            if (вКолоду > 0 && (printed <= 0 || вКолоду < printed)) {
+                return вКолоду + подготовка;
+            }
             if (printed > 0) {
-                return printed;
+                return printed + подготовка;
             }
         } catch (RuntimeException ignored) {
             // содержимое недоступно (сцена в тесте) — падаем на запасное число
         }
         return RESERVE_ROUND_CAP_FALLBACK;
+    }
+
+    /**
+     * ПОДГОТОВИТЕЛЬНЫЙ РАУНД (решение дизайнера 25.09.2026): первый раунд
+     * играется БЕЗ КАРТЫ РЫНКА — на планшете рынка работает только печатный
+     * обмен, а первая карта открывается в Обновлении второго раунда. Галочка
+     * в настройках партии, ключ свода {@code market.preparatory_round}.
+     */
+    private boolean подготовительныйРаунд() {
+        return Boolean.TRUE.equals(rs().get("market.preparatory_round", false));
     }
 
     public GameEngine(GameState state, List<Agent> agents, Consumer<Map<String, Object>> onEvent) {
@@ -131,6 +152,17 @@ public final class GameEngine {
 
     /** Испустить событие: передать во внешний коллбэк и уведомить агента места. */
     private void emit(Map<String, Object> event) {
+        // СКЛАД НЕ ПЕРЕПОЛНЯЕТСЯ НИКОГДА (27.09.2026). Ячейки пропадают многими
+        // путями — сожжённая или отнятая карта арсенала с ячейкой, уведённое
+        // здание, — и не каждый путь помнил, что кубики из пропавшей ячейки
+        // падают. Поэтому перед тем, как событие увидят запись и игроки, лишнее
+        // сгорает фиксированным порядком (поймано StorageNeverOverflowsTest).
+        for (PlayerState p : state.players) {
+            if (p.resources.kelium() + p.resources.ammo() + p.resources.trophy()
+                    > Storage.totalMax(state, p)) {
+                Storage.forceEvictOnBuildingReturn(state, p);
+            }
+        }
         if (onEvent != null) {
             onEvent.accept(event);
         }
@@ -143,6 +175,10 @@ public final class GameEngine {
         for (Agent a : agents) {
             a.observePublicEvent(event);
         }
+        // СРАБАТЫВАНИЯ КАРТ «каждый раз, когда …» (Карты 2.0) — после того, как
+        // событие увидели запись и игроки: в записи причина идёт раньше следствия.
+        Срабатывания.учесть(state, event);
+        Срабатывания.раздать(state, event);
     }
 
     private static Map<String, Object> ev(Object... kv) {
@@ -168,6 +204,7 @@ public final class GameEngine {
         offerSealChoice();
         offerSuperPick();
         offerStartObjectivePick();
+        offerStartArsenalPick();
         loop(1, 1, true);
         return finishAndScore();
     }
@@ -186,6 +223,7 @@ public final class GameEngine {
         bind(s, agents, this::emit);
         emit(ev("type", "game_start", "players", s.numPlayers(), "ruleset", rs().id));
         dealStart();
+        offerStartArsenalPick();
         loop(1, 1, true);
     }
 
@@ -205,7 +243,10 @@ public final class GameEngine {
     public Map<String, Object> resume() {
         GameState s = state;
         maxRounds = roundLimit;
-        bindResume(s, agents, onEvent == null ? null : this::emit);
+        // Всегда через emit движка, даже без наблюдателя: события боя и веток с
+        // карт запускают срабатывания карт (Карты 2.0) — это правила, и повтор
+        // позиции обязан играть их так же, как настоящая партия.
+        bindResume(s, agents, this::emit);
         loop(Math.max(1, s.round), Math.max(1, s.circle), false);
         return finishAndScore();
     }
@@ -222,8 +263,17 @@ public final class GameEngine {
             s.round = rnd;
             int firstCircle = 1;
             if (rnd > startRound || freshRound) {
-                refresh(rnd);
-                blindDiscard();
+                // ПОРЯДОК ОБНОВЛЕНИЯ: свалка — первым шагом, до новой карты
+                // рынка (дизайнер 28.09.2026, ключ rounds.scrapyard_first). Так
+                // первый раунд — это «только шаг 1», а свалку выбирают, не зная
+                // следующей карты рынка.
+                if (rs().getBool("rounds.scrapyard_first", false)) {
+                    blindDiscard();
+                    refresh(rnd);
+                } else {
+                    refresh(rnd);
+                    blindDiscard();
+                }
             } else {
                 firstCircle = startCircle;
             }
@@ -257,22 +307,34 @@ public final class GameEngine {
         if (s.winner == null) {
             int best = 0;
             for (int i = 1; i < s.numPlayers(); i++) {
-                if (better(scores, s, i, best)) {
+                if (compareEnd(scores, s, i, best) > 0) {
                     best = i;
                 }
             }
-            s.winner = best;
-            if (s.winCondition == null) {
-                s.winCondition = "victory_points";
+            // ПОБЕДУ ДЕЛЯТ, если после всей развязки игроки равны (правило
+            // дизайнера 14.09.2026).
+            s.winners.clear();
+            for (int i = 0; i < s.numPlayers(); i++) {
+                if (compareEnd(scores, s, i, best) == 0) {
+                    s.winners.add(i);
+                }
             }
+            s.winner = s.winners.isEmpty() ? best : s.winners.get(0);
+            if (s.winCondition == null) {
+                s.winCondition = s.winners.size() > 1 ? "shared_victory" : "victory_points";
+            }
+        } else if (s.winners.isEmpty()) {
+            s.winners.add(s.winner);
         }
         s.finished = true;
         emit(ev("type", "game_end", "winner", s.winner, "condition", s.winCondition,
+            "winners", new ArrayList<>(s.winners),
             "spawn_left", s.spawnLeftAtEnd, "spawn_threshold", s.spawnThreshold,
             "scores", scores));
 
         Map<String, Object> result = new HashMap<>();
         result.put("winner", s.winner);
+        result.put("winners", new ArrayList<>(s.winners));
         result.put("condition", s.winCondition);
         result.put("spawn_left", s.spawnLeftAtEnd);
         result.put("spawn_threshold", s.spawnThreshold);
@@ -281,19 +343,58 @@ public final class GameEngine {
         return result;
     }
 
-    // Больше очков; ничья ломается по келемию, затем по монетам.
-    private static boolean better(Map<Integer, Map<String, Integer>> scores, GameState s, int i, int best) {
-        int ti = scores.get(i).get("total");
-        int tb = scores.get(best).get("total");
-        if (ti != tb) {
-            return ti > tb;
+    /**
+     * КТО ВЫШЕ В ИТОГЕ (правило дизайнера 14.09.2026): больше победных очков;
+     * при равенстве — больше ГЕКСОВ, на которых стоят жетоны игрока; дальше —
+     * больше ТРОФЕЕВ (уничтоженные жетоны на свалке плюс кубики трофеев в
+     * хранилище); дальше — больше КЕЛЕМИЯ в хранилище. Всё равно — победу
+     * делят, и сравнение возвращает 0.
+     *
+     * <p>Прежняя развязка (келемий, затем монеты) была выдумкой движка.
+     *
+     * @return {@code >0}, если i выше best; {@code <0}, если ниже; 0 — делят
+     */
+    private static int compareEnd(Map<Integer, Map<String, Integer>> scores,
+                                  GameState s, int i, int best) {
+        int d = Integer.compare(scores.get(i).get("total"), scores.get(best).get("total"));
+        if (d != 0) {
+            return d;
         }
-        int ki = s.players.get(i).resources.kelium();
-        int kb = s.players.get(best).resources.kelium();
-        if (ki != kb) {
-            return ki > kb;
+        d = Integer.compare(hexesHeld(s.players.get(i)), hexesHeld(s.players.get(best)));
+        if (d != 0) {
+            return d;
         }
-        return s.players.get(i).resources.coin() > s.players.get(best).resources.coin();
+        d = Integer.compare(trophiesHeld(s.players.get(i)), trophiesHeld(s.players.get(best)));
+        if (d != 0) {
+            return d;
+        }
+        return Integer.compare(s.players.get(i).resources.kelium(),
+            s.players.get(best).resources.kelium());
+    }
+
+    /** На скольких РАЗНЫХ гексах стоят жетоны игрока — здания и войска вместе. */
+    private static int hexesHeld(PlayerState p) {
+        java.util.Set<String> hexes = new java.util.HashSet<>();
+        for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+            if (b.hexId != null) {
+                hexes.add(b.hexId);
+            }
+        }
+        for (kelium.core.UnitToken u : p.unitsOnField()) {
+            if (u.hexId != null) {
+                hexes.add(u.hexId);
+            }
+        }
+        return hexes.size();
+    }
+
+    /**
+     * ТРОФЕИ НА КОНЕЦ ПАРТИИ: жетоны на свалке плюс кубики трофеев в хранилище.
+     * Жетон считается за СТОЛЬКО ТРОФЕЕВ, СКОЛЬКО НА НЁМ НАПЕЧАТАНО (правило
+     * дизайнера 14.09.2026) — то есть по его трофейной стороне.
+     */
+    private static int trophiesHeld(PlayerState p) {
+        return p.destroyedValue() + p.resources.trophy();
     }
 
     // ---- помощники подготовки --------------------------------------------
@@ -302,22 +403,26 @@ public final class GameEngine {
      * цветная колода приказов — 4 карты (по одной на каждый верхний приказ) плюс
      * одна карта БЕЗОПАСНОСТЬ. Именно принадлежность колоде задаёт асимметрию
      * нижних приказов (голубой цикл вперёд, алый назад, зелёный обмен, жёлтый —
-<<<<<<< HEAD
-     * зеркало на Наступления). Цвета раздаются игрокам СЛУЧАЙНО по сиду.
-=======
      * зеркало на Наступлении). Цвета раздаются игрокам СЛУЧАЙНО по сиду.
->>>>>>> origin/main
      */
     /**
      * Цвет, выбранный за столом на это место, или {@code null} — «раздай сам».
      * Берётся из настроек стола, а не из правил: это решение игроков, а не
      * редакции правил.
      */
-    private static String seatColorPick(int seat) {
+    private String seatColorPick(int seat) {
         java.util.List<kelium.dataio.GameConfig.SeatPick> all =
             kelium.dataio.GameConfig.seatPickAll();
         String выбрана = seat < all.size() && all.get(seat) != null
             ? all.get(seat).orderColor() : null;
+        // ФРАКЦИЯ ЗАДАЁТ ЦВЕТ (23.09.2026): колода приказов — того же цвета, что
+        // планшет войск места. Иначе красный планшет получал синюю колоду.
+        if (выбрана == null && seat < state.players.size()) {
+            String сторона = state.player(seat).board.troop.side;
+            if (java.util.List.of("red", "green", "blue", "yellow").contains(сторона)) {
+                return сторона;
+            }
+        }
         // НЕ ВЫБРАЛИ — БЕРЁМ КОЛОДУ СВОЕГО ЦВЕТА, а не то, что выпадет по сиду
         // (заказ дизайнера 11.09.2026). Иначе за красным планшетом мог оказаться
         // зелёный узор нижних приказов.
@@ -470,22 +575,35 @@ public final class GameEngine {
         }
     }
 
+    /**
+     * ПРОГНАТЬ ФАЗУ ОБНОВЛЕНИЯ ОТДЕЛЬНО — только для сторожей.
+     *
+     * <p>Способности, срабатывающие в Обновление («Ремонтная база»), иначе
+     * проверялись бы целой партией, а партия показывает лишь то, что бот
+     * СОГЛАСИЛСЯ картой воспользоваться. Точка входа та же, что у самой игры, —
+     * подменного пути тут нет.
+     */
+    public void refreshForTest(int rnd) {
+        refresh(rnd);
+    }
+
     private void refresh(int rnd) {
         GameState s = state;
         if (rnd == 1) {
-            s.marketActive = s.decks.get("market").draw(s.rng);
-            moduleSwapAll();
-            emit(ev("type", "refresh", "round", rnd, "skipped", true));
+            // В подготовительном раунде карты рынка нет: первая откроется в
+            // Обновлении второго раунда обычным шагом «Рынок».
+            s.marketActive = подготовительныйРаунд() ? null
+                : s.decks.get("market").draw(s.rng);
+            emit(ev("type", "refresh", "round", rnd, "skipped", true,
+                "preparatory", подготовительныйРаунд()));
             return;
         }
-        // ПРИОРИТЕТ (карта рынка «Штаб корпуса») отменяет передачу по кругу ровно
-        // один раз: игрок, взявший жетон, начинает и следующий раунд. Флаг
-        // снимается здесь же — на второй раунд он уже не действует.
-        if (s.firstPlayerHeld) {
-            s.firstPlayerHeld = false;
-        } else {
-            s.firstPlayer = (s.firstPlayer + 1) % s.numPlayers();
-        }
+        // ПОРЯДОК ШАГОВ ОБНОВЛЕНИЯ (решение дизайнера 16.09.2026): рынок, потом
+        // первый игрок, и последним — выбор карты под свалку. Выбор свалки в
+        // движке не моделируется (это бумажный шаг: игрок откладывает одну из
+        // пяти своих карт приказов), но порядок двух первых шагов обязан
+        // совпадать с книгой — иначе свод, движок и текст расходятся.
+        //
         // КАРТА РЫНКА УХОДИТ ИЗ ИГРЫ НАВСЕГДА (правило дизайнера 15.08.2026).
         // Колода рынка тасуется на подготовке, каждый раунд с неё снимается одна
         // карта — и больше в игру не возвращается. Восемь карт = восемь раундов,
@@ -514,27 +632,33 @@ public final class GameEngine {
                 java.util.Arrays.fill(side, -1);
             }
         }
+        // ШАГ 2 — ПЕРВЫЙ ИГРОК, ПОСЛЕ РЫНКА (порядок 16.09.2026).
+        // ПРИОРИТЕТ (карта рынка «Штаб корпуса») отменяет передачу по кругу
+        // ровно один раз: игрок, взявший жетон, начинает и следующий раунд.
+        // Флаг снимается здесь же — на второй раунд он уже не действует.
+        if (s.firstPlayerHeld) {
+            s.firstPlayerHeld = false;
+        } else {
+            // ЖЕТОН ИДЁТ ПРОТИВ ЧАСОВОЙ СТРЕЛКИ (решение дизайнера 19.09.2026),
+            // а карты приказов вскрываются по-прежнему ПО часовой.
+            //
+            // Почему это не мелочь. Пока жетон шёл по часовой, сосед слева от
+            // первого игрока был первым и в этом раунде (после него), и в
+            // следующем (как новый первый) — два хода подряд без чужого
+            // вмешательства. Встречное вращение это разрывает: новый первый
+            // игрок — тот, кто в прошлом раунде вскрывался ПОСЛЕДНИМ, то есть
+            // дольше всех ждал.
+            int n = s.numPlayers();
+            s.firstPlayer = (s.firstPlayer - 1 + n) % n;
+        }
+        // ЯЧЕЙКА СМЕНЫ КАРТЫ РЫНКА чистится каждое Обновление, как и ячейки
+        // предложений: сменить карту рынка можно раз за раунд.
+        s.marketRefreshCell = -1;
         // Келемий на тайлах зарождения НЕ восстанавливается: сколько выкопали —
         // столько и убыло, тайл истощается за партию и потом уходит с поля.
         // (Раньше здесь стояло ежераундовое восстановление — это была ошибка
         // движка, а не правило игры.)
-        // Обновление: с КАЖДОГО жетона снимается ОДИН кубик урона (не весь).
-        // Урон копится по раундам — штурм ЦУ можно вести несколько раундов.
-        // Сколько кубиков урона снимается в Обновление. Правило — ОДИН (СВОД),
-        // и это значение по умолчанию. Ключ вынесен в ruleset НЕ ради изменения
-        // правила, а чтобы балансовый стенд ({@code kelium.RuleExperiment}) мог
-        // проверить, что будет при другом числе: скорость лечения напрямую решает,
-        // возможна ли многораундовая осада, а угадывать это по рассуждению нельзя.
-        int heal = ((Number) rs().get("combat_model.heal_per_refresh", 1)).intValue();
         for (PlayerState p : s.players) {
-            for (int i = 0; i < heal; i++) {
-                for (UnitToken t : p.units) {
-                    t.healOneDamage();
-                }
-                for (BuildingToken t : p.buildings) {
-                    t.healOneDamage();
-                }
-            }
             // ТОЧКА ПРАВИЛ: доход в Обновление от карт арсенала (например
             // «энергостанции платят монетами за каждый кубик энергии»).
             int income = (int) Math.round(kelium.engine.ability.RuleQuery
@@ -543,6 +667,24 @@ public final class GameEngine {
             if (income > 0) {
                 p.resources.add(kelium.core.Resource.COIN, income);
                 emit(ev("type", "refresh_income", "seat", p.seat, "coin", income));
+            }
+            // «РЕМОНТНАЯ БАЗА» (арсенал 6.0.0): в Обновление весь урон со своих
+            // жетонов снимается. По книге (глава 9) урон лежит на жетоне до его
+            // гибели и не сходит сам — эта карта единственное, что его снимает.
+            if (Passives.hasPassive(s, p.seat, "repair_all_in_refresh")) {
+                int снято = 0;
+                for (kelium.core.UnitToken u : p.unitsOnField()) {
+                    снято += u.damage;
+                    u.resetDamage();
+                }
+                for (kelium.core.BuildingToken b : p.buildingsOnField()) {
+                    снято += b.damage;
+                    b.resetDamage();
+                }
+                if (снято > 0) {
+                    emit(ev("type", "ability_reaction", "seat", p.seat,
+                        "ability", "repair_all_in_refresh", "damage_cleared", снято));
+                }
             }
             payArsenalUpkeep(p);
             floodTrainingCards(p);
@@ -555,21 +697,9 @@ public final class GameEngine {
             emit(ev("type", "containers_laid", "round", rnd, "count", laid,
                 "on_field", TokenContainers.onField(s)));
         }
-        moduleSwapAll();
         // Накопитель «Штабной игры» (супер-задания 5.0): раунды первым игроком.
         s.player(s.firstPlayer).roundsFirstPlayer += 1;
         emit(ev("type", "refresh", "round", rnd, "first_player", s.firstPlayer));
-    }
-
-    /** Провести бесплатную смену модулей для всех игроков, у кого они есть. */
-    private void moduleSwapAll() {
-        GameState s = state;
-        for (int seat = 0; seat < s.numPlayers(); seat++) {
-            PlayerState p = s.player(seat);
-            if (p.redModules > 0 || p.blueModules > 0) {
-                Modules.moduleSwap(s, seat, agents.get(seat), this::emit);
-            }
-        }
     }
 
     private void refillContainers() {
@@ -636,6 +766,9 @@ public final class GameEngine {
 
     private void playCircle(int circle) {
         GameState s = state;
+        if (s.circleStartHook != null) {
+            s.circleStartHook.accept(s);
+        }
         // I2: вскрытие ОДНОВРЕМЕННОЕ. Сначала все места ВЫБИРАЮТ карту (руки не
         // трогаем — каждый агент видит одинаковый до-вскрытный стейт, поздние места
         // не подглядывают выбор ранних), и только потом карты разом снимаются с рук.
@@ -761,6 +894,10 @@ public final class GameEngine {
         PlayerState p = s.player(seat);
         Ruleset rs = rs();
         s.journal.startTurn(seat);
+        // «АВАРИЙНОЕ ПИТАНИЕ» 7.3.0: монеты с ячеек энергии уходят в общий запас
+        for (BuildingToken b : p.buildingsOnField()) {
+            b.stripEnergyOf(Actions.COIN_SOURCE_UID);
+        }
         // «КЕЛЕМИЕВЫЙ РУДНИК» (супер-арсенал sa6, редакция 17.08.2026): +1 келемий
         // В НАЧАЛЕ КАЖДОГО ХОДА, не раз в раунд — до вершины трека игрок
         // добирается поздно, и награда за раунд к тому времени уже ничего не решает.
@@ -774,12 +911,29 @@ public final class GameEngine {
         // ТОЧКА ПРАВИЛ: сколько СПЕЦ-действий за ход. Карта арсенала может дать
         // второе («два СПЕЦ, если не играл Безопасность») или третье («Параллельные
         // штабы»).
+        // совпадение известно уже сейчас — «Оперативный отдел» (арсенал 7.3.0)
+        // даёт за него ещё одно спец-действие и спрашивает об этом здесь
+        s.journal.of(seat).orderBlocked = reveal.coincided();
         int specLimit = (int) Math.round(kelium.engine.ability.RuleQuery
             .of(s, seat, kelium.engine.ability.Hook.ORDER_SPEC_COUNT)
             .base(Math.max(rs.getInt("actions.spec_per_turn"), Passives.specActions(s, seat)))
             .ask());
+        // ЗОЛОТАЯ ЯЧЕЙКА ХРАНИЛИЩА (жетоны 2.0, 02.10.2026): постоянная
+        // пассивка — ещё одно спец-действие в каждом своём ходу.
+        specLimit += ЖетоныХранилища.спецДействий(s.player(seat));
         specLimit = Math.max(0, specLimit - specPenalty);
+        // «ШТАБНАЯ ДИРЕКТИВА» (супер-арсенал 4.0.0, печать 25.09.2026): «За
+        // совпадение нижнего приказа ты получаешь ещё 1 спец. действие». Нижний
+        // приказ открыт — к его действию прибавляется спец-действие этого хода.
+        boolean директива = Passives.superArsenalPassive(s, seat,
+            "directive_coincidence_both_bottom_spec");
+        if (директива && !isJoker && card.get("bottom") != null && reveal.bottomOpen()) {
+            specLimit += 1;
+            emit(ev("type", "spec_bonus", "seat", seat, "bonus", 1,
+                "ability", "directive_coincidence_both_bottom_spec"));
+        }
         TurnContext ctx = new TurnContext(seat, specLimit);
+        ctx.факты = s.journal.of(seat);
         // Контекст хода — памятка для отката безопасных действий (концепт
         // «Командный пункт» §5): без него откат возвращал состояние, но не
         // знание «что сыграно», и игрок терял слот действия.
@@ -788,6 +942,13 @@ public final class GameEngine {
             emit(ev("type", "spec_penalty", "seat", seat, "penalty", specPenalty,
                 "ability", "ignore_coincidence"));
         }
+
+        // ПЛАШКА ЭТОГО ХОДА — живой игрок видит её в меню хода.
+        ходПлашка = card.get("spec") instanceof String пл ? пл
+            : (Boolean.TRUE.equals(card.get("maneuver")) ? "movement" : null);
+        ходПлашкаЦена = card.get("spec_cost_coin") instanceof Number нц ? нц.intValue() : 0;
+        ходПлашкаСыграна = false;
+        boolean менюХода = agents.get(seat).specInActionMenu();
 
         if (isJoker) {
             // Джокер даёт столько же действий, сколько верх обычной карты: иначе
@@ -826,7 +987,10 @@ public final class GameEngine {
             // партии на четверых, зато боёв стало на 39–64% меньше. Новых
             // вариантов розыгрыша действий не заводим.
             int topA = rs.getInt("actions.top_actions_per_turn", 2);
-            int maxA = coincided ? Math.min(1, topA) : topA;
+            // «ШТАБНАЯ ДИРЕКТИВА» (4.0.0): «При совпадении приказов ты играешь
+            // оба действия». Совпадение при этом СЛУЧИЛОСЬ (журнал его помнит —
+            // задания «сыграй тот же приказ» выполняются), не случился только срез.
+            int maxA = coincided && !директива ? Math.min(1, topA) : topA;
             // Признак блокировки нужен способностям карт («Резервный штаб»
             // обходит её за келемий): OptionSource видит состояние партии, но не
             // ход, поэтому флаг живёт в журнале хода.
@@ -896,9 +1060,13 @@ public final class GameEngine {
             // на нём игрались как игрались.
             String плашка = card.get("spec") instanceof String с ? с
                 : (Boolean.TRUE.equals(card.get("maneuver")) ? "movement" : null);
-            if (плашка != null) {
-                разыгратьПлашку(p, ctx, плашка);
+            if (плашка != null && !менюХода) {
+                int цена = card.get("spec_cost_coin") instanceof Number н ? н.intValue() : 0;
+                разыгратьПлашку(p, ctx, плашка, цена);
             }
+        }
+        if (менюХода && !s.finished) {
+            finalSpecMenu(p, ctx);
         }
         s.turnUndo = null;
         emit(ev("type", "turn_end", "seat", seat, "resources", resourcesMap(p)));
@@ -953,6 +1121,13 @@ public final class GameEngine {
             for (String nname : candidates) {
                 opts.add(new Choice("action", nname, nname));
             }
+            // СПЕЦ-ДЕЙСТВИЕ В МЕНЮ ХОДА (просьба дизайнера 26.09.2026): живой
+            // игрок видит его рядом с действиями и играет, когда хочет, — а не
+            // отдельным вопросом после каждого действия.
+            boolean меню = agents.get(p.seat).specInActionMenu();
+            if (меню) {
+                opts.addAll(menuSpecOptions(p, ctx));
+            }
             opts.add(new Choice("pass", null, "ничего не делать"));
             // Что известно о вскрытии — в контекст решения: бот, который
             // планирует ход целиком, должен знать, сколько действий у него есть
@@ -966,13 +1141,29 @@ public final class GameEngine {
             if (ch.payload() == null) {
                 break;
             }
+            if (меню && !"action".equals(ch.kind())) {
+                applyMenuSpec(p, ctx, ch);
+                continue;
+            }
             String actionName = (String) ch.payload();
             Action action = Actions.create(actionName, s);
+            java.util.Set<String> открытыДо = PrintedContainers.открытые(s);
             ActionResult res = action.perform(p, ctx, agents.get(p.seat));
-            if (res.ok()) {
-                s.journal.onAction(p.seat, actionName, res.telemetry());
+            PrintedContainers.накрытия(s, p, открытыДо);
+            // РАЗВИЛКА (приказы 5.0.0): в журнал и в событие идёт ИМЯ ВЫПОЛНЕННОЙ
+            // ВЕТКИ — прежнего действия, на которое смотрят задания, отчёты и
+            // проигрыватель; имя самой развилки — в поле fork.
+            String fork = null;
+            String сыграно = actionName;
+            if (action instanceof Actions.ForkAction fa && fa.branch != null) {
+                fork = actionName;
+                сыграно = fa.branch;
             }
-            emit(ev("type", "action", "seat", p.seat, "action", actionName,
+            if (res.ok()) {
+                s.journal.onAction(p.seat, сыграно, res.telemetry());
+            }
+            emit(ev("type", "action", "seat", p.seat, "action", сыграно,
+                "fork", fork,
                 "ok", res.ok(), "detail", res.detail(), "telemetry", res.telemetry()));
             ctx.playedCount += 1;
             if (repeatable > 0) {
@@ -983,7 +1174,9 @@ public final class GameEngine {
             if (!containersOpenIsSpec()) {
                 offerOpenContainer(p);
             }
-            offerSpec(p, ctx);
+            if (!меню) {
+                offerSpec(p, ctx);
+            }
             int bought = s.journal.of(p.seat).takeBlockBypassGrants();
             extra += bought;
             repeatable += bought;
@@ -992,11 +1185,83 @@ public final class GameEngine {
         // пустой список кандидатов) НЕ отбирает СПЕЦ: игрок всё ещё может
         // завершить задание, установить арсенал, внести вклад в супер-задание
         // или развернуть готовое супер-задание ради мгновенной победы.
-        if (!s.finished && ctx.canSpec()) {
+        if (!s.finished && ctx.canSpec() && !agents.get(p.seat).specInActionMenu()) {
             if (!containersOpenIsSpec()) {
                 offerOpenContainer(p);
             }
             offerSpec(p, ctx);
+        }
+    }
+
+    /** Плашка приказа этого хода: вид, цена, сыграна ли (для меню хода). */
+    private String ходПлашка;
+    private int ходПлашкаЦена;
+    private boolean ходПлашкаСыграна;
+
+    /**
+     * ВАРИАНТЫ СПЕЦ-ДЕЙСТВИЯ ДЛЯ МЕНЮ ХОДА: всё, что можно сделать спецом, плюс
+     * плашка карты приказа. Спец истрачен — остаются только свободные верхи ∞.
+     * ЦУ в запасе — единственный вариант: он обязан вернуться первым спецом.
+     */
+    private List<Choice> menuSpecOptions(PlayerState p, TurnContext ctx) {
+        ctx.specUnlimited = state.journal.of(p.seat).unlimitedSpec;
+        ctx.specLimit = ctx.specLimitBase + state.journal.of(p.seat).specBonus;
+        List<Choice> out = new ArrayList<>();
+        if (!ctx.canSpec()) {
+            for (String cid : new ArrayList<>(p.objectiveHand)) {
+                if (верхСвободный(state, cid)) {
+                    out.add(new Choice("free_objective_burn", cid, "burn free top " + cid));
+                }
+            }
+            return out;
+        }
+        if (Ctx.rules(state).getBool("command_center.must_replace_cu_with_spec", false)
+                && ЦуИзЗапаса.вЗапасе(p) != null) {
+            out.add(new Choice("spec_cu_return", "cu", "вернуть ЦУ на поле"));
+            return out;
+        }
+        out.addAll(buildSpecOptions(p));
+        if (ходПлашка != null && !ходПлашкаСыграна
+                && (ходПлашкаЦена <= 0 || p.resources.coin() >= ходПлашкаЦена)) {
+            out.add(new Choice("order_plate", ходПлашка, "плашка приказа"));
+        }
+        return out;
+    }
+
+    /** Сыграть спец-вариант, выбранный в меню хода. */
+    private void applyMenuSpec(PlayerState p, TurnContext ctx, Choice ch) {
+        switch (ch.kind()) {
+            case "spec_cu_return" -> {
+                if (ЦуИзЗапаса.поставить(state, p, agents.get(p.seat))) {
+                    ctx.useSpec();
+                    emit(ev("type", "cu_replaced", "seat", p.seat));
+                }
+            }
+            case "order_plate" -> {
+                ходПлашкаСыграна = true;
+                разыгратьПлашку(p, ctx, ходПлашка, ходПлашкаЦена, false);
+            }
+            default -> applySpec(p, ctx, ch);
+        }
+    }
+
+    /**
+     * КОНЕЦ ХОДА ЖИВОГО ИГРОКА: действия сыграны, а спец-действие (и плашка)
+     * ещё доступны — то же меню, пока игрок не нажмёт «Завершить ход».
+     */
+    private void finalSpecMenu(PlayerState p, TurnContext ctx) {
+        for (int guard = 0; guard < 24 && !state.finished; guard++) {
+            List<Choice> opts = menuSpecOptions(p, ctx);
+            if (opts.isEmpty()) {
+                return;
+            }
+            opts.add(new Choice("pass", null, "завершить ход"));
+            Choice ch = agents.get(p.seat).choose(state, opts, ev("kind", "spec",
+                "turn_end", true));
+            if (ch == null || ch.payload() == null) {
+                return;
+            }
+            applyMenuSpec(p, ctx, ch);
         }
     }
 
@@ -1012,16 +1277,62 @@ public final class GameEngine {
      * <p>Плашка предлагается ПОСЛЕДНЕЙ в ходу: если игрок уже потратил спец на
      * задание, плашка просто не предлагается — это и есть конкуренция.
      */
-    private void разыгратьПлашку(PlayerState p, TurnContext ctx, String вид) {
+    private void разыгратьПлашку(PlayerState p, TurnContext ctx, String вид, int цена) {
+        разыгратьПлашку(p, ctx, вид, цена, true);
+    }
+
+    /**
+     * @param спросить {@code false} — игрок уже выбрал плашку в меню хода,
+     *                 переспрашивать «платить ли» не нужно
+     */
+    private void разыгратьПлашку(PlayerState p, TurnContext ctx, String вид, int цена,
+                                 boolean спросить) {
         if (!ctx.canSpec()) {
             return;
         }
+        // ПЛАТНАЯ ПЛАШКА (набор orders 3.0.0): «−1 монета → …». Не хватает
+        // монет — плашки нет. Хватает — игрок решает, платить ли: это
+        // спец-действие, и оно же нужно для заданий и арсенала.
+        if (цена > 0) {
+            if (p.resources.coin() < цена) {
+                return;
+            }
+            if (спросить && !"movement".equals(вид)) {
+                Choice ч = agents.get(p.seat).choose(state, List.of(
+                    new Choice("order_spec", вид, "−" + цена + " мон: " + вид),
+                    new Choice("pass", null, "не брать плашку")),
+                    ev("kind", "order_spec", "spec", вид, "cost", цена));
+                if (ч.payload() == null) {
+                    return;
+                }
+            }
+        }
         switch (вид) {
-            case "movement" -> offerManeuver(p, ctx);
-            case "coin" -> {
-                p.resources.add(kelium.core.Resource.COIN, 1);
+            case "movement" -> {
+                // Манёвр сам спрашивает, какой жетон вести и вести ли вообще;
+                // платим, только если он состоялся (спец-действие потрачено).
+                boolean могБыл = ctx.canSpec();
+                java.util.Set<String> открытыДо = PrintedContainers.открытые(state);
+                offerManeuver(p, ctx);
+                PrintedContainers.накрытия(state, p, открытыДо);
+                if (цена > 0 && могБыл && !ctx.canSpec()) {
+                    p.resources.pay(kelium.core.Resource.COIN, цена);
+                }
+            }
+            case "ammo" -> {
+                p.resources.pay(kelium.core.Resource.COIN, цена);
+                int got = Storage.addAmmoCapped(state, p, 1);
                 ctx.useSpec();
-                emit(ev("type", "order_spec", "seat", p.seat, "spec", "coin", "got", 1));
+                emit(ev("type", "order_spec", "seat", p.seat, "spec", "ammo", "got", got,
+                    "cost", цена));
+            }
+            case "coin" -> {
+                // Сколько монет даёт плашка — из свода (orders.spec_coin); 2 с
+                // 23.09.2026 по решению дизайнера, прежде было напечатано 1.
+                int монет = Ctx.rules(state).getInt("orders.spec_coin", 1);
+                p.resources.add(kelium.core.Resource.COIN, монет);
+                ctx.useSpec();
+                emit(ev("type", "order_spec", "seat", p.seat, "spec", "coin", "got", монет));
             }
             case "objective" -> {
                 String карта = state.decks.get("objectives").draw(state.rng);
@@ -1033,10 +1344,13 @@ public final class GameEngine {
                         "empty", true));
                     return;
                 }
+                if (цена > 0) {
+                    p.resources.pay(kelium.core.Resource.COIN, цена);
+                }
                 p.objectiveHand.add(карта);
                 ctx.useSpec();
                 emit(ev("type", "order_spec", "seat", p.seat, "spec", "objective",
-                    "card", карта));
+                    "card", карта, "cost", цена));
             }
             default -> { }
         }
@@ -1124,6 +1438,8 @@ public final class GameEngine {
             f.unitsMoved = f.movedUids.size();
             f.movedFromHexes.add(fromHex);
         }
+        // КУДА ВСТАЛО — выбирает игрок (26.09.2026)
+        СекторыВойск.поставить(s, agents.get(p.seat), unit);
         ctx.useSpec();
         emit(ev("type", "maneuver", "seat", p.seat, "unit", uid, "to", unit.hexId));
     }
@@ -1135,11 +1451,34 @@ public final class GameEngine {
             return;
         }
         GameState s = state;
-        // КАРТА УЖЕ ЛЕЖИТ ПЕРЕД ИГРОКОМ: её взяли, когда получили контейнер.
-        // Вскрытие только переворачивает верхнюю (заказ дизайнера 11.09.2026).
-        String cid = p.containerHand.isEmpty() ? null : p.containerHand.get(0);
+        // КАРТА УЖЕ НА РУКЕ (27.09.2026): контейнер взят лицом, владелец знает,
+        // что в нём, — и выбирает, какой вскрыть, если их несколько разных.
+        String cid;
+        if (!p.containerCards.isEmpty()) {
+            List<String> разные = new ArrayList<>(new java.util.LinkedHashSet<>(p.containerCards));
+            cid = разные.get(0);
+            if (разные.size() > 1) {
+                List<Choice> opts = new ArrayList<>();
+                for (String id : разные) {
+                    Map<String, Object> k = Ctx.cards(s, "containers").byId(id);
+                    Object подпись = k == null ? id
+                        : ((Map<?, ?>) k.getOrDefault("a", Map.of())).get("label");
+                    // вид «pick_container», а не «open_container»: тот занят
+                    // выбором стороны карты у записей прежних партий
+                    opts.add(new Choice("pick_container", id,
+                        подпись == null ? id : String.valueOf(подпись)));
+                }
+                Choice ch = agents.get(p.seat).choose(s, opts, ev("kind", "pick_container"));
+                if (ch != null && ch.payload() instanceof String выбран) {
+                    cid = выбран;
+                }
+            }
+            p.containerCards.remove(cid);
+        } else {
+            cid = s.decks.get("containers").draw(s.rng);
+        }
         if (cid == null) {
-            return;   // I3: карты нет (колода была пуста) — жетон НЕ сгорает
+            return;   // I3: пустая колода — жетон НЕ сгорает
         }
         Map<String, Object> card = Ctx.cards(s, "containers").byId(cid);
         Map<String, Object> a = (Map<String, Object>) card.get("a");
@@ -1147,13 +1486,12 @@ public final class GameEngine {
         // напечатано на карте, то и выдаётся. Вскрыл — получил.
         //
         // Прежде карта с напечатанной второй стороной предлагала выбрать одну
-        // из двух; играющие наборы (4.0.0 и 5.0.0) второй стороны не несут
-        // вовсе, но старые её несут, и молча вернуть по ним выбор нельзя.
-        // Сторона «b» игнорируется: применяется всегда напечатанная «a».
+        // из двух; действующая колода (6.0.0) второй стороны не несёт вовсе,
+        // но записи старых партий её несут, и молча вернуть по ним выбор
+        // нельзя. Сторона «b» игнорируется: применяется всегда напечатанная «a».
         Object[] payload = new Object[]{"a", a};
         Map<String, Object> variant = (Map<String, Object>) payload[1];
         p.containers -= 1;
-        p.containerHand.remove(0);
         Map<String, Object> got;
         try {
             got = Effects.apply((String) variant.get("effect"), s, p.seat,
@@ -1163,6 +1501,13 @@ public final class GameEngine {
         }
         s.decks.get("containers").discard(cid);
         s.journal.of(p.seat).containersOpened += 1;
+        // «СДАЧА ТАРЫ» (начальный арсенал 7.1.0): «Вскрывая контейнер, получи
+        // ещё 1 монету» — за каждую вскрытую карту, сверх напечатанного на ней.
+        if (Passives.hasPassive(s, p.seat, "coin_on_container_open")) {
+            p.resources.add(kelium.core.Resource.COIN, 1);
+            got = new HashMap<>(got);
+            got.put("card_bonus_coin", 1);   // отдельно от напечатанного на контейнере
+        }
         emit(ev("type", "container", "seat", p.seat, "card", cid, "variant", payload[0],
             "effect", variant.getOrDefault("effect", ""),
             "label", variant.getOrDefault("label", ""), "got", got));
@@ -1200,14 +1545,69 @@ public final class GameEngine {
         // лимит на остаток хода. Флаг живёт в журнале: эффект карты не видит
         // контекст хода, а «до конца хода» — ровно срок жизни журнала.
         ctx.specUnlimited = state.journal.of(p.seat).unlimitedSpec;
+        // УТИЛЬ «ТРИ СПЕЦ-ДЕЙСТВИЯ» прибавляет к пределу, а не снимает его.
+        // Считается от базы, посчитанной на входе в ход: иначе прибавка
+        // складывалась бы с собой на каждом предложении СПЕЦ.
+        ctx.specLimit = ctx.specLimitBase + state.journal.of(p.seat).specBonus;
         if (!ctx.canSpec()) {
+            // СВОБОДНЫЙ ВЕРХ (знак ∞) спец-действия не просит — его можно сжечь
+            // и тогда, когда спец-действие хода уже истрачено.
+            offerFreeBurns(p);
             return;
         }
+        // ЦУ В ЗАПАСЕ ОБЯЗАН ВЕРНУТЬСЯ НА ПОЛЕ (command_center.must_replace_cu_with_spec):
+        // первое же спец-действие хода уходит на это — на свободные сектора любого гекса.
+        if (Ctx.rules(state).getBool("command_center.must_replace_cu_with_spec", false)
+                && ЦуИзЗапаса.вЗапасе(p) != null) {
+            if (ЦуИзЗапаса.поставить(state, p, agents.get(p.seat))) {
+                ctx.useSpec();
+                emit(ev("type", "cu_replaced", "seat", p.seat));
+                return;
+            }
+        }
+        GameState s = state;
+        TurnJournal j = s.journal;
+        List<Choice> opts = buildSpecOptions(p);
+        if (opts.isEmpty()) {
+            return;
+        }
+        opts.add(new Choice("pass", null, "без спец-действия"));
+        // ИНДИКАТОРЫ ЗАДАНИЙ (заказ дизайнера 17.08.2026). Движок сам считает по
+        // каждой карте руки: горит ли «ГОТОВО», горит ли «ДОСТИЖИМО В ЭТОТ ХОД»,
+        // и если достижимо — какими действиями. Кладём в контекст выбора, чтобы
+        // агент решал СПЕЦ-действие, видя пути к наградам, а не одни награды.
+        List<ObjectiveHints.Hint> hints = ObjectiveHints.forHand(s, p.seat, j,
+            ctx.remainingActionNames(), ctx.remainingActions());
+        Map<String, Object> specCtx = ev("kind", "spec");
+        specCtx.put("objective_hints", hints);
+        emit(ev("type", "objective_hints", "seat", p.seat, "round", s.round,
+            "hints", hintsForLog(hints)));
+        Choice ch = agents.get(p.seat).choose(s, opts, specCtx);
+        if (ch.payload() == null) {
+            return;
+        }
+        applySpec(p, ctx, ch);
+    }
+
+    /**
+     * ВАРИАНТЫ СПЕЦ-ДЕЙСТВИЯ — что игрок может сделать спец-действием прямо
+     * сейчас (без «паса»). Один список на оба способа спросить: отдельным
+     * вопросом после действия (боты) и в меню хода рядом с действиями (живой
+     * игрок, {@link kelium.core.Agent#specInActionMenu}).
+     */
+    private List<Choice> buildSpecOptions(PlayerState p) {
         GameState s = state;
         TurnJournal j = s.journal;
         List<Choice> opts = new ArrayList<>();
         for (String cid : Objectives.playableObjectives(s, p.seat, j)) {
             opts.add(new Choice("spec_objective", cid, "complete " + cid));
+            // УСИЛЕНИЕ — ОТДЕЛЬНАЯ ВОЗМОЖНОСТЬ, а не прибавка к первой (правило
+            // дизайнера 16.09.2026: усиленная награда даётся ВМЕСТО базовой).
+            // Развилка обязана быть видна в момент выбора: у заданий-жертв
+            // усиление стоит доплаты, и платить её вслепую нельзя.
+            if (Objectives.enhancedAvailable(s, p.seat, j, cid)) {
+                opts.add(new Choice("spec_objective_enh", cid, "complete+ " + cid));
+            }
         }
         // Верхний утилизационный эффект: любую карту задания в руке можно СЖЕЧЬ
         // ради мгновенного верхнего эффекта (вместо выполнения низа). Доступно
@@ -1219,12 +1619,20 @@ public final class GameEngine {
                 // ВЕРХ «В МОМЕНТЕ» В СВОЙ ХОД НЕ ПРЕДЛАГАЕТСЯ. Реакция ждёт
                 // чужого удара, и сжечь её просто так значило бы отдать карту
                 // даром: окно ей открывает бой (kelium.engine.Реакции).
-                opts.add(new Choice("spec_objective_burn", cid, "burn top " + cid));
+                // СВОБОДНЫЙ ВЕРХ (∞) предлагается отдельным вариантом: он
+                // спец-действия не тратит (см. offerFreeBurns).
+                opts.add(верхСвободный(s, cid)
+                    ? new Choice("free_objective_burn", cid, "burn free top " + cid)
+                    : new Choice("spec_objective_burn", cid, "burn top " + cid));
             }
         }
         for (String cid : new ArrayList<>(p.arsenalHand)) {
-            opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
-            opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
+            if (стартовыйНабор(s, cid) == null) {
+                opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
+            }
+            if (!sameNameInstalled(p, cid)) {
+                opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
+            }
         }
         // «МАНДАТ СОВЕТА» (супер-арсенал sa8): перекладка между обычной полкой
         // и своим отдельным местом — свободная перестановка, не тратит ресурс,
@@ -1274,16 +1682,9 @@ public final class GameEngine {
                 opts.add(new Choice("spec_arsenal_use", cid, "SPEC " + passive + " (" + cid + ")"));
             }
         }
-        // СУПЕР-ЗАДАНИЕ 6.0: низ карты. Карта НЕ сжигается — награда выдаётся за
-        // ВЫПОЛНЕННОЕ жёсткое требование, один раз за партию, и множитель верха
-        // после этого продолжает считаться. Именно это ограничение и просил
-        // дизайнер: разовым эффектом больше нельзя воспользоваться сразу же,
-        // сперва надо довести партию до нужного состояния.
-        if (p.superObjective != null && !p.superObjectiveComplete && СуперЗадания.on6(s)
-                && СуперЗадания.требованиеВыполнено(s, p.seat)) {
-            opts.add(new Choice("spec_super6_claim", p.superObjective,
-                "СУПЕР-НАГРАДА " + p.superObjective));
-        }
+        // СУПЕР-ЗАДАНИЕ СПЕЦ-ДЕЙСТВИЯ НЕ ДАЁТ (правило дизайнера 14.09.2026):
+        // карту нельзя ни выполнить, ни сжечь — она только считает очки в конце
+        // партии. Прежний низ с жёстким требованием и разовой наградой удалён.
         // СПОСОБНОСТИ АРСЕНАЛА сами кладут свои варианты в меню СПЕЦ: движок не
         // знает про карты, он спрашивает «что добавить?». Так карта даёт НОВОЕ
         // спец-действие без правки движка (13.08.2026).
@@ -1306,27 +1707,19 @@ public final class GameEngine {
             opts.add(new Choice("spec_combat", specBattleAmmo,
                 "СПЕЦ: провести Бой за " + specBattleAmmo + " боеприпас(ов)"));
         }
-        if (opts.isEmpty()) {
-            return;
-        }
-        opts.add(new Choice("pass", null, "без спец-действия"));
-        // ИНДИКАТОРЫ ЗАДАНИЙ (заказ дизайнера 17.08.2026). Движок сам считает по
-        // каждой карте руки: горит ли «ГОТОВО», горит ли «ДОСТИЖИМО В ЭТОТ ХОД»,
-        // и если достижимо — какими действиями. Кладём в контекст выбора, чтобы
-        // агент решал СПЕЦ-действие, видя пути к наградам, а не одни награды.
-        List<ObjectiveHints.Hint> hints = ObjectiveHints.forHand(s, p.seat, j,
-            ctx.remainingActionNames(), ctx.remainingActions());
-        Map<String, Object> specCtx = ev("kind", "spec");
-        specCtx.put("objective_hints", hints);
-        emit(ev("type", "objective_hints", "seat", p.seat, "round", s.round,
-            "hints", hintsForLog(hints)));
-        Choice ch = agents.get(p.seat).choose(s, opts, specCtx);
-        if (ch.payload() == null) {
-            return;
-        }
+        return opts;
+    }
+
+    /** СЫГРАТЬ ВЫБРАННЫЙ ВАРИАНТ СПЕЦ-ДЕЙСТВИЯ и потратить спец, если положено. */
+    private void applySpec(PlayerState p, TurnContext ctx, Choice ch) {
+        GameState s = state;
+        TurnJournal j = s.journal;
         switch (ch.kind()) {
             case "spec_objective" -> Objectives.playObjective(s, p.seat, j, (String) ch.payload(), this::emit);
-            case "spec_objective_burn" -> objectiveBurnTop(p, (String) ch.payload());
+            case "spec_objective_enh" -> Objectives.playObjective(
+                s, p.seat, j, (String) ch.payload(), this::emit, true);
+            case "spec_objective_burn", "free_objective_burn" ->
+                objectiveBurnTop(p, (String) ch.payload());
             case "spec_arsenal_burn" -> arsenalBurn(p, (String) ch.payload());
             case "spec_arsenal_install" -> arsenalInstall(p, (String) ch.payload(), agents.get(p.seat));
             case "spec_mandate_store" -> mandateStoreCard(p, (String) ch.payload());
@@ -1334,20 +1727,16 @@ public final class GameEngine {
             case "spec_mandate_containers" -> mandateAllocateContainers(p, (Integer) ch.payload());
             case "spec_container" -> massOpen(p);
             case "spec_arsenal_use" -> useInstalledSpec(p, (String) ch.payload());
-            case "spec_super6_claim" -> {
-                p.superObjectiveComplete = true;
-                Map<String, Object> got = СуперЗадания.наградаНиза(s, p, agents.get(p.seat), this::emit);
-                emit(ev("type", "super6_claim", "seat", p.seat,
-                    "card", ch.payload(), "got", got));
-            }
             case "spec_combat" -> {
                 // Плата вперёд, и только потом бой: не хватило — предложения бы и
                 // не было (см. проверку выше), а порядок важен для журнала.
                 int цена = (Integer) ch.payload();
                 p.resources.pay(kelium.core.Resource.AMMO, цена);
                 TurnContext бойCtx = new TurnContext(p.seat, 0);
+                java.util.Set<String> открытыДо = PrintedContainers.открытые(s);
                 var res = kelium.engine.Actions.create("combat", s)
                     .perform(p, бойCtx, agents.get(p.seat));
+                PrintedContainers.накрытия(s, p, открытыДо);
                 if (res != null && res.ok()) {
                     j.onAction(p.seat, "combat", res.telemetry());
                 }
@@ -1364,7 +1753,63 @@ public final class GameEngine {
                 }
             }
         }
-        ctx.useSpec();
+        // ВЫПОЛНЕНИЕ ЗАДАНИЯ — СВОБОДНОЕ ДЕЙСТВИЕ (правило-вариант дизайнера
+        // 19.09.2026, свод objectives.play_is_free_action). Тогда карта задания
+        // разыгрывается в любой момент своего хода и спец-действия не тратит;
+        // спец остаётся за арсеналом, контейнерами и прочим.
+        //
+        // Зачем проверять. Замер 19.09: за ход выполняется максимум ОДНО
+        // задание, ходов с двумя не бывает вовсе — спец-действие и есть то
+        // горлышко. Если снять его с заданий, колода начинает играть, но и
+        // цена спеца падает; что перевесит, видно только партиями.
+        //
+        // СЖИГАНИЕ КАРТЫ РАДИ УТИЛЯ остаётся спец-действием: утиль — это
+        // разовый эффект вне очереди, и делать его бесплатным значит превратить
+        // руку в веер мгновенных фокусов.
+        boolean заданиеСвободно = Boolean.TRUE.equals(Ctx.rules(state)
+                .get("objectives.play_is_free_action", Boolean.FALSE))
+            && ("spec_objective".equals(ch.kind()) || "spec_objective_enh".equals(ch.kind()));
+        if (!заданиеСвободно && !"free_objective_burn".equals(ch.kind())) {
+            ctx.useSpec();
+        }
+    }
+
+    /**
+     * ВЕРХ КАРТЫ ЗАДАНИЯ СО ЗНАКОМ ∞ — СВОБОДНОЕ ДЕЙСТВИЕ (печатные карты
+     * 25.09.2026; памятка планшета войск: «∞ свободное · ▶ СПЕЦ»). Такой верх
+     * сжигается в свой ход в любой момент и спец-действия не тратит. Реакции
+     * тоже помечены ∞, но их окно открывает бой, и сюда они не попадают.
+     */
+    public static boolean верхСвободный(GameState s, String cid) {
+        Map<String, Object> oc = Ctx.cards(s, "objectives").find(cid);
+        return oc != null && oc.get("top") instanceof Map<?, ?> t
+            && t.get("params") instanceof Map<?, ?> пар
+            && Boolean.TRUE.equals(пар.get("free"))
+            && kelium.engine.Реакции.видКарты(s, cid) == null;
+    }
+
+    /**
+     * СВОБОДНЫЕ ВЕРХИ, КОГДА СПЕЦ-ДЕЙСТВИЕ УЖЕ ИСТРАЧЕНО. Предлагаются по одному,
+     * пока игрок не откажется: каждая карта сгорает, так что круг конечен.
+     */
+    private void offerFreeBurns(PlayerState p) {
+        for (int guard = 0; guard < 16; guard++) {
+            List<Choice> opts = new ArrayList<>();
+            for (String cid : new ArrayList<>(p.objectiveHand)) {
+                if (верхСвободный(state, cid)) {
+                    opts.add(new Choice("free_objective_burn", cid, "burn free top " + cid));
+                }
+            }
+            if (opts.isEmpty()) {
+                return;
+            }
+            opts.add(new Choice("pass", null, "не сжигать"));
+            Choice ch = agents.get(p.seat).choose(state, opts, ev("kind", "spec"));
+            if (ch == null || ch.payload() == null) {
+                return;
+            }
+            objectiveBurnTop(p, (String) ch.payload());
+        }
     }
 
     /**
@@ -1435,8 +1880,12 @@ public final class GameEngine {
                     "open container (" + p.containers + " left)"));
             }
             for (String cid : new ArrayList<>(p.arsenalHand)) {
-                opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
-                opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
+                if (стартовыйНабор(s, cid) == null) {
+                    opts.add(new Choice("spec_arsenal_burn", cid, "burn " + cid));
+                }
+                if (!sameNameInstalled(p, cid)) {
+                    opts.add(new Choice("spec_arsenal_install", cid, "install " + cid));
+                }
             }
             if (opts.isEmpty()) {
                 return;
@@ -1451,6 +1900,14 @@ public final class GameEngine {
                 case "spec_arsenal_burn" -> arsenalBurn(p, (String) ch.payload());
                 case "spec_arsenal_install" -> arsenalInstall(p, (String) ch.payload());
                 default -> { }
+            }
+            // ОДНО СПЕЦ — ОДНО ВСКРЫТИЕ, когда массовое вскрытие отменено
+            // (containers_storage.mass_open: false, решение дизайнера 12.08.2026).
+            // Прежде цикл спрашивал «ещё?» и после единственного вскрытия —
+            // дизайнер 28.09: «нажал «Завершить ход», а он предлагает вскрыть».
+            if (!Boolean.TRUE.equals(Ctx.rules(s).get("containers_storage.mass_open",
+                    Boolean.TRUE))) {
+                return;
             }
         }
     }
@@ -1471,7 +1928,7 @@ public final class GameEngine {
     private void offerSuperPick() {
         GameState s = state;
         for (PlayerState p : s.players) {
-            if (p.superObjective != null || p.superObjectiveOffer.size() < 2) {
+            if (!p.superObjectives.isEmpty() || p.superObjectiveOffer.size() < 2) {
                 continue;
             }
             List<Choice> opts = new ArrayList<>();
@@ -1484,9 +1941,39 @@ public final class GameEngine {
                 ev("kind", "super_pick", "seat", p.seat));
             String chosen = ch.payload() instanceof String cid ? cid
                 : p.superObjectiveOffer.get(0);
-            p.superObjective = chosen;
+            p.superObjectives.add(chosen);
             emit(ev("type", "super_pick", "seat", p.seat, "card", chosen,
                 "offered", new ArrayList<>(p.superObjectiveOffer)));
+        }
+    }
+
+    /**
+     * ВЫБОР НАЧАЛЬНОГО АРСЕНАЛА (решение Влада 02.10.2026, ключ
+     * {@code setup.start_arsenal_offer}): игроку на подготовке раздали две карты
+     * из восьми; одну он оставляет — она встаёт на планшет и даёт стартовый
+     * набор с верха, — вторая уходит в коробку, в колоду арсенала не идёт: у
+     * начальных своя рубашка.
+     */
+    private void offerStartArsenalPick() {
+        GameState s = state;
+        for (PlayerState p : s.players) {
+            if (p.startArsenalOffer.isEmpty()) {
+                continue;
+            }
+            List<Choice> opts = new ArrayList<>();
+            for (String cid : p.startArsenalOffer) {
+                Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+                String label = card == null ? cid : String.valueOf(card.get("name"));
+                opts.add(new Choice("start_arsenal_pick", cid, label));
+            }
+            Choice ch = opts.size() == 1 ? opts.get(0)
+                : agents.get(p.seat).choose(s, opts, ev("kind", "start_arsenal_pick", "seat", p.seat));
+            String chosen = ch != null && ch.payload() instanceof String cid ? cid
+                : p.startArsenalOffer.get(0);
+            List<String> предложено = new ArrayList<>(p.startArsenalOffer);
+            p.startArsenalOffer.clear();
+            Setup.поставитьНачальную(s, p, chosen);
+            emit(ev("type", "start_arsenal_pick", "seat", p.seat, "card", chosen, "offered", предложено));
         }
     }
 
@@ -1626,27 +2113,66 @@ public final class GameEngine {
         {"северо-восток", "восток", "юго-восток", "юго-запад", "запад", "северо-запад"};
 
     private void offerSealChoice() {
-        GameState s = state;
-        if (!rs().getBool("command_center.destruction_token_seals_cell", false)) {
+        Modules.раздатьГлухиеЖетоны(state, this::emit);
+        стартовоеВойскоПодБлокировкой();
+    }
+
+    /**
+     * СТАРТОВОЕ ВОЙСКО ПОД БЛОКИРОВКОЙ (решение дизайнера 13.10.2026, ключ
+     * setup.start_unit_from_seal): на подготовке каждый ставит на свой
+     * стартовый гекс 1 жетон того рода войск, который нарисован на его модуле
+     * блокировки боя. Нет места на гексе — жетон садится внутрь ЦУ (вышка
+     * внутрь не садится и тогда не ставится).
+     */
+    private void стартовоеВойскоПодБлокировкой() {
+        if (!Ctx.rules(state).getBool("setup.start_unit_from_seal", false)) {
             return;
         }
-        List<UnitType> мешок = new ArrayList<>();
-        for (UnitType t : UnitType.values()) {
-            if (s.player(0).board.troop.specializedTarget(t) != null) {
-                мешок.add(t);
+        for (PlayerState p : state.players) {
+            UnitType род = null;
+            for (Map.Entry<UnitType, Map<String, Object>> e : p.redPlacements.entrySet()) {
+                if (Boolean.TRUE.equals(e.getValue().get("blocks"))) {
+                    род = e.getKey();
+                }
             }
-        }
-        Collections.shuffle(мешок, s.rng);
-        for (PlayerState p : s.players) {
-            if (мешок.isEmpty()) {
-                break;      // игроков больше, чем жетонов — остальные без него
+            BuildingToken цу = null;
+            for (BuildingToken b : p.buildingsOnField()) {
+                if (b.type == kelium.core.BuildingType.COMMAND_CENTER) {
+                    цу = b;
+                }
             }
-            UnitType род = мешок.remove(0);
-            Map<String, Object> жетон = new HashMap<>();
-            жетон.put("id", PlayerState.CU_MODULE);
-            жетон.put("blocks", true);
-            p.redPlacements.put(род, жетон);
-            emit(ev("type", "seal_unit", "seat", p.seat, "unit", род.code));
+            if (род == null || цу == null) {
+                continue;
+            }
+            // ВМЕСТО СТАРТОВОЙ ПЕХОТЫ: она уходит в запас, на её место встаёт
+            // жетон рода с модуля (пехота на модуле — пехота и остаётся)
+            UnitToken пехота = null;
+            for (UnitToken x : p.units) {
+                if (x.type == UnitType.INFANTRY && цу.hexId.equals(x.hexId)) {
+                    пехота = x;
+                }
+            }
+            if (род == UnitType.INFANTRY && пехота != null) {
+                emit(ev("type", "start_unit", "seat", p.seat, "unit", род.code, "hex", цу.hexId));
+                continue;
+            }
+            if (пехота != null) {
+                p.units.remove(пехота);
+            }
+            boolean наГекс = Placement.canHireOn(state, p, цу.hexId, род);
+            if (!наГекс && род == UnitType.TOWER) {
+                continue;
+            }
+            UnitToken u = state.tokenStats.makeUnit(род, p.seat, Placement.nextUid(state),
+                p.unitsOfKind(род));
+            p.units.add(u);
+            u.hexId = цу.hexId;
+            if (наГекс) {
+                СекторыВойск.поставить(state, agents.get(p.seat), u);
+            } else {
+                u.insideBuildingUid = цу.uid;
+            }
+            emit(ev("type", "start_unit", "seat", p.seat, "unit", род.code, "hex", цу.hexId));
         }
     }
 
@@ -1724,6 +2250,34 @@ public final class GameEngine {
     }
 
     /**
+     * ДВУХ ОДНОИМЁННЫХ АРСЕНАЛОВ У ИГРОКА НЕ БЫВАЕТ (правило дизайнера).
+     * Одинаковый низ у дизайнера всегда носит одно имя, поэтому сравнение
+     * по имени и есть запрет на двойной эффект. Считаются карты на полке
+     * и под Мандатом совета.
+     */
+    private boolean sameNameInstalled(PlayerState p, String cid) {
+        return sameNameInstalled(state, p, cid);
+    }
+
+    public static boolean sameNameInstalled(GameState s, PlayerState p, String cid) {
+        String name = arsenalName(s, cid);
+        if (name == null) {
+            return false;
+        }
+        for (String уже : p.arsenalInstalled) {
+            if (name.equals(arsenalName(s, уже))) {
+                return true;
+            }
+        }
+        return p.mandateArsenalCard != null && name.equals(arsenalName(s, p.mandateArsenalCard));
+    }
+
+    private static String arsenalName(GameState s, String cid) {
+        Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+        return card == null || card.get("name") == null ? null : String.valueOf(card.get("name"));
+    }
+
+    /**
      * Установить карту арсенала. Слотов ВСЕГДА три (мандат sa8 — не четвёртый
      * такой же, а отдельное место, см. {@link #mandateStoreCard}). Если три
      * слота заняты и игрок держит sa8 с ПУСТЫМ мандатом (ни карты, ни
@@ -1733,6 +2287,9 @@ public final class GameEngine {
      */
     private void arsenalInstall(PlayerState p, String cid, Agent agent) {
         GameState s = state;
+        if (sameNameInstalled(p, cid)) {
+            return;                // одноимённая уже установлена — карта остаётся в руке
+        }
         p.arsenalHand.remove(cid);
         boolean mandateFree = p.superArsenalCards.contains("sa8")
             && p.mandateArsenalCard == null && p.mandateContainers == 0;
@@ -1807,6 +2364,39 @@ public final class GameEngine {
         p.arsenalInstalled.add(cid);
         applyHpPassive(p, cid, +1);           // B7: вшить бонус HP в жетоны
         emit(ev("type", "arsenal", "seat", p.seat, "card", cid, "mode", "install"));
+        выдатьСтартовыйНабор(p, cid);
+    }
+
+    /**
+     * СТАРТОВЫЙ НАБОР НАЧАЛЬНОГО АРСЕНАЛА (решение дизайнера 26.09.2026):
+     * «вместо эффектов утиля сверху указано, что игрок получает, — и он
+     * получает это сразу при установке, затем текст скрывается под
+     * планшетом». Верх такой карты помечен {@code kit: true}; сжечь её нельзя
+     * (разрыва на печати нет), только установить.
+     */
+    private void выдатьСтартовыйНабор(PlayerState p, String cid) {
+        Map<String, Object> top = стартовыйНабор(state, cid);
+        if (top == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> params = top.get("params") instanceof Map<?, ?> m
+            ? (Map<String, Object>) m : Map.of();
+        Map<String, Object> got = Effects.apply(String.valueOf(top.get("effect")), state,
+            p.seat, params);
+        emit(ev("type", "starter_kit", "seat", p.seat, "card", cid, "got", got));
+    }
+
+    /** Верх-набор карты арсенала или {@code null}, если это обычный утиль. */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> стартовыйНабор(GameState s, String cid) {
+        Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+        if (card == null || !(card.get("top") instanceof Map<?, ?> t)) {
+            return null;
+        }
+        Map<String, Object> top = (Map<String, Object>) t;
+        return top.get("params") instanceof Map<?, ?> пар
+            && Boolean.TRUE.equals(пар.get("kit")) ? top : null;
     }
 
     /**
@@ -1909,6 +2499,29 @@ public final class GameEngine {
     private void returnStep(boolean gameEnding) {
         GameState s = state;
         Ruleset rs = rs();
+        // «ШТУРМОВЫЕ ЩИТЫ» (арсенал 7.0.0, печать 13.09.2026): «в фазу
+        // Возвращение верни с поля в запас всю свою пехоту, на которой есть
+        // урон». Прежняя редакция («Ударная пехота» 5.0/6.0) уводила раненых
+        // сразу после боя; на новой карте срок — фаза Возвращение, то есть
+        // раненая пехота доживает до конца раунда и ещё может ходить и бить.
+        // В последний Возврат партии возврата нет, как и у уничтоженных жетонов.
+        if (!gameEnding) {
+            for (PlayerState p : s.players) {
+                if (!Passives.hasPassive(s, p.seat, "infantry_hp2_returns_at_return")) {
+                    continue;
+                }
+                for (kelium.core.UnitToken u : new ArrayList<>(p.unitsOnField())) {
+                    if (u.type != kelium.core.UnitType.INFANTRY || u.damage <= 0) {
+                        continue;
+                    }
+                    u.hexId = null;
+                    u.resetDamage();
+                    emit(ev("type", "ability_reaction", "seat", p.seat,
+                        "ability", "infantry_hp2_returns_at_return",
+                        "returned_unit", u.type.code, "round", s.round));
+                }
+            }
+        }
         // ЭКСПЕРИМЕНТ «военный трек» (economy.leftover_destroyed_vp_per = N, 0=выкл,
         // и таким и остаётся во всех живых рулсетах) — устарел с правилом 2026-08-15
         // «в Возврат ВСЕ уничтоженные жетоны конвертируются в трофеи» ниже: раньше это был
@@ -2061,21 +2674,31 @@ public final class GameEngine {
                 }
             }
         }
-        // Пополнение заданий: в конце раунда игрок получает РОВНО ОДНУ новую карту,
-        // только если у него сейчас СТРОГО МЕНЬШЕ трёх. Предела руки в середине
-        // раунда нет — лимит проверяется только здесь.
+        // ПОПОЛНЕНИЕ ЗАДАНИЙ ДО ПРЕДЕЛА РУКИ, а не одной картой за раунд.
+        // Ключ свода так и назван — return_step.refill_objectives_to_limit, «до
+        // предела», — и глава 5 книги говорит то же. Прежде здесь бралась РОВНО
+        // ОДНА карта, и игрок с пустой рукой восстанавливался два раунда вместо
+        // одного. Предела руки в середине раунда нет — он проверяется только здесь.
         int limit = rs.getInt("rounds.objective_hand_limit");
-        for (PlayerState p : s.players) {
+        boolean доПредела = rs.getBool("return_step.refill_objectives_to_limit", true);
+        // ДОБОРА ЗАДАНИЙ В ВОЗВРАЩЕНИИ НЕТ ВОВСЕ (дизайнер 28.09.2026): карты
+        // заданий не сбрасывают и не добирают, шага «Задания» нет.
+        boolean добор = rs.getBool("return_step.refill_objectives", true);
+        for (PlayerState p : добор ? s.players : java.util.List.<PlayerState>of()) {
             // Пассив objective_hand_plus1 (стартовая карта «Штаб связи»):
             // лимит руки заданий для пополнения +1.
             int myLimit = limit
                 + (Passives.hasPassive(s, p.seat, "objective_hand_plus1") ? 1 : 0);
-            if (p.objectiveHand.size() < myLimit) {
+            while (p.objectiveHand.size() < myLimit) {
                 String c = s.decks.get("objectives").draw(s.rng);
-                if (c != null) {
-                    p.objectiveHand.add(c);
-                    emit(ev("type", "objective_drawn", "seat", p.seat, "card", c,
-                        "hand", p.objectiveHand.size(), "source", "round_end"));
+                if (c == null) {
+                    break;                    // колода и сброс исчерпаны
+                }
+                p.objectiveHand.add(c);
+                emit(ev("type", "objective_drawn", "seat", p.seat, "card", c,
+                    "hand", p.objectiveHand.size(), "source", "round_end"));
+                if (!доПредела) {
+                    break;                    // старое поведение: ровно одна карта
                 }
             }
         }
@@ -2113,8 +2736,9 @@ public final class GameEngine {
      * Мирные условия конца партии (дизайнер, ПРОБЛЕМА 2). Партия заканчивается,
      * когда выполнено ЛЮБОЕ из:
      * <ol>
-     *   <li>заняты все ТРИ последние (верхние, шаг 5) ячейки на трёх тех-треках
-     *       — {@code tech.allPeaksOccupied()};</li>
+     *   <li>ОДИН игрок занял верхние ступени всех трёх тех-треков
+     *       — {@code tech.allPeaksByOneSeat()} (правило дизайнера 17.09.2026;
+     *       прежде хватало трёх вершин, занятых кем угодно);</li>
      *   <li>на поле остался ПОСЛЕДНИЙ источник келемия: не более 1 гекса типа
      *       SPAWN с {@code kelium > 0} и не убранного ({@code !spawnRemoved}).</li>
      * </ol>
@@ -2124,7 +2748,7 @@ public final class GameEngine {
      */
     private boolean peacefulEnd() {
         GameState s = state;
-        if (s.tech.allPeaksOccupied()) {
+        if (s.tech.allPeaksByOneSeat()) {
             s.winCondition = "all_peaks_occupied";
             return true;
         }
@@ -2178,6 +2802,7 @@ public final class GameEngine {
         state.combat = new CombatResolver(state, onEvent == null ? e -> { } : onEvent)
             .bindAgents(agents);
         state.agents = agents;
+        state.публикатор = onEvent;
     }
 
     /** Привязать без наблюдателя событий — для тестов и пробников. */
@@ -2198,6 +2823,7 @@ public final class GameEngine {
         state.combat = new CombatResolver(state, onEvent == null ? e -> { } : onEvent)
             .bindAgents(agents);
         state.agents = agents;
+        state.публикатор = onEvent;
     }
 
     /** Удобная обёртка: создать движок и прогнать партию, вернув итог. */

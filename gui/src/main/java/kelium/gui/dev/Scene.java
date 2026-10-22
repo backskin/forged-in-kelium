@@ -467,8 +467,10 @@ public final class Scene {
      */
     public Scene superObjective(int seat, String cardId, boolean низОтработан) {
         PlayerState p = state.player(seat);
-        p.superObjective = cardId;
-        p.superObjectiveComplete = низОтработан;
+        p.superObjectives.add(cardId);
+        if (низОтработан) {
+            p.superObjectivesDone.add(cardId);
+        }
         return this;
     }
 

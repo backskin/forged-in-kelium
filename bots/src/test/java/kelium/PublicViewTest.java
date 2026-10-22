@@ -47,8 +47,7 @@ class PublicViewTest {
      * (лежит рубашкой вверх — что именно, видит только владелец).
      */
     private static final Set<String> ЗАКРЫТО = Set.of(
-        "orderHand", "objectiveHand", "arsenalHand", "containerHand",
-        "orderSetAside");
+        "orderHand", "objectiveHand", "arsenalHand", "orderSetAside");
 
     /**
      * ПЕРЕИМЕНОВАННОЕ В ВИДЕ: поле снимка → поле вида. Имена разошлись там, где

@@ -36,19 +36,14 @@ import kelium.engine.Setup;
  */
 class StartModesAndBagsTest {
 
-    /** Свод, на котором стоят эти сторожа: действующий. */
-    private static final String СВОД = "1.43.0";
-
     /**
-     * Партия с заданными тумблерами дополнений.
-     *
-     * <p>Дополнения — ТРИ НЕЗАВИСИМЫХ ТУМБЛЕРА (17.08.2026): супер задания и
-     * начальные задания друг друга не исключают, поэтому сцена задаёт их
-     * напрямую, а не выбором «режима». {@code mode} {@code null} — оставить как
-     * в своде.
+     * Партия на ДЕЙСТВУЮЩЕМ своде. {@code mode} задаёт тумблеры дополнений:
+     * {@code super} — только супер-задания, {@code starters} — только начальные,
+     * {@code null} — тумблеры как в своде.
      */
     private static GameState game(String mode, int players, long seed) {
-        GameConfig cfg = GameConfig.buildCached(СВОД, players, seed, null, null);
+        GameConfig cfg = GameConfig.buildCached(
+            GameConfig.DEFAULT_RULESET, players, seed, null, null);
         if (mode != null) {
             cfg.ruleset.override("expansions.super_objectives", "super".equals(mode));
             cfg.ruleset.override("expansions.starting_objectives", "starters".equals(mode));
@@ -65,7 +60,7 @@ class StartModesAndBagsTest {
         for (PlayerState p : s.players) {
             assertTrue(p.superObjectiveOffer.isEmpty(), "супер заданий нет");
             assertTrue(p.startObjectiveOffer.isEmpty(), "начальных заданий нет");
-            assertTrue(p.superObjective == null, "супер задание не назначено");
+            assertTrue(p.superObjectives.isEmpty(), "супер задание не назначено");
         }
     }
 
@@ -96,9 +91,17 @@ class StartModesAndBagsTest {
     void fixedBagIsTheSameRegardlessOfPlayerCount() {
         for (int players = 2; players <= 4; players++) {
             GameState s = game(null, players, 30L + players);
-            assertEquals(12, s.redBag.size(),
+            // Начальный арсенал «1 модуль из мешка на выбор» тянет модуль ещё на
+            // подготовке: считаем мешок вместе с тем, что уже у игроков.
+            int красныхУИгроков = 0;
+            int синихУИгроков = 0;
+            for (PlayerState p : s.players) {
+                красныхУИгроков += p.redTokens.size();
+                синихУИгроков += p.blueTokens.size();
+            }
+            assertEquals(12, s.redBag.size() + красныхУИгроков,
                 "фиксированный красный набор — 12 жетонов при любом числе игроков");
-            assertEquals(12, s.blueBag.size(),
+            assertEquals(12, s.blueBag.size() + синихУИгроков,
                 "фиксированный синий набор — 12 жетонов при любом числе игроков");
         }
     }
@@ -127,10 +130,15 @@ class StartModesAndBagsTest {
     void awardGivesConcreteTokenAndEmptyBagGivesNothing() {
         GameState s = game(null, 4, 32L);
         PlayerState p = s.player(0);
+        // у игрока уже может быть модуль из начального арсенала
+        List<String> было = new java.util.ArrayList<>(p.redTokens);
+        int былоМодулей = p.redModules;
         String id = kelium.engine.Modules.awardModule(s, p, "red");
         assertTrue(id != null, "награда «модуль» выдаёт КОНКРЕТНЫЙ жетон из мешка");
-        assertEquals(List.of(id), p.redTokens, "жетон лёг игроку");
-        assertEquals(1, p.redModules, "счётчик модулей тоже вырос");
+        List<String> ждём = new java.util.ArrayList<>(было);
+        ждём.add(id);
+        assertEquals(ждём, p.redTokens, "жетон лёг игроку");
+        assertEquals(былоМодулей + 1, p.redModules, "счётчик модулей тоже вырос");
 
         s.redBag.clear();
         int wasModules = p.redModules;

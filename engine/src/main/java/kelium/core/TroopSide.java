@@ -28,7 +28,58 @@ public final class TroopSide {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> speedsMap() {
-        return (Map<String, Object>) raw.get("speeds");
+        Map<String, Object> печатные = (Map<String, Object>) raw.get("speeds");
+        return Переопределение.наложить(печатные);
+    }
+
+    /**
+     * СКОРОСТИ ИЗ ЗАПУСКА: {@code -Dkelium.speeds=infantry:2,vehicle:2,aircraft:3}.
+     *
+     * <p>Скорость напечатана на планшете войск, и менять её в файле досок ради
+     * одного замера значит смешивать проверку с решением: пока не измерено,
+     * правки в печатном компоненте быть не должно. Переключатель накладывается
+     * поверх печатных значений и по умолчанию не делает ничего.
+     *
+     * <p>Разбор строки делается ОДИН РАЗ на процесс: {@code speedsMap()}
+     * зовётся на каждое движение каждого жетона, и разбирать её там заново
+     * стоило бы дороже самого хода.
+     */
+    private static final class Переопределение {
+
+        private static final Map<String, Object> ИЗ_ЗАПУСКА = разобрать();
+
+        private Переопределение() {
+        }
+
+        private static Map<String, Object> разобрать() {
+            String строка = System.getProperty("kelium.speeds", "").trim();
+            if (строка.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, Object> итог = new java.util.LinkedHashMap<>();
+            for (String кусок : строка.split(",")) {
+                int двоеточие = кусок.indexOf(':');
+                if (двоеточие <= 0) {
+                    throw new IllegalArgumentException(
+                        "kelium.speeds: ожидался вид infantry:2, а было «" + кусок + "»");
+                }
+                итог.put(кусок.substring(0, двоеточие).trim(),
+                    Integer.parseInt(кусок.substring(двоеточие + 1).trim()));
+            }
+            return Map.copyOf(итог);
+        }
+
+        static Map<String, Object> наложить(Map<String, Object> печатные) {
+            kelium.dataio.Вариант в = kelium.dataio.Вариант.сейчас();
+            Map<String, Object> изВарианта = в == null ? Map.of() : в.скорости();
+            if (ИЗ_ЗАПУСКА.isEmpty() && изВарианта.isEmpty()) {
+                return печатные;
+            }
+            Map<String, Object> итог = new java.util.LinkedHashMap<>(печатные);
+            итог.putAll(изВарианта);
+            итог.putAll(ИЗ_ЗАПУСКА);
+            return итог;
+        }
     }
 
     /** Скорость движения указанного типа юнита на этой стороне. */
@@ -54,6 +105,37 @@ public final class TroopSide {
     }
 
     /**
+     * ПЕЧАТНОЕ ПРОИЗВОДСТВО ЗДАНИЯ за одно Снаряжение (планшеты фракций
+     * 22.09.2026): в заголовке здания две строки — боеприпасы и войска за наём.
+     * Ключ {@code production: {barracks: {ammo: 2, units: 1}, ...}}.
+     *
+     * @param kind "ammo" или "unit"
+     * @return число с планшета, или null, если планшет его не печатает
+     */
+    @SuppressWarnings("unchecked")
+    public Integer printedOutput(BuildingType building, String kind) {
+        if (!(raw.get("production") instanceof Map<?, ?> prod)) {
+            return null;
+        }
+        if (!(prod.get(building.code) instanceof Map<?, ?> row)) {
+            return null;
+        }
+        Object v = row.get("ammo".equals(kind) ? "ammo" : "units");
+        return v instanceof Number n ? n.intValue() : null;
+    }
+
+    /**
+     * ЖЕТОНЫ ЦВЕТА: прочность войск, ячейки и прочность зданий напечатаны на
+     * жетонах, а жетоны у каждого цвета свои. Ключ {@code tokens} повторяет
+     * устройство общей записи token_stats ({@code units.<род>.hp},
+     * {@code buildings.<здание>.hp/energy_slots}) и накрывает её поле за полем.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> tokenPatch() {
+        return raw.get("tokens") instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
+    }
+
+    /**
      * БОЙ 2.0 (заказ дизайнера 18.08.2026): у стороны вместо печатной пары
      * целей — универсальная ячейка (любая цель, задаётся ценой ruleset'а, не
      * этим файлом) плюс одна специализированная печатная цель на род войск.
@@ -65,12 +147,71 @@ public final class TroopSide {
     }
 
     /**
+     * ТАБЛИЦА ПЕЧАТНЫХ ЦЕЛЕЙ, с поправкой из запуска:
+     * {@code -Dkelium.targets=infantry:vehicle,vehicle:aircraft,
+     * aircraft:buildings_towers,tower:infantry}.
+     *
+     * <p>Цели напечатаны на планшете войск, и переставлять их в файле досок
+     * ради замера значит менять компонент раньше, чем измерено. Поправка
+     * накладывается поверх печатной таблицы по роду войск и по умолчанию не
+     * делает ничего. Коды целей — {@link Target#code}.
+     *
+     * <p>Поправка работает только на сторонах с {@link #dualCell()}, где
+     * {@code attacks:} хранит одну цель на род: у старых досок там пара, и
+     * подменять половину пары строкой запуска было бы тихой ошибкой.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> таблицаЦелей() {
+        Map<String, Object> печатная = (Map<String, Object>) raw.get("attacks");
+        kelium.dataio.Вариант в = kelium.dataio.Вариант.сейчас();
+        Map<String, String> изВарианта = в == null ? Map.of() : в.цели();
+        boolean нечего = ЦелиИзЗапуска.СПИСОК.isEmpty() && изВарианта.isEmpty();
+        if (печатная == null || нечего || !dualCell()) {
+            return печатная;
+        }
+        Map<String, Object> итог = new java.util.LinkedHashMap<>(печатная);
+        итог.putAll(изВарианта);
+        итог.putAll(ЦелиИзЗапуска.СПИСОК);
+        return итог;
+    }
+
+    /** Разбор {@code kelium.targets} — один раз на процесс. */
+    private static final class ЦелиИзЗапуска {
+
+        static final Map<String, Object> СПИСОК = разобрать();
+
+        private ЦелиИзЗапуска() {
+        }
+
+        private static Map<String, Object> разобрать() {
+            String строка = System.getProperty("kelium.targets", "").trim();
+            if (строка.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, Object> итог = new java.util.LinkedHashMap<>();
+            for (String кусок : строка.split(",")) {
+                int двоеточие = кусок.indexOf(':');
+                if (двоеточие <= 0) {
+                    throw new IllegalArgumentException(
+                        "kelium.targets: ожидался вид infantry:vehicle, а было «" + кусок + "»");
+                }
+                String род = кусок.substring(0, двоеточие).trim();
+                String цель = кусок.substring(двоеточие + 1).trim();
+                UnitType.fromCode(род);            // падём сразу на опечатке
+                Target.fromCode(цель);
+                итог.put(род, цель);
+            }
+            return Map.copyOf(итог);
+        }
+    }
+
+    /**
      * ОДНА печатная цель специализированной ячейки (только для {@link
      * #dualCell()} сторон — {@code attacks:} там хранит скаляр, не пару).
      */
     @SuppressWarnings("unchecked")
     public Target specializedTarget(UnitType unit) {
-        Map<String, Object> tbl = (Map<String, Object>) raw.get("attacks");
+        Map<String, Object> tbl = таблицаЦелей();
         if (tbl == null) {
             return null;
         }
@@ -81,11 +222,10 @@ public final class TroopSide {
     /** Цели (основная, вторичная) для юнита, если полная таблица атак задана; иначе null. */
     @SuppressWarnings("unchecked")
     public Target[] attacks(UnitType unit) {
-        Object tblObj = raw.get("attacks");
-        if (tblObj == null) {
+        Map<String, Object> tbl = таблицаЦелей();
+        if (tbl == null) {
             return null;
         }
-        Map<String, Object> tbl = (Map<String, Object>) tblObj;
         Object row = tbl.get(unit.code);
         if (row == null) {
             return null;

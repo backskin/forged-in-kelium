@@ -485,7 +485,7 @@ public final class LayoutEditor {
         Theme.restyleTree(frame.getJMenuBar());
         // Подложка поля — явно: в светлой палитре она белая, как и панель, и по
         // одной краске их не различить (см. Theme.counterpart).
-        canvas.setBackground(Theme.paper());
+        canvas.setBackground(Canvas.canvasBg());
         // Полотно сборки из блоков — та же беда с фоном, что у canvas выше.
         if (assemblyTab != null) {
             assemblyTab.перекрасить();
@@ -692,8 +692,8 @@ public final class LayoutEditor {
      * <p>Слоёв несколько, а геометрия ОДНА ({@link #sharedFit}): холсты разные,
      * и без общего масштаба со сдвигом они разъехались бы на доли гекса.
      */
-    private static java.awt.image.BufferedImage fuseLayers(int fw, int fh,
-                                                           PngExport.Options options) {
+    static java.awt.image.BufferedImage fuseLayers(int fw, int fh,
+                                                   PngExport.Options options) {
         double[] fit = sharedFit(model, fw, fh);
         java.awt.image.BufferedImage out =
             assemblyTab.renderBlocksLayer(fw, fh, fit[0], fit[1], fit[2], true);
@@ -720,6 +720,24 @@ public final class LayoutEditor {
         return out;
     }
 
+    /**
+     * ЗАВЕСТИ ПОЛОТНО И ВКЛАДКУ СБОРКИ БЕЗ ОКНА — для снимков раскладок.
+     *
+     * <p>Слияние рисуют те же холсты, что и живой конструктор, а они висят на
+     * статических полях, которые заполняет сборка окна. Снимку окно не нужно,
+     * но поля нужны — здесь они и заводятся, ровно один раз.
+     */
+    static AssemblyWindow подготовитьБезОкна() {
+        if (canvas == null) {
+            canvas = new Canvas();
+            canvas.model = model;
+        }
+        if (assemblyTab == null) {
+            assemblyTab = new AssemblyWindow(model);
+        }
+        return assemblyTab;
+    }
+
     private static PngExport.Content layoutContent() {
         return new PngExport.Content(layoutLegend(), playerBlocks(model), mapStats(model))
             .filtered(ExportOptionsDialog.current(settings));
@@ -733,10 +751,20 @@ public final class LayoutEditor {
      * выбирается один раз в окне настроек экспорта, а не при каждом сохранении.
      */
     private static void exportLayoutPngUnsafe() {
-        if (assemblyTab == null || !assemblyTab.hasResult()) {
+        // Сборка — ОТ ТЕКУЩЕГО ПОЛЯ: поле могли поправить после расчёта, и
+        // тогда слои слияния разъезжались (баг дизайнера 25.09.2026).
+        java.awt.Cursor было = frame.getCursor();
+        frame.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));
+        boolean собрано;
+        try {
+            собрано = assemblyTab != null && assemblyTab.ensureCurrent();
+        } finally {
+            frame.setCursor(было);
+        }
+        if (!собрано) {
             JOptionPane.showMessageDialog(frame,
-                Ui.text("Сборка из блоков ещё не подобрана. Открой вкладку "
-                    + "«Сборка из блоков», дождись расчёта и попробуй снова.", 380),
+                Ui.text("Сборку из блоков для этого поля подобрать не удалось. Открой "
+                    + "вкладку «Сборка из блоков» — там видно, чего не хватает.", 380),
                 "Экспорт PNG", JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -946,7 +974,7 @@ public final class LayoutEditor {
             "«×2» на тайле зарождения — два тайла стопкой: исчерпав верхний, "
                 + "открываешь нижний. «+1» / «−1» — правка келемия на лице"));
         out.add(PngExport.Item.hex(new Color(0x3A3A3A),
-            "запретный гекс (✕) — непроходим ни для кого и никогда, строить нельзя"));
+            "запретный гекс (тёмный) — непроходим ни для кого и никогда, строить нельзя"));
         out.add(PngExport.Item.square(Canvas.NEUTRAL_FILL,
             "нейтральное здание: закрывает стенку гекса с обеих сторон — через неё "
                 + "не пройти наземкой и не расширить зону стройки. Малое занимает "
@@ -1222,7 +1250,7 @@ public final class LayoutEditor {
         JMenu help = new JMenu("Справка");
         help.add(item("Как пользоваться", "F1", null, e -> showGuide()));
         help.add(item("О программе", null, null, e -> JOptionPane.showMessageDialog(frame,
-            Ui.text("Конструктор раскладок «Кристаллы Раздора».\n"
+            Ui.text("Конструктор раскладок «Lex Talionis».\n"
                 + "Сохраняет YAML, который читает симулятор.\n\n"
                 + "Настройки хранятся в файле: " + AppSettings.location(), 520),
             "О программе", JOptionPane.INFORMATION_MESSAGE)));
@@ -1705,7 +1733,7 @@ public final class LayoutEditor {
             // ПОДЛОЖКА ПОЛЯ берётся из темы: на светлой это бумага, на тёмной —
             // тёмный стол, но всё равно светлее фона окна, чтобы поле читалось
             // отдельным предметом (тот же приём, что в разборе партии).
-            setBackground(Theme.paper());
+            setBackground(canvasBg());
             MouseAdapter ma = new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e) {
                     lastMx = e.getX();
@@ -1743,6 +1771,22 @@ public final class LayoutEditor {
 
                 @Override public void mouseWheelMoved(java.awt.event.MouseWheelEvent e) {
                     zoom(e.getPreciseWheelRotation() < 0 ? 1.12 : 1 / 1.12);
+                }
+
+                // ПРИЗРАК ИНСТРУМЕНТА следует за курсором (просьба дизайнера
+                // 25.09.2026): перерисовка на каждый сдвиг мыши — только когда
+                // выбранному инструменту есть что показать.
+                @Override public void mouseMoved(MouseEvent e) {
+                    hoverMx = e.getX();
+                    hoverMy = e.getY();
+                    if (hasGhost(tool)) {
+                        repaint();
+                    }
+                }
+
+                @Override public void mouseExited(MouseEvent e) {
+                    hoverMx = -1;
+                    repaint();
                 }
             };
             addMouseListener(ma);
@@ -2609,10 +2653,128 @@ public final class LayoutEditor {
                 double[] c = center(h.q, h.r);
                 drawHex(g, h, c[0], c[1]);
             }
+            drawToolGhost(g);
+        }
+
+        /** Где курсор над полотном (−1 — курсора нет). */
+        private int hoverMx = -1;
+        private int hoverMy = -1;
+
+        /** Инструменты, у которых есть призрак под курсором. */
+        private static boolean hasGhost(Tool t) {
+            return t == Tool.NEUTRAL_SMALL || t == Tool.NEUTRAL_BIG
+                || t == Tool.SPAWN_START || t == Tool.KELIUM || t == Tool.PLAYER
+                || t == Tool.FORBIDDEN;
+        }
+
+        /**
+         * ПРИЗРАК ТОГО, ЧТО ПОСТАВИТ ЩЕЛЧОК (просьба дизайнера 25.09.2026: «я
+         * нажимаю на кусок гекса с большим нейтральным зданием и не вижу, куда
+         * оно поставится — оно уходит поворотом в другую сторону»).
+         *
+         * <p>Считается ТЕМ ЖЕ расчётом, что и сам щелчок ({@link #click}): тот
+         * же ближайший гекс, тот же край по углу курсора, те же правила
+         * свободных стенок. Поэтому призрак стоит ровно там, где встанет деталь,
+         * а если щелчок повернёт уже стоящее здание — призрак показывает его
+         * новое положение. Рисуется полупрозрачно, поверх поля.
+         */
+        private void drawToolGhost(Graphics2D g) {
+            if (hoverMx < 0 || !hasGhost(tool) || ExportPaint.active()) {
+                return;
+            }
+            LHex h = null;
+            double bestD = Double.MAX_VALUE;
+            for (LHex x : model.hexes.values()) {
+                double[] c = center(x.q, x.r);
+                double d = Math.hypot(hoverMx - c[0], hoverMy - c[1]);
+                if (d < bestD) {
+                    bestD = d;
+                    h = x;
+                }
+            }
+            if (h == null || bestD > size * 0.95) {
+                return;
+            }
+            double[] c = center(h.q, h.r);
+            double ang = Math.toDegrees(Math.atan2(hoverMy - c[1], hoverMx - c[0]));
+            int corner = Math.floorMod((int) Math.round((ang + 60) / 60.0), 6) + 1;
+            java.awt.Composite was = g.getComposite();
+            g.setComposite(java.awt.AlphaComposite.getInstance(
+                java.awt.AlphaComposite.SRC_OVER, 0.5f));
+            try {
+                switch (tool) {
+                    case NEUTRAL_SMALL, NEUTRAL_BIG -> {
+                        if ("forbidden".equals(h.content)) {
+                            return;
+                        }
+                        boolean big = tool == Tool.NEUTRAL_BIG;
+                        Neutral under = neutralAtCorner(h, corner);
+                        Integer at;
+                        if (under != null) {
+                            // щелчок по своему зданию его ПОВЕРНЁТ — показать куда
+                            at = under.big == big ? freeCornerFrom(h, under, under.corner) : null;
+                        } else if (spanFree(h, corner, big, null)) {
+                            at = corner;
+                        } else {
+                            at = freeCornerFrom(h, null, corner);
+                        }
+                        if (at != null) {
+                            drawNeutral(g, c[0], c[1], new Neutral(big, at));
+                        }
+                    }
+                    case SPAWN_START, KELIUM -> {
+                        String want = tool == Tool.KELIUM ? "kelium_tile" : "spawn_start";
+                        if (want.equals(h.content) || "forbidden".equals(h.content)) {
+                            return;
+                        }
+                        LHex ghost = new LHex(h.q, h.r);
+                        ghost.content = want;
+                        drawSpawn(g, ghost, c[0], c[1]);
+                    }
+                    case PLAYER -> {
+                        if ("player_start".equals(h.content) || !canAddStart(model)) {
+                            return;
+                        }
+                        Set<Integer> used = new HashSet<>();
+                        for (LHex x : model.hexes.values()) {
+                            if ("player_start".equals(x.content)) {
+                                used.add(x.seat);
+                            }
+                        }
+                        int seat = 0;
+                        while (used.contains(seat)) {
+                            seat++;
+                        }
+                        double rr = size * 0.5;
+                        g.setColor(SEAT[seat % 4]);
+                        g.fillOval((int) (c[0] - rr), (int) (c[1] - rr),
+                            (int) (2 * rr), (int) (2 * rr));
+                        g.setColor(Color.WHITE);
+                        g.setFont(getFont().deriveFont(Font.BOLD, (float) (size * 0.40)));
+                        drawCentered(g, "P" + (seat + 1), c[0], c[1]);
+                    }
+                    case FORBIDDEN -> {
+                        if ("forbidden".equals(h.content)) {
+                            return;
+                        }
+                        g.setColor(new Color(0x2E2F33));
+                        g.fill(roundedTile(c[0], c[1], size * 0.88));
+                    }
+                    default -> { }
+                }
+            } finally {
+                g.setComposite(was);
+            }
         }
 
         private void drawHex(Graphics2D g, LHex h, double cx, double cy) {
             drawHexBody(g, h, cx, cy);
+            // КООРДИНАТЫ — ТОЛЬКО НА ЭКРАНЕ (просьба дизайнера 25.09.2026): это
+            // подсказка для рисования, на печатном поле их нет, и в выгрузке
+            // они лишь засоряли картинку.
+            if (ExportPaint.active()) {
+                return;
+            }
             // Кегль подписей на поле считается от РАЗМЕРА ГЕКСА, а не от масштаба
             // интерфейса: Theme.font() домножил бы его на масштаб второй раз.
             g.setFont(getFont().deriveFont((float) (size * 0.17)));
@@ -2666,9 +2828,9 @@ public final class LayoutEditor {
                     g.setColor(new Color(0x5A6068));
                     g.setStroke(new BasicStroke(1.6f));
                     g.draw(tile);
-                    g.setColor(new Color(0xE0E0E0));
-                    g.setFont(getFont().deriveFont(Font.BOLD, (float) (size * 0.46)));
-                    drawCentered(g, "✕", cx, cy);
+                    // БЕЗ БУКВЫ «✕» (просьба дизайнера 25.09.2026): запретный
+                    // гекс и так читается тёмной картонкой, а знак поверх —
+                    // лишняя надпись, которой на печатной детали нет.
                 }
                 default -> { }
             }
@@ -2789,10 +2951,21 @@ public final class LayoutEditor {
             }
             boolean dark = Theme.isDark();
             return switch (h.content) {
-                case "forbidden" -> dark ? new Color(0x0E1116) : new Color(0x4a4844);
+                case "forbidden" -> dark ? new Color(0x1C2027) : new Color(0x4a4844);
                 case "player_start" -> dark ? new Color(0x333A44) : new Color(0xFFFDF5);
-                default -> dark ? new Color(0x2A313B) : Color.WHITE;
+                default -> dark ? new Color(0x353D49) : Color.WHITE;
             };
+        }
+
+        /**
+         * ПОДЛОЖКА ПОЛОТНА — ЗАМЕТНО ТЕМНЕЕ ГЕКСА в обеих темах (просьба
+         * дизайнера 25.09.2026). Раньше подложкой была {@code Theme.paper()}: на
+         * светлой теме — тот же белый, что и гекс, на тёмной — почти тот же тон.
+         * Дырка внутри кольца гексов не читалась вовсе. Теперь положенный гекс
+         * всегда светлее фона, и пустое место видно сразу.
+         */
+        static Color canvasBg() {
+            return Theme.isDark() ? new Color(0x0C0E12) : new Color(0xB9B5AB);
         }
 
         /** Обводка гекса — по теме, иначе на тёмном фоне её не видно. */

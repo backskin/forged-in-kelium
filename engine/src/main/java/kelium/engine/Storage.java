@@ -31,7 +31,7 @@ import kelium.dataio.Ctx;
  * лежит там — ячейки открыты (доступны под кубики): это верно, пока здание СТОИТ
  * НА ПОЛЕ (построено) и ПОКА ОНО У ДРУГОГО ИГРОКА СРЕДИ УНИЧТОЖЕННЫХ ЖЕТОНОВ (уничтожено, но ещё
  * не возвращено — вместимость от этого НЕ падает). Ячейки закрываются ровно в
- * момент, когда жетон возвращается владельцу В ЗАПАС — сносом Стройкой
+ * момент, когда жетон возвращается владельцу В ЗАПАС — сносом Стройкой за монету
  * ({@link kelium.engine.Actions#returnOwnBuildingToReserve}) или возвратом с
  * чужой карты трофеев (Возврат конца раунда, чужое действие Науки) — тогда
  * правила ОБЯЗЫВАЮТ положить жетон на планшет хранилища на его место, и это
@@ -89,8 +89,25 @@ public final class Storage {
         if (!Boolean.TRUE.equals(rs.get("containers_storage.open_is_spec", Boolean.FALSE))) {
             return true;                    // правило ячеек выключено
         }
+        if (!closedArsenalInCells(s)) {
+            return true;                    // закрытые карты лежат стопкой, без предела
+        }
         int cells = ((Number) rs.get("containers_storage.arsenal_cells", 3)).intValue();
         return cellsUsed(s, p) + 1 <= cells;
+    }
+
+    /**
+     * ЗАНИМАЕТ ЛИ ЗАКРЫТАЯ КАРТА АРСЕНАЛА ЯЧЕЙКУ ПОД ПЛАНШЕТОМ.
+     *
+     * <p>Правило дизайнера 25.09.2026: «карты арсенала, ещё не вставленные,
+     * лежат стопкой под планшетом хранилища, и их количество не ограничено».
+     * Ячейки под планшетом войск занимают только УСТАНОВЛЕННЫЕ карты и
+     * контейнеры. Ключ {@code containers_storage.closed_arsenal_in_cells};
+     * своды без ключа играют по-старому (закрытая карта занимает ячейку).
+     */
+    public static boolean closedArsenalInCells(kelium.core.GameState s) {
+        return !Boolean.FALSE.equals(Ctx.rules(s).get(
+            "containers_storage.closed_arsenal_in_cells", Boolean.TRUE));
     }
 
     /**
@@ -102,7 +119,8 @@ public final class Storage {
         int perFree = ((Number) rs.get("containers_storage.slots_per_free_cell", 2)).intValue();
         int onCard = ((Number) rs.get("containers_storage.slots_on_open_card_with_slot", 1))
             .intValue();
-        int арсенал = p.arsenalHand.size() + p.arsenalInstalled.size();
+        int арсенал = (closedArsenalInCells(s) ? p.arsenalHand.size() : 0)
+            + p.arsenalInstalled.size();
         // ЛЕЖАЩИЕ НЕ В ЯЧЕЙКАХ НЕ СЧИТАЮТСЯ: контейнеры под «мандатом» лежат на
         // своём отдельном месте, а у установленной карты с container_slot есть
         // место НА САМОЙ КАРТЕ. Без этой поправки счёт завышал занятость и
@@ -151,7 +169,8 @@ public final class Storage {
         int cells = ((Number) rs.get("containers_storage.arsenal_cells", 3)).intValue();
         int perFree = ((Number) rs.get("containers_storage.slots_per_free_cell", 2)).intValue();
         int onCard = ((Number) rs.get("containers_storage.slots_on_open_card_with_slot", 1)).intValue();
-        int occupied = Math.min(cells, p.arsenalHand.size() + p.arsenalInstalled.size());
+        int occupied = Math.min(cells, (closedArsenalInCells(s) ? p.arsenalHand.size() : 0)
+            + p.arsenalInstalled.size());
         int freeCells = cells - occupied;
         int slotCards = 0;
         var lib = Ctx.cards(s, "arsenal");
@@ -200,17 +219,14 @@ public final class Storage {
             add = Math.min(n, Math.max(0, cap - p.containers));
             p.containers += add;
         }
-        // КАРТА БЕРЁТСЯ СРАЗУ, а не при вскрытии: у игрока лежит конкретный
-        // контейнер рубашкой вверх (заказ дизайнера 11.09.2026). Колода пуста —
-        // контейнер всё равно выдан: правило «жетон не сгорает» старше колоды,
-        // просто вскрывать будет нечего.
-        var колода = s.decks == null ? null : s.decks.get("containers");
-        for (int i = 0; i < add && колода != null; i++) {
-            String cid = колода.draw(s.rng);
+        // КАРТА БЕРЁТСЯ СРАЗУ (27.09.2026): владелец видит, что получил.
+        for (int i = 0; i < add && s != null && s.decks != null
+                && s.decks.get("containers") != null; i++) {
+            String cid = s.decks.get("containers").draw(s.rng);
             if (cid == null) {
-                break;
+                break;   // колода кончилась — оставшиеся потянутся при вскрытии
             }
-            p.containerHand.add(cid);
+            p.containerCards.add(cid);
         }
         if (add > 0) {
             SOURCE_STATS.computeIfAbsent(source,
@@ -257,9 +273,12 @@ public final class Storage {
     /** Сколько ячеек склада ОТКРЫТО у игрока (по типам U/K/A). */
     private static Cells openCells(kelium.core.GameState s, PlayerState player) {
         StorageSide storage = player.board.storage;
-        // На планшете хранилища ВСЕГДА открыты 2 центральные универсальные
-        // ячейки (стартовые слоты), независимо от построенных зданий.
-        int u = 2, k = 0, a = 0;
+        // На планшете хранилища ВСЕГДА открыты центральные универсальные ячейки,
+        // независимо от построенных зданий. Сколько — ключ storage.open_cells:
+        // на печати планшета одна (решение дизайнера 27.09.2026), раньше две.
+        // без партии (s == null — старые вызовы без стола) — по печати, одна
+        int u = s == null ? 1 : ((Number) Ctx.rules(s).get("storage.open_cells", 2)).intValue();
+        int k = 0, a = 0;
         java.util.Set<Integer> minerLevels = new java.util.HashSet<>();
         java.util.Set<Integer> plantLevels = new java.util.HashSet<>();
         // ЖЕТОН НА ГЕКСЕ — ЗНАЧИТ НЕ НА ПЛАНШЕТЕ ХРАНИЛИЩА, а только лежащий на
@@ -304,11 +323,8 @@ public final class Storage {
             Cells c = countCells(storage.plantCells(lv));
             u += c.u; k += c.k; a += c.a;
         }
-        for (String tok : player.storageTokens) {
-            if ("+1_universal_cell".equals(tok)) {
-                u++;
-            }
-        }
+        // обе стороны жетона-ячейки дают ячейку (жетоны 2.0, 02.10.2026)
+        u += ЖетоныХранилища.ячеек(player);
         return new Cells(u, k, a);
     }
 
@@ -532,7 +548,14 @@ public final class Storage {
         }
         int add = Math.min(amount, room);
         player.resources.add(Resource.TROPHY, add);
-        учесть(add);
+        учесть(s, add);
+        // ЧТО НЕ ВЛЕЗЛО — ТОЖЕ ЧИСЛО. Трофей режется вместимостью склада, и
+        // срезанное исчезает молча. Пока это не считали, спор «мало трофеев
+        // или некуда их класть» был спором мнений.
+        if (УЧЁТ_ТРОФЕЕВ != null && amount > add
+                && (НАСТОЯЩАЯ_ПАРТИЯ == null || s == НАСТОЯЩАЯ_ПАРТИЯ)) {
+            УЧЁТ_ТРОФЕЕВ.merge("!НЕ ВЛЕЗЛО", (long) (amount - add), Long::sum);
+        }
         return add;
     }
 
@@ -551,8 +574,21 @@ public final class Storage {
      */
     public static java.util.Map<String, Long> УЧЁТ_ТРОФЕЕВ = null;
 
-    private static void учесть(int add) {
-        if (УЧЁТ_ТРОФЕЕВ == null || add <= 0) {
+    /**
+     * КАКУЮ ПАРТИЮ СЧИТАТЬ НАСТОЯЩЕЙ.
+     *
+     * <p>Без этого учёт считал ВООБРАЖЕНИЕ БОТОВ. Планировщик перебирает
+     * десятки сценариев на ход, каждый — на копии стола, и трофеи в этих копиях
+     * начисляются через ту же самую функцию. Первый прогон дал 460 трофеев на
+     * игрока за партию при десяти снесённых жетонах: считались не приходы, а
+     * мысли. Теперь приход засчитывается, только если он случился в том самом
+     * столе, который стенд объявил настоящим.
+     */
+    public static kelium.core.GameState НАСТОЯЩАЯ_ПАРТИЯ = null;
+
+    private static void учесть(kelium.core.GameState s, int add) {
+        if (УЧЁТ_ТРОФЕЕВ == null || add <= 0
+                || (НАСТОЯЩАЯ_ПАРТИЯ != null && s != НАСТОЯЩАЯ_ПАРТИЯ)) {
             return;
         }
         String откуда = StackWalker.getInstance().walk(кадры -> кадры

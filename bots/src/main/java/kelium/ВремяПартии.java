@@ -360,6 +360,9 @@ public final class ВремяПартии {
             case "energy_hex" -> "куда двигать энергию";
             case "pay_power" -> "платить ли за энергию";
             case "module_place_red", "module_place_blue" -> "куда класть жетон модуля";
+            case "module_gild_pick" -> "какой модуль позолотить";
+            case "module_replace_red", "module_replace_blue" -> "какой модуль заменить новым";
+            case "module_move_pick" -> "какой модуль переложить";
             case "destroyed_pay" -> "чем платить за науку";
             case "container" -> "открывать ли контейнер";
             case "arsenal_replace" -> "что снять с планшета арсенала";

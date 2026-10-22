@@ -38,11 +38,28 @@ public final class HelpBook {
         public final String title;
         public final List<Section> children = new ArrayList<>();
         private final Supplier<String> body;
+        /**
+         * Какую страницу показывает раздел. Обычно свою ({@link #id}); у разделов
+         * главы книги правил — главу целиком ({@link RulesMarkdown}), и тогда
+         * {@link #anchor} — порядковый номер заголовка, к которому прокрутить.
+         */
+        public final String page;
+        public final int anchor;
+        /** Файл главы книги правил, из которого набирается страница; иначе null. */
+        public final Path file;
 
         Section(String id, String title, Supplier<String> body) {
+            this(id, title, body, id, -1, null);
+        }
+
+        Section(String id, String title, Supplier<String> body, String page, int anchor,
+                Path file) {
             this.id = id;
             this.title = title;
             this.body = body;
+            this.page = page;
+            this.anchor = anchor;
+            this.file = file;
         }
 
         /**
@@ -52,6 +69,9 @@ public final class HelpBook {
          */
         public String html() {
             try {
+                if (file != null) {
+                    return RulesMarkdown.render(file, HelpWindow.liveStyle(false));
+                }
                 String s = body == null ? "" : body.get();
                 return s == null ? "" : s;
             } catch (RuntimeException | Error e) {
@@ -94,7 +114,7 @@ public final class HelpBook {
      */
     public static HelpBook of(Session session) {
         Path root = GameConfig.resolveDataRoot(null);
-        String id = GameConfig.DEFAULT_RULESET;
+        String id = GameConfig.GAME_RULESET;
         if (session != null && session.hasRecord() && session.record().ruleset != null
                 && !session.record().ruleset.isBlank()) {
             id = session.record().ruleset;
@@ -133,6 +153,10 @@ public final class HelpBook {
         // ПЕРВЫМ — правила самой игры: справочников два, и второй объясняет не
         // приборы разбора, а то, во что за столом играют (заказ дизайнера
         // 13.08.2026). Дальше идут разделы про само приложение.
+        // Самой первой — КНИГА ПРАВИЛ, главы из markdown (заказ 25.09.2026:
+        // «финальный свод всех правил … в цифровой версии»). Ветка ниже — прежний
+        // пересказ правил с числами из набора правил.
+        out.add(RulesMarkdown.tree());
         out.add(RulesBook.tree(this));
         out.add(leaf("start", "С чего начать", this::start));
         out.add(leaf("setup", "Настройка партии", this::setup));
@@ -301,11 +325,8 @@ public final class HelpBook {
             + "жетон держит, прежде чем его уничтожат.");
         h.h("Красная обводка раненого");
         h.p("Жетон с уроном обводится красным, а сам урон показан кубиками на нём. "
-            + "Держится ли урон до конца раунда и сколько снимается — это правило "
-            + "версии:");
+            + "Урон остаётся на жетоне, пока его не снимет эффект карты.");
         h.table2("Урон", rows(
-            "combat_model.damage_persists_until_refresh",
-            "combat_model.heal_per_refresh",
             "combat_model.walls_block_shots"));
         h.h("Ячейки энергии и зона свободной энергии");
         h.p("Здание работает, когда его ячейки энергии заполнены кубиками. Ячейки "
@@ -996,7 +1017,7 @@ public final class HelpBook {
 
     /** Что из текстур реально лежит на месте — это факт, а не обещание. */
     private String texturesFound() {
-        Path dir = dataRoot.resolve("textures");
+        Path dir = GameConfig.texturesRoot();
         if (!Files.isDirectory(dir)) {
             return "<p style='color:" + Html.DIM + "'>Каталог текстур не найден.</p>";
         }

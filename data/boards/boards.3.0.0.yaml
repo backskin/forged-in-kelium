@@ -77,14 +77,27 @@ boards:
     unit_tokens_per_color: 16
     building_tokens_per_color: 12
     buildings:
-      barracks:   {energy_slots: 1, hp: 1, assembly: [infantry, ammo], trophy: 2}
+      # ЯЧЕЙКА ЭНЕРГИИ ПЕРЕЕХАЛА С АВИАБАЗЫ НА КАЗАРМУ (решение дизайнера
+      # 20.09.2026). Было: казарма 1, авиабаза 2. Стало: казарма 2, авиабаза 1.
+      #
+      # Зачем. Замер 19.09 показал затор в стройке: при нехватке энергии
+      # энергостанция оценивается ботом в 12.0, а военное здание в 3.6, и
+      # военные здания проигрывают очередь почти всегда. Авиабазе нужно было
+      # ДВА кубика против одного у казармы, и она проигрывала вдвойне: авиации
+      # производилось 0.06 жетона на игрока за партию, то есть её в игре не
+      # было. Пехоты при этом 38% всего выпуска — казарма как раз и есть то
+      # здание, которое дёшево заваливает поле.
+      #
+      # Перенос выравнивает очередь: авиабаза встаёт наравне с бывшей казармой,
+      # а казарма перестаёт быть безусловно самой дешёвой постройкой.
+      barracks:   {energy_slots: 1, hp: 2, assembly: [infantry, ammo], trophy: 2}
       factory:    {energy_slots: 2, hp: 2, assembly: [vehicle, ammo],  trophy: 3}
       # АВИАБАЗА: 2 ячейки энергии вместо 3, цена постройки +1 монета на всех
       # сторонах (решение дизайнера 13.08.2026). Замер показывал, что при трёх
       # ячейках авиабазу почти не строят: общий дефицит энергии 3 кубика, и она
       # съедала его целиком. Два ячейки дают +48% авиации на поле; цена растёт,
       # чтобы дешевле не стало.
-      airbase:    {energy_slots: 2, hp: 3, assembly: [aircraft, ammo], trophy: 4}
+      airbase:    {energy_slots: 2, hp: 2, assembly: [aircraft, ammo], trophy: 4}
       # hp 3 и trophy 0 — решение дизайнера 11.08.2026: ЦУ на место уничтоженных жетонов не идёт,
       # вся награда — жетон уничтожения ЦУ (см. ruleset command_center).
       # ЦУ: ОДНА ячейка энергии как у военного здания (energy_slots), но даёт
@@ -102,11 +115,17 @@ boards:
       - {level: 2, hp: 1, energy_gives: 2, cost: 2, trophy: 1}
       - {level: 3, hp: 2, energy_gives: 2, cost: 3, trophy: 2}
       - {level: 4, hp: 2, energy_gives: 3, cost: 4, trophy: 3, vp_on_field: true}
-    # Energy invariant: sources give 8 (1+2+2+3) + CU 2 = 10; consumers hold 13 → deficit 3.
-    energy_invariant: {sources: 10, consumer_slots: 13, deficit: 3}
+    # ПОТОЛОК ЯЧЕЕК ЭНЕРГИИ НА ЗДАНИИ — ДВЕ (ограничение рисунка на жетоне,
+    # решение дизайнера 20.09.2026). Общий планшет: казарма 1, завод 2,
+    # авиабаза 2. Источников 8 (1+2+2+3) плюс ЦУ 2 = 10; мест потребления
+    # 6 у шахт + 5 у военных + 1 у ЦУ = 12 → дефицит 2.
+    energy_invariant: {sources: 10, consumer_slots: 12, deficit: 2}
     modules:
       red_per_player: 4    # attack modules, overlay secondary row
-      blue_per_player: 4   # assembly modules, overlay printed "1" -> 2 (gold 3)
+      # СИНИЕ ЖЕТОНЫ (жетоны дизайнера, 23.09.2026): 2/2→2/3, 2/2→3/2,
+      # 3/1→3/2, 1/3→2/3 (боеприпасы / войска, лицо → позолота). Жетон
+      # накрывает печатное число здания. Мешок — modules.3.0.0, набор C30.
+      blue_per_player: 4   # сборочные модули, накрывают печатное число здания
 
   # -- Планшет войск (dual_cell) ---------------------------------------------
   # attacks: {unit: target} — ОДНА печатная цель (специализированная ячейка).
@@ -131,8 +150,104 @@ boards:
       vehicle:  buildings_towers    # техника — здания и вышки
       aircraft: vehicle             # авиация — технику
       tower:    infantry            # вышка — пехоту
-    speeds: {infantry: 1, vehicle: 1, aircraft: 2, tower: 0}
-    building_prices: {barracks: 1, factory: 2, airbase: 3}   # заказ 25.08.2026: завод 2, авиабаза 3
+    # БАЗОВЫЕ СКОРОСТИ 2·2·3·0 (решение дизайнера 20.09.2026). Замер на старых,
+    # просторных полях: сносов 2,19 -> 2,93, «цели в досягаемости нет» 14% -> 11%.
+    # На тесных новых полях та же правка не давала ничего — дальность там и так
+    # не была стеной, поэтому скорости и просторные поля идут одним решением.
+    speeds: {infantry: 2, vehicle: 2, aircraft: 3, tower: 0}
+    building_prices: {barracks: 1, factory: 2, airbase: 2}   # 19.09.2026: авиабаза 3 -> 2, вровень с заводом
+
+  # -- Планшеты войск ФРАКЦИЙ (нарисованы дизайнером 22.09.2026) --------------
+  # Источник: «Компоненты игрока/экспорт-планшеты/планшет-войск-new-1..4» и
+  # жетоны войск и зданий; расшифровка — design-docs/ФРАКЦИИ — расшифровка
+  # нарисованных планшетов (22.09.2026).md. Цвета: 1 красный, 2 зелёный,
+  # 3 синий, 4 жёлтый. Какой цвет у какого места — asymmetry.board_sides свода.
+  #
+  # production — заголовок здания: ammo = боеприпасы за Снаряжение, units =
+  #   войска за наём (два автомата — два жетона за раз).
+  # tokens — то, что напечатано на ЖЕТОНАХ цвета (жетоны зданий — экспорт
+  #   22.09.2026 11:36, сверено по картинкам 23.09): прочность войск, ячейки и
+  #   прочность военных зданий и ЦУ. Добытчики и энергостанции у всех цветов
+  #   одинаковые (решение дизайнера 23.09.2026) и берутся из общей записи.
+  - id: troop_red
+    kind: troop_side
+    side: red
+    name: "Красные"
+    dual_cell: true
+    attacks: {infantry: buildings_towers, vehicle: buildings_towers, aircraft: vehicle, tower: infantry}
+    speeds: {infantry: 2, vehicle: 2, aircraft: 2, tower: 0}
+    building_prices: {barracks: 3, factory: 2, airbase: 1}
+    production:
+      barracks: {ammo: 2, units: 1}
+      factory:  {ammo: 2, units: 1}
+      airbase:  {ammo: 1, units: 2}
+    tokens:
+      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 2}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 2}
+        factory:        {energy_slots: 2, hp: 2}
+        airbase:        {energy_slots: 1, hp: 2}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_green
+    kind: troop_side
+    side: green
+    name: "Зелёные"
+    dual_cell: true
+    attacks: {infantry: infantry, vehicle: buildings_towers, aircraft: vehicle, tower: aircraft}
+    speeds: {infantry: 1, vehicle: 2, aircraft: 3, tower: 0}
+    building_prices: {barracks: 1, factory: 3, airbase: 2}
+    production:
+      barracks: {ammo: 1, units: 2}
+      factory:  {ammo: 2, units: 1}
+      airbase:  {ammo: 2, units: 1}
+    tokens:
+      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 2}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 1}
+        factory:        {energy_slots: 1, hp: 2}
+        airbase:        {energy_slots: 2, hp: 2}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_blue
+    kind: troop_side
+    side: blue
+    name: "Синие"
+    dual_cell: true
+    attacks: {infantry: aircraft, vehicle: infantry, aircraft: vehicle, tower: buildings_towers}
+    speeds: {infantry: 2, vehicle: 2, aircraft: 1, tower: 0}
+    building_prices: {barracks: 2, factory: 1, airbase: 2}
+    production:
+      barracks: {ammo: 2, units: 1}
+      factory:  {ammo: 1, units: 2}
+      airbase:  {ammo: 2, units: 1}
+    tokens:
+      units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 2}, tower: {hp: 1}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 2}
+        factory:        {energy_slots: 2, hp: 2}
+        airbase:        {energy_slots: 2, hp: 3}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_yellow
+    kind: troop_side
+    side: yellow
+    name: "Жёлтые"
+    dual_cell: true
+    attacks: {infantry: vehicle, vehicle: aircraft, aircraft: buildings_towers, tower: infantry}
+    speeds: {infantry: 2, vehicle: 1, aircraft: 3, tower: 0}
+    building_prices: {barracks: 1, factory: 2, airbase: 2}
+    production:
+      barracks: {ammo: 2, units: 1}
+      factory:  {ammo: 1, units: 2}
+      airbase:  {ammo: 1, units: 1}
+    tokens:
+      units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 1}, tower: {hp: 1}}
+      buildings:
+        barracks:       {energy_slots: 2, hp: 1}
+        factory:        {energy_slots: 1, hp: 1}
+        airbase:        {energy_slots: 1, hp: 1}
+        command_center: {energy_slots: 1, hp: 3}
 
   # -- Планшет хранилища ----------------------------------------------------
   # cells: list per level 1..4; each is a string of cell types (У/К/Б) →
@@ -161,5 +276,5 @@ boards:
     science_dept_exchanges:
       - "1-2 trophy -> 1-2 coins"
       - "1 trophy -> move 1 module"
-      - "2 trophy -> draw 2 arsenal keep 1"
+      - "1 trophy -> draw 2 arsenal keep 1"
       - "3 trophy -> gild (upgrade) 1 module"

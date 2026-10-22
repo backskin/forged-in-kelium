@@ -282,7 +282,7 @@ public final class AppSettings {
                 // затевался ровно ради того, чтобы его открывали блокнотом и
                 // читали глазами.
                 StringBuilder sb = new StringBuilder();
-                sb.append("# Настройки приложений «Кристаллы Раздора».\n")
+                sb.append("# Настройки приложений «Lex Talionis».\n")
                   .append("# Файл можно править блокнотом и переносить между машинами.\n")
                   .append("# Раздел replay2 — окно, тема, масштаб; paths — папки.\n\n");
                 java.util.List<String> keys = new java.util.ArrayList<>(

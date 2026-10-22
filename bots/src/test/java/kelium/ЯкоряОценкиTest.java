@@ -55,7 +55,7 @@ class ЯкоряОценкиTest {
             "ИЗМЕНИЛСЯ курс зданий на поле — пересчитай eval.buildings");
         assertEquals(0, rs.getInt("economy.units_per_vp", -1),
             "ИЗМЕНИЛСЯ курс войск на поле — пересчитай eval.units");
-        assertEquals(java.util.List.of(1, 1, 2, 3), rs.getIntList("tech.step_vp_cumulative"),
+        assertEquals(java.util.List.of(1, 2, 3, 5), rs.getIntList("tech.step_vp_cumulative"),
             "ИЗМЕНИЛАСЬ лестница трека науки — пересчитай eval.tech_steps. "
             + "Первый шаг ОБЯЗАН давать очко: обнуление входа убивает треки "
             + "целиком (замер 24.08.2026: доля треков в счёте 10% против 40%)");

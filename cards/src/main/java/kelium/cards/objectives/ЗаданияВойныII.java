@@ -26,68 +26,6 @@ public final class ЗаданияВойныII {
     private ЗаданияВойныII() {
     }
 
-    /** o26 «Блицкриг» — два уничтожения ОДНИМ своим жетоном войска за ход. */
-    public static final class Блицкриг extends ЗаданиеВКоде {
-        public Блицкриг() {
-            super("o26");
-        }
-
-        @Override
-        public Лицо лицо() {
-            return new Лицо("Блицкриг", ОБЫЧНАЯ, ПРОИСШЕСТВИЕ,
-                "В ЭТОТ ХОД ты уничтожил два жетона противника одним своим жетоном войска",
-                "В ЭТОТ ХОД это войско — пехота",
-                Награда.монеты(5), Награда.модуль("attack").иКартыЗаданий(1),
-                Утиль.БОЙ,
-                "В ЭТОТ ХОД ты уничтожил два жетона противника одним своим жетоном "
-                + "войска — награда 5 монет. Если это войско — пехота, условие "
-                + "усилено: жетон модуля атаки и карта задания. Пехота, снявшая двоих "
-                + "за ход, стоит целого завода.");
-        }
-
-        /** Есть ли жетон, набравший два уничтожения; при {@code род} — и он этого рода. */
-        private boolean двоеОдним(CardContext ctx, String род) {
-            var ф = ход(ctx);
-            for (var e : ф.killsByUnit.entrySet()) {
-                if (e.getValue() >= 2
-                        && (род == null || род.equals(ф.killerUnitTypes.get(e.getKey())))) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public boolean satisfied(CardContext ctx) {
-            return двоеОдним(ctx, null);
-        }
-
-        @Override
-        public boolean satisfiedEnhanced(CardContext ctx) {
-            return двоеОдним(ctx, "infantry");
-        }
-
-        @Override
-        public double progress(CardContext ctx) {
-            int лучший = 0;
-            for (int n : ход(ctx).killsByUnit.values()) {
-                лучший = Math.max(лучший, n);
-            }
-            return доля(лучший, 2);
-        }
-
-        @Override
-        public String needed(CardContext ctx) {
-            return satisfied(ctx) ? ""
-                : "добить второй жетон тем же войском, что уже стреляло";
-        }
-
-
-        @Override
-        protected String действие() {
-            return "combat";
-        }
-    }
 
     /**
      * o27 «На чужом дворе» — своё войско на гексе с войсками противника.
@@ -102,16 +40,33 @@ public final class ЗаданияВойныII {
 
         @Override
         public Лицо лицо() {
-            return new Лицо("На чужом дворе", ОБЫЧНАЯ, СОСТОЯНИЕ,
-                "У тебя есть своё войско на гексе, где есть здания врага",
-                "На одном таком гексе два твоих войска",
-                Награда.боеприпасы(3), Награда.картаАрсенала(),
-                Утиль.РИКОШЕТ,
-                "У тебя есть своё войско на гексе, где есть здания врага, — награда 3 "
-                + "боеприпаса. На одном таком гексе два твоих войска — условие "
-                + "усилено: 1 карта арсенала. Двор чужой, а гекс общий: здание закрывает "
-                + "только свои стенки, и войти во двор можно, пока в нём есть свободный "
-                + "сектор.");
+            // ПЕЧАТНАЯ КАРТА «Засада» № 09 (25.09.2026): усиление — два таких
+            // гекса со зданиями ОДНОГО врага.
+            return печатное("На чужом дворе", СОСТОЯНИЕ,
+                "Имей своё войско на гексе, где есть здание врага",
+                "на двух гексах, где есть здания одного врага",
+                Награда.выбор("market", "combat"),
+                Награда.нет().иКартыАрсенала(2),
+                Утиль.КОНТРАТАКА);
+        }
+
+        /**
+         * СКОЛЬКО РАЗНЫХ ГЕКСОВ СО СВОИМ ВОЙСКОМ И ЗДАНИЕМ ОДНОГО И ТОГО ЖЕ
+         * ВРАГА — наибольшее по врагам.
+         */
+        private int гексовУОдного(CardContext ctx) {
+            java.util.Map<Integer, java.util.Set<String>> поВрагам = new java.util.HashMap<>();
+            for (UnitToken u : ctx.me().unitsOnField()) {
+                for (Token t : ctx.enemyBuildingsOn(u.hexId)) {
+                    поВрагам.computeIfAbsent(t.owner(), k -> new java.util.HashSet<>())
+                        .add(u.hexId);
+                }
+            }
+            int лучший = 0;
+            for (var гексы : поВрагам.values()) {
+                лучший = Math.max(лучший, гексы.size());
+            }
+            return лучший;
         }
 
         /**
@@ -148,13 +103,13 @@ public final class ЗаданияВойныII {
 
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
-            return вместе(ctx) >= 2;
+            return гексовУОдного(ctx) >= 2;
         }
 
         @Override
         public double progress(CardContext ctx) {
             if (satisfied(ctx)) {
-                return вместе(ctx) >= 2 ? 1.0 : 0.75;
+                return 1.0;
             }
             // Половина дела — стоять рядом с чужим зданием: шаг, и ты во дворе.
             for (UnitToken u : ctx.me().unitsOnField()) {
@@ -179,87 +134,6 @@ public final class ЗаданияВойныII {
         }
     }
 
-    /** o28 «Клещи» — свои войска на двух гексах вокруг одного чужого. */
-    public static final class Клещи extends ЗаданиеВКоде {
-        public Клещи() {
-            super("o28");
-        }
-
-        @Override
-        protected String отсев() {
-            return "[4]";
-        }
-
-        @Override
-        public Лицо лицо() {
-            return new Лицо("Клещи", ОБЫЧНАЯ, СОСТОЯНИЕ,
-                "У тебя есть свои войска на двух гексах, соседних с одним и тем же гексом, "
-                + "где есть войска противника",
-                "Эти клещи замкнуты с трёх сторон",
-                Награда.боеприпасы(3), Награда.трофеи(2),
-                Утиль.ДВИЖЕНИЕ,
-                "У тебя есть свои войска на двух гексах, соседних с одним и тем же гексом, "
-                + "где есть войска противника, — награда 3 боеприпаса. Клещи замкнуты "
-                + "с трёх сторон — условие усилено: 2 трофея. Клещи не бьют — они отнимают выход.");
-        }
-
-        /** Наибольшее число моих гексов вокруг одного гекса с чужими войсками. */
-        private int охват(CardContext ctx) {
-            java.util.Set<String> мои = new java.util.HashSet<>();
-            for (UnitToken u : ctx.me().unitsOnField()) {
-                мои.add(u.hexId);
-            }
-            int лучший = 0;
-            for (String центр : ctx.allHexes()) {
-                boolean чужиеВойска = false;
-                for (Token t : ctx.enemyTokensOn(центр)) {
-                    if (t instanceof UnitToken) {
-                        чужиеВойска = true;
-                        break;
-                    }
-                }
-                if (!чужиеВойска) {
-                    continue;
-                }
-                int n = 0;
-                for (String рядом : ctx.neighbors(центр)) {
-                    if (мои.contains(рядом)) {
-                        n++;
-                    }
-                }
-                лучший = Math.max(лучший, n);
-            }
-            return лучший;
-        }
-
-        @Override
-        public boolean satisfied(CardContext ctx) {
-            return охват(ctx) >= 2;
-        }
-
-        @Override
-        public boolean satisfiedEnhanced(CardContext ctx) {
-            return охват(ctx) >= 3;
-        }
-
-        @Override
-        public double progress(CardContext ctx) {
-            return доля(охват(ctx), 2);
-        }
-
-        @Override
-        public String needed(CardContext ctx) {
-            int есть = охват(ctx);
-            return есть >= 2 ? "" : "подвести войско ещё на " + (2 - есть)
-                + " гекс вокруг чужого";
-        }
-
-
-        @Override
-        protected String действие() {
-            return "movement";
-        }
-    }
 
     /**
      * o29 «Пустой двор» — свои войска стоят там, где нет своих зданий.
@@ -278,15 +152,23 @@ public final class ЗаданияВойныII {
 
         @Override
         public Лицо лицо() {
-            return new Лицо("Пустой двор", ОБЫЧНАЯ, СОСТОЯНИЕ,
-                "У тебя есть два своих войска на гексах, где нет твоих зданий",
-                "Их четыре, и все стоят на разных гексах",
-                Награда.монеты(2).иКартыЗаданий(1), Награда.модуль("assembly"),
-                Утиль.ОТВЕТНЫЙ_ОГОНЬ,
-                "У тебя есть два своих войска на гексах, где нет твоих зданий, — награда "
-                + "2 монеты и 1 карта задания. Если таких войск четыре и все стоят "
-                + "на разных гексах, условие усилено: жетон модуля сборки. Войско "
-                + "без своего здания рядом умрёт первым — зато не даром.");
+            // ПЕЧАТНАЯ КАРТА «Засада» № 06 (25.09.2026): счёт по ГЕКСАМ — три,
+            // в усилении четыре.
+            return печатное("Пустой двор", СОСТОЯНИЕ,
+                "Имей свои войска на трех гексах, где нет твоих зданий",
+                "на четырех гексах.",
+                Награда.действием("power"),
+                Награда.монеты(4),
+                Утиль.АТАКА_ДВУМЯ);
+        }
+
+        /** Разные гексы, где стоят мои войска и нет ни одного моего здания. */
+        private java.util.Set<String> гексыВне(CardContext ctx) {
+            java.util.Set<String> гексы = new java.util.LinkedHashSet<>();
+            for (UnitToken u : снаружи(ctx)) {
+                гексы.add(u.hexId);
+            }
+            return гексы;
         }
 
         /** Свои войска на гексах, где нет ни одного своего здания. */
@@ -303,29 +185,24 @@ public final class ЗаданияВойныII {
 
         @Override
         public boolean satisfied(CardContext ctx) {
-            return снаружи(ctx).size() >= 2;
+            return гексыВне(ctx).size() >= 3;
         }
 
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
-            var вне = снаружи(ctx);
-            java.util.Set<String> гексы = new java.util.LinkedHashSet<>();
-            for (UnitToken u : вне) {
-                гексы.add(u.hexId);
-            }
-            return вне.size() >= 4 && гексы.size() == вне.size();
+            return гексыВне(ctx).size() >= 4;
         }
 
         @Override
         public double progress(CardContext ctx) {
-            return доля(снаружи(ctx).size(), 2);
+            return доля(гексыВне(ctx).size(), 3);
         }
 
         @Override
         public String needed(CardContext ctx) {
-            int есть = снаружи(ctx).size();
-            return есть >= 2 ? "" : "вывести ещё " + (2 - есть)
-                + " войско на гекс, где нет твоих зданий";
+            int есть = гексыВне(ctx).size();
+            return есть >= 3 ? "" : "вывести войска ещё на " + (3 - есть)
+                + " гекс, где нет твоих зданий";
         }
 
 
@@ -335,199 +212,6 @@ public final class ЗаданияВойныII {
         }
     }
 
-    /** o31 «Господство в небе» — своя авиация на гексе с жетонами противника. */
-    public static final class ГосподствоВНебе extends ЗаданиеВКоде {
-        public ГосподствоВНебе() {
-            super("o31");
-        }
-
-        @Override
-        public Лицо лицо() {
-            return new Лицо("Господство в небе", ОБЫЧНАЯ, СОСТОЯНИЕ,
-                "У тебя есть своя авиация на гексе, где есть жетоны противника",
-                "На этом гексе стоит ЦУ противника",
-                Награда.монеты(4), Награда.модуль("attack").иКартыЗаданий(1),
-                Утиль.СКОРОСТЬ,
-                "У тебя есть своя авиация на гексе, где есть жетоны противника, — награда "
-                + "4 монеты. Если на этом гексе стоит ЦУ противника, условие усилено: "
-                + "жетон модуля атаки и карта задания. В воздушную ячейку чужого "
-                + "гекса влезает ровно одна авиация — чья первая, того и небо.");
-        }
-
-        @Override
-        public boolean satisfied(CardContext ctx) {
-            for (UnitToken u : ctx.me().unitsOnField()) {
-                if (u.type == UnitType.AIRCRAFT && !ctx.enemyTokensOn(u.hexId).isEmpty()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public boolean satisfiedEnhanced(CardContext ctx) {
-            for (UnitToken u : ctx.me().unitsOnField()) {
-                if (u.type != UnitType.AIRCRAFT) {
-                    continue;
-                }
-                for (Token t : ctx.enemyTokensOn(u.hexId)) {
-                    if (t instanceof BuildingToken b
-                            && b.type == BuildingType.COMMAND_CENTER) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public double progress(CardContext ctx) {
-            if (satisfied(ctx)) {
-                return 1.0;
-            }
-            // ТРЕБОВАНИЕ РАСПАДАЕТСЯ НА ДВА: сперва иметь авиацию вообще, потом
-            // довести её до чужого гекса. Без авиации близость честный ноль —
-            // тут нечего доводить, нужен найм. С авиацией мерим путь до
-            // ближайшего чужого жетона: это ровно то, что осталось пролететь.
-            java.util.Set<String> чужие = new java.util.LinkedHashSet<>();
-            for (Token t : ctx.enemyTokensOnField()) {
-                чужие.add(t.hexId());
-            }
-            if (чужие.isEmpty()) {
-                return 0.0;
-            }
-            Integer лучшее = null;
-            for (UnitToken u : ctx.me().unitsOnField()) {
-                if (u.type != UnitType.AIRCRAFT) {
-                    continue;
-                }
-                Integer d = ctx.distance(u.hexId, чужие);
-                if (d != null && (лучшее == null || d < лучшее)) {
-                    лучшее = d;
-                }
-            }
-            if (лучшее == null) {
-                return 0.0;   // авиации нет — карта ждёт Сборки, а не Движения
-            }
-            return готовность(доля(5 - Math.min(5, лучшее), 5));
-        }
-
-        @Override
-        public String needed(CardContext ctx) {
-            return satisfied(ctx) ? "" : "завести авиацию на гекс с жетонами противника";
-        }
-
-
-        @Override
-        protected String действие() {
-            return "movement";
-        }
-    }
-
-    /**
-     * o41 «Ответный удар» — сбить нападавшего в ответном бою.
-     *
-     * <p>ЭТА КАРТА БЫЛА НЕВЫПОЛНИМА, И ВОТ ПОЧЕМУ. Ответный бой по устройству
-     * случается НЕ В ТВОЙ ХОД: по тебе бьют, ты отбиваешься, и запись ложится в
-     * твой журнал посреди чужого хода. К началу твоего собственного хода журнал
-     * обнулялся, а в свой ход тебя не атакуют — значит условие «в этот ход
-     * уничтожь жетон в ответном бою» не могло стать истинным никогда. Замер это
-     * подтверждал: ноль выполнений за сто пятьдесят партий.
-     *
-     * <p>ПЕРВОЕ РЕШЕНИЕ (годится ответный бой после начала прошлого хода) УМЕРЛО
-     * ВМЕСТЕ С ОТВЕТНЫМ БОЕМ: свод 1.34.0 убрал автоматический ответный удар из
-     * правил вовсе, и оба поля журнала, на которые смотрела карта, снова стали
-     * вечными нулями. Замер 08.09.2026: ноль выполнений на двадцать три
-     * попадания в руку, близость никогда выше 0.5.
-     *
-     * <p>РЕШЕНО ТАК: ответный удар — это УДАР С МЕСТА. Враг подошёл сам, а ты
-     * сбил его жетоном, который в этот ход не сходил с позиции и не разменял её
-     * на манёвр. Ни нового правила, ни новой памяти: и убийцы, и перемещённые
-     * жетоны уже лежат в журнале хода, а за столом это видно по тому, что жетон
-     * стоит там же, где стоял.
-     */
-    public static final class ОтветныйУдар extends ЗаданиеВКоде {
-        public ОтветныйУдар() {
-            super("o41");
-        }
-
-        @Override
-        public Лицо лицо() {
-            return new Лицо("Ответный удар", ОБЫЧНАЯ, ПРОИСШЕСТВИЕ,
-                "В ЭТОТ ХОД ты уничтожил жетон противника войском, которое в этот ход "
-                + "не перемещалось",
-                "Это войско стоит на гексе, где есть твоё здание",
-                Награда.боеприпасы(3), Награда.трофеи(3),
-                Утиль.БОЙ,
-                "В ЭТОТ ХОД ты уничтожил жетон противника войском, которое в этот ход "
-                + "не перемещалось, — награда 3 боеприпаса. Если это войско стоит "
-                + "на гексе, где есть твоё здание, условие усилено: 3 трофея. "
-                + "Ответный удар — это удар с места: враг подошёл сам, а ты не "
-                + "сходил с позиции и не разменял её на манёвр.");
-        }
-
-        /** Жетоны, которые в этот ход убивали и при этом никуда не ходили. */
-        private java.util.List<Integer> убийцыСМеста(CardContext ctx) {
-            var ф = ход(ctx);
-            java.util.List<Integer> out = new java.util.ArrayList<>();
-            for (var e : ф.killsByUnit.entrySet()) {
-                if (e.getValue() > 0 && !ф.movedUids.contains(e.getKey())) {
-                    out.add(e.getKey());
-                }
-            }
-            return out;
-        }
-
-        @Override
-        public boolean satisfied(CardContext ctx) {
-            return !убийцыСМеста(ctx).isEmpty();
-        }
-
-        @Override
-        public boolean satisfiedEnhanced(CardContext ctx) {
-            java.util.Set<String> сЗданием = new java.util.HashSet<>();
-            for (BuildingToken b : ctx.me().buildingsOnField()) {
-                сЗданием.add(b.hexId);
-            }
-            for (int uid : убийцыСМеста(ctx)) {
-                for (UnitToken u : ctx.me().unitsOnField()) {
-                    if (u.uid == uid && сЗданием.contains(u.hexId)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public double progress(CardContext ctx) {
-            if (satisfied(ctx)) {
-                return 1.0;
-            }
-            // Половина дела — стоять там, где есть по кому бить, и не двигаться:
-            // случай представился, осталось выстрелить.
-            for (UnitToken u : ctx.me().unitsOnField()) {
-                if (ход(ctx).movedUids.contains(u.uid)) {
-                    continue;
-                }
-                if (ctx.adjacentToEnemy(u.hexId) || !ctx.enemyTokensOn(u.hexId).isEmpty()) {
-                    return 0.5;
-                }
-            }
-            return 0.0;
-        }
-
-        @Override
-        public String needed(CardContext ctx) {
-            return satisfied(ctx) ? "" : "сбить жетон противника, не двигая это войско";
-        }
-
-
-        @Override
-        protected String действие() {
-            return "combat";
-        }
-    }
 
     /**
      * o42 «Разорение» — уничтожить чужой добытчик.
@@ -543,16 +227,14 @@ public final class ЗаданияВойныII {
 
         @Override
         public Лицо лицо() {
-            return new Лицо("Разорение", ОБЫЧНАЯ, ПРОИСШЕСТВИЕ,
-                "В ЭТОТ ХОД ты уничтожил добытчик противника",
-                "Этот добытчик был полностью запитан и примыкал к келемию",
-                Награда.монеты(4), Награда.модуль("attack"),
-                Утиль.ОБМЕН_НАУКА_ИЛИ_РЫНОК,
-                "В ЭТОТ ХОД ты уничтожил добытчик противника — награда 4 монеты. Если "
-                + "этот добытчик был полностью запитан и примыкал к келемию, условие "
-                + "усилено: жетон модуля атаки. Отнятый добытчик стоит сопернику "
-                + "всех оставшихся раундов добычи — а работающий на полную вдвое "
-                + "дороже.");
+            // ПЕЧАТНАЯ КАРТА «Устранение» № 28 (25.09.2026): усиление —
+            // добытчик у СТАРТОВОГО зарождения.
+            return печатное("Разорение", ПРОИСШЕСТВИЕ,
+                "В ЭТОТ ХОД уничтожь добытчик противника",
+                "добытчик примыкал к стартовому зарождению.",
+                Награда.выбор("power", "extract"),
+                Награда.трофеи(1).иСпец(1),
+                Утиль.ОТВЕТНЫЙ_ОГОНЬ);
         }
 
         @Override
@@ -562,7 +244,12 @@ public final class ЗаданияВойныII {
 
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
-            return ход(ctx).destroyedFullMinerAtKelium;
+            for (var у : убитые(ctx)) {
+                if (у.atStartSpawn()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
@@ -611,12 +298,11 @@ public final class ЗаданияВойныII {
     }
 
     /**
-     * o43 «Охота на сильного» — сбить жетон того, у кого зданий больше.
+     * o43 «Охота на сильного» — сбить жетон того, у кого келемия больше.
      *
-     * <p>ПЕРЕПИСАНА ЦЕЛИКОМ. Прежняя редакция требовала бить того, кто ведёт по
-     * победным очкам: за столом это не считается, очки в середине партии никто не
-     * знает, и правило годилось только для симуляции. Новое условие видно глазами
-     * — здания на поле пересчитываются.
+     * <p>Мерка «сильного» видна глазами: келемий лежит в хранилище открыто.
+     * Прежде мерой были здания на поле (до печатной карты 25.09.2026), ещё
+     * раньше — победные очки, которые за столом не посчитать.
      */
     public static final class ОхотаНаСильного extends ЗаданиеВКоде {
         public ОхотаНаСильного() {
@@ -625,41 +311,48 @@ public final class ЗаданияВойныII {
 
         @Override
         public Лицо лицо() {
-            return new Лицо("Охота на сильного", ОБЫЧНАЯ, ПРОИСШЕСТВИЕ,
-                "В ЭТОТ ХОД ты уничтожил жетон игрока, у которого на поле больше "
-                + "зданий, чем у тебя",
-                "В ЭТОТ ХОД уничтоженный жетон был зданием",
-                Награда.боеприпасы(2).иКартыЗаданий(1), Награда.трофеи(1),
-                Утиль.ЭВАКУАЦИЯ_ТРОФЕЕВ,
-                "В ЭТОТ ХОД ты уничтожил жетон игрока, у которого на поле больше зданий, чем "
-                + "у тебя, — награда 2 боеприпаса и 1 карта задания. Если уничтоженный "
-                + "жетон был зданием, условие усилено: 1 трофей. Догоняющему выгодно бить "
-                + "того, кто оторвался, — и это видно по столу без подсчёта очков.");
+            // ПЕЧАТНАЯ КАРТА «Устранение» № 34 (25.09.2026): сильнее — по
+            // КЕЛЕМИЮ, а не по зданиям; усиление — два жетона, один добытчик.
+            return печатное("Охота на сильного", ПРОИСШЕСТВИЕ,
+                "В ЭТОТ ХОД уничтожь жетон игрока, у которого больше келемия, чем у тебя.",
+                "2 жетона, один из них - добытчик.",
+                Награда.выбор("mining", "assembly"),
+                Награда.трофеи(1).иСпец(1),
+                Утиль.ДВИЖЕНИЕ_ДВУМЯ);
         }
 
-        private int зданий(CardContext ctx, int seat) {
-            return ctx.state().player(seat).buildingsOnField().size();
+        /** Келемий игрока — мерка «сильного» на печатной карте. */
+        private int келемия(CardContext ctx, int seat) {
+            return ctx.state().player(seat).resources.kelium();
         }
 
-        /** Сбил ли я в этот ход жетон того, у кого зданий больше моего. */
-        private boolean сбилСильного(CardContext ctx) {
-            int моих = зданий(ctx, ctx.seat());
-            for (int чей : ход(ctx).destroyedOwners) {
-                if (чей != ctx.seat() && чей >= 0 && зданий(ctx, чей) > моих) {
-                    return true;
-                }
-            }
-            return false;
+        /**
+         * СНЯТОЕ У ТЕХ, У КОГО В МИГ УДАРА КЕЛЕМИЯ БЫЛО БОЛЬШЕ МОЕГО. Сравнение —
+         * на момент удара: к проверке келемий мог уже уйти на Рынок.
+         */
+        private static java.util.Map<Integer, java.util.List<kelium.core.TurnJournal.Убитый>>
+                уБогатого(CardContext ctx) {
+            return убитыеУ(ctx, у -> у.victimKelium() > у.myKelium());
         }
 
         @Override
         public boolean satisfied(CardContext ctx) {
-            return сбилСильного(ctx);
+            return !уБогатого(ctx).isEmpty();
         }
 
         @Override
         public boolean satisfiedEnhanced(CardContext ctx) {
-            return сбилСильного(ctx) && ход(ctx).destroyedLeaderBuilding;
+            for (var снятые : уБогатого(ctx).values()) {
+                if (снятые.size() < 2) {
+                    continue;
+                }
+                for (var у : снятые) {
+                    if (BuildingType.MINER.code.equals(у.kind())) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         @Override
@@ -668,18 +361,18 @@ public final class ЗаданияВойныII {
                 return 1.0;
             }
             // ГОДНАЯ ЦЕЛЬ ЕСТЬ ИЛИ ЕЁ НЕТ: жетон именно того игрока, у кого
-            // зданий больше моего, и именно в пределах выстрела. Без такой цели
-            // близость честный ноль — карта ждёт не Боя, а роста соперника или
-            // подхода войск. Проверка повторяет условие карты, но глядя вперёд.
+            // келемия больше моего, и именно в пределах выстрела. Без такой цели
+            // близость честный ноль. Проверка повторяет условие карты, но глядя
+            // вперёд.
             if (ctx.have(Resource.AMMO) < 1) {
                 return 0.0;
             }
-            int моих = зданий(ctx, ctx.seat());
+            int моих = келемия(ctx, ctx.seat());
             for (UnitToken u : ctx.me().unitsOnField()) {
                 for (String гекс : ctx.attackReach(u)) {
                     for (Token t : ctx.enemyTokensOn(гекс)) {
                         if (t.owner() != ctx.seat() && t.owner() >= 0
-                                && зданий(ctx, t.owner()) > моих) {
+                                && келемия(ctx, t.owner()) > моих) {
                             return готовность(true);
                         }
                     }
@@ -691,7 +384,7 @@ public final class ЗаданияВойныII {
             // 08.09.2026: ноль выполнений на двадцать шесть попаданий в руку.
             return подготовка(чужойВПределахДороги(ctx, 2,
                 t -> t.owner() != ctx.seat() && t.owner() >= 0
-                    && зданий(ctx, t.owner()) > моих));
+                    && келемия(ctx, t.owner()) > моих));
         }
 
         @Override
@@ -700,8 +393,8 @@ public final class ЗаданияВойныII {
                 return "";
             }
             return progress(ctx) >= 0.5
-                ? "сбить жетон игрока, у которого зданий на поле больше твоего"
-                : "подвести войска к игроку, у которого зданий больше твоего";
+                ? "сбить жетон игрока, у которого келемия больше твоего"
+                : "подвести войска к игроку, у которого келемия больше твоего";
         }
 
 
@@ -711,98 +404,4 @@ public final class ЗаданияВойныII {
         }
     }
 
-    /** o46 «Трофейный обоз» — жетоны трёх разных видов среди уничтоженных жетонов. */
-    public static final class ТрофейныйОбоз extends ЗаданиеВКоде {
-        public ТрофейныйОбоз() {
-            super("o46");
-        }
-
-        @Override
-        public Лицо лицо() {
-            return new Лицо("Трофейный обоз", ОБЫЧНАЯ, СОСТОЯНИЕ,
-                "Среди твоих уничтоженных жетонов есть жетоны трёх разных видов",
-                "Видов четыре",
-                Награда.монеты(3), Награда.модуль("assembly"),
-                Утиль.ЭНЕРГИЯ_ИЛИ_МОДУЛИ,
-                "Среди твоих уничтоженных жетонов есть жетоны трёх разных видов — пехота, техника, "
-                + "авиация, вышка и каждый тип здания считаются отдельно. Награда: "
-                + "3 монеты. Видов четыре — условие усилено: жетон модуля сборки. Обоз показывает не силу удара, а широту "
-                + "фронта.");
-        }
-
-        private int видов(CardContext ctx) {
-            java.util.Set<String> виды = new java.util.HashSet<>();
-            for (Token t : ctx.me().destroyedTokens) {
-                if (t instanceof UnitToken u) {
-                    виды.add("unit:" + u.type.code);
-                } else if (t instanceof BuildingToken b) {
-                    виды.add("building:" + b.type.code);
-                }
-            }
-            return виды.size();
-        }
-
-        @Override
-        public boolean satisfied(CardContext ctx) {
-            return видов(ctx) >= 3;
-        }
-
-        @Override
-        public boolean satisfiedEnhanced(CardContext ctx) {
-            return видов(ctx) >= 4;
-        }
-
-        /** Каких ЕЩЁ видов чужие жетоны я достаю выстрелом прямо сейчас. */
-        private int новыхВидовПодРукой(CardContext ctx) {
-            java.util.Set<String> есть = new java.util.HashSet<>();
-            for (Token t : ctx.me().destroyedTokens) {
-                есть.add(вид(t));
-            }
-            java.util.Set<String> достану = new java.util.LinkedHashSet<>();
-            for (UnitToken u : ctx.me().unitsOnField()) {
-                for (String гекс : ctx.attackReach(u)) {
-                    for (Token t : ctx.enemyTokensOn(гекс)) {
-                        String в = вид(t);
-                        if (!есть.contains(в)) {
-                            достану.add(в);
-                        }
-                    }
-                }
-            }
-            return достану.size();
-        }
-
-        private static String вид(Token t) {
-            if (t instanceof UnitToken u) {
-                return "unit:" + u.type.code;
-            }
-            return t instanceof BuildingToken b ? "building:" + b.type.code : "?";
-        }
-
-        @Override
-        public double progress(CardContext ctx) {
-            // СЧЁТ СОБРАННЫХ ВИДОВ ПЛЮС ТО, ЧТО МОЖНО ДОБРАТЬ. Обоз собирается
-            // не одним боем, и карта, считавшая только собранное, молчала о
-            // главном: каких видов не хватает и есть ли они поблизости. Замер
-            // 08.09.2026: ноль выполнений на двадцать пять попаданий в руку.
-            double собрано = доля(видов(ctx), 3);
-            int добавлю = новыхВидовПодРукой(ctx);
-            return ступени(собрано,
-                собрано + доля(добавлю, 3) * 0.5,
-                подготовка(чужойВПределахДороги(ctx, 2, t -> true)));
-        }
-
-        @Override
-        public String needed(CardContext ctx) {
-            int есть = видов(ctx);
-            return есть >= 3 ? "" : "добавить на место уничтоженных жетонов ещё " + (3 - есть)
-                + " жетон другого вида";
-        }
-
-
-        @Override
-        protected String действие() {
-            return "combat";
-        }
-    }
 }

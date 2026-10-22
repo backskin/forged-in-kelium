@@ -1,0 +1,634 @@
+# -*- coding: utf-8 -*-
+"""Перестиль книги правил: «командная панель» вместо чёрной рамки.
+
+Что меняется — только оформление, текст и вёрстка страниц те же:
+- рамка страницы: векторная кайма со скошенными углами, скобками по углам и
+  насечками-рисками, у корешка открыта (левая и правая страницы — зеркально);
+- заголовок главы: зелёная плашка с косым срезом «ГЛАВА N» и сам заголовок,
+  за ним линия с ромбом;
+- врезки Пример / Важно! / Совет: панель со скошенными углами и цветным
+  ярлыком-плашкой; блоки текста — тонкий кант;
+- подзаголовки: h2 с двойной линией (тонкая + короткая жирная), h3 с
+  треугольной меткой; таблицы, колонцифра, оглавление, фазы — в том же языке;
+- поверх фона страницы — едва заметная гекс-сетка.
+
+Всё плоское и векторное: ни свечения, ни градиентов — так велит стильбиблия
+для интерфейсной графики. Палитра прежняя: кремовая бумага, чернила, зелень
+келемия, охра.
+"""
+import glob
+import io
+import os
+import re
+
+D = os.path.dirname(os.path.abspath(__file__))
+КНИГА = glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "rules", "Книга правил*", "вёрстка", "Книга правил.html"))[0]
+
+
+# ---------------------------------------------------------------- кайма
+
+def кайма():
+    """SVG-рамка страницы 220×220 мм. Стороны и хвосты — отдельными путями,
+    чтобы CSS мог убрать сторону у корешка и дотянуть верх и низ до края."""
+    o = 5.0          # внешняя линия
+    c = 4.0          # скос угла
+    i = 6.8          # внутренняя тонкая линия
+    ci = 3.2
+    L = 220.0
+    верх = f"M{o+c},{o} H{L-o-c}"
+    низ = f"M{o+c},{L-o} H{L-o-c}"
+    лев = f"M{o+c},{o} L{o},{o+c} V{L-o-c} L{o+c},{L-o}"
+    прав = f"M{L-o-c},{o} L{L-o},{o+c} V{L-o-c} L{L-o-c},{L-o}"
+    хв_л = f"M{o+c},{o} H0 M{o+c},{L-o} H0"
+    хв_п = f"M{L-o-c},{o} H{L} M{L-o-c},{L-o} H{L}"
+    вн_верх = f"M{i+ci},{i} H{L-i-ci}"
+    вн_низ = f"M{i+ci},{L-i} H{L-i-ci}"
+    вн_лев = f"M{i+ci},{i} L{i},{i+ci} V{L-i-ci} L{i+ci},{L-i}"
+    вн_прав = f"M{L-i-ci},{i} L{L-i},{i+ci} V{L-i-ci} L{L-i-ci},{L-i}"
+    вн_хв_л = f"M{i+ci},{i} H0 M{i+ci},{L-i} H0"
+    вн_хв_п = f"M{L-i-ci},{i} H{L} M{L-i-ci},{L-i} H{L}"
+    # риски по верху и низу: каждые 10 мм, длинная — каждые 50
+    риски = []
+    for x in range(20, 201, 10):
+        h = 1.9 if x % 50 == 0 else 1.0
+        риски.append(f"M{x},{o} v{h} M{x},{L-o} v-{h}")
+    # скобки по углам — жирные, келемий
+    b = 2.6
+    s = 11.0
+    скобки = {
+        "л": f"M{b},{b+s} V{b} H{b+s} M{b},{L-b-s} V{L-b} H{b+s}",
+        "п": f"M{L-b-s},{b} H{L-b} V{b+s} M{L-b-s},{L-b} H{L-b} V{L-b-s}",
+    }
+    return f'''<svg class="кайма" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+<path class="к-осн" d="{верх} {низ}"/><path class="к-осн к-лев" d="{лев}"/><path class="к-осн к-прав" d="{прав}"/>
+<path class="к-осн к-хвл" d="{хв_л}"/><path class="к-осн к-хвп" d="{хв_п}"/>
+<path class="к-тонк" d="{вн_верх} {вн_низ}"/><path class="к-тонк к-лев" d="{вн_лев}"/><path class="к-тонк к-прав" d="{вн_прав}"/>
+<path class="к-тонк к-хвл" d="{вн_хв_л}"/><path class="к-тонк к-хвп" d="{вн_хв_п}"/>
+<path class="к-риски" d="{' '.join(риски)}"/>
+<path class="к-скобка к-лев" d="{скобки['л']}"/><path class="к-скобка к-прав" d="{скобки['п']}"/>
+</svg>'''
+
+
+# ---------------------------------------------------------------- CSS
+
+СКОС = "polygon({c} 0, 100% 0, 100% calc(100% - {c}), calc(100% - {c}) 100%, 0 100%, 0 {c})"
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import мозаика as _мозаика  # фон внутренних полос — tools/книга/мозаика.py
+
+ГЕКС_СЕТКА = _мозаика.url()
+# плитка штриховки: одна чёрная и одна светлая диагональ на 0,5 мм
+ШТРИХ = ("url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'>"
+         "<path d='M-1 1L1 -1M0 4L4 0M3 5L5 3' stroke='%23000' stroke-opacity='.035' stroke-width='1.42'/>"
+         "<path d='M-1 3L3 -1M1 5L5 1' stroke='%23fff' stroke-opacity='.06' stroke-width='1.42'/></svg>\")")
+ШТРИХ_РАЗМЕР = ".5mm .5mm"
+
+CSS = r"""
+  /* Оформление книг игры: квадрат 22×22 см, две колонки, Tektur, охра
+     страницы, зелень келемия. РЕДАКЦИЯ «КОМАНДНАЯ ПАНЕЛЬ» (14.09.2026):
+     векторная кайма со скосами и скобками, плашки с косым срезом, панели
+     врезок со скошенными углами — тот же язык, что на картах приказов и на
+     задней обложке. Всё плоское, без свечения и градиентов. */
+  :root {
+    --страница: #F7F1E1;
+    --подложка: rgba(247, 241, 225, .90);
+    --чернила: #2A2318;
+    --охра: #6B4413;
+    --келемий: #186C24;
+    --келемий-ярк: #3FBF62;
+    --серый: #5E5139;
+    --рамка: #D8CCAE;
+    --кант: rgba(42, 35, 24, .28);
+    --выноска: #E7F0E2;
+    --пример: #F2E4C4;
+    --пример-кант: #A9761E;
+    --важно: #F3DED4;
+    --важно-кант: #9A2A12;
+    --совет: #E4EFDF;
+    --место-иконки: #EADFC6;
+    --уточнить: #9A2A12;
+  }
+  * { box-sizing: border-box; }
+  html { background: #4a463f; }
+  body { margin: 0; padding: 20px 0 40px; font-family: "Tektur", sans-serif; color: var(--чернила); }
+
+  .подпись-разворота { text-align: center; color: #e6dfd0; font: 13px "Tektur Med", "Tektur", sans-serif; margin: 0 0 8px; }
+  .разворот { display: flex; justify-content: center; width: 440mm; margin: 0 auto 30px; }
+  .разворот.одна { justify-content: flex-end; }
+
+  .стр {
+    flex: none; width: 220mm; height: 220mm; position: relative; overflow: hidden; isolation: isolate;
+    background: var(--страница) center / cover no-repeat;
+    padding: 15mm 15mm 16mm;
+    box-shadow: 0 2px 10px rgba(0,0,0,.4);
+  }
+  ФОНЫ
+  /* Мозаика едва заметной разметкой поверх фона страницы, под текстом. */
+  .стр:not(.обложка)::after {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: ГЕКС_СЕТКА; background-size: МОЗ_РАЗМЕР; opacity: МОЗ_ПРОЗР;
+  }
+
+  /* ---- кайма страницы ---- */
+  .кайма { position: absolute; inset: 0; width: 220mm; height: 220mm; z-index: 5; pointer-events: none; overflow: visible; }
+  .кайма .к-осн { fill: none; stroke: var(--чернила); stroke-width: .5; stroke-linejoin: round; }
+  .кайма .к-тонк { fill: none; stroke: var(--чернила); stroke-width: .16; opacity: .7; }
+  .кайма .к-риски { fill: none; stroke: var(--чернила); stroke-width: .25; }
+  /* Цвет уголков на полосах с картинкой задаёт фон_иллюстрации.py —
+     «вывернутый» цвет фона разворота (дизайнер 14.10.2026). */
+  .кайма .к-скобка { fill: none; stroke: var(--келемий); stroke-width: 1.05; stroke-linecap: square; }
+  .кайма .к-хвл, .кайма .к-хвп { display: none; }
+  /* У корешка рамка открыта: левая страница теряет правую сторону, правая — левую,
+     а верх и низ дотягиваются до самого края. */
+  .разворот:not(.одна):not(.левая) > .стр:first-child .к-прав { display: none; }
+  .разворот:not(.одна):not(.левая) > .стр:first-child .к-хвп { display: block; }
+  .разворот:not(.одна):not(.левая) > .стр:last-child .к-лев { display: none; }
+  .разворот:not(.одна):not(.левая) > .стр:last-child .к-хвл { display: block; }
+  .разворот.одна > .стр .к-лев { display: none; }
+  .разворот.одна > .стр .к-хвл { display: block; }
+  .разворот.левая > .стр .к-прав { display: none; }
+  .разворот.левая > .стр .к-хвп { display: block; }
+  .стр.обложка { padding: 0; background: #222; }
+  .стр.обложка img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* ТЕХНО-РАМКА ОБЛОЖКИ — один в один с памяткой на задней стороне. */
+  .стр.обложка .рамка-техно { position: absolute; inset: 4.5mm; z-index: 3;
+    pointer-events: none; border: .45mm solid #2A2318;
+    clip-path: polygon(6mm 0, 100% 0, 100% calc(100% - 6mm), calc(100% - 6mm) 100%, 0 100%, 0 6mm); }
+  .стр.обложка .рамка-техно::before, .стр.обложка .рамка-техно::after {
+    content: ""; position: absolute; width: 14mm; height: 14mm;
+    border: .7mm solid var(--келемий); }
+  .стр.обложка .рамка-техно::before { right: -.3mm; top: -.3mm; border-left: 0; border-bottom: 0; }
+  .стр.обложка .рамка-техно::after { left: -.3mm; bottom: -.3mm; border-right: 0; border-top: 0; }
+
+  .колонцифра {
+    position: absolute; bottom: 5.8mm; left: 0; right: 0; text-align: center; z-index: 6;
+    font: 700 10pt/1 "Tektur", sans-serif; color: var(--страница);
+  }
+  .колонцифра span { display: inline-block; background: var(--чернила); padding: .9mm 3.8mm .75mm;
+    clip-path: polygon(1.6mm 0, 100% 0, calc(100% - 1.6mm) 100%, 0 100%); }
+
+  /* ПОДЛОЖКА ПОД ТЕКСТОМ. Три правила, все три — просьба дизайнера
+     14.09.2026: воздух от края текста, одинаковые поля слева и справа (никаких
+     отрицательных отступов, из-за которых колонки выглядели по-разному) и
+     заливка полупрозрачная, чтобы бумага и гекс-сетка проступали. */
+  .блок { background: rgba(247, 241, 225, .66); padding: 1.9mm 2.7mm 1.6mm;
+    margin: 0 0 3mm; outline: .18mm solid var(--кант); outline-offset: -.18mm; }
+  .блок > :last-child { margin-bottom: 0; }
+  /* РАЗДЕЛ-ПРИМЕР — тот же жёлтый, что у врезки «Пример»: заливка, кант,
+     заголовок ярлыком-плашкой (дизайнер 05.10.2026). */
+  .блок.пример-блок { background: var(--пример); box-shadow: inset 0 0 0 .3mm var(--пример-кант); }
+  .блок.пример-блок > h2:first-child, .блок.пример-блок > .половина > h2:first-child,
+  .карточки .блок.пример-блок > h2 { display: inline-block; font: 800 8.4pt/1 "Tektur", sans-serif; color: var(--страница);
+    text-transform: uppercase; letter-spacing: .06em; background: var(--пример-кант); border: 0;
+    padding: 1.2mm 3.2mm 1mm 2.6mm; margin: -1.9mm 0 1.6mm -2.7mm;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
+  .блок.пример-блок > h2::after { display: none; }
+  .блок.пример-блок h3 { color: var(--пример-кант); }
+
+
+  /* ---- заголовок главы: плашка с номером, заголовок, линия с ромбом ---- */
+  .глава {
+    display: flex; align-items: center; gap: 3mm; position: relative;
+    font: 700 17pt/1.15 "Tektur", sans-serif; color: var(--охра);
+    padding: 0 0 1.6mm; margin: 0 0 3.6mm;
+  }
+  .глава::after { content: ""; flex: 1; height: .5mm; background: var(--келемий); position: relative; }
+  .глава .гл-н { flex: none; background: var(--келемий); color: var(--страница); font: 800 9pt/1 "Tektur", sans-serif;
+    text-transform: uppercase; letter-spacing: .1em; padding: 2.1mm 3.6mm 1.9mm 3mm; align-self: stretch; display: flex; align-items: center;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.4mm) 100%, 0 100%); }
+  .глава .гл-т { flex: none; padding-left: .4mm; }
+  .глава:not(:has(.гл-н)) { padding-left: 2.4mm; }
+  .глава .гл-т::after { content: ""; display: inline-block; width: 2mm; height: 2mm; background: var(--охра); transform: rotate(45deg) translateY(-.2mm); margin-left: 3.2mm; vertical-align: middle; }
+
+  h2 { font: 700 11.5pt/1.2 "Tektur", sans-serif; color: var(--охра); margin: 3mm 0 1.4mm; padding-bottom: .7mm; position: relative;
+    border-bottom: .22mm solid var(--келемий); }
+  h2::after { content: ""; position: absolute; left: 0; bottom: -.62mm; width: 9mm; height: 1mm; background: var(--келемий); }
+  h2:first-child { margin-top: 0; }
+  h3 { font: 700 10pt/1.2 "Tektur", sans-serif; color: var(--келемий); margin: 2.5mm 0 1mm; }
+  h3::before { content: ""; display: inline-block; width: 1.7mm; height: 1.9mm; background: var(--келемий);
+    clip-path: polygon(0 0, 100% 50%, 0 100%); margin-right: 1.5mm; vertical-align: -.05mm; }
+  p, li { font: 9.5pt/1.3 "Tektur", sans-serif; margin: 0 0 1.4mm; hyphens: auto; }
+  /* ВВОДНЫЙ АБЗАЦ ГЛАВЫ — крупнее и без подложки: он задаёт тон полосе, а не
+     спорит с блоками правил (просьба дизайнера 14.09.2026). */
+  .вводка { background: none; outline: 0; padding: 0 1mm 1mm; margin: 0 0 3.4mm; column-span: all; }
+  .вводка p { font: 10.5pt/1.34 "Tektur", sans-serif; color: var(--чернила); }
+  .вводка p:last-child { margin-bottom: 0; }
+  ol, ul { margin: 0 0 1.4mm; padding-left: 4.5mm; }
+  li { margin-bottom: .8mm; }
+  ul li::marker { color: var(--келемий); content: "▸ "; }
+  ol li::marker { color: var(--охра); font-weight: 700; }
+  b { font-weight: 700; }
+  .ссылка { color: var(--серый); }
+
+  .две { column-count: 2; column-gap: 6mm; column-fill: balance; }
+  /* БЛОК НЕ РВЁТСЯ МЕЖДУ КОЛОНКАМИ. Прежде заголовок с одной фразой
+     оставался внизу первой колонки, а продолжение уезжало во вторую
+     отдельной рамкой и читалось как другой раздел. */
+  .две .блок { break-inside: avoid; }
+  .две .пример, .две h2, .две h3, .две table, .две .заглушка, .две svg { break-inside: avoid; }
+  .две h2, .две h3 { break-after: avoid; }
+  .звезда, .две li, .две p { break-inside: avoid; }
+  .две:has(> .блок:only-child) { column-count: 1; }
+
+  /* ---- таблицы ---- */
+  table { width: 100%; border-collapse: collapse; font: 10pt/1.3 "Tektur Narrow", "Tektur", sans-serif; background: rgba(255,255,255,.55);
+    outline: .18mm solid var(--кант); }
+  table + p { margin-top: 1.6mm; }
+  th { background: var(--келемий); color: #fff; font-weight: 700; text-align: left; padding: 1.3mm 1.8mm; text-transform: uppercase; letter-spacing: .04em; font-size: 8.6pt; }
+  th:first-child { padding-left: 2.6mm; }
+  td:first-child:has(.ико) { white-space: nowrap; }
+  td { padding: 1.2mm 1.8mm; border-bottom: .25mm dotted var(--пример-кант); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+
+  /* ---- заглушки ---- */
+  .ико {
+    display: inline-block; min-width: 4.8mm; height: 3.9mm; padding: 0 .8mm;
+    background: var(--место-иконки); border: .25mm dashed var(--пример-кант); border-radius: .8mm;
+    font: 8pt/3.5mm "Tektur Narrow", sans-serif; color: var(--серый); text-align: center; vertical-align: -.8mm; white-space: nowrap;
+  }
+  .ико.крупно { min-width: 10mm; height: 10mm; font-size: 8pt; line-height: 9.6mm; vertical-align: middle; }
+  .заглушка {
+    background: var(--место-иконки); border: .35mm dashed var(--пример-кант);
+    padding: 2.2mm 3mm; margin: 0 0 2.5mm; font: 9pt/1.3 "Tektur Narrow", "Tektur", sans-serif; color: var(--серый);
+  }
+  .заглушка .метка { display: block; font: 700 9pt "Tektur Narrow", sans-serif; color: var(--охра); margin-bottom: .8mm; letter-spacing: .02em; }
+  .заглушка.рисунок { display: flex; flex-direction: column; justify-content: center; text-align: center; }
+  /* ЗАПОЛНИТЕЛЬ ВЫНУЖДЕННОЙ ПУСТОТЫ: где полоса не набирается текстом, стоит
+     место под художественную иллюстрацию — дизайнер вставит её в конце работы. */
+  .добор { column-span: all; margin-top: 2mm; }
+  .добор .заглушка { height: 100%; min-height: 34mm; margin: 0; }
+  .уточнить { font: 700 9pt "Tektur Narrow", sans-serif; color: var(--уточнить); }
+  .звезда { display: flex; gap: 2.5mm; align-items: center; margin: .5mm 0 1.4mm; }
+  .звезда p { margin: 0; }
+
+  /* ---- состав игры ---- */
+  .сетка { display: grid; gap: 2.4mm 3mm; margin: 0 0 2.5mm; }
+  .сетка.к3 { grid-template-columns: repeat(3, 1fr); }
+  .сетка.к4 { grid-template-columns: repeat(4, 1fr); }
+  .комп .фото {
+    height: 15mm; background: var(--место-иконки); border: .3mm dashed var(--пример-кант);
+    display: flex; align-items: center; justify-content: center;
+    font: 8.5pt "Tektur Narrow", sans-serif; color: var(--серый); text-transform: uppercase; letter-spacing: .05em;
+    clip-path: СКОС2;
+  }
+  .комп .фото.низ { height: 11mm; }
+  .крупнее .комп .фото { height: 30mm; }
+  .крупнее .комп .фото.низ { height: 22mm; }
+  .комп .имя { font: 700 9.5pt/1.2 "Tektur Narrow", "Tektur", sans-serif; margin-top: .9mm; }
+  .комп .сколько { font: 9.5pt/1.2 "Tektur Narrow", "Tektur", sans-serif; color: var(--серый); }
+  .комп .сколько b { color: var(--чернила); }
+  .набор { outline: .18mm solid var(--кант); outline-offset: -.18mm; padding: 2.2mm 2.4mm .6mm; background: var(--подложка); margin: 0 0 2.5mm; clip-path: СКОС2; }
+  .набор > p { font-weight: 700; }
+
+  /* ---- разворот подготовки: иллюстрация в центре, текст у внешних краёв ---- */
+  .стр.подготовка { padding: 0; }
+  .подготовка .схема { position: absolute; inset: 0; width: 220mm; height: 220mm; z-index: 1; }
+  .подготовка .столбец { position: absolute; top: 13mm; bottom: 14mm; width: 80mm; z-index: 3; }
+  .стр.левая-подг .столбец { left: 12mm; top: 29mm; }
+  .стр.правая-подг .столбец { right: 11mm; width: 80mm; top: 10.5mm; }  /* выше: совет не лезет на рамку (дизайнер 14.10.2026) */
+  .стр.левая-подг .глава { position: absolute; left: 13mm; right: 13mm; top: 12mm; margin: 0; z-index: 3; }
+  .столбец .блок { margin: 0 0 1mm; padding: .8mm 1.8mm; }
+  .столбец h3 { margin: 0 0 1mm; }
+  .столбец p { font: 9.4pt/1.22 "Tektur Narrow", "Tektur", sans-serif; margin: 0; }
+  .шаг { display: inline-flex; align-items: center; justify-content: center; width: 4.4mm; height: 4.4mm;
+    border-radius: 50%; background: var(--келемий); color: #fff; font: 700 8.5pt "Tektur Narrow", sans-serif;
+    margin-right: 1mm; vertical-align: middle; }
+  .схема .номер-круг { fill: var(--келемий); stroke: #fff; stroke-width: .5; }
+  .схема .номер-текст { fill: #fff; font: 700 4.2px "Tektur Narrow", sans-serif; text-anchor: middle; dominant-baseline: central; }
+  .схема .выноска { fill: none; stroke: var(--келемий); stroke-width: .55; stroke-linejoin: round; }
+  .схема .выноска-фон { fill: none; stroke: #F7F1E1; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; opacity: .9; }
+  .схема .точка-фон { fill: #F7F1E1; opacity: .9; }
+  .схема .точка-выноски { fill: var(--келемий); }
+  .схема .макет { fill: rgba(255,255,255,.55); stroke: var(--пример-кант); stroke-width: .35; stroke-dasharray: 1.2 .8; }
+  .схема .подпись { fill: var(--чернила); font: 3.6px "Tektur Narrow", sans-serif; text-anchor: middle; }
+  .схема .метка-илл { fill: var(--охра); font: 700 3.8px "Tektur Narrow", sans-serif; text-anchor: middle; }
+
+  /* ---- врезки: Пример, Важно!, Совет — панель со скосами и ярлык-плашка ---- */
+  .пример { position: relative; background: var(--пример-кант); padding: .3mm; margin: 1.4mm 0 2.4mm; break-inside: avoid;
+    clip-path: СКОС28; }
+  .пример > * { position: relative; }
+  .пример::before { content: ""; position: absolute; inset: .3mm; background: var(--пример); clip-path: СКОС25; }
+  .пример .метка { display: inline-block; font: 800 8.4pt/1 "Tektur", sans-serif; color: var(--страница); text-transform: uppercase; letter-spacing: .08em;
+    background: var(--пример-кант); padding: 1.2mm 3.2mm 1mm 2.6mm; margin: 0 0 1.2mm 0;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 2.2mm) 100%, 0 100%); }
+  .пример p, .пример li { font-size: 9.5pt; padding: 0 2.9mm; }
+  .пример > p:last-child, .пример > ul:last-child, .пример > ol:last-child { padding-bottom: 2mm; margin-bottom: 0; }
+  .пример ul, .пример ol { padding-left: 6.6mm; }
+  .пример ul li, .пример ol li { padding: 0 2.6mm 0 0; }
+  .пример.важно { background: var(--важно-кант); }
+  .пример.важно::before { background: var(--важно); }
+  .пример.важно .метка { background: var(--важно-кант); }
+  .пример.совет { background: var(--келемий); }
+  .пример.совет::before { background: var(--совет); }
+  .пример.совет .метка { background: var(--келемий); }
+
+  /* ЦИКЛ РАУНДА: три фазы столбцами, стрелки между ними, возврат снизу. */
+  .цикл { column-span: all; break-inside: avoid; margin: 0 0 3mm; }
+  .цикл-ряд { display: grid; grid-template-columns: 1fr 5mm 1fr 5mm 1fr; align-items: stretch; }
+  .фаза { display: flex; flex-direction: column; background: var(--подложка);
+    outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: СКОС28; }
+  .фаза header { display: flex; align-items: center; gap: 2.6mm; background: var(--келемий);
+    color: #fff; padding: 0 3mm 0 2.4mm; height: 16mm; box-sizing: border-box; }
+  .фаза .ф-н { flex: none; width: 10.8mm; height: 12.5mm; filter: drop-shadow(0 .3mm .5mm rgba(0,0,0,.35)); }
+  .фаза header b { display: block; font: 800 13.5pt/1.05 "Tektur", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+  .фаза header i { display: block; font: 500 8.8pt/1.2 "Tektur", sans-serif; font-style: normal; color: #CFE8C9; margin-top: .6mm; }
+  .ф-тело { padding: 2.2mm 2.8mm 2.6mm; display: flex; flex-direction: column; gap: 1.8mm; }
+  .ф-тело p { margin: 0; font-size: 9.2pt; line-height: 1.27; }
+  .ф-шаг { display: flow-root; }
+  .ф-шаг .ф-и { float: left; width: 8.4mm; height: 8.4mm; object-fit: contain; margin: .3mm 2mm .6mm 0; }
+  .ф-шаг .ф-и.ф-карта { width: auto; height: 12mm; border-radius: .8mm; box-shadow: 0 .3mm .8mm rgba(0,0,0,.35); }
+  .ф-тело { flex: 1; }
+  .ф-низ { margin-top: auto; padding-top: 2mm; text-align: center; }
+  .ф-низ img { max-width: 88%; max-height: 30mm; }
+  .ф-стрелка { position: relative; }
+  /* Стрелка между фазами — клин во всю высоту зелёной шапки: шапка фазы
+     словно указывает на следующую. Внутри охряной шеврон. */
+  .ф-стрелка::before { content: ""; position: absolute; left: 0; width: 100%; top: 0; height: 16mm;
+    background: var(--келемий); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  .ф-стрелка::after { content: ""; position: absolute; left: .2mm; width: 2.6mm; top: 5.2mm; height: 5.6mm;
+    background: #F3E7C9; clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
+  .цикл-возврат { position: relative; height: 7mm; margin: 0 16.67%; border: .8mm solid var(--охра);
+    border-top: 0; border-radius: 0 0 3mm 3mm; }
+  .цикл-возврат::before { content: ""; position: absolute; left: -2.6mm; top: -2.4mm; width: 4.4mm; height: 3.6mm;
+    background: var(--охра); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .цикл-возврат span { position: absolute; left: 50%; bottom: -2.8mm; transform: translateX(-50%);
+    background: var(--охра); color: #fff; font: 700 8.6pt/1 "Tektur", sans-serif; text-transform: uppercase;
+    letter-spacing: .06em; padding: 1.2mm 3mm; white-space: nowrap; clip-path: СКОС2; }
+
+  .фазы { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin: 0 0 3mm;
+    column-span: all; break-inside: avoid; }
+  .фазы > div { position: relative; background: var(--подложка); border-top: 1mm solid var(--келемий); padding: 1.8mm 2.4mm;
+    outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: СКОС2; }
+  .фазы > div { padding: 2.1mm 2.6mm; }
+  .фазы b { display: block; font: 700 11pt "Tektur", sans-serif; color: var(--охра); margin-bottom: .8mm; }
+  .фазы p { margin: 0; font: 9.8pt/1.28 "Tektur", sans-serif; }
+
+  .разворот.левая { justify-content: flex-start; }
+  .схема-гекса { display: block; width: 62mm; margin: 1mm auto 2mm; }
+
+  .обзор td { font-size: 9pt; vertical-align: top; }
+  .обзор td:nth-child(1) { width: 30%; }
+
+  .сведения { display: flex; gap: 6mm; justify-content: center; margin: 2mm 0 0; }
+  .сведения b { font: 700 13pt "Tektur", sans-serif; color: var(--охра); background: var(--подложка); padding: 2mm 4.6mm; outline: .18mm solid var(--кант); outline-offset: -.18mm;
+    clip-path: polygon(2mm 0, 100% 0, calc(100% - 2mm) 100%, 0 100%); }
+  .оглавление { list-style: none; margin: 0; padding: 3mm 5mm; background: var(--подложка); outline: .18mm solid var(--кант); outline-offset: -.18mm; clip-path: СКОС28; }
+  .оглавление li { display: flex; align-items: center; gap: 3mm; font: 12pt/1.9 "Tektur", sans-serif; margin: 0; border-bottom: .25mm dotted var(--пример-кант); }
+  .оглавление li:last-child { border-bottom: 0; }
+  .оглавление .н { width: 10mm; flex: none; font: 800 9.5pt/1 "Tektur", sans-serif; color: var(--страница); background: var(--келемий); text-align: center; padding: 1.3mm 0 1.1mm;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 1.6mm) 100%, 0 100%); }
+  .оглавление .т { flex: 1; }
+  .оглавление .с { font-weight: 700; color: var(--охра); }
+  .оглавление .будет { color: var(--серый); }
+  .оглавление .будет .н { background: var(--серый); }
+
+  .рисунок-во-всю { column-span: all; break-inside: avoid; }
+  /* Врезка сразу под широким рисунком тоже идёт во всю ширину: в колонке
+     она валится под рисунок и уезжает за полосу (15.09.2026). */
+  .рисунок-во-всю + .пример { column-span: all; }
+  td .дст, .две td b + .и { white-space: nowrap; }
+  /* ЗАГОЛОВОК ПЕРЕД РИСУНКОМ НА ВСЮ ШИРИНУ — тоже на всю ширину: иначе
+     подложка заголовка обрывается посреди полосы (замечание дизайнера). */
+  .две .блок:has(+ .рисунок-во-всю) { column-span: all; break-after: avoid; }
+  .рисунок-в-колонке { break-inside: avoid; }
+  .две .блок:has(.рис) { break-inside: avoid; }
+  .рис { position: relative; margin: 0 auto; }
+  .рис img { display: block; width: 100%; height: auto; }
+  .рис svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .рис .номер-круг { fill: #fff; stroke: var(--келемий); }
+  .рис .номер-текст { fill: var(--келемий); font-family: "Tektur Narrow", sans-serif; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+  .рис .черта { stroke: var(--келемий); fill: none; }
+  .рис .выноска-л { stroke: var(--келемий); }
+  .рис .выноска-т { fill: var(--келемий); }
+  /* ЛЕГЕНДА ПОД РИСУНКОМ: две колонки. Список из девяти пунктов одной
+     колонкой не помещается на полосу, а рисунок ужимать уже некуда. */
+  /* ---- создатели игры ---- */
+  .создатели .строки { margin: .5mm 0 0; }
+  .строки .кто { display: flex; align-items: baseline; gap: 2.4mm; padding: .7mm 0;
+    border-bottom: .2mm dotted var(--пример-кант); }
+  .строки .кто:last-child { border-bottom: 0; }
+  .строки .роль { flex: none; width: 27mm; font: 700 7.2pt/1.2 "Tektur Narrow", sans-serif;
+    color: var(--келемий); text-transform: uppercase; letter-spacing: .02em; }
+  .строки .имя { flex: 1; font: 8.6pt/1.2 "Tektur Narrow", "Tektur", sans-serif; }
+  .создатели h2 { font-size: 10.5pt; }
+  .создатели p, .создатели li { font: 8.6pt/1.25 "Tektur Narrow", sans-serif; }
+  .создатели .пример p { font-size: 8.4pt; }
+  .создатели .пример .метка { font-size: 8pt; }
+  .создатели .права p { font: 8pt/1.22 "Tektur Narrow", sans-serif; color: var(--серый); }
+  /* МЕСТО ПОД ЛОГОТИП занимает ВСЮ оставшуюся высоту полосы и отбито от блоков
+     текста сверху (просьба дизайнера 15.09.2026). */
+  .создатели .марка { position: absolute; left: 15mm; right: 15mm;
+    top: 126mm; bottom: 22mm; }
+  .создатели .марка { display: flex; align-items: center; justify-content: center; }
+  .создатели .марка img { max-width: 100%; max-height: 100%; width: auto; height: auto;
+    object-fit: contain; display: block; }
+  .создатели .марка .заглушка { height: 100%; width: 100%; margin: 0; }
+  /* ИКОНКА В СТРОКЕ ТЕКСТА — настоящая иконка игры, не заглушка. */
+  .и { height: 4.3mm; width: auto; vertical-align: -1.1mm; margin: 0 .3mm 0 1.2mm; }
+  td .и, th .и { vertical-align: -1.3mm; height: 4.8mm; }
+  /* Ячейка «иконка + подпись»: иконка крупно, подпись по центру под ней. */
+  .дст { display: flex; flex-direction: column; align-items: center;
+    gap: .5mm; text-align: center; line-height: 1.1; }
+  .дст .и { height: 8mm; width: auto; vertical-align: 0; margin: 0; }
+  .дст b { font-weight: 700; }
+  .и.крупно { height: 8.4mm; vertical-align: middle; margin: 0 2mm 0 0; }
+  .иконка-строка { display: flex; align-items: center; margin: 1.2mm 0; }
+  .блок.легенда { column-count: 2; column-gap: 5mm; column-span: all; }
+  /* БЛОК ПОПОЛАМ: во всю ширину полосы, слева рисунки, справа текст. */
+  .блок.вовсю { column-span: all; }
+  /* ---- заглавная иконка главы (04.10.2026): слева от вступления, ростом с него ---- */
+  .с-заглавной { column-span: all; display: flex; align-items: stretch; gap: 4mm; margin: 0 0 3mm; }
+  .с-заглавной > .блок { flex: 1; margin: 0; }
+  .с-заглавной .заглавная { flex: none; display: flex; align-items: center; justify-content: center;
+    width: 26mm; }
+  .с-заглавной .заг-и { height: 100%; max-height: 18mm; width: auto; max-width: 18mm; object-fit: contain; }
+  /* Блок на ступень крупнее: когда на полосе остаётся воздух, текст
+     лучше дать больше, чем растягивать пустоту (15.09.2026). */
+  .блок.крупно p, .блок.крупно li { font-size: 10.4pt; line-height: 1.32; }
+  .блок.крупно h2 { font-size: 13pt; }
+  .блок.крупно li { margin-bottom: 1.2mm; }
+  .блок.надвое { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    column-gap: 5mm; align-items: start; }
+  .блок.надвое > h2, .блок.надвое > h3 { grid-column: 1 / -1; }
+  .блок.надвое:has(.широкий) { grid-template-columns: 1.6fr 1fr;  /* рынок крупно, текст уже (дизайнер 14.10.2026) */ }
+  .блок.надвое:has(.шире) { grid-template-columns: 1.45fr 1fr; }
+  .блок.в-две { column-count: 2; column-gap: 7mm; }
+  .блок.в-две > h2 { column-span: all; }
+  .блок.в-две li { break-inside: avoid; }
+  .блок.надвое > .под-низ { grid-column: 1 / -1; }
+  /* ПАРА ПРИМЕРОВ (02.10.2026): два примера рядом, у каждого слева
+     рисунок, справа его текст — пример манёвра и пример боя на одной полосе. */
+  .блок.пара { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    column-gap: 5mm; align-items: start; }
+  .блок.пара > h2 { grid-column: 1 / -1; }
+  .блок.пара .половина > h3 { margin-top: 0; }
+  .блок.пара .пара-ряд { display: grid; grid-template-columns: 46% 1fr; column-gap: 2.6mm;
+    align-items: start; }
+  .блок.пара .пара-ряд .рисунок-в-колонке { padding: 0 !important; margin: 0; }
+  .блок.пара .пара-ряд .рис { width: 100% !important; }
+  .блок.пара .пара-ряд p { margin-top: 0; }
+  .блок.надвое .половина > *:first-child { margin-top: 0; }
+  .блок.надвое .половина > ul, .блок.надвое .половина > ol { margin-top: 0; }
+  .блок.легенда h3 { column-span: all; }
+  .блок.легенда > ul, .блок.легенда > ol { margin: 0; }
+  .блок.легенда li { break-inside: avoid; }
+  .легенда-цифры { margin: 1mm 0 0; padding-left: 5mm; }
+  .легенда-цифры li { font-size: 9pt; margin-bottom: .4mm; }
+
+  @media print {
+    html, body { background: none; padding: 0; }
+    .подпись-разворота { display: none; }
+    .разворот, .разворот.одна { display: block; width: auto; margin: 0; }
+    .стр { box-shadow: none; break-after: page; }
+    @page { size: 220mm 220mm; margin: 0; }
+  }
+
+  /* ---- просторная вёрстка (главы, переписанные с 27.09.2026) ----
+     Замечание дизайнера: при нынешнем кегле поля внутри плашек малы, а сами
+     плашки слипаются. Поля и промежутки — одной мерой по всей полосе. */
+  .стр.просторно .блок { padding: 3.2mm 4mm 3mm; margin: 0 0 4.5mm; }
+  .стр.просторно .блок h2 { margin-bottom: 2.2mm; }
+  .стр.просторно .две { column-gap: 7mm; }
+  .стр.просторно .дст .и { height: 15mm; }
+  .стр.просторно table { table-layout: fixed; width: 100%; }
+  .стр.просторно td { padding-top: 2mm; padding-bottom: 2mm; }
+  /* карточки: вещи игры сеткой 2×2 во всю ширину, картинка над текстом */
+  .карточки { column-span: all; display: grid; grid-template-columns: 1fr 1fr;
+    gap: 4.5mm 7mm; margin: 0 0 4.5mm; align-items: stretch; }
+  .карточки .блок.карточка { margin: 0; }
+  .карт-рис { height: 27mm; display: flex; align-items: center; justify-content: center;
+    gap: 5mm; margin: 0 0 3mm; }
+  .карт-рис img { max-height: 100%; max-width: 46%; object-fit: contain; }
+  .карт-рис img.значок { max-height: 68%; }
+  /* карты — со скруглёнными углами и тёмным кантом, как на столе (05.10.2026) */
+  .карт-рис img.карта { border-radius: 2.4mm; box-shadow: 0 0 0 .35mm #3C3020, 0 .6mm 1.4mm rgba(0,0,0,.28); }
+  /* одна картинка (лицо карты, широкий жетон) — во всю ширину карточки */
+  .карт-рис img:only-child { max-width: 100%; }
+
+  /* ---- состав игры: сетка компонентов (27.09.2026) ---- */
+  .комп-сетка { display: grid; gap: 3mm 3.5mm; margin: 1mm 0 3mm; }
+  .комп-сетка:last-child { margin-bottom: 0; }
+  /* планшеты войск и хранилища одной высоты на столе: колонки в том же
+     соотношении, что их ширины, — тогда оба встают в одном масштабе */
+  .комп-сетка.к2 { grid-template-columns: 2.01fr 1fr; }
+  .комп-сетка.к3 { grid-template-columns: repeat(3, 1fr); }
+  .комп-сетка.к4 { grid-template-columns: repeat(4, 1fr); }
+  .комп-сетка.к5 { grid-template-columns: repeat(5, 1fr); }
+  .комп-сетка.к6 { grid-template-columns: repeat(6, 1fr); }
+  .комп-сетка.к7 { grid-template-columns: repeat(7, 1fr); }
+  .комп-сетка.к8 { grid-template-columns: repeat(8, 1fr); }
+  .комп { text-align: center; }
+  .комп-рис { height: var(--комп-h, 16mm); display: flex; align-items: center; justify-content: center; gap: 1.5mm; }
+  .комп-рис img { max-height: 100%; max-width: 100%; object-fit: contain; min-width: 0; }
+  .комп-рис img + img { max-width: 48%; }
+  .комп-число { font: 800 11pt/1 "Tektur", sans-serif; color: var(--келемий); margin: 1mm 0 .4mm; }
+  .комп-рис img.значок { max-height: 62%; }
+  .комп-имя { font: 600 8pt/1.15 "Tektur Narrow", "Tektur", sans-serif; color: var(--чернила); }
+  .цвета { display: flex; gap: 2.5mm; align-items: center; margin: 0 0 2mm; }
+  .цвета span { width: 5mm; height: 5mm; border-radius: 1mm; display: inline-block;
+    outline: .2mm solid rgba(0,0,0,.35); }
+
+  /* ---- плитки действий-развилок (28.09.2026) ---- */
+  .плитки { display: grid; gap: 3mm; margin: 2mm 0 0; }
+  .плитки.к5 { grid-template-columns: repeat(5, 1fr); }
+  .плитки.к4 { grid-template-columns: repeat(4, 1fr); }
+  .плитки.к3 { grid-template-columns: repeat(3, 1fr); }
+  .плитки.к2 { grid-template-columns: repeat(2, 1fr); }
+  .плитка { display: flex; flex-direction: column; align-items: center; text-align: center;
+    background: rgba(255, 255, 255, .45); outline: .18mm solid var(--кант); padding: 2.4mm 1.6mm 2.6mm; }
+  .плитка .и.плит { height: var(--плит-h, 14mm); margin: 0 0 1.4mm; vertical-align: 0; }
+  .плитка b { font: 700 10pt/1.15 "Tektur", sans-serif; color: var(--охра); margin: 0 0 1.6mm; }
+  .плитка .ветка { font: 600 9pt/1.2 "Tektur Narrow", sans-serif; color: var(--чернила); }
+  .плитка .или { font: 400 8pt/1.1 "Tektur Narrow", sans-serif; color: var(--серый); margin: .7mm 0; }
+
+  /* ---- раздел: заголовок группы карточек одного действия (28.09.2026) ---- */
+  .раздел { column-span: all; display: flex; align-items: center; gap: 3mm;
+    margin: 1mm 0 3mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--келемий); }
+  .раздел .и.разд { height: 11mm; margin: 0; vertical-align: 0; }
+  .раздел span { font: 700 15pt/1 "Tektur", sans-serif; color: var(--охра); }
+  .карточка ul { margin: 0 0 1.4mm; padding-left: 4mm; }
+  .карточка li { margin: 0 0 .8mm; }
+  .карточка ol { margin: 0 0 1.4mm; padding-left: 5mm; }
+
+  /* ОТСТУП НАД БЛОКАМИ ВО ВСЮ ШИРИНУ (дизайнер 14.10.2026): нижний отступ
+     блока в колонке обрезается на границе колонок, и следующий широкий блок
+     прилипал к нему (с. 25). Отступ даёт сам широкий блок. */
+  .две > .блок.вовсю, .две > .карточки, .две > .блок.надвое, .две > .блок.пара,
+  .две > .рисунок-во-всю { margin-top: 3mm; }
+  .две > :first-child { margin-top: 0; }
+
+  /* ШТРИХОВКА (дизайнер 14.10.2026): тончайшие диагональные полоски, чёрная
+     и светлая через одну, еле видны — как на картах. Лежит на фоне полосы,
+     мозаике и подложках блоков; текст, значки и рисунки — поверх неё. */
+  .стр:not(.обложка)::after { background-image: ШТРИХ, ГЕКС_СЕТКА;
+    background-size: ШТРИХ_РАЗМЕР, МОЗ_РАЗМЕР; }
+  .блок, .пример::before, .набор, .фаза, .фазы > div, .оглавление, table {
+    background-image: ШТРИХ !important; background-size: ШТРИХ_РАЗМЕР !important; }
+
+  /* БЕЗ ПОДЛОЖЕК (дизайнер 14.10.2026: «бежевый на бежевом — лишняя
+     подложка»). Обычный блок — без заливки, канта и штриховки; цветные
+     (примеры, советы) остаются. Разделитель — тонкая линия, и только между
+     двумя блоками подряд: под заголовком главы или раздела его нет. */
+  .стр:not(.задняя) .блок:not(.пример-блок) {
+    background: none !important; background-image: none !important;
+    outline: none !important; box-shadow: none !important;
+    padding-left: 0; padding-right: 0; padding-bottom: 0; padding-top: 0; }
+  /* Сплошных линий между блоками нет (дизайнер 14.10.2026: «тонкие чёрточки
+     лишние»): у заголовка своё подчёркивание, подписи под рисунком — его
+     часть. Линия остаётся только между шагами подготовки (.столбец). */
+  .стр:not(.задняя) :is(.блок, .рисунок-во-всю) + .блок:not(.пример-блок):not(.карточка) {
+    padding-top: 1.2mm; }
+  .столбец .блок:not(.пример-блок) + .блок { border-top: .3mm solid var(--кант); padding-top: 1.6mm; }
+"""
+
+
+def собрать_css(старый):
+    фоны = "\n  ".join(re.findall(r'\.стр\.фон\d \{ background-image: url\("data:[^"]+"\); \}', старый))
+    задняя = ""
+    i = старый.find("  /* ---- задняя сторона обложки")
+    if i >= 0:
+        задняя = старый[i:]
+    css = (CSS.replace("ФОНЫ", фоны)
+              .replace("ШТРИХ_РАЗМЕР", ШТРИХ_РАЗМЕР).replace("ШТРИХ", ШТРИХ).replace("ГЕКС_СЕТКА", ГЕКС_СЕТКА).replace("МОЗ_РАЗМЕР", "%.2fmm %.2fmm" % (_мозаика.ШИРИНА_ММ, _мозаика.ВЫСОТА_ММ)).replace("МОЗ_ПРОЗР", str(_мозаика.ПРОЗРАЧНОСТЬ))
+              .replace("СКОС28", СКОС.format(c="2.8mm"))
+              .replace("СКОС25", СКОС.format(c="2.5mm"))
+              .replace("СКОС2", СКОС.format(c="2mm")))
+    return css + "\n" + задняя
+
+
+def патч_разметки(t, кайма_svg):
+    # заголовок главы двумя частями
+    t = re.sub(r'<div class="глава">(Глава \d+)\.\s*([^<]+)</div>',
+               r'<div class="глава"><span class="гл-н">\1</span><span class="гл-т">\2</span></div>', t)
+    # классы врезок по метке
+    t = re.sub(r'<div class="пример"((?:\s[^>]*)?)>(\s*<span class="метка">Важно!?</span>)',
+               r'<div class="пример важно"\1>\2', t)
+    t = re.sub(r'<div class="пример"((?:\s[^>]*)?)>(\s*<span class="метка">Совет</span>)',
+               r'<div class="пример совет"\1>\2', t)
+    # кайма на каждой странице, кроме обложек; старые каймы убрать
+    t = re.sub(r'\s*<svg class="кайма".*?</svg>', "", t, flags=re.S)
+    def вставить(m):
+        cls = m.group(1)
+        if "обложка" in cls:
+            return m.group(0)
+        return m.group(0) + "\n    " + кайма_svg
+    t = re.sub(r'<div class="стр ([^"]*)">', вставить, t)
+    # ПЕРЕДНЯЯ ОБЛОЖКА — БЕЗ ТЕХНО-РАМКИ (дизайнер 14.10.2026 убрал её).
+    t = t.replace('<div class="стр обложка"><div class="рамка-техно"></div>', '<div class="стр обложка">')
+    return t
+
+
+def main():
+    t = io.open(КНИГА, encoding="utf-8").read()
+    a = t.index("<style>") + len("<style>")
+    b = t.index("</style>")
+    t = t[:a] + "\n" + собрать_css(t[a:b]) + t[b:]
+    svg = кайма()
+    io.open(os.path.join(D, "_кайма.svg"), "w", encoding="utf-8").write(svg)
+    t = патч_разметки(t, svg)
+    io.open(КНИГА, "w", encoding="utf-8").write(t)
+    print("перестиль применён; страниц с каймой:", t.count('<svg class="кайма"'))
+
+
+if __name__ == "__main__":
+    main()

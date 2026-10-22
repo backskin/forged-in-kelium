@@ -35,7 +35,7 @@ public final class Scenario {
         }
     }
 
-    private static String hexId(int q, int r) {
+    static String hexId(int q, int r) {
         return "h" + q + "_" + r;
     }
 

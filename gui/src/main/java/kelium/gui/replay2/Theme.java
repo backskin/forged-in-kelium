@@ -155,6 +155,31 @@ public final class Theme {
         scale = DPI * (userScale == 0 ? AUTO : userScale);
     }
 
+    /**
+     * МАСШТАБ ОКНА ИГРЫ — по экрану, В ОБЕ СТОРОНЫ (26.09.2026). Прибор разбора
+     * партии рассчитан на 1500×950 и на больших экранах не растёт; игру же
+     * смотрят с расстояния, и на Full HD её текст оставался мелким. Окно игры
+     * выверено на 1366×768 при множителе 1.0 — от этого размера и считаем:
+     * Full HD даёт около 1.37, ноутбук 1366×768 — 1.0. Ручной множитель, если
+     * он выбран, главнее.
+     */
+    public static void useGameScale() {
+        if (userScale != 0) {
+            return;
+        }
+        try {
+            if (GraphicsEnvironment.isHeadless()) {
+                return;
+            }
+            java.awt.Rectangle b = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .getMaximumWindowBounds();
+            double fit = Math.min(b.width / DPI / 1366.0, b.height / DPI / 768.0);
+            scale = DPI * Math.max(0.75, Math.min(1.8, fit));
+        } catch (RuntimeException | Error e) {
+            // остаётся прежний масштаб
+        }
+    }
+
     /** Ручной множитель: 0 — включён автоподбор. */
     public static double userScale() {
         return userScale;
@@ -275,8 +300,107 @@ public final class Theme {
         new Color(0x1F6FC4),
     };
 
+    /**
+     * ПАЛИТРА «СТОЛ» — для окна живой партии (просьба дизайнера 25.09.2026:
+     * «белые элементы как плашки из ворда не сочетаются с цветом стола»). Та же
+     * тёмная тема по устройству, но в тонах бирюзового сукна: поверхности —
+     * глубокая бирюза, текст — светлый, акцент — яркая бирюза. Печатные
+     * компоненты светлые и на ней горят.
+     */
+    private static Color[] TABLE = {
+        new Color(0x0E2029),   // 0 фон приложения
+        new Color(0x14303C),   // 1 панели
+        new Color(0x1B3C4A),   // 2 плитки
+        new Color(0x245062),   // 3 наведение
+        new Color(0x2C5667),   // 4 границы
+        new Color(0x3B6A7C),   // 5 сильные разделители
+        new Color(0xEEF7FA),   // 6 текст главный
+        new Color(0xB8D3DD),   // 7 текст второй
+        new Color(0x7FA3B2),   // 8 текст тихий
+        new Color(0x1F3F4E),   // 9 подложка поля
+        new Color(0x3FC1DE),   // 10 акцент
+    };
+
+    private static boolean table;
+
+    /**
+     * ПАЛИТРА СТОЛА ОТ ЦВЕТА ФРАКЦИИ (просьба дизайнера 26.09.2026: «главное
+     * меню серо-металлическое, а когда игрок выбрал фракцию и нажал „Играть“,
+     * окно игры окрашивается: акцент всех эффектов — цвет фракции»).
+     *
+     * <p>Поверхности — глубокие тона того же оттенка, что цвет фракции, но
+     * приглушённые, чтобы печатные компоненты горели на них; текст — светлый
+     * с лёгким оттенком; акцент — яркий цвет фракции. {@code null} — серый
+     * металл без оттенка (меню до выбора).
+     */
+    public static void applyTable(Color faction) {
+        float[] hsb = faction == null ? new float[]{0.55f, 0f, 1f}
+            : Color.RGBtoHSB(faction.getRed(), faction.getGreen(), faction.getBlue(), null);
+        float hue = hsb[0];
+        // серый металл — почти без насыщенности; фракция — умеренно
+        float sat = faction == null ? 0.07f : Math.min(0.62f, Math.max(0.35f, hsb[1] * 0.75f));
+        TABLE = new Color[]{
+            hsb(hue, sat, 0.13f),          // 0 фон
+            hsb(hue, sat, 0.19f),          // 1 панели
+            hsb(hue, sat * 0.95f, 0.24f),  // 2 плитки
+            hsb(hue, sat * 0.95f, 0.31f),  // 3 наведение
+            hsb(hue, sat * 0.8f, 0.36f),   // 4 границы
+            hsb(hue, sat * 0.7f, 0.46f),   // 5 разделители
+            hsb(hue, 0.04f, 0.97f),        // 6 текст главный
+            hsb(hue, 0.12f, 0.85f),        // 7 текст второй
+            hsb(hue, 0.16f, 0.68f),        // 8 текст тихий
+            hsb(hue, sat, 0.26f),          // 9 подложка поля
+            faction == null ? new Color(0xB9C4CC)
+                : hsb(hue, Math.max(0.55f, hsb[1]), Math.max(0.86f, hsb[2])),  // 10 акцент
+        };
+        applyTable();
+    }
+
+    private static Color hsb(float h, float s, float b) {
+        return Color.getHSBColor(h, Math.max(0f, Math.min(1f, s)), Math.max(0f, Math.min(1f, b)));
+    }
+
+    /** Включить палитру «Стол» (тёмная тема в тонах сукна). */
+    public static void applyTable() {
+        apply(true);
+        table = true;
+        UIManager.put("Panel.background", panel());
+        UIManager.put("ScrollPane.background", panel());
+        UIManager.put("Viewport.background", panel());
+        UIManager.put("Label.foreground", ink());
+        UIManager.put("SplitPane.background", bg());
+        UIManager.put("SplitPaneDivider.background", bg());
+        UIManager.put("ToolTip.background", tile());
+        UIManager.put("ToolTip.foreground", ink());
+        UIManager.put("Component.focusColor", accent());
+        UIManager.put("Component.borderColor", border());
+    }
+
+    public static boolean isTable() {
+        return table;
+    }
+
+    /**
+     * ПОСЧИТАТЬ ЧТО-ТО В ПАЛИТРЕ «СТОЛ», не меняя действующую тему. Нужно окну,
+     * которое всегда в цветах стола, даже когда его открыли из светлого «Штаба»
+     * (справочник правил): оно снимает краски отсюда один раз и дальше красит
+     * себя само. Оформление Swing (UIManager) при этом не трогается.
+     */
+    public static <T> T asTable(java.util.function.Supplier<T> what) {
+        boolean d = dark;
+        boolean t = table;
+        dark = true;
+        table = true;
+        try {
+            return what.get();
+        } finally {
+            dark = d;
+            table = t;
+        }
+    }
+
     private static Color base(int i) {
-        return (dark ? DARK : LIGHT)[i];
+        return (table ? TABLE : dark ? DARK : LIGHT)[i];
     }
 
     public static Color bg() {
@@ -633,30 +757,12 @@ public final class Theme {
 
     // ==================== применение ====================
     /**
-     * СГЛАЖИВАНИЕ ТЕКСТА ВО ВСЕХ ОКНАХ.
-     *
-     * <p>Наши собственные рисовалки (поле, планшеты, карты) включают сглаживание
-     * сами — {@link kelium.report.Сглаживание}. А подписи, кнопки, вкладки и
-     * списки рисует не наш код, а Swing, и он берёт настройку не из наших
-     * подсказок, а из системы: выключен ClearType — и весь текст приложения
-     * ступенчатый, хотя поле рядом гладкое (жалоба дизайнера 11.09.2026
-     * «сглаживание только на поле работает»).
-     *
-     * <p>Поэтому просим сглаживание ЯВНО, и делаем это в статическом блоке:
-     * свойства читаются один раз, когда поднимается оконная подсистема, а она
-     * поднимается раньше любого нашего окна, но позже загрузки этого класса.
-     */
-    static {
-        System.setProperty("awt.useSystemAAFontSettings", "lcd");
-        System.setProperty("swing.aatext", "true");
-    }
-
-    /**
      * Поставить тему. Вызывать ДО создания окна; для переключения на ходу — вместе
      * с {@link javax.swing.SwingUtilities#updateComponentTreeUI}.
      */
     public static void apply(boolean darkTheme) {
         dark = darkTheme;
+        table = false;          // палитра «Стол» — только через applyTable()
         // СТРОКУ ЗАГОЛОВКА рисует сама FlatLaf, а не Windows: иначе при тёмной теме
         // в светлом режиме системы (и наоборот) заголовок оставался цветов системы
         // и окно выглядело склеенным из двух программ. Свойства читаются при
@@ -679,15 +785,6 @@ public final class Theme {
         }
         // ТОКЕНЫ поверх темы: скругления, отступы, шрифт, цвета акцента. Всё в
         // одном месте — так облик правится значениями, а не переписыванием кода.
-        // СГЛАЖИВАНИЕ ТЕКСТА — ПОДСКАЗКОЙ В САМОЙ ТЕМЕ. Swing рисует подписи не
-        // нашим кодом, и берёт настройку сглаживания из UIDefaults по этому
-        // ключу; оформление кладёт туда системную настройку, а системная может
-        // быть «выключено» — и тогда весь текст окон ступенчатый, хотя поле
-        // рядом гладкое (жалоба дизайнера 11.09.2026). Ставим ПОСЛЕ установки
-        // оформления, поэтому наше значение и остаётся последним.
-        UIManager.put(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING,
-            java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
-        UIManager.put(java.awt.RenderingHints.KEY_TEXT_LCD_CONTRAST, 140);
         UIManager.put("defaultFont", body());
         UIManager.put("Button.arc", R_TILE * 2);
         UIManager.put("Component.arc", R_TILE * 2);

@@ -49,7 +49,8 @@ class MiningReachTest {
 
     private static GameState game(long seed) {
         GameState s = Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, seed, null, null));
+            GameConfig.buildCached("1.45.0",   // проверяет правило свода 1.45.0 (до пяти развилок)
+             4, seed, null, null));
         List<Agent> agents = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
             agents.add(new Greedy());

@@ -23,6 +23,38 @@ public final class Names {
     }
 
     /**
+     * ЗАГОЛОВОК ПОДСКАЗКИ ГЕКСА — словами, без служебного имени вида
+     * {@code h-2_3} (жалоба дизайнера 27.09.2026: «Гекс h-2_3» на экране).
+     * Гекс называется тем, что на нём лежит.
+     */
+    public static String hexTitle(String kind, ReplayRecord.HexState st) {
+        if ("FORBIDDEN".equals(kind)) {
+            return "Запретный гекс";
+        }
+        if (st != null && st.spawn != null) {
+            return st.spawn.start ? "Стартовый тайл зарождения" : "Тайл зарождения";
+        }
+        if (st != null && st.containerCell >= 0) {
+            return "Гекс с печатным контейнером";
+        }
+        if (st != null && !st.neutrals.isEmpty()) {
+            return "Гекс с нейтральной постройкой";
+        }
+        return "Гекс поля";
+    }
+
+    /** Строка о печатном контейнере гекса: где он напечатан, без номера ячейки. */
+    public static String hexContainer(int cell) {
+        return cell == 6 ? "печатный контейнер — в воздушной ячейке (только для авиации)"
+            : "печатный контейнер — на одном из секторов гекса";
+    }
+
+    /** Строка о жёлтой ячейке энергостанции, без номера ячейки. */
+    public static String hexEnergyCell() {
+        return "жёлтая ячейка — только на ней энергостанция даёт номинал";
+    }
+
+    /**
      * Победные очки: откуда пришли.
      *
      * <p>НАЙДЕНО 18.08.2026: словарь и {@link kelium.engine.Scoring} разошлись —
@@ -43,6 +75,7 @@ public final class Names {
             case "units_on_field" -> "войска";
             case "tech" -> "наука";
             case "gold_modules" -> "золотые модули";
+            case "storage_cell_stars" -> "пустые ячейки жетонов хранилища";
             case "spawn_tiles" -> "тайлы";
             case "cu_tokens" -> "жетоны ЦУ";
             case "war_track" -> "военный трек";
@@ -57,9 +90,10 @@ public final class Names {
             case "objective_card_vp" -> "очки с карты задания";
             // Супер-задание семейства «одна карта втайне»: в режиме 5.0 это
             // накопитель, в 6.0 — множитель очков в финале.
-            case "super5_stockpile" -> "супер-задание";
+            case "super_objectives" -> "супер-задания";
             // Установленная (не сожжённая) карта арсенала со своим scoring-условием.
             case "arsenal_vp" -> "очки арсенала";
+            case "arsenal_stars" -> "звёзды на картах арсенала";
             case "total" -> "всего";
             default -> unknown(key);
         };
@@ -185,6 +219,15 @@ public final class Names {
             case "infrastructure" -> "ИНФРАСТРУКТУРА";
             case "operation" -> "НАСТУПЛЕНИЕ";
             case "acquisitions" -> "ПРИОБРЕТЕНИЯ";
+            case "place" -> "РАЗМЕСТИТЬ";
+            case "acquire" -> "ПРИОБРЕСТИ";
+            case "control" -> "КОНТРОЛИРОВАТЬ";
+            case "explore" -> "ИССЛЕДОВАТЬ";
+            case "settle" -> "ОСВОИТЬ";
+            case "mobilize" -> "МОБИЛИЗОВАТЬ";
+            case "advance" -> "НАСТУПАТЬ";
+            case "secure" -> "КОНТРОЛИРОВАТЬ";
+            case "research" -> "ИССЛЕДОВАТЬ";
             // Джокер печатается как БЕЗОПАСНОСТЬ — у него нет верха и низа.
             case "security", "joker" -> "БЕЗОПАСНОСТЬ";
             // НЕИЗВЕСТНЫЙ КОД НЕ ВЫДАЁТ СЕБЯ ЗА КАРТУ. Прежде здесь стояла та же
@@ -206,6 +249,14 @@ public final class Names {
             case "combat" -> "бой";
             case "market" -> "рынок";
             case "science" -> "наука";
+            case "extract" -> "добыча";
+            case "power" -> "питание";
+            case "supply" -> "снабжение";
+            case "command" -> "командование";
+            case "develop" -> "развитие";
+            case "build_miner" -> "построить добытчик";
+            case "build_plant" -> "построить энергостанцию";
+            case "build_military" -> "построить военное здание";
             case "special" -> "спец-действие";
             default -> unknown(code);
         };
@@ -226,6 +277,11 @@ public final class Names {
             String хвост = длинная ? " · победа по очкам" : "";
             return "конец по келемию: источников осталось " + left
                 + " при пороге свода " + threshold + хвост;
+        }
+        if (threshold == 0) {
+            return длинная
+                ? "конец по келемию: все тайлы зарождения истощены · победа по очкам"
+                : "кончился келемий на поле";
         }
         return длинная
             ? "конец по келемию: на поле остался последний тайл зарождения · победа по очкам"
@@ -250,8 +306,10 @@ public final class Names {
             case "victory_points" -> "по победным очкам";
             case "super_objective" -> "супер-заданием";
             case "all_peaks_occupied" -> "заняты все вершины треков";
+            case "all_peaks" -> "победа наукой";
             case "last_spawn_tile" -> "кончился келемий на поле";
             case "military" -> "военная победа";
+            case "market_out" -> "кончились карты рынка";
             case "" -> "партия завершена";
             default -> unknown(code);
         };
@@ -273,7 +331,8 @@ public final class Names {
     private static String conditionLongBase(String code) {
         return switch (code == null ? "" : code) {
             case "victory_points" -> "победа по победным очкам";
-            case "military" -> "ВОЕННАЯ победа: уничтожено второе ЦУ";
+            case "military" -> "ВОЕННАЯ победа: игрок второй раз уничтожил ЦУ";
+            case "all_peaks" -> "ПОБЕДА НАУКОЙ: игрок занял вершины всех трёх треков";
             case "super_objective" -> "победа по СУПЕР-ЗАДАНИЮ: проект развёрнут";
             case "all_peaks_occupied" -> "конец по науке: заняты все три вершины треков "
                 + "· победа по очкам";
@@ -303,6 +362,11 @@ public final class Names {
             case "tokens_returned" -> "жетоны вернулись";
             case "return" -> "конец раунда";
             case "game_end" -> "конец партии";
+            case "seal_unit" -> "подготовка: глухой жетон";
+            case "starter_kit" -> "стартовый набор";
+            case "blind_discard" -> "отложенные приказы";
+            case "super_pick", "start_objective_pick" -> "подготовка: выбор карты";
+            case "cu_facing" -> "подготовка: поворот ЦУ";
             // Неизвестный тип — нейтральное слово, а не «не описано»: это заголовок
             // титра на поле, и «не описано» там читается как ошибка.
             default -> "шаг партии";
@@ -319,6 +383,7 @@ public final class Names {
             case "per_kelium_coin" -> "за 1 келемий — " + v + " монет";
             case "per_kelium_ammo" -> "за 1 келемий — " + v + " боеприпасов";
             case "per_kelium_cards" -> "за 1 келемий — " + v + " карт заданий";
+            case "keep_cards" -> "из них остаётся в руке — " + v;
             case "kelium_to_coin" -> "келемий в монеты";
             case "kelium_to_ammo" -> "келемий в боеприпасы";
             case "kelium_to_objective" -> "келемий в карты заданий";
@@ -329,7 +394,7 @@ public final class Names {
             case "give_trophy" -> "отдать трофеев: " + v;
             case "get_coin" -> "получить монет: " + v;
             case "trophy_to_coin" -> "трофеи в монеты";
-            case "move_module" -> "переставить модуль";
+            case "move_module" -> "смена модуля";
             case "draw_arsenal", "draw2_keep1" -> "взять две карты арсенала, оставить одну";
             case "gild_module" -> "озолотить модуль";
             default -> unknown(key) + (v.isBlank() ? "" : " " + v);
@@ -424,28 +489,87 @@ public final class Names {
      * вместо них пустые квадраты. Один раз это уже испортило пульт, поэтому весь
      * чужой текст проходит через этот фильтр: непечатаемое молча выбрасывается.
      */
+    private static final java.util.regex.Pattern SEAL = java.util.regex.Pattern.compile(
+        "^seal_unit \\{seat=(\\d+), unit=([a-z_]+)\\}");
+    private static final java.util.regex.Pattern KIT = java.util.regex.Pattern.compile(
+        "^starter_kit \\{seat=(\\d+), got=\\{([^}]*)\\}");
+
+    /**
+     * События подготовки, которые движок пишет служебной строкой, — словами:
+     * глухой жетон, вытянутый при раздаче, стартовый набор арсенала. Прочая
+     * телеметрия (подсказки ботов, пустой бой) человеку не нужна.
+     */
+    private static String telemetryWords(String s) {
+        java.util.regex.Matcher m = SEAL.matcher(s);
+        if (m.find()) {
+            return "Игрок " + (Integer.parseInt(m.group(1)) + 1)
+                + " вытянул глухой жетон — он закрывает ячейку «" + unit(m.group(2)) + "»";
+        }
+        m = KIT.matcher(s);
+        if (m.find()) {
+            java.util.List<String> got = new java.util.ArrayList<>();
+            for (String part : m.group(2).split(",\\s*")) {
+                String[] kv = part.split("=");
+                if (kv.length == 2) {
+                    got.add("+" + kv[1].trim() + " " + switch (kv[0].trim()) {
+                        case "coin" -> "монета";
+                        case "ammo" -> "боеприпас";
+                        case "kelium" -> "келемий";
+                        case "trophy" -> "трофей";
+                        default -> "";
+                    });
+                }
+            }
+            return "Игрок " + (Integer.parseInt(m.group(1)) + 1) + " получил стартовый набор: "
+                + String.join(", ", got);
+        }
+        return "";
+    }
+
     public static String printable(String s) {
         if (s == null || s.isEmpty()) {
             return "";
         }
+        // СЫРАЯ ТЕЛЕМЕТРИЯ БОТОВ («objective_hints {…}») человеку не нужна —
+        // окно партии её тоже не показывает; в полном журнале она остаётся.
+        if (s.matches("(?s)^[a-z_]+ \\{.*")) {
+            return telemetryWords(s);
+        }
         java.awt.Font f = kelium.gui.replay2.Theme.body();
-        if (f.canDisplayUpTo(s) < 0) {
-            return s;
-        }
-        StringBuilder sb = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '\n' || c == '\t' || f.canDisplay(c)) {
-                sb.append(c);
+        String out = s;
+        if (f.canDisplayUpTo(s) >= 0) {
+            StringBuilder sb = new StringBuilder(s.length());
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                if (c == '\n' || c == '\t' || f.canDisplay(c)) {
+                    sb.append(c);
+                }
             }
+            out = sb.toString();
         }
-        // ВНУТРЕННИЕ КОДЫ В СКОБКАХ убираем: движок иногда дописывает в лог
+        // ВНУТРЕННИЕ КОДЫ В СКОБКАХ убираем: движок дописывает в лог
         // идентификатор карты вроде «(yellow_dev)» — человеку он ничего не говорит,
         // а правило у нас одно: внутренних ключей на экране быть не должно.
-        return sb.toString()
-            .replaceAll("\\s*\\([a-z][a-z0-9_]*\\)", "")
+        // Прежде чистка стояла только на ветке с непечатаемыми символами, и
+        // обычная строка приходила на экран с «(blue_explore)» (26.09.2026).
+        out = out.replaceAll("\\s*\\([a-z][a-z0-9_:>.\\-]*\\)", "")
+            .replaceAll("(Игрок \\d+) · \\1", "$1")
+            // карта-джокер напечатана как «ЗАТАИТЬСЯ» — так же и в строке лога
+            .replace("БЕЗОПАСНОСТЬ", "ЗАТАИТЬСЯ")
             .replaceAll("^[\\s·•]+", "")
             .trim();
+        // отчёты движка — словами, как в ленте окна партии; построчно, чтобы
+        // многострочная запись хода не слиплась в одну строку
+        String[] rows = out.split("\n", -1);
+        StringBuilder res = new StringBuilder(out.length());
+        for (int i = 0; i < rows.length; i++) {
+            if (i > 0) {
+                res.append('\n');
+            }
+            String lead = rows[i].substring(0, rows[i].length() - rows[i].stripLeading().length());
+            res.append(lead).append(kelium.gui.kp.FeedWords.ru(rows[i]));
+        }
+        return res.toString();
     }
 
     /**

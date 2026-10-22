@@ -116,6 +116,26 @@ public final class Passability {
     }
 
     /**
+     * Есть ли на гексе чужие НАЗЕМНЫЕ войска (авиация не в счёт). Решение
+     * дизайнера 23.09.2026: наземные не заходят на гекс с чужими наземными
+     * войсками; чужая авиация наземным не мешает.
+     */
+    public static boolean enemyGroundUnitsOn(GameState state, String hexId, int seat) {
+        for (PlayerState p : state.players) {
+            if (p.seat == seat) {
+                continue;
+            }
+            for (UnitToken u : p.units) {
+                if (u.alive() && !u.inside() && hexId.equals(u.hexId)
+                        && u.type != kelium.core.UnitType.AIRCRAFT) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Закрывает ли жетон, занимающий сторону гекса, проход наземному войску
      * игрока {@code seat}: чужое здание и нейтральная постройка — да, своё
      * здание и любые войска — нет.

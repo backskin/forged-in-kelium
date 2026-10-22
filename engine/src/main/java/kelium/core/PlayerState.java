@@ -64,11 +64,29 @@ public final class PlayerState {
      * ней нельзя: оно принадлежит игроку, а не способности.
      */
     public final Map<String, Integer> arsenalCardKelium = new HashMap<>();
-    public String superObjective = null;
+    /**
+     * ЭНЕРГИЯ, ЛЕЖАЩАЯ НА УСТАНОВЛЕННОЙ КАРТЕ АРСЕНАЛА: id карты → сколько
+     * кубиков энергии на ней сейчас. Устроено так же и по той же причине, что
+     * {@link #arsenalCardKelium}, но валюта другая: «Разрядник» (арсенал 6.0.0)
+     * копит на себе энергию и разменивает её на выстрел без боеприпасов.
+     *
+     * <p>Кубики на карте НЕ считаются энергией здания: пока они здесь, здание
+     * их не получает, и источник, с которого они сняты, их не держит.
+     */
+    public final Map<String, Integer> arsenalCardEnergy = new HashMap<>();
+    /**
+     * СУПЕР-ЗАДАНИЯ ИГРОКА — их может быть несколько, и они НАКАПЛИВАЮТСЯ.
+     *
+     * <p>Одну карту игрок получает в подготовку, ещё по одной выдаёт третий шаг
+     * каждого трека науки. Пришедшая карта ложится к прежним и работает наравне
+     * с ними: каждая считает свой множитель в финале и каждая один раз за партию
+     * отдаёт награду за своё требование.
+     */
+    public final List<String> superObjectives = new ArrayList<>();
     /**
      * ПРЕДЛОЖЕНИЕ супер заданий: карты, разданные игроку на выбор (правило 2.0,
      * 12.08.2026 — раздаём две, игрок оставляет одну). Пока выбор не сделан,
-     * {@link #superObjective} равен null.
+     * {@link #superObjectives} пуст.
      */
     public final List<String> superObjectiveOffer = new ArrayList<>();
     /**
@@ -78,13 +96,17 @@ public final class PlayerState {
      */
     public final List<String> startObjectiveOffer = new ArrayList<>();
     /**
-     * НИЗ СУПЕР-ЗАДАНИЯ ОТРАБОТАН. Награда за жёсткое требование берётся один
-     * раз за партию, поэтому нужен один флаг — и больше ничего. Прежняя
-     * механика (четыре ячейки, счётчик запуска, жетон супероружия, символы под
-     * планшетом) снесена по требованию дизайнера 09.09.2026: верх карты это
-     * множитель победных очков в финале, низ — требование с разовой наградой.
+     * НАЧАЛЬНЫЙ АРСЕНАЛ НА ВЫБОР (решение Влада 02.10.2026, ключ
+     * {@code setup.start_arsenal_offer}): две карты из восьми наугад, одну игрок
+     * оставляет, вторая уходит в коробку. Пусто — выбор сделан или его нет.
      */
-    public boolean superObjectiveComplete = false;
+    public final List<String> startArsenalOffer = new ArrayList<>();
+    /**
+     * НИЗЫ, КОТОРЫЕ УЖЕ ОТРАБОТАЛИ. Награда за жёсткое требование берётся один
+     * раз за партию — но у каждой карты своя, поэтому флаг нужен ПОКАРТОЧНЫЙ:
+     * супер-заданий у игрока может быть несколько ({@link #superObjectives}).
+     */
+    public final java.util.Set<String> superObjectivesDone = new java.util.HashSet<>();
 
     // Модули в резерве (ещё не размещены). red/blue; gold = позолочённые.
     public int redModules = 0;
@@ -99,7 +121,7 @@ public final class PlayerState {
     public final List<String> blueTokens = new ArrayList<>();
     public int goldModules = 0;
 
-    // Размещения модулей на доске (выбираются в фазе смены модулей):
+    // Размещения модулей на доске (выбираются при смене модулей):
     // redPlacements[UnitType] = модуль поверх вторичного ряда атаки этого юнита.
     // bluePlacements[BuildingType] = модуль поверх сборочной «1» этого здания.
     public final Map<UnitType, Map<String, Object>> redPlacements = new HashMap<>();
@@ -127,26 +149,16 @@ public final class PlayerState {
     public final List<String> superArsenalCards = new ArrayList<>();
 
     // Контейнеры на руках (не вскрытые). Вскрытие — бесплатное действие.
-    /**
-     * СКОЛЬКО КОНТЕЙНЕРОВ У ИГРОКА. Всегда равно длине {@link #containerHand}:
-     * поле оставлено потому, что счёт спрашивают в восьми десятках мест, а
-     * коды карт нужны только показу и вскрытию.
-     */
     public int containers = 0;
 
     /**
-     * КАКИЕ ИМЕННО КОНТЕЙНЕРЫ ЛЕЖАТ У ИГРОКА, рубашкой вверх.
-     *
-     * <p>Карта берётся из колоды В МОМЕНТ ПОЛУЧЕНИЯ контейнера, а не при
-     * вскрытии (заказ дизайнера 11.09.2026: «там же должен выдаваться
-     * конкретный контейнер»). Так это и на столе: взял — взял ту карту,
-     * которая легла, и она лежит перед тобой закрытой, пока её не вскроют.
-     *
-     * <p>Пока колода не кончилась, длина списка равна {@link #containers}.
-     * Кончилась — контейнер всё равно выдаётся счётчиком: правило «жетон не
-     * сгорает» старше любой колоды.
+     * КАКИЕ ИМЕННО КАРТЫ КОНТЕЙНЕРОВ ЛЕЖАТ ПОД ПЛАНШЕТОМ (решение дизайнера
+     * 27.09.2026): карту берут из колоды сразу, когда контейнер получен, и
+     * владелец её видит; вскрывают её спец-действием. Соперникам видно только
+     * число. Карт бывает меньше, чем {@link #containers}, только когда колода
+     * контейнеров кончилась: такой контейнер тянется при вскрытии, как прежде.
      */
-    public final List<String> containerHand = new ArrayList<>();
+    public final List<String> containerCards = new ArrayList<>();
 
     /**
      * ЖЕТОНЫ ЩИТА, ЛЕЖАЩИЕ НА СТРОКАХ ПЛАНШЕТА ВОЙСК (эффект «щит», 17.08.2026).
@@ -321,10 +333,12 @@ public final class PlayerState {
         p.arsenalHand.addAll(arsenalHand);
         p.arsenalInstalled.addAll(arsenalInstalled);
         p.arsenalCardKelium.putAll(arsenalCardKelium);
-        p.superObjective = superObjective;
+        p.arsenalCardEnergy.putAll(arsenalCardEnergy);
+        p.superObjectives.addAll(superObjectives);
         p.superObjectiveOffer.addAll(superObjectiveOffer);
         p.startObjectiveOffer.addAll(startObjectiveOffer);
-        p.superObjectiveComplete = superObjectiveComplete;
+        p.startArsenalOffer.addAll(startArsenalOffer);
+        p.superObjectivesDone.addAll(superObjectivesDone);
         p.redModules = redModules;
         p.blueModules = blueModules;
         p.redTokens.addAll(redTokens);
@@ -348,7 +362,7 @@ public final class PlayerState {
         p.storageTokens.addAll(storageTokens);
         p.superArsenalCards.addAll(superArsenalCards);
         p.containers = containers;
-        p.containerHand.addAll(containerHand);
+        p.containerCards.addAll(containerCards);
         p.shieldedKinds.addAll(shieldedKinds);
         p.mandateArsenalCard = mandateArsenalCard;
         p.mandateContainers = mandateContainers;
@@ -362,12 +376,10 @@ public final class PlayerState {
         p.warTrackVp = warTrackVp;
         p.cuKills = cuKills;
         p.killsTotal = killsTotal;
-        p.superObjective = superObjective;
         p.roundsFirstPlayer = roundsFirstPlayer;
         p.cuEverLost = cuEverLost;
         p.cuTokenRemoved = cuTokenRemoved;
         p.objectivesCompleted = objectivesCompleted;
-        p.superObjectiveComplete = superObjectiveComplete;
         return p;
     }
 

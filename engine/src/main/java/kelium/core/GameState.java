@@ -42,6 +42,13 @@ public final class GameState {
      * вслепую с верха колоды, витрины не касаясь.
      */
     public final java.util.List<String> arsenalDisplay = new java.util.ArrayList<>();
+    /**
+     * ОТКРЫТЫЕ СУПЕР-ЗАДАНИЯ НА СТОЛЕ (решение дизайнера 05.10.2026, свод
+     * {@code super_objectives.display}). На подготовке супер-заданий не
+     * раздают: 3 карты лежат лицом вверх, за третью ступень трека игрок
+     * забирает одну из них, и на её место выкладывают верхнюю карту колоды.
+     */
+    public final java.util.List<String> superDisplay = new java.util.ArrayList<>();
     public int circle = 0;                    // 1..circlesPerRound
     public int firstPlayer = 0;               // место с жетоном первого игрока
 
@@ -78,8 +85,26 @@ public final class GameState {
      * остальных сузилось. Сбрасываются на Обновлении вместе со сменой карты.
      */
     public final int[][] marketCells = {{-1, -1}, {-1, -1}};
+    /**
+     * ЯЧЕЙКА ОБНОВЛЕНИЯ КАРТЫ РЫНКА — место игрока, чей кубик келемия в ней
+     * стоит, либо −1 (свободна). Нарисована на планшете рынка слева от слота
+     * карты со значком обновления и есть в печатной игре с самого начала;
+     * в правилах и в движке её до 15.09.2026 не было вовсе.
+     *
+     * <p>Игрок кладёт в неё келемий действием Рынок — открытая карта тут же
+     * уходит из игры вместе со всеми кубиками на её ячейках предложений, и
+     * открывается следующая, со свободными ячейками. Ячейка одна и чистится на
+     * Обновлении, поэтому карту рынка обновляют не больше раза за раунд.
+     */
+    public int marketRefreshCell = -1;
     public boolean finished = false;
     public Integer winner = null;
+    /**
+     * ВСЕ ПОБЕДИТЕЛИ. Обычно один — он же {@link #winner}; при полной ничьей
+     * (равны очки и все три признака развязки) победу делят, и здесь их
+     * несколько (правило дизайнера 14.09.2026).
+     */
+    public final java.util.List<Integer> winners = new java.util.ArrayList<>();
     public String winCondition = null;
     /**
      * СКОЛЬКО ИСТОЧНИКОВ КЕЛЕМИЯ ОСТАЛОСЬ, когда партия кончилась по ним, и при
@@ -113,6 +138,22 @@ public final class GameState {
      */
     public TurnUndo turnUndo = null;
 
+    /**
+     * КРЮЧОК НАЧАЛА КРУГА (пошаговый API, 23.09.2026): движок зовёт его в самом
+     * начале каждого круга, до вскрытия приказов. Летопись снимает здесь точную
+     * копию стола — от неё позиция и проигрывается заново. В копии НЕ переносится.
+     */
+    public java.util.function.Consumer<GameState> circleStartHook = null;
+
+    /**
+     * КУДА ПУБЛИКОВАТЬ СОБЫТИЯ ИЗ ГЛУБИНЫ ПРАВИЛ (Карты 2.0, 30.09.2026).
+     * Ветка, сыгранная с карты, идёт мимо главного цикла движка — без этого
+     * поля о ней не узнали бы ни запись партии, ни карты «каждый раз, когда
+     * играешь ветку …». Ставится при привязке агентов, в копии НЕ переносится;
+     * {@code null} — наблюдателя нет (тесты, пробники).
+     */
+    public java.util.function.Consumer<java.util.Map<String, Object>> публикатор = null;
+
     public GameState(Object config, List<PlayerState> players, Field field,
                      TokenStats tokenStats, TechBoard tech,
                      Map<String, Deck> decks, Random rng, int firstPlayer) {
@@ -144,7 +185,38 @@ public final class GameState {
      * ссылки на прежнее состояние и агентов. Копию обязан привязать вызывающий
      * через {@code GameEngine.bind(copy, agents)}.
      */
+    /**
+     * ТОЧНАЯ КОПИЯ — с тем же состоянием ГСЧ, а не новым (23.09.2026). Нужна
+     * пошаговому API ({@code kelium.engine.step}): позиция там — снимок стола в
+     * начале круга плюс решения после него, и повтор решений обязан дать ровно
+     * ту же партию, включая доборы карт. Обычная {@link #deepCopy} для этого не
+     * годится — её ГСЧ новый нарочно.
+     */
+    public GameState exactCopy() {
+        return copyWith(cloneRandom(rng));
+    }
+
+    /** Копия ГСЧ в том же состоянии (Random сериализуем — это единственный публичный путь). */
+    private static Random cloneRandom(Random r) {
+        try {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(128);
+            try (java.io.ObjectOutputStream oo = new java.io.ObjectOutputStream(bo)) {
+                oo.writeObject(r);
+            }
+            try (java.io.ObjectInputStream oi = new java.io.ObjectInputStream(
+                    new java.io.ByteArrayInputStream(bo.toByteArray()))) {
+                return (Random) oi.readObject();
+            }
+        } catch (java.io.IOException | ClassNotFoundException e) {
+            throw new IllegalStateException("ГСЧ не копируется", e);
+        }
+    }
+
     public GameState deepCopy(long rngSeed) {
+        return copyWith(new Random(rngSeed));
+    }
+
+    private GameState copyWith(Random newRng) {
         Map<Integer, Token> registry = new HashMap<>();
         List<PlayerState> ps = new ArrayList<>();
         for (PlayerState p : players) {
@@ -163,7 +235,7 @@ public final class GameState {
             dk.put(e.getKey(), e.getValue().copy());
         }
         GameState s = new GameState(config, ps, field.copy(), tokenStats, tech.copy(),
-            dk, new Random(rngSeed), firstPlayer);
+            dk, newRng, firstPlayer);
         s.round = round;
         s.circle = circle;
         s.marketActive = marketActive;
@@ -173,14 +245,17 @@ public final class GameState {
         // обязана её нести: без этого бот, доигрывая копию, «видел» бы пустую
         // витрину и не мог оценить покупку арсенала вовсе.
         s.arsenalDisplay.addAll(arsenalDisplay);
+        s.superDisplay.addAll(superDisplay);
         s.redBag.addAll(redBag);
         s.blueBag.addAll(blueBag);
         for (int side = 0; side < marketCells.length; side++) {
             System.arraycopy(marketCells[side], 0, s.marketCells[side], 0,
                 marketCells[side].length);
         }
+        s.marketRefreshCell = marketRefreshCell;
         s.finished = finished;
         s.winner = winner;
+        s.winners.addAll(winners);
         s.winCondition = winCondition;
         s.spawnLeftAtEnd = spawnLeftAtEnd;
         s.spawnThreshold = spawnThreshold;
@@ -245,6 +320,8 @@ public final class GameState {
         superArsenalOffer.putAll(fresh.superArsenalOffer);
         arsenalDisplay.clear();
         arsenalDisplay.addAll(fresh.arsenalDisplay);
+        superDisplay.clear();
+        superDisplay.addAll(fresh.superDisplay);
         redBag.clear();
         redBag.addAll(fresh.redBag);
         blueBag.clear();
@@ -253,8 +330,11 @@ public final class GameState {
             System.arraycopy(fresh.marketCells[side], 0, marketCells[side], 0,
                 fresh.marketCells[side].length);
         }
+        marketRefreshCell = fresh.marketRefreshCell;
         finished = fresh.finished;
         winner = fresh.winner;
+        winners.clear();
+        winners.addAll(fresh.winners);
         winCondition = fresh.winCondition;
         spawnLeftAtEnd = fresh.spawnLeftAtEnd;
         spawnThreshold = fresh.spawnThreshold;

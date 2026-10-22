@@ -35,7 +35,10 @@ public final class UndoableAgent extends Agent {
 
     /** Действия, после которых остаётся точка отката (см. javadoc класса). */
     public static final Set<String> SAFE_ACTIONS = Set.of(
-        "build", "mining", "movement", "energy_swap", "assembly");
+        "build", "mining", "movement", "energy_swap", "assembly",
+        // развилки свода 1.46.0: Бой, Рынок и Наука запекаются своими видами
+        // решений (attack, market_*, sci_*), как и прежде
+        "extract", "power", "supply", "command");
 
     /**
      * ВИДЫ РЕШЕНИЙ, ФАКТИЧЕСКИ СОВЕРШАЮЩИЕ необратимое: первый залп боя,
@@ -53,18 +56,42 @@ public final class UndoableAgent extends Agent {
     private final GameState state;
     private final InteractiveAgent delegate;
     private final List<Mark> stack = new ArrayList<>();
+    /**
+     * Снимать ли точки отката. Окно партии откатывает ПЕРЕИГРОВКОЙ ленты
+     * решений (любое решение, не только безопасные действия), и снимки ему не
+     * нужны — больше того, вредны: снимок сдвигает ГСЧ партии
+     * ({@code rng.nextLong}), а при переигровке ленты этот агент не
+     * спрашивается, и поток случайностей разошёлся бы с исходной партией.
+     */
+    private final boolean snapshots;
 
     public UndoableAgent(int seat, String name, GameState state,
                           Consumer<InteractiveAgent.PendingDecision> onDecision,
                           Consumer<Map<String, Object>> onPublicEvent) {
+        this(seat, name, state, onDecision, onPublicEvent, true);
+    }
+
+    public UndoableAgent(int seat, String name, GameState state,
+                          Consumer<InteractiveAgent.PendingDecision> onDecision,
+                          Consumer<Map<String, Object>> onPublicEvent, boolean snapshots) {
         super(seat, name);
         this.state = state;
+        this.snapshots = snapshots;
         this.delegate = new InteractiveAgent(seat, name, onDecision, onPublicEvent);
+    }
+
+    /** Живой игрок: спец-действие — в меню хода (см. {@link Agent#specInActionMenu}). */
+    @Override
+    public boolean specInActionMenu() {
+        return true;
     }
 
     @Override
     public Choice choose(GameState s, List<Choice> options, Map<String, Object> context) {
         Choice pick = delegate.choose(s, options, context);
+        if (!snapshots) {
+            return pick;
+        }
         String kind = String.valueOf(context.get("kind"));
         if ("action".equals(kind) && pick.payload() instanceof String actionName
                 && SAFE_ACTIONS.contains(actionName)) {

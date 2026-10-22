@@ -110,6 +110,7 @@ public class StrategicAgent extends HeuristicAgent {
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
         String ctxKind = context != null ? String.valueOf(context.getOrDefault("kind", "")) : "";
+        options = безЦели(state, options);
         // ПЛАН ДЕРЖИТСЯ МЕЖДУ ХОДАМИ (15.08.2026). Раньше он пересоздавался с
         // нуля при каждом вскрытии и каждом действии: при двух близких по
         // ценности целях бот метался между ними и не доводил до конца НИ ОДНОЙ
@@ -180,7 +181,7 @@ public class StrategicAgent extends HeuristicAgent {
         }
         return switch (kind) {
             case "reveal_order" -> explainReveal(state, pick);
-            case "action" -> explainAction(state, pick);
+            case "action", "action_branch" -> explainAction(state, pick);
             case "move" -> explainMove(state, pick);
             case "maneuver_unit" -> explainManeuver(state, pick);
             case "combat_target" -> explainCombatTarget(state, pick);
@@ -210,11 +211,12 @@ public class StrategicAgent extends HeuristicAgent {
             return Phrasebook.pick("приказ.безопасность." + jokerGrade(state), rng);
         }
         Order top = Order.fromCode((String) card.get("top"));
-        String what = switch (top) {
-            case DEVELOPMENT -> "разработка";
-            case INFRASTRUCTURE -> "инфраструктура";
-            case OPERATION -> "операция";
-            case ACQUISITIONS -> "приобретения";
+        String what = switch (top.legacy()) {
+            case ACQUIRE -> "разработка";      // фразы прежних наборов: ближайший по смыслу
+            case PLACE -> "инфраструктура";
+            case CONTROL -> "операция";
+            case EXPLORE -> "приобретения";
+            default -> "операция";
         };
         return Phrasebook.pick("приказ." + what + "." + orderGrade(state, top), rng);
     }
@@ -223,7 +225,8 @@ public class StrategicAgent extends HeuristicAgent {
     private String orderGrade(GameState state, Order top) {
         String planned = plan == null || plan.nextStep == null
             ? null : plan.nextStep.action;
-        List<String> actions = List.of(Order.ORDER_ACTIONS.get(top));
+        List<String> actions = kelium.engine.Actions.expandForks(
+            List.of(Order.ORDER_ACTIONS.get(top)));
         if (planned != null && actions.contains(planned)) {
             return СИЛЬНО;
         }
@@ -294,7 +297,7 @@ public class StrategicAgent extends HeuristicAgent {
                 boolean anyNear = false;
                 for (BuildingToken b : me.buildingsOnField()) {
                     if (b.type != BuildingType.MINER
-                            || !Plan.touchesLiveTile(state, b.hexId, live)) {
+                            || !Plan.добывает(state, b)) {
                         continue;
                     }
                     anyNear = true;
@@ -396,7 +399,8 @@ public class StrategicAgent extends HeuristicAgent {
     private String explainSpec(GameState state, Choice pick) {
         String what = switch (pick.kind()) {
             case "spec_objective" -> "задание";
-            case "spec_objective_burn" -> "сжечь_задание";
+            case "spec_objective_enh" -> "задание_усиленно";
+            case "spec_objective_burn", "free_objective_burn" -> "сжечь_задание";
             case "spec_arsenal_burn" -> "сжечь_арсенал";
             case "spec_arsenal_install" -> "установить_арсенал";
             case "spec_super" -> "супер";
@@ -595,11 +599,24 @@ public class StrategicAgent extends HeuristicAgent {
                 }
                 return 0.0;
             }
-            case "action" -> {
+            case "action", "action_branch" -> {
                 if (o.payload() == null) {
                     return 0.0;
                 }
                 String name = String.valueOf(o.payload());
+                // РАЗВИЛКА (приказы 5.0.0): годится, если одна из веток — нужная.
+                List<String> ветки = kelium.engine.Actions.FORKS.get(name);
+                if (ветки != null) {
+                    // List.of не принимает null в contains — план без действия бывает
+                    if (step != null && step.action != null && ветки.contains(step.action)) {
+                        return k * 6.0;
+                    }
+                    String итог = step == null ? finalAction(plan) : null;
+                    if (итог != null && ветки.contains(итог)) {
+                        return k * 8.0;
+                    }
+                    return 0.0;
+                }
                 // действие, которым закрывается ближайший шаг
                 if (step != null && name.equals(step.action)) {
                     return k * 6.0;
@@ -696,7 +713,8 @@ public class StrategicAgent extends HeuristicAgent {
         } catch (RuntimeException e) {
             return 0.0;
         }
-        for (String a : kelium.engine.Order.ORDER_ACTIONS.get(ord)) {
+        for (String a : kelium.engine.Actions.expandForks(
+                List.of(kelium.engine.Order.ORDER_ACTIONS.get(ord)))) {
             if (a.equals(action)) {
                 return 1.0;
             }
@@ -728,7 +746,7 @@ public class StrategicAgent extends HeuristicAgent {
         }
         Order top = Order.fromCode((String) card.get("top"));
         double pull = genome.get("plan.reveal_pull", 6.0);
-        for (String a : Order.ORDER_ACTIONS.get(top)) {
+        for (String a : kelium.engine.Actions.expandForks(List.of(Order.ORDER_ACTIONS.get(top)))) {
             if (a.equals(needNow)) {
                 // готовый план (nextStep == null) закрывается финальным действием
                 // — это самый ценный приказ на руке.
@@ -1339,7 +1357,7 @@ public class StrategicAgent extends HeuristicAgent {
             // зашитым числом: у авиабазы их два, а не три, с 13.08.2026.
             int need;
             try {
-                need = state.tokenStats.buildingEnergySlots(bt, null);
+                need = state.tokenStats.buildingEnergySlots(bt, null, seat);
             } catch (RuntimeException e) {
                 need = 2;
             }
@@ -1510,11 +1528,7 @@ public class StrategicAgent extends HeuristicAgent {
 
     /**
      * Выбор жетона для бесплатного манёвра: предпочитаем тот, у кого есть
-<<<<<<< HEAD
-     * убиваемая цель — манёвр приблизит к удару без затрат Наступления/боеприпасов.
-=======
      * убиваемая цель — манёвр приблизит к удару без затрат Наступления и боеприпасов.
->>>>>>> origin/main
      */
     private double scoreManeuverUnit(GameState state, Choice o) {
         if ("pass".equals(o.kind())) {

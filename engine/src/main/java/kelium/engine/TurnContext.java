@@ -36,9 +36,18 @@ public final class TurnContext implements kelium.core.TurnUndo {
     // использован ли бесплатный ход ЦУ?
     public boolean cuFreeMoveUsed = false;
 
+    /**
+     * ПРЕДЕЛ СПЕЦ-ДЕЙСТВИЙ, ПОСЧИТАННЫЙ НА ВХОДЕ В ХОД, — без прибавок, которые
+     * дают утили посреди хода. Нужен, чтобы прибавка не накапливалась: ход
+     * пересчитывает предел перед каждым предложением СПЕЦ, и складывать её с
+     * уже сложенным значением значило бы расти на каждый круг предложения.
+     */
+    public final int specLimitBase;
+
     public TurnContext(int seat, int specLimit) {
         this.seat = seat;
         this.specLimit = specLimit;
+        this.specLimitBase = specLimit;
     }
 
     /**
@@ -59,7 +68,17 @@ public final class TurnContext implements kelium.core.TurnUndo {
             throw new IllegalStateException("превышен лимит SPEC-действий");
         }
         specUsed++;
+        if (факты != null) {
+            факты.спецИспользовано++;
+        }
     }
+
+    /**
+     * ФАКТЫ ХОДА В ЖУРНАЛЕ — туда же пишется число потраченных спец-действий,
+     * чтобы требование «в этот ход используй третье спец-действие» видело его
+     * (Карты 2.0). Ставит движок при начале хода; {@code null} — вне хода.
+     */
+    public kelium.core.TurnJournal.TurnFacts факты = null;
 
     /**
      * Наценка за СЛЕДУЮЩУЮ операцию {@code action} по расписанию вида [0,1,2,3];
@@ -90,8 +109,20 @@ public final class TurnContext implements kelium.core.TurnUndo {
 
     /** Названия действий, которые в этом ходу ещё не сыграны. */
     public Set<String> remainingActionNames() {
-        Set<String> out = new LinkedHashSet<>(orderActions);
-        out.removeAll(actionsPlayed);
+        // Развилка (приказы 5.0.0) открывает обе свои ветки — это имена прежних
+        // действий, по которым планируют задания.
+        Set<String> out = new LinkedHashSet<>();
+        for (String a : orderActions) {
+            if (actionsPlayed.contains(a)) {
+                continue;
+            }
+            List<String> ветки = Actions.FORKS.get(a);
+            if (ветки == null) {
+                out.add(a);
+            } else {
+                out.addAll(ветки);
+            }
+        }
         return out;
     }
 
@@ -130,6 +161,20 @@ public final class TurnContext implements kelium.core.TurnUndo {
      * дефицит, и выдача трёх штук осталась бы на поле после действия.
      */
     public boolean allPowered = false;
+
+    /**
+     * РАБОТАЕТ ТОЛЬКО ЭТО ЗДАНИЕ (uid; −1 — все). Нужно срабатыванию при
+     * постройке (решение дизайнера 24.09.2026): новое здание один раз выполняет
+     * своё — выпуск или добычу — тем же кодом, что Снабжение и Добыча, но только
+     * оно одно, без энергии и без возврата войск в запас.
+     */
+    public int толькоЗдание = -1;
+
+    /**
+     * СБОРКА ТОЛЬКО ВОЙСКАМИ: боеприпасы не предлагаются. Срабатывание военного
+     * здания, построенного на ячейке контейнера (решение дизайнера 25.09.2026).
+     */
+    public boolean сборкаТолькоВойска = false;
 
     /**
      * НАДБАВКИ СНЯТЫ для перечисленных счётчиков операций.
@@ -198,6 +243,17 @@ public final class TurnContext implements kelium.core.TurnUndo {
     public int attackTokensLimit = 0;
 
     /**
+     * МАНЁВР ОГРАНИЧЕННЫМ ЧИСЛОМ ЖЕТОНОВ — верх карты «Выполни движение двумя
+     * любыми жетонами войск» (печатные карты 25.09.2026). Ноль — обычный Манёвр.
+     *
+     * <p>Не больше стольких РАЗНЫХ жетонов, с любых гексов, каждый на свою
+     * скорость, без доплаты: так напечатано — «двумя любыми жетонами». Поле
+     * {@link #freeExtraMoves} для этого не годится: его не читает никто, и
+     * прежний утиль «движение 2 войсками» с ним делал обычный полный Манёвр.
+     */
+    public int moveTokensLimit = 0;
+
+    /**
      * ТОЛЬКО ОБМЕНЫ, И НЕ БОЛЬШЕ СТОЛЬКИХ — верх карты «1 обмен в Науке (не
      * трек) / 1 обмен в Рынке (не карта)». Ноль — обычное действие.
      *
@@ -239,6 +295,13 @@ public final class TurnContext implements kelium.core.TurnUndo {
      * надбавку за вторую операцию. −1 значит «цена обычная».
      */
     public int buildFixedPrice = -1;
+
+    /**
+     * ВЕТКА «ПОСТРОИТЬ» ДЕЙСТВИЯ-РАЗВИЛКИ (приказы 5.0.0): какие здания эта
+     * Стройка ставит и сносит — miner | plant | military (военные и ЦУ).
+     * {@code null} — обычная Стройка, все типы.
+     */
+    public String buildBranch = null;
 
     // ==================== памятка хода для отката ====================
 

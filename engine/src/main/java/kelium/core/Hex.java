@@ -328,13 +328,25 @@ public final class Hex {
      * одиночных (пехота/вышки, по 1). Тайл зарождения закрывает гекс целиком.
      */
     public boolean fitsWithRepack(int fp, int vehicles, int singles) {
+        return fitsWithRepack(fp, vehicles, singles, 0);
+    }
+
+    /**
+     * То же с секторами, которые ДЕРЖАТ войска ({@code held} — маска сторон).
+     *
+     * <p>ЖЕТОНЫ ДЕРЖАТ СВОИ СЕКТОРЫ (дизайнер 30.09.2026): войско стоит на
+     * секторе так же, как здание, и ничто его не сдвигает. Тогда стоящие войска
+     * — такие же жёсткие, как здания: их секторы передаются маской, а
+     * {@code vehicles}/{@code singles} — нули (переупаковывать некого).
+     */
+    public boolean fitsWithRepack(int fp, int vehicles, int singles, int held) {
         if (spawnTile != null) {
             return false;
         }
         if (fp == 0) {
-            return feasible(freeMask(), vehicles, singles);
+            return feasible(freeMask(held), vehicles, singles);
         }
-        return chooseFootprint(fp, vehicles, singles) != null;
+        return chooseFootprint(fp, vehicles, singles, held) != null;
     }
 
     /**
@@ -352,10 +364,15 @@ public final class Hex {
      * ячейку с печатным контейнером накрывает след.
      */
     public List<Integer> footprintAt(int start, int fp, int vehicles, int singles) {
+        return footprintAt(start, fp, vehicles, singles, 0);
+    }
+
+    /** То же с секторами, которые держат войска (см. {@link #fitsWithRepack(int, int, int, int)}). */
+    public List<Integer> footprintAt(int start, int fp, int vehicles, int singles, int held) {
         if (spawnTile != null || fp <= 0) {
             return null;
         }
-        boolean[] free = freeMask();
+        boolean[] free = freeMask(held);
         List<Integer> run = new ArrayList<>();
         for (int k = 0; k < fp; k++) {
             int i = (start + k) % 6;
@@ -372,10 +389,15 @@ public final class Hex {
     }
 
     public List<Integer> chooseFootprint(int fp, int vehicles, int singles) {
+        return chooseFootprint(fp, vehicles, singles, 0);
+    }
+
+    /** То же с секторами, которые держат войска (см. {@link #fitsWithRepack(int, int, int, int)}). */
+    public List<Integer> chooseFootprint(int fp, int vehicles, int singles, int held) {
         if (spawnTile != null || fp <= 0) {
             return null;
         }
-        boolean[] free = freeMask();
+        boolean[] free = freeMask(held);
         for (int start = 0; start < 6; start++) {
             boolean ok = true;
             List<Integer> run = new ArrayList<>();
@@ -401,10 +423,10 @@ public final class Hex {
         return null;
     }
 
-    private boolean[] freeMask() {
+    private boolean[] freeMask(int held) {
         boolean[] free = new boolean[6];
         for (int i = 0; i < 6; i++) {
-            free[i] = sideOwner[i] == null;
+            free[i] = sideOwner[i] == null && (held & (1 << i)) == 0;
         }
         return free;
     }

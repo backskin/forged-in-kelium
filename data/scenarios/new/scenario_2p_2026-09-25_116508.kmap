@@ -1,0 +1,82 @@
+version: editor
+scenarios:
+- id: scenario_2p_2026-09-25_116508
+  players: 2
+  _made_with: LayoutEditor
+  hexes:
+  - q: 1
+    r: -2
+    content: spawn_start
+  - q: 2
+    r: -1
+  - q: 1
+    r: 0
+  - q: 0
+    r: 0
+    content: kelium_tile
+    kelium_delta: 1
+  - q: 0
+    r: -1
+    neutral_list:
+    - size: big
+      corners:
+      - 5
+      - 6
+      - 1
+  - q: 2
+    r: 0
+    content: player_start
+    seat: 0
+  - q: 2
+    r: -2
+  - q: 1
+    r: -1
+    neutral_list:
+    - size: small
+      corners:
+      - 4
+      - 5
+  - q: 0
+    r: 1
+    neutral_list:
+    - size: big
+      corners:
+      - 2
+      - 3
+      - 4
+  - q: -1
+    r: 2
+    content: spawn_start
+  - q: -1
+    r: 1
+    neutral_list:
+    - size: small
+      corners:
+      - 1
+      - 2
+  - q: -2
+    r: 1
+  - q: -2
+    r: 2
+  - q: -1
+    r: 0
+  - q: -1
+    r: -1
+  - q: 0
+    r: -2
+  - q: -2
+    r: 0
+    content: player_start
+    seat: 1
+  - q: 1
+    r: 1
+  - q: 0
+    r: 2
+  - q: -2
+    r: 3
+  - q: -1
+    r: 3
+  - q: 1
+    r: -3
+  - q: 2
+    r: -3

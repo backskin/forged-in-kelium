@@ -62,6 +62,17 @@ public final class MoveLog {
             inner.observePublicEvent(event);
         }
 
+        /** Живой игрок остаётся живым и под записью: меню хода с тем же списком. */
+        @Override
+        public boolean specInActionMenu() {
+            return inner.specInActionMenu();
+        }
+
+        @Override
+        public String intent() {
+            return inner.intent();
+        }
+
         /** Настоящий агент под обёрткой. */
         public Agent inner() {
             return inner;
@@ -103,8 +114,10 @@ public final class MoveLog {
                             + " записан вариант " + idx + ", а вариантов " + options.size()
                             + ". Партию по такому сохранению не восстановить.");
                 }
+                fromTape = true;
                 return options.get(idx);
             }
+            fromTape = false;
             if (!announced) {
                 announced = true;
                 if (onCaughtUp != null) {
@@ -122,6 +135,20 @@ public final class MoveLog {
         @Override
         public void observePublicEvent(Map<String, Object> event) {
             inner.observePublicEvent(event);
+        }
+
+        /** Проигрывание обязано видеть те же варианты, что видел игрок. */
+        @Override
+        public boolean specInActionMenu() {
+            return inner.specInActionMenu();
+        }
+
+        /** Решение с ленты — не решение бота: намерения у него нет. */
+        private boolean fromTape;
+
+        @Override
+        public String intent() {
+            return fromTape ? null : inner.intent();
         }
 
         public Agent inner() {

@@ -1,0 +1,167 @@
+package kelium;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.junit.jupiter.api.Test;
+
+import kelium.dataio.ContentSet;
+import kelium.dataio.GameConfig;
+import kelium.engine.ability.Abilities;
+
+/**
+ * КОЛОДА АРСЕНАЛА 7.0.0 И СУПЕР-АРСЕНАЛ 3.0.0 — по печатным картам дизайнера
+ * (экспорт 13.09 и 17.09.2026).
+ *
+ * <p>Сторожит то, что считано с печати и ломается правкой одной строки: состав
+ * (32 обычные, 4 начальные, 4 супер-войска), «одно имя — один низ», звёзды на
+ * лицах и то, что у каждой карты есть живой код — карта без кода молча
+ * выпадает из колоды на подготовке.
+ */
+class ArsenalSevenDeckTest {
+
+    private static GameConfig cfg() {
+        return GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 7L, null, null);
+    }
+
+    private static ContentSet arsenal() {
+        return cfg().content.get("arsenal");
+    }
+
+    private static List<Map<String, Object>> вид(String kind) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> c : arsenal().entries) {
+            boolean старт = "starting".equals(String.valueOf(c.get("kind")));
+            if (старт == "starting".equals(kind)) {
+                out.add(c);
+            }
+        }
+        return out;
+    }
+
+    private static String низ(Map<String, Object> card) {
+        return card.get("bottom") instanceof Map<?, ?> m
+            ? String.valueOf(m.get("passive")) : "";
+    }
+
+    @Test
+    void действующийСводБерётНабор71ИЧетвёртыйСупер() {
+        assertEquals("7.4.0", arsenal().version);   // 7.4 — «пять развилок» без «Сдачи тары», 30.09
+        assertEquals("4.0.0", cfg().content.get("super_arsenal").version);
+    }
+
+    @Test
+    void тридцатьТриОбычныхИСемьНачальных() {
+        // 7.1.0 (25.09.2026): печатные №1…32 и заполненная заготовка №33;
+        // начальные — печатные №1…6 и заполненная заготовка №7.
+        assertEquals(33, вид("regular").size(), "обычных карт — №1…33");
+        // 7.4.0 (30.09.2026): «Сдача тары» убрана — контейнеры на старте непредсказуемы
+        assertEquals(6, вид("starting").size(), "начальных — №1…6");
+    }
+
+    @Test
+    void начальныеНеПовторяютНизИИмя() {
+        // «Одно название — одна карта»: две начальные с разным низом под одним
+        // именем нельзя было бы установить вместе. Имена печатных дублей —
+        // служебные, печатное лежит в поле печатное_имя.
+        Set<String> имена = new HashSet<>();
+        Set<String> низы = new HashSet<>();
+        for (Map<String, Object> c : вид("starting")) {
+            assertTrue(имена.add(String.valueOf(c.get("name"))), "имя повторяется: " + c.get("id"));
+            assertTrue(низы.add(низ(c)), "низ повторяется: " + c.get("id"));
+        }
+        // 7.2.0 (26.09.2026): те же карты, верх — стартовый набор
+        assertEquals("Полевой генератор", arsenal().byId("bs72_5").get("печатное_имя"));
+        assertEquals("Мародёрка", arsenal().byId("bs72_6").get("печатное_имя"));
+    }
+
+    @Test
+    void одинНизОдноИмя() {
+        Map<String, String> имяПоНизу = new HashMap<>();
+        for (Map<String, Object> c : вид("regular")) {
+            String было = имяПоНизу.putIfAbsent(низ(c), String.valueOf(c.get("name")));
+            if (было != null) {
+                assertEquals(было, c.get("name"), "низ " + низ(c) + " под двумя именами");
+            }
+        }
+    }
+
+    @Test
+    void параВерхНизНеПовторяется() {
+        Set<String> пары = new HashSet<>();
+        for (Map<String, Object> c : вид("regular")) {
+            String верх = c.get("top") instanceof Map<?, ?> m ? String.valueOf(m.get("label")) : "";
+            assertTrue(пары.add(верх + " | " + низ(c)), "пара повторяется у " + c.get("id"));
+        }
+    }
+
+    @Test
+    void звёздыПоПечати() {
+        // Звезда в левом нижнем углу лица: №1, 5, 7, 8, 9, 11, 12, 16, 17, 19,
+        // 20, 22, 26, 27, 28, 29 — по одной.
+        Set<String> соЗвездой = new HashSet<>();
+        for (Map<String, Object> c : вид("regular")) {
+            if (c.get("vp_on_card") instanceof Number n && n.intValue() > 0) {
+                assertEquals(1, n.intValue(), "на карте одна звезда: " + c.get("id"));
+                соЗвездой.add(String.valueOf(c.get("id")));
+            }
+        }
+        Set<String> ждём = new HashSet<>();
+        for (int n : new int[]{1, 5, 7, 8, 9, 11, 12, 16, 17, 19, 20, 22, 26, 27, 28, 29}) {
+            ждём.add(String.format("a7_%02d", n));
+        }
+        assertEquals(ждём, соЗвездой);
+        for (Map<String, Object> c : вид("starting")) {
+            assertFalse(c.containsKey("vp_on_card"), "на начальных звёзд нет");
+        }
+    }
+
+    @Test
+    void укаждойКартыЖивойКод() {
+        List<String> мёртвые = new ArrayList<>();
+        for (Map<String, Object> c : arsenal().entries) {
+            if (!Abilities.implemented(низ(c))) {
+                мёртвые.add(c.get("id") + " низ " + низ(c));
+            }
+            String эффект = c.get("top") instanceof Map<?, ?> m
+                ? String.valueOf(m.get("effect")) : "";
+            if (!kelium.engine.Effects.isImplemented(эффект)) {
+                мёртвые.add(c.get("id") + " верх " + эффект);
+            }
+        }
+        for (Map<String, Object> c : cfg().content.get("super_arsenal").entries) {
+            if (!Abilities.implemented(String.valueOf(c.get("passive")))) {
+                мёртвые.add(c.get("id") + " " + c.get("passive"));
+            }
+        }
+        assertTrue(мёртвые.isEmpty(), "без реализации: " + мёртвые);
+    }
+
+    @Test
+    void суперВойскаПоПечати() {
+        List<Map<String, Object>> супер = cfg().content.get("super_arsenal").entries;
+        assertEquals(9, супер.size(), "четыре супер-войска и пять способностей");
+        Set<String> роды = new HashSet<>();
+        int способностей = 0;
+        for (Map<String, Object> c : супер) {
+            assertEquals(1, ((Number) c.get("vp_on_card")).intValue(), "одна звезда: " + c.get("id"));
+            if ("power".equals(c.get("kind"))) {
+                способностей++;
+                continue;
+            }
+            assertEquals("troop", c.get("kind"));
+            assertEquals(1, ((Number) c.get("attacks")).intValue(), "одна рамка атаки");
+            роды.add(String.valueOf(c.get("unit")));
+        }
+        assertEquals(Set.of("infantry", "vehicle", "aircraft", "tower"), роды);
+        assertEquals(5, способностей);
+    }
+}

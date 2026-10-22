@@ -50,8 +50,26 @@ public final class NoisyAgent extends Agent {
         this.rng = rng;
     }
 
+    /** Прежний бот — ошибается и в ходах без цели (см. {@link HeuristicAgent#прежний}). */
+    public boolean прежний = false;
+
+    public NoisyAgent прежним() {
+        this.прежний = true;
+        return this;
+    }
+
+    @Override
+    public String intent() {
+        return под.intent();
+    }
+
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
+        // ОШИБКА НОВИЧКА — ВЫБОР НЕ ТОГО, А НЕ ХОД БЕЗ ЦЕЛИ: снос своего ЦУ без
+        // угрозы не попадает даже в случайный выбор (заказ 27.09.2026).
+        if (!прежний) {
+            options = Угрозы.отсеять(state, seat, options);
+        }
         Choice умный = под.choose(state, options, context);
         if (options == null || options.size() < 2 || rng.nextDouble() >= доляОшибок) {
             return умный;

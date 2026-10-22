@@ -166,6 +166,20 @@ public final class GameConfig {
     }
 
     /** Определить каталог данных: свойство kelium.data или первый существующий кандидат. */
+    /**
+     * ГДЕ ЛЕЖАТ КАРТИНКИ. В раздаче они приходят отдельным паком
+     * ({@code textures.pak}) и распаковываются не туда, где правила и карты:
+     * запускатель передаёт их папку свойством {@code kelium.textures}. Нет
+     * свойства — картинки в {@code <data>/textures}, как в проекте.
+     */
+    public static Path texturesRoot() {
+        String prop = System.getProperty("kelium.textures");
+        if (prop != null && !prop.isEmpty() && Files.isDirectory(Paths.get(prop))) {
+            return Paths.get(prop);
+        }
+        return resolveDataRoot(null).resolve("textures");
+    }
+
     public static Path resolveDataRoot(Path override) {
         if (override != null) {
             return override;
@@ -249,8 +263,57 @@ public final class GameConfig {
                                    Path dataRoot, java.util.List<String> boardSides) {
         Path root = resolveDataRoot(dataRoot);
         Ruleset ruleset = Ruleset.loadById(rulesetId, root.resolve("rulesets"));
+        применитьПравки(ruleset);
         ContentLibrary content = ContentLibrary.forRuleset(ruleset, root);
         return new GameConfig(ruleset, content, numPlayers, seed, root, boardSides);
+    }
+
+    /**
+     * ПРАВКИ СВОДА ИЗ КОМАНДНОЙ СТРОКИ: {@code -Dkelium.rules=ключ=значение,...}.
+     *
+     * <p>Зачем. Правило-вариант («келемий — джокер», «по два военных здания»)
+     * надо сравнить со старым правилом на ОДНОМ и том же своде, иначе в замер
+     * попадут заодно все прочие отличия версий. Править файл свода между
+     * прогонами нельзя: это меняет его для всех и легко забывается откатить.
+     *
+     * <p>Значение читается как число, как {@code true}/{@code false} или как
+     * строка — в таком порядке. Пример:
+     * {@code -Dkelium.rules=economy.kelium_is_joker=true,actions.build.military_copies=2}
+     */
+    private static void применитьПравки(Ruleset ruleset) {
+        // ПРАВКИ ВАРИАНТА (стенд) идут первыми, правки запуска — поверх них:
+        // строка запуска задаётся человеком вручную и должна побеждать.
+        Вариант в = Вариант.сейчас();
+        if (в != null) {
+            for (java.util.Map.Entry<String, Object> e : в.правкиСвода().entrySet()) {
+                ruleset.override(e.getKey(), e.getValue());
+            }
+        }
+        String строка = System.getProperty("kelium.rules", "").trim();
+        if (строка.isEmpty()) {
+            return;
+        }
+        for (String кусок : строка.split(",")) {
+            int знак = кусок.indexOf('=');
+            if (знак <= 0) {
+                continue;
+            }
+            String ключ = кусок.substring(0, знак).trim();
+            String значение = кусок.substring(знак + 1).trim();
+            Object v;
+            if ("true".equalsIgnoreCase(значение) || "false".equalsIgnoreCase(значение)) {
+                v = Boolean.parseBoolean(значение);
+            } else {
+                try {
+                    v = значение.contains(".") ? (Object) Double.parseDouble(значение)
+                        : (Object) Integer.parseInt(значение);
+                } catch (NumberFormatException нет) {
+                    v = значение;
+                }
+            }
+            ruleset.override(ключ, v);
+            System.out.println("[СВОД] правка запуска: " + ключ + " = " + v);
+        }
     }
 
     /** Собрать конфигурацию с настройками по умолчанию. */
@@ -273,7 +336,14 @@ public final class GameConfig {
      * одинаковых замера для трёх разных сводов и чуть не сделал из этого вывод.
      */
     public static final String DEFAULT_RULESET =
-        System.getProperty("kelium.ruleset", "1.43.0");
+        System.getProperty("kelium.ruleset", "1.46.0");
+
+    /**
+     * СВОД ИГРЫ — с ним игра открывается у игрока (выпуск 1.0, 07.10.2026: 1.50.0; 12.10.2026: 1.51.0 — асимметрия жетонов и планшетов,
+     * здания без энергии, стройка без срабатывания). {@link #DEFAULT_RULESET} остаётся опорой тестов и стендов.
+     */
+    public static final String GAME_RULESET =
+        System.getProperty("kelium.ruleset", "1.51.0");
 
     // Кэш «правила + контент» по (версия, каталог данных): YAML читается один раз,
     // а не на каждую партию (на батче в тысячи партий это была главная статья
@@ -363,9 +433,18 @@ public final class GameConfig {
         Path root = resolveDataRoot(dataRoot);
         // ВЫБРАННЫЕ ВРУЧНУЮ КОЛОДЫ входят в ключ кэша: иначе партия на других
         // заданиях получила бы набор, загруженный для прошлой (см. contentPick).
-        String key = rulesetId + "@" + root + "#" + contentKey();
+        // ПОДПИСЬ ВАРИАНТА В КЛЮЧЕ: стенд гоняет несколько вариантов свода в
+        // одном процессе, и без неё второй вариант забрал бы правила первого
+        // из кэша — молча и без единого признака в отчёте.
+        String key = rulesetId + "@" + root + "#" + contentKey()
+            + "#" + System.getProperty("kelium.rules", "")
+            + "#" + Вариант.подписьТекущего();
         Object[] rc = CACHE.computeIfAbsent(key, k -> {
             Ruleset rs = Ruleset.loadById(rulesetId, root.resolve("rulesets"));
+            // ПРАВКИ ЗАПУСКА применяются и здесь: почти все стенды ходят через
+            // buildCached, и без этой строки -Dkelium.rules молча не работал бы
+            // ровно там, где он и нужен.
+            применитьПравки(rs);
             for (java.util.Map.Entry<String, String> e : CONTENT_PICK.entrySet()) {
                 rs.override("content_versions." + e.getKey(), e.getValue());
             }

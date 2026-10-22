@@ -223,18 +223,7 @@ public final class OrderCardsPanel extends JComponent {
      * колоды игрока — поэтому для неё спрашивается цвет, а не номер.
      */
     private static java.awt.image.BufferedImage orderArt(String cardId, String deckColor) {
-        if (cardId == null || cardId.isBlank()) {
-            return null;
-        }
-        if (cardId.startsWith("security")) {
-            String c = deckColor == null || deckColor.isBlank() ? "" : deckColor;
-            // «red» и «scarlet» — одно и то же: в наборе колода зовётся алой, а
-            // в идентификаторах карт стоит red.
-            String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
-            return kelium.report.Textures.orderCard("security_" + c,
-                alt.isEmpty() ? null : "security_" + alt, "security");
-        }
-        return kelium.report.Textures.orderCard(cardId);
+        return kelium.gui.CardArt.order(cardId, deckColor);
     }
 
     private Color deckColour(ReplayRecord.Player p) {
@@ -299,7 +288,11 @@ public final class OrderCardsPanel extends JComponent {
         // КОМПОНЕНТА, и карта, выросшая до самого края, потеряла бы там угол.
         // Разворот веера в этот запас не лезет — он ограничен отдельно (FAN_ROOM).
         double cardH = Math.min(backH * 1.46, (h - 2 * pad) * 0.92);
-        double cardW = cardH / CARD_RATIO;
+        // Пропорция — с печатной рубашки колоды этого игрока; нет печати —
+        // прежнее отношение сторон печатной карты.
+        java.awt.image.BufferedImage рубашка = kelium.gui.CardArt.orderBack(p.orderColor);
+        double cardW = рубашка != null ? cardH * kelium.gui.CardArt.aspect(рубашка)
+            : cardH / CARD_RATIO;
         double cardTop = h - pad - cardH;
 
         Map<String, Slot> want = layout(p, w, h, cardTop, cardW, cardH, pad);

@@ -87,7 +87,7 @@ class HelpBookTest {
             if (s.id.startsWith("card-") || s.id.startsWith("rules-")) {
                 continue;
             }
-            for (String key : List.of("kelium_to_ammo", "per_kelium_coin", "heal_per_refresh",
+            for (String key : List.of("kelium_to_ammo", "per_kelium_coin", "all_attacks_damage",
                     "circles_per_round", "step_vp_cumulative", "objective_hand_limit")) {
                 assertFalse(html.contains(key),
                     "в статье «" + s.title + "» виден внутренний ключ " + key);

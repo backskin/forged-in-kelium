@@ -69,6 +69,9 @@ public final class PrintedContainers {
     public static int onUnitMoved(GameState s, PlayerState p, String fromHexId,
                                   String toHexId, UnitType type,
                                   boolean wasInsideBuilding) {
+        if (поДействию(s)) {
+            return 0;   // выдача — по итогу действия (накрытия)
+        }
         // ИСКЛЮЧЕНИЕ 1: вышел из здания — контейнер не берёт.
         if (wasInsideBuilding) {
             return 0;
@@ -87,6 +90,9 @@ public final class PrintedContainers {
      * сработать в принципе — жетон пришёл из запаса.
      */
     public static int onUnitPlaced(GameState s, PlayerState p, String hexId, UnitType type) {
+        if (поДействию(s)) {
+            return 0;   // выдача — по итогу действия (накрытия)
+        }
         return grantForUnit(s, p, hexId, type, "найм/разворот");
     }
 
@@ -270,6 +276,9 @@ public final class PrintedContainers {
      * печатную ячейку.
      */
     public static int onBuildingPlaced(GameState s, PlayerState p, BuildingToken b) {
+        if (поДействию(s)) {
+            return 0;   // выдача — по итогу действия (накрытия)
+        }
         Hex h = b.hexId == null ? null : s.field.get(b.hexId);
         if (h == null || h.containerCell < 0 || h.containerCell == BlockStamp.AIR) {
             return 0;
@@ -309,23 +318,41 @@ public final class PrintedContainers {
             return false;
         }
         if (h.containerCell == BlockStamp.AIR) {
-            // воздушную ячейку зданиями не накрыть, но авиация её занимает
+            // ВОЗДУШНАЯ ЯЧЕЙКА зданиями не накрывается, её занимает авиация:
+            // контейнер в небе виден, пока в небо никто не встал. Добытчику он
+            // тоже достаётся: запрет 16.09.2026 («и не воздушном») отменён
+            // вместе со всем узким правилом 18.09.2026.
             return h.airToken == null;
         }
         // Войска в модели ячеек не значатся (sideOwner заполняют только здания и
         // стенки нейтралов), поэтому считаем консервативно: есть на гексе наземные
         // жетоны — ячейка может быть под ними, контейнера не видно.
-        return groundContainerFree(s, h) && h.groundTokens.isEmpty();
+        // ВОЙСКО НА ЯЧЕЙКЕ тоже её накрывает (26.09.2026): сектор войска теперь
+        // выбирает игрок, и раскладку гекса знает СекторыВойск.
+        return groundContainerFree(s, h) && h.groundTokens.isEmpty()
+            && СекторыВойск.наСекторе(s, h, h.containerCell) == null;
     }
 
     /**
-     * Гекс с ВИДИМЫМ контейнером, до которого добытчик ДОТЯГИВАЕТСЯ: его
-     * собственный гекс либо тот, что лежит за ЕГО СТЕНКОЙ — ровно так же, как
-     * он примыкает к тайлу зарождения. null, если брать нечего.
+     * Гекс с ВИДИМЫМ контейнером, до которого добытчик ДОТЯГИВАЕТСЯ.
      *
-     * <p>Считать по всем шести соседям гекса нельзя: добытчик занимает одну
-     * ячейку и «смотрит» только в одну сторону (баг найден дизайнером
-     * 12.08.2026 на добыче келемия и правится здесь заодно).
+     * <p><b>Правило (дизайнер, 12.08.2026, возвращено 18.09.2026).</b> Добытчик
+     * берёт ОТКРЫТЫЙ контейнер со СВОЕГО гекса, а если своего нет — с любого
+     * гекса, к которому он стоит стенкой.
+     *
+     * <p>ПОЧЕМУ ЗДЕСЬ ДВАЖДЫ ПЕРЕПИСАНО. 16.09.2026 правило сузили до «контейнер
+     * на секторе, СОСЕДНЕМ с сектором добытчика, и не воздушном»: добытчик
+     * перестал дотягиваться через весь гекс, и с соседа годился только сектор,
+     * смотрящий на него. Онлайн-тест 18.09.2026 это отменил — дизайнер словами:
+     * «отмена была зря, старая версия правила будет лучше». Узкое правило
+     * заставляло возить добытчик по секторам ради карты, а не ради позиции,
+     * и добыча за столом превращалась в геометрическую головоломку.
+     *
+     * <p>Сектор контейнера здесь не смотрят вовсе — ни свой, ни чужой; вся
+     * проверка «не накрыт ли он» живёт в {@link #visibleContainer}, и
+     * воздушная ячейка снова годится (авиация в небе её просто закрывает).
+     *
+     * @return гекс с добываемым контейнером или {@code null}, если брать нечего
      */
     public static String minableContainerHex(GameState s, BuildingToken miner) {
         Hex self = miner.hexId == null ? null : s.field.get(miner.hexId);
@@ -337,7 +364,7 @@ public final class PrintedContainers {
         }
         for (int side = 0; side < 6; side++) {
             if (self.sideOwner[side] == null || self.sideOwner[side] != miner.uid) {
-                continue;
+                continue;               // этим сектором добытчик не стоит
             }
             String nbId = self.neighborBySide[side];
             if (nbId != null && visibleContainer(s, s.field.get(nbId))) {
@@ -356,6 +383,116 @@ public final class PrintedContainers {
         // нейтралов; войска в нём не значатся. Значит любой владелец = ячейка
         // накрыта, контейнера не видно.
         return h.sideOwner[h.containerCell] == null;
+    }
+
+    // ======================================================================
+    //  НАКРЫТИЕ ЗА ДЕЙСТВИЕ (решение дизайнера 23.09.2026)
+    // ======================================================================
+
+    /**
+     * Действует ли правило «накрытие за действие» ({@code containers.cover_by_action}).
+     *
+     * <p>Правило: контейнер получает игрок, если ячейка с контейнером была
+     * ОТКРЫТА (видна) ДО начала его действия, а В КОНЦЕ действия ЗАКРЫТА его
+     * жетоном — войском или зданием. Сколько раз жетоны дёргали туда-сюда
+     * внутри действия, неважно: считается только «до» и «после», поэтому лишних
+     * контейнеров не бывает. Прежние исключения (вышел из здания, стоял на
+     * другом контейнере) этим правилом заменены: сошёл с одного контейнера и
+     * накрыл другой — получил.
+     */
+    public static boolean поДействию(GameState s) {
+        return Boolean.TRUE.equals(kelium.dataio.Ctx.rules(s)
+            .get("containers.cover_by_action", Boolean.FALSE));
+    }
+
+    /**
+     * Снимки «до» всех действий, идущих сейчас в этом потоке. Действие может
+     * случиться ВНУТРИ другого (награда задания даёт Стройку посреди хода), и
+     * контейнер, выданный внутреннему, внешнее не должно выдать второй раз.
+     */
+    private static final ThreadLocal<java.util.ArrayDeque<java.util.Set<String>>> ИДУЩИЕ =
+        ThreadLocal.withInitial(java.util.ArrayDeque::new);
+
+    /** Гексы, где печатный контейнер сейчас открыт. Снимается в начале действия. */
+    public static java.util.Set<String> открытые(GameState s) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        if (!поДействию(s)) {
+            return out;
+        }
+        for (Hex h : s.field.hexes.values()) {
+            if (h.containerCell >= 0 && visibleContainer(s, h)) {
+                out.add(h.id);
+            }
+        }
+        java.util.ArrayDeque<java.util.Set<String>> стек = ИДУЩИЕ.get();
+        if (стек.size() > 64) {
+            стек.clear();       // осиротевшие снимки прерванных розыгрышей
+        }
+        стек.push(out);
+        return out;
+    }
+
+    /**
+     * Конец действия: каждый контейнер, открытый до него и закрытый теперь
+     * жетоном действовавшего игрока, — ему в запас.
+     *
+     * @return сколько контейнеров получено
+     */
+    public static int накрытия(GameState s, PlayerState p, java.util.Set<String> до) {
+        java.util.ArrayDeque<java.util.Set<String>> стек = ИДУЩИЕ.get();
+        // снять свой снимок (и всё, что осталось над ним от прерванных действий)
+        while (!стек.isEmpty()) {
+            if (стек.pop() == до) {
+                break;
+            }
+        }
+        int got = 0;
+        for (String id : до) {
+            Hex h = s.field.get(id);
+            if (h != null && !visibleContainer(s, h) && накрыл(s, p, h)) {
+                got += grant(s, p, "накрытие за действие");
+                for (java.util.Set<String> внешний : стек) {
+                    внешний.remove(id);
+                }
+            }
+        }
+        return got;
+    }
+
+    /** Закрыта ли ячейка контейнера жетоном этого игрока. */
+    private static boolean накрыл(GameState s, PlayerState p, Hex h) {
+        if (h.containerCell == BlockStamp.AIR) {
+            return h.airToken != null && своё(p, h.airToken);
+        }
+        Integer владелец = h.sideOwner[h.containerCell];
+        if (владелец != null) {
+            return своё(p, владелец);
+        }
+        // войско, поставленное на ячейку контейнера (выбор сектора 26.09.2026)
+        kelium.core.UnitToken наЯчейке = СекторыВойск.наСекторе(s, h, h.containerCell);
+        if (наЯчейке != null) {
+            return наЯчейке.owner == p.seat;
+        }
+        for (Integer uid : h.groundTokens) {
+            if (своё(p, uid)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean своё(PlayerState p, int uid) {
+        for (kelium.core.UnitToken u : p.units) {
+            if (u.uid == uid && u.hexId != null) {
+                return true;
+            }
+        }
+        for (BuildingToken b : p.buildings) {
+            if (b.uid == uid && b.hexId != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int grant(GameState s, PlayerState p, String source) {

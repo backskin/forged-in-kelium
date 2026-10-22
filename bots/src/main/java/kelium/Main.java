@@ -79,7 +79,7 @@ public final class Main {
         Consumer<Map<String, Object>> onEvent = logger::record;
 
         // краткая шапка запуска в консоль (в файле своя шапка)
-        stdout.println("Forged in Kelium — партия: игроков=" + players
+        stdout.println("Lex Talionis — партия: игроков=" + players
             + " сид=" + seed + " боты=" + agentSpec + " лог=" + logPath);
 
         // --- прогон партии (лог льётся в реальном времени) ---

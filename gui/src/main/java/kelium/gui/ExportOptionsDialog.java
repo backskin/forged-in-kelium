@@ -57,7 +57,10 @@ public final class ExportOptionsDialog {
             // Сетка имеет смысл только в слиянии — там обычных гексов нет вовсе.
             // В остальных раскладках галочка недоступна, и читать её нельзя:
             // включённая однажды, она иначе тянулась бы в чужие режимы.
-            layout == PngExport.Layout.FUSION && settings.getBoolean(KEY_HEXGRID, false));
+            // Умолчание ТО ЖЕ, что у галочки в окне (там true): прежде окно
+            // показывало сетку включённой, а экспорт читал «выключено», и
+            // угасающая сетка пропадала из слияния (жалоба дизайнера 25.09.2026).
+            layout == PngExport.Layout.FUSION && settings.getBoolean(KEY_HEXGRID, true));
     }
 
     public static void show(Window owner, AppSettings settings) {

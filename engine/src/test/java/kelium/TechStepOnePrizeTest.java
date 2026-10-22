@@ -15,14 +15,11 @@ import kelium.rules.Ruleset;
 import kelium.support.Fix;
 
 /**
- * ПЕРВЫЙ ШАГ НАУКИ: сколько на нём ячеек и что лежит на каждой
- * (правила дизайнера 16.08.2026).
+ * ЯЧЕЙКИ СТУПЕНЕЙ НАУКИ: сколько их и что лежит на каждой.
  *
- * <p>Приз лежит НЕ на шаге целиком, а на каждой его ячейке по отдельности и
- * убывает от ячейки к ячейке. Ячейки при этом открываются по составу стола, и
- * третья ячейка первого шага открыта только вчетвером — поэтому её приз может
- * молча пропасть, если код умеет раздавать только «первому» и «второму».
- * Ровно так и было до 16.08.2026.
+ * <p>Финальный планшет научного отдела (25.09.2026): призы ячеек — только
+ * монеты, одинаково на всех трёх треках. Ступень 1 — 1 монета первому,
+ * ступень 2 — 2 и 1, ступень 3 — 3, вершина — ничего. Ячейки «4И» без приза.
  */
 class TechStepOnePrizeTest {
 
@@ -30,36 +27,27 @@ class TechStepOnePrizeTest {
     @Test
     void stepCellsOpenUpWithTheTableSize() {
         Ruleset rs = Ctx.rules(Fix.game());
-        assertEquals(List.of(3, 3, 2, 1), rs.stepCapacity(4),
-            "вчетвером открыты все ячейки всех шагов");
+        // Вершина — без предела (решение 25.09.2026): null.
+        assertEquals(java.util.Arrays.asList(3, 3, 2, null), rs.stepCapacity(4),
+            "вчетвером открыты все ячейки всех шагов, вершина без предела");
         // Последняя ячейка шагов 1, 2 и 3 открыта ТОЛЬКО вчетвером, поэтому
-        // вдвоём и втроём состав ячеек одинаковый: 2/2/1/1.
-        assertEquals(List.of(2, 2, 1, 1), rs.stepCapacity(3),
+        // вдвоём и втроём состав ячеек одинаковый: 2/2/1.
+        assertEquals(java.util.Arrays.asList(2, 2, 1, null), rs.stepCapacity(3),
             "втроём закрыты последние ячейки шагов 1, 2 и 3");
-        assertEquals(List.of(2, 2, 1, 1), rs.stepCapacity(2),
+        assertEquals(java.util.Arrays.asList(2, 2, 1, null), rs.stepCapacity(2),
             "вдвоём открыты те же ячейки, что и втроём");
     }
 
-    /** Трек красных модулей: 3 боеприпаса на первой ячейке, 1 на второй. */
+    /** Призов ячеек нет вовсе (печать «Наука» 26.09.2026): ни монет, ни ресурсов. */
     @Test
-    void theRedModuleTrackPaysThreeThenOneAmmo() {
+    void призыЯчеекТолькоМонеты() {
         Ruleset rs = Ctx.rules(Fix.game());
-        assertEquals(3, prize(rs, "left", "first", "ammo"),
-            "первая ячейка шага 1 трека красных модулей — 3 боеприпаса");
-        assertEquals(1, prize(rs, "left", "second", "ammo"),
-            "вторая ячейка — 1 боеприпас");
-        assertNull(rs.get("tech.step1_prize.left.third", null),
-            "третьей награды на красном треке нет: ячейка есть, приза на ней нет");
-    }
-
-    /** Трек синих модулей: 4 · 2 · 1 монета по трём ячейкам. */
-    @Test
-    void theBlueModuleTrackPaysFourThenTwoThenOneCoin() {
-        Ruleset rs = Ctx.rules(Fix.game());
-        assertEquals(4, prize(rs, "right", "first", "coin"), "первая ячейка — 4 монеты");
-        assertEquals(2, prize(rs, "right", "second", "coin"), "вторая ячейка — 2 монеты");
-        assertEquals(1, prize(rs, "right", "third", "coin"),
-            "третья ячейка — 1 монета; она открыта только вчетвером, но приз на ней есть");
+        assertEquals(List.of(List.of(), List.of(), List.of(), List.of()),
+            rs.get("tech.step_coin_prize", null));
+        Object старые = rs.get("tech.step1_prize", null);
+        assertTrue(старые == null || (старые instanceof Map<?, ?> m && m.isEmpty()),
+            "приза-ресурса первой ступени больше нет");
+        assertNull(rs.get("tech.step1_prize.left.first", null));
     }
 
     /**
@@ -75,15 +63,5 @@ class TechStepOnePrizeTest {
             "у шага 1 " + cellsOnStepOne + " ячеек, а движок знает только "
             + kelium.engine.Actions.PRIZE_RANK_KEYS.length + " ключей приза — "
             + "приз последней ячейки выдать нечем");
-    }
-
-    @SuppressWarnings("unchecked")
-    private static int prize(Ruleset rs, String track, String rank, String resource) {
-        Object raw = rs.get("tech.step1_prize." + track + "." + rank, null);
-        assertTrue(raw instanceof Map, "нет награды " + track + "/" + rank);
-        Object v = ((Map<String, Object>) raw).get(resource);
-        assertTrue(v instanceof Number, "награда " + track + "/" + rank
-            + " не содержит ресурс " + resource);
-        return ((Number) v).intValue();
     }
 }

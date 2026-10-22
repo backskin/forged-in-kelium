@@ -49,20 +49,27 @@ class BoardsAndPodiumTest {
     @Test
     void recordCarriesTrackOccupancyAndMarketCells() {
         ReplayRecord rec = game();
-        ReplayRecord.Snapshot last = rec.frames.get(rec.frames.size() - 1).snapshot;
 
-        assertEquals(3, last.techOccupancy.size(), "три трека науки в записи");
+        // ТРЕКИ НАУКИ — тоже за несколько партий (причина та же, что у рынка
+        // ниже): шаг по треку — выбор ботов, а сторожим мы запись.
         int onTracks = 0;
-        for (List<List<Integer>> steps : last.techOccupancy.values()) {
-            assertTrue(steps.size() >= 4, "по четыре шага на трек");
-            for (List<Integer> seats : steps) {
-                onTracks += seats.size();
-                for (int seat : seats) {
-                    assertTrue(seat >= 0 && seat < rec.players, "место игрока в пределах стола");
+        for (int i = 0; i < 6 && onTracks == 0; i++) {
+            ReplayRecord r = i == 0 ? rec : GameRecorder.play(GameConfig.DEFAULT_RULESET, 4,
+                909 + i, List.of("strat:hawk", "strat:dove", "strat:balanced",
+                    "strat:opportunist"), null);
+            ReplayRecord.Snapshot last = r.frames.get(r.frames.size() - 1).snapshot;
+            assertEquals(3, last.techOccupancy.size(), "три трека науки в записи");
+            for (List<List<Integer>> steps : last.techOccupancy.values()) {
+                assertTrue(steps.size() >= 4, "по четыре шага на трек");
+                for (List<Integer> seats : steps) {
+                    onTracks += seats.size();
+                    for (int seat : seats) {
+                        assertTrue(seat >= 0 && seat < r.players, "место игрока в пределах стола");
+                    }
                 }
             }
         }
-        assertTrue(onTracks > 0, "за партию кто-то шагнул по трекам");
+        assertTrue(onTracks > 0, "ни в одной из шести партий никто не шагнул по трекам");
 
         // ЯЧЕЙКИ РЫНКА: владелец записан, и за несколько партий их хоть раз занимали.
         //
@@ -140,6 +147,9 @@ class BoardsAndPodiumTest {
             for (var e : f.snapshot.techOccupancy.entrySet()) {
                 List<List<Integer>> steps = e.getValue();
                 for (int i = 0; i < steps.size() && i < caps.size(); i++) {
+                    if (caps.get(i) == null) {
+                        continue;                   // вершина без предела
+                    }
                     assertTrue(steps.get(i).size() <= caps.get(i),
                         "на шаге " + (i + 1) + " трека " + e.getKey() + " больше игроков ("
                             + steps.get(i).size() + "), чем ячеек (" + caps.get(i) + ")");
@@ -155,10 +165,12 @@ class BoardsAndPodiumTest {
     @Test
     void cellCountsFollowThePlayerCount() {
         var rules = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 0L, null, null).ruleset;
-        assertEquals(List.of(3, 3, 2, 1), rules.stepCapacity(4), "вчетвером открыто всё");
-        assertEquals(List.of(2, 2, 1, 1), rules.stepCapacity(3),
+        // вершина без предела (решение 25.09.2026) — null
+        assertEquals(java.util.Arrays.asList(3, 3, 2, null), rules.stepCapacity(4),
+            "вчетвером открыто всё");
+        assertEquals(java.util.Arrays.asList(2, 2, 1, null), rules.stepCapacity(3),
             "втроём закрыты последние ячейки шагов 1, 2 и 3");
-        assertEquals(List.of(2, 2, 1, 1), rules.stepCapacity(2),
+        assertEquals(java.util.Arrays.asList(2, 2, 1, null), rules.stepCapacity(2),
             "вдвоём открыты те же ячейки, что и втроём");
     }
 

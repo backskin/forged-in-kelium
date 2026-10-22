@@ -223,7 +223,7 @@ public final class RevisionProbe {
                     techSteps += v;
                 }
             }
-            if (s.tech.allPeaksOccupied()) {
+            if (s.tech.allPeaksByOneSeat()) {
                 allPeaks++;
             }
         }

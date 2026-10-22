@@ -68,9 +68,13 @@ public final class CardReader {
         JScrollPane textScroll = new JScrollPane(text);
         textScroll.setBorder(null);
 
+        // ПЕЧАТНОЕ ЛИЦО КАРТЫ над разворотом: сверять напечатанное с
+        // каталогом глазами, а не пересказом (лица разложены по id).
+        FacePane face = new FacePane();
         list.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 String id = list.getSelectedValue();
+                face.setFace(id == null ? null : kelium.gui.CardArt.face(kind, id));
                 text.setText(id == null ? "" : describe(content, kind, id, names));
                 text.setCaretPosition(0);
             }
@@ -81,12 +85,56 @@ public final class CardReader {
 
         JScrollPane listScroll = new JScrollPane(list);
         listScroll.setPreferredSize(new Dimension(Theme.px(230), Theme.px(360)));
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listScroll, textScroll);
+        JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, face, textScroll);
+        right.setResizeWeight(0.62);
+        right.setBorder(null);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listScroll, right);
         split.setDividerLocation(Theme.px(230));
         f.add(split, BorderLayout.CENTER);
-        f.setSize(Theme.px(720), Theme.px(420));
+        f.setSize(Theme.px(820), Theme.px(700));
         f.setLocationRelativeTo(owner);
         f.setVisible(true);
+    }
+
+    /**
+     * Печатное лицо выбранной карты — целиком, в пропорции картинки (задание
+     * стоячее, арсенал лежачий). Лица нет — пишет об этом, разворот ниже.
+     */
+    static final class FacePane extends javax.swing.JComponent {
+        private static final long serialVersionUID = 1L;
+        private java.awt.image.BufferedImage img;
+
+        FacePane() {
+            setPreferredSize(new Dimension(Theme.px(420), Theme.px(400)));
+            setMinimumSize(new Dimension(Theme.px(60), Theme.px(40)));
+        }
+
+        void setFace(java.awt.image.BufferedImage img) {
+            this.img = img;
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(java.awt.Graphics g0) {
+            java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+            g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING,
+                java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g.setColor(Theme.bg());
+            g.fillRect(0, 0, getWidth(), getHeight());
+            int pad = Theme.px(Theme.PAD_PANEL);
+            if (img != null) {
+                kelium.gui.CardArt.drawFit(g, img, pad, pad, getWidth() - 2 * pad,
+                    getHeight() - 2 * pad, Theme.px(Theme.R_OVERLAY));
+            } else {
+                g.setFont(Theme.italic());
+                g.setColor(Theme.ink3());
+                g.drawString("печатного лица у этой карты нет — ниже её текст", pad,
+                    pad + Theme.px(14));
+            }
+            g.dispose();
+        }
     }
 
     /** Откуда брать человеческие названия карт (обычно сама запись партии). */

@@ -31,7 +31,7 @@ import java.util.WeakHashMap;
  * долгоживущие, поэтому цепочка строится один раз, а если картинку выкинут —
  * уйдёт и цепочка.
  */
-final class Mips {
+public final class Mips {
 
     /** Ниже этого не мельчим: восемь пикселей — уже не картинка. */
     private static final int МИНИМУМ = 8;
@@ -39,6 +39,36 @@ final class Mips {
     private static final Map<BufferedImage, List<BufferedImage>> CACHE = new WeakHashMap<>();
 
     private Mips() {
+    }
+
+    /**
+     * Пирамида картинки: из кэша или построенная. Строится ВНЕ ЗАМКА
+     * (28.09.2026): разогрев при старте партии строит пирамиды отдельным
+     * потоком, и окно не должно ждать его ради готовой.
+     */
+    private static List<BufferedImage> chain(BufferedImage src) {
+        synchronized (Mips.class) {
+            List<BufferedImage> got = CACHE.get(src);
+            if (got != null) {
+                return got;
+            }
+        }
+        List<BufferedImage> built = построить(src);
+        synchronized (Mips.class) {
+            List<BufferedImage> got = CACHE.get(src);
+            if (got != null) {
+                return got;
+            }
+            CACHE.put(src, built);
+            return built;
+        }
+    }
+
+    /** Построить пирамиду заранее (разогрев при старте партии). */
+    public static void warm(BufferedImage src) {
+        if (src != null && src.getWidth() > МИНИМУМ) {
+            chain(src);
+        }
     }
 
     /**
@@ -50,16 +80,12 @@ final class Mips {
      *
      * @param targetW сколько пикселей на экране займёт вся картинка
      */
-    static synchronized BufferedImage forWidth(BufferedImage src, double targetW) {
+    static BufferedImage forWidth(BufferedImage src, double targetW) {
         if (src == null || targetW <= 0 || src.getWidth() <= МИНИМУМ
                 || targetW >= src.getWidth() * 0.7) {
             return src;                 // крупный показ — рисуем сам исходник
         }
-        List<BufferedImage> chain = CACHE.get(src);
-        if (chain == null) {
-            chain = построить(src);
-            CACHE.put(src, chain);
-        }
+        List<BufferedImage> chain = chain(src);
         BufferedImage best = src;
         for (BufferedImage lvl : chain) {
             if (lvl.getWidth() >= targetW) {
@@ -69,6 +95,51 @@ final class Mips {
             }
         }
         return best;
+    }
+
+    /**
+     * НАРИСОВАТЬ КАРТИНКУ В ПРЯМОУГОЛЬНИК СГЛАЖЕННО — уровнем пирамиды под
+     * экранный размер и билинейно (жалоба дизайнера 26.09.2026: стол игрока
+     * «пиксельный, пестрящий» — большие картинки ужимались в разы одним шагом,
+     * и билинейная выборка из четырёх соседей давала рябь). Масштаб самого
+     * экрана (HiDPI) учитывается: уровень берётся под настоящие пиксели.
+     */
+    public static void draw(java.awt.Graphics2D g, BufferedImage img, int x, int y, int w, int h) {
+        if (img == null || w <= 0 || h <= 0) {
+            return;
+        }
+        double device = Math.abs(g.getTransform().getScaleX());
+        BufferedImage lvl = forWidth(img, w * (device > 0 ? device : 1));
+        Object was = g.getRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(lvl, x, y, w, h, null);
+        if (was != null) {
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, was);
+        }
+    }
+
+    /** То же для картинки под матрицей (поворот, наклон): уровень под её масштаб. */
+    public static void draw(java.awt.Graphics2D g, BufferedImage img,
+                            java.awt.geom.AffineTransform at) {
+        if (img == null) {
+            return;
+        }
+        double k = Math.hypot(at.getScaleX(), at.getShearY());
+        double device = Math.abs(g.getTransform().getScaleX());
+        BufferedImage lvl = forWidth(img, img.getWidth() * k * (device > 0 ? device : 1));
+        java.awt.geom.AffineTransform use = new java.awt.geom.AffineTransform(at);
+        if (lvl != img) {
+            double s = img.getWidth() / (double) lvl.getWidth();
+            use.scale(s, s);
+        }
+        Object was = g.getRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(lvl, use, null);
+        if (was != null) {
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, was);
+        }
     }
 
     private static List<BufferedImage> построить(BufferedImage src) {

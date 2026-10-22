@@ -68,7 +68,7 @@ public final class КубикиНауки {
                     }
                 }
             }
-            if (s.tech.allPeaksOccupied()) {
+            if (s.tech.allPeaksByOneSeat()) {
                 вершины++;
             }
             List<Integer> caps = cfg.ruleset.stepCapacity(игроков);

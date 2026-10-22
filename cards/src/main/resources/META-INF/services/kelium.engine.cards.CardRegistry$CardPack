@@ -3,6 +3,5 @@
 # связи по сборке нет вовсе (см. cards/pom.xml).
 kelium.cards.objectives.ObjectivePack
 kelium.cards.arsenal.ArsenalPack
-kelium.cards.containers.ContainerPack
 kelium.cards.market.MarketPack
 kelium.cards.superarsenal.SuperArsenalPack

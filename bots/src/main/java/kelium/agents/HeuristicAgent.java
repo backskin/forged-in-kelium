@@ -122,9 +122,31 @@ public class HeuristicAgent extends Agent {
     /** Решение «жечь или копить» супер-карту 5.0 — монета один раз за партию. */
     private Boolean super5БудетЖечь = null;
 
+    /**
+     * ПРЕЖНИЙ БОТ — как играл до заказа 27.09.2026 («боты играют против
+     * соперников»): без отсева ходов без цели. Нужен только для очной встречи
+     * новых ботов с прежними на одних раздачах; за стол садятся новые.
+     */
+    public boolean прежний = false;
+
+    /** Пометить бота прежним (см. {@link #прежний}). */
+    public HeuristicAgent прежним() {
+        this.прежний = true;
+        return this;
+    }
+
+    /**
+     * ХОДЫ БЕЗ ЦЕЛИ НЕ ПРЕДЛАГАЮТСЯ ВОВСЕ — снос и перенос своего ЦУ без угрозы
+     * ему ({@link Угрозы#отсеять}). Вход один для всех решений этого бота.
+     */
+    protected List<Choice> безЦели(GameState state, List<Choice> options) {
+        return прежний ? options : Угрозы.отсеять(state, seat, options);
+    }
+
     @Override
     public Choice choose(GameState state, List<Choice> options, Map<String, Object> context) {
         String kind = context != null ? String.valueOf(context.getOrDefault("kind", "")) : "";
+        options = безЦели(state, options);
         List<Choice> opts = new ArrayList<>(options);
         java.util.function.BiFunction<GameState, Choice, Double> scorer = scorerFor(kind, context);
         if (scorer == null) {
@@ -134,21 +156,89 @@ public class HeuristicAgent extends Agent {
                     reals.add(o);
                 }
             }
-            return reals.isEmpty() ? opts.get(0) : reals.get(rng.nextInt(reals.size()));
+            // БЕЗ СЛУЧАЙНОСТИ (требование дизайнера 07.10.2026): правила на
+            // этот вопрос нет — первый настоящий вариант, а не наугад.
+            return reals.isEmpty() ? opts.get(0) : reals.get(0);
         }
         double best = Double.NEGATIVE_INFINITY;
+        double второй = Double.NEGATIVE_INFINITY;
         List<Choice> top = new ArrayList<>();
         for (Choice o : opts) {
             double sc = scorer.apply(state, o) + наведениеПоЗаданиям(state, kind, o, context);
             if (sc > best) {
+                второй = best;
                 best = sc;
                 top.clear();
                 top.add(o);
             } else if (sc == best) {
                 top.add(o);
+            } else if (sc > второй) {
+                второй = sc;
             }
         }
-        return top.get(rng.nextInt(top.size()));
+        Диагностика.записать(kind, best, второй, opts.size());
+        return top.get(0);   // равные — первый по порядку движка, без случайности
+    }
+
+    /**
+     * ДИАГНОСТИКА РЕШЕНИЙ — насколько выбор был безальтернативным.
+     *
+     * <p>Зачем. Самая ценная находка про ботов за 19.09.2026 была сделана
+     * глазами: энергостанция при нехватке энергии оценивается в 12.0, а военное
+     * здание в 3.6, и военные здания проигрывают сравнение ВСЕГДА. Такие заторы
+     * не видны ни в одном итоговом числе — их видно только в разрыве между
+     * лучшим вариантом и вторым. Где разрыв велик и постоянен, там выбора нет:
+     * либо правило мёртвое, либо в оценке ошибка.
+     *
+     * <p>Включается настройкой запуска {@code -Dkelium.bot.diag=true} и печатается
+     * вызовом {@link Диагностика#напечатать}. По умолчанию не стоит ничего:
+     * счётчики не трогаются вовсе.
+     */
+    public static final class Диагностика {
+        private static final boolean ВКЛ =
+            Boolean.parseBoolean(System.getProperty("kelium.bot.diag", "false"));
+        /** вид решения -> {решений, сумма разрыва, безальтернативных, сумма вариантов} */
+        private static final Map<String, double[]> ПО_ВИДАМ =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+        private Диагностика() {
+        }
+
+        static void записать(String вид, double лучший, double второй, int вариантов) {
+            if (!ВКЛ || вариантов < 2 || Double.isInfinite(второй)) {
+                return;
+            }
+            double[] с = ПО_ВИДАМ.computeIfAbsent(вид, k -> new double[4]);
+            synchronized (с) {
+                с[0]++;
+                с[1] += лучший - второй;
+                // «Безальтернативно» — когда лучший вдвое дороже второго: такой
+                // разрыв решение уже не решение, а предопределённость.
+                if (второй <= 0 ? лучший > 0 : лучший / второй >= 2.0) {
+                    с[2]++;
+                }
+                с[3] += вариантов;
+            }
+        }
+
+        /** Печать отчёта: где у бота выбора нет. */
+        public static void напечатать(java.io.PrintStream out) {
+            if (ПО_ВИДАМ.isEmpty()) {
+                out.println("диагностика решений выключена (-Dkelium.bot.diag=true)");
+                return;
+            }
+            out.println("ДИАГНОСТИКА РЕШЕНИЙ: где у бота нет выбора");
+            out.printf("%-20s %8s %10s %12s %10s%n", "вид решения", "решений",
+                "вариантов", "разрыв 1-2", "безальт.");
+            ПО_ВИДАМ.entrySet().stream()
+                .sorted((a, b) -> Double.compare(b.getValue()[2] / Math.max(1, b.getValue()[0]),
+                    a.getValue()[2] / Math.max(1, a.getValue()[0])))
+                .forEach(e -> {
+                    double[] с = e.getValue();
+                    out.printf("%-20s %8.0f %10.1f %12.2f %9.0f%%%n", e.getKey(), с[0],
+                        с[3] / с[0], с[1] / с[0], 100 * с[2] / с[0]);
+                });
+        }
     }
 
     /**
@@ -254,14 +344,9 @@ public class HeuristicAgent extends Agent {
             case COMMAND_CENTER:
                 return 2.5;
             case MINER: {
-                // Живая жила рядом — иначе добытчик выдаёт пустоту.
-                for (String nb : s.field.neighbors(b.hexId)) {
-                    kelium.core.Hex h = s.field.get(nb);
-                    if (h != null && h.spawnTile != null && h.spawnTile.kelium > 0) {
-                        return 3.0;
-                    }
-                }
-                return 0.2;      // жила выработана — добытчик выдаёт пустоту
+                // Добывает ли он вообще — по правилу движка (стоит на жиле или
+                // стенкой смотрит на неё). Иначе энергия на нём пропадает зря.
+                return Plan.добывает(s, b) ? 3.0 : 0.0;
             }
             case BARRACKS:
             case FACTORY:
@@ -349,6 +434,9 @@ public class HeuristicAgent extends Agent {
         return switch (kind) {
             case "reveal_order" -> (s, o) -> scoreReveal(s, o);
             case "action" -> (s, o) -> scoreAction(s, o);
+            // ВЕТКА ДЕЙСТВИЯ-РАЗВИЛКИ (приказы 5.0.0): вариант — имя прежнего
+            // действия, и оценивается он прежним оценщиком действия.
+            case "action_branch" -> (s, o) -> scoreAction(s, o);
             case "build_pick" -> (s, o) -> scoreBuildPick(s, o);
             case "build_hex" -> (s, o) -> scoreBuildHex(s, o, ctx);
             case "build_facing" -> (s, o) -> scoreBuildFacing(s, o, ctx);
@@ -357,6 +445,7 @@ public class HeuristicAgent extends Agent {
             // ДВИЖЕНИЕ ПО РУЛБУКУ: сперва бесплатный гекс — тот, чьим войскам
             // есть куда и зачем идти. Без оценки бот брал гекс наугад.
             case "move_source" -> (s, o) -> scoreMoveSource(s, o);
+            case "maneuver_hex" -> (s, o) -> scoreMoveSource(s, o);
             case "combat_source" -> (s, o) -> scoreCombatSource(s, o);
             case "combat_target" -> (s, o) -> scoreCombatTarget(s, o);
             case "attack" -> (s, o) -> scoreAttack(s, o);
@@ -379,6 +468,31 @@ public class HeuristicAgent extends Agent {
                     return 0.1;                 // самооценки нет — не трогаем планшет
                 }
                 return 4.0 * (ценаНовой - ценаСтарой);
+            };
+            // ВЕРНУТЬ ВОЙСКО В ЗАПАС (Снаряжение, правило 18.09.2026). Без
+            // оценки эта точка выбора разоружала бота: при пустом оценщике он
+            // берёт ЛЮБОЙ вариант кроме отказа — то есть каждое Снаряжение
+            // сметал бы с поля всю свою армию до последнего жетона.
+            //
+            // Отказ стоит дорого: возврат осмыслен ровно в одном случае —
+            // запас рода кончился, а жетон этого рода стоит на поле без дела,
+            // и производство из-за него встало. Раненый жетон возвращается
+            // охотнее: в запасе с него снимается урон.
+            case "return_unit" -> (s, o) -> {
+                if (o.payload() == null) {
+                    return 1.0;                 // никого не возвращать
+                }
+                int uid = ((Number) o.payload()).intValue();
+                for (kelium.core.UnitToken u : s.player(seat).unitsOnField()) {
+                    if (u.uid != uid) {
+                        continue;
+                    }
+                    boolean запасКончился = s.player(seat).unitsOfKind(u.type)
+                        >= s.tokenStats.unitStock(u.type);
+                    double цена = запасКончился ? 1.2 : 0.0;
+                    return цена + (u.damage > 0 ? 0.6 : 0.0) - 2.0 * польза(s, u.type);
+                }
+                return 0.0;
             };
             case "module_place_red" -> (s, o) -> scoreModuleRed(s, o);
             // ЧТО СНИМАТЬ ПРИ ПЕРЕНОСЕ. Раньше у этих двух шагов не было оценки
@@ -412,9 +526,18 @@ public class HeuristicAgent extends Agent {
                     }
                 }
                 double п = польза(s, куда);
+                // ВЕС РОДА СЧИТАЕТСЯ ТОЛЬКО ТАМ, ГДЕ ЕСТЬ ЧЕМ ВОЕВАТЬ.
+                //
+                // Замер 19.09 поймал мою же ошибку: безусловная надбавка за род
+                // погнала красные жетоны на АВИАЦИЮ, которой на поле нет. Вышло
+                // ровно то, чего дизайнер и не хотел: жетонов на авиации 0.51 на
+                // место, а атак авиацией 0.13 — половина красных модулей лежала
+                // мёртвым грузом. Жетон усиливает АТАКУ, а не намерение: нет
+                // войск этого рода — надбавка почти обнуляется.
+                double есть = своих > 0 ? 1.0 : 0.2;
                 return глухой
-                    ? 3.0 - 4.0 * п - 0.5 * своих      // душить то, что не нужно
-                    : 1.0 + 4.0 * п + 0.5 * своих;     // усиливать то, что нужно
+                    ? 3.0 - 4.0 * п - 0.5 * своих - 1.5 * весРода(куда) * есть
+                    : 1.0 + 4.0 * п + 0.5 * своих + 1.5 * весРода(куда) * есть;
             };
             case "module_place_blue" -> (s, o) -> scoreModuleBlue(s, o);
             // K3: выбор гекса-исхода Смены энергии — ценим по числу простаивающих
@@ -471,6 +594,64 @@ public class HeuristicAgent extends Agent {
                 double v = Math.min(снять, голод) * 1.5 - surcharge * 1.2;
                 return v > 0 ? 1.0 + v : 0.3;
             };
+            // ОТДАТЬ ИЛИ ЗАБРАТЬ (Питание). Прежде этого вопроса бот не знал вовсе:
+            // выбор шёл наугад среди «отдать» и «забрать», а «закончить» не
+            // выбирался никогда — бот снимал кубики с запитанных зданий и
+            // обесточивал их (замер 07.10.2026: 315 перекладок из 504 не
+            // прибавили ни одного запитанного здания, 54% зданий без энергии).
+            case "energy_activation" -> (s, o) -> {
+                PlayerState я = s.player(seat);
+                double голод = 0;          // голодные ячейки зданий, которым энергия нужна
+                for (BuildingToken b : я.buildingsOnField()) {
+                    int пусто = Math.max(0, b.energySlots - b.energyPlaced);
+                    if (пусто > 0 && b.type != BuildingType.POWER_PLANT) {
+                        double ц = ценностьВыхода(s, b);
+                        if (ц >= 1.5) {
+                            голод += пусто * ц;
+                        }
+                    }
+                }
+                if ("energy_done".equals(o.kind()) || o.payload() == null) {
+                    return 1.0;
+                }
+                if ("energy_kelium".equals(o.kind()) || "energy_coin".equals(o.kind())) {
+                    return голод > 0 ? 0.9 : 0.1;   // трата ресурса — только если очень нужно
+                }
+                int uid;
+                try {
+                    uid = Integer.parseInt(String.valueOf(o.payload()));
+                } catch (NumberFormatException e) {
+                    return 0.5;
+                }
+                BuildingToken src = null;
+                for (BuildingToken b : я.buildingsOnField()) {
+                    if (b.uid == uid) {
+                        src = b;
+                    }
+                }
+                if ("energy_give".equals(o.kind())) {
+                    int есть = src != null ? src.energyIdle : 1;
+                    return голод > 0 ? 2.0 + Math.min(есть, голод) : 0.4;
+                }
+                // ЗАБРАТЬ — только чтобы перекатить: кубики этого источника
+                // лежат на здании, которое сейчас почти ничего не даёт, а
+                // нужное здание голодает.
+                double снять = 0;
+                double потеря = 0;
+                for (BuildingToken b : я.buildingsOnField()) {
+                    int n = b.energyBySource.getOrDefault(uid, 0);
+                    if (n <= 0) {
+                        continue;
+                    }
+                    double ц = ценностьВыхода(s, b);
+                    if (ц < 1.5) {
+                        снять += n;
+                    } else {
+                        потеря += n * ц;
+                    }
+                }
+                return снять > 0 && голод > 0 && потеря == 0 ? 1.5 + снять : 0.2;
+            };
             // K3: раскладка кубика — приоритет ЦУ > добытчики > военные > прочее
             // (та же логика, что была зашита в движок, теперь решает бот).
             case "energy_place" -> (s, o) -> {
@@ -485,6 +666,9 @@ public class HeuristicAgent extends Agent {
                         // Лестница была верна для мирного разгона и намертво
                         // держала военные здания в темноте до конца партии.
                         double base = ценностьВыхода(s, b);
+                        if (base <= 0) {
+                            return 0.0;   // здание ничего не даст — кубик на нём пропадёт
+                        }
                         // добить здание до запитанности ценнее, чем начать новое
                         if (b.energyPlaced + 1 >= b.energySlots) {
                             base += 1.0;
@@ -564,6 +748,12 @@ public class HeuristicAgent extends Agent {
             case "destroyed_pay" -> (s, o) -> {
                 int remaining = ctx != null && ctx.get("remaining") instanceof Number n
                     ? n.intValue() : 1;
+                if (o.payload() == null) {
+                    // КУБИКАМИ ТРОФЕЕВ (выбор игрока, 14.09.2026): без переплаты,
+                    // зато жетоны остаются на свалке до Возвращения. Ровно как
+                    // жетон точной ценности.
+                    return 10.0;
+                }
                 int v = ((kelium.core.Token) o.payload()).trophyValue();
                 return v >= remaining ? 10.0 - (v - remaining) : 1.0 + v * 0.1;
             };
@@ -790,7 +980,7 @@ public class HeuristicAgent extends Agent {
         if (b.type == BuildingType.MINER) {
             // добытчик переносим ТОЛЬКО с выработанной жилы на живую
             var live = Plan.liveTileHexes(state);
-            boolean nowUseless = !Plan.touchesLiveTile(state, b.hexId, live);
+            boolean nowUseless = !Plan.добывает(state, b);
             boolean somewhereBetter = false;
             for (String hid : kelium.engine.Placement.buildableHexes(state, seat)) {
                 if (!hid.equals(b.hexId) && Plan.touchesLiveTile(state, hid, live)) {
@@ -823,20 +1013,8 @@ public class HeuristicAgent extends Agent {
             if (h == null) {
                 continue;
             }
-            int veh = 0;
-            int single = 0;
-            for (PlayerState p : state.players) {
-                for (UnitToken u : p.unitsOnField()) {
-                    if (hid.equals(u.hexId) && u.type != UnitType.AIRCRAFT) {
-                        if (u.type == UnitType.VEHICLE) {
-                            veh++;
-                        } else {
-                            single++;
-                        }
-                    }
-                }
-            }
-            if (h.fitsWithRepack(1, veh, single)) {
+            int[] ld = kelium.engine.Placement.groundLoad(state, hid, -1);
+            if (h.fitsWithRepack(1, ld[0], ld[1], ld[2])) {
                 return true;
             }
         }
@@ -864,7 +1042,7 @@ public class HeuristicAgent extends Agent {
         Order top = Order.fromCode((String) card.get("top"));
         double val = 0;
         for (String a : Order.ORDER_ACTIONS.get(top)) {
-            val += w.getOrDefault("action." + a, 1.0);
+            val += actionWeight(a);
         }
         // ИНДИКАТОРЫ ЗАДАНИЙ (заказ дизайнера 17.08.2026, продолжение пункта 3
         // плана: «привести всё к тому, чтобы собирать войска под конкретную
@@ -874,7 +1052,11 @@ public class HeuristicAgent extends Agent {
         // чем выполнялись (см. javadoc ObjectiveHints). Бонус считает движок,
         // а не бот: ObjectiveHints уже знает, каким действием закрывается
         // разрыв каждой карты.
-        val += objectiveActionBonus(state, Order.ORDER_ACTIONS.get(top));
+        val += objectiveActionBonus(state, kelium.engine.Actions.expandForks(
+            List.of(Order.ORDER_ACTIONS.get(top))).toArray(new String[0]));
+        // Приказы 5.0.0 оцениваются по ближайшему прежнему приказу.
+        Order верх = top;
+        top = top.legacy();
         int nUnits = me.unitsOnField().size();
         int nMil = 0;
         for (BuildingToken b : me.buildingsOnField()) {
@@ -883,17 +1065,17 @@ public class HeuristicAgent extends Agent {
                 nMil++;
             }
         }
-        if (top == Order.OPERATION && nUnits >= 1 && (threatened(state) || wget("aggression") >= 2.0)) {
+        if (top == Order.CONTROL && nUnits >= 1 && (threatened(state) || wget("aggression") >= 2.0)) {
             val += 6.0 * wget("aggression");
         }
-        if (top == Order.DEVELOPMENT && nMil >= 1) {
+        if (top == Order.ACQUIRE && nMil >= 1) {
             val += 3.0;
         }
-        if (top == Order.INFRASTRUCTURE && nMil == 0) {
+        if (top == Order.PLACE && nMil == 0) {
             val += 3.0;
         }
         // Есть трофеи для трат на треки науки -> охотнее берём Приобретения.
-        if (top == Order.ACQUISITIONS && trophyPool(me) >= 1) {
+        if (top == Order.EXPLORE && trophyPool(me) >= 1) {
             val += 4.0;
         }
         // ЦЕПОЧКА РАУНДА (порядок розыгрыша карт внутри раунда!):
@@ -901,14 +1083,14 @@ public class HeuristicAgent extends Agent {
         // 2) захватил жетоны -> НЕМЕДЛЕННО Приобретения (наука), пока трофеи
         //    не вернулись владельцам в Возврат;
         // 3) армии нет, а бить хочется -> сперва Разработка (сборка).
-        if (top == Order.OPERATION && combatOpportunity(state)
+        if (top == Order.CONTROL && combatOpportunity(state)
                 && me.resources.ammo() >= 1) {
             val += 7.0;
         }
-        if (top == Order.ACQUISITIONS && me.destroyedValue() > 0) {
+        if (top == Order.EXPLORE && me.destroyedValue() > 0) {
             val += 8.0 + me.destroyedValue();
         }
-        if (top == Order.DEVELOPMENT && nMil >= 1 && nUnits < 3
+        if (top == Order.ACQUIRE && nMil >= 1 && nUnits < 3
                 && wget("aggression") >= 0.8) {
             val += 3.0;
         }
@@ -925,7 +1107,7 @@ public class HeuristicAgent extends Agent {
         // соперника выводится вычитанием. Отложенную вслепую карту НЕ учитываем —
         // это скрытая информация, подглядывать нельзя.
         double read = wget("read_opponent");   // 0 = не подгадывать вовсе
-        double riskTop = read * chanceSomeoneReveals(state, top);
+        double riskTop = read * chanceSomeoneReveals(state, верх);
         double perAction = val / Math.max(1, Order.ORDER_ACTIONS.get(top).length);
         val -= riskTop * perAction;                       // потеря второго действия
 
@@ -935,7 +1117,7 @@ public class HeuristicAgent extends Agent {
             double openChance = chanceSomeoneReveals(state, bo);
             double bottomValue = 0;
             for (String a : Order.ORDER_ACTIONS.get(bo)) {
-                bottomValue += w.getOrDefault("action." + a, 1.0);
+                bottomValue += actionWeight(a);
             }
             // низ даёт ОДНО действие — берём среднюю пользу действия этого приказа
             val += read * openChance * bottomValue
@@ -1017,11 +1199,33 @@ public class HeuristicAgent extends Agent {
     }
 
     // ================= выбор действия ===================================
+    /** Вес действия; у развилки — лучшая из её веток. */
+    private double actionWeight(String a) {
+        List<String> ветки = kelium.engine.Actions.FORKS.get(a);
+        if (ветки == null) {
+            return w.getOrDefault("action." + a, 1.0);
+        }
+        double best = Double.NEGATIVE_INFINITY;
+        for (String b : ветки) {
+            best = Math.max(best, w.getOrDefault("action." + b, 1.0));
+        }
+        return best;
+    }
+
     private double scoreAction(GameState state, Choice o) {
         if ("pass".equals(o.kind())) {
             return -1.0;
         }
         String name = (String) o.payload();
+        // РАЗВИЛКА (приказы 5.0.0) стоит столько, сколько лучшая её ветка.
+        List<String> ветки = kelium.engine.Actions.FORKS.get(name);
+        if (ветки != null) {
+            double best = Double.NEGATIVE_INFINITY;
+            for (String b : ветки) {
+                best = Math.max(best, scoreAction(state, new Choice("action", b, b)));
+            }
+            return best;
+        }
         double base = w.getOrDefault("action." + name, 1.0);
         PlayerState me = state.player(seat);
         int nUnits = me.unitsOnField().size();
@@ -1099,7 +1303,7 @@ public class HeuristicAgent extends Agent {
             for (BuildingToken b : me.buildingsOnField()) {
                 if (b.type == BuildingType.MINER && b.powered()) {
                     poweredMiner = true;
-                    if (Plan.touchesLiveTile(state, b.hexId, live)) {
+                    if (Plan.добывает(state, b)) {
                         liveVein = true;
                     }
                 }
@@ -1108,7 +1312,7 @@ public class HeuristicAgent extends Agent {
             for (BuildingToken b : me.buildingsOnField()) {
                 if (b.type == BuildingType.MINER && !b.powered()
                         && me.resources.coin() >= b.energySlots - b.energyPlaced
-                        && Plan.touchesLiveTile(state, b.hexId, live)) {
+                        && Plan.добывает(state, b)) {
                     minerPayable = true;
                     break;
                 }
@@ -1127,9 +1331,12 @@ public class HeuristicAgent extends Agent {
             return contRoom ? base : 0.2;
         }
         if ("market".equals(name)) {
-            // Продавать нечего — рынок пустой ход. Келемий нужен ЛЮБОЙ сделке.
+            // БЕЗ КЕЛЕМИЯ РЫНОК НЕ ПУСТОЙ (свод 1.46+, market.zero_kelium_coin):
+            // нулевая ступень обмена даёт монету. Прежде здесь стояло 0,15 — ниже
+            // пустой Науки (0,1 у неё, но она бывала оценена выше по пулу), и бот
+            // выбирал Науку, которая ничего не делала (замер 01.10.2026).
             if (me.resources.kelium() <= 0) {
-                return 0.15;
+                return Ctx.rules(state).getInt("market.zero_kelium_coin", 0) > 0 ? 0.5 : 0.15;
             }
             // чем острее нужда в деньгах/патронах, тем ценнее размен
             double need = (me.resources.coin() <= 2 ? 2.5 : 0.0)
@@ -1140,7 +1347,10 @@ public class HeuristicAgent extends Agent {
         // Тогда поднимаем её высоко: треки — крупный источник ПО (до 7 за трек).
         if ("science".equals(name)) {
             int pool = trophyPool(me);
-            if (pool <= 0 || !hasAffordableTechStep(state, me, pool)) {
+            // кубиков в личном запасе нет — шаг не встанет, сколько ни плати
+            boolean кубиковНет = Ctx.rules(state).getBool("tech.cubes_are_permanent", false)
+                && me.techCubesLeft <= 0;
+            if (pool <= 0 || кубиковНет || !hasAffordableTechStep(state, me, pool)) {
                 return 0.1;
             }
             // ЦЕПОЧКА ВОЙНЫ: захваченные жетоны на месте уничтоженных жетонов ВЕРНУТСЯ
@@ -1351,7 +1561,7 @@ public class HeuristicAgent extends Agent {
             // высокий аппетит, пока их меньше, чем станций, дающих им энергию.
             base = (nMiners < nPlants + 1 ? 8.0 : 4.0) + lvlBonus;
         } else if (военное) {
-            int need = militarySlots(state, bt);
+            int need = militarySlots(state, bt, seat);
             if (spareEnergy < need) {
                 // Запитать нечем, и монетой ячейку НЕ закрыть (такого правила
                 // нет). Но здание можно построить впрок: недостающие кубики
@@ -1359,7 +1569,28 @@ public class HeuristicAgent extends Agent {
                 // тем выше, чем ближе энергия: не хватает 1 кубика — почти
                 // норм, не хватает 3 (авиабаза с нуля) — рано.
                 int gap = need - Math.max(0, spareEnergy);
-                base = Math.max(0.4, 2.2 - 0.8 * gap);
+                // КЕЛЕМИЙ ЗАКРЫВАЕТ ЯЧЕЙКУ ЭНЕРГИИ — если правило-джокер включено.
+                // Бот этого не знал и считал недостающий кубик непреодолимым,
+                // сидя при этом на келемии.
+                if (Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                        .get("economy.kelium_is_joker", Boolean.FALSE))) {
+                    gap -= me.resources.kelium();
+                }
+                gap = Math.max(0, gap);
+                // НЕДОСТАЮЩИЙ КУБИК — ЭТО НЕ ПРИГОВОР (замечание дизайнера
+                // 20.09.2026: «из-за одной энергии не выбирать род войск — мда»).
+                //
+                // Прежняя оценка давала при нехватке ОДНОГО кубика 1.4 против
+                // 9+ у здания, которое можно запитать сейчас, — разрыв в шесть
+                // раз. Из-за этого боты не строили НИ ОДНОГО здания с двумя
+                // ячейками, пока оставалось хоть одно с одной: замер 20.09
+                // показал, что после переноса ячейки на казарму пехота рухнула
+                // с 38% выпуска до 5%, то есть казарму просто перестали ставить.
+                //
+                // А кубик приходит сам: станции выдают их каждый раунд, и
+                // здание, построенное впрок, работает уже со следующего.
+                // Цена ожидания — один раунд, а не потерянный род войск.
+                base = Math.max(1.6, 3.2 - 0.6 * gap);
                 // ПЕРВОЕ ЗДАНИЕ СВОЕГО ВИДА — И ВПРОК ТОЖЕ. Свободной энергии у
                 // игрока почти никогда нет: источники дают 10 кубиков на 13
                 // ячеек потребителей, и разница уходит в добытчики. Поэтому
@@ -1370,6 +1601,15 @@ public class HeuristicAgent extends Agent {
                 // подождать кубик, — в отличие от второго такого же.
                 if (первоеЗданиеВида(me, bt)) {
                     base += 3.0;
+                }
+                // ЧТО ИМЕННО ОТКРЫВАЕТ ЭТО ЗДАНИЕ (19.09.2026). Казарма, завод
+                // и авиабаза открывают РАЗНЫЕ рода, и стоят они разного. Без
+                // этого слагаемого бот сравнивал их только по цене и энергии —
+                // и всегда выбирал казарму, самую дешёвую. Замер: авиации
+                // производится 0.06 жетона за партию, то есть её нет в игре.
+                kelium.core.UnitType родВпрок = родЗдания(bt);
+                if (родВпрок != null) {
+                    base += 2.0 * весРода(родВпрок);
                 }
             } else {
                 double want = 3.0 + 4.0 * wget("military_build");
@@ -1395,6 +1635,11 @@ public class HeuristicAgent extends Agent {
                     // неё должна быть соответствующая: замер показал 1.14 пехоты
                     // против 0.29 техники и 0.27 авиации — боты строили только
                     // самое дешёвое и оставались с одним родом войск.
+                    // ЧЕГО СТОИТ САМ РОД: авиация быстрее вдвое и не берётся
+                    // ни одной специализированной атакой — за неё и платят
+                    // втрое. Без этого слагаемого рода были для бота
+                    // равноценны, и он брал самый дешёвый.
+                    base += 2.0 * весРода(род);
                     if (первоеЗданиеВида(me, bt)) {
                         base += 6.0;
                     }
@@ -1438,12 +1683,12 @@ public class HeuristicAgent extends Agent {
      * зашитым в бота числам: дизайнер меняет энергоёмкость в файлах, и бот
      * обязан считать так же, как движок.
      */
-    private static int militarySlots(GameState state, kelium.core.BuildingType bt) {
+    private static int militarySlots(GameState state, kelium.core.BuildingType bt, int seat) {
         if (bt == null) {
             return 1;
         }
         try {
-            return state.tokenStats.buildingEnergySlots(bt, null);
+            return state.tokenStats.buildingEnergySlots(bt, null, seat);
         } catch (RuntimeException e) {
             return 1;
         }
@@ -1469,11 +1714,7 @@ public class HeuristicAgent extends Agent {
                 demand += b.energySlots;
             }
         }
-        for (String tok : me.storageTokens) {
-            if ("+1_energy".equals(tok)) {
-                supply += 1;
-            }
-        }
+        supply += kelium.engine.ЖетоныХранилища.энергииЦу(me);
         return supply - demand;
     }
 
@@ -1499,7 +1740,9 @@ public class HeuristicAgent extends Agent {
                     return 10.0;
                 }
             }
-            return 1.0;
+            // жилы ни здесь, ни рядом — добытчик не добудет ничего за всю
+            // партию: ниже отказа
+            return 0.05;
         }
         if ("power_plant".equals(btype)) {
             // ЖЁЛТАЯ ЯЧЕЙКА: только на ней станция даёт свой номинал. Гекс, где
@@ -1521,7 +1764,7 @@ public class HeuristicAgent extends Agent {
             kelium.core.BuildingType бт = kelium.core.BuildingType.fromCode(btype);
             UnitType род = kelium.engine.Actions.ASSEMBLY_UNIT.get(бт);
             if (род != null && !kelium.engine.Actions.roomForBuildingAndUnit(
-                    state, hid, kelium.engine.Actions.buildingFootprint(бт), род)) {
+                    state, hid, kelium.engine.Actions.buildingFootprint(бт), род, seat)) {
                 return 0.05;
             }
             // УДАРНОЕ ЗДАНИЕ СТАВИМ БЛИЖЕ К ПРОТИВНИКУ. Раньше этот метод не
@@ -1665,7 +1908,7 @@ public class HeuristicAgent extends Agent {
         kelium.core.BuildingType бт = kelium.core.BuildingType.fromCode(btype);
         UnitType род = бт == null ? null : kelium.engine.Actions.ASSEMBLY_UNIT.get(бт);
         if (род != null && род != UnitType.AIRCRAFT && род != UnitType.TOWER
-                && !kelium.engine.Actions.roomAfterFootprint(state, hid, sides, род)) {
+                && !kelium.engine.Actions.roomAfterFootprint(state, hid, sides, род, seat)) {
             v -= 10.0;
         }
         return v;
@@ -2051,6 +2294,48 @@ public class HeuristicAgent extends Agent {
      * цель, поделённый на общий спрос. Ноль — цель этого рода на поле не стоит
      * вовсе, и дешёвая атака у него висит вхолостую.
      */
+    /**
+     * ЧЕГО СТОИТ САМ РОД ВОЙСК — тем же мерилом, что и армия в оценке позиции.
+     *
+     * <p>Заказ дизайнера 19.09.2026: «у ботов должна быть мотивация поставить
+     * вытащенный жетон модуля боя на технику или авиацию». Прежде выбор ячейки
+     * считался только по СПРОСУ на печатную цель рода и по числу своих жетонов
+     * этого рода — то есть по обстановке, но не по тому, чего стоит сам род.
+     *
+     * <p>Из-за этого выходил замкнутый круг: авиации на поле нет (её не
+     * строят), значит «своих» ноль, значит модуль на неё класть незачем,
+     * значит и строить незачем. Вес рода круг размыкает: модуль на технику и
+     * авиацию дороже по определению, потому что усиливает жетон, который сам
+     * по себе сильнее — быстрее ходит, лучше держит удар и труднее сбивается.
+     *
+     * <p>Числа те же, что в {@code PositionValue}: одна шкала на весь бот.
+     */
+    private static double весРода(UnitType род) {
+        return switch (род) {
+            case INFANTRY -> 0.8;
+            case VEHICLE -> 1.15;
+            case AIRCRAFT -> ЦЕНА_АВИАЦИИ;
+            case TOWER -> 0.65;
+        };
+    }
+
+    /**
+     * ЦЕНА АВИАЦИИ — вынесена в настройку запуска {@code -Dkelium.bot.air}.
+     *
+     * <p>Зачем настройка, а не число. Критик указал верно: правка «1.15 -> 1.5»
+     * может не сработать вовсе, потому что авиабаза проигрывает сравнение не
+     * весом рода, а раньше — энергостанция при нехватке энергии оценивается в
+     * 12.0 против 3.6 у военного здания. Пока военное здание не проходит отбор,
+     * вес рода ВНУТРИ него не решает ничего.
+     *
+     * <p>Проверяется это вилкой, а не одной точкой: прогнать 1.15 / 1.5 / 3 / 8
+     * и смотреть ОДИН счётчик — сколько авиации произведено. Если при восьмёрке
+     * авиации столько же, сколько при 1.15, рычаг до решения не доходит и
+     * крутить его дальше бессмысленно.
+     */
+    private static final double ЦЕНА_АВИАЦИИ =
+        Double.parseDouble(System.getProperty("kelium.bot.air", "1.5"));
+
     private double польза(GameState state, UnitType род) {
         PlayerState me = state.player(seat);
         if (me.board == null || me.board.troop == null) {
@@ -2099,6 +2384,11 @@ public class HeuristicAgent extends Agent {
         if (hitsBuildings) {
             v += 2.5;
         }
+        // ЧЕГО СТОИТ САМ РОД — но только если этим родом есть кем воевать.
+        // Безусловная надбавка гнала жетоны на авиацию, которой нет на поле
+        // (замер: жетонов 0.51 на место при 0.13 атаки). Жетон усиливает атаку,
+        // а не намерение.
+        v += 1.5 * весРода(ut) * (cnt > 0 ? 1.0 : 0.2);
         return v;
     }
 
@@ -2251,6 +2541,20 @@ public class HeuristicAgent extends Agent {
             // Келемий сам по себе очковый, поэтому «не торговать» — достойный
             // вариант. Но при пустом кошельке он хуже любой сделки.
             return me.resources.coin() <= 1 ? 0.4 : 2.0;
+        }
+        if ("market_refresh".equals(o.kind())) {
+            // СМЕНА КАРТЫ РЫНКА за келемий (ячейка обновления планшета).
+            // Обновление не даёт ничего само по себе: оно только открывает
+            // следующую карту — и стоит того лишь когда брать с нынешней уже
+            // нечего. Поэтому считаем по свободным ячейкам, а не по выгоде.
+            boolean естьЧтоБрать = kelium.engine.Actions.freeMarketCellOpen(state, "left")
+                || kelium.engine.Actions.freeMarketCellOpen(state, "right");
+            if (естьЧтоБрать) {
+                return 0.3;
+            }
+            // Ячеек не осталось, а келемий есть — открыть свежую карту разумно,
+            // но только если после обновления хватит и на само предложение.
+            return kel >= 2 ? 1.8 : 0.2;
         }
         if ("market_rate".equals(o.kind())) {
             Map<String, Object> pl = (Map<String, Object>) o.payload();
@@ -2423,7 +2727,15 @@ public class HeuristicAgent extends Agent {
             case "pass" -> 0.2;
             case "spec_super_deploy" -> 100.0;
             case "spec_objective" -> scoreObjectiveComplete(state, (String) o.payload());
+            // ВЫПОЛНИТЬ УСИЛЕННО — отдельный вариант, а не прибавка: усиленная
+            // награда даётся ВМЕСТО базовой (правило 16.09.2026). Какую из двух
+            // брать, решает отбор, а не константа в коде.
+            case "spec_objective_enh" -> scoreObjectiveComplete(state, (String) o.payload())
+                * wget("objective.enhanced");
             case "spec_objective_burn" -> scoreObjectiveBurn(state, (String) o.payload());
+            // СВОБОДНЫЙ ВЕРХ (∞, задания 1.19.0) ценится той же меркой, что
+            // сжигание спец-действием: вещь та же, только спец не тратится.
+            case "free_objective_burn" -> scoreObjectiveBurn(state, (String) o.payload());
             case "spec_super" -> 3.0;
             case "spec_arsenal_install" -> scoreArsenalInstall(state, (String) o.payload());
             // ПРИМЕНИТЬ УЖЕ УСТАНОВЛЕННУЮ КАРТУ. Этой ветки не было вовсе, и

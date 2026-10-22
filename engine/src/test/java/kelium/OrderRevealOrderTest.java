@@ -64,10 +64,11 @@ class OrderRevealOrderTest {
     @Test
     void первыйВскрывшийВКругеНеВстречаетНикого() {
         GameState s = Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 3, 11L, null, null));
+            GameConfig.buildCached("1.45.0",   // проверяет правило свода 1.45.0 (до пяти развилок)
+             3, 11L, null, null));
         List<Agent> agents = new ArrayList<>();
         for (int seat = 0; seat < s.numPlayers(); seat++) {
-            agents.add(new SameOrderAgent(seat, "operation"));
+            agents.add(new SameOrderAgent(seat, "control"));
         }
 
         // Первый круг первого раунда: чей ход — тот и вскрывается, по порядку.
@@ -78,14 +79,14 @@ class OrderRevealOrderTest {
                 return;
             }
             int seat = (Integer) ev.get("seat");
-            if (!"operation".equals(ev.get("top")) || блок.containsKey(seat)) {
+            if (!"control".equals(ev.get("top")) || блок.containsKey(seat)) {
                 return;                       // считаем только первое вскрытие
             }
             блок.put(seat, Boolean.TRUE.equals(ev.get("coincided")));
             низОткрыт.put(seat, Boolean.TRUE.equals(ev.get("bottom_open")));
         }).run();
 
-        assertEquals(3, блок.size(), "все три места обязаны вскрыть «Наступление»");
+        assertEquals(3, блок.size(), "все три места обязаны вскрыть «Контролировать»");
         List<Integer> порядок = new ArrayList<>(блок.keySet());
         int первый = порядок.get(0);
         assertFalse(блок.get(первый),

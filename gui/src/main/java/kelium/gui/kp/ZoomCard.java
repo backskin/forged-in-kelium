@@ -35,7 +35,37 @@ public final class ZoomCard extends JComponent {
     private double progress = -1;
     private final Anim fade = new Anim();
 
+    /** Печатное лицо карты: есть — карта показывается картинкой, крупно. */
+    private java.awt.image.BufferedImage face;
+    /** Строка под картинкой: прогресс задания, что будет по щелчку. */
+    private String faceNote;
+
+    /**
+     * КАРТА ПЕЧАТНЫМ ЛИЦОМ (просьба дизайнера 25.09.2026: «вставить все
+     * текстуры карт»). Текст на самой картинке, поэтому под ней — только то,
+     * чего на печати нет: прогресс задания и подсказка, что делает щелчок.
+     */
+    public void showFace(java.awt.image.BufferedImage img, String note) {
+        this.face = img;
+        this.faceNote = note;
+        setVisible(true);
+        fade.snap(0);
+        fade.play(1, 120, v -> repaint(), null);
+    }
+
+    /** Размер под картинку заданной высоты (с полем под подпись). */
+    public java.awt.Dimension faceSize(int height) {
+        if (face == null) {
+            return new java.awt.Dimension(Theme.px(300), Theme.px(420));
+        }
+        int note = faceNote == null ? 0 : Theme.px(26);
+        int w = (int) Math.round((height - note) * face.getWidth() / (double) face.getHeight());
+        return new java.awt.Dimension(w + Theme.px(6), height + Theme.px(8));
+    }
+
     public void show(String name, String typeLabel, Color band, String detail, double progress) {
+        this.face = null;
+        this.faceNote = null;
         this.name = name == null ? "" : name;
         this.typeLabel = typeLabel == null ? "" : typeLabel;
         this.band = band;
@@ -64,6 +94,34 @@ public final class ZoomCard extends JComponent {
         int h = getHeight() - Theme.px(8);
         int arc = Theme.px(12);
         int pad = Theme.px(14);
+        if (face != null) {
+            int note = faceNote == null ? 0 : Theme.px(26);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setColor(new Color(0, 0, 0, 110));
+            g.fillRoundRect(Theme.px(4), Theme.px(6), w, h, arc, arc);
+            java.awt.Shape clip = g.getClip();
+            g.clip(new java.awt.geom.RoundRectangle2D.Double(0, 0, w, h - note, arc, arc));
+            g.drawImage(face, 0, 0, w, h - note, null);
+            g.setClip(clip);
+            if (note > 0) {
+                g.setColor(Theme.panel());
+                g.fillRoundRect(0, h - note - Theme.px(4), w, note + Theme.px(4), arc, arc);
+                g.setFont(Theme.font(11, Font.BOLD));
+                g.setColor(Theme.ink());
+                FontMetrics nf = g.getFontMetrics();
+                String s = faceNote;
+                while (nf.stringWidth(s) > w - pad && s.length() > 4) {
+                    s = s.substring(0, s.length() - 2);
+                }
+                g.drawString(s, (w - nf.stringWidth(s)) / 2, h - Theme.px(9));
+            }
+            g.setColor(Theme.border());
+            g.setStroke(new BasicStroke(Theme.pxf(1.2)));
+            g.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
+            g.dispose();
+            return;
+        }
 
         g.setColor(new Color(0, 0, 0, 110));
         g.fillRoundRect(Theme.px(4), Theme.px(6), w, h, arc, arc);

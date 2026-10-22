@@ -128,7 +128,7 @@ public final class StateFeatures {
             hungry += Math.max(0, b.energySlots - b.energyPlaced);
             switch (b.type) {
                 case MINER -> {
-                    if (b.powered() && Plan.touchesLiveTile(s, b.hexId, live)) {
+                    if (b.powered() && Plan.добывает(s, b)) {
                         minersWorking++;
                     }
                 }
@@ -202,7 +202,7 @@ public final class StateFeatures {
         f[16] = techSteps;
         f[17] = peaks;
         f[18] = me.objectiveHand.size();
-        f[19] = me.superObjectiveComplete ? 1 : 0;
+        f[19] = me.superObjectivesDone.size();
         f[20] = силаУстановленных(s, me);
         f[21] = me.containers;
         f[22] = me.cuDestructionTokens;

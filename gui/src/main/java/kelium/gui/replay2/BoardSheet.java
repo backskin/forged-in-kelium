@@ -118,11 +118,11 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     private static final double ELEM_K = 1.25;
 
     /** Размер элемента: та же единица, что во всём приложении, но крупнее. */
-    static int px(int v) {
+    private static int px(int v) {
         return (int) Math.round(Theme.px(v) * ELEM_K);
     }
 
-    static Font font(int size, int style) {
+    private static Font font(int size, int style) {
         return Theme.font((int) Math.round(size * TEXT_K), style);
     }
 
@@ -245,13 +245,6 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         int leftW = px(330);
         int rightX = pad + leftW + colGap;
         int rightW = getWidth() - pad - rightX;
-        // У ПЕЧАТНОГО ПЛАНШЕТА ЛЕВОЙ КОЛОНКИ НЕТ ВОВСЕ: и здания, и склад лежат
-        // на самой печати, в ленте наверху. Оставлять под них пустую треть
-        // листа незачем — остальное начинается от левого края.
-        if (PrintedBoards.available(p.seat) && PrintedBoards.сцепка(p.seat) != null) {
-            rightX = pad;
-            rightW = getWidth() - pad * 2;
-        }
 
         // ПЛАНШЕТ ВОЙСК — ОТДЕЛЬНЫМ РЯДОМ НА ВСЮ ШИРИНУ (макет дизайнера
         // 20.08.2026). В правой колонке ему было тесно: четыре столбца по роду
@@ -265,28 +258,37 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         // рисованный вид, он же остаётся источником чисел, которых на печати
         // нет (запас жетонов, цены, скорости).
         int full = getWidth() - pad * 2;
-        // ПЕЧАТНЫЕ ПЛАНШЕТЫ ЖИВУТ В ОТДЕЛЬНОЙ ЛЕНТЕ ({@link ПолосаПланшетов}):
-        // у них своя прокрутка вбок и своё увеличение (заказ дизайнера
-        // 11.09.2026). Лист под лентой показывает только то, чего на печати
-        // нет: здания списком, модули в запасе, отложенный приказ.
-        boolean printed = PrintedBoards.available(p.seat)
-            && PrintedBoards.сцепка(p.seat) != null;
+        boolean printed = PrintedBoards.available(p.seat);
+        if (printed) {
+            // ОБА ПЛАНШЕТА ОДНОЙ СЦЕПКОЙ, как они лежат на столе: хранилище
+            // слева, углом в выемку планшета войск, и жетоны военных зданий
+            // над своими подписями сверху (заказ дизайнера 09.09.2026).
+            printedSpots.clear();
+            storeTokenSpots.clear();
+            var сцепка = PrintedBoards.сцепка(p.seat);
+            if (сцепка != null) {
+                double k = full / сцепка.ширина();
+                PrintedBoards.paintPair(g, pad, y, k, сцепка, p, troopSide(p),
+                    cellFill, startFill, coveredCells(buildingsOf(f, p.seat)),
+                    вЗапасе(f, p.seat), запасВойск(f, p.seat),
+                    printedSpots, storeTokenSpots);
+                y += (int) Math.round(сцепка.высота() * k) + px(8);
+            }
+            // ПОДПИСЕЙ «на поле 1 · запас 3» ПОД ПЛАНШЕТОМ БОЛЬШЕ НЕТ: запас
+            // показан жетонами над планшетом хранилища (заказ 11.09.2026).
+        }
         if (!printed) {
             y = paintTroops(g, f, p, pad, y, full) + px(12);
         }
 
         int yLeft = paintBuildings(g, f, p, pad, y, leftW, printed);
-        int yRight = paintModulesAndCards(g, p, rightX, y, rightW, printed);
+        int yRight = paintModulesAndCards(g, p, rightX, y, rightW);
         int cardH = px(180);
         int cardW = px(150);
         yRight += px(6);
         paintSetAside(g, p, rightX, yRight, cardW, cardH);
-        // КАРТА ТРОФЕЕВ ЗДЕСЬ ТОЛЬКО У РИСОВАННОГО ПЛАНШЕТА: у печатного она
-        // лежит под хранилищем, на своём месте со стола.
-        if (!printed) {
-            paintDestroyedCard(g, p, rightX + cardW + colGap, yRight,
-                rightW - cardW - colGap, cardH, null);
-        }
+        paintDestroyedCard(g, p, rightX + cardW + colGap, yRight,
+            rightW - cardW - colGap, cardH);
         yRight += cardH + px(24);
 
         // БЛОКА СЧЁТА ХРАНИЛИЩА ПРИ ПЕЧАТНОМ ПЛАНШЕТЕ НЕТ (заказ дизайнера
@@ -319,6 +321,350 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * их собой; построил — ячейки открылись и в них видно, что лежит. Ровно так это
      * работает на столе.
      */
+    /**
+     * СЦЕПКА ПЕЧАТНЫХ ПЛАНШЕТОВ ИГРОКА В ЧУЖОЙ ХОЛСТ.
+     *
+     * <p>То же самое, что лист личной зоны рисует у себя наверху, но без шапки,
+     * списков и прочей обвязки прибора: только два планшета так, как они лежат
+     * на столе. Нужно картинке подготовленной партии для книги правил — рисовать
+     * её отдельным кодом значило бы завести второй источник правды о том, где на
+     * планшете что лежит.
+     *
+     * @param width ширина всей сцепки в точках холста
+     * @return высота сцепки (0 — печатных планшетов у этого места нет)
+     */
+    /**
+     * ОДИН ПЛАНШЕТ КРУПНО — для окна увеличения на столе живой партии (заказ
+     * дизайнера 25.09.2026: «при нажатии на планшет увеличить на весь экран,
+     * с подсказкой по каждому элементу»). Рисуется ВСЯ сцепка тем же кодом, что
+     * на столе, но в таком масштабе и со сдвигом, чтобы выбранный планшет занял
+     * {@code view}; остальное срезается. Зоны деталей пишутся в {@code hits},
+     * жетоны модулей и хранилища — в {@code modules} и {@code stores}.
+     *
+     * @param which {@code troop} или {@code storage}
+     * @return где планшет лёг на экране ({@code null} — печатных планшетов нет)
+     */
+    public Rectangle paintBoardZoom(Graphics2D g, Rectangle view, String which,
+                                    Map<String, Rectangle> hits,
+                                    Map<Rectangle, Object[]> modules,
+                                    Map<Rectangle, String> stores) {
+        return paintBoardZoom(g, view, which, hits, modules, stores, null, null);
+    }
+
+    /**
+     * То же, и вдобавок НАСТОЯЩИЕ ФОРМЫ деталей — для подсветки по форме
+     * (жалоба дизайнера 27.09.2026: наведённый жетон крыла обводился огромным
+     * прямоугольником, накрывавшим соседей): {@code outlines} — контур детали,
+     * {@code silhouettes} — картинка жетона с его матрицей.
+     */
+    public Rectangle paintBoardZoom(Graphics2D g, Rectangle view, String which,
+                                    Map<String, Rectangle> hits,
+                                    Map<Rectangle, Object[]> modules,
+                                    Map<Rectangle, String> stores,
+                                    Map<String, java.awt.Shape> outlines,
+                                    Map<String, TokenSilhouettes.Entry> silhouettes) {
+        ReplayRecord.Frame f = session.frame();
+        if (f == null || f.snapshot == null || seat >= f.snapshot.players.size()
+            || !PrintedBoards.available(seat)) {
+            return null;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(seat);
+        var с = PrintedBoards.сцепка(seat);
+        if (с == null) {
+            return null;
+        }
+        double rx;
+        double ry;
+        double rw;
+        double rh;
+        if ("storage".equals(which)) {
+            rx = с.хрX();
+            ry = с.хрY();
+            rw = PrintedBoards.хранилищеШирина(seat, с);
+            rh = PrintedBoards.хранилищеВысота(seat, с);
+        } else {
+            // войска — вместе с жетонами военных зданий над ними и картами,
+            // свисающими из пазов
+            rx = с.войX();
+            ry = 0;
+            rw = с.ширина() - с.войX();
+            rh = с.войY() + Math.max(PrintedBoards.войскаВысота(seat), PrintedBoards.низПаза(seat));
+        }
+        double k = Math.min(view.width / rw, view.height / rh);
+        int bx = (int) Math.round(view.x + (view.width - rw * k) / 2);
+        int by = (int) Math.round(view.y + (view.height - rh * k) / 2);
+        Rectangle board = new Rectangle(bx, by, (int) Math.round(rw * k), (int) Math.round(rh * k));
+        List<ReplayRecord.Tok> all = buildingsOf(f, seat);
+        planCells(p, all);
+        Map<String, Rectangle> всеЗоны = new LinkedHashMap<>();
+        Map<Rectangle, Object[]> всеМодули = new LinkedHashMap<>();
+        Map<Rectangle, String> всеЖетоны = new LinkedHashMap<>();
+        java.awt.Shape clip = g.getClip();
+        g.clip(board);
+        PrintedBoards.hits = всеЗоны;
+        Map<String, java.awt.Shape> всеКонтуры = new LinkedHashMap<>();
+        Map<String, TokenSilhouettes.Entry> всеСилуэты = new LinkedHashMap<>();
+        PrintedBoards.outlines = всеКонтуры;
+        boolean былаЗапись = TokenSilhouettes.recording;
+        var былоКуда = TokenSilhouettes.into;
+        TokenSilhouettes.into = всеСилуэты;
+        TokenSilhouettes.recording = true;
+        try {
+            if ("storage".equals(which)) {
+                // хранилище — одно, без угла планшета войск, лежащего поверх
+                PrintedBoards.paintStorage(g, board.x, board.y, board.width, p,
+                    cellFill, startFill, coveredCells(all), всеЖетоны);
+            } else {
+                // войска — одни, без угла хранилища сбоку
+                PrintedBoards.paintTroopOnly(g, (int) Math.round(bx - rx * k),
+                    (int) Math.round(by - ry * k), k, с, p, troopSide(p),
+                    вЗапасе(f, seat), всеМодули);
+            }
+        } finally {
+            PrintedBoards.hits = null;
+            PrintedBoards.outlines = null;
+            TokenSilhouettes.recording = былаЗапись;
+            TokenSilhouettes.into = былоКуда;
+            g.setClip(clip);
+        }
+        // в подсказки — только то, что попало на показанный планшет
+        всеЗоны.forEach((key, r) -> {
+            if (board.intersects(r)) {
+                hits.put(key, r);
+                if (outlines != null && всеКонтуры.containsKey(key)) {
+                    outlines.put(key, всеКонтуры.get(key));
+                }
+                if (silhouettes != null && всеСилуэты.containsKey(key)) {
+                    silhouettes.put(key, всеСилуэты.get(key));
+                }
+            }
+        });
+        всеМодули.forEach((r, v) -> {
+            if (board.intersects(r)) {
+                modules.put(r, v);
+            }
+        });
+        всеЖетоны.forEach((r, v) -> {
+            if (board.intersects(r)) {
+                stores.put(r, v);
+            }
+        });
+        return board;
+    }
+
+    /** Подсказка к жетону модуля с увеличенного планшета. */
+    public static String moduleTip(Object[] spot) {
+        return ModuleSlot.describe((ReplayRecord.Module) spot[0], (Boolean) spot[1],
+            String.valueOf(spot[2]));
+    }
+
+    /** Подсказка к жетону хранилища с увеличенного планшета. */
+    public static String storeTip(String token) {
+        return ModuleSlot.storageTokenName(token);
+    }
+
+    /**
+     * ЧТО ЭТО ЗА ДЕТАЛЬ — по ключу зоны планшета ({@code building:miner:2},
+     * {@code red:infantry}, {@code cell:miner:3:0:1:K}…). {@code null} —
+     * сказать нечего.
+     */
+    public String describeHit(String key) {
+        ReplayRecord.Frame f = session.frame();
+        if (key == null || f == null || f.snapshot == null || seat >= f.snapshot.players.size()) {
+            return null;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(seat);
+        String[] a = key.split(":");
+        switch (a[0]) {
+            case "troop":
+                return "ПЛАНШЕТ ВОЙСК\nСверху — жетоны военных зданий над своими подписями."
+                    + "\nСтолбцы — рода войск: прочность, скорость, атаки."
+                    + "\nКрасные ячейки — модули боя, синие — модули сборки, пазы — арсенал.";
+            case "storage":
+                return "ПЛАНШЕТ ХРАНИЛИЩА\nЯчейки склада под кубики: центральные открыты всегда,"
+                    + "\nостальные открывает построенный добытчик или энергостанция.";
+            case "building": {
+                String type = a.length > 1 ? a[1] : "";
+                Integer level = a.length > 2 ? Integer.valueOf(a[2]) : null;
+                return buildingTip(f, type, level);
+            }
+            case "red":
+                return ModuleSlot.describe(null, true, Names.unit(a.length > 1 ? a[1] : ""))
+                    .replaceFirst("^Красный модуль \\(атака\\)", "Ячейка модуля боя");
+            case "blue":
+                return ModuleSlot.describe(null, false,
+                    kelium.gui.GameRecorder.buildingName(a.length > 1 ? a[1] : "", null))
+                    .replaceFirst("^Синий модуль \\(сборка\\)", "Ячейка модуля сборки");
+            case "unit": {
+                String t = a.length > 1 ? a[1] : "";
+                int[] z = запасВойск(f, seat).getOrDefault(t, new int[2]);
+                return Names.unit(t).toUpperCase(java.util.Locale.ROOT)
+                    + "\nна поле " + z[0] + " · в запасе " + z[1];
+            }
+            case "installed":
+                return "УСТАНОВЛЕННЫЙ АРСЕНАЛ\n«" + Names.card(session.record(),
+                    key.substring("installed:".length())) + "»";
+            case "containers":
+                return "КОНТЕЙНЕРЫ под планшетом: " + p.containers
+                    + "\nВладелец знает, что в них; соперникам видно только число."
+                    + "\nВскрыть — спец-действием: вы получаете написанное,"
+                    + " карта уходит в сброс.";
+            case "store":
+                return "Место под жетон модуля хранилища — пусто";
+            case "cell": {
+                String grp = a.length > 1 ? a[1] : "";
+                String lvl = a.length > 2 ? a[2] : "";
+                boolean open = a.length > 4 && "1".equals(a[4]);
+                char has = a.length > 5 && !a[5].isEmpty() ? a[5].charAt(0) : '-';
+                String чья = "base".equals(grp) ? "Центральная ячейка склада — открыта всегда"
+                    : "Ячейка склада " + ("miner".equals(grp) ? "добытчика" : "энергостанции")
+                        + " №" + lvl + (open ? " — открыта (здание построено)"
+                            : " — закрыта: на ней лежит жетон здания");
+                String что = switch (has) {
+                    case 'K' -> "лежит келемий";
+                    case 'D' -> "лежит трофей";
+                    case 'A' -> "лежит боеприпас";
+                    default -> open ? "пусто" : null;
+                };
+                return что == null ? чья : чья + "\n" + что;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /** Подсказка к жетону здания: главное — где оно сейчас. */
+    private String buildingTip(ReplayRecord.Frame f, String type, Integer level) {
+        ReplayRecord.Tok t = null;
+        for (ReplayRecord.Tok x : buildingsOf(f, seat)) {
+            if (type.equals(x.type) && (level == null || level.equals(x.level))) {
+                t = x;
+                break;
+            }
+        }
+        StringBuilder sb = new StringBuilder(
+            kelium.gui.GameRecorder.buildingName(type, level).toUpperCase(java.util.Locale.ROOT));
+        if (t == null || t.hexId == null && t.alive && t.capturedBy == null) {
+            sb.append("\nлежит на планшете — можно построить");
+        } else if (t.hexId != null && t.alive) {
+            sb.append("\nпостроено, стоит на поле");
+            sb.append("\nпрочность ").append(Math.max(0, t.hp - t.damage)).append(" из ").append(t.hp);
+            if (t.energySlots > 0) {
+                sb.append("\nэнергия ").append(t.energyPlaced).append(" из ").append(t.energySlots);
+            }
+        } else if (t.capturedBy != null) {
+            sb.append("\nуничтожено — лежит на свалке у игрока ").append(t.capturedBy + 1);
+        } else {
+            sb.append("\nснесено — вернётся в запас в Возвращении");
+        }
+        if ("miner".equals(type) || "power_plant".equals(type)) {
+            sb.append(t != null && t.hexId != null && t.alive
+                ? "\nего ячейки склада открыты" : "\nего ячейки склада закрыты самим жетоном");
+        }
+        return sb.toString();
+    }
+
+    int печатнаяСцепка(Graphics2D g, int x, int y, int width) {
+        ReplayRecord.Frame f = session.frame();
+        if (f == null || f.snapshot == null || seat >= f.snapshot.players.size()
+            || !PrintedBoards.available(seat)) {
+            return 0;
+        }
+        ReplayRecord.Player p = f.snapshot.players.get(seat);
+        var сцепка = PrintedBoards.сцепка(seat);
+        if (сцепка == null) {
+            return 0;
+        }
+        List<ReplayRecord.Tok> all = buildingsOf(f, seat);
+        planCells(p, all);
+        double k = width / сцепка.ширина();
+        PrintedBoards.paintPair(g, x, y, k, сцепка, p, troopSide(p),
+            cellFill, startFill, coveredCells(all), вЗапасе(f, seat), запасВойск(f, seat),
+            new LinkedHashMap<>(), new LinkedHashMap<>());
+        return (int) Math.round(сцепка.высота() * k);
+    }
+
+    /**
+     * ПЛАНШЕТЫ НА СТОЛ ЖИВОЙ ПАРТИИ — та же сцепка, плюс зоны щелчка по
+     * деталям (жетоны зданий, ячейки модулей, запас войск; ключи — см.
+     * {@code PrintedBoards.hits}).
+     *
+     * @return высота сцепки (0 — печатных планшетов нет)
+     */
+    public int paintTableBoards(Graphics2D g, int x, int y, int width,
+                                Map<String, Rectangle> hits,
+                                Map<String, java.awt.Shape> outlines) {
+        PrintedBoards.hits = hits;
+        PrintedBoards.outlines = outlines;
+        TokenSilhouettes.LAST.clear();
+        TokenSilhouettes.into = TokenSilhouettes.LAST;
+        TokenSilhouettes.recording = true;
+        // На столе запас войск лежит САМИМИ ЖЕТОНАМИ стопкой, без подписей:
+        // сколько осталось, столько и видно (подписи — прибору разбора).
+        boolean былиПодписи = PrintedBoards.подписиЗапаса;
+        PrintedBoards.подписиЗапаса = false;
+        try {
+            return печатнаяСцепка(g, x, y, width);
+        } finally {
+            PrintedBoards.hits = null;
+            PrintedBoards.outlines = null;
+            TokenSilhouettes.recording = false;
+            PrintedBoards.подписиЗапаса = былиПодписи;
+        }
+    }
+
+    /**
+     * НАСКОЛЬКО ВСТАВЛЕННЫЕ КАРТЫ СВИСАЮТ ПОД СЦЕПКОЙ — доля её высоты: карта
+     * в пазу торчит из-под планшета войск вниз (окно паза — в разметке).
+     */
+    public double tableHang() {
+        var с = PrintedBoards.сцепка(seat);
+        if (с == null) {
+            return 0;
+        }
+        double низКарты = с.войY() + PrintedBoards.низПаза(seat);
+        return Math.max(0, (низКарты - с.высота()) / с.высота());
+    }
+
+    /** Ширина карты арсенала — доля ширины сцепки (по пазу планшета войск). */
+    public double tableCardWidth() {
+        var с = PrintedBoards.сцепка(seat);
+        return с == null ? 0.17 : PrintedBoards.картаШирина(seat) / с.ширина();
+    }
+
+    /** Ширина сцепки в пикселях печати (300 точек на дюйм) — мера стола. */
+    public double tablePrintWidth() {
+        var с = PrintedBoards.сцепка(seat);
+        return с == null ? 0 : с.ширина();
+    }
+
+    /** Пропорция сцепки для стола живой партии (0 — планшетов нет). */
+    public double tableAspect() {
+        return пропорцияСцепки();
+    }
+
+    /**
+     * Где в сцепке лежит планшет хранилища — доли её ширины и высоты:
+     * {@code [левый край, ширина, низ]}. Под ним на столе лежит стопка
+     * закрытых карт арсенала.
+     */
+    public double[] tableStorageBox() {
+        var с = PrintedBoards.сцепка(seat);
+        if (с == null) {
+            return new double[]{0, 0.33, 1};
+        }
+        double хрШ = PrintedBoards.storageHeight(seat, 1000) > 0
+            ? PrintedBoards.хранилищеШирина(seat, с) : с.ширина() * 0.33;
+        double низ = (с.хрY() + PrintedBoards.хранилищеВысота(seat, с)) / с.высота();
+        return new double[]{с.хрX() / с.ширина(), хрШ / с.ширина(), Math.min(1, низ)};
+    }
+
+    /** Каких пропорций сцепка печатных планшетов: ширина к высоте. */
+    double пропорцияСцепки() {
+        var с = PrintedBoards.сцепка(seat);
+        return с == null ? 0 : с.ширина() / с.высота();
+    }
+
     private int paintBuildings(Graphics2D g, ReplayRecord.Frame f, ReplayRecord.Player p,
                                int x, int y, int w, boolean печатный) {
         buildingSpots.clear();
@@ -368,8 +714,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * того, что видно на столе: погибший жетон уходит и с поля, и из запаса, а
      * всего их у игрока всё равно четыре.
      */
-    static Map<String, int[]> запасВойск(Session session,
-                                        ReplayRecord.Frame f, int seat) {
+    private Map<String, int[]> запасВойск(ReplayRecord.Frame f, int seat) {
         String[] types = {"infantry", "vehicle", "aircraft", "tower"};
         Map<String, int[]> out = new LinkedHashMap<>();
         for (String t : types) {
@@ -392,7 +737,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         return out;
     }
 
-    static java.util.Set<String> вЗапасе(ReplayRecord.Frame f, int seat) {
+    private java.util.Set<String> вЗапасе(ReplayRecord.Frame f, int seat) {
         java.util.Set<String> out = new java.util.LinkedHashSet<>(
             List.of("command_center", "barracks", "factory", "airbase"));
         for (ReplayRecord.Tok t : buildingsOf(f, seat)) {
@@ -516,11 +861,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         return java.util.List.copyOf(moduleSpots.keySet());
     }
 
+    /** То же для жетонов, лежащих на ПЕЧАТНОМ планшете. */
+    private final Map<Rectangle, Object[]> printedSpots = new LinkedHashMap<>();
+
     /**
      * Складские здания, чей жетон ЛЕЖИТ НА ПЛАНШЕТЕ и накрывает свои печатные
      * ячейки. Ключи те же, что у {@link ReplayRecord.Player#storageCells}.
      */
-    static java.util.Set<String> coveredCells(List<ReplayRecord.Tok> all) {
+    private java.util.Set<String> coveredCells(List<ReplayRecord.Tok> all) {
         java.util.Set<String> out = new java.util.LinkedHashSet<>();
         for (Slot s : storageSlots(all)) {
             if (s.inStock()) {
@@ -593,20 +941,8 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * места на место при листании партии.
      */
     private void planCells(ReplayRecord.Player p, List<ReplayRecord.Tok> all) {
-        План план = складПлан(p, all);
         cellFill.clear();
-        cellFill.putAll(план.ячейки());
-        startFill = план.старт();
-    }
-
-    /** Что где лежит на складе: ячейки зданий и две стартовые. */
-    record План(Map<String, char[]> ячейки, char[] старт) {
-    }
-
-    /** Тот же счёт, но без состояния — им пользуется и лента планшетов. */
-    static План складПлан(ReplayRecord.Player p, List<ReplayRecord.Tok> all) {
-        Map<String, char[]> cellFill = new LinkedHashMap<>();
-        char[] startFill = new char[]{0, 0};
+        startFill = new char[]{0, 0};
         List<char[]> holders = new ArrayList<>();   // ссылка на массив
         List<int[]> idx = new ArrayList<>();        // индекс внутри массива
         List<Character> types = new ArrayList<>();
@@ -634,6 +970,41 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 types.add(str.charAt(i));
             }
         }
+        // ЯЧЕЙКИ ВНЕ ПЕЧАТИ ПЛАНШЕТА (жалоба дизайнера 27.09.2026: «келемия 2/3,
+        // а на хранилище один кубик»). Склад движка считает ещё жетон хранилища
+        // стороной «+1 ячейка» и карты со способностью «+1 ячейка склада»;
+        // окно раскладывало кубики только по печатным ячейкам, и кубик в такой
+        // ячейке не рисовался нигде. Теперь у каждой такой ячейки своё место:
+        // на самом жетоне хранилища и на самой карте.
+        int printed = holders.size();
+        for (int i = 0; i < p.storageTokens.size(); i++) {
+            if (kelium.engine.ЖетоныХранилища.ячейка(p.storageTokens.get(i))) {
+                char[] arr = new char[1];
+                cellFill.put("store-" + i, arr);
+                holders.add(arr);
+                idx.add(new int[]{0});
+                types.add('U');
+            }
+        }
+        Map<String, Integer> наКартах = new LinkedHashMap<>(p.cellCards);
+        int сверх = p.storeCap - holders.size()
+            - наКартах.values().stream().mapToInt(Integer::intValue).sum();
+        // запись без раскладки по картам (сетевой стол, старые записи): лишние
+        // ячейки — по одной на установленные карты, как у «+1 ячейка склада»
+        for (int i = 0; сверх > 0 && i < p.arsenalInstalled.size(); i++) {
+            наКартах.merge(p.arsenalInstalled.get(i), 1, Integer::sum);
+            сверх--;
+        }
+        for (Map.Entry<String, Integer> e : наКартах.entrySet()) {
+            char[] arr = new char[Math.max(0, e.getValue())];
+            cellFill.put("card-" + e.getKey(), arr);
+            for (int i = 0; i < arr.length; i++) {
+                holders.add(arr);
+                idx.add(new int[]{i});
+                types.add('U');
+            }
+        }
+        extraCells = holders.size() - printed;
         int k = Math.max(0, p.kelium);
         int a = Math.max(0, p.ammo);
         for (int i = 0; i < types.size() && k > 0; i++) {
@@ -672,7 +1043,39 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             holders.get(i)[idx.get(i)[0]] = 'D';
             d--;
         }
-        return new План(cellFill, startFill);
+        PrintedBoards.кубикиВнеПечати = cellFill;
+    }
+
+    /** Сколько ячеек склада лежит вне печати планшета (жетоны, карты) — для проверок. */
+    private int extraCells;
+
+    /**
+     * Сколько кубиков (келемий, боеприпас, трофей) НАРИСОВАНО с прошлого вызова —
+     * для проверок, что каждый кубик склада виден на планшете.
+     */
+    public static int[] takeDrawnCubesForTest() {
+        int[] out = PrintedBoards.НАРИСОВАНО.clone();
+        java.util.Arrays.fill(PrintedBoards.НАРИСОВАНО, 0);
+        return out;
+    }
+
+    /** Сколько кубиков каждого вида разложено по ячейкам — для проверок. */
+    public int[] cubesForTest() {
+        int[] out = new int[3];
+        java.util.List<char[]> all = new ArrayList<>(cellFill.values());
+        all.add(startFill);
+        for (char[] arr : all) {
+            for (char c : arr) {
+                if (c == 'K') {
+                    out[0]++;
+                } else if (c == 'A') {
+                    out[1]++;
+                } else if (c == 'D') {
+                    out[2]++;
+                }
+            }
+        }
+        return out;
     }
 
     /** Значок ресурса, лежащего в ячейке склада: код для {@link MarkIcons}. */
@@ -694,7 +1097,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     }
 
     /** Складские здания игрока в постоянном порядке: добытчики, потом станции. */
-    private static List<Slot> storageSlots(List<ReplayRecord.Tok> all) {
+    private List<Slot> storageSlots(List<ReplayRecord.Tok> all) {
         List<Slot> out = new ArrayList<>();
         out.addAll(roster(all, slot("miner", 1), slot("miner", 2), slot("miner", 3),
             slot("miner", 4)));
@@ -957,9 +1360,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         cx = divider(g, cx, cy, cell);
         int cubes = 0;
         for (String tok : p.storageTokens) {
-            if (tok != null && tok.contains("energy")) {
-                cubes++;
-            }
+            cubes += kelium.engine.ЖетоныХранилища.кубиковЦу(tok);
         }
         int zoneW = Math.max(cell * 2 + gap, cubes * (cell + gap));
         g.setColor(Theme.alpha(Theme.energy(), Theme.isDark() ? 0.16 : 0.14));
@@ -1128,7 +1529,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             }
         }
 
-        kelium.core.TroopSide troop = troopSide(session, p);
+        kelium.core.TroopSide troop = troopSide(p);
         int gap = px(6);
         int colW = (w - gap * 3) / 4;
         int colH = px(150);
@@ -1146,8 +1547,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * kelium.core.PlayerBoard#fromContent}): второй разбор той же таблицы рано
      * или поздно разошёлся бы с движком.
      */
-    static kelium.core.TroopSide troopSide(Session session,
-                                          ReplayRecord.Player p) {
+    private kelium.core.TroopSide troopSide(ReplayRecord.Player p) {
         try {
             var entries = session.content().get("boards").entries;
             return kelium.core.PlayerBoard.fromContent(entries,
@@ -1192,7 +1592,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         g.drawString(Names.building(maker), x + pad, ty);
         ty += px(11);
         // ЯЧЕЙКИ ЭНЕРГИИ — точками: столько кубиков здание просит, чтобы работать.
-        int slots = buildingSlots(maker);
+        int slots = buildingSlots(troop, maker);
         int dot = px(6);
         for (int i = 0; i < slots; i++) {
             g.setColor(Theme.energy());
@@ -1206,7 +1606,19 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             int price = buildingPrice(troop, maker);
             g.setFont(mono(9, Font.BOLD));
             g.setColor(Theme.ink2());
-            g.drawString(price < 0 ? "не строится" : price + " мон",
+            // ПРОИЗВОДСТВО с планшета цвета: боеприпасы / войска за одно Снаряжение.
+            String выход = "";
+            try {
+                var bt = kelium.core.BuildingType.fromCode(maker);
+                Integer бпр = troop == null ? null : troop.printedOutput(bt, "ammo");
+                Integer войск = troop == null ? null : troop.printedOutput(bt, "unit");
+                if (бпр != null && войск != null) {
+                    выход = " · " + бпр + " БПР / " + войск + " войск";
+                }
+            } catch (RuntimeException нет) {
+                выход = "";
+            }
+            g.drawString((price < 0 ? "не строится" : price + " мон") + выход,
                 x + pad + slots * (dot + px(2)) + px(4), ty);
         }
         ty += px(12);
@@ -1220,7 +1632,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         g.setColor(Theme.ink2());
         // ПРОЧНОСТЬ РЯДОМ СО СКОРОСТЬЮ: без неё по планшету нельзя понять, чем
         // кончится обстрел, а именно за этим в него и смотрят.
-        int hp = unitHp(type);
+        int hp = unitHp(troop, type);
         String stat = (hp < 0 ? "" : "прочность " + hp + " · ")
             + "скорость " + (troop == null ? "?"
             : String.valueOf(troop.speed(kelium.core.UnitType.fromCode(type))));
@@ -1342,8 +1754,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         };
     }
 
-    /** Сколько ячеек энергии просит здание — из правил, иначе 0. */
-    private int buildingSlots(String building) {
+    /** Сколько ячеек энергии просит здание — с жетона цвета, иначе из правил, иначе 0. */
+    private int buildingSlots(kelium.core.TroopSide troop, String building) {
+        if (troop != null && troop.tokenPatch() != null
+                && troop.tokenPatch().get("buildings") instanceof Map<?, ?> m
+                && m.get(building) instanceof Map<?, ?> b
+                && b.get("energy_slots") instanceof Number n) {
+            return n.intValue();
+        }
         try {
             var entries = session.content().get("boards").entries;
             for (var e : entries) {
@@ -1362,10 +1780,16 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     /**
      * Прочность жетона рода войск — из правил, или −1, если правил нет.
      *
-     * <p>Живёт не в стороне планшета, а в общей таблице жетонов: прочность у
-     * всех сторон одна и та же, меняется только то, что напечатано на планшете.
+     * <p>Прочность напечатана на жетоне, а жетоны у каждого цвета свои
+     * (фракции 22.09.2026): сперва жетоны цвета этого планшета, иначе общая
+     * таблица жетонов.
      */
-    private int unitHp(String type) {
+    private int unitHp(kelium.core.TroopSide troop, String type) {
+        if (troop != null && troop.tokenPatch() != null
+                && troop.tokenPatch().get("units") instanceof Map<?, ?> m
+                && m.get(type) instanceof Map<?, ?> u && u.get("hp") instanceof Number n) {
+            return n.intValue();
+        }
         try {
             for (var e : session.content().get("boards").entries) {
                 Object us = e.get("units");
@@ -1388,7 +1812,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * жетонов ещё не разложено.
      */
     private int paintModulesAndCards(Graphics2D g, ReplayRecord.Player p, int x, int y,
-                                     int w, boolean печатный) {
+                                     int w) {
         caption(g, "МОДУЛИ В ЗАПАСЕ И КАРТЫ", x, y);
         y += px(14);
         int t = px(18);
@@ -1422,17 +1846,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             ? px(96) : px(28);
         int bx = x;
         int by = y;
-        var стопки = deckButtons(p, печатный);
-        if (стопки.isEmpty()) {
-            // РЯДА СТОПОК НЕТ ВОВСЕ. У печатного планшета все карты лежат по
-            // своим местам, и пустой ряд оставлял под модулями полосу высотой в
-            // карту — на листе это читалось как дыра.
-            return y;
-        }
-        for (Object[] btn : стопки) {
+        for (Object[] btn : deckButtons(p)) {
             String label = (String) btn[0];
             int count = (Integer) btn[1];
-            int need = deckButtonWidth(g, label, count);
+            int need = deckButtonWidth(g, label, count, (String) btn[2]);
             if (bx > x && bx + need > x + w) {
                 bx = x;
                 by += rowH;
@@ -1459,32 +1876,31 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * <p>Списком, а не четырьмя вызовами подряд: ряд переносится по ширине, и
      * перенос считается ОДНИМ правилом на все кнопки, а не повторяется у каждой.
      */
-    private java.util.List<Object[]> deckButtons(ReplayRecord.Player p, boolean печатный) {
+    private java.util.List<Object[]> deckButtons(ReplayRecord.Player p) {
         java.util.List<Object[]> out = new ArrayList<>();
-        if (!печатный) {
-            // У ПЕЧАТНОГО ПЛАНШЕТА стопка заданий стоит справа от него ростом с
-            // планшет (заказ дизайнера 11.09.2026), и второй раз мелкой
-            // кнопкой её показывать незачем.
-            out.add(new Object[]{"задания", p.objectiveHand.size(), "objectives",
-                p.objectiveHand});
-        }
+        out.add(new Object[]{"задания", p.objectiveHand.size(), "objectives", p.objectiveHand});
         // КНОПОК АРСЕНАЛА ЗДЕСЬ НЕТ: карты арсенала лежат в трёх пазах внизу
         // планшета войск, и читать их открывают щелчком прямо оттуда (заказ
         // дизайнера 11.09.2026).
-        if (p.superObjective != null) {
-            // Карта супер-задания: множитель очков в финале и требование низа.
-            // Взята ли награда низа — говорит подпись.
+        if (!p.superObjectives.isEmpty()) {
+            // Карты супер-заданий: у каждой множитель очков в финале и требование
+            // низа. Сколько низов уже отработало — говорит подпись.
             out.add(new Object[]{
-                p.superComplete ? "супер-задание (низ отработан)" : "супер-задание",
-                1, "super_objectives", java.util.List.of(p.superObjective)});
+                p.superDone.isEmpty() ? "супер-задания"
+                    : "супер-задания (низов отработало " + p.superDone.size() + ")",
+                p.superObjectives.size(), "super_objectives", p.superObjectives});
         }
         return out;
     }
 
     /** Ширина кнопки-стопки вместе с отступом до следующей. */
-    private int deckButtonWidth(Graphics2D g, String label, int count) {
+    private int deckButtonWidth(Graphics2D g, String label, int count, String kind) {
         g.setFont(font(9, Font.PLAIN));
-        int стопка = (int) Math.round(px(48) / КАРТА)
+        // ШИРИНА СТОПКИ — ПО САМОЙ РУБАШКЕ, как и в стопкаКарт: пропорция с
+        // картинки, а не общим числом.
+        java.awt.image.BufferedImage рубашка = kelium.gui.CardArt.back(kind);
+        int стопка = (рубашка == null ? px(48)
+            : (int) Math.round(px(76) * kelium.gui.CardArt.aspect(рубашка)))
             + (Math.min(Math.max(count, 1), 5) - 1) * px(4);
         return Math.max(стопка, g.getFontMetrics().stringWidth(
             label + (count > 0 ? " " + count : ""))) + px(10);
@@ -1496,9 +1912,6 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
 
     /** Кнопки стопок и что за ними стоит — заполняется при отрисовке. */
     private final Map<Rectangle, Deck> deckSpots = new LinkedHashMap<>();
-
-    /** Отношение высоты печатной карты к ширине (256×358 точек). */
-    private static final double КАРТА = 358 / 256.0;
 
     /**
      * СТОПКА КАРТ — НАСТОЯЩИМИ КАРТАМИ, А НЕ КНОПКОЙ С ЧИСЛОМ.
@@ -1514,8 +1927,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      */
     private int стопкаКарт(Graphics2D g, int x, int y, String label, int count,
                            String kind, java.util.List<String> ids) {
-        java.awt.image.BufferedImage рубашка = kelium.report.Textures.card(
-            "deck_" + kind, "deck");
+        java.awt.image.BufferedImage рубашка = kelium.gui.CardArt.back(kind);
         if (рубашка == null) {
             return deckButton(g, x, y, label, count, kind, ids);
         }
@@ -1550,18 +1962,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         return x + Math.max(w, пw) + px(10);
     }
 
-    /** Доля рубашки колоды: ширина к высоте (0 — рубашки нет). */
-    static double доляРубашки(String kind) {
-        var р = kelium.report.Textures.card("deck_" + kind, "deck");
-        return р == null ? 0 : р.getWidth() / (double) р.getHeight();
-    }
-
-    /** Сколько карт видно в стопке: больше пяти на столе всё равно не различить. */
-    static int видимыхКарт(int count) {
-        return Math.min(Math.max(count, 1), 5);
-    }
-
-    /** Прежний вид стопки — числом в рамке; остаётся, если рубашки нет. */    /** Прежний вид стопки — числом в рамке; остаётся, если рубашки нет. */
+    /** Прежний вид стопки — числом в рамке; остаётся, если рубашки нет. */
     private int deckButton(Graphics2D g, int x, int y, String label, int count,
                            String kind, java.util.List<String> ids) {
         g.setFont(font(11, Font.PLAIN));
@@ -1619,8 +2020,10 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     }
 
     /** Отложенный приказ — рубашкой вверх, как он и лежит на столе. */
-    /** Отношение высоты печатной карты к её ширине (661×1028 точек). */
-    static final double КАРТА_ПРИКАЗА = 1028 / 661.0;
+    /** Отношение высоты карты приказа к ширине — с самой картинки. */
+    private static double высотаКШирине(java.awt.image.BufferedImage img) {
+        return 1.0 / kelium.gui.CardArt.aspect(img);
+    }
 
     /**
      * РУБАШКА КОЛОДЫ ПРИКАЗОВ этого игрока — печатная картинка со стола.
@@ -1629,36 +2032,13 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * идентификаторах карт стоит {@code red}: спрашиваем оба имени, потом общую
      * рубашку.
      */
-    static java.awt.image.BufferedImage рубашкаПриказов(String colour) {
-        String c = colour == null || colour.isBlank() ? "" : colour;
-        String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
-        return kelium.report.Textures.orderCard(c.isEmpty() ? null : "back_" + c,
-            alt.isEmpty() ? null : "back_" + alt, "back");
+    private static java.awt.image.BufferedImage рубашкаПриказов(String colour) {
+        return kelium.gui.CardArt.orderBack(colour);
     }
 
     /** Печатное лицо карты приказа; {@code null} — художник его не рисовал. */
-    /**
-     * ОТЛОЖЕННЫЙ ПРИКАЗ ДЛЯ ЛЕНТЫ. Рисует его {@link ПолосаПланшетов}: при
-     * печатных планшетах нижнего листа нет вовсе, а карта — вещь со стола и
-     * лежит рядом с планшетами. Счёт половин и лиц остаётся здесь: он завязан
-     * на набор карт партии.
-     */
-    void отложенныйПриказ(Graphics2D g, ReplayRecord.Player p, int x, int y,
-                          int w, int h) {
-        paintSetAside(g, p, x, y, w, h);
-    }
-
     private java.awt.image.BufferedImage лицоПриказа(String cardId, String colour) {
-        if (cardId == null || cardId.isBlank()) {
-            return null;
-        }
-        if (cardId.startsWith("security")) {
-            String c = colour == null || colour.isBlank() ? "" : colour;
-            String alt = "red".equals(c) ? "scarlet" : ("scarlet".equals(c) ? "red" : "");
-            return kelium.report.Textures.orderCard(c.isEmpty() ? null : "security_" + c,
-                alt.isEmpty() ? null : "security_" + alt, "security");
-        }
-        return kelium.report.Textures.orderCard(cardId);
+        return kelium.gui.CardArt.order(cardId, colour);
     }
 
     private void paintSetAside(Graphics2D g, ReplayRecord.Player p, int x, int y,
@@ -1673,8 +2053,9 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         java.awt.image.BufferedImage печать = p.orderSetAside == null
             ? рубашкаПриказов(p.orderColor) : лицоПриказа(p.orderSetAside, p.orderColor);
         if (печать != null) {
-            int кв = (int) Math.min(w, h / КАРТА_ПРИКАЗА);
-            int кh = (int) (кв * КАРТА_ПРИКАЗА);
+            double отн = высотаКШирине(печать);
+            int кв = (int) Math.min(w, h / отн);
+            int кh = (int) (кв * отн);
             java.awt.Composite было = g.getComposite();
             if (p.orderSetAside == null) {
                 // Ничего не отложено — на месте лежит рубашка, приглушённая:
@@ -1849,32 +2230,25 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
      * поворот случайный, но УСТОЙЧИВЫЙ — он привязан к номеру жетона, поэтому при
      * листании партии вперёд-назад они не дёргаются на месте.
      */
-    static void paintDestroyedCard(Graphics2D g, ReplayRecord.Player p, int x, int y,
-                                 int w, int h, java.awt.image.BufferedImage лицо) {
-        caption(g, лицо == null ? "КАРТА ТРОФЕЕВ" : "ОТЛОЖЕНО", x, y);
+    private void paintDestroyedCard(Graphics2D g, ReplayRecord.Player p, int x, int y,
+                                 int w, int h) {
+        caption(g, "КАРТА ТРОФЕЕВ", x, y);
         int top = y + px(14);
         // МЕСТО ПОД ТРОФЕИ — ЭТО РУБАШКА КАРТЫ ПРИКАЗОВ, ПОВЁРНУТАЯ НА 90°
         // ПРОТИВ ЧАСОВОЙ (заказ дизайнера 09.09.2026: «зачем ты используешь
         // отдельно нарисованную область, когда можно взять рубашку карты — и
         // получится ровно та же самая область, и это будет как раз в тему»).
         // Своей нарисованной плашки здесь больше нет.
-        // ЭТО И ЕСТЬ ОТЛОЖЕННАЯ КАРТА ПРИКАЗА, лежащая повёрнутой: на неё же
-        // складывают снесённые жетоны. Щелчок переворачивает её лицом, не
-        // разворачивая (заказ дизайнера 11.09.2026), и тогда трофеи поверх не
-        // рисуются — иначе они закрыли бы то, ради чего её перевернули.
-        java.awt.image.BufferedImage рубашка = лицо != null ? лицо
-            : рубашкаПриказов(p.orderColor);
+        java.awt.image.BufferedImage рубашка = рубашкаПриказов(p.orderColor);
         if (рубашка != null) {
-            int кh = (int) Math.min(h, w / КАРТА_ПРИКАЗА);
-            int кв = (int) (кh * КАРТА_ПРИКАЗА);
+            double отн = высотаКШирине(рубашка);
+            int кh = (int) Math.min(h, w / отн);
+            int кв = (int) (кh * отн);
             java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform();
             at.translate(x, top + кh);
             at.rotate(-Math.PI / 2);
             at.scale(кh / (double) рубашка.getWidth(), кв / (double) рубашка.getHeight());
             g.drawImage(рубашка, at, null);
-            if (лицо != null) {
-                return;
-            }
         } else {
             g.setColor(Theme.tile());
             g.fill(new RoundRectangle2D.Double(x, top, w, h, Theme.R_OVERLAY * 2,
@@ -1931,7 +2305,7 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
     }
 
     /** Один уничтоженный жетон: силуэт бывшего владельца и напечатанная ценность. */
-    static void paintDestroyedToken(Graphics2D g, ReplayRecord.DestroyedToken t, double cx,
+    private void paintDestroyedToken(Graphics2D g, ReplayRecord.DestroyedToken t, double cx,
                                   double cy, double size, double angleDeg) {
         // ТРОФЕЙНАЯ СТОРОНА — СВОЕЙ ПЕЧАТЬЮ (заказ дизайнера 11.09.2026:
         // «трофеи на карте приказов должны быть видны непосредственно текстурой
@@ -1982,14 +2356,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
         };
     }
 
-    static void caption(Graphics2D g, String text, int x, int y) {
+    private void caption(Graphics2D g, String text, int x, int y) {
         g.setFont(Theme.caption());
         g.setColor(Theme.ink3());
         g.drawString(text, x, y + px(9));
     }
 
     /** Здания игрока: и на поле, и в запасе, и уехавшие на место уничтоженных жетонов. */
-    static List<ReplayRecord.Tok> buildingsOf(ReplayRecord.Frame f, int owner) {
+    private List<ReplayRecord.Tok> buildingsOf(ReplayRecord.Frame f, int owner) {
         List<ReplayRecord.Tok> out = new ArrayList<>();
         for (ReplayRecord.Tok t : f.snapshot.tokens) {
             if (t.building && t.owner == owner) {
@@ -2021,6 +2395,14 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
                 return true;
             }
         }
+        for (Map.Entry<Rectangle, Object[]> en : printedSpots.entrySet()) {
+            if (en.getKey().contains(p)) {
+                Object[] sp = en.getValue();
+                ModuleZoom.show(javax.swing.SwingUtilities.getWindowAncestor(this),
+                    (ReplayRecord.Module) sp[0], (Boolean) sp[1], String.valueOf(sp[2]));
+                return true;
+            }
+        }
         return false;
     }
 
@@ -2033,6 +2415,13 @@ public final class BoardSheet extends JComponent implements javax.swing.Scrollab
             if (en.getKey().contains(e.getPoint())) {
                 ModuleSpot sp = en.getValue();
                 return Ui2.tip(ModuleSlot.describe(sp.module(), sp.red(), sp.slotName()));
+            }
+        }
+        for (Map.Entry<Rectangle, Object[]> en : printedSpots.entrySet()) {
+            if (en.getKey().contains(e.getPoint())) {
+                Object[] sp = en.getValue();
+                return Ui2.tip(ModuleSlot.describe((ReplayRecord.Module) sp[0],
+                    (Boolean) sp[1], String.valueOf(sp[2])));
             }
         }
         for (Map.Entry<Rectangle, String> en : storeTokenSpots.entrySet()) {

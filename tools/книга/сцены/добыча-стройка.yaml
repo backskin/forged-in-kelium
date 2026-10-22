@@ -1,0 +1,11 @@
+# Гордон (жёлтый) строит добытчик №1 стенкой к тайлу зарождения:
+# новое здание только встаёт на поле и ничего не берёт (свод 1.51.0, 12.10.2026)
+size: 300
+hexStroke: "#5A4A33"
+hexes:
+  - {q: 0, r: 0, spawn: {kelium: 4}}
+  - {q: 1, r: 0}
+tokens:
+  - {type: miner, owner: 3, q: 1, r: 0, building: true, sides: [3], level: 1, energySlots: 2, energyPlaced: 0}
+outline:
+  - {q: 1, r: 0, color: "#1F7A3A"}

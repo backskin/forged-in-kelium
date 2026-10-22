@@ -207,6 +207,24 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         }
         // Оба планшета одной высоты и целиком в отведённом месте: доска, у
         // которой обрезан край, читается как другая доска.
+        if (only != null) {
+            // ОДНА ДОСКА НА ВКЛАДКУ (26.09.2026): научный отдел и рынок —
+            // отдельными ящиками, каждая доска крупно на всё место
+            boolean science = "science".equals(only);
+            double asp = science ? aspS : aspM;
+            int room1H = science ? roomH : h - 2 * pad;
+            int oh = Math.min(room1H, (int) ((w - 2 * pad) / asp));
+            int ow = (int) Math.round(oh * asp);
+            int ox = pad + (w - 2 * pad - ow) / 2;
+            int oy = pad + (room1H - oh) / 2;
+            if (science) {
+                paintScienceArt(g, sci, ox, oy, ow, oh);
+                paintPrintedStrip(g, pad, h - pad - strip, w - 2 * pad, strip);
+            } else {
+                paintMarketArt(g, mkt, ox, oy, ow, oh);
+            }
+            return;
+        }
         int hh = Math.min(roomH, (int) (roomW / (aspS + aspM)));
         int sw = (int) Math.round(hh * aspS);
         int mw = (int) Math.round(hh * aspM);
@@ -217,13 +235,69 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         paintPrintedStrip(g, pad, h - pad - strip, w - 2 * pad, strip);
     }
 
+    /**
+     * ОДНА ПЕЧАТНАЯ ДОСКА С ЖИВЫМ СОСТОЯНИЕМ — в прямоугольник экрана (сцена
+     * планшета, 28.09.2026): кубики науки в ячейках, карта рынка с кубиками.
+     */
+    public void paintBoard(Graphics2D g, String which, int x, int y, int w, int h) {
+        java.awt.image.BufferedImage art = kelium.report.Textures.board(which);
+        if (art == null || snap == null) {
+            return;
+        }
+        kelium.report.Сглаживание.включить(g);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        if ("science".equals(which) && kelium.gui.replay2.BoardAnchors.science() != null) {
+            paintScienceArt(g, art, x, y, w, h);
+        } else if ("market".equals(which) && kelium.gui.replay2.BoardAnchors.marketCard() != null) {
+            paintMarketArt(g, art, x, y, w, h);
+        } else {
+            g.drawImage(scaled(art, w, h), x, y, null);
+        }
+    }
+
+    /**
+     * Ячейка шага {@code step} трека {@code track} на картинке планшета науки —
+     * место варианта «шагнуть сюда» на сцене планшета (null — якорей нет).
+     */
+    public java.awt.Shape scienceStepArea(String track, int step) {
+        kelium.gui.replay2.BoardAnchors.Science sc = kelium.gui.replay2.BoardAnchors.science();
+        if (sc == null) {
+            return null;
+        }
+        int[] cost = ints("tech.step_cost_trophy", new int[]{2, 3, 4, 5});
+        int[] cap = ints("tech.step_capacity", new int[]{3, 3, 2, 1});
+        int steps = Math.min(cost.length, cap.length);
+        double[] c = sc.cell(track, Math.max(1, Math.min(steps, step)), 0, steps);
+        if (c == null) {
+            return null;
+        }
+        // ячейка шага напечатана наискось; подсветка — её повёрнутая рамка
+        double w = sc.cellW() * 1.08;
+        double h = sc.cellH() * 1.08;
+        java.awt.geom.AffineTransform t = new java.awt.geom.AffineTransform();
+        t.translate(c[0], c[1]);
+        t.rotate(Math.toRadians(sc.angle()));
+        return t.createTransformedShape(new java.awt.geom.RoundRectangle2D.Double(
+            -w / 2, -h / 2, w, h, w * 0.18, w * 0.18));
+    }
+
+    /** Только одна доска: {@code science}, {@code market}; null — обе. */
+    private String only;
+
+    public void setOnly(String which) {
+        this.only = which;
+        repaint();
+    }
+
     /** Планшет науки: картинка плюс кубики в напечатанных ячейках. */
     private void paintScienceArt(Graphics2D g, java.awt.image.BufferedImage art,
                                  int x, int y, int w, int h) {
         g.drawImage(scaled(art, w, h), x, y, null);
         kelium.gui.replay2.BoardAnchors.Science sc = kelium.gui.replay2.BoardAnchors.science();
         double k = w / (double) sc.artW();
-        int[] cost = ints("tech.step_cost_trophy", new int[]{1, 2, 3, 4});
+        int[] cost = ints("tech.step_cost_trophy", new int[]{2, 3, 4, 5});
         int[] cap = ints("tech.step_capacity", new int[]{3, 3, 2, 1});
         int steps = Math.min(cost.length, cap.length);
         int players = record == null ? snap.players.size() : record.players;
@@ -245,6 +319,15 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                     }
                     кубикВЯчейку(g, x + c[0] * k, y + c[1] * k, cube, sc.angle(),
                         FieldView.seatColor(here.get(used++)));
+                }
+                // ВЕРШИНА БЕЗ ПРЕДЕЛА (решение 25.09.2026): кубики на её
+                // единственной ячейке стоят стопкой — каждый следующий выше.
+                if (step == steps && used > 0 && used < here.size()) {
+                    double[] c = sc.cell(TRACKS[t], step, 0, steps);
+                    for (int extra = 1; c != null && used < here.size(); extra++) {
+                        кубикВЯчейку(g, x + c[0] * k, y + c[1] * k - extra * cube * 0.45,
+                            cube, sc.angle(), FieldView.seatColor(here.get(used++)));
+                    }
                 }
             }
             // ВЕРШИНА ЗАНЯТА — карту супер-арсенала с неё уже забрали. На печати
@@ -309,6 +392,9 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
      */
     private void картаВЯчейку(Graphics2D g, int x, int y, int w, int h,
                               int cellCost, int players) {
+        if (печатьРынка(g, x, y, w, h, players)) {
+            return;
+        }
         Map<String, Object> card = snap.market == null ? null : find("market", snap.market);
         Color accent = new Color(0x2F, 0x85, 0x5A);      // зелень планшета рынка
         int r = Math.max(6, h / 12);
@@ -357,6 +443,63 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
             card.get("left"), 0, cellCost, players, du, accent);
         предложениеВЯчейку(g, x + pad, oy + rowH, w - 2 * pad, rowH - Math.max(2, h / 60),
             card.get("right"), 1, cellCost, players, du, accent);
+    }
+
+    /**
+     * ЦЕНТРЫ ЯЧЕЕК НА ПЕЧАТНОЙ КАРТЕ РЫНКА — доли её ширины и высоты, сняты
+     * по шаблону {@code card/market_face.png} (1028×661): у левого предложения
+     * две ячейки внизу слева, у правого — две внизу справа; вторая в паре
+     * помечена «4 игрока». Сторона ячейки — доля ширины карты.
+     */
+    private static final double[][][] ЯЧЕЙКИ_РЫНКА = {
+        {{0.154, 0.809}, {0.327, 0.809}},
+        {{0.671, 0.809}, {0.845, 0.809}},
+    };
+    private static final double ЯЧЕЙКА_РЫНКА = 0.124;
+
+    /**
+     * АКТИВНАЯ КАРТА РЫНКА ПЕЧАТНЫМ ЛИЦОМ — если лицо этой карты разложено
+     * ({@code card/market/<id>.png}; id любой: {@code m3_03}, {@code m4_07}).
+     * Карта вписывается в место в своей пропорции, не сплющиваясь; поверх
+     * напечатанных ячеек ложатся кубики келемия тех, кто их занял, с меткой
+     * места. Закрытая по числу игроков ячейка затеняется.
+     *
+     * @return {@code false} — лица нет, рисуй прежним видом
+     */
+    private boolean печатьРынка(Graphics2D g, int x, int y, int w, int h, int players) {
+        java.awt.image.BufferedImage face = CardArt.market(snap.market);
+        if (face == null) {
+            return false;
+        }
+        java.awt.Rectangle r = CardArt.drawFit(g, face, x, y, w, h, Math.max(4, h / 24.0));
+        int open = kelium.engine.Actions.marketCellsOpen(players);
+        int d = (int) Math.round(r.width * ЯЧЕЙКА_РЫНКА);
+        for (int side = 0; side < ЯЧЕЙКИ_РЫНКА.length; side++) {
+            int[] taken = snap.marketCells == null || snap.marketCells.length <= side
+                ? new int[]{-1, -1} : snap.marketCells[side];
+            for (int i = 0; i < ЯЧЕЙКИ_РЫНКА[side].length; i++) {
+                int cx = r.x + (int) Math.round(ЯЧЕЙКИ_РЫНКА[side][i][0] * r.width);
+                int cy = r.y + (int) Math.round(ЯЧЕЙКИ_РЫНКА[side][i][1] * r.height);
+                if (i >= open) {
+                    g.setColor(kelium.gui.replay2.Theme.alpha(Color.BLACK, 0.38));
+                    g.fillRoundRect(cx - d / 2, cy - d / 2, d, d, d / 5, d / 5);
+                    continue;
+                }
+                int seat = i < taken.length ? taken[i] : -1;
+                if (seat < 0) {
+                    continue;
+                }
+                int c = (int) Math.round(d * 0.62);
+                cube(g, cx - c / 2, cy - c / 2, c, KELIUM_CUBE);
+                int m = Math.max(6, d / 3);
+                g.setColor(FieldView.seatColor(seat));
+                g.fillOval(cx + d / 2 - m, cy - d / 2, m, m);
+                g.setColor(FieldView.seatStroke(seat));
+                g.setStroke(new BasicStroke(1.2f));
+                g.drawOval(cx + d / 2 - m, cy - d / 2, m, m);
+            }
+        }
+        return true;
     }
 
     /** Одно предложение карты рынка: что дают и ячейки, кто его уже занял. */
@@ -625,7 +768,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
     private void paintScience(Graphics2D g, int x, int y, int w, int h) {
         frame(g, x, y, w, h, "ПЛАНШЕТ НАУКИ");
 
-        int[] cost = ints("tech.step_cost_trophy", new int[]{1, 2, 3, 4});
+        int[] cost = ints("tech.step_cost_trophy", new int[]{2, 3, 4, 5});
         int[] vp = ints("tech.step_vp_cumulative", new int[]{1, 1, 2, 3});
         int[] cap = ints("tech.step_capacity", new int[]{3, 2, 2, 1});
         int steps = Math.max(1, Math.min(cost.length, Math.min(vp.length, cap.length)));
@@ -740,6 +883,12 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
                     } else if (cell < here.size()) {
                         cube(g, sx + 2, sy + 2, cube - 4, FieldView.seatColor(here.get(cell)));
                     }
+                }
+                // вершина без предела: лишние кубики — левее ячейки, рядом
+                for (int extra = mins.size(); i == steps - 1 && extra < here.size(); extra++) {
+                    int sx = px - (extra - mins.size() + 1) * slot;
+                    int sy = ry + (rowH - 6 - cube) / 2;
+                    cube(g, sx + 2, sy + 2, cube - 4, FieldView.seatColor(here.get(extra)));
                 }
             }
 
@@ -1582,12 +1731,20 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         g.setColor(ink3());
         wrap(g, "Ячейки предложений РАСХОДУЮТСЯ: занял — предложение для остальных "
             + "сузилось. Кубик келемия в ячейке и цветная метка рядом показывают, "
-            + "кто её занял. Вторая ячейка открыта только при ЧЕТЫРЁХ игроках.",
+            + "кто её занял. У каждого предложения две ячейки при любом числе игроков.",
             x + 20, ey, w - 40, 21, 4);
     }
 
     private void paintMarketCard(Graphics2D g, int x, int y, int w, int h,
                                  int cellCost, int players) {
+        if (CardArt.market(snap.market) != null) {
+            // Лицо карты есть — оно и лежит на месте карты, в своей пропорции.
+            g.setFont(bold(10));
+            g.setColor(new Color(0x2C, 0x62, 0xA8));
+            g.drawString("АКТИВНАЯ КАРТА РЫНКА · раунд " + snap.round, x + 12, y + 16);
+            печатьРынка(g, x, y + 24, w, h - 24, players);
+            return;
+        }
         Map<String, Object> card = snap.market == null ? null : find("market", snap.market);
         g.setColor(wash(new Color(0x2C, 0x62, 0xA8)));
         g.fillRoundRect(x, y, w, h, 12, 12);
@@ -1654,7 +1811,7 @@ public final class BoardsPanel extends JPanel implements javax.swing.Scrollable 
         wrap(g, label == null ? "" : kelium.gui.replay2.Names.offer(String.valueOf(label)),
             x + 10, y + 70, w - 140, 21, 2);
 
-        // ЯЧЕЙКИ ПРЕДЛОЖЕНИЯ: вторая открыта только при ЧЕТЫРЁХ игроках. Занятая
+        // ЯЧЕЙКИ ПРЕДЛОЖЕНИЯ: обе открыты при любом числе игроков. Занятая
         // ячейка держит ОБЪЁМНЫЙ КУБИК КЕЛЕМИЯ, а рядом — цветная метка игрока,
         // который его туда поставил (просьба дизайнера 12.08.2026).
         int sideIdx = "ПРАВОЕ".equals(side) ? 1 : 0;

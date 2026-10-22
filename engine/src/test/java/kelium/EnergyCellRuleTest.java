@@ -14,6 +14,7 @@ import kelium.core.BuildingType;
 import kelium.core.GameState;
 import kelium.core.Hex;
 import kelium.core.HexKind;
+import kelium.dataio.Ctx;
 import kelium.dataio.GameConfig;
 import kelium.engine.GameEngine;
 import kelium.engine.Power;
@@ -78,10 +79,15 @@ class EnergyCellRuleTest {
             "на жёлтой ячейке станция №4 обязана давать свой полный номинал");
     }
 
-    /** Станция мимо жёлтой ячейки даёт 1 кубик — независимо от уровня. */
+    /**
+     * Станция мимо жёлтой ячейки даёт значение свода {@code plant_off_cell_gives}
+     * (сейчас 0 — решение дизайнера 20.09.2026), но не больше своего номинала.
+     * Ожидание берётся из свода, чтобы тест не ломался при смене этого числа.
+     */
     @Test
-    void plantOffTheYellowCellGivesOneCubeWhateverItsLevel() {
+    void plantOffTheYellowCellGivesOffCellValueWhateverItsLevel() {
         GameState s = Fix.game();
+        int off = Ctx.rules(s).getInt("energy.plant_off_cell_gives", 0);
         for (int level = 1; level <= 4; level++) {
             String hex = openHex(s);
             Hex h = s.field.get(hex);
@@ -90,9 +96,11 @@ class EnergyCellRuleTest {
 
             assertFalse(Power.onEnergyCell(s, plant),
                 "станция №" + level + " стоит НЕ на жёлтой ячейке");
-            assertEquals(1, Power.plantOutput(s, plant),
-                "станция №" + level + " вне жёлтой ячейки обязана давать 1 кубик, "
-                + "а номинал уровня (" + s.tokenStats.plantEnergyGives(level) + ") — только на ней");
+            int ждём = Math.min(off, s.tokenStats.plantEnergyGives(level));
+            assertEquals(ждём, Power.plantOutput(s, plant),
+                "станция №" + level + " вне жёлтой ячейки даёт значение свода ("
+                + off + "), но не больше номинала уровня ("
+                + s.tokenStats.plantEnergyGives(level) + ")");
         }
     }
 
@@ -107,8 +115,10 @@ class EnergyCellRuleTest {
         String hex = openHex(s);
         Hex h = s.field.get(hex);
         BuildingToken weak = plantAt(s, hex, (h.energyCell + 1) % 6, 1);
-        assertEquals(s.tokenStats.plantEnergyGives(1), Power.plantOutput(s, weak),
-            "станция №1 даёт свой номинал и вне жёлтой ячейки — правило только режет");
+        int off = Ctx.rules(s).getInt("energy.plant_off_cell_gives", 0);
+        int ждём = Math.min(off, s.tokenStats.plantEnergyGives(1));
+        assertEquals(ждём, Power.plantOutput(s, weak),
+            "станция №1 вне жёлтой ячейки даёт не больше номинала — правило только режет");
     }
 
     /**

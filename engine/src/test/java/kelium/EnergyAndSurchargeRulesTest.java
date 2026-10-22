@@ -35,7 +35,8 @@ class EnergyAndSurchargeRulesTest {
 
     private static GameState game() {
         return Setup.buildGame(
-            GameConfig.buildCached(GameConfig.DEFAULT_RULESET, 4, 7L, null, null));
+            GameConfig.buildCached("1.45.0",   // проверяет правило свода 1.45.0 (до пяти развилок)
+             4, 7L, null, null));
     }
 
     @Test

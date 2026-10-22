@@ -33,6 +33,43 @@ final class PrintedBoards {
     }
 
     /**
+     * ЗОНЫ ЩЕЛЧКА НА ПЛАНШЕТАХ — для живой партии (просьба дизайнера
+     * 25.09.2026: «выбрать жетончик на планшете во время стройки, выбрать гекс
+     * и нажать»). Пока поле не {@code null}, рисование записывает сюда, где
+     * лежит каждая деталь: {@code building:barracks}, {@code building:miner:2},
+     * {@code red:infantry}, {@code blue:factory}, {@code unit:vehicle},
+     * {@code store:0}, {@code storage}, {@code troop}. Рисуют только на потоке
+     * Swing, поэтому одного поля на программу хватает.
+     */
+    static Map<String, Rectangle> hits;
+    /** Настоящий контур детали для подсветки (повёрнутые жетоны крыльев). */
+    static Map<String, java.awt.Shape> outlines;
+
+    private static void hit(String key, Rectangle r) {
+        if (hits != null && r != null) {
+            hits.put(key, new Rectangle(r));
+        }
+        // ФОРМА ДЕТАЛИ ПО УМОЛЧАНИЮ — её рамка со скруглением печати (ячейки,
+        // пазы, места жетонов): подсветка идёт по детали, а не прямоугольником
+        // во весь её охват (жалоба дизайнера 27.09.2026). Детали сложной формы
+        // (жетоны крыльев) кладут свой контур следом и перекрывают этот.
+        if (outlines != null && r != null && !"troop".equals(key) && !"storage".equals(key)) {
+            double rad = Math.min(r.width, r.height) * 0.16;
+            outlines.put(key, new RoundRectangle2D.Double(r.x, r.y, r.width, r.height, rad, rad));
+        }
+    }
+
+    private static void hit(String key, java.awt.Shape s) {
+        if (s == null) {
+            return;
+        }
+        hit(key, s.getBounds());
+        if (outlines != null) {
+            outlines.put(key, s);
+        }
+    }
+
+    /**
      * ПЛАНШЕТ ВЫБИРАЕТСЯ ПО ЦВЕТУ ИГРОКА, А НЕ ПО СТОРОНЕ.
      *
      * <p>Сторон «А» и «Б» больше нет (решение дизайнера 09.09.2026): асимметрия
@@ -77,6 +114,39 @@ final class PrintedBoards {
         return height(troopArt(seat), width);
     }
 
+    /**
+     * Ширина КАРТЫ АРСЕНАЛА в пикселях печати сцепки — по пазу планшета войск:
+     * паз нарисован в натуральную величину карты.
+     */
+    static double картаШирина(int seat) {
+        var пазы = BoardAnchors.cardSlots(цвет(seat), "arsenal_back");
+        return пазы.isEmpty() ? 804 : пазы.get(0)[2];
+    }
+
+    /** Нижний край окна паза в пикселях печати планшета войск. */
+    static double низПаза(int seat) {
+        var пазы = BoardAnchors.cardSlots(цвет(seat), "arsenal_open");
+        return пазы.isEmpty() ? 1217 : пазы.get(0)[1] + пазы.get(0)[3];
+    }
+
+    /** Ширина планшета хранилища в пикселях печати сцепки. */
+    static double хранилищеШирина(int seat, Сцепка с) {
+        BufferedImage хр = storageArt(seat);
+        return хр == null ? 0 : хр.getWidth() * с.хрМасштаб();
+    }
+
+    /** Высота планшета хранилища в пикселях печати сцепки. */
+    static double хранилищеВысота(int seat, Сцепка с) {
+        BufferedImage хр = storageArt(seat);
+        return хр == null ? 0 : хр.getHeight() * с.хрМасштаб();
+    }
+
+    /** Высота планшета войск в пикселях печати сцепки (0 — картинки нет). */
+    static double войскаВысота(int seat) {
+        BufferedImage вой = troopArt(seat);
+        return вой == null ? 0 : вой.getHeight();
+    }
+
     /** Высота планшета хранилища при такой ширине (0 — картинки нет). */
     static int storageHeight(int seat, int width) {
         return height(storageArt(seat), width);
@@ -118,7 +188,8 @@ final class PrintedBoards {
         }
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
-        g.drawImage(art, x, y, width, h, null);
+        kelium.report.Mips.draw(g, art, x, y, width, h);
+        hit("troop", new Rectangle(x, y, width, h));
         for (BoardAnchors.Column c : troopCols(p.seat)) {
             paintTroopAttack(g, x, y, k, c, p, troop, spots);
             paintTroopAssembly(g, x, y, k, c, p, spots);
@@ -131,6 +202,7 @@ final class PrintedBoards {
                                          Map<Rectangle, Object[]> spots) {
         ReplayRecord.Module m = p.redPlaced.get(c.unit());
         Rectangle box = scale(x, y, k, c.ax(), c.ay(), c.aw(), c.ah());
+        hit("red:" + c.unit(), box);
         if (m != null) {
             // Жетон НАКРЫВАЕТ напечатанную ячейку ЦЕЛИКОМ — так он и лежит на
             // столе. Прежде он рисовался в 0,62 ячейки, и дизайнер это отбил
@@ -140,28 +212,21 @@ final class PrintedBoards {
                 box.width, box.height, c.unit());
             spots.put(new Rectangle(box),
                 new Object[]{m, Boolean.TRUE, Names.unit(c.unit())});
-            return;
         }
-        if (troop == null || !troop.dualCell()) {
-            return;
-        }
-        kelium.core.Target t = troop.specializedTarget(kelium.core.UnitType.fromCode(c.unit()));
-        if (t == null) {
-            return;
-        }
-        // Настоящая цель — узкой плашкой у нижней кромки рамки: не закрывает
-        // печатный рисунок, но говорит, по кому род бьёт на самом деле.
-        chip(g, box, "→ " + targetName(t), Theme.accent());
+        // ПЛАШКИ «→ пехота / → техника» В ЯЧЕЙКАХ МОДУЛЯ БОЯ УБРАНЫ (приказ
+        // дизайнера 25.09.2026: «убери эти надписи вообще»). Цель напечатана на
+        // самом планшете.
     }
 
     private static void paintTroopAssembly(Graphics2D g, int x, int y, double k,
                                            BoardAnchors.Column c, ReplayRecord.Player p,
                                            Map<Rectangle, Object[]> spots) {
         ReplayRecord.Module m = p.bluePlaced.get(c.building());
+        Rectangle box = scale(x, y, k, c.bx(), c.by(), c.bw(), c.bh());
+        hit("blue:" + c.building(), box);
         if (m == null) {
             return;
         }
-        Rectangle box = scale(x, y, k, c.bx(), c.by(), c.bw(), c.bh());
         // Рамка Сборки ВЫТЯНУТАЯ, и синий жетон нарисован таким же — кладём его
         // в рамку целиком, по её форме.
         ModuleSlot.paintOnPrint(g, m, ModuleSlot.blue(), box.x, box.y,
@@ -218,8 +283,44 @@ final class PrintedBoards {
      * меняется вместе с ним.
      */
     private static double зданиеH(int seat) {
+        // ОДИН МАСШТАБ СО ЖЕТОНАМИ ХРАНИЛИЩА (замечание дизайнера 26.09.2026:
+        // «военные здания нереально маленькие, не соответствуют размеру других
+        // зданий на планшете хранилища»). Все жетоны — картонки одного листа,
+        // значит один пиксель картинки — одна и та же доля планшета. Мера —
+        // добытчик в крыле хранилища.
+        double s = пиксельЖетона(seat);
+        if (s > 0) {
+            double max = 0;
+            for (String code : new String[]{"barracks", "factory", "airbase"}) {
+                var f = Textures.found(code, 0, seat);
+                if (f != null && f.image() != null) {
+                    max = Math.max(max, краскаЖетона(f.image())[3] * s);
+                }
+            }
+            if (max > 0) {
+                return max;
+            }
+        }
         var cols = troopCols(seat);
         return cols.isEmpty() ? 215 : cols.get(0).bh();
+    }
+
+    /**
+     * ПИКСЕЛЬ КАРТИНКИ ЖЕТОНА в пикселях печати ПЛАНШЕТА ВОЙСК — так, как
+     * добытчик ложится в верхнее крыло хранилища. −1 — картинок нет.
+     */
+    static double пиксельЖетона(int seat) {
+        BufferedImage вой = troopArt(seat);
+        BufferedImage хр = storageArt(seat);
+        var добытчик = Textures.found("miner", 1, seat);
+        if (вой == null || хр == null || добытчик == null || добытчик.image() == null) {
+            return -1;
+        }
+        // верхнее крыло: половина верхней кромки шестиугольника (доли — как в
+        // крылья()), по длине 0.96, жетон на 5% меньше крыла
+        double крыло = (0.8357 - 0.1657) / 2 * хр.getWidth() * 0.96 * УМЕНЬШЕНИЕ;
+        double f = вой.getHeight() / (double) хр.getHeight();
+        return крыло / добытчик.image().getWidth() * f;
     }
 
     /** Зазор между полосой зданий и кромкой планшета войск. */
@@ -227,18 +328,6 @@ final class PrintedBoards {
 
     private static final Map<BufferedImage, double[]> КРОМКИ =
         new java.util.WeakHashMap<>();
-
-    /** Высота планшета войск в пикселях печати (0 — картинки нет). */
-    static double высотаВойск(int seat) {
-        BufferedImage вой = troopArt(seat);
-        return вой == null ? 0 : вой.getHeight();
-    }
-
-    /** Размер планшета хранилища в ЕГО пикселях печати ({@code null} — нет). */
-    static double[] размерХранилища(int seat) {
-        BufferedImage хр = storageArt(seat);
-        return хр == null ? null : new double[]{хр.getWidth(), хр.getHeight()};
-    }
 
     /** Как сложены планшеты этого игрока ({@code null} — картинок нет). */
     static Сцепка сцепка(int seat) {
@@ -356,9 +445,7 @@ final class PrintedBoards {
                           Map<String, char[]> fill, char[] base, Set<String> covered,
                           Set<String> вЗапасе, Map<String, int[]> запас,
                           Map<Rectangle, Object[]> spots,
-                          Map<Rectangle, String> storeSpots,
-                          ПроКарты про, Map<Rectangle, String> клики,
-                          Map<Rectangle, String> вставленные) {
+                          Map<Rectangle, String> storeSpots) {
         BufferedImage хр = storageArt(p.seat);
         BufferedImage вой = troopArt(p.seat);
         if (с == null || хр == null || вой == null) {
@@ -369,16 +456,52 @@ final class PrintedBoards {
             fill, base, covered, storeSpots);
         int войX = (int) Math.round(x + с.войX() * k);
         int войY = (int) Math.round(y + с.войY() * k);
+        // КАРТЫ В ПАЗАХ — ДО ПЛАНШЕТА: вставленная карта заезжает под него
+        // верхом (утилем), и планшет, нарисованный поверх, этот верх и прячет;
+        // видна только способность (замечание дизайнера 25.09.2026).
+        картыВПазах(g, войX, войY, k, p);
         paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
         военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
-        картыВПазах(g, войX, войY, k, p, про, клики, вставленные);
+        подписьКонтейнеров(g);
         // Блок запаса стоит В ТОЙ ЖЕ ПОЛОСЕ, что и жетоны военных зданий над
         // планшетом войск: она начинается у самого верха сцепки и кончается там,
         // где начинаются планшеты. Отсюда и «вровень по высоте».
+        // На столе ряд значков чуть уже хранилища: у его правого края над
+        // планшетом войск начинается жетон казармы, и значок вышки на него
+        // наезжал (замер 27.09.2026 — на 1–5 точек при любом масштабе).
         запасВойск(g, (int) Math.round(x + с.хрX() * k), y,
-            (int) Math.round(хр.getWidth() * с.хрМасштаб() * k),
-            (int) Math.round((с.зданияH() - ЗДАНИЕ_ЗАЗОР) * k), запас, p.seat);
+            (int) Math.round(хр.getWidth() * с.хрМасштаб() * k * (подписиЗапаса ? 1.0 : 0.9)),
+            (int) Math.round((с.зданияH() - ЗДАНИЕ_ЗАЗОР) * k), запас, p.seat,
+            подписиЗапаса ? -1 : k);
     }
+
+    /**
+     * ТОЛЬКО ПЛАНШЕТ ВОЙСК со своим — картами в пазах, жетонами военных зданий
+     * и контейнерами, без хранилища сбоку (увеличение планшета, заказ
+     * дизайнера 26.09.2026: «чтобы хранилище к войскам не прилипало»).
+     * {@code x, y} — начало сцепки, как у {@link #paintPair}.
+     */
+    static void paintTroopOnly(Graphics2D g, int x, int y, double k, Сцепка с,
+                               ReplayRecord.Player p, kelium.core.TroopSide troop,
+                               Set<String> вЗапасе, Map<Rectangle, Object[]> spots) {
+        BufferedImage вой = troopArt(p.seat);
+        if (с == null || вой == null) {
+            return;
+        }
+        int войX = (int) Math.round(x + с.войX() * k);
+        int войY = (int) Math.round(y + с.войY() * k);
+        картыВПазах(g, войX, войY, k, p);
+        paintTroop(g, войX, войY, (int) Math.round(вой.getWidth() * k), p, troop, spots);
+        военныеЗдания(g, войX, войY, k, p, вЗапасе, spots);
+        подписьКонтейнеров(g);
+    }
+
+    /**
+     * ПОДПИСИ ПОД СТОПКАМИ ЗАПАСА («пехота», «3 из 4»). На столе таких цифр нет:
+     * там просто лежат оставшиеся жетоны. Прибору они нужны, картинке стола для
+     * книги правил — нет, поэтому выключаются на время снимка.
+     */
+    static boolean подписиЗапаса = true;
 
     /**
      * ЗАПАС ЖЕТОНОВ ВОЙСК — ЧЕТЫРЬМЯ СТОПКАМИ НАД ПЛАНШЕТОМ ХРАНИЛИЩА.
@@ -393,8 +516,158 @@ final class PrintedBoards {
      *
      * @param запас род → {@code [на поле, в запасе]}
      */
+    /** Оставшиеся жетоны рода стопкой внахлёст — вид со стола. */
+    private static void стопкаЖетонов(Graphics2D g, BufferedImage tex, int cx, int y,
+                                      int colW, int высота, int сколько) {
+        стопкаЖетонов(g, tex, cx, y, colW, высота, сколько, -1);
+    }
+
+    /**
+     * @param k экранных точек на пиксель печати; больше нуля — жетон в
+     *          НАТУРАЛЬНУЮ величину (картинки жетонов — в той же мере, что
+     *          планшеты: 300 точек на дюйм), стопка стоит на нижней кромке
+     */
+    private static void стопкаЖетонов(Graphics2D g, BufferedImage tex, int cx, int y,
+                                      int colW, int высота, int сколько, double k) {
+        if (tex == null || сколько <= 0) {
+            return;
+        }
+        double доля = tex.getWidth() / (double) tex.getHeight();
+        int th = высота;
+        int tw = (int) Math.round(th * доля);
+        if (k > 0) {
+            th = (int) Math.round(tex.getHeight() * k);
+            tw = (int) Math.round(tex.getWidth() * k);
+            y += высота - th;
+            высота = th;
+        } else if (tw > colW - 6) {
+            tw = colW - 6;
+            th = (int) Math.round(tw / доля);
+        }
+        int сдвиг = Math.max(1, th / 9);
+        int всего = (сколько - 1) * сдвиг;
+        for (int i = сколько - 1; i >= 0; i--) {
+            kelium.report.Mips.draw(g, tex, cx - tw / 2 - всего / 2 + i * сдвиг,
+                y + (высота - th) / 2 - i * сдвиг / 2, tw, th);
+        }
+    }
+
+    /** Перекрашенные иконки жетонов войск: «род:место» → картинка. */
+    private static final Map<String, BufferedImage> ЗНАЧКИ_ЗАПАСА =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * ИКОНКА ЖЕТОНА РОДА В ЦВЕТЕ ФРАКЦИИ. На печатной иконке ({@code unit_<род>})
+     * рамка и фигура — тёмный серо-синий; эти пиксели перекрашиваются в цвет
+     * места с сохранением светлоты (тени и блики остаются), белое не трогается.
+     */
+    static BufferedImage значокРода(String род, int seat) {
+        return ЗНАЧКИ_ЗАПАСА.computeIfAbsent(род + ":" + seat, key -> {
+            BufferedImage src = kelium.report.Textures.icon("unit_" + род);
+            if (src == null) {
+                return null;
+            }
+            Color цвет = Theme.seat(seat);
+            BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(),
+                BufferedImage.TYPE_INT_ARGB);
+            double свет0 = 0.299 * 75 + 0.587 * 83 + 0.114 * 104;   // печатный серо-синий
+            for (int yy = 0; yy < src.getHeight(); yy++) {
+                for (int xx = 0; xx < src.getWidth(); xx++) {
+                    int argb = src.getRGB(xx, yy);
+                    int a = argb >>> 24;
+                    int r = (argb >> 16) & 255, gg = (argb >> 8) & 255, b = argb & 255;
+                    float[] hsb = Color.RGBtoHSB(r, gg, b, null);
+                    if (a > 0 && hsb[1] < 0.45f && hsb[2] < 0.75f && b >= r) {
+                        double свет = 0.299 * r + 0.587 * gg + 0.114 * b;
+                        double м = свет / свет0;
+                        int nr = (int) Math.min(255, цвет.getRed() * м);
+                        int ng = (int) Math.min(255, цвет.getGreen() * м);
+                        int nb = (int) Math.min(255, цвет.getBlue() * м);
+                        argb = (a << 24) | (nr << 16) | (ng << 8) | nb;
+                    }
+                    out.setRGB(xx, yy, argb);
+                }
+            }
+            return out;
+        });
+    }
+
+    /**
+     * СТОПКИ ЖЕТОНОВ ВМЕСТО ЗНАЧКОВ — только для снимка стола в книге правил
+     * (дизайнер 14.10.2026: «стопарики по 4 жетона»). В игре выключено.
+     */
+    static boolean стопкиЖетонов = false;
+
+    /** Стопка из {@code n} жетонов: каждый следующий выше на толщину картона,
+     *  под каждым — тёмный торец. Возвращает занятый прямоугольник. */
+    private static Rectangle стопкаСТорцом(Graphics2D g, BufferedImage tex, int x, int y,
+                                           int colW, int height, int n) {
+        n = Math.max(1, n);
+        double доля = tex.getWidth() / (double) tex.getHeight();
+        double шаг = 0.10;                       // подъём на жетон, доли высоты жетона
+        double торец = 0.07;                     // толщина картона, доли высоты
+        int th = (int) Math.floor(height / (1 + шаг * (n - 1) + торец));
+        int tw = (int) Math.round(th * доля);
+        if (tw > colW * 0.9) {
+            tw = (int) (colW * 0.9);
+            th = (int) Math.round(tw / доля);
+        }
+        int низ = y + height - (int) Math.round(th * торец);
+        int left = x + (colW - tw) / 2;
+        BufferedImage тёмный = new BufferedImage(tex.getWidth(), tex.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D d = тёмный.createGraphics();
+        d.drawImage(tex, 0, 0, null);
+        d.setComposite(java.awt.AlphaComposite.SrcIn);
+        d.setColor(new Color(40, 34, 28));
+        d.fillRect(0, 0, tex.getWidth(), tex.getHeight());
+        d.dispose();
+        int верх = низ;
+        for (int j = 0; j < n; j++) {
+            int ty = низ - th - (int) Math.round(j * th * шаг);
+            int тол = (int) Math.max(1, Math.round(th * торец));
+            for (int t = тол; t >= 1; t--) {
+                kelium.report.Mips.draw(g, тёмный, left, ty + t, tw, th);
+            }
+            kelium.report.Mips.draw(g, tex, left, ty, tw, th);
+            верх = ty;
+        }
+        return new Rectangle(left, верх, tw, низ - верх + (int) Math.round(th * торец));
+    }
+
+    /** Значок рода и число жетонов в запасе — одна колонка запаса на столе. */
+    private static Rectangle значокЗапаса(Graphics2D g, String род, int seat, int x, int y,
+                                     int colW, int height, int вЗапасе) {
+        BufferedImage ic = значокРода(род, seat);
+        int s = Math.max(10, Math.min(height - 4, (int) (colW * 0.58)));
+        java.awt.Font шрифт = Theme.font(Math.max(10, (int) (s * 0.62)), Font.BOLD);
+        g.setFont(шрифт);
+        String число = String.valueOf(вЗапасе);
+        int tw = g.getFontMetrics().stringWidth(число);
+        int left = x + (colW - s - 3 - tw) / 2;
+        int top = y + (height - s) / 2;
+        java.awt.Composite было = g.getComposite();
+        if (вЗапасе == 0) {
+            g.setComposite(java.awt.AlphaComposite.getInstance(
+                java.awt.AlphaComposite.SRC_OVER, 0.35f));
+        }
+        if (ic != null) {
+            kelium.report.Mips.draw(g, ic, left, top, s, s);
+        }
+        g.setColor(вЗапасе == 0 ? Theme.ink3() : Theme.ink());
+        java.awt.FontMetrics fm = g.getFontMetrics();
+        g.drawString(число, left + s + 3, top + (s + fm.getAscent() - fm.getDescent()) / 2);
+        g.setComposite(было);
+        int pad = Math.max(2, s / 10);
+        return new Rectangle(left - pad, top - pad, s + 3 + tw + 2 * pad, s + 2 * pad);
+    }
+
     private static void запасВойск(Graphics2D g, int x, int y, int width, int height,
                                    Map<String, int[]> запас, int seat) {
+        запасВойск(g, x, y, width, height, запас, seat, -1);
+    }
+
+    private static void запасВойск(Graphics2D g, int x, int y, int width, int height,
+                                   Map<String, int[]> запас, int seat, double k) {
         if (запас == null || запас.isEmpty() || width <= 0 || height <= 0) {
             return;
         }
@@ -405,11 +678,28 @@ final class PrintedBoards {
             int вЗапасе = c[1];
             int всего = c[0] + c[1];
             int cx = x + i * colW + colW / 2;
+            hit("unit:" + роды[i], new Rectangle(x + i * colW, y, colW, height));
             java.awt.Font шрифт = Theme.font(Math.max(9, height / 7), Font.BOLD);
             g.setFont(шрифт);
-            int строка = g.getFontMetrics().getHeight();
+            int строка = подписиЗапаса ? g.getFontMetrics().getHeight() : 0;
             int картинкаH = Math.max(8, height - строка * 2 - 2);
             BufferedImage tex = Textures.unit(роды[i], seat);
+            if (!подписиЗапаса && стопкиЖетонов && tex != null) {
+                // КНИГА (дизайнер 14.10.2026): на снимке стола — настоящие
+                // стопки жетонов рода, а не значок с числом.
+                hit("unit:" + роды[i], стопкаСТорцом(g, tex, x + i * colW, y, colW, height, вЗапасе));
+                continue;
+            }
+            if (!подписиЗапаса) {
+                // СТОЛ (решение дизайнера 27.09.2026): вместо стопки жетонов —
+                // печатная иконка жетона рода, перекрашенная в цвет фракции, и
+                // рядом число оставшихся жирным шрифтом стола.
+                Rectangle знак = значокЗапаса(g, роды[i], seat, x + i * colW, y, colW, height,
+                    вЗапасе);
+                // зона и форма — ровно значок с числом, а не весь столбец
+                hit("unit:" + роды[i], знак);
+                continue;
+            }
             java.awt.Composite было = g.getComposite();
             if (вЗапасе == 0) {
                 g.setComposite(java.awt.AlphaComposite.getInstance(
@@ -423,7 +713,7 @@ final class PrintedBoards {
                     tw = colW - 4;
                     th = (int) Math.round(tw / доля);
                 }
-                g.drawImage(tex, cx - tw / 2, y + (картинкаH - th) / 2, tw, th, null);
+                kelium.report.Mips.draw(g, tex, cx - tw / 2, y + (картинкаH - th) / 2, tw, th);
             }
             g.setComposite(было);
             g.setColor(вЗапасе == 0 ? Theme.ink3() : Theme.ink2());
@@ -446,205 +736,138 @@ final class PrintedBoards {
      * размещая их там визуально» — и убрать текст «арсенал в руке / установлен /
      * контейнеров».
      *
-     * <p>Паз занимают тремя способами, и у каждого своя рамка в маске:
-     * УСТАНОВЛЕННАЯ карта арсенала вставлена в паз и видна лицом
-     * ({@code arsenal_open}); карта В РУКЕ лежит рубашкой и торчит из паза
-     * дальше ({@code arsenal_back}); КОНТЕЙНЕРЫ кладутся по два в паз
-     * ({@code container}).
+     * <p>Паз занимают двумя способами: УСТАНОВЛЕННАЯ карта арсенала вставлена
+     * в паз и видна лицом ({@code arsenal_open}), КОНТЕЙНЕРЫ кладутся по два в
+     * паз ({@code container}). Карты В РУКЕ в пазы не кладутся (правило
+     * 25.09.2026): они лежат стопкой под планшетом хранилища.
      *
-     * <p>Порядок раскладки — как на столе: сперва установленные, потом то, что в
-     * руке, потом контейнеры; каждая занятая ячейка выбывает.
+     * <p>Порядок раскладки — как на столе: сперва установленные, потом
+     * контейнеры; каждая занятая ячейка выбывает.
      */
     private static void картыВПазах(Graphics2D g, int войX, int войY, double k,
-                                    ReplayRecord.Player p, ПроКарты про,
-                                    Map<Rectangle, String> клики,
-                                    Map<Rectangle, String> вставленные) {
+                                    ReplayRecord.Player p) {
         var вставлено = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_open");
-        var рубашкой = BoardAnchors.cardSlots(цвет(p.seat), "arsenal_back");
         var подКонтейнер = BoardAnchors.cardSlots(цвет(p.seat), "container");
         if (вставлено.isEmpty()) {
             return;
         }
         int паз = 0;
+        BufferedImage лицоНет = Textures.card("deck_arsenal", "deck");
+        // В ПАЗАХ — ТОЛЬКО УСТАНОВЛЕННЫЕ КАРТЫ, И СВОИМ ЛИЦОМ. Закрытые карты
+        // арсенала в пазы больше не кладутся (правило дизайнера 25.09.2026):
+        // они лежат стопкой под планшетом хранилища, и их число не ограничено.
         for (String id : p.arsenalInstalled) {
             if (паз >= вставлено.size()) {
                 break;
             }
-            // ВСТАВЛЕННАЯ КАРТА ЛЕЖИТ ЛИЦОМ — её уже разыграли, скрывать нечего.
-            // Лиц арсенала художник пока не рисовал, поэтому вместо картинки
-            // идёт заглушка с названием (заказ дизайнера 11.09.2026).
-            // ВЕРХНЕЙ ПОЛОВИНЫ У ВСТАВЛЕННОЙ КАРТЫ НЕ ВИДНО: она ушла в паз
-            // вместе с утилем, и на столе её не прочитать (заказ дизайнера
-            // 11.09.2026). Остаётся название и нижняя половина — та, что
-            // работает, пока карта установлена.
-            Rectangle место = рамкаПаза(войX, войY, k, вставлено.get(паз));
-            лицоАрсенала(g, место, вставлено.get(паз), k, безВерха(про == null
-                ? new String[]{id} : про.половины(id)));
-            if (вставленные != null) {
-                вставленные.put(место, id);
-            }
-            паз++;
-        }
-        for (int i = 0; i < p.arsenalHand.size() && паз < рубашкой.size(); i++) {
-            String id = p.arsenalHand.get(i);
-            int[] рамка = рубашкой.get(паз);
-            Rectangle box = рамкаПаза(войX, войY, k, рамка);
-            if (про != null && про.вскрыта(id)) {
-                лицоАрсенала(g, box, рамка, k, про.половины(id));
-            } else {
-                // НАЧАЛЬНЫЙ АРСЕНАЛ — СВОЯ РУБАШКА: это другая колода, и на
-                // столе её ни с чем не спутать (замечание дизайнера 11.09.2026
-                // «ты используешь рубашку обычного арсенала на начальном»).
-                boolean начальный = про != null && про.начальный(id);
-                картаВПаз(g, box, рамка, k, Textures.card(
-                    начальный ? "deck_arsenal_start" : "deck_arsenal", "deck"));
-            }
-            if (клики != null) {
-                клики.put(box, id);
+            // обычный, начальный и супер-арсенал — каждый из своей папки лиц
+            BufferedImage лицо = kelium.gui.CardArt.arsenal(id);
+            картаВПаз(g, войX, войY, k, вставлено.get(паз), лицо != null ? лицо : лицоНет);
+            Rectangle окно = scale(войX, войY, k, вставлено.get(паз)[0],
+                вставлено.get(паз)[1], вставлено.get(паз)[2], вставлено.get(паз)[3]);
+            hit("installed:" + id, окно);
+            char[] наКарте = кубикиВнеПечати == null ? null : кубикиВнеПечати.get("card-" + id);
+            if (наКарте != null && наКарте.length > 0) {
+                кубикиКарт.add(new Object[]{окно, наКарте});
             }
             паз++;
         }
         // КОНТЕЙНЕРЫ: по два в паз, поэтому рамок шесть — берём те, что
-        // относятся к ещё свободным пазам. Каждый контейнер — КОНКРЕТНАЯ карта,
-        // взятая рубашкой вверх; щелчок её переворачивает (заказ дизайнера
-        // 11.09.2026).
-        BufferedImage рубашкаК = Textures.containerCard("back");
-        if (рубашкаК == null) {
-            рубашкаК = Textures.card("deck_containers", "deck");
-        }
+        // относятся к ещё свободным пазам.
+        BufferedImage конт = Textures.card("deck_containers", "deck");
         int положено = 0;
+        Rectangle первый = null;
         for (int i = паз * 2; i < подКонтейнер.size() && положено < p.containers; i++) {
-            int[] рамка = подКонтейнер.get(i);
-            Rectangle box = рамкаПаза(войX, войY, k, рамка);
-            String id = положено < p.containerHand.size()
-                ? p.containerHand.get(положено) : null;
-            BufferedImage лицо = id == null || про == null || !про.вскрыта(id)
-                ? null : про.лицо("containers", id);
-            картаВПаз(g, box, рамка, k, лицо != null ? лицо : рубашкаК);
-            if (клики != null && id != null) {
-                клики.put(box, id);
-            }
+            картаВПаз(g, войX, войY, k, подКонтейнер.get(i), конт);
+            int[] r = подКонтейнер.get(i);
+            Rectangle box = scale(войX, войY, k, r[0], r[1], r[2], r[3]);
+            первый = первый == null ? box : первый.union(box);
             положено++;
         }
-    }
-
-    /** Та же карта, но без верхней половины: она закрыта пазом. */
-    private static String[] безВерха(String[] карта) {
-        if (карта == null || карта.length < 2) {
-            return карта;
+        // ПОДПИСЬ К КОНТЕЙНЕРАМ рисуется ПОСЛЕ планшета (подписьКонтейнеров):
+        // карты лежат под ним, подпись — поверх.
+        контейнерыПодпись = первый != null && p.containers > 0 ? первый : null;
+        контейнерыЧисло = p.containers;
+        if (контейнерыПодпись != null) {
+            hit("containers", первый);
         }
-        String[] out = карта.clone();
-        out[1] = null;
-        return out;
     }
 
-    /** Рамка паза на экране. */
-    private static Rectangle рамкаПаза(int войX, int войY, double k, int[] рамка) {
-        return scale(войX, войY, k, рамка[0], рамка[1], рамка[2], рамка[3]);
+    /** Где подписать контейнеры в пазах (после планшета), и сколько их. */
+    private static Rectangle контейнерыПодпись;
+    private static int контейнерыЧисло;
+
+    /**
+     * ПОДПИСЬ К КОНТЕЙНЕРАМ: квадратная рубашка в пазу без подписи читалась
+     * как непонятный квадратик (замечание дизайнера 25.09.2026).
+     */
+    /** Рамка ячейки склада, которой нет на печати: светлая подложка и контур. */
+    private static void рамкаБезПечати(Graphics2D g, Rectangle box) {
+        double r = box.width * 0.14;
+        g.setColor(Theme.alpha(Color.WHITE, 0.55));
+        g.fill(new RoundRectangle2D.Double(box.x, box.y, box.width, box.height, r, r));
+        g.setColor(Theme.alpha(new Color(0x55, 0x5F, 0x66), 0.9));
+        g.setStroke(new BasicStroke(Math.max(1f, box.width / 16f)));
+        g.draw(new RoundRectangle2D.Double(box.x, box.y, box.width, box.height, r, r));
     }
 
     /**
-     * ЗАГЛУШКА ЛИЦА КАРТЫ АРСЕНАЛА: белое поле, чёрные буквы.
-     *
-     * <p>Лиц арсенала художник ещё не рисовал, а видеть, ЧТО игрок вставил,
-     * нужно уже сейчас (заказ дизайнера 11.09.2026). Поэтому карта показана
-     * названием, но ПО ФОРМЕ СВОЕГО ПАЗА — с тем же скруглением и той же
-     * обрезкой, — чтобы, когда печать появится, ничего не сдвинулось.
-     *
-     * <p>Из эффектов оставлен ОДИН, у нижней кромки: карта сидит в пазу, и
-     * тёмная полоса под ней — это край кармана. Тень по кругу превратила бы её
-     * в наклейку поверх планшета.
+     * КУБИКИ В ЯЧЕЙКАХ ВНЕ ПЕЧАТИ ПЛАНШЕТА — что куда разложено (ключи
+     * {@code store-N} — жетон хранилища, {@code card-ID} — карта «+1 ячейка»).
+     * Ставит {@code BoardSheet.planCells} перед рисованием.
      */
-    private static void лицоАрсенала(Graphics2D g, Rectangle box, int[] рамка,
-                                     double k, String[] карта) {
-        java.awt.Shape форма = вырез(box, рамка, k);
-        java.awt.Shape было = g.getClip();
-        g.clip(форма);
-        g.setColor(java.awt.Color.WHITE);
-        g.fill(форма);
-        int полоса = Math.max(2, (int) Math.round(box.height * 0.07));
-        g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.30));
-        g.fill(new java.awt.geom.Rectangle2D.Double(box.x,
-            box.y + box.height - полоса, box.width, полоса));
-        текстКарты(g, box, карта, полоса);
-        g.setClip(было);
-        g.setColor(new java.awt.Color(0x1E, 0x1E, 0x1E));
-        g.setStroke(new BasicStroke(Math.max(1f, (float) (box.width * 0.008))));
-        g.draw(форма);
-    }
+    static Map<String, char[]> кубикиВнеПечати;
+    /** Карты с ячейками склада: окно паза и что в ячейках. Рисуются поверх планшета. */
+    private static final java.util.List<Object[]> кубикиКарт = new java.util.ArrayList<>();
+    /** Сколько кубиков нарисовано с последнего сброса: 'K', 'A', 'D' — для проверок. */
+    static final int[] НАРИСОВАНО = new int[3];
 
     /**
-     * ВСЯ КАРТА ТЕКСТОМ: название, верхняя половина, нижняя половина.
-     *
-     * <p>Заказ дизайнера 11.09.2026: «там места спокойно хватает на разметке на
-     * вставленном арсенале, чтобы разместить весь текст и все пометки». Одного
-     * названия и правда мало: по нему не скажешь, что карта делает.
-     *
-     * <p>Половины разделены чертой — так они и напечатаны. Кегль считается от
-     * высоты паза, поэтому при увеличении ленты текст растёт вместе с картой.
+     * КУБИКИ НА КАРТАХ «+1 ЯЧЕЙКА СКЛАДА» — поверх планшета, по нижнему краю
+     * видимой части карты: там кубик и лежит на столе.
      */
-    private static void текстКарты(Graphics2D g, Rectangle box, String[] карта,
-                                   int полоса) {
-        if (карта == null || карта.length == 0) {
+    private static void кубикиНаКартах(Graphics2D g) {
+        for (Object[] e : кубикиКарт) {
+            Rectangle окно = (Rectangle) e[0];
+            char[] arr = (char[]) e[1];
+            int cs = Math.max(8, Math.min(окно.width / 3, окно.height / 2));
+            int gap = Math.max(2, cs / 8);
+            int total = arr.length * cs + (arr.length - 1) * gap;
+            int x0 = окно.x + (окно.width - total) / 2;
+            int y0 = окно.y + окно.height - cs - gap * 2;
+            for (int i = 0; i < arr.length; i++) {
+                Rectangle box = new Rectangle(x0 + i * (cs + gap), y0, cs, cs);
+                g.setColor(Theme.alpha(Theme.paper(), 0.78));
+                g.fill(new RoundRectangle2D.Double(box.x, box.y, cs, cs, cs * 0.25, cs * 0.25));
+                g.setColor(Theme.alpha(Color.BLACK, 0.55));
+                g.setStroke(new BasicStroke(Math.max(1f, cs / 14f)));
+                g.draw(new RoundRectangle2D.Double(box.x, box.y, cs, cs, cs * 0.25, cs * 0.25));
+                if (arr[i] != 0) {
+                    cube(g, box, arr[i]);
+                }
+            }
+        }
+        кубикиКарт.clear();
+    }
+
+    private static void подписьКонтейнеров(Graphics2D g) {
+        кубикиНаКартах(g);
+        Rectangle первый = контейнерыПодпись;
+        контейнерыПодпись = null;
+        if (первый == null) {
             return;
         }
-        int поле = (int) Math.round(box.width * 0.05);
-        int x = box.x + поле;
-        int ширина = box.width - поле * 2;
-        int y = box.y + поле;
-        int низ = box.y + box.height - полоса - поле / 2;
-        g.setColor(java.awt.Color.BLACK);
-        if (карта[0] != null && !карта[0].isBlank()) {
-            g.setFont(Theme.font(Math.max(8, (int) Math.round(box.height * 0.115)),
-                java.awt.Font.BOLD));
-            y = строки(g, карта[0], x, y, ширина, низ);
-            y += Math.max(2, (int) Math.round(box.height * 0.03));
-        }
-        int кегль = Math.max(7, (int) Math.round(box.height * 0.082));
-        for (int i = 1; i < карта.length; i++) {
-            if (карта[i] == null || карта[i].isBlank() || y >= низ) {
-                continue;
-            }
-            g.setColor(Theme.alpha(java.awt.Color.BLACK, 0.30));
-            g.setStroke(new BasicStroke(1f));
-            g.drawLine(x, y, x + ширина, y);
-            y += Math.max(3, (int) Math.round(box.height * 0.035));
-            g.setColor(java.awt.Color.BLACK);
-            g.setFont(Theme.font(кегль, java.awt.Font.PLAIN));
-            y = строки(g, карта[i], x, y, ширина, низ);
-            y += Math.max(2, (int) Math.round(box.height * 0.025));
-        }
-    }
-
-    /** Текст в столбик по ширине; возвращает, докуда дошёл. */
-    private static int строки(Graphics2D g, String текст, int x, int y, int ширина,
-                              int низ) {
+        String s = "контейнеры · " + контейнерыЧисло;
+        g.setFont(Theme.font(Math.max(9, первый.height / 6), Font.BOLD));
         var fm = g.getFontMetrics();
-        StringBuilder строка = new StringBuilder();
-        java.util.List<String> готовые = new java.util.ArrayList<>();
-        for (String слово : текст.trim().split("\\s+")) {
-            String проба = строка.length() == 0 ? слово : строка + " " + слово;
-            if (fm.stringWidth(проба) > ширина && строка.length() > 0) {
-                готовые.add(строка.toString());
-                строка = new StringBuilder(слово);
-            } else {
-                строка = new StringBuilder(проба);
-            }
-        }
-        if (строка.length() > 0) {
-            готовые.add(строка.toString());
-        }
-        int шаг = fm.getHeight();
-        for (String s : готовые) {
-            if (y + шаг > низ) {
-                // Не влезло — честно обрываем многоточием, а не лезем за край.
-                g.drawString("…", x, y + fm.getAscent());
-                return низ;
-            }
-            g.drawString(s, x, y + fm.getAscent());
-            y += шаг;
-        }
-        return y;
+        int tw = fm.stringWidth(s) + 12;
+        int th = fm.getHeight() + 2;
+        int tx = первый.x + (первый.width - tw) / 2;
+        int ty = первый.y + первый.height - th - 2;
+        g.setColor(Theme.alpha(new Color(0x6B, 0x45, 0x1F), 0.92));
+        g.fill(new RoundRectangle2D.Double(tx, ty, tw, th, th, th));
+        g.setColor(Color.WHITE);
+        g.drawString(s, tx + 6, ty + fm.getAscent() + 1);
     }
 
     /**
@@ -655,18 +878,16 @@ final class PrintedBoards {
      * та наполовину ушла в паз. Поэтому карта кладётся во всю свою ширину,
      * прижатой верхом, и обрезается краем паза — ровно как торчит из кармана.
      */
-    private static void картаВПаз(Graphics2D g, Rectangle box, int[] рамка, double k,
-                                  BufferedImage картинка) {
+    private static void картаВПаз(Graphics2D g, int войX, int войY, double k,
+                                  int[] рамка, BufferedImage картинка) {
+        Rectangle box = scale(войX, войY, k, рамка[0], рамка[1], рамка[2], рамка[3]);
         if (картинка != null) {
+            // ВО ВСЮ ШИРИНУ ОКНА, СВОЕЙ ПРОПОРЦИЕЙ, НИЖНИМ КРАЕМ ПО НИЖНЕМУ КРАЮ
+            // ОКНА: верх карты уходит вверх, под планшет, и его накроет сам
+            // планшет, нарисованный следом. Ничего не сжимается.
             int h = (int) Math.round(box.width
                 * картинка.getHeight() / (double) картинка.getWidth());
-            java.awt.Shape было = g.getClip();
-            // УГЛЫ СРЕЗАНЫ ПО РАЗМЕТКЕ (заказ дизайнера 11.09.2026: «обрежь
-            // края контейнерам и арсеналу согласно разметке»). Радиус не
-            // выдуман — он снят с самой маски и лежит пятым числом якоря.
-            g.clip(вырез(box, рамка, k));
-            g.drawImage(картинка, box.x, box.y, box.width, Math.max(h, box.height), null);
-            g.setClip(было);
+            kelium.report.Mips.draw(g, картинка, box.x, box.y + box.height - h, box.width, h);
             return;
         }
         // Печати нет — рисуем саму карту: паз не должен выглядеть пустым, когда
@@ -701,8 +922,15 @@ final class PrintedBoards {
             if (!вЗапасе.contains(c.building())) {
                 continue;
             }
+            // рост — по краске СВОЕЙ картинки в общем масштабе жетонов
+            double рост = зданиеH(p.seat);
+            double пикс = пиксельЖетона(p.seat);
+            var f = Textures.found(c.building(), 0, p.seat);
+            if (пикс > 0 && f != null && f.image() != null) {
+                рост = краскаЖетона(f.image())[3] * пикс;
+            }
             жетонЗдания(g, войX + c.labelCx() * k, войY - ЗДАНИЕ_ЗАЗОР * k,
-                зданиеH(p.seat) * k, c.building(), p.seat, spots);
+                рост * k, c.building(), p.seat, spots);
         }
     }
 
@@ -733,7 +961,10 @@ final class PrintedBoards {
             kelium.report.ТеньЖетона.силуэт(tex,
                 kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
             at, d, d);
-        g.drawImage(tex, at, null);
+        kelium.report.Mips.draw(g, tex, at);
+        TokenSilhouettes.put("building:" + code, tex, at);
+        hit("building:" + code, new Rectangle((int) Math.round(cx - ш / 2),
+            (int) Math.round(низ - высота), (int) Math.round(ш), (int) Math.round(высота)));
         if (spots != null) {
             spots.put(new Rectangle((int) Math.round(cx - ш / 2),
                     (int) Math.round(низ - высота),
@@ -762,13 +993,16 @@ final class PrintedBoards {
         }
         double k = width / (double) art.getWidth();
         int h = (int) Math.round(art.getHeight() * k);
-        g.drawImage(art, x, y, width, h, null);
+        kelium.report.Mips.draw(g, art, x, y, width, h);
+        hit("storage", new Rectangle(x, y, width, h));
         // Рамки ячеек КАЖДОГО складского здания: по ним ляжет сам жетон, если он
         // ещё на планшете (см. ниже, жетонПоверхЯчеек).
         Map<String, java.util.List<Rectangle>> зоны = new java.util.LinkedHashMap<>();
         int seen = 0;
         int lastLevel = -1;
         String lastGroup = "";
+        BoardAnchors.Cell последняяОбщая = null;
+        int общихНапечатано = 0;
         for (BoardAnchors.Cell c : storageCells(p.seat)) {
             if (!c.group().equals(lastGroup) || c.level() != lastLevel) {
                 lastGroup = c.group();
@@ -781,12 +1015,19 @@ final class PrintedBoards {
             if ("base".equals(c.group())) {
                 open = true;
                 has = base != null && seen < base.length ? base[seen] : 0;
+                последняяОбщая = c;
+                общихНапечатано = seen + 1;
             } else {
                 String key = ("miner".equals(c.group()) ? "miner-" : "plant-") + c.level();
                 open = !covered.contains(key);
                 char[] arr = fill.get(key);
                 has = open && arr != null && seen < arr.length ? arr[seen] : 0;
             }
+            // ЗОНА ЯЧЕЙКИ — для подсказки по каждой детали планшета (увеличение
+            // планшета, 25.09.2026): чья ячейка, открыта ли и что в ней лежит.
+            String cellKey = "cell:" + c.group() + ":" + c.level() + ":" + seen + ":" + (open ? 1 : 0)
+                + ":" + (has == 0 ? '-' : has);
+            hit(cellKey, box);
             seen++;
             if (!open) {
                 // ЯЧЕЙКА НАКРЫТА СВОИМ ЖЕТОНОМ — и жетон мы сейчас на неё и
@@ -797,7 +1038,9 @@ final class PrintedBoards {
                 String key = ("miner".equals(c.group()) ? "miner-" : "plant-") + c.level();
                 зоны.computeIfAbsent(key, ключ -> new java.util.ArrayList<>()).add(box);
             } else if (has != 0) {
+                cubeKey = cellKey;
                 cube(g, box, has);
+                cubeKey = null;
             }
         }
         // КРЫЛЬЯ ПЛАНШЕТА: жетон занимает КРЫЛО целиком, а не только свои
@@ -806,6 +1049,27 @@ final class PrintedBoards {
         java.util.List<Крыло> крылья = крылья(лист);
         for (var e : зоны.entrySet()) {
             жетонНаКрыле(g, e.getKey(), e.getValue(), p.seat, крылья);
+        }
+        // ОБЩАЯ ЯЧЕЙКА БЕЗ ПЕЧАТИ (жалоба дизайнера 27.09.2026: «келемия 2/3, а
+        // на хранилище один кубик»). По своду и книге (глава 4, «Д») ячеек,
+        // открытых всегда, ДВЕ, а на новой печати планшета их одна. Кубик во
+        // второй ячейке раньше не рисовался нигде; теперь она нарисована рамкой
+        // рядом с печатной, пока печать и свод не сойдутся; поверх жетонов крыльев,
+        // чтобы её не накрыл лежащий рядом жетон.
+        if (последняяОбщая != null && base != null) {
+            for (int i = общихНапечатано; i < base.length; i++) {
+                int сдвиг = (i - общихНапечатано + 1) * (последняяОбщая.w() + 14);
+                Rectangle box = scale(x, y, k, последняяОбщая.x() + сдвиг,
+                    последняяОбщая.y(), последняяОбщая.w(), последняяОбщая.h());
+                рамкаБезПечати(g, box);
+                String baseKey = "cell:base:0:" + i + ":1:" + (base[i] == 0 ? '-' : base[i]);
+                hit(baseKey, box);
+                if (base[i] != 0) {
+                    cubeKey = baseKey;
+                    cube(g, box, base[i]);
+                    cubeKey = null;
+                }
+            }
         }
         жетоныХранилища(g, x, y, k, p, storeSpots);
     }
@@ -830,15 +1094,24 @@ final class PrintedBoards {
         }
         for (int i = 0; i < места.size(); i++) {
             String tok = i < p.storageTokens.size() ? p.storageTokens.get(i) : null;
+            int[] b = места.get(i);
+            Rectangle box = scale(x, y, k, b[0], b[1], b[2], b[3]);
+            hit("store:" + i, box);
             if (tok == null) {
                 continue;
             }
-            int[] b = места.get(i);
-            Rectangle box = scale(x, y, k, b[0], b[1], b[2], b[3]);
             int side = Math.min(box.width, box.height);
             int sx = box.x + (box.width - side) / 2;
             int sy = box.y + (box.height - side) / 2;
             ModuleSlot.paintStorageToken(g, tok, sx, sy, side);
+            // жетон стороной «+1 ячейка» — сам ячейка склада: кубик в ней
+            // лежит на жетоне (жалоба 27.09.2026 — кубик не рисовался нигде)
+            char[] вЯчейке = кубикиВнеПечати == null ? null : кубикиВнеПечати.get("store-" + i);
+            if (вЯчейке != null && вЯчейке.length > 0 && вЯчейке[0] != 0) {
+                int cs = (int) Math.round(side * 0.6);
+                cube(g, new Rectangle(sx + (side - cs) / 2, sy + (side - cs) / 2, cs, cs),
+                    вЯчейке[0]);
+            }
             if (storeSpots != null) {
                 storeSpots.put(new Rectangle(sx, sy, side, side), tok);
             }
@@ -1011,7 +1284,10 @@ final class PrintedBoards {
                 kelium.report.ТеньЖетона.силуэт(tex,
                     kelium.report.ТеньЖетона.краска(Theme.seatStroke(seat))),
                 at, d, d);
-            g.drawImage(tex, at, null);
+            kelium.report.Mips.draw(g, tex, at);
+            TokenSilhouettes.put("building:" + code + ":" + уровень, tex, at);
+            hit("building:" + code + ":" + уровень, at.createTransformedShape(
+                new Rectangle(0, 0, tex.getWidth(), tex.getHeight())));
             return;
         }
         kelium.report.FieldGeometry.Shape sh;
@@ -1028,6 +1304,7 @@ final class PrintedBoards {
         at.scale(k, k);
         at.translate(-sh.vbW() / 2.0, -sh.vbH() / 2.0);
         java.awt.Shape path = at.createTransformedShape(sh.path());
+        hit("building:" + code + ":" + уровень, path);
         double торец = Math.max(1.5, k * 6);
         g.setColor(Theme.seatStroke(seat));
         kelium.report.ТеньЖетона.блок(g, path, торец, торец);
@@ -1068,6 +1345,7 @@ final class PrintedBoards {
 
     /** Кубик ресурса в напечатанной ячейке: тем же значком, что и везде. */
     private static void cube(Graphics2D g, Rectangle box, char has) {
+        НАРИСОВАНО[has == 'K' ? 0 : has == 'D' ? 2 : 1]++;
         // КУБИК КРУПНЕЕ НА ПЯТУЮ (заказ дизайнера 09.09.2026): в печатной ячейке
         // он сидел мелко, и ячейка читалась как пустая рамка со значком внутри.
         double s = Math.min(box.width, box.height) * 0.79;
@@ -1086,48 +1364,25 @@ final class PrintedBoards {
             case 'D' -> Theme.trophy();
             default -> Theme.ink2();
         });
+        // СИЛУЭТ КУБИКА — для подсветки по форме (дизайнер 28.09.2026:
+        // «выделения на хранилище квадратные, а просил по форме и положению
+        // жетона»): та же картинка и то же место, что у MarkIcons.paint
+        if (cubeKey != null) {
+            BufferedImage img = Textures.icon(has == 'K' ? "kelium" : has == 'D' ? "trophy" : "ammo");
+            if (img != null) {
+                int px = (int) Math.round(s * 1.15);
+                java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform();
+                at.translate(Math.round(cx - px / 2.0), Math.round(cy - px / 2.0));
+                at.scale(px / (double) img.getWidth(), px / (double) img.getHeight());
+                TokenSilhouettes.put(cubeKey, img, at);
+            }
+        }
     }
+
+    /** Ключ ячейки, в которую сейчас кладётся кубик (для его силуэта). */
+    private static String cubeKey;
 
     // ==================== мелочи рисования ====================
-
-    /**
-     * ФОРМА ПАЗА: скруглённый прямоугольник с радиусом из разметки. Радиуса нет
-     * (старые якоря) — форма остаётся прямоугольной, как была.
-     */
-    private static java.awt.Shape вырез(Rectangle box, int[] рамка, double k) {
-        double r = рамка != null && рамка.length > 4 ? рамка[4] * k : 0;
-        if (r <= 0.5) {
-            return box;
-        }
-        return new RoundRectangle2D.Double(box.x, box.y, box.width, box.height,
-            r * 2, r * 2);
-    }
-
-    /** Что программа знает о картах в пазах планшета войск. */
-    interface ПроКарты {
-
-        /** Название карты по коду — для заглушки, пока лица не нарисовано. */
-        String имя(String вид, String id);
-
-        /**
-         * ЧТО НАПЕЧАТАНО НА КАРТЕ АРСЕНАЛА: {@code {название, верхняя половина,
-         * нижняя половина}}. Любая строка может быть пустой — тогда её не
-         * рисуют.
-         */
-        String[] половины(String id);
-
-        /** НАЧАЛЬНЫЙ ли это арсенал: у него своя рубашка, другая колода. */
-        boolean начальный(String id);
-
-        /** Перевёрнута ли карта щелчком — показывать лицо. */
-        boolean вскрыта(String id);
-
-        /**
-         * ПЕЧАТНОЕ ЛИЦО КАРТЫ ({@code null} — не нарисовано). У контейнеров оно
-         * есть, у арсенала пока нет — тому вместо картинки пишут текст.
-         */
-        BufferedImage лицо(String вид, String id);
-    }
 
     private static Rectangle scale(int x, int y, double k, int bx, int by, int bw, int bh) {
         return new Rectangle(x + (int) Math.round(bx * k), y + (int) Math.round(by * k),

@@ -1,0 +1,174 @@
+# CONTENT: market  version 3.0.0
+# ============================================================================
+#  ВЫГРУЖЕНО ИЗ КОДА — файл является ЗЕРКАЛОМ классов карт.
+#  рынок 3.0: 10 карт, на каждой ресурсное и действенное предложение (решения дизайнера 14-15.09.2026)
+#
+#  Править этот файл руками бессмысленно: движок накрывает запись каталога
+#  выгрузкой класса. Менять надо класс kelium.cards.market.СделкиНаРынке3,
+#  а затем выгружать заново (kelium.ВыгрузкаРынка).
+# ============================================================================
+meta:
+  id: 3.0.0
+  type: market
+  выгружено: 'рынок 3.0: 10 карт, на каждой ресурсное и действенное предложение (решения дизайнера 14-15.09.2026)'
+market:
+- id: m3_01
+  name: Военный подряд
+  left:
+    effect: gain
+    name: Госзаказ
+    label: 5 монет
+    params:
+      coin: 5
+  right:
+    effect: free_action
+    name: Мобилизация
+    label: 'Снаряжение даром: все здания запитаны'
+    params:
+      action: assembly
+      all_powered: true
+  описание: Ведомство платит звонкой монетой и поднимает цеха без всякой энергии.
+- id: m3_02
+  name: Оружейная ярмарка
+  left:
+    effect: gain
+    name: Арсенал
+    label: 3 боеприпаса
+    params:
+      ammo: 3
+  right:
+    effect: free_action
+    name: Внезапный удар
+    label: Бой даром и 2 боеприпаса
+    params:
+      action: combat
+      ammo: 2
+  описание: Ящики со снарядами с одной стороны прилавка, готовая атака — с другой.
+- id: m3_03
+  name: Штаб корпуса
+  left:
+    effect: gain
+    name: Разнарядка
+    label: 4 карты заданий, оставить 2
+    params:
+      objective_cards: 4
+      objective_cards_keep: 2
+  right:
+    effect: free_action
+    name: Грант
+    label: 'Наука даром: трофеев как будто на 1 больше'
+    params:
+      virtual_trophy: 1
+      action: science
+  описание: 'Бумаги из штаба: кому разнарядка на четыре наряда, кому научный грант.'
+- id: m3_04
+  name: Трофейный двор
+  left:
+    effect: gain
+    name: Разбор
+    label: 2 трофея
+    params:
+      trophy: 2
+  right:
+    effect: place_on_energy_cell
+    name: Подключение
+    label: келемий в ячейку энергии навсегда
+    params: {}
+  описание: Двор разбирает лом на трофеи, а кристалл со двора уходит прямо в сеть.
+- id: m3_05
+  name: Теневой обоз
+  left:
+    effect: gain
+    name: Поставка
+    label: 3 контейнера
+    params:
+      containers: 3
+  right:
+    effect: grab_first_player
+    name: Перехват инициативы
+    label: жетон первого игрока и 1 карта задания у него
+    params:
+      take_objective_cards: 1
+      now: true
+  описание: Обоз везёт три ящика без описи — и чужую очередь заодно.
+- id: m3_06
+  name: Военная тревога
+  left:
+    effect: gain
+    name: Госзаказ
+    label: 5 монет
+    params:
+      coin: 5
+  right:
+    effect: free_action
+    name: Внезапный удар
+    label: Бой даром и 2 боеприпаса
+    params:
+      action: combat
+      ammo: 2
+  описание: Касса открыта, но труба уже играет тревогу.
+- id: m3_07
+  name: Научная миссия
+  left:
+    effect: gain
+    name: Арсенал
+    label: 3 боеприпаса
+    params:
+      ammo: 3
+  right:
+    effect: free_action
+    name: Грант
+    label: 'Наука даром: трофеев как будто на 1 больше'
+    params:
+      virtual_trophy: 1
+      action: science
+  описание: Миссия приехала с ящиком снарядов и чужими деньгами на опыты.
+- id: m3_08
+  name: Мобилизационный пункт
+  left:
+    effect: gain
+    name: Разнарядка
+    label: 4 карты заданий, оставить 2
+    params:
+      objective_cards: 4
+      objective_cards_keep: 2
+  right:
+    effect: free_action
+    name: Мобилизация
+    label: 'Снаряжение даром: все здания запитаны'
+    params:
+      action: assembly
+      all_powered: true
+  описание: На пункте выдают предписания и тут же ставят цеха под пар.
+- id: m3_09
+  name: Гражданский подряд
+  left:
+    effect: gain
+    name: Разбор
+    label: 2 трофея
+    params:
+      trophy: 2
+  right:
+    effect: free_action
+    name: Наряд
+    label: 'Добыча даром: все добытчики запитаны'
+    params:
+      action: mining
+      all_powered: true
+  описание: Подрядчик расплачивается ломом и гоняет добытчики без разрешения на свет.
+- id: m3_10
+  name: Комендантский час
+  left:
+    effect: gain
+    name: Поставка
+    label: 3 контейнера
+    params:
+      containers: 3
+  right:
+    effect: free_action
+    name: Передислокация
+    label: Манёвр даром и 2 боеприпаса
+    params:
+      action: movement
+      ammo: 2
+  описание: Ночью по дорогам везут ящики и переставляют войска — до утра никто не спросит.

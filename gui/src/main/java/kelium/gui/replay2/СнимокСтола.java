@@ -1,0 +1,1276 @@
+package kelium.gui.replay2;
+
+import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Path2D;
+import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.imageio.ImageIO;
+
+import kelium.core.GameState;
+import kelium.core.Hex;
+import kelium.dataio.ContentLibrary;
+import kelium.dataio.GameConfig;
+import kelium.engine.Modules;
+import kelium.engine.Setup;
+import kelium.gui.GameRecorder;
+import kelium.report.FieldGeometry;
+import kelium.report.FieldPainter;
+import kelium.report.Java2DCanvas;
+import kelium.report.ReplayRecord;
+import kelium.report.Textures;
+
+/**
+ * СНИМОК СТОЛА — подготовленная партия, снятая сверху, как она лежит на столе.
+ *
+ * <p>Зачем. Книге правил нужен разворот «подготовка к игре»: не схема из
+ * пунктирных прямоугольников, а картинка настоящего стола, по которой видно,
+ * где что лежит. Рисовать её руками значит перерисовывать после каждой правки
+ * правил, поэтому она СОБИРАЕТСЯ ДВИЖКОМ: партия действительно готовится
+ * ({@link Setup#buildGame}), а потом рисуется теми же классами, что рисуют поле
+ * и планшеты в проигрывателе. Разошлись правила — разошлась и картинка, и это
+ * видно сразу.
+ *
+ * <p><b>Масштаб честный.</b> Все размеры заданы В МИЛЛИМЕТРАХ ПЕЧАТИ: гекс 90 мм
+ * по ширине, планшет войск 284×75, хранилища 131×75, планшет науки 228×158,
+ * рынка 160×160, карты 56×87, 68×44 и 34×34. Поэтому на картинке компоненты соотносятся
+ * друг с другом так же, как на настоящем столе.
+ *
+ * <p>Запуск:
+ * <pre>
+ *   java -cp gui/target/kelium-runner.jar kelium.gui.replay2.СнимокСтола \
+ *        &lt;куда.png&gt; [ширина в точках] [раскладка.kmap] [сид] [сукно] [игроков]
+ * </pre>
+ * Игроков по умолчанию трое (разворот книги). Задник коробки снимает партию на
+ * четверых ради раскладки поля; зоны рисуются только у первых трёх мест.
+ */
+public final class СнимокСтола {
+
+    private СнимокСтола() {
+    }
+
+    // ==================== стол в миллиметрах ====================
+
+    private static final double СТОЛ_Ш = 1500;
+    private static final double СТОЛ_В = 978;
+    /** Сколько сукна оставить вокруг разложенной игры. */
+    private static final double ПОЛЯ_ММ = 22;
+
+    /**
+     * РАДИУС ГЕКСА НА ПЕЧАТИ. Жетон гекса зарождения уходит в типографию как
+     * 90×82 мм — это ровно описанная окружность 45 мм у гекса «плашмя вверх».
+     */
+    private static final double ГЕКС_R = 45.3;
+    /**
+     * ПЛАНШЕТ ВОЙСК ПО ЭКСПОРТУ: 3354 точки при 300 dpi = 284 мм (было 300 —
+     * планшеты выходили на 6 % крупнее поля и карт; сверено 28.09.2026).
+     * Планшет хранилища идёт от него сцепкой, по отношению точек печати.
+     */
+    private static final double ВОЙСКА_Ш = 3354 / 300.0 * 25.4;
+    /**
+     * ОБЩИЕ ПЛАНШЕТЫ ПРИСТАВЛЯЮТСЯ К ПОЛЮ ВПРИТЫК (замысел дизайнера).
+     *
+     * <p>Планшет науки и планшет рынка нарочно вырезаны ГЕКСАМИ того же размера,
+     * что и поле: они встают к нему вплотную, продолжая его сетку. Поэтому у них
+     * не задана ширина в миллиметрах — она считается из радиуса гекса на самой
+     * печати, и планшет всегда точно ложится на соседние клетки поля.
+     *
+     * <p>Радиус найден по якорям печати: середины треков науки отстоят друг от
+     * друга на 1,5R = 810 точек, значит R = 540 при полотне 2693×1866. У рынка
+     * полотно 1890×1890 — это ровно 3,5R по ширине, тот же R.
+     */
+    private static final double АРТ_R = 540;
+    /** Центр правой доли планшета науки на его картинке. */
+    private static final double[] НАУКА_ПРАВАЯ = {2160, 933};
+    /** Центр левой доли планшета рынка на его картинке. */
+    private static final double[] РЫНОК_ЛЕВАЯ = {540, 945};
+    private static final double КАРТА_ЗАДАНИЕ_Ш = 56;   // 56×87
+    private static final double КАРТА_АРСЕНАЛ_Ш = 68;   // 68×44
+    /** Зазор от низа сцепки до руки приказов, мм: под планшетом лежит арсенал. */
+    private static final double ОТСТУП_РУКИ = 38;
+    private static final double КАРТА_КОНТЕЙНЕР_Ш = 34; // 34×34
+    private static final double КАРТА_РЫНКА_Ш = 87;    // 87×56, лежит боком
+
+    /** Цвета мест в том же порядке, что гнёзда краски: 0 синий, 1 красный… */
+    private static final String[] ЦВЕТ_ПРИКАЗОВ =
+        {"back_blue", "back_scarlet", "back_green", "back_yellow"};
+
+    private static double k;                 // точек в миллиметре
+
+    /**
+     * ЯКОРЯ ВЫНОСОК: номер шага подготовки → точка на картинке (в её точках).
+     * Пишутся рядом с PNG отдельным файлом, и вёрстка книги ставит по ним
+     * кружки 1…18 — не подбирая координаты руками по картинке.
+     */
+    private static final java.util.Map<String, int[]> ЯКОРЯ =
+        new java.util.LinkedHashMap<>();
+
+    /**
+     * ЗАПАС СЛОЯ ПО ВЫСОТЕ, мм. Руки игроков выходят за стол 1500×978: у
+     * сидящих напротив — за верхний край, у ближнего — за нижний, и слой
+     * обрезал карты пополам (дизайнер 14.10.2026). Слой выше на два запаса,
+     * всё рисуется со сдвигом вниз; лишнее потом срезает обрезка по компонентам.
+     */
+    private static final double ЗАПАС_В = 140;
+    private static int сдвигY;
+
+    private static void якорь(String номер, double xМм, double yМм) {
+        ЯКОРЯ.put(номер, new int[]{px(xМм), px(yМм) + сдвигY});
+    }
+
+    private static void якорьТ(String номер, double x, double y) {
+        ЯКОРЯ.put(номер, new int[]{(int) Math.round(x), (int) Math.round(y) + сдвигY});
+    }
+
+    private static int px(double мм) {
+        return (int) Math.round(мм * k);
+    }
+
+    // ==================== запуск ====================
+
+    public static void main(String[] args) throws Exception {
+        Theme.apply(false);
+        Path out = Path.of(args.length > 0 ? args[0] : "стол.png");
+        int ширина = args.length > 1 ? Integer.parseInt(args[1]) : 4500;
+        Path root = GameConfig.resolveDataRoot(null);
+        Path раскладка = args.length > 2 && !args[2].isBlank()
+            ? Path.of(args[2])
+            : root.resolve("scenarios/old/сценарий 3 игрока 1.kmap");
+        long сид = args.length > 3 ? Long.parseLong(args[3]) : 7L;
+        if (args.length > 4 && !args[4].isBlank()) {
+            сукно = args[4];
+        }
+        int игроков = args.length > 5 ? Integer.parseInt(args[5]) : 3;
+
+        GameConfig cfg = GameConfig.buildCached(GameConfig.DEFAULT_RULESET, игроков, сид,
+            root, null, null, null, раскладка);
+        GameState st = Setup.buildGame(cfg);
+        // ПОДГОТОВКА ДОИГРЫВАЕТСЯ ДО КОНЦА: глухие жетоны раздаются на шаге 14
+        // подготовки, карта рынка первого раунда вскрывается на шаге 6. В
+        // движке и то и другое делает GameEngine первым делом партии — здесь
+        // вызывается то же самое, но без единого хода.
+        Modules.раздатьГлухиеЖетоны(st, null);
+        if (st.marketActive == null && st.decks.get("market") != null) {
+            st.marketActive = st.decks.get("market").draw(st.rng);
+        }
+        ReplayRecord rec = GameRecorder.setupOnly(cfg, st, сид,
+            java.util.Collections.nCopies(игроков, "human"));
+
+        Session session = new Session();
+        session.setContent(ContentLibrary.forRuleset(cfg.ruleset, root));
+        session.setRecord(rec);
+        session.seek(0);
+
+        BufferedImage img = нарисовать(session, rec, st, ширина);
+        Path dir = out.toAbsolutePath().getParent();
+        if (dir != null) {
+            Files.createDirectories(dir);
+        }
+        ImageIO.write(img, "png", out.toFile());
+        String таб = "\t";
+        StringBuilder sb = new StringBuilder("# номер" + таб + "x" + таб
+            + "y (точки картинки " + img.getWidth() + "×" + img.getHeight() + ")\n");
+        for (var e : ЯКОРЯ.entrySet()) {
+            sb.append(e.getKey()).append(таб).append(e.getValue()[0])
+                .append(таб).append(e.getValue()[1]).append('\n');
+        }
+        Path якоря = out.resolveSibling(out.getFileName().toString()
+            .replaceFirst("\\.png$", "") + "-якоря.txt");
+        Files.writeString(якоря, sb.toString(), java.nio.charset.StandardCharsets.UTF_8);
+        System.out.println("[стол] " + out.toAbsolutePath() + " "
+            + img.getWidth() + "×" + img.getHeight());
+        System.out.println("[стол] якоря: " + якоря.toAbsolutePath());
+    }
+
+    // ==================== сама картинка ====================
+
+    private static BufferedImage нарисовать(Session session, ReplayRecord rec,
+                                            GameState st, int ширина) {
+        k = ширина / СТОЛ_Ш;
+        сдвигY = px(ЗАПАС_В);
+        int высота = px(СТОЛ_В + 2 * ЗАПАС_В);
+        // ВСЁ РИСУЕТСЯ НА ПРОЗРАЧНОМ СЛОЕ, а сукно подкладывается потом. Так
+        // картинку можно обрезать ровно по компонентам: пустое сукно по краям
+        // ничего не рассказывает, а места на развороте занимает.
+        BufferedImage слой = new BufferedImage(ширина, высота, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = слой.createGraphics();
+        качество(g);
+        g.translate(0, сдвигY);
+
+        // РАССАДКА НА ТРОИХ: один игрок с ближнего края стола, двое напротив.
+        // Их планшеты повёрнуты к ним, то есть к нам вверх ногами, — ровно так
+        // это и выглядит, когда смотришь на стол со своего места.
+        поле(g, st, 750, 470);
+        планшетНауки(g);
+        планшетРынка(g, st);
+        double арсX = наука[0] + наука[2] * 0.26;
+        double арсY = наука[1] + наука[3] + px(46);
+        // КОЛОДЫ ЗАДАНИЙ — СЛЕВА ОТ ПЛАНШЕТА НАУКИ, столбцом (дизайнер 14.10.2026:
+        // сверху они упирались в зону красного игрока)
+        double задX = наука[0] - px(КАРТА_ЗАДАНИЕ_Ш * 0.95);
+        double задY = наука[1] + наука[3] * 0.5;
+        колодыАрсенала(g, арсX, арсY);
+        колодыЗаданий(g, задX, задY);
+        якорьТ("4", наука[0] + наука[2] * 0.5, наука[1] + наука[3] * 0.30);
+        якорьТ("5", арсX - px(64), арсY);
+        якорьТ("6", рынок[0] + рынок[2] * 0.40, рынок[1] + рынок[3] * 0.5);
+        // Шаг 7 — колода ЗАДАНИЙ, первая в ряду; посередине лежат начальные
+        // задания, а они относятся к шагу 16 (поймано 28.09.2026).
+        якорьТ("7", задX - px(КАРТА_ЗАДАНИЕ_Ш * 0.5), задY - px(КАРТА_ЗАДАНИЕ_Ш * 0.5 + 7));
+
+        зонаИгрока(g, session, 0, 750, 806, 0);
+        double фишX = зона0[0] + зона0[2] + px(60);
+        double фишY = зона0[1] + зона0[3] * 0.3;
+        фишкаПервогоТ(g, фишX, фишY);
+        // точка выноски — у края фишки, а не на ней: иначе закрывает рисунок
+        якорьТ("10", фишX - px(30), фишY + px(40));
+        зонаИгрока(g, session, 1, 420, 162, 180);
+        зонаИгрока(g, session, 2, 1082, 162, 180);
+
+        double запX = наука[0] + наука[2] * 0.22;
+        double запY = наука[1] + наука[3] + px(156);
+        общийЗапасТ(g, запX, запY);
+        double мешX = рынок[0] + рынок[2] * 1.45;
+        double мешY = рынок[1] + рынок[3] + px(150);
+        мешочкиТ(g, мешX, мешY);
+        супергЗадания(g, рынок[0] + рынок[2] + px(62), рынок[1] + рынок[3] * 0.5);
+        якорьТ("9", запX, запY);
+        якорьТ("8", мешX, мешY);
+
+
+        g.dispose();
+        return обрезать(слой);
+    }
+
+    /**
+     * ОБРЕЗАТЬ ПО КОМПОНЕНТАМ. Рамка берётся по тому, что нарисовано, плюс
+     * поля. Ни пропорция разворота, ни столешница по умолчанию не добавляются:
+     * книге нужен PNG с прозрачным фоном, чтобы компоненты легли прямо на
+     * бумагу полосы, а вёрстка сама подберёт окно под пропорцию картинки.
+     */
+    private static BufferedImage обрезать(BufferedImage слой) {
+        int x0 = слой.getWidth();
+        int y0 = слой.getHeight();
+        int x1 = 0;
+        int y1 = 0;
+        for (int y = 0; y < слой.getHeight(); y++) {
+            for (int x = 0; x < слой.getWidth(); x++) {
+                if ((слой.getRGB(x, y) >>> 24) > 10) {
+                    x0 = Math.min(x0, x);
+                    x1 = Math.max(x1, x);
+                    y0 = Math.min(y0, y);
+                    y1 = Math.max(y1, y);
+                }
+            }
+        }
+        if (x1 <= x0 || y1 <= y0) {
+            x0 = 0;
+            y0 = 0;
+            x1 = слой.getWidth() - 1;
+            y1 = слой.getHeight() - 1;
+        }
+        // ПОЛЯ ТОЛЬКО ТЕ, ЧТО НУЖНЫ. Пропорция картинки НЕ подгоняется под
+        // разворот: пустое сукно по бокам уезжало под подложку текстовых
+        // столбцов и выглядело грязью (замечание дизайнера 14.09.2026).
+        // Вёрстка сама подбирает окно под пропорцию того, что получилось.
+        int поле = px(ПОЛЯ_ММ);
+        x0 -= поле;
+        y0 -= поле;
+        x1 += поле;
+        y1 += поле;
+        int ш = (int) Math.round(x1 - x0);
+        int в = (int) Math.round(y1 - y0);
+        // БЕЗ СТОЛА — ПРОЗРАЧНЫЙ ФОН (просьба дизайнера 14.09.2026). Компоненты
+        // с их тенями ложатся прямо на бумагу разворота, и никакого чужого
+        // прямоугольника на полосе не появляется. Столешница остаётся только
+        // для отдельной картинки: ключ запуска wood / cloth / light.
+        boolean сВерхом = !"none".equals(сукно);
+        BufferedImage img = new BufferedImage(ш, в,
+            сВерхом ? BufferedImage.TYPE_INT_RGB : BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        качество(g);
+        if (сВерхом) {
+            стол(g, ш, в);
+        }
+        g.drawImage(слой, (int) Math.round(-x0), (int) Math.round(-y0), null);
+        g.dispose();
+        for (int[] точка : ЯКОРЯ.values()) {
+            точка[0] -= (int) Math.round(x0);
+            точка[1] -= (int) Math.round(y0);
+        }
+        return img;
+    }
+
+    private static void качество(Graphics2D g) {
+        kelium.report.Сглаживание.включить(g);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,
+            RenderingHints.VALUE_STROKE_PURE);
+    }
+
+    /**
+     * ПОВЕРХНОСТЬ СТОЛА. Картон у игры светлый, и подложка нужна тёмная, иначе
+     * компоненты в неё проваливаются. По умолчанию дерево: книга печатается на
+     * кремовой бумаге, и тёплый стол ложится в её палитру, а тёмно-серое сукно
+     * (ключ {@code cloth}) даёт больший контраст. {@code light} — светлый стол,
+     * оставлен для сравнения. {@code none} (по умолчанию) — вовсе без стола:
+     * прозрачный PNG для книги.
+     */
+    static String сукно = "none";
+
+    private static void стол(Graphics2D g, int w, int h) {
+        Color верх;
+        Color низ;
+        Color блик;
+        switch (сукно) {
+            case "wood" -> {
+                верх = new Color(0x6B4A2C);
+                низ = new Color(0x3A2616);
+                блик = new Color(255, 236, 200, 26);
+            }
+            case "light" -> {
+                верх = new Color(0xC9BFA6);
+                низ = new Color(0x8E8571);
+                блик = new Color(255, 255, 255, 34);
+            }
+            default -> {
+                верх = new Color(0x3E4440);
+                низ = new Color(0x1F2326);
+                блик = new Color(255, 255, 255, 16);
+            }
+        }
+        g.setPaint(new java.awt.GradientPaint(0, 0, верх, w, h, низ));
+        g.fillRect(0, 0, w, h);
+        g.setPaint(new java.awt.RadialGradientPaint(
+            new java.awt.geom.Point2D.Double(w / 2.0, h * 0.45), (float) (w * 0.60),
+            new float[]{0.45f, 1f},
+            new Color[]{блик, new Color(0, 0, 0, 130)}));
+        g.fillRect(0, 0, w, h);
+    }
+
+    // ==================== поле ====================
+
+    private static void поле(Graphics2D g, GameState st, double cxМм, double cyМм) {
+        double size = ГЕКС_R * k;
+        List<ReplayRecord.HexInfo> infos = new ArrayList<>();
+        double minx = Double.MAX_VALUE;
+        double miny = Double.MAX_VALUE;
+        double maxx = -Double.MAX_VALUE;
+        double maxy = -Double.MAX_VALUE;
+        for (Hex h : st.field.hexes.values()) {
+            int[] qr = FieldGeometry.parseQR(h.id);
+            if (qr == null) {
+                continue;
+            }
+            double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
+            minx = Math.min(minx, c[0]);
+            maxx = Math.max(maxx, c[0]);
+            miny = Math.min(miny, c[1]);
+            maxy = Math.max(maxy, c[1]);
+            infos.add(ReplayRecord.HexInfo.of(h));
+        }
+        int w = (int) Math.ceil(maxx - minx + 3 * size);
+        int h = (int) Math.ceil(maxy - miny + 3 * size);
+        BufferedImage слой = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D gg = слой.createGraphics();
+        качество(gg);
+        FieldPainter.dark = false;
+        // БЕЗ ПОДКРАСКИ ГЕКСА ЦВЕТОМ ХОЗЯИНА (дизайнер 05.10.2026): в книге
+        // модуль поля всегда в своём печатном цвете, ни в одном примере.
+        FieldPainter.showOwnership = false;
+        FieldPainter.книжнаяТолщина = true;      // толщина жетонов, как на всех кадрах книги
+        FieldPainter.showCardboard = true;
+        FieldPainter.showBlocks = false;
+        // ГДЕ НАРИСОВАНЫ ВОЙСКА — берём у самого рисовальщика: выноска к пехоте
+        // должна смотреть на жетон, а не на место, где он «обычно» лежит.
+        FieldPainter.unitSpots = new java.util.HashMap<>();
+        ReplayRecord.Snapshot снимок = ReplayRecord.snapshotOf(st, null);
+        FieldPainter.paintField(new Java2DCanvas(gg, 1, Theme.body()), size, infos,
+            снимок, 1.5 * size - minx, 1.5 * size - miny, false);
+        java.util.Map<Integer, double[]> пятна = FieldPainter.unitSpots;
+        FieldPainter.unitSpots = null;
+        gg.dispose();
+        int x0 = px(cxМм) - w / 2;
+        int y0 = px(cyМм) - h / 2;
+        положить(g, слой, x0, y0, w, h, 5.0);
+
+        // ЯКОРЯ НА ПОЛЕ — по настоящим гексам, а не на глаз. Смещение то же, с
+        // каким поле нарисовано: (1,5·size − min) внутри слоя плюс угол слоя.
+        double dx = x0 + 1.5 * size - minx;
+        double dy = y0 + 1.5 * size - miny;
+        полеРазмер = size;
+        полеDX = dx;
+        полеDY = dy;
+        обвестиЗарождения(g, st, size, dx, dy);
+        крайПоля(st, size);
+        // ШАГ 1 «ПОЛЕ» — В СЕРЕДИНУ ПУСТОГО ГЕКСА у прежней точки: на стыке
+        // зарождения и нейтрала выноска читалась как выноска к постройке
+        // (28.09.2026).
+        double цельX = px(cxМм) + w * 0.18;
+        double цельY = px(cyМм) - h * 0.06;
+        java.util.Set<String> сЖетонами = new java.util.HashSet<>();
+        for (ReplayRecord.Tok тк : снимок.tokens) {
+            if (тк.hexId != null) {
+                сЖетонами.add(тк.hexId);
+            }
+        }
+        double лучший = Double.MAX_VALUE;
+        for (Hex hex : st.field.hexes.values()) {
+            int[] qr = FieldGeometry.parseQR(hex.id);
+            if (qr == null || hex.kind != kelium.core.HexKind.NORMAL || hex.hasSpawnTile()
+                    || hex.hasNeutral() || сЖетонами.contains(hex.id)) {
+                continue;
+            }
+            double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
+            double d = Math.hypot(c[0] + dx - цельX, c[1] + dy - цельY);
+            if (d < лучший) {
+                лучший = d;
+                якорьТ("1", c[0] + dx, c[1] + dy);
+            }
+        }
+        if (!ЯКОРЯ.containsKey("1")) {
+            якорьТ("1", цельX, цельY);
+        }
+        for (Hex hex : st.field.hexes.values()) {
+            int[] qr = FieldGeometry.parseQR(hex.id);
+            if (qr == null) {
+                continue;
+            }
+            double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
+            double hx = c[0] + dx;
+            double hy = c[1] + dy;
+            // САМЫЙ ЛЕВЫЙ тайл зарождения и САМЫЙ ПРАВЫЙ нейтрал: середина
+            // картинки уходит в сгиб разворота, и выноска туда не читается.
+            if (hex.hasSpawnTile()
+                    && (!ЯКОРЯ.containsKey("2") || hx < ЯКОРЯ.get("2")[0])) {
+                якорьТ("2", hx, hy);
+            }
+            if (hex.hasNeutral()
+                    && (!ЯКОРЯ.containsKey("3") || hx > ЯКОРЯ.get("3")[0])) {
+                // Нейтрал лежит НЕ в центре гекса, а полосой по своим сторонам:
+                // выноска должна смотреть на сам картон, а не на пустую середину.
+                List<Integer> углы = hex.neutrals.get(0).corners;
+                double sx = 0;
+                double sy = 0;
+                // Это УГЛЫ гекса (60k − 90), не стороны: прежде их гнали через
+                // edgeAngle, и точка уезжала с картона на соседний сектор.
+                for (int угол : углы) {
+                    double a = Math.toRadians(60.0 * угол - 90);
+                    sx += Math.cos(a);
+                    sy += Math.sin(a);
+                }
+                double норма = Math.hypot(sx, sy);
+                double сдвиг = норма < 1e-6 ? 0 : size * 0.62 / норма;
+                якорьТ("3", hx + sx * сдвиг, hy + sy * сдвиг);
+            }
+        }
+        // ЦУ и пехота первого игрока: их видно на его стартовом гексе. Точки —
+        // на самих жетонах: ЦУ по середине занятых им сторон, пехота там, где
+        // её нарисовал рисовальщик (прежде точки стояли «над» и «под» центром
+        // гекса и промахивались мимо жетонов, 28.09.2026).
+        for (ReplayRecord.Tok тк : снимок.tokens) {
+            if (тк.hexId == null || тк.owner != 0) {
+                continue;
+            }
+            int[] qr = FieldGeometry.parseQR(тк.hexId);
+            if (qr == null) {
+                continue;
+            }
+            double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
+            if ("command_center".equals(тк.type)) {
+                List<Integer> стороны = new ArrayList<>();
+                for (ReplayRecord.HexState hs : снимок.hexes) {
+                    if (тк.hexId.equals(hs.id)) {
+                        for (int сторона = 0; сторона < 6; сторона++) {
+                            if (hs.sideOwner[сторона] == тк.uid) {
+                                стороны.add(сторона);
+                            }
+                        }
+                    }
+                }
+                double[] p = стороны.isEmpty()
+                    ? new double[]{c[0] + dx, c[1] + dy}
+                    : FieldGeometry.polar(c[0] + dx, c[1] + dy, size * 0.62,
+                        FieldGeometry.meanEdgeAngle(стороны));
+                якорьТ("17", p[0], p[1]);
+            } else if ("infantry".equals(тк.type) && пятна.containsKey(тк.uid)) {
+                double[] п = пятна.get(тк.uid);
+                якорьТ("18", x0 + п[0], y0 + п[1]);
+            }
+        }
+    }
+
+    /** Геометрия уже нарисованного поля — по ней приставляются общие планшеты. */
+    private static double полеРазмер;
+    private static double полеDX;
+    private static double полеDY;
+    private static int[] крайЛево;
+    private static int[] крайПраво;
+    /** Куда встали общие планшеты — по ним раскладываются колоды и запас. */
+    private static int[] наука;
+    private static int[] рынок;
+    /** Личная зона ближнего игрока: x, y, ширина, высота в точках. */
+    private static int[] зона0;
+
+    /**
+     * КРАЙНИЕ КЛЕТКИ ПОЛЯ слева и справа — те, к которым приставляются общие
+     * планшеты. Из крайнего столбца берётся клетка, ближняя к середине поля:
+     * приставленный к ней планшет не свесится за край стола.
+     */
+    private static void крайПоля(GameState st, double size) {
+        int minQ = Integer.MAX_VALUE;
+        int maxQ = Integer.MIN_VALUE;
+        List<int[]> все = new ArrayList<>();
+        double sumY = 0;
+        for (Hex h : st.field.hexes.values()) {
+            int[] qr = FieldGeometry.parseQR(h.id);
+            if (qr == null) {
+                continue;
+            }
+            все.add(qr);
+            minQ = Math.min(minQ, qr[0]);
+            maxQ = Math.max(maxQ, qr[0]);
+            sumY += FieldGeometry.hexCenter(qr[0], qr[1], size)[1];
+        }
+        double серединаY = все.isEmpty() ? 0 : sumY / все.size();
+        крайЛево = ближе(все, minQ, серединаY, size);
+        крайПраво = ближе(все, maxQ, серединаY, size);
+    }
+
+    private static int[] ближе(List<int[]> все, int q, double серединаY, double size) {
+        int[] лучший = null;
+        double лучшее = Double.MAX_VALUE;
+        for (int[] qr : все) {
+            if (qr[0] != q) {
+                continue;
+            }
+            double d = Math.abs(FieldGeometry.hexCenter(qr[0], qr[1], size)[1] - серединаY);
+            if (d < лучшее) {
+                лучшее = d;
+                лучший = qr;
+            }
+        }
+        return лучший == null ? new int[]{q, 0} : лучший;
+    }
+
+    /** Точка поля по осевым координатам — в точках уже нарисованной картинки. */
+    private static double[] клетка(int q, int r) {
+        double[] c = FieldGeometry.hexCenter(q, r, полеРазмер);
+        return new double[]{c[0] + полеDX, c[1] + полеDY};
+    }
+
+    // ==================== общие планшеты ====================
+
+    private static void планшетНауки(Graphics2D g) {
+        BufferedImage art = Textures.board("science", null);
+        if (art == null || крайЛево == null) {
+            return;
+        }
+        double s = полеРазмер / АРТ_R;
+        int w = (int) Math.round(art.getWidth() * s);
+        int h = (int) Math.round(art.getHeight() * s);
+        // Правая доля планшета встаёт в клетку слева-сверху от края поля.
+        // ВПРИТЫК К ПОЛЮ (дизайнер 14.10.2026): на клетку правее и выше прежнего
+        double[] цель = клетка(крайЛево[0], крайЛево[1] - 1);
+        int x = (int) Math.round(цель[0] - НАУКА_ПРАВАЯ[0] * s);
+        int y = (int) Math.round(цель[1] - НАУКА_ПРАВАЯ[1] * s);
+        наука = new int[]{x, y, w, h};
+        положить(g, art, x, y, w, h, 2.2);
+        // Карт супер-арсенала на треках НЕТ: это закрытая колода рядом с
+        // колодой арсенала (дизайнер 14.10.2026).
+    }
+
+    private static void планшетРынка(Graphics2D g, GameState st) {
+        BufferedImage art = Textures.board("market", null);
+        if (art == null || крайПраво == null) {
+            return;
+        }
+        double s = полеРазмер / АРТ_R;
+        int w = (int) Math.round(art.getWidth() * s);
+        int h = (int) Math.round(art.getHeight() * s);
+        // Левая доля планшета встаёт в клетку справа-снизу от края поля.
+        double[] цель = клетка(крайПраво[0] + 1, крайПраво[1]);
+        int x = (int) Math.round(цель[0] - РЫНОК_ЛЕВАЯ[0] * s);
+        int y = (int) Math.round(цель[1] - РЫНОК_ЛЕВАЯ[1] * s);
+        рынок = new int[]{x, y, w, h};
+        положить(g, art, x, y, w, h, 2.2);
+        // КОЛОДА РЫНКА ЛЕЖИТ НА ПЛАНШЕТЕ (дизайнер 14.10.2026): рубашкой вверх
+        // в окне карты, верхняя открыта и лежит лицом вверх на той же колоде.
+        int[] рамка = BoardAnchors.marketCard();
+        BufferedImage лицо = Textures.card("market_face", "deck_market");
+        BufferedImage рубашка = Textures.card("deck_market");
+        if (рамка != null && лицо != null) {
+            double sk = w / (double) art.getWidth();
+            int кx = x + (int) Math.round(рамка[0] * sk), кy = y + (int) Math.round(рамка[1] * sk);
+            int кw = (int) Math.round(рамка[2] * sk), кh = (int) Math.round(рамка[3] * sk);
+            int сдвиг = Math.max(1, px(0.6));
+            if (рубашка != null) {
+                стопка(g, рубашка, кx + сдвиг, кy + сдвиг, кw, кh, 6);
+            }
+            положить(g, лицо, кx, кy, кw, кh, 1.2);
+        }
+    }
+
+    private record Колода(String тег, double ширинаМм) {
+    }
+
+    /** Колоды заданий и начальных заданий — общим местом стола. */
+    private static void колодыЗаданий(Graphics2D g, double cx, double cy) {
+        // набок, одна над другой; (cx, cy) — середина столбца
+        String[] теги = {"deck_objectives", "deck_objectives_start"};
+        double зазор = 10;
+        BufferedImage первая = Textures.card(теги[0]);
+        if (первая == null) {
+            return;
+        }
+        int w = px(КАРТА_ЗАДАНИЕ_Ш * первая.getHeight() / (double) первая.getWidth());
+        int h = px(КАРТА_ЗАДАНИЕ_Ш);
+        double y = cy - (2 * h + px(зазор)) / 2.0;
+        for (String тег : теги) {
+            BufferedImage a = Textures.card(тег);
+            if (a != null) {
+                стопка(g, набок(a), (int) Math.round(cx - w / 2.0), (int) Math.round(y), w, h, 4);
+            }
+            y += h + px(зазор);
+        }
+    }
+
+    /**
+     * СУПЕР-ЗАДАНИЯ (подготовка, шаг 7; дизайнер 14.10.2026): колода рубашкой
+     * вверх и рядом три верхние карты лицом вверх. В руки на подготовке их не
+     * берут.
+     */
+    private static void супергЗадания(Graphics2D g, double cx, double cy) {
+        // ОДНОЙ ВЕРТИКАЛЬНОЙ ЛИНИЕЙ И НАБОК (дизайнер 14.10.2026): колода и три
+        // открытые карты столбцом справа от планшета рынка, поперёк — их
+        // читают все игроки за столом. (cx, cy) — середина столбца.
+        String[] теги = {"deck_super_objectives", "objective_super/s9_03",
+            "objective_super/s9_08", "objective_super/s9_11"};
+        double зазор = 10;
+        BufferedImage первая = Textures.card(теги[0]);
+        if (первая == null) {
+            return;
+        }
+        int w = px(КАРТА_ЗАДАНИЕ_Ш * первая.getHeight() / (double) первая.getWidth());
+        int h = px(КАРТА_ЗАДАНИЕ_Ш);
+        double всего = теги.length * h + (теги.length - 1) * px(зазор);
+        double y = cy - всего / 2;
+        for (int i = 0; i < теги.length; i++) {
+            BufferedImage a = Textures.card(теги[i]);
+            if (a != null) {
+                стопка(g, набок(a), (int) Math.round(cx - w / 2.0), (int) Math.round(y), w, h,
+                    i == 0 ? 4 : 1);
+            }
+            y += h + px(зазор);
+        }
+        якорьТ("7·2", cx - w * 0.30, cy - всего / 2 + h * 0.5);
+    }
+
+    /**
+     * Колоды арсенала, супер-арсенала и контейнеров — «рядом с планшетом
+     * науки» (подготовка, шаги 4–5). Колоды начального арсенала нет: после раздачи остаток уходит
+     * в коробку (дизайнер 14.10.2026).
+     */
+    private static void колодыАрсенала(Graphics2D g, double cx, double cy) {
+        колодыТ(g, cx, cy, List.of(
+            new Колода("deck_arsenal", КАРТА_АРСЕНАЛ_Ш),
+            new Колода("deck_super_arsenal", КАРТА_АРСЕНАЛ_Ш),
+            new Колода("deck_containers", КАРТА_КОНТЕЙНЕР_Ш)));
+    }
+
+    /**
+     * Колоды общего стола стопками: карта, а под ней край второй и третьей.
+     * Координаты — В ТОЧКАХ картинки: колоды привязаны к планшетам, а те встают
+     * к полю и заранее не знают, где окажутся в миллиметрах стола.
+     */
+    private static void колодыТ(Graphics2D g, double cx, double cy, List<Колода> список) {
+        колодыТ(g, cx, cy, список, false);
+    }
+
+    /** {@code открытые} — после первой колоды идут одиночные карты лицом вверх. */
+    private static void колодыТ(Graphics2D g, double cx, double cy, List<Колода> список,
+                                boolean открытые) {
+        колодыТ(g, cx, cy, список, открытые, false);
+    }
+
+    /**
+     * {@code набок} — карты лежат повёрнутыми на 90° (дизайнер 14.10.2026:
+     * общие колоды заданий и супер-задания — набок, чтобы их видели все
+     * игроки за столом, а не только сидящий снизу).
+     */
+    private static void колодыТ(Graphics2D g, double cx, double cy, List<Колода> список,
+                                boolean открытые, boolean набок) {
+        double зазор = 16;
+        double всего = -зазор;
+        List<BufferedImage> арт = new ArrayList<>();
+        java.util.List<Double> ширины = new ArrayList<>();
+        for (Колода к : список) {
+            BufferedImage a = Textures.card(к.тег());
+            if (a != null && набок) {
+                a = набок(a);
+            }
+            арт.add(a);
+            // повёрнутая карта занимает по ширине свою прежнюю высоту
+            double ш = a == null ? 0 : (набок ? к.ширинаМм() * a.getWidth() / (double) a.getHeight()
+                : к.ширинаМм());
+            ширины.add(ш);
+            if (a != null) {
+                всего += ш + зазор;
+            }
+        }
+        double x = cx - px(всего) / 2.0;
+        for (int i = 0; i < список.size(); i++) {
+            BufferedImage a = арт.get(i);
+            if (a == null) {
+                continue;      // печати ещё нет — на столе пусто, врать не будем
+            }
+            Колода к = список.get(i);
+            int w = px(ширины.get(i));
+            int h = (int) Math.round(w * a.getHeight() / (double) a.getWidth());
+            стопка(g, a, (int) Math.round(x), (int) Math.round(cy) - h / 2, w, h,
+                открытые && (i > 0 || !к.тег().startsWith("deck_")) ? 1 : 4);
+            x += px(ширины.get(i) + зазор);
+        }
+    }
+
+    /** Карта, повёрнутая на 90° против часовой стрелки. */
+    private static BufferedImage набок(BufferedImage a) {
+        BufferedImage r = new BufferedImage(a.getHeight(), a.getWidth(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = r.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.translate(0, a.getWidth());
+        g.rotate(-Math.PI / 2);
+        g.drawImage(a, 0, 0, null);
+        g.dispose();
+        return r;
+    }
+
+    /**
+     * ОБВОДКА ТАЙЛОВ ЗАРОЖДЕНИЯ (дизайнер 14.10.2026: «их нихуя не видно»):
+     * яркий зелёный контур келемия по краю гекса со светлым ореолом.
+     */
+    private static void обвестиЗарождения(Graphics2D g, GameState st, double size,
+                                          double dx, double dy) {
+        Graphics2D t = (Graphics2D) g.create();
+        качество(t);
+        for (Hex hex : st.field.hexes.values()) {
+            int[] qr = FieldGeometry.parseQR(hex.id);
+            if (qr == null || !hex.hasSpawnTile()) {
+                continue;
+            }
+            double[] c = FieldGeometry.hexCenter(qr[0], qr[1], size);
+            java.awt.geom.Path2D.Double путь = FieldGeometry.roundedHexPath(c[0] + dx, c[1] + dy,
+                size * 0.97, 0.08);
+            t.setStroke(new BasicStroke((float) (size * 0.13), BasicStroke.CAP_ROUND,
+                BasicStroke.JOIN_ROUND));
+            t.setColor(new Color(255, 255, 255, 200));
+            t.draw(путь);
+            t.setStroke(new BasicStroke((float) (size * 0.07), BasicStroke.CAP_ROUND,
+                BasicStroke.JOIN_ROUND));
+            t.setColor(new Color(40, 170, 60));
+            t.draw(путь);
+        }
+        t.dispose();
+    }
+
+    /** Стопка карт: нижние листы выглядывают на волосок. */
+    private static void стопка(Graphics2D g, BufferedImage art, int x, int y,
+                               int w, int h, int листов) {
+        int сдвиг = Math.max(1, px(0.6));
+        for (int i = листов - 1; i >= 0; i--) {
+            положить(g, art, x + i * сдвиг, y + i * сдвиг, w, h, i == листов - 1 ? 1.6 : 0);
+        }
+    }
+
+    // ==================== зоны игроков ====================
+
+    /**
+     * ЛИЧНАЯ ЗОНА ИГРОКА: сцепка печатных планшетов, а перед ней рука приказов.
+     * Первый игрок сидит снизу, второй слева, третий справа, и всё повёрнуто к
+     * своему хозяину — как на столе.
+     */
+    private static void зонаИгрока(Graphics2D g, Session session, int seat,
+                                   double cx, double cy, double угол) {
+        BoardSheet лист = new BoardSheet(session, seat);
+        double пропорция = лист.пропорцияСцепки();
+        if (пропорция <= 0) {
+            return;
+        }
+        int ширина = (int) Math.round(px(ВОЙСКА_Ш) * ширинаСцепкиКВойскам(seat));
+        int высота = (int) Math.round(ширина / пропорция);
+        BufferedImage холст = new BufferedImage(ширина, высота, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D gg = холст.createGraphics();
+        качество(gg);
+        PrintedBoards.подписиЗапаса = false;    // на столе цифр «3 из 4» нет
+        PrintedBoards.стопкиЖетонов = true;     // запас войск — стопками жетонов
+        лист.печатнаяСцепка(gg, 0, 0, ширина);
+        PrintedBoards.стопкиЖетонов = false;
+        PrintedBoards.подписиЗапаса = true;
+        gg.dispose();
+
+        Graphics2D t = (Graphics2D) g.create();
+        качество(t);
+        t.translate(px(cx), px(cy));
+        t.rotate(Math.toRadians(угол));
+        // НАЧАЛЬНЫЙ АРСЕНАЛ (подготовка, шаг 13; дизайнер 30.09.2026): карту
+        // открывают и сразу устанавливают в первую ячейку под планшетом войск.
+        // Её верх («получи при установке») уходит под планшет — поэтому карта
+        // кладётся ДО сцепки, и планшет её накрывает.
+        int[] арс = начальныйАрсенал(t, seat, холст.getWidth(), холст.getHeight());
+        положить(t, холст, -холст.getWidth() / 2, -холст.getHeight() / 2,
+            холст.getWidth(), холст.getHeight(), 2.6);
+        рукаПриказов(t, seat, холст.getHeight());
+        t.dispose();
+
+        // ЯКОРЯ ЛИЧНОЙ ЗОНЫ снимаются с ближнего игрока: он смотрит на нас, и
+        // выноска к его планшету читается без поворота головы.
+        if (seat == 0 && угол == 0) {
+            double лx = px(cx) - холст.getWidth() / 2.0;
+            double лy = px(cy) - холст.getHeight() / 2.0;
+            зона0 = new int[]{(int) Math.round(лx), (int) Math.round(лy),
+                холст.getWidth(), холст.getHeight()};
+            якорьТ("11", лx + холст.getWidth() * 0.14, лy + холст.getHeight() * 0.62);
+            якорьТ("12", лx + холст.getWidth() * 0.13, лy + холст.getHeight() * 0.035);
+            if (арс != null) {
+                якорьТ("13", px(cx) + арс[0] + арс[2] * 0.5, px(cy) + арс[1] + арс[3] * 0.78);
+            }
+            якорьТ("14", лx + холст.getWidth() * 0.965, лy + холст.getHeight() * 0.74);
+            якорьТ("15", px(cx) - px(КАРТА_ЗАДАНИЕ_Ш) * 0.9,
+                px(cy) + холст.getHeight() / 2.0 + px(ОТСТУП_РУКИ) + px(КАРТА_ЗАДАНИЕ_Ш) * 0.78);
+            якорьТ("16", px(cx) + px(КАРТА_ЗАДАНИЕ_Ш) * 2.3,
+                px(cy) + холст.getHeight() / 2.0 + px(ОТСТУП_РУКИ) + px(КАРТА_ЗАДАНИЕ_Ш) * 0.78);
+        }
+        // ВТОРАЯ «12» (дизайнер 14.10.2026) — на стопки жетонов войск красного
+        // игрока: он сидит напротив (поворот 180°), его полоса запаса внизу зоны.
+        if (seat == 1 && угол == 180) {
+            double лx = px(cx) - холст.getWidth() / 2.0;
+            double лy = px(cy) - холст.getHeight() / 2.0;
+            якорьТ("12·2", лx + холст.getWidth() * 0.87, лy + холст.getHeight() * 0.965);
+        }
+    }
+
+    /**
+     * НАЧАЛЬНЫЙ АРСЕНАЛ ИГРОКА (подготовка, шаг 13) — лицом вверх в первой
+     * ячейке под планшетом войск. Планшет войск — правая часть сцепки, ячейка
+     * для карт — у его левого края. Возвращает {x, y, ш, в} карты в осях зоны
+     * (начало — центр сцепки). Стартовых монет у руки нет: стартовые ресурсы —
+     * верх этой карты.
+     */
+    private static int[] начальныйАрсенал(Graphics2D g, int seat, int ширина, int высота) {
+        BufferedImage карта = Textures.card("arsenal_start/bs72_" + (seat % 7 + 1),
+            "deck_arsenal_start");
+        if (карта == null) {
+            return null;
+        }
+        int w = px(КАРТА_АРСЕНАЛ_Ш);
+        int h = (int) Math.round(w * карта.getHeight() / (double) карта.getWidth());
+        double левыйКрайВойск = ширина / 2.0 - px(ВОЙСКА_Ш);
+        int x = (int) Math.round(левыйКрайВойск + px(ВОЙСКА_Ш) * 0.22 - w / 2.0);
+        int y = высота / 2 - px(15);
+        положить(g, карта, x, y, w, h, 1.4);
+        return new int[]{x, y, w, h};
+    }
+
+    /** Отношение ширины сцепки к ширине одного планшета войск. */
+    private static double ширинаСцепкиКВойскам(int seat) {
+        var с = PrintedBoards.сцепка(seat);
+        BufferedImage вой = Textures.board("troop-p1", "troop-A");
+        if (с == null || вой == null) {
+            return 1;
+        }
+        return с.ширина() / вой.getWidth();
+    }
+
+    /**
+     * РУКА ПРИКАЗОВ — пять карт рубашкой вверх веером перед планшетом, плюс
+     * начальное задание рядом: подготовка, шаги 15 и 16.
+     */
+    private static void рукаПриказов(Graphics2D g, int seat, int высотаСцепки) {
+        BufferedImage back = Textures.card("orders/"
+            + ЦВЕТ_ПРИКАЗОВ[Math.floorMod(FieldGeometry.seatColor(seat), 4)],
+            "orders/back");
+        if (back == null) {
+            return;
+        }
+        int w = px(КАРТА_ЗАДАНИЕ_Ш);
+        int h = (int) Math.round(w * back.getHeight() / (double) back.getWidth());
+        int y = высотаСцепки / 2 + px(ОТСТУП_РУКИ) + h / 2;
+        double шаг = w * 0.66;
+        for (int i = 0; i < 5; i++) {
+            Graphics2D c = (Graphics2D) g.create();
+            качество(c);
+            c.translate(-шаг * 2 + шаг * i, y);
+            c.rotate(Math.toRadians((i - 2) * 6));
+            положить(c, back, -w / 2, -h / 2, w, h, 1.4);
+            c.dispose();
+        }
+        // Справа от руки — начальное задание рубашкой вверх (подготовка, шаг 16;
+        // супер-заданий на подготовке не берут), слева — две памятки игрока.
+        int x = (int) Math.round(шаг * 2 + w * 0.78);
+        for (String тег : new String[]{"deck_objectives_start"}) {
+            BufferedImage карта = Textures.card(тег, "deck_objectives");
+            if (карта != null) {
+                положить(g, карта, x, y - h / 2, w, h, 1.4);
+                x += w + px(8);
+            }
+        }
+        int xп = (int) Math.round(-шаг * 2 - w * 0.78);
+        for (String тег : new String[]{"aid_actions", "aid_round"}) {
+            BufferedImage п = Textures.card(тег);
+            if (п != null) {
+                int пh = (int) Math.round(w * п.getHeight() / (double) п.getWidth());
+                положить(g, п, xп - w, y - пh / 2, w, пh, 1.4);
+                xп -= w + px(8);
+            }
+        }
+    }
+
+    // ==================== общий запас ====================
+
+    /**
+     * ОБЩИЙ ЗАПАС (подготовка, шаг 9): монеты, кубики келемия, боеприпасов,
+     * трофеев и энергии и жетоны модулей хранилища — кучками, как их и
+     * вываливают на стол, а не ровными рядами.
+     */
+    private static void общийЗапасТ(Graphics2D g, double cx, double cy) {
+        double шаг = px(74);
+        double строка = px(66);
+        // ОБЪЁМНЫЕ КОМПОНЕНТЫ (рендер Leonardo, дизайнер 14.10.2026), если есть
+        if (объёмный(g, "монеты", cx - шаг, cy - строка / 2, 52)) {
+            объёмный(g, "кубики-келемий", cx, cy - строка / 2, 52);
+            объёмный(g, "кубики-боеприпасы", cx + шаг, cy - строка / 2, 52);
+            объёмный(g, "кубики-трофеи", cx - шаг / 2, cy + строка / 2, 52);
+            объёмный(g, "кубики-энергия", cx + шаг / 2, cy + строка / 2, 52);
+        } else {
+        кучка(g, "COIN", cx - шаг, cy - строка / 2, 7, 15);
+        кучка(g, "KELIUM", cx, cy - строка / 2, 8, 13);
+        кучка(g, "AMMO", cx + шаг, cy - строка / 2, 8, 13);
+        кучка(g, "TROPHY", cx - шаг / 2, cy + строка / 2, 7, 13);
+        кубики(g, cx + шаг / 2, cy + строка / 2, 8, 13,
+            new Color(0xF2C51F), new Color(0x8A6E0B));
+        }
+        // Жетоны модулей хранилища — печатные, лежат тем же запасом.
+        BufferedImage жет = Textures.module("mod_store_energy");
+        if (жет != null) {
+            int w = px(30);
+            int h = (int) Math.round(w * жет.getHeight() / (double) жет.getWidth());
+            for (int i = 0; i < 4; i++) {
+                положить(g, жет, (int) Math.round(cx + шаг * 1.5) + i * px(7),
+                    (int) Math.round(cy - строка / 2) + i * px(9) - h / 2, w, h, 1.2);
+            }
+        }
+    }
+
+    /** Общий сид «россыпи»: кучки должны быть одинаковыми от запуска к запуску. */
+    private static final java.util.Random РОССЫПЬ = new java.util.Random(4242);
+
+    /** Кучка фишек: россыпью, слегка внахлёст. */
+    private static void кучка(Graphics2D g, String код, double cx, double cy,
+                              int сколько, double размер) {
+        РОССЫПЬ.setSeed(код.hashCode());
+        for (int i = 0; i < сколько; i++) {
+            double dx = (РОССЫПЬ.nextDouble() - 0.5) * px(размер) * 1.9;
+            double dy = (РОССЫПЬ.nextDouble() - 0.5) * px(размер) * 1.4;
+            MarkIcons.paint(g, код, cx + dx, cy + dy, px(размер), null);
+        }
+    }
+
+    /** То же для кубика своего цвета — энергии в наборе значков нет. */
+    private static void кубики(Graphics2D g, double cx, double cy, int сколько,
+                               double ребро, Color тело, Color кант) {
+        РОССЫПЬ.setSeed(777);
+        for (int i = 0; i < сколько; i++) {
+            double dx = (РОССЫПЬ.nextDouble() - 0.5) * px(ребро) * 1.9;
+            double dy = (РОССЫПЬ.nextDouble() - 0.5) * px(ребро) * 1.4;
+            double x = cx + dx - px(ребро) / 2.0;
+            double y = cy + dy - px(ребро) / 2.0;
+            RoundRectangle2D r = new RoundRectangle2D.Double(x, y, px(ребро), px(ребро),
+                px(ребро) * 0.22, px(ребро) * 0.22);
+            g.setColor(тело);
+            g.fill(r);
+            g.setColor(кант);
+            g.setStroke(new BasicStroke((float) Math.max(1, px(0.7))));
+            g.draw(r);
+        }
+    }
+
+    /** Два мешочка модулей: красный для боя, синий для сборки. */
+    private static void мешочкиТ(Graphics2D g, double cx, double cy) {
+        if (объёмный(g, "мешочек-красный", cx - px(46), cy, 84)) {
+            объёмный(g, "мешочек-синий", cx + px(46), cy, 84);
+            return;
+        }
+        мешочек(g, cx - px(42), cy, new Color(0x9C2B21), new Color(0x63170F));
+        мешочек(g, cx + px(42), cy, new Color(0x25538C), new Color(0x14304F));
+    }
+
+    /**
+     * КИСЕТ С ЖЕТОНАМИ — вид сверху: мятое тканевое тело, собранная горловина и
+     * шнурок с двумя хвостами. Печати у мешочков нет, поэтому это единственная
+     * вещь на картинке, нарисованная кодом, а не снятая с компонента.
+     */
+    private static void мешочек(Graphics2D g, double cx, double cy,
+                                Color тело, Color тень) {
+        double ш = 78;
+        double в = 92;
+        double x = cx - px(ш) / 2.0;
+        double y = cy - px(в) / 2.0;
+        Path2D мешок = new Path2D.Double();
+        мешок.moveTo(x + px(ш) * 0.30, y + px(в) * 0.30);
+        мешок.curveTo(x - px(ш) * 0.12, y + px(в) * 0.58,
+            x + px(ш) * 0.02, y + px(в) * 0.99, x + px(ш) * 0.50, y + px(в) * 0.99);
+        мешок.curveTo(x + px(ш) * 0.98, y + px(в) * 0.99,
+            x + px(ш) * 1.12, y + px(в) * 0.58, x + px(ш) * 0.70, y + px(в) * 0.30);
+        мешок.closePath();
+        тень(g, мешок, 2.6);
+        g.setPaint(new java.awt.RadialGradientPaint(
+            new java.awt.geom.Point2D.Double(x + px(ш) * 0.38, y + px(в) * 0.52),
+            (float) px(ш * 0.78), new float[]{0f, 1f},
+            new Color[]{светлее(тело, 1.25), тень}));
+        g.fill(мешок);
+        // складки ткани
+        g.setColor(new Color(0, 0, 0, 46));
+        g.setStroke(new BasicStroke((float) px(0.9), BasicStroke.CAP_ROUND,
+            BasicStroke.JOIN_ROUND));
+        for (int i = 0; i < 4; i++) {
+            double ф = 0.24 + i * 0.17;
+            Path2D складка = new Path2D.Double();
+            складка.moveTo(x + px(ш) * ф, y + px(в) * 0.36);
+            складка.quadTo(x + px(ш) * (ф - 0.05), y + px(в) * 0.70,
+                x + px(ш) * (ф + 0.03), y + px(в) * 0.95);
+            g.draw(складка);
+        }
+        // горловина: сборка и шнурок
+        java.awt.geom.Ellipse2D горло = new Ellipse2D.Double(x + px(ш) * 0.26,
+            y + px(в) * 0.10, px(ш) * 0.48, px(в) * 0.30);
+        g.setPaint(new java.awt.GradientPaint(
+            (float) горло.getX(), (float) горло.getY(), светлее(тело, 1.05),
+            (float) горло.getMaxX(), (float) горло.getMaxY(), тень));
+        g.fill(горло);
+        g.setColor(светлее(тело, 0.85));
+        g.setStroke(new BasicStroke((float) px(1.1)));
+        g.draw(горло);
+        g.setColor(new Color(0xD9CCA8));
+        g.setStroke(new BasicStroke((float) px(1.8), BasicStroke.CAP_ROUND,
+            BasicStroke.JOIN_ROUND));
+        g.draw(new Ellipse2D.Double(x + px(ш) * 0.24, y + px(в) * 0.24,
+            px(ш) * 0.52, px(в) * 0.16));
+        Path2D хвост = new Path2D.Double();
+        хвост.moveTo(x + px(ш) * 0.24, y + px(в) * 0.30);
+        хвост.quadTo(x + px(ш) * 0.10, y + px(в) * 0.30,
+            x + px(ш) * 0.06, y + px(в) * 0.20);
+        g.draw(хвост);
+        Path2D хвост2 = new Path2D.Double();
+        хвост2.moveTo(x + px(ш) * 0.76, y + px(в) * 0.30);
+        хвост2.quadTo(x + px(ш) * 0.90, y + px(в) * 0.30,
+            x + px(ш) * 0.94, y + px(в) * 0.20);
+        g.draw(хвост2);
+    }
+
+    private static Color светлее(Color c, double k) {
+        return new Color(
+            Math.min(255, (int) Math.round(c.getRed() * k)),
+            Math.min(255, (int) Math.round(c.getGreen() * k)),
+            Math.min(255, (int) Math.round(c.getBlue() * k)));
+    }
+
+    /**
+     * Фишка первого игрока — та же фигурка «#1», что в наборе иконок игры
+     * (icons/first_player.png): её рисунок и лежит на столе (дизайнер 30.09.2026).
+     */
+    /**
+     * ОБЪЁМНЫЙ КОМПОНЕНТ — вырезанный рендер (illustrations/компоненты-3д/имя.png,
+     * режет вырезать.py), шириной {@code ширинаМм} мм стола, с мягкой тенью.
+     * Нет файла — false, и рисуется прежний плоский вариант.
+     */
+    private static boolean объёмный(Graphics2D g, String имя, double cx, double cy, double ширинаМм) {
+        try {
+            java.nio.file.Path п = java.nio.file.Path.of("illustrations", "компоненты-3д", имя + ".png");
+            if (!java.nio.file.Files.exists(п)) {
+                return false;
+            }
+            BufferedImage im = javax.imageio.ImageIO.read(п.toFile());
+            int w = px(ширинаМм);
+            int h = (int) Math.round(w * im.getHeight() / (double) im.getWidth());
+            положить(g, im, (int) Math.round(cx - w / 2.0), (int) Math.round(cy - h / 2.0), w, h, 2.0);
+            return true;
+        } catch (java.io.IOException e) {
+            return false;
+        }
+    }
+
+    private static void фишкаПервогоТ(Graphics2D g, double cx, double cy) {
+        if (объёмный(g, "фишка-первого", cx, cy, 62)) {
+            return;
+        }
+        // крупная фишка — из экспорта дизайнера (338 точек), иконка игры всего 128
+        BufferedImage фишка = null;
+        try {
+            java.nio.file.Path п = java.nio.file.Path.of("rules", "иконки-экспорт", "фишка-первого.png");
+            if (java.nio.file.Files.exists(п)) {
+                фишка = javax.imageio.ImageIO.read(п.toFile());
+            }
+        } catch (java.io.IOException ignored) {
+            фишка = null;
+        }
+        if (фишка == null) {
+            фишка = Textures.icon("first_player");
+        }
+        if (фишка != null) {
+            // ФИШКА КРУПНО (дизайнер 05.10.2026: «её даже не видно») — почти в 3 раза
+            // больше прежнего; картинка иконки 256 точек, качество не теряется.
+            int h = px(110);
+            int w = (int) Math.round(h * фишка.getWidth() / (double) фишка.getHeight());
+            положить(g, фишка, (int) Math.round(cx - w / 2.0), (int) Math.round(cy - h / 2.0), w, h, 1.6);
+            return;
+        }
+        double d = 44;
+        Ellipse2D e = new Ellipse2D.Double(cx - px(d) / 2.0, cy - px(d) / 2.0,
+            px(d), px(d));
+        тень(g, e, 2.0);
+        g.setPaint(new java.awt.GradientPaint((float) e.getX(), (float) e.getY(),
+            new Color(0xF2D46A), (float) e.getMaxX(), (float) e.getMaxY(),
+            new Color(0xC79B22)));
+        g.fill(e);
+        g.setColor(new Color(0x6F5410));
+        g.setStroke(new BasicStroke((float) px(1.4)));
+        g.draw(e);
+        g.setColor(new Color(0x6F5410));
+        g.fill(звезда(cx, cy, px(d) * 0.34, px(d) * 0.15));
+    }
+
+    private static Path2D звезда(double cx, double cy, double r1, double r2) {
+        Path2D p = new Path2D.Double();
+        for (int i = 0; i < 10; i++) {
+            double a = Math.toRadians(-90 + i * 36);
+            double r = i % 2 == 0 ? r1 : r2;
+            double x = cx + r * Math.cos(a);
+            double y = cy + r * Math.sin(a);
+            if (i == 0) {
+                p.moveTo(x, y);
+            } else {
+                p.lineTo(x, y);
+            }
+        }
+        p.closePath();
+        return p;
+    }
+
+    // ==================== тени ====================
+
+    /**
+     * ПОЛОЖИТЬ КОМПОНЕНТ НА СТОЛ: сначала мягкая тень по его силуэту, потом
+     * он сам. Без тени картон выглядит наклейкой, а не предметом.
+     *
+     * <p>Тень — настоящее размытие с полями вокруг силуэта (дизайнер 14.10.2026:
+     * прежняя тень, ужатая в 12 раз и растянутая обратно, давала по краям
+     * «кубические остроугольные уродства»).
+     *
+     * @param мм насколько мягкая и далёкая тень (миллиметры стола); 0 — без тени
+     */
+    private static void положить(Graphics2D g, BufferedImage art, int x, int y,
+                                 int w, int h, double мм) {
+        if (мм > 0) {
+            BufferedImage маска = new BufferedImage(Math.max(1, w), Math.max(1, h),
+                BufferedImage.TYPE_INT_ARGB);
+            Graphics2D m = маска.createGraphics();
+            m.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            m.drawImage(art, 0, 0, w, h, null);
+            m.dispose();
+            мягкаяТень(g, маска, x, y, мм, 0.5f);
+        }
+        g.drawImage(art, x, y, w, h, null);
+    }
+
+    /** Мягкая тень произвольной фигуры (мешочки, подставка фишки). */
+    private static void тень(Graphics2D g, java.awt.Shape s, double мм) {
+        java.awt.Rectangle b = s.getBounds();
+        BufferedImage маска = new BufferedImage(Math.max(1, b.width + 2), Math.max(1, b.height + 2),
+            BufferedImage.TYPE_INT_ARGB);
+        Graphics2D m = маска.createGraphics();
+        m.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        m.translate(-b.x + 1, -b.y + 1);
+        m.setColor(Color.BLACK);
+        m.fill(s);
+        m.dispose();
+        мягкаяТень(g, маска, b.x - 1, b.y - 1, мм, 0.45f);
+    }
+
+    /**
+     * Размытый чёрный силуэт маски, сдвинутый вниз-вправо. Размытие считается
+     * на копии вчетверо мельче (три прохода прямоугольного ядра — почти
+     * Гаусс), с полями на весь радиус, поэтому края круглые, а не лесенкой.
+     */
+    private static void мягкаяТень(Graphics2D g, BufferedImage маска, int x, int y,
+                                   double мм, float сила) {
+        final int F = 4;
+        int р = Math.max(2, px(мм));
+        int П = (int) Math.ceil(р / (double) F) + 2;           // поле, мелкие точки
+        int w0 = Math.max(1, маска.getWidth() / F), h0 = Math.max(1, маска.getHeight() / F);
+        int W = w0 + 2 * П, H = h0 + 2 * П;
+        BufferedImage мал = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D gg = мал.createGraphics();
+        gg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        gg.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        gg.drawImage(маска, П, П, w0, h0, null);
+        gg.dispose();
+        int[] a = new int[W * H];
+        for (int yy = 0; yy < H; yy++) {
+            for (int xx = 0; xx < W; xx++) {
+                a[yy * W + xx] = мал.getRGB(xx, yy) >>> 24;
+            }
+        }
+        int радиус = Math.max(1, (int) Math.round(р / (double) F / 2.2));
+        for (int проход = 0; проход < 3; проход++) {
+            a = размыть(a, W, H, радиус, true);
+            a = размыть(a, W, H, радиус, false);
+        }
+        int[] пик = new int[W * H];
+        for (int k = 0; k < пик.length; k++) {
+            пик[k] = Math.min(255, Math.round(a[k] * сила)) << 24;
+        }
+        мал.setRGB(0, 0, W, H, пик, 0, W);
+        double кх = маска.getWidth() / (double) w0, ку = маска.getHeight() / (double) h0;
+        Graphics2D t = (Graphics2D) g.create();
+        t.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        int dx = (int) Math.round(р * 0.15), dy = (int) Math.round(р * 0.45);
+        t.drawImage(мал, (int) Math.round(x - П * кх) + dx, (int) Math.round(y - П * ку) + dy,
+            (int) Math.round(W * кх), (int) Math.round(H * ку), null);
+        t.dispose();
+    }
+
+    /** Один проход прямоугольного ядра по строкам (по) или столбцам. */
+    private static int[] размыть(int[] a, int W, int H, int r, boolean поСтрокам) {
+        int[] b = new int[a.length];
+        int n = поСтрокам ? H : W, len = поСтрокам ? W : H;
+        for (int i = 0; i < n; i++) {
+            int сумма = 0;
+            for (int k = -r; k <= r; k++) {
+                int j = Math.min(len - 1, Math.max(0, k));
+                сумма += a[поСтрокам ? i * W + j : j * W + i];
+            }
+            for (int j = 0; j < len; j++) {
+                b[поСтрокам ? i * W + j : j * W + i] = сумма / (2 * r + 1);
+                int прочь = Math.max(0, j - r), вновь = Math.min(len - 1, j + r + 1);
+                сумма += a[поСтрокам ? i * W + вновь : вновь * W + i]
+                    - a[поСтрокам ? i * W + прочь : прочь * W + i];
+            }
+        }
+        return b;
+    }
+}

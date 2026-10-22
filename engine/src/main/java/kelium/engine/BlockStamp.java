@@ -262,6 +262,95 @@ public final class BlockStamp {
             }
             уложить(запас, цель[0], цель[1], byQr, накрыто, rules);
         }
+        закрытьСвесы(field, all);
+    }
+
+    /**
+     * СВЕСЫ БЛОКОВ — ЗАПРЕТНЫМИ ГЕКСАМИ (правило дизайнера 14.09.2026).
+     *
+     * <p>«Соберите поле из блоков по раскладке. Гексы, которых нет в раскладке,
+     * закройте тайлами недоступных гексов» — книга правил, глава 3, шаг 1. На
+     * столе блок лежит ЦЕЛИКОМ, и его лишние гексы никуда не деваются: их
+     * накрывают запретными тайлами. Раньше движок просто терял их («гекс блока,
+     * свисающий за край поля, теряется»), и поле в игре было меньше поля на
+     * столе: разложенная партия выглядела фигурной кляксой вместо сложенных
+     * встык картонок.
+     *
+     * <p>Свесы вычисляются по уже разложенному картону: гекс знает свой блок,
+     * сторону, поворот и своё место ВНУТРИ блока — этого хватает, чтобы найти
+     * начало блока и добрать остальные его гексы.
+     */
+    private static void закрытьСвесы(Field field, List<Face> all) {
+        Map<String, Face> поИмени = new LinkedHashMap<>();
+        for (Face f : all) {
+            поИмени.put(f.blockId() + "/" + f.side(), f);
+        }
+        // Где начинается каждый экземпляр картонки: ключ — блок, сторона,
+        // поворот и смещение; так два одинаковых блока на поле не смешаются.
+        java.util.Set<String> разобраны = new java.util.LinkedHashSet<>();
+        List<int[]> свесы = new ArrayList<>();
+        List<Object[]> печатьСвеса = new ArrayList<>();
+        for (Hex h : new ArrayList<>(field.hexes.values())) {
+            if (h.blockId == null || h.blockSide == null) {
+                continue;
+            }
+            int[] c = kelium.report.FieldGeometry.parseQR(h.id);
+            Face face = поИмени.get(h.blockId + "/" + h.blockSide);
+            if (c == null || face == null) {
+                continue;
+            }
+            int[] d = rotate(h.blockQ, h.blockR, h.blockRot);
+            int dq = c[0] - d[0];
+            int dr = c[1] - d[1];
+            String ключ = h.blockId + "/" + h.blockSide + "/" + h.blockRot + "/"
+                + dq + "/" + dr;
+            if (!разобраны.add(ключ)) {
+                continue;
+            }
+            for (Cell cell : face.cells()) {
+                int[] dd = rotate(cell.q(), cell.r(), h.blockRot);
+                int q = dq + dd[0];
+                int r = dr + dd[1];
+                if (field.hexes.containsKey(Scenario.hexId(q, r))) {
+                    continue;
+                }
+                свесы.add(new int[]{q, r});
+                печатьСвеса.add(new Object[]{face, h.blockRot, cell});
+            }
+        }
+        for (int i = 0; i < свесы.size(); i++) {
+            int[] qr = свесы.get(i);
+            String id = Scenario.hexId(qr[0], qr[1]);
+            if (field.hexes.containsKey(id)) {
+                continue;
+            }
+            Hex nh = new Hex(id);
+            nh.kind = HexKind.FORBIDDEN;
+            Object[] п = печатьСвеса.get(i);
+            Face face = (Face) п[0];
+            Cell cell = (Cell) п[2];
+            nh.blockId = face.blockId();
+            nh.blockSide = face.side();
+            nh.blockRot = (Integer) п[1];
+            nh.blockQ = cell.q();
+            nh.blockR = cell.r();
+            field.addHex(nh);
+        }
+        // Соседство новым гексам: без него они висят в пустоте, и рисовальщик
+        // считает их одинокими — скругляет им весь контур.
+        for (Hex h : new ArrayList<>(field.hexes.values())) {
+            int[] c = kelium.report.FieldGeometry.parseQR(h.id);
+            if (c == null) {
+                continue;
+            }
+            for (int side = 0; side < Field.AXIAL_DIRS.length; side++) {
+                String nb = Scenario.hexId(c[0] + Field.AXIAL_DIRS[side][0],
+                    c[1] + Field.AXIAL_DIRS[side][1]);
+                if (field.hexes.containsKey(nb) && !h.neighbors.contains(nb)) {
+                    field.link(h.id, nb, side);
+                }
+            }
+        }
     }
 
     /**

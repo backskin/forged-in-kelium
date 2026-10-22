@@ -1,0 +1,303 @@
+# 3.2.0 (26.09.2026): ПЛАНШЕТЫ ВОЙСК ПЕРЕВЫГРУЖЕНЫ ДИЗАЙНЕРОМ (экспорт 26.09 01:48):
+# новая выработка зданий (ЦУ — 2 боеприпаса, без войск), цены зданий и
+# скорости по печати; у синих вышка ходит на 1 гекс. Атаки и прочность
+# — как в 3.1.0 (нижняя половина печати не менялась).
+# ============================================================================
+#  CONTENT: boards  version 3.1.0 — ОДИН ПЛАНШЕТ НА ВСЕХ
+#
+#  3.1.0 (25.09.2026) от 3.0.0: ТРОФЕИ — ПО ОБОРОТАМ ЖЕТОНОВ (решение дизайнера:
+#  «обороты используют те, которые на печати, они актуальнее»). Шестерни на
+#  обороте: добытчик и энергостанция 4-го уровня — 2 (было 3), авиабаза — 3
+#  (было 4), ЦУ — 1 (было 0). Остальное — как в 3.0.0.
+#
+#  СТОРОН «Б» НЕТ. Решение дизайнера 09.09.2026: «я полностью упразднил
+#  стороны Б планшетов — хранилища и планшета войск; асимметрии в игре и так
+#  достаточно, а делать её ячейками планшета — это перебор». Планшет войск и
+#  планшет хранилища у всех игроков одинаковые; различает игроков цвет, а не
+#  печать.
+#
+#  ЧЕМ АСИММЕТРИЯ ЖИВЁТ ВМЕСТО ЭТОГО: раскладка поля и место за столом,
+#  супер-задание, порядок приказов, модули из мешка и то, что игрок успел
+#  застроить. Этого хватает, и ни одна из этих вещей не требует от игрока
+#  разбираться в чужом планшете.
+#
+#  ЦЕНЫ ВОЕННЫХ ЗДАНИЙ: казарма 1 + завод 2 + авиабаза 3 — шесть монет.
+# ============================================================================
+#  У КАЖДОГО РОДА ВОЙСК РОВНО ДВЕ АТАКИ:
+#
+#    УНИВЕРСАЛЬНАЯ — 2 боеприпаса, 1 урон, ЛЮБОЙ тип жетонов. Не улучшается
+#      ничем, одна и та же у всех. Смысл: ударить можно всегда и по кому угодно,
+#      просто дорого.
+#
+#    СПЕЦИАЛЬНАЯ — 1 боеприпас, РОВНО ОДИН напечатанный тип цели. Это та самая
+#      ячейка, на которую кладётся ЖЕТОН МОДУЛЯ АТАКИ. Смысл: платить меньше за
+#      удар по своему профилю — и это единственная атака, которую можно
+#      расширить и улучшить.
+#
+#  ЖЕТОН МОДУЛЯ АТАКИ накрывает ячейку специальной атаки: напечатанный тип
+#  закрывается ЦЕЛИКОМ, вместо него открываются ДВА типа, напечатанных на самом
+#  жетоне, каждый за 1 боеприпас.
+#    обычная сторона — цель НА ВЫБОР из двух, один выстрел за бой;
+#    ЗОЛОТАЯ сторона — ОБА типа сразу за ОДИН боеприпас, по 1 урону каждому.
+#  Жетонов шесть видов (все шесть пар из четырёх типов целей), каждый в двух
+#  экземплярах в мешке — набор R30 в data/modules/modules.3.0.0.yaml.
+#
+#  РАСПРЕДЕЛЕНИЕ СПЕЦИАЛЬНЫХ АТАК:
+#    пехота  -> авиация
+#    техника -> здания и вышки
+#    авиация -> техника
+#    вышка   -> пехота
+#  Это перестановка без неподвижных точек: ни один род не бьёт свой тип, и все
+#  четыре цели покрыты ровно один раз.
+# ============================================================================
+
+meta:
+  id: 3.2.0
+  type: boards
+  draft_fields: ["troop_side.speeds", "troop_side.building_prices"]
+
+# The single top-level list the loader validates; we group real structure under
+# named entries so each addressable chunk still has an id.
+boards:
+
+  # -- Token stats (fixed for everyone) ------------------------------------
+  - id: tokens
+    kind: token_stats
+    units:
+      # trophy value list = value depending on count already taken (1st/2nd/3rd/4th)
+      # count = ЛИЧНЫЙ ЗАПАС игрока по этому роду: ровно 4 жетона, и это не
+      # меняется за партию — уничтоженные возвращаются владельцу на этапе
+      # Возврата («Бой — полные правила», §трофеи). Раньше здесь стояло
+      # count: null, и движок ограничивал только ОБЩЕЕ число жетонов (16 на цвет)
+      # — то есть игрок мог выставить девять вышек. Поймано дизайнером в
+      # проигрывателе 13.08.2026.
+      # trophy = ЧТО НАПЕЧАТАНО НА ОБОРОТЕ каждого из четырёх жетонов рода
+      # (уточнение дизайнера 13.08.2026). Не «сколько дадут за первого,
+      # второго, третьего» — а именно жетон номер 1, 2, 3, 4.
+      #   вышки   — на всех четырёх по 1 ТО
+      #   пехота  — на трёх по 1, на четвёртом 2
+      #   техника — на двух по 2, на двух по 1
+      #   авиация — так же, как техника
+      infantry: {hp: 1, trophy: [1, 1, 1, 2], count: 4}
+      vehicle:  {hp: 2, trophy: [1, 1, 2, 2], count: 4}
+      aircraft: {hp: 1, trophy: [1, 1, 2, 2], count: 4}
+      # ВЫШКА — 1 ПРОЧНОСТЬ (решение дизайнера 25.09.2026): две были наследием
+      # старой редакции. Какой фракции дать 2 — вопрос асимметрии, на потом.
+      tower:    {hp: 1, trophy: [1, 1, 1, 1], count: 4}
+    # Сумма личных запасов по родам: 4 рода × 4 жетона.
+    unit_tokens_per_color: 16
+    building_tokens_per_color: 12
+    buildings:
+      # ЯЧЕЙКА ЭНЕРГИИ ПЕРЕЕХАЛА С АВИАБАЗЫ НА КАЗАРМУ (решение дизайнера
+      # 20.09.2026). Было: казарма 1, авиабаза 2. Стало: казарма 2, авиабаза 1.
+      #
+      # Зачем. Замер 19.09 показал затор в стройке: при нехватке энергии
+      # энергостанция оценивается ботом в 12.0, а военное здание в 3.6, и
+      # военные здания проигрывают очередь почти всегда. Авиабазе нужно было
+      # ДВА кубика против одного у казармы, и она проигрывала вдвойне: авиации
+      # производилось 0.06 жетона на игрока за партию, то есть её в игре не
+      # было. Пехоты при этом 38% всего выпуска — казарма как раз и есть то
+      # здание, которое дёшево заваливает поле.
+      #
+      # Перенос выравнивает очередь: авиабаза встаёт наравне с бывшей казармой,
+      # а казарма перестаёт быть безусловно самой дешёвой постройкой.
+      barracks:   {energy_slots: 1, hp: 2, assembly: [infantry, ammo], trophy: 2}
+      factory:    {energy_slots: 2, hp: 2, assembly: [vehicle, ammo],  trophy: 3}
+      # АВИАБАЗА: 2 ячейки энергии вместо 3, цена постройки +1 монета на всех
+      # сторонах (решение дизайнера 13.08.2026). Замер показывал, что при трёх
+      # ячейках авиабазу почти не строят: общий дефицит энергии 3 кубика, и она
+      # съедала его целиком. Два ячейки дают +48% авиации на поле; цена растёт,
+      # чтобы дешевле не стало.
+      airbase:    {energy_slots: 2, hp: 2, assembly: [aircraft, ammo], trophy: 3}
+      # hp 3 — решение дизайнера 11.08.2026. trophy 1 — с оборота жетона (25.09.2026):
+      # на печати одна шестерня и значок жетона уничтожения ЦУ.
+      # ЦУ: ОДНА ячейка энергии как у военного здания (energy_slots), но даёт
+      # ДВА кубика как источник (energy_gives). Ключ energy_needed: 2 здесь был
+      # устаревшим и перебивал energy_slots — из-за него ЦУ просило две ячейки
+      # вместо одной (поправлено 12.08.2026 по указанию дизайнера).
+      command_center: {energy_gives: 1, energy_slots: 1, hp: 3, assembly: [tower, ammo], trophy: 1}
+    miners:   # №1–4
+      - {level: 1, energy_slots: 2, hp: 1, yield_kelium: 1, cost: 1, trophy: 1}
+      - {level: 2, energy_slots: 1, hp: 1, yield_kelium: 1, cost: 2, trophy: 1}
+      - {level: 3, energy_slots: 2, hp: 2, yield_kelium: 2, cost: 3, trophy: 2}
+      - {level: 4, energy_slots: 1, hp: 2, yield_kelium: 2, cost: 4, trophy: 2, vp_on_field: true}
+    power_plants:  # №1–4
+      - {level: 1, hp: 1, energy_gives: 1, cost: 1, trophy: 1}
+      - {level: 2, hp: 1, energy_gives: 2, cost: 2, trophy: 1}
+      - {level: 3, hp: 2, energy_gives: 2, cost: 3, trophy: 2}
+      - {level: 4, hp: 2, energy_gives: 3, cost: 4, trophy: 2, vp_on_field: true}
+    # ПОТОЛОК ЯЧЕЕК ЭНЕРГИИ НА ЗДАНИИ — ДВЕ (ограничение рисунка на жетоне,
+    # решение дизайнера 20.09.2026). Общий планшет: казарма 1, завод 2,
+    # авиабаза 2. Источников 8 (1+2+2+3) плюс ЦУ 2 = 10; мест потребления
+    # 6 у шахт + 5 у военных + 1 у ЦУ = 12 → дефицит 2.
+    energy_invariant: {sources: 10, consumer_slots: 12, deficit: 2}
+    modules:
+      red_per_player: 4    # attack modules, overlay secondary row
+      # СИНИЕ ЖЕТОНЫ (жетоны дизайнера, 23.09.2026): 2/2→2/3, 2/2→3/2,
+      # 3/1→3/2, 1/3→2/3 (боеприпасы / войска, лицо → позолота). Жетон
+      # накрывает печатное число здания. Мешок — modules.3.0.0, набор C30.
+      blue_per_player: 4   # сборочные модули, накрывают печатное число здания
+
+  # -- Планшет войск (dual_cell) ---------------------------------------------
+  # attacks: {unit: target} — ОДНА печатная цель (специализированная ячейка).
+  # Универсальная ячейка (любая цель, 2 БП) есть у всех и в этот файл не
+  # входит — см. заголовок файла. targets в {infantry, vehicle, aircraft,
+  # buildings_towers}. speeds order П·Т·А·В.
+  #
+  # ТАБЛИЦА СВЕРЕНА С ПЕЧАТЬЮ 11.09.2026 по картинке планшета: в каждой
+  # специализированной ячейке нарисована цель, и данные обязаны её повторять.
+  # У пехоты стояла авиация, а напечатан ТАНК — расхождение исправлено.
+  # Перестановкой таблица после этого быть перестала: технику бьют двое
+  # (пехота и авиация), а авиацию специализированной атакой не бьёт никто —
+  # только универсальной ячейкой за 2 БПР. Так напечатано на картоне.
+  # Планшет один на всех, поле `side: A` осталось только как его имя.
+  - id: troop_A
+    kind: troop_side
+    side: A
+    shared: true          # identical for all players
+    dual_cell: true
+    attacks:
+      infantry: vehicle             # пехота бьёт ТЕХНИКУ (на печати танк)
+      vehicle:  buildings_towers    # техника — здания и вышки
+      aircraft: vehicle             # авиация — технику
+      tower:    infantry            # вышка — пехоту
+    # БАЗОВЫЕ СКОРОСТИ 2·2·3·0 (решение дизайнера 20.09.2026). Замер на старых,
+    # просторных полях: сносов 2,19 -> 2,93, «цели в досягаемости нет» 14% -> 11%.
+    # На тесных новых полях та же правка не давала ничего — дальность там и так
+    # не была стеной, поэтому скорости и просторные поля идут одним решением.
+    speeds: {infantry: 2, vehicle: 2, aircraft: 3, tower: 0}
+    building_prices: {barracks: 1, factory: 2, airbase: 2}   # 19.09.2026: авиабаза 3 -> 2, вровень с заводом
+
+  # -- Планшеты войск ФРАКЦИЙ (нарисованы дизайнером 22.09.2026) --------------
+  # Источник: «Компоненты игрока/экспорт-планшеты/планшет-войск-new-1..4» и
+  # жетоны войск и зданий; расшифровка — design-docs/ФРАКЦИИ — расшифровка
+  # нарисованных планшетов (22.09.2026).md. Цвета: 1 красный, 2 зелёный,
+  # 3 синий, 4 жёлтый. Какой цвет у какого места — asymmetry.board_sides свода.
+  #
+  # production — заголовок здания: ammo = боеприпасы за Снаряжение, units =
+  #   войска за наём (два автомата — два жетона за раз).
+  # tokens — то, что напечатано на ЖЕТОНАХ цвета (жетоны зданий — экспорт
+  #   22.09.2026 11:36, сверено по картинкам 23.09): прочность войск, ячейки и
+  #   прочность военных зданий и ЦУ. Добытчики и энергостанции у всех цветов
+  #   одинаковые (решение дизайнера 23.09.2026) и берутся из общей записи.
+  - id: troop_red
+    kind: troop_side
+    side: red
+    name: "Красные"
+    dual_cell: true
+    attacks: {infantry: buildings_towers, vehicle: buildings_towers, aircraft: vehicle, tower: infantry}
+    speeds: {infantry: 3, vehicle: 2, aircraft: 2, tower: 0}
+    building_prices: {barracks: 3, factory: 2, airbase: 1}
+    production:
+      barracks: {ammo: 1, units: 2}
+      factory:  {ammo: 1, units: 1}
+      airbase:  {ammo: 2, units: 1}
+      # ЦУ НЕ НАНИМАЕТ ВЫШКИ, ПОКА НА НЁМ НЕТ СИНЕГО ЖЕТОНА (решение дизайнера
+      # 25.09.2026): печатное число вышек — 0, жетон сборки накрывает его своим.
+      command_center: {ammo: 2, units: 0}
+    tokens:
+      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 1}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 2}
+        factory:        {energy_slots: 2, hp: 2}
+        airbase:        {energy_slots: 1, hp: 2}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_green
+    kind: troop_side
+    side: green
+    name: "Зелёные"
+    dual_cell: true
+    attacks: {infantry: infantry, vehicle: buildings_towers, aircraft: vehicle, tower: aircraft}
+    speeds: {infantry: 2, vehicle: 2, aircraft: 3, tower: 0}
+    building_prices: {barracks: 2, factory: 3, airbase: 1}
+    production:
+      barracks: {ammo: 2, units: 1}
+      factory:  {ammo: 1, units: 2}
+      airbase:  {ammo: 1, units: 1}
+      # ЦУ НЕ НАНИМАЕТ ВЫШКИ, ПОКА НА НЁМ НЕТ СИНЕГО ЖЕТОНА (решение дизайнера
+      # 25.09.2026): печатное число вышек — 0, жетон сборки накрывает его своим.
+      command_center: {ammo: 2, units: 0}
+    tokens:
+      units: {infantry: {hp: 2}, vehicle: {hp: 2}, aircraft: {hp: 1}, tower: {hp: 1}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 1}
+        factory:        {energy_slots: 1, hp: 2}
+        airbase:        {energy_slots: 2, hp: 2}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_blue
+    kind: troop_side
+    side: blue
+    name: "Синие"
+    dual_cell: true
+    attacks: {infantry: aircraft, vehicle: infantry, aircraft: vehicle, tower: buildings_towers}
+    speeds: {infantry: 2, vehicle: 2, aircraft: 2, tower: 1}
+    building_prices: {barracks: 2, factory: 1, airbase: 3}
+    production:
+      barracks: {ammo: 2, units: 1}
+      factory:  {ammo: 1, units: 1}
+      airbase:  {ammo: 1, units: 2}
+      # ЦУ НЕ НАНИМАЕТ ВЫШКИ, ПОКА НА НЁМ НЕТ СИНЕГО ЖЕТОНА (решение дизайнера
+      # 25.09.2026): печатное число вышек — 0, жетон сборки накрывает его своим.
+      command_center: {ammo: 2, units: 0}
+    tokens:
+      units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 2}, tower: {hp: 1}}
+      buildings:
+        barracks:       {energy_slots: 1, hp: 2}
+        factory:        {energy_slots: 2, hp: 2}
+        airbase:        {energy_slots: 2, hp: 3}
+        command_center: {energy_slots: 1, hp: 3}
+
+  - id: troop_yellow
+    kind: troop_side
+    side: yellow
+    name: "Жёлтые"
+    dual_cell: true
+    attacks: {infantry: vehicle, vehicle: aircraft, aircraft: buildings_towers, tower: infantry}
+    speeds: {infantry: 2, vehicle: 3, aircraft: 2, tower: 0}
+    building_prices: {barracks: 1, factory: 3, airbase: 2}
+    production:
+      barracks: {ammo: 1, units: 1}
+      factory:  {ammo: 1, units: 2}
+      airbase:  {ammo: 2, units: 1}
+      # ЦУ НЕ НАНИМАЕТ ВЫШКИ, ПОКА НА НЁМ НЕТ СИНЕГО ЖЕТОНА (решение дизайнера
+      # 25.09.2026): печатное число вышек — 0, жетон сборки накрывает его своим.
+      command_center: {ammo: 2, units: 0}
+    tokens:
+      units: {infantry: {hp: 1}, vehicle: {hp: 1}, aircraft: {hp: 1}, tower: {hp: 1}}
+      buildings:
+        barracks:       {energy_slots: 2, hp: 1}
+        factory:        {energy_slots: 1, hp: 1}
+        airbase:        {energy_slots: 1, hp: 1}
+        command_center: {energy_slots: 1, hp: 3}
+
+  # -- Планшет хранилища ----------------------------------------------------
+  # cells: list per level 1..4; each is a string of cell types (У/К/Б) →
+  # normalized here as codes: U universal, K kelium, A ammo. "" = no cells.
+  - id: storage_A
+    kind: storage_side
+    side: A
+    shared: true
+    miners:  ["U", "U", "UU", "UU"]
+    plants:  ["U", "U", "UU", "UU"]
+    prices:  [1, 2, 3, 4]
+    storage_token: {sides: ["+1_energy", "+1_universal_cell"]}
+    vp_star_level: 4
+
+  # -- Tech / development board (3 shared tracks) ---------------------------
+  # Step numeric values (cost/vp/capacity) live in the RULESET so they can be
+  # tuned; here we describe the fixed *structure* — which track gives what.
+  - id: tech_tracks
+    kind: tech_board
+    tracks:
+      - {id: left,   modules: red,     ability: "+1 ammo in combat"}
+      - {id: middle, modules: storage, ability: "+1 kelium per Mining"}
+      - {id: right,  modules: blue,    ability: "+1 extra move"}
+    step_rewards: ["prize_cube", "module", "module", "super_arsenal_card"]
+    first_arriver_prizes: {left: "1_ammo", middle: "1_kelium", right: "1_coin"}
+    science_dept_exchanges:
+      - "1-2 trophy -> 1-2 coins"
+      - "1 trophy -> move 1 module"
+      - "1 trophy -> draw 2 arsenal keep 1"
+      - "3 trophy -> gild (upgrade) 1 module"

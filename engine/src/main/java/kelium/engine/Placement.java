@@ -161,10 +161,32 @@ public final class Placement {
             }
         }
 
+        // ОПЫТ «БАЗА ИДЁТ ЗА АРМИЕЙ» (actions.build.zone_from_units, по умолчанию
+        // выключен): гекс, где стоит своё войско, входит в зону стройки. Вопрос
+        // дизайнера 22.09.2026 — почему игроки не переезжают по полю; замер
+        // kelium.ДинамикаПозиций показал, что зона стройки растёт только от
+        // стенок своих зданий, и база за партию уходит от старта на 0,8 гекса.
+        if (kelium.dataio.Ctx.rules(state).getBool("actions.build.zone_from_units", false)) {
+            for (kelium.core.UnitToken u : p.unitsOnField()) {
+                if (u.hexId != null && !u.inside()) {
+                    result.add(u.hexId);
+                }
+            }
+        }
+
         List<String> ok = new ArrayList<>();
         for (String hid : result) {
             Hex h = state.field.get(hid);
             if (h.kind == HexKind.FORBIDDEN || h.hasSpawnTile()) {
+                continue;
+            }
+            // ЧУЖИЕ ВОЙСКА ЗАПИРАЮТ ГЕКС ДЛЯ СТРОЙКИ (правило дизайнера
+            // 16.09.2026). Войско имеет право стоять на гексе с вашим зданием —
+            // и ничего страшного, — но пока оно там, на этом гексе не появится
+            // ничего нового и не исчезнет ничего старого: ни постройки, ни
+            // сноса. Снос ходит через тот же список гексов, поэтому правило
+            // стоит здесь одно на обе операции.
+            if (enemyUnitsLockHex(state, hid, seat)) {
                 continue;
             }
             // НЕЙТРАЛЬНОЕ ЗДАНИЕ САМО ПО СЕБЕ НЕ ЗАКРЫВАЕТ ГЕКС (баг найден
@@ -224,17 +246,120 @@ public final class Placement {
             return false;
         }
         if (t == kelium.core.UnitType.AIRCRAFT) {
-            for (PlayerState pl : state.players) {
-                for (kelium.core.UnitToken u : pl.units) {
-                    if (u.type == kelium.core.UnitType.AIRCRAFT && hexId.equals(u.hexId)) {
-                        return false;   // воздушная ячейка занята
-                    }
-                }
-            }
-            return true;
+            return skyOpen(state, hexId, player.seat, -1);
         }
         int[] load = groundLoad(state, hexId, -1);
-        return h.fitsWithRepack(t == kelium.core.UnitType.VEHICLE ? 2 : 1, load[0], load[1]);
+        return h.fitsWithRepack(t == kelium.core.UnitType.VEHICLE ? 2 : 1,
+            load[0], load[1], load[2]);
+    }
+
+    /**
+     * ОТКРЫТО ЛИ НЕБО ГЕКСА для авиации игрока {@code seat}
+     * (правило дизайнера 16.09.2026).
+     *
+     * <p>Прежде в небе гекса помещался РОВНО ОДИН жетон авиации, чей угодно.
+     * Теперь небо вмещает СКОЛЬКО УГОДНО жетонов — но только ОДНОГО игрока:
+     * встать в небо, где уже стоит чужая авиация, нельзя, а рядом со своей —
+     * можно без счёта.
+     *
+     * <p>Ключ свода {@code field.sky_single_owner}. Выключенный возвращает
+     * прежнее правило «одна авиация на гекс».
+     *
+     * @param excludeUid жетон, который сейчас входит или выходит (не считать);
+     *                   {@code -1} — считать все
+     */
+    public static boolean skyOpen(GameState state, String hexId, int seat, int excludeUid) {
+        boolean одинХозяин = Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                .get("field.sky_single_owner", Boolean.TRUE));
+        for (PlayerState pl : state.players) {
+            for (UnitToken u : pl.units) {
+                if (u.type != UnitType.AIRCRAFT || u.uid == excludeUid
+                        || !hexId.equals(u.hexId) || !u.alive() || u.inside()) {
+                    continue;
+                }
+                if (!одинХозяин || pl.seat != seat) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * ЗАПИРАЮТ ЛИ ЧУЖИЕ ВОЙСКА ГЕКС ДЛЯ СТРОЙКИ И НАЙМА
+     * (правило дизайнера 16.09.2026).
+     *
+     * <p>Чужие войска — наземные и авиация в небе — не мешают стоять на гексе
+     * чужому ЗДАНИЮ: войско спокойно встаёт на гекс с вашей постройкой. Но пока
+     * оно там стоит, на этом гексе нельзя:
+     * <ul>
+     *   <li>построить что бы то ни было новое;</li>
+     *   <li>снести своё здание (снос — такая же операция Стройки);</li>
+     *   <li>поставить нанятый жетон НА ГЕКС — он садится гарнизоном в здание.</li>
+     * </ul>
+     *
+     * <p>Ключ свода {@code field.enemy_units_block_build}.
+     */
+    public static boolean enemyUnitsLockHex(GameState state, String hexId, int seat) {
+        if (!Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                .get("field.enemy_units_block_build", Boolean.TRUE))) {
+            return false;
+        }
+        return Passability.enemyUnitsOn(state, hexId, seat);
+    }
+
+    /**
+     * МОЖНО ЛИ ПОСТАВИТЬ НА ГЕКС нанятый жетон: есть место И гекс не заперт
+     * чужими войсками. Нанимают не только Снаряжением, но и карты арсенала —
+     * правило одно на всех, иначе карта тихо обходит его.
+     */
+    /**
+     * СКОЛЬКО ИЗ {@code n} НАНЯТЫХ ЖЕТОНОВ ВСТАНЕТ НА САМ ГЕКС, а не сядет
+     * гарнизоном внутрь здания. Нужно призракам найма в окне партии (заказ
+     * дизайнера 25.09.2026: «на места, куда нельзя выставить, — призрак не
+     * ставится»). Считает и запас рода: жетонов больше, чем лежит в запасе, не
+     * будет.
+     */
+    public static int hireFits(GameState state, PlayerState player, String hexId,
+                               kelium.core.UnitType t, int n) {
+        Hex h = state.field.get(hexId);
+        if (h == null || n <= 0 || enemyUnitsLockHex(state, hexId, player.seat)) {
+            return 0;
+        }
+        int вЗапасе = 0;
+        for (UnitToken u : player.units) {
+            if (u.hexId == null && u.type == t) {
+                вЗапасе++;
+            }
+        }
+        вЗапасе += Math.max(0, state.tokenStats.unitStock(t) - player.unitsOfKind(t));
+        int можно = Math.min(n, вЗапасе);
+        if (t == kelium.core.UnitType.AIRCRAFT) {
+            return skyOpen(state, hexId, player.seat, -1) ? можно : 0;
+        }
+        int[] load = groundLoad(state, hexId, -1);
+        int veh = load[0];
+        int single = load[1];
+        int fits = 0;
+        for (int i = 0; i < можно; i++) {
+            int fp = t == kelium.core.UnitType.VEHICLE ? 2 : 1;
+            if (!h.fitsWithRepack(fp, veh, single, load[2])) {
+                break;
+            }
+            if (fp == 2) {
+                veh++;
+            } else {
+                single++;
+            }
+            fits++;
+        }
+        return fits;
+    }
+
+    public static boolean canHireOn(GameState state, PlayerState player,
+                                    String hexId, kelium.core.UnitType t) {
+        return !enemyUnitsLockHex(state, hexId, player.seat)
+            && hasRoomOnHex(state, player, hexId, t);
     }
 
     public static int nextUid(GameState state) {
@@ -251,12 +376,38 @@ public final class Placement {
     }
 
     /**
-     * Наземная нагрузка гекса войсками (все игроки): [техника, одиночные].
+     * ДЕРЖАТ ЛИ ВОЙСКА СВОИ СЕКТОРЫ (дизайнер 30.09.2026): войско занимает
+     * сектор так же, как здание, и внутри гекса ничто не сдвигается.
+     * Ключ свода {@code field.units_hold_sectors}; в своде 1.45.0 его нет —
+     * там войска по-прежнему переупаковываются.
+     */
+    public static boolean unitsHoldSectors(GameState state) {
+        return Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                .get("field.units_hold_sectors", Boolean.FALSE));
+    }
+
+    /**
+     * Наземная нагрузка гекса войсками (все игроки): [техника, одиночные, маска].
      * excludeUid — жетон, который сейчас входит/выходит (не считать), -1 = никто.
-     * Техника занимает 2 смежные ячейки, одиночные (пехота/вышка) — одну;
-     * конкретные позиции не считаются — войска переупаковываются (нежёсткие).
+     * Техника занимает 2 смежные ячейки, одиночные (пехота/вышка) — одну.
+     *
+     * <p>По своду 1.45.0 конкретные позиции не считаются — войска
+     * переупаковываются, маска ноль. По правилу «жетоны держат секторы»
+     * ({@link #unitsHoldSectors}) счётчики ноль, а маска — секторы, на которых
+     * войска стоят: их не занять ни зданию, ни другому войску.
      */
     public static int[] groundLoad(GameState state, String hexId, int excludeUid) {
+        if (unitsHoldSectors(state)) {
+            int held = 0;
+            for (var e : СекторыВойск.разложить(state, hexId).entrySet()) {
+                if (e.getKey() != excludeUid) {
+                    for (int i : e.getValue()) {
+                        held |= 1 << i;
+                    }
+                }
+            }
+            return new int[]{0, 0, held};
+        }
         int veh = 0;
         int single = 0;
         for (PlayerState p : state.players) {
@@ -276,6 +427,6 @@ public final class Placement {
                 }
             }
         }
-        return new int[]{veh, single};
+        return new int[]{veh, single, 0};
     }
 }

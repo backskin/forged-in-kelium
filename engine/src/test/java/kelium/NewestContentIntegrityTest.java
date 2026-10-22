@@ -73,7 +73,7 @@ class NewestContentIntegrityTest {
 
     private static GameConfig newestContent() {
         GameConfig.pickContentVersion("arsenal", "5.0.0");
-        GameConfig.pickContentVersion("objectives", "1.18.0");
+        GameConfig.pickContentVersion("objectives", "1.17.0");
         try {
             // buildCached, НЕ build(): GameConfig.build() не читает CONTENT_PICK
             // вовсе (грабля, на которой сам обжёгся 14.08.2026 — первый прогон

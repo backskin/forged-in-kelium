@@ -56,23 +56,93 @@ public final class CardChoiceOverlay extends JComponent {
                         : Cursor.getDefaultCursor());
                     repaint();
                 }
+                if (i < 0) {
+                    pass(e);
+                }
             }
 
             @Override
             public void mouseClicked(MouseEvent e) {
                 int i = cardAt(e.getPoint());
-                if (i >= 0) {
+                if (i >= 0 && !passing) {
                     cards.get(i).onPick().run();
                 }
             }
 
             @Override
             public void mousePressed(MouseEvent e) {
-                // шторка глотает клики
+                // Нажатие МИМО КАРТ — начало перетаскивания поля под шторкой
+                // (жалоба дизайнера 27.09.2026: пока открыт выбор карты, поле
+                // нельзя было ни сдвинуть, ни приблизить).
+                passing = cardAt(e.getPoint()) < 0;
+                if (passing) {
+                    pass(e);
+                }
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (passing) {
+                    pass(e);
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (passing) {
+                    pass(e);
+                }
             }
         };
         addMouseListener(m);
         addMouseMotionListener(m);
+        // колесо мимо карт — масштаб поля под шторкой
+        addMouseWheelListener(e -> {
+            if (cardAt(e.getPoint()) < 0) {
+                pass(e);
+            }
+        });
+    }
+
+    /** Поле под шторкой: ему уходят нажатия, перетаскивание и колесо мимо карт. */
+    private java.util.function.Supplier<java.awt.Component> passTo = () -> null;
+    /** Идёт перетаскивание, начатое мимо карт, — его ведёт поле. */
+    private boolean passing;
+
+    public void setPassThrough(java.util.function.Supplier<java.awt.Component> c) {
+        this.passTo = c == null ? () -> null : c;
+    }
+
+    /** Переслать событие мыши полю — в его координатах. */
+    private void pass(MouseEvent e) {
+        java.awt.Component c = passTo.get();
+        if (c == null || !c.isShowing()) {
+            return;
+        }
+        java.awt.Point p = javax.swing.SwingUtilities.convertPoint(this, e.getPoint(), c);
+        if (!passing && !new Rectangle(c.getSize()).contains(p)) {
+            return;
+        }
+        MouseEvent out = e instanceof java.awt.event.MouseWheelEvent w
+            ? new java.awt.event.MouseWheelEvent(c, w.getID(), w.getWhen(), w.getModifiersEx(),
+                p.x, p.y, w.getXOnScreen(), w.getYOnScreen(), w.getClickCount(), false,
+                w.getScrollType(), w.getScrollAmount(),
+                w.getWheelRotation(), w.getPreciseWheelRotation())
+            : new MouseEvent(c, e.getID(), e.getWhen(), e.getModifiersEx(), p.x, p.y,
+                e.getClickCount(), false, e.getButton());
+        c.dispatchEvent(out);
+    }
+
+    /**
+     * ВЫБРАННАЯ КАРТА — для разбора партии: там церемонию показывают уже
+     * решённой, и выбранная карта отмечена, остальные пригашены. −1 — выбора
+     * ещё нет (живая партия).
+     */
+    private int picked = -1;
+
+    public void setPicked(int index) {
+        picked = index;
+        repaint();
     }
 
     public void open(String title, String subtitle, List<Card> newCards) {
@@ -81,6 +151,7 @@ public final class CardChoiceOverlay extends JComponent {
         cards.clear();
         cards.addAll(newCards);
         hoverIdx = -1;
+        picked = -1;
         setVisible(true);
         anim.snap(0);
         anim.play(1, 180, v -> repaint(), null);
@@ -100,11 +171,38 @@ public final class CardChoiceOverlay extends JComponent {
     private int cardW() {
         int n = Math.max(1, cards.size());
         int fit = (getWidth() - Theme.px(80)) / n + Theme.px(30);
-        return Math.max(Theme.px(120), Math.min(Theme.px(170), fit));
+        // КАРТЫ ПОМЕНЬШЕ (жалоба дизайнера 27.09.2026: «слишком крупные»): все
+        // карты занимают около половины высоты поля, а не почти всё окно.
+        // Мелкий текст читается в описании под веером.
+        boolean printed = !cards.isEmpty() && art.apply(cards.get(0).id()) != null;
+        int max = printed ? Theme.px(170) : Theme.px(140);
+        int byHeight = (int) (getHeight() * 0.36 * ratio());
+        return Math.max(Theme.px(80), Math.min(Math.min(max, byHeight), fit));
     }
 
     private int cardH() {
-        return (int) (cardW() * 1.42);
+        return (int) Math.round(cardW() / ratio());
+    }
+
+    /**
+     * Ширина к высоте — С ПЕЧАТНОГО ЛИЦА первой карты (карты одной колоды
+     * одного формата); печати нет — пропорция карты приказа 661×1028.
+     */
+    private double ratio() {
+        if (!cards.isEmpty()) {
+            java.awt.image.BufferedImage img = art.apply(cards.get(0).id());
+            if (img != null && img.getHeight() > 0) {
+                return img.getWidth() / (double) img.getHeight();
+            }
+        }
+        return 661 / 1028.0;
+    }
+
+    /** Печатное лицо карты по id (null — рисуем сами). */
+    private java.util.function.Function<String, java.awt.image.BufferedImage> art = id -> null;
+
+    public void setArt(java.util.function.Function<String, java.awt.image.BufferedImage> art) {
+        this.art = art == null ? id -> null : art;
     }
 
     private Rectangle cardRect(int i) {
@@ -142,7 +240,8 @@ public final class CardChoiceOverlay extends JComponent {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
             RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setComposite(AlphaComposite.SrcOver.derive((float) (0.5 * a)));
+        // затемнение легче прежнего: поле под шторкой видно и его можно двигать
+        g.setComposite(AlphaComposite.SrcOver.derive((float) (0.38 * a)));
         g.setColor(new Color(0x10, 0x14, 0x1A));
         g.fillRect(0, 0, getWidth(), getHeight());
         g.setComposite(AlphaComposite.SrcOver.derive((float) a));
@@ -172,8 +271,39 @@ public final class CardChoiceOverlay extends JComponent {
         if (hoverIdx >= 0 && hoverIdx < cards.size()) {
             paintCard(g, hoverIdx, slide);
             paintDescription(g, cards.get(hoverIdx));
+        } else if (picked >= 0 && picked < cards.size()) {
+            paintDescription(g, cards.get(picked));
         }
         g.dispose();
+    }
+
+    /** Лица карт, сжатые и скруглённые под размер раскладки. */
+    private final java.util.Map<java.awt.image.BufferedImage, java.awt.image.BufferedImage> sprites =
+        new java.util.IdentityHashMap<>();
+
+    private java.awt.image.BufferedImage sprite(java.awt.image.BufferedImage img, int w, int h,
+                                                double dpr) {
+        int pw = (int) Math.round(w * dpr);
+        int ph = (int) Math.round(h * dpr);
+        java.awt.image.BufferedImage got = sprites.get(img);
+        if (got != null && got.getWidth() == pw && got.getHeight() == ph) {
+            return got;
+        }
+        if (sprites.size() > 24) {
+            sprites.clear();
+        }
+        java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(pw, ph,
+            java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE);
+        java.awt.Graphics2D gg = out.createGraphics();
+        gg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        gg.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        gg.setClip(new java.awt.geom.RoundRectangle2D.Double(0, 0, pw, ph,
+            Theme.px(10) * dpr, Theme.px(10) * dpr));
+        kelium.report.Mips.draw(gg, img, 0, 0, pw, ph);
+        gg.dispose();
+        sprites.put(img, out);
+        return out;
     }
 
     private void paintCard(Graphics2D g, int i, int slide) {
@@ -182,7 +312,20 @@ public final class CardChoiceOverlay extends JComponent {
         Card c = cards.get(i);
         g.setColor(new Color(0, 0, 0, 100));
         g.fillRoundRect(r.x + 3, r.y + 5, r.width, r.height, Theme.px(10), Theme.px(10));
-        if (c.face() != null) {
+        java.awt.image.BufferedImage img = art.apply(c.id());
+        if (img != null) {
+            // ПЕЧАТНОЕ ЛИЦО КАРТЫ — готовой картинкой под этот размер (29.09.2026:
+            // сжатие с бикубикой через скруглённую маску на каждом кадре давало
+            // ~2 ГБ мусора за партию и дёргало сборку мусора)
+            double dpr = Math.max(1.0, g.getTransform().getScaleX());
+            java.awt.image.BufferedImage spr = sprite(img, r.width, r.height, dpr);
+            java.awt.geom.AffineTransform was = g.getTransform();
+            java.awt.geom.Point2D at = was.transform(new java.awt.geom.Point2D.Double(r.x, r.y), null);
+            g.setTransform(java.awt.geom.AffineTransform.getTranslateInstance(
+                Math.round(at.getX()), Math.round(at.getY())));
+            g.drawImage(spr, 0, 0, null);
+            g.setTransform(was);
+        } else if (c.face() != null) {
             OrderCardFace.paint(g, c.face(), r.x, r.y, r.width, r.height, false);
         } else {
             g.setColor(Theme.paper());
@@ -198,11 +341,28 @@ public final class CardChoiceOverlay extends JComponent {
                 ty += fm.getHeight();
             }
         }
-        if (i == hoverIdx) {
+        if (picked >= 0 && i != picked) {
+            g.setColor(new Color(0x10, 0x14, 0x1A, 120));
+            g.fillRoundRect(r.x, r.y, r.width, r.height, Theme.px(10), Theme.px(10));
+        }
+        if (i == hoverIdx || i == picked) {
             g.setColor(Theme.accent());
-            g.setStroke(new BasicStroke(Theme.pxf(2.4)));
+            g.setStroke(new BasicStroke(Theme.pxf(i == picked ? 4.0 : 2.4)));
             g.drawRoundRect(r.x - 1, r.y - 1, r.width + 2, r.height + 2,
                 Theme.px(11), Theme.px(11));
+        }
+        if (i == picked) {
+            String tag = "ВЫБРАНО";
+            g.setFont(Theme.font(13, Font.BOLD));
+            var fm = g.getFontMetrics();
+            int tw = fm.stringWidth(tag) + Theme.px(18);
+            int th = fm.getHeight() + Theme.px(6);
+            int tx = r.x + (r.width - tw) / 2;
+            int ty = r.y - th / 2;
+            g.setColor(Theme.accent());
+            g.fillRoundRect(tx, ty, tw, th, th, th);
+            g.setColor(new Color(0x10, 0x14, 0x1A));
+            g.drawString(tag, tx + Theme.px(9), ty + Theme.px(3) + fm.getAscent());
         }
     }
 

@@ -87,7 +87,7 @@ public final class NarrativeLog {
         }
         GameConfig cfg = Ctx.cfg(state);
         if (md) {
-            line("# Рассказ партии — «Кристаллы Раздора»");
+            line("# Рассказ партии — «Lex Talionis»");
             line("");
             line("**Игроков:** " + state.numPlayers() + " · **сид:** " + cfg.seed
                 + " · **правила:** " + cfg.ruleset.id);
@@ -98,7 +98,7 @@ public final class NarrativeLog {
             }
         } else {
             line("═".repeat(72));
-            line("  РАССКАЗ ПАРТИИ — «Кристаллы Раздора»");
+            line("  РАССКАЗ ПАРТИИ — «Lex Talionis»");
             line("  игроков: " + state.numPlayers() + "   сид: " + cfg.seed
                 + "   правила: " + cfg.ruleset.id);
             line("  за столом:");
@@ -341,8 +341,9 @@ public final class NarrativeLog {
         out.add(item + "арсенал: рука" + p.arsenalHand + " установлено" + p.arsenalInstalled);
         out.add(String.format("%sмодули: красн=%d син=%d золото=%d   супер=%s%s",
             item, p.redModules, p.blueModules, p.goldModules,
-            p.superObjective != null ? p.superObjective : "—",
-            p.superObjectiveComplete ? " (выполнено)" : ""));
+            p.superObjectives.isEmpty() ? "—" : p.superObjectives.toString(),
+            p.superObjectivesDone.isEmpty() ? ""
+                : " (низ отработал: " + p.superObjectivesDone + ")"));
         int vp = kelium.engine.Scoring.scorePlayer(state, seat).getOrDefault("total", 0);
         out.add(item + "ПО сейчас: " + vp);
         return out;
@@ -392,6 +393,15 @@ public final class NarrativeLog {
                 case "infrastructure" -> "Инфраструктура";
                 case "operation" -> "Наступление";
                 case "acquisitions" -> "Приобретения";
+                case "place" -> "Разместить";
+                case "acquire" -> "Приобрести";
+                case "control" -> "Контролировать";
+                case "explore" -> "Исследовать";
+                case "settle" -> "Освоить";
+                case "mobilize" -> "Мобилизовать";
+                case "advance" -> "Наступать";
+                case "secure" -> "Контролировать";
+                case "research" -> "Исследовать";
                 default -> top;
             };
             return cid + " (" + ru + ")";

@@ -1487,23 +1487,8 @@ public final class Predicates {
                     pool.add(b);
                 }
             }
-            // Граф: ребро между зданиями на РАЗНЫХ гексах, примыкающими стенкой.
-            Map<Integer, List<Integer>> g = new HashMap<>();
-            for (BuildingToken b : pool) {
-                g.put(b.uid, new ArrayList<>());
-            }
-            for (int i = 0; i < pool.size(); i++) {
-                for (int k = i + 1; k < pool.size(); k++) {
-                    BuildingToken a = pool.get(i);
-                    BuildingToken b = pool.get(k);
-                    if (!a.hexId.equals(b.hexId) && abutsAcrossWall(s, a, b)) {
-                        g.get(a.uid).add(b.uid);
-                        g.get(b.uid).add(a.uid);
-                    }
-                }
-            }
-            Set<Integer> nodes = new HashSet<>(g.keySet());
-            return largestComponentOf(g, nodes) >= intp(p, "count", 2);
+            // Граф примыкания стенкой — общий (Chains → Соседство).
+            return Chains.largestWallChain(s, pool) >= intp(p, "count", 2);
         });
 
         // o20 «Коммутация» 10.0: на КАЖДОМ своём источнике энергии лежит ровно
@@ -1641,60 +1626,6 @@ public final class Predicates {
             picked.remove(picked.size() - 1);
         }
         return false;
-    }
-
-    /**
-     * ПРИМЫКАЮТ ЛИ ДВА ЗДАНИЯ на РАЗНЫХ гексах общей стенкой: A занимает сторону,
-     * смотрящую на гекс B, а B — противоположную сторону той же грани.
-     */
-    private static boolean abutsAcrossWall(GameState s, BuildingToken a, BuildingToken b) {
-        Hex ha = s.field.get(a.hexId);
-        Hex hb = s.field.get(b.hexId);
-        if (ha == null || hb == null) {
-            return false;
-        }
-        for (int side = 0; side < 6; side++) {
-            Integer owner = ha.sideOwner[side];
-            if (owner == null || owner != a.uid) {
-                continue;
-            }
-            if (!b.hexId.equals(ha.neighborBySide[side])) {
-                continue;
-            }
-            Integer opp = hb.sideOwner[(side + 3) % 6];
-            if (opp != null && opp == b.uid) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Размер наибольшей связной компоненты в готовом графе смежности. */
-    private static int largestComponentOf(Map<Integer, List<Integer>> g, Set<Integer> nodes) {
-        Set<Integer> seen = new HashSet<>();
-        int best = 0;
-        for (Integer start : nodes) {
-            if (seen.contains(start)) {
-                continue;
-            }
-            int comp = 0;
-            Deque<Integer> stack = new ArrayDeque<>();
-            stack.push(start);
-            while (!stack.isEmpty()) {
-                Integer x = stack.pop();
-                if (!seen.add(x)) {
-                    continue;
-                }
-                comp++;
-                for (Integer nb : g.getOrDefault(x, List.of())) {
-                    if (!seen.contains(nb)) {
-                        stack.push(nb);
-                    }
-                }
-            }
-            best = Math.max(best, comp);
-        }
-        return best;
     }
 
     // ---- геометрические помощники ------------------------------------------

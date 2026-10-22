@@ -141,7 +141,8 @@ public final class AssemblyWindow extends JPanel {
         top.add(Box.createHorizontalStrut(4));
         top.add(spinner(blackCount, "Сколько накладок «недоступный гекс» есть (1–16)"));
         top.add(Box.createHorizontalStrut(16));
-        JButton again = new JButton("↻ Другая сборка");
+        // стрелка — рисованный значок: символа «↻» в шрифте Tektur нет
+        JButton again = new JButton("Другая сборка", new ЗначокПоворота(true));
         again.setToolTipText("<html><div style='width:320px'>Показать <b>следующий вариант</b> "
             + "сборки того же поля. Варианты перебираются по кругу в случайном порядке, "
             + "каждый показывается один раз — потом порядок тасуется заново.<br>"
@@ -357,6 +358,73 @@ public final class AssemblyWindow extends JPanel {
 
     public void refresh() {
         resolve();
+    }
+
+    /**
+     * ПОДОБРАТЬ СБОРКУ БЕЗ ОКНА — для снимков раскладок в справочник.
+     *
+     * <p>Обычный {@link #resolve()} считает в {@code SwingWorker} и рисует
+     * результат, когда тот вернётся; снимку ждать нечем — окна нет, цикла
+     * событий тоже. Здесь тот же подбор, но синхронно: вернулись из
+     * {@code solveVariants} — сборка готова, можно рисовать слои.
+     *
+     * <p>Числа блоков приходят снаружи, а не из полей ввода: у безоконного
+     * вызова их нет, а набор коробки задаёт тот, кто делает снимок.
+     *
+     * @return нашлась ли сборка
+     */
+    /**
+     * СБОРКА ОБЯЗАНА БЫТЬ ОТ ТЕКУЩЕГО ПОЛЯ. Вкладка пересчитывает её, только
+     * когда на неё переходят, — а экспорт слиянием зовут с вкладки
+     * «Конструктор». Поправил поле и сразу выгрузил — блоки брались от прежнего
+     * поля, и все слои съезжали друг с друга (баг дизайнера 25.09.2026).
+     * Здесь сборка сверяется с полем и при расхождении подбирается заново,
+     * синхронно, с теми же числами блоков, что стоят во вкладке.
+     *
+     * @return есть ли сборка текущего поля
+     */
+    boolean ensureCurrent() {
+        Set<Cell> playable = new HashSet<>();
+        for (LHex h : model.hexes.values()) {
+            if (!"forbidden".equals(h.content)) {
+                playable.add(new Cell(h.q, h.r));
+            }
+        }
+        if (hasResult() && playable.equals(view.playable)) {
+            return true;
+        }
+        if (worker != null && !worker.isDone()) {
+            worker.cancel(true);
+        }
+        boolean ok = подобратьБезОкна((Integer) bigCount.getValue(),
+            (Integer) smallCount.getValue(), (Integer) blackCount.getValue());
+        if (ok) {
+            variants.clear();
+            variants.add(view.result);
+            order.clear();
+            order.add(0);
+            orderPos = 0;
+            showVariant(view.result);
+        }
+        return ok;
+    }
+
+    boolean подобратьБезОкна(int big, int small, int black) {
+        Set<Cell> playable = new HashSet<>();
+        for (LHex h : model.hexes.values()) {
+            if (!"forbidden".equals(h.content)) {
+                playable.add(new Cell(h.q, h.r));
+            }
+        }
+        List<Result> найдено = kelium.engine.BlockAssembler.solveVariants(
+            playable, big, small, black, BUDGET_MS, 1);
+        if (найдено.isEmpty()) {
+            return false;
+        }
+        view.playable = playable;
+        view.result = найдено.get(0);
+        пересобратьКартонки();
+        return true;
     }
 
     /**

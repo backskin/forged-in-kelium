@@ -22,11 +22,21 @@ public final class ActionIcons {
     }
 
     /** Категория приказа → её два действия (порядок печатный). */
-    public static final Map<String, List<String>> CATEGORY_ACTIONS = Map.of(
-        "infrastructure", List.of("build", "energy_swap"),
-        "development", List.of("assembly", "mining"),
-        "operation", List.of("movement", "combat"),
-        "acquisitions", List.of("market", "science"));
+    public static final Map<String, List<String>> CATEGORY_ACTIONS = Map.ofEntries(
+        Map.entry("infrastructure", List.of("build", "energy_swap")),
+        Map.entry("development", List.of("assembly", "mining")),
+        Map.entry("operation", List.of("movement", "combat")),
+        Map.entry("acquisitions", List.of("market", "science")),
+        Map.entry("place", List.of("movement", "build")),
+        Map.entry("acquire", List.of("assembly", "market")),
+        Map.entry("control", List.of("energy_swap", "combat")),
+        Map.entry("explore", List.of("mining", "science")),
+        // приказы 5.0.0: пять действий-развилок
+        Map.entry("settle", List.of("extract", "power")),
+        Map.entry("mobilize", List.of("power", "supply")),
+        Map.entry("advance", List.of("supply", "command")),
+        Map.entry("secure", List.of("command", "develop")),
+        Map.entry("research", List.of("develop", "extract")));
 
     /** Русское имя категории приказа. */
     public static String categoryRu(String cat) {
@@ -35,6 +45,15 @@ public final class ActionIcons {
             case "development" -> "РАЗРАБОТКА";
             case "operation" -> "НАСТУПЛЕНИЕ";
             case "acquisitions" -> "ПРИОБРЕТЕНИЯ";
+            case "place" -> "РАЗМЕСТИТЬ";
+            case "acquire" -> "ПРИОБРЕСТИ";
+            case "control" -> "КОНТРОЛИРОВАТЬ";
+            case "explore" -> "ИССЛЕДОВАТЬ";
+            case "settle" -> "ОСВОИТЬ";
+            case "mobilize" -> "МОБИЛИЗОВАТЬ";
+            case "advance" -> "НАСТУПАТЬ";
+            case "secure" -> "КОНТРОЛИРОВАТЬ";
+            case "research" -> "ИССЛЕДОВАТЬ";
             default -> cat == null ? "" : cat.toUpperCase(java.util.Locale.ROOT);
         };
     }
@@ -54,6 +73,24 @@ public final class ActionIcons {
     /** Нарисовать глиф действия с центром (cx,cy), вписанный в size×size. */
     public static void paint(Graphics2D g, String action, double cx, double cy,
                              double size, Color color) {
+        // ПЕЧАТНЫЕ ИКОНКИ ДЕЙСТВИЙ (экспорт-иконки, 26.09.2026) — те же, что на
+        // картах приказов; самодельные фигуры остаются запасом.
+        java.awt.image.BufferedImage img = action == null ? null
+            : kelium.report.Textures.icon("action_" + action);
+        if (img != null) {
+            int s = (int) Math.round(size * 1.2);
+            kelium.report.Mips.draw(g, img, (int) Math.round(cx - s / 2.0),
+                (int) Math.round(cy - s / 2.0), s, s);
+            return;
+        }
+        // РАЗВИЛКА рисуется глифом первой ветки (своих глифов у неё пока нет)
+        if (action != null) {
+            List<String> ветки = kelium.engine.Actions.FORKS.get(action);
+            if (ветки != null) {
+                paint(g, ветки.get(0), cx, cy, size, color);
+                return;
+            }
+        }
         double r = size / 2;
         g.setColor(color);
         g.setStroke(new BasicStroke((float) (size * 0.12),

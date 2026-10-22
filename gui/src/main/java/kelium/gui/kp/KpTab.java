@@ -87,7 +87,14 @@ public final class KpTab extends JComponent {
         // поворота точка центра неподвижна, поэтому строка просто центрируется
         // относительно неё в повернутых координатах.
         g.rotate(-Math.PI / 2, w / 2.0, h / 2.0);
-        g.setFont(Theme.font(11.5, Font.BOLD));
+        // Кегль подгоняется под высоту корешка: на низком окне вкладки
+        // сжимаются, и подпись обрезалась с обоих концов («аука и рынс»).
+        double size = 11.5;
+        g.setFont(Theme.font(size, Font.BOLD));
+        while (size > 8 && g.getFontMetrics().stringWidth(label) > h - Theme.px(12)) {
+            size -= 0.5;
+            g.setFont(Theme.font(size, Font.BOLD));
+        }
         g.setColor(selected ? Theme.ink() : hover ? Theme.ink() : Theme.ink2());
         var fm = g.getFontMetrics();
         g.drawString(label, w / 2 - fm.stringWidth(label) / 2,

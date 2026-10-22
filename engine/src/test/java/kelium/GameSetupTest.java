@@ -40,18 +40,26 @@ class GameSetupTest {
                 // помнить чью-то старую цифру.
                 int поСводу = kelium.dataio.Ctx.rules(s)
                     .getIntList("setup.start_coins").get(p.seat);
-                assertEquals(поСводу, p.resources.get(kelium.core.Resource.COIN),
-                    "стартовые монеты обязаны совпадать со сводом");
+                // НАЧАЛЬНЫЙ АРСЕНАЛ (30.09.2026) добавляет монеты своего верха:
+                // стартовые монеты = свод + набор установленной начальной карты.
+                int сКарты = 0;
+                for (String cid : p.arsenalInstalled) {
+                    var top = kelium.engine.GameEngine.стартовыйНабор(s, cid);
+                    if (top != null && top.get("params") instanceof java.util.Map<?, ?> пар
+                            && пар.get("coin") instanceof Number монет) {
+                        сКарты += монет.intValue();
+                    }
+                }
+                assertEquals(поСводу + сКарты, p.resources.get(kelium.core.Resource.COIN),
+                    "стартовые монеты — свод плюс верх начального арсенала");
                 assertEquals(1, p.unitsOnField().size(), "1 стартовая пехота");
                 assertNotNull(p.startHex, "стартовый гекс задан");
                 // С правил 1.6.0 подготовка РАЗДАЁТ карты супер задания, а выбор
                 // делает игрок в начале партии (super_objectives.deal = 2).
-                // Где лежит карта, зависит от РЕЖИМА супер-заданий: в старых
-                // режимах это superObjective/superObjectiveOffer, в режимах
-                // «одна карта втайне» (solo5/solo6) — superObjective. Сторож
-                // проверяет, что карта РАЗДАНА, а не в каком она поле.
-                assertTrue(p.superObjective != null || !p.superObjectiveOffer.isEmpty()
-                        || p.superObjective != null,
+                // Где лежит карта, зависит от РЕЖИМА супер-заданий: либо она уже
+                // в superObjectives, либо ещё лежит в предложении на выбор.
+                // Сторож проверяет, что карта РАЗДАНА, а не в каком она поле.
+                assertTrue(!p.superObjectives.isEmpty() || !p.superObjectiveOffer.isEmpty(),
                     "супер-задание назначено, предложено на выбор или роздано втайне");
             }
         }

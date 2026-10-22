@@ -143,6 +143,11 @@ public final class TestCardContext implements CardContext {
         return true;
     }
 
+    @Override public boolean specActions(int n) {
+        log.add(Map.of("spec_actions", n));
+        return true;
+    }
+
     @Override public boolean speedBoost() {
         log.add(Map.of("speed_boost", true));
         return true;
@@ -153,8 +158,18 @@ public final class TestCardContext implements CardContext {
         return true;
     }
 
+    @Override public boolean deployUnits(int count) {
+        log.add(Map.of("deploy_units", count));
+        return true;
+    }
+
     @Override public boolean energyOrModules() {
         log.add(Map.of("energy_or_modules", true));
+        return true;
+    }
+
+    @Override public boolean moduleSwap() {
+        log.add(Map.of("module_swap", true));
         return true;
     }
 

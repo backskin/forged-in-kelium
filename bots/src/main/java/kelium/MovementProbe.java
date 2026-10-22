@@ -114,8 +114,10 @@ public final class MovementProbe {
                     why.add("тайл зарождения");
                     continue;
                 }
+                int[] ld = nb == null ? null
+                    : kelium.engine.Placement.groundLoad(s, nbId, u.uid);
                 if (nb != null && !nb.fitsWithRepack(u.type == UnitType.VEHICLE ? 2 : 1,
-                        vehicles(s, nbId, u.uid), singles(s, nbId, u.uid))) {
+                        ld[0], ld[1], ld[2])) {
                     why.add("нет места на гексе");
                     continue;
                 }

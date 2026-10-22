@@ -21,6 +21,7 @@ import kelium.core.TechBoard;
 import kelium.core.TokenStats;
 import kelium.core.UnitToken;
 import kelium.core.UnitType;
+import kelium.dataio.Ctx;
 import kelium.dataio.GameConfig;
 import kelium.rules.Ruleset;
 
@@ -75,6 +76,11 @@ public final class Setup {
             return configOverride;
         }
         Object explicit = ruleset.get("asymmetry.board_sides", null);
+        // Строкой «green/blue/yellow/red» — из правки запуска
+        // (-Dkelium.rules=asymmetry.board_sides=...), где запятая уже занята.
+        if (explicit instanceof String str && !str.isBlank()) {
+            explicit = List.of(str.trim().split("\\s*/\\s*"));
+        }
         if (explicit instanceof List<?> list) {
             List<String> out = new ArrayList<>();
             for (Object o : list) {
@@ -300,6 +306,45 @@ public final class Setup {
         }
     }
 
+    /**
+     * ТАЙЛЫ ЗАРОЖДЕНИЯ ПО СВОДУ (решение дизайнера 13.10.2026): «за большие
+     * тайлы должна быть драка». Ключи раздела field:
+     * <ul>
+     *   <li>{@code spawn_face_kelium_bonus} — столько келемия добавить на лицо
+     *       каждого тайла (стартового и большого);</li>
+     *   <li>{@code big_spawn_tiles_minus_players} — больших тайлов не больше,
+     *       чем игроков минус это число; лишние снимаются с поля случайно, и
+     *       гекс становится обычным.</li>
+     * </ul>
+     * Случай берётся своим генератором от сида партии — раздачи и всё прочее
+     * от этого не сдвигаются.
+     */
+    private static void тайлыЗарождения(Field field, Ruleset ruleset, int n, Long seed) {
+        int bonus = ruleset.getInt("field.spawn_face_kelium_bonus", 0);
+        int minus = ruleset.getInt("field.big_spawn_tiles_minus_players", -1);
+        List<Hex> big = new ArrayList<>();
+        for (Hex h : field.hexes.values()) {
+            if (h.spawnTile == null) {
+                continue;
+            }
+            if (bonus != 0) {
+                h.spawnTile.applyTopFaceDelta(bonus);
+            }
+            if (!h.spawnTile.isStart) {
+                big.add(h);
+            }
+        }
+        if (minus < 0) {
+            return;
+        }
+        int max = Math.max(0, n - minus);
+        Random r = seed != null ? new Random(seed * 0x9E3779B97F4A7C15L + 13) : new Random();
+        Collections.shuffle(big, r);
+        for (int i = max; i < big.size(); i++) {
+            big.get(i).spawnTile = null;
+        }
+    }
+
     /** Вернуть (Field, {seat: id стартового гекса}) — из сценария или кольцо-заглушку. */
     private static Scenario.FieldWithStarts loadField(GameConfig config, int n) {
         // B8: у сценариев СВОЙ ключ версии (независимый от досок).
@@ -375,6 +420,20 @@ public final class Setup {
      * (ЦУ, добытчик №1, 1 пехота), раздаёт по одному супер-заданию, создаёт
      * тех-планшет и колоды (с отбраковкой карт под число игроков).
      */
+    /**
+     * СТАРТОВЫЙ РЕСУРС ПО МЕСТУ ЗА СТОЛОМ. Ключ свода может быть одним числом
+     * (всем поровну) или списком по местам — тогда берётся элемент своего
+     * места. Нет ключа — печатное умолчание.
+     */
+    private static int поМесту(Ruleset ruleset, String key, int seat, int умолчание) {
+        Object cfg = ruleset.get(key, null);
+        if (cfg instanceof List<?> lst) {
+            return seat < lst.size() && lst.get(seat) instanceof Number n
+                ? n.intValue() : умолчание;
+        }
+        return cfg instanceof Number n ? n.intValue() : умолчание;
+    }
+
     public static GameState buildGame(GameConfig config) {
         return buildGame(config, null);
     }
@@ -423,6 +482,7 @@ public final class Setup {
         Scenario.FieldWithStarts fw = loadField(config, n);
         Field field = fw.field();
         Map<Integer, String> startHexes = fw.starts();
+        тайлыЗарождения(field, ruleset, n, config.seed);
 
         // КОНТЕЙНЕРЫ 2.0: поле раскладывается картонными блоками, и с них на
         // ячейки гексов переносятся ПЕЧАТНЫЕ контейнеры. Жетон, вставший на
@@ -440,23 +500,23 @@ public final class Setup {
             // какая сторона названа в наборе, та и берётся обоим планшетам.
             String side = sides.get(seat);
             PlayerBoard board = PlayerBoard.fromContent(boardsEntries, side, side);
+            // Жетоны этого цвета (прочность, ячейки) — до того, как на поле
+            // встанет первый жетон места.
+            stats.setSeatPatch(seat, board.troop.tokenPatch());
             // Стартовые монеты: из ruleset (setup.start_coins), иначе умолчание —
             // 5 всем (решение 2026-08-12).
-            int startCoins;
-            Object coinsCfg = ruleset.get("setup.start_coins", null);
-            if (coinsCfg instanceof List<?> lst && seat < lst.size()
-                    && lst.get(seat) instanceof Number cn) {
-                startCoins = cn.intValue();
-            } else {
-                startCoins = seat < START_COINS.length ? START_COINS[seat] : 4;
-            }
+            int startCoins = поМесту(ruleset, "setup.start_coins", seat,
+                seat < START_COINS.length ? START_COINS[seat] : 4);
             // Стартовые келемий и боеприпасы — тем же путём, что монеты: из
             // свода, если ключ задан, иначе печатное умолчание. Меню запуска
             // правит их для ТРЕНИРОВОЧНОЙ партии, не трогая файлы правил.
-            int startKelium = ruleset.get("setup.start_kelium", null) instanceof Number kn
-                ? kn.intValue() : START_KELIUM;
-            int startAmmo = ruleset.get("setup.start_ammo", null) instanceof Number an
-                ? an.intValue() : START_AMMO;
+            //
+            // КЕЛЕМИЙ ТОЖЕ ПО МЕСТУ ЗА СТОЛОМ (решение дизайнера 13.09.2026):
+            // первый игрок ходит первым и начинает без келемия, остальным он
+            // компенсирует очередь. Раньше ключ принимал только одно число на
+            // всех, и движок выдавал по келемию даже первому игроку.
+            int startKelium = поМесту(ruleset, "setup.start_kelium", seat, START_KELIUM);
+            int startAmmo = поМесту(ruleset, "setup.start_ammo", seat, START_AMMO);
             Resources res = new Resources(startCoins, startKelium, startAmmo, 0);
             String startHex = startHexes.get(seat);
             PlayerState ps = new PlayerState(seat, board, res, startHex);
@@ -464,7 +524,22 @@ public final class Setup {
             // есть предел науки за партию. Ключа нет - остаётся -1, и наука
             // играет по-старому: кубик один на трек, он переставляется.
             if (ruleset.getBool("tech.cubes_are_permanent", false)) {
-                ps.techCubesLeft = ruleset.getInt("tech.cube_supply", 8);
+                // КУБИКОВ ПО СОСТАВУ (решение дизайнера 13.09.2026): в коробке 8,
+                // но берут вдвоём 8, втроём 7, вчетвером 6 — чтобы кубиков в сумме
+                // было примерно столько же, сколько ячеек на трёх треках, и трек
+                // при любом составе оставался гонкой за места.
+                int supply = ruleset.getInt("tech.cube_supply", 8);
+                Object поСоставу = ruleset.get("tech.cube_supply_by_players", null);
+                if (поСоставу instanceof java.util.Map<?, ?> m) {
+                    Object v = m.get(String.valueOf(n));
+                    if (v == null) {
+                        v = m.get(n);
+                    }
+                    if (v instanceof Number num) {
+                        supply = num.intValue();
+                    }
+                }
+                ps.techCubesLeft = supply;
             }
             Hex sh = field.get(startHex);
 
@@ -544,30 +619,17 @@ public final class Setup {
         //   none     — без стартовых заданий вообще.
         // Начальные задания (kind: starting) в любом режиме изымаются из ОБЩЕЙ
         // колоды заданий: это отдельный модуль старта, а не обычные карты.
-        int deal = Math.max(1, ((Number) ruleset.get("super_objectives.deal", 1)).intValue());
-        // СУПЕР-ЗАДАНИЯ 5.0 (mode: solo5): по ОДНОЙ карте втайне, без вскрытия
-        // и счётчика; раздачу делает Super5 ниже, когда GameState уже собран.
-        // Прежняя раздача (несколько карт на выбор, вскрытие, счётчик) не
-        // действует ни в 5.0, ни в 6.0: там игроку идёт ОДНА карта втайне.
-        String режимСупер = String.valueOf(ruleset.get("super_objectives.mode", ""));
-        boolean одинокаяКарта = "solo5".equals(режимСупер) || "solo6".equals(режимСупер);
-        if (!одинокаяКарта && expansionOn(ruleset, "super_objectives")) {
-            List<String> superIds = new ArrayList<>(content.get("super_objectives").ids());
-            Collections.shuffle(superIds, rng);
-            int at = 0;
-            for (PlayerState ps : players) {
-                for (int k = 0; k < deal && at < superIds.size(); k++, at++) {
-                    ps.superObjectiveOffer.add(superIds.get(at));
-                }
-                // Одна карта в предложении = выбора нет, ставим сразу.
-                if (ps.superObjectiveOffer.size() == 1) {
-                    ps.superObjective = ps.superObjectiveOffer.get(0);
-                }
-            }
-        }
+        // СУПЕР-ЗАДАНИЯ 8.0 (14.09.2026): каждому ОДНА карта втайне, без выбора
+        // из нескольких и без вскрытия. Раздача — ниже, когда GameState собран
+        // (СуперЗадания.deal): здесь партии ещё нет.
         // НЕЗАВИСИМЫЙ ТУМБЛЕР: начальные задания включаются отдельно и МОГУТ
         // играться вместе с супер заданиями (решение дизайнера 17.08.2026).
         if (expansionOn(ruleset, "starting_objectives")) {
+            // ОДНА КАРТА НАЧАЛЬНОГО ЗАДАНИЯ В РУКУ (подготовка, шаг 16). Прежде
+            // число бралось из ключа супер-заданий — он к начальным отношения
+            // не имеет и вместе с их редакцией 8.0 исчез.
+            int deal = Math.max(1,
+                ((Number) ruleset.get("starting_objectives.deal", 1)).intValue());
             List<String> starters = new ArrayList<>();
             for (Map<String, Object> e : content.get("objectives").entries) {
                 if ("starting".equals(e.get("kind"))) {
@@ -665,9 +727,11 @@ public final class Setup {
                     ids = kept;
                 }
             }
-            // РЕЖИМ ИГРЫ (правило дизайнера 12.08.2026): супер задания и
-            // НАЧАЛЬНЫЕ задания вместе не играются. В режиме super начальные
-            // задания из колоды изымаются целиком.
+            // НАЧАЛЬНЫЕ ЗАДАНИЯ — НЕ В ОБЩЕЙ КОЛОДЕ. Это отдельная стопка: на
+            // подготовке каждому игроку одна карта в руку (см. раздачу выше,
+            // expansions.starting_objectives), а по ходу партии их не тянут.
+            // Поэтому из колоды заданий они убираются всегда, при любых
+            // дополнениях.
             if ("objectives".equals(ctype)) {
                 List<String> kept = new ArrayList<>();
                 for (String id : ids) {
@@ -677,8 +741,8 @@ public final class Setup {
                     }
                 }
                 if (kept.size() != ids.size()) {
-                    logOnce("[SETUP] режим супер заданий: изъято начальных заданий "
-                        + (ids.size() - kept.size()));
+                    logOnce("[SETUP] начальные задания (" + (ids.size() - kept.size())
+                        + ") — отдельная стопка, раздаются на подготовке; в колоду заданий не идут");
                 }
                 ids = kept;
             }
@@ -713,6 +777,23 @@ public final class Setup {
                     ids = more;
                 }
             }
+            if ("market".equals(ctype)) {
+                // СКОЛЬКО КАРТ РЫНКА КЛАДУТ НА ПЛАНШЕТ (решение дизайнера
+                // 15.09.2026). В колоде их десять, а в партии участвуют восемь:
+                // перемешали, отсчитали сколько нужно, остальные в коробку не
+                // глядя. Партия каждый раз собирается из другого набора.
+                //
+                // ЭТО И ЕСТЬ РЕГУЛЯТОР ДЛИНЫ ПАРТИИ: карты рынка кончились —
+                // партия кончилась, поэтому сколько карт положили, столько
+                // раундов максимум и будет. Ноль или больше, чем есть в
+                // колоде, — берётся вся колода.
+                int вКолоду = ((Number) ruleset.get("market.deck_size", 0)).intValue();
+                if (вКолоду > 0 && вКолоду < ids.size()) {
+                    List<String> перемешанные = new ArrayList<>(ids);
+                    java.util.Collections.shuffle(перемешанные, rng);
+                    ids = new ArrayList<>(перемешанные.subList(0, вКолоду));
+                }
+            }
             if ("market".equals(ctype) && !expansionOn(ruleset, "market_cards")) {
                 // КАРТЫ РЫНКА ВЫКЛЮЧЕНЫ: колода не собирается вовсе, активной
                 // карты в партии нет, и на планшете рынка остаётся только
@@ -735,19 +816,46 @@ public final class Setup {
             }
         }
         Collections.shuffle(startingArsenal, rng);
-        for (int seat = 0; seat < players.size() && seat < startingArsenal.size(); seat++) {
-            String cid = startingArsenal.get(seat);
-            players.get(seat).arsenalHand.add(cid);
-            decks.get("arsenal").removeCard(cid);   // не должна выпасть повторно
+        // ДВЕ НА ВЫБОР (решение Влада 02.10.2026, setup.start_arsenal_offer): каждому
+        // по N карт наугад; какую оставить, движок спросит первым делом партии
+        // (GameEngine.offerStartArsenalPick), остальные — в коробку. Карт на всех
+        // не хватает — поровну, сколько выходит, но не меньше одной.
+        int наВыбор = Math.max(1, ((Number) ruleset.get("setup.start_arsenal_offer", 1)).intValue());
+        if (наВыбор >= 2) {
+            int поКарт = Math.max(1, Math.min(наВыбор, startingArsenal.size() / Math.max(1, players.size())));
+            int at = 0;
+            for (PlayerState ps : players) {
+                for (int k = 0; k < поКарт && at < startingArsenal.size(); k++, at++) {
+                    ps.startArsenalOffer.add(startingArsenal.get(at));
+                }
+                if (ps.startArsenalOffer.size() == 1) {
+                    ps.arsenalHand.add(ps.startArsenalOffer.remove(0));   // выбора нет
+                }
+            }
+        } else {
+            for (int seat = 0; seat < players.size() && seat < startingArsenal.size(); seat++) {
+                String cid = startingArsenal.get(seat);
+                players.get(seat).arsenalHand.add(cid);
+            }
+        }
+        // НЕРОЗДАННЫЕ НАЧАЛЬНЫЕ — В КОРОБКУ, А НЕ В ОБЩУЮ КОЛОДУ. У начального
+        // арсенала своя рубашка («Начальный арсенал»), и за столом его остаток
+        // в колоду арсенала не замешать: книга (гл. 3, шаг 16) раздаёт по одной
+        // карте, остальное в игре не участвует. Прежде убирались только
+        // розданные, и при 7 начальных картах (набор 7.1.0) вчетвером три
+        // карты с чужой рубашкой оставались в колоде арсенала.
+        for (String cid : startingArsenal) {
+            decks.get("arsenal").removeCard(cid);
         }
 
         GameState s = new GameState(config, players, field, stats, tech, decks, rng, 0);
         s.journal = new kelium.core.TurnJournal(n);
 
-        // ВИТРИНА АРСЕНАЛА (правило дизайнера 15.08.2026): две открытые карты
-        // рядом с планшетом науки. Карты СНИМАЮТСЯ С КОЛОДЫ — вытянуть их
-        // вслепую, пока они лежат на витрине, нельзя, ровно как за столом.
-        refillArsenalDisplay(s);
+        // ВИТРИНЫ АРСЕНАЛА НЕТ (решение дизайнера 13.09.2026). Правило
+        // 15.08.2026 выкладывало рядом с планшетом науки две открытые карты;
+        // подготовка в книге (глава 3) такого шага не знает, и обмен Научного
+        // отдела берёт карты прямо с колоды (две, одну оставить). Здесь
+        // витрина больше не выкладывается: список остаётся пустым.
 
         // МЕШКИ МОДУЛЕЙ («Модули 2.0», 12.08.2026): по полному набору жетонов на
         // каждого игрока — 8/12/16 жетонов на 2/3/4 игроков для мешка из одного
@@ -784,40 +892,106 @@ public final class Setup {
         // гексов), а мог достаться воздушный, до которого наземным жетонам не
         // дотянуться. Привязывать стартовую карту к раскладке — значит делать
         // старт неравным на ровном месте, поэтому она выдаётся безусловно.
+        // 13.09.2026: КАРТЫ КОНТЕЙНЕРА НА СТАРТЕ НЕТ (правило дизайнера).
+        // Раздача была тестовой и расходилась с правилами. Ключ оставлен ради
+        // старых сводов: они играются по-прежнему, по одной карте каждому.
+        int стартКонтейнеров = ruleset.getInt("setup.start_containers", 1);
         for (PlayerState p : players) {
-            Storage.addContainersCapped(s, p, 1, "подготовка");
+            if (стартКонтейнеров > 0) {
+                Storage.addContainersCapped(s, p, стартКонтейнеров, "подготовка");
+            }
         }
 
-        // Супер-арсенал (треки 2.0): из 9 карт выложить В ОТКРЫТУЮ по одной на
-        // вершину каждого трека; остальные — «в коробку» (не участвуют).
+        // СУПЕР-АРСЕНАЛ — ЗАКРЫТАЯ КОЛОДА (дизайнер 14.10.2026): открытых карт
+        // на вершинах треков нет. Кто встал на вершину, берёт 2 верхние карты,
+        // одну оставляет, вторую кладёт под низ колоды (Actions, ветка
+        // super_arsenal_card). Прежде на подготовке по карте выкладывали
+        // в открытую на каждый трек — superArsenalOffer остаётся пустым и
+        // читается только старыми записями партий.
         // ДОПОЛНЕНИЕ: выключается тумблером, и тогда вершина трека даёт другой
         // приз (см. Actions, ветка super_arsenal_card).
         if (expansionOn(ruleset, "super_arsenal")) {
             try {
-                List<String> saIds = new ArrayList<>(content.get("super_arsenal").ids());
-                Collections.shuffle(saIds, rng);
-                for (int i = 0; i < tech.tracks.size() && i < saIds.size(); i++) {
-                    s.superArsenalOffer.put(tech.tracks.get(i), saIds.get(i));
-                }
+                s.decks.put("super_arsenal", Deck.fromIds("super_arsenal",
+                    new ArrayList<>(content.get("super_arsenal").ids()), rng));
             } catch (RuntimeException e) {
                 // контента может не быть в старых версиях правил — играем без вершин
             }
         }
-        // СУПЕР-ЗАДАНИЯ: по одной карте втайне каждому. Верх карты — множитель
-        // победных очков в финале, низ — жёсткое требование с разовой наградой;
-        // и то и другое разыгрывает СуперЗадания (класс Super5 по прежнему
-        // имени). РАЗДАЧА СПРАШИВАЕТ ТУМБЛЕР ДОПОЛНЕНИЯ, а не только режим:
-        // иначе выключенное дополнение всё равно раздавало карты, и это ловил
-        // StartModesAndBagsTest.
-        String суперРежим = String.valueOf(ruleset.get("super_objectives.mode", ""));
-        if ("solo6".equals(суперРежим) && expansionOn(ruleset, "super_objectives")) {
-            try {
-                СуперЗадания.deal(s, content.get("super_objectives").ids(), rng);
-            } catch (RuntimeException e) {
-                // каталога нет — режим включён зря; играем без карт
+        // СУПЕР-ЗАДАНИЯ: по одной карте втайне каждому. Карта только считает
+        // очки в конце партии (СуперЗадания.vp). Раздача спрашивает тумблер
+        // дополнения: выключено — карт нет вовсе.
+        // С 05.10.2026 (super_objectives.display > 0) карт в руку не раздают:
+        // они лежат открыто на столе, см. refillSuperDisplay.
+        if (expansionOn(ruleset, "super_objectives")) {
+            if (ruleset.getInt("super_objectives.display", 0) > 0) {
+                // КОЛОДА СУПЕР-ЗАДАНИЙ (ошибка, найденная 13.10.2026): колоды
+                // собираются списком выше, а супер-задания в него не входили —
+                // стол открытых супер-заданий с 05.10 оставался пустым, и шаг
+                // трека карты не давал. Колода — весь набор, перемешанный.
+                if (!s.decks.containsKey("super_objectives")) {
+                    try {
+                        s.decks.put("super_objectives", Deck.fromIds("super_objectives",
+                            new ArrayList<>(content.get("super_objectives").ids()), rng));
+                    } catch (RuntimeException e) {
+                        // набора нет — играем без супер-заданий
+                    }
+                }
+                refillSuperDisplay(s, ruleset);
+            } else {
+                try {
+                    СуперЗадания.deal(s, content.get("super_objectives").ids(), rng);
+                } catch (RuntimeException e) {
+                    // каталога нет — режим включён зря; играем без карт
+                }
             }
         }
+        установитьНачальныйАрсенал(s, ruleset);
         return s;
+    }
+
+    /**
+     * НАЧАЛЬНЫЙ АРСЕНАЛ ОТКРЫВАЮТ НА ПОДГОТОВКЕ (решение дизайнера 30.09.2026,
+     * книга гл. 3, шаг 13): карту не держат в руке, а сразу устанавливают.
+     * Игрок получает набор с её верха — это и есть его стартовые ресурсы
+     * (монет и келемия по своду при этом 0) — и её постоянную способность.
+     * Включается ключом {@code setup.start_arsenal_installed}; без него карта,
+     * как прежде, лежит в руке арсенала до установки спец-действием.
+     */
+    @SuppressWarnings("unchecked")
+    static void установитьНачальныйАрсенал(GameState s, Ruleset ruleset) {
+        if (!ruleset.getBool("setup.start_arsenal_installed", false)) {
+            return;
+        }
+        for (PlayerState p : s.players) {
+            for (String cid : new ArrayList<>(p.arsenalHand)) {
+                Map<String, Object> card = Ctx.cards(s, "arsenal").find(cid);
+                if (card == null || !"starting".equals(card.get("kind"))) {
+                    continue;
+                }
+                p.arsenalHand.remove(cid);
+                поставитьНачальную(s, p, cid);
+            }
+        }
+    }
+
+    /**
+     * Поставить начальную карту арсенала: на планшет и стартовый набор с её верха.
+     * Без {@code setup.start_arsenal_installed} — в руку, как прежде.
+     */
+    @SuppressWarnings("unchecked")
+    static void поставитьНачальную(GameState s, PlayerState p, String cid) {
+        if (!Ctx.rules(s).getBool("setup.start_arsenal_installed", false)) {
+            p.arsenalHand.add(cid);
+            return;
+        }
+        p.arsenalInstalled.add(cid);
+        Map<String, Object> top = GameEngine.стартовыйНабор(s, cid);
+        if (top != null) {
+            Map<String, Object> params = top.get("params") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : Map.of();
+            Effects.apply(String.valueOf(top.get("effect")), s, p.seat, params);
+        }
     }
 
     /**
@@ -845,6 +1019,14 @@ public final class Setup {
                         // должно быть — отсев по «нереализованной пассивке» здесь
                         // выбросил бы совершенно рабочую карту.
                         bad = null;
+                    } else if (bottom != null && bottom.get("когда") instanceof Map<?, ?>) {
+                        // СРАБАТЫВАНИЕ ДАННЫМИ (Карты 2.0): способности-кода нет и
+                        // не нужно — жив ли низ, решает его эффект.
+                        Object эф = bottom.get("эффект") instanceof Map<?, ?> em ? em.get("effect") : null;
+                        if (эф == null || !("спец".equals(эф)
+                                || Effects.isImplemented(String.valueOf(эф)))) {
+                            bad = "trigger effect " + эф;
+                        }
                     } else if (bottom != null
                             && !Passives.isImplemented((String) bottom.get("passive"))) {
                         bad = "passive " + bottom.get("passive");
@@ -893,6 +1075,22 @@ public final class Setup {
      * колода и сброс исчерпаны, витрина остаётся неполной — это законное
      * состояние партии, а не ошибка.
      */
+    /** Добрать открытые супер-задания на столе до {@code super_objectives.display}. */
+    public static void refillSuperDisplay(GameState s, Ruleset ruleset) {
+        kelium.core.Deck deck = s.decks.get("super_objectives");
+        int n = ruleset.getInt("super_objectives.display", 0);
+        if (deck == null) {
+            return;
+        }
+        while (s.superDisplay.size() < n) {
+            String card = deck.draw(s.rng);
+            if (card == null) {
+                break;                    // колода кончилась — на столе меньше карт
+            }
+            s.superDisplay.add(card);
+        }
+    }
+
     public static void refillArsenalDisplay(GameState s) {
         kelium.core.Deck deck = s.decks.get("arsenal");
         if (deck == null) {
