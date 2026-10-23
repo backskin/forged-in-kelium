@@ -3746,6 +3746,7 @@ public final class HotSeatWindow {
         Map.entry("trigger_pay", "карта арсенала: заплатить келемий?"),
         Map.entry("neutral_victim", "какой нейтрал атаковать"),
         Map.entry("attack", "атака"),
+        Map.entry("container_gamble", "перевернуть контейнер колоды перед атакой?"),
         Map.entry("mine", "добыча: что взять"),
         Map.entry("assemble", "выпуск: нанять войско или произвести боеприпасы"),
         Map.entry("tuck", "подложить карту-символ"),
@@ -6220,7 +6221,8 @@ public final class HotSeatWindow {
         String row = switch (raw.substring(dot + 1, arrow)) {
             case "universal" -> "универсальная атака";
             case "special", "specialized" -> "спец-атака";
-            default -> "атака «" + raw.substring(dot + 1, arrow) + "»";
+            default -> raw.substring(dot + 1, arrow).startsWith("super")
+                ? "атака супер-войска" : "атака «" + raw.substring(dot + 1, arrow) + "»";
         };
         String tcat = Boolean.TRUE.equals(payload.get("neutral")) ? "снос нейтрала"
             : switch (String.valueOf(payload.get("tcat"))) {

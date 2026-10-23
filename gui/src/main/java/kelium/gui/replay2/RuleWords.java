@@ -262,6 +262,8 @@ public final class RuleWords {
                 "сколько своих зданий можно снести перед стройкой в одной ветке";
             case "actions.combat.kelium_for_ammo" ->
                 "за атаку можно платить келемием вместо боеприпаса, 1 к 1";
+            case "actions.combat.container_gamble" ->
+                "перед атакой можно перевернуть верхний контейнер колоды: +1, пусто или −1 к цене";
             case "actions.combat.token_surcharge_ammo" ->
                 "доплата боеприпасами за жетон, бьющий не из выбранного гекса";
             case "actions.build.move_enabled" ->

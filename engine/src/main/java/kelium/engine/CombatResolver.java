@@ -699,6 +699,70 @@ public final class CombatResolver {
         return Passives.hasPassive(state, seat, "kelium_instead_of_ammo_in_operation");
     }
 
+    // ==================================================================
+    //  БРОСОК КОНТЕЙНЕРОМ (свод 1.53.0, решение дизайнера 23.10.2026)
+    // ==================================================================
+
+    /**
+     * МОЖНО ЛИ СЕЙЧАС БРОСИТЬ: правило включено и в колоде контейнеров (или в
+     * её сбросе, который перетасуется) есть хоть одна карта.
+     *
+     * <p>Бросок — это «кубик без кубика»: перед атакой переворачивают ВЕРХНЮЮ
+     * карту колоды контейнеров и читают уголок. Свои карты контейнеров игрока
+     * здесь ни при чём (дизайнер: «свои карты вообще никак в этом не
+     * участвуют»), поэтому знание собственной руки риска не снимает.
+     */
+    private boolean броскиМожно() {
+        if (!Boolean.TRUE.equals(kelium.dataio.Ctx.rules(state)
+                .get("actions.combat.container_gamble", Boolean.FALSE))) {
+            return false;
+        }
+        kelium.core.Deck d = state.decks.get("containers");
+        return d != null && (d.size() > 0 || !d.discardPile.isEmpty());
+    }
+
+    /**
+     * ПЕРЕВЕРНУТЬ ВЕРХНЮЮ КАРТУ КОЛОДЫ КОНТЕЙНЕРОВ и вернуть число с её уголка:
+     * +1, 0 или −1; {@code null}, если карт нет. Карта уходит ПОД НИЗ колоды, а
+     * не в сброс: кубик не расходуется, и колода от бросков не прокручивается
+     * (дизайнер опасался именно прокрутки колоды).
+     */
+    private Integer броситьКонтейнер(int seat, int ценаДо, String цель) {
+        kelium.core.Deck d = state.decks.get("containers");
+        if (d == null) {
+            return null;
+        }
+        String id = d.draw(state.rng);
+        if (id == null) {
+            return null;
+        }
+        d.putUnder(id);
+        Map<String, Object> карта = kelium.dataio.Ctx.cards(state, "containers").byId(id);
+        int уголок = карта != null && карта.get("уголок_боя") instanceof Number n
+            ? Integer.signum(n.intValue()) : 0;
+        emit("type", "container_gamble", "seat", seat, "card", id, "corner", уголок,
+            "ammo_before", ценаДо, "ammo_after", Math.max(0, ценаДо - уголок),
+            "target", цель);
+        return уголок;
+    }
+
+    /**
+     * СПРОСИТЬ, БРОСАТЬ ЛИ. Первый вариант — «без броска»: бот, не знающий
+     * этого вида решения, берёт первый и не рискует вслепую.
+     */
+    private boolean спроситьБросок(Agent agent, int seat, int цена, String цель) {
+        List<Choice> варианты = List.of(
+            new Choice("container_gamble", Boolean.FALSE, "атаковать без броска"),
+            new Choice("container_gamble", Boolean.TRUE,
+                "перевернуть контейнер колоды: +1, пусто или −1 к цене"));
+        Map<String, Object> вопрос = new HashMap<>();
+        вопрос.put("kind", "container_gamble");
+        вопрос.put("ammo", цена);
+        вопрос.put("target", цель);
+        Choice выбор = agent.choose(state, варианты, вопрос);
+        return Boolean.TRUE.equals(выбор.payload());
+    }
+
     /**
      * ВПЕРЕМЕШКУ ЛИ: недостающие боеприпасы добираются келемием 1 к 1 (свод
      * 1.52.0: «можно платить за атаку 1 келемием вместо 1 боеприпаса»). Прежний
@@ -1009,8 +1073,17 @@ public final class CombatResolver {
                         }
                         int cost = effCost(ar.ammoCost(), ar.target(), attackerSeat, цель,
                             firstAttackUsed) + доплата;
+                        // НЕ ХВАТАЕТ ОДНОГО БОЕПРИПАСА — атака всё равно в меню, но
+                        // ТОЛЬКО С БРОСКОМ контейнера (свод 1.53.0): «+1» её
+                        // оплатит, «пусто» и «−1» дадут осечку. Это и есть самый
+                        // острый случай риска: стрелять нечем, а очень надо.
+                        boolean толькоСБроском = false;
                         if (!можетОплатитьАтаку(p, cost)) {
-                            continue;
+                            if (cost > 0 && броскиМожно() && можетОплатитьАтаку(p, cost - 1)) {
+                                толькоСБроском = true;
+                            } else {
+                                continue;
+                            }
                         }
                         Token victim = pickVictimCategory(цель, attackerSeat, ar.target(),
                             restrictTargetOwner, closed, u);
@@ -1055,10 +1128,13 @@ public final class CombatResolver {
                                 pl.put("tcat2", ar.target2().code);
                             }
                             pl.put("target", цель);
+                            if (толькоСБроском) {
+                                pl.put("gamble_only", Boolean.TRUE);
+                            }
                             options.add(new Choice("attack", pl,
                                 u.type.code + "." + ar.row() + "->" + ar.target().code
                                     + (ar.target2() == null ? "" : "+" + ar.target2().code)
-                                    + "@" + цель));
+                                    + "@" + цель + (толькоСБроском ? " (только с броском контейнера)" : "")));
                             if ("specialized".equals(ar.row())) {
                                 естьСпец = true;
                             } else {
@@ -1075,8 +1151,11 @@ public final class CombatResolver {
                             pl.put("tcat", ar.target().code);
                             pl.put("target", цель);
                             pl.put("neutral", Boolean.TRUE);
+                            if (толькоСБроском) {
+                                pl.put("gamble_only", Boolean.TRUE);
+                            }
                             options.add(new Choice("attack", pl,
-                                u.type.code + "." + ar.row() + "->raze neutral@" + цель));
+                                u.type.code + "." + ar.row() + "->raze neutral@" + цель + (толькоСБроском ? " (только с броском контейнера)" : "")));
                         }
                     }
                     учестьЯчейки(s, u, естьСпец, естьУнив);
@@ -1179,9 +1258,30 @@ public final class CombatResolver {
                 usedRows.add(key);
                 continue;
             }
+            // БРОСОК КОНТЕЙНЕРОМ (свод 1.53.0) — уже после окна перед атакой: стрелок
+            // жив и цель на месте, иначе бросать незачем. Одна карта на атаку.
+            // Атака «только с броском» бросает без вопроса: без броска ей не
+            // хватает боеприпаса. Бесплатную атаку бросать бессмысленно — плюсу
+            // нечего уменьшать, а минус только навредит.
+            boolean толькоСБроском = Boolean.TRUE.equals(pl.get("gamble_only"));
+            boolean бросали = false;
+            if (ammo > 0 && броскиМожно()
+                    && (толькоСБроском || спроситьБросок(agent, attackerSeat, ammo, target))) {
+                Integer уголок = броситьКонтейнер(attackerSeat, ammo, target);
+                if (уголок != null) {
+                    ammo = Math.max(0, ammo - уголок);
+                    бросали = true;
+                }
+            }
             // ОКНО ПЕРЕД АТАКОЙ МОГЛО ОТНЯТЬ БОЕПРИПАСЫ (реакции на отход и
-            // контратаку): платить больше нечем — выстрел не состоялся.
+            // контратаку): платить больше нечем — выстрел не состоялся. Сюда же
+            // попадает ОСЕЧКА броска: «−1» поднял цену или «пусто» не помогло
+            // атаке, которой не хватало боеприпаса, а закрыть цену нечем.
             if (!можетОплатитьАтаку(p, ammo)) {
+                if (бросали || толькоСБроском) {
+                    emit("type", "combat_misfire", "seat", attackerSeat, "target", target,
+                        "ammo", ammo);
+                }
                 usedRows.add(key);
                 continue;
             }

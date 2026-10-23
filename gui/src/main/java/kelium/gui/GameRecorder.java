@@ -1243,6 +1243,20 @@ public final class GameRecorder {
                         + (detail.isBlank() || "null".equals(detail) ? "" : ": " + detail)
                         + paid;
                 }
+                // БРОСОК КОНТЕЙНЕРОМ (свод 1.53.0): верхняя карта колоды
+                // контейнеров перевёрнута перед атакой, её уголок меняет цену.
+                case "container_gamble": {
+                    int уголок = ev.get("corner") instanceof Number n ? n.intValue() : 0;
+                    String итог = уголок > 0 ? "+1 — атака на боеприпас дешевле"
+                        : уголок < 0 ? "−1 — атака на боеприпас дороже"
+                            : "пусто — цена прежняя";
+                    return "БОЙ. " + who(ev.get("seat")) + " переворачивает контейнер колоды: "
+                        + итог + " (цена " + ev.get("ammo_before") + " → "
+                        + ev.get("ammo_after") + ")";
+                }
+                case "combat_misfire":
+                    return "БОЙ. " + who(ev.get("seat")) + ": ОСЕЧКА по " + ev.get("target")
+                        + " — заплатить " + ev.get("ammo") + " нечем, атаки нет";
                 case "combat_hit": {
                     boolean dead = Boolean.TRUE.equals(ev.get("destroyed"));
                     return "БОЙ. " + who(ev.get("seat")) + ": " + ev.get("attacker") + " с "

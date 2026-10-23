@@ -2206,6 +2206,16 @@ public class HeuristicAgent extends Agent {
             return 0.3;
         }
         Map<String, Object> pl = (Map<String, Object>) o.payload();
+        // АТАКА ТОЛЬКО С БРОСКОМ КОНТЕЙНЕРА (свод 1.53.0): боеприпаса не хватает,
+        // и выстрел состоится, лишь если уголок верхней карты колоды — «+1».
+        // Таких карт треть, поэтому ценность атаки делится на три, а не
+        // оценивается как верный выстрел. Ниже паса она не опускается
+        // отдельно: решает обычное сравнение с вариантом «закончить».
+        if (Boolean.TRUE.equals(pl.get("gamble_only"))) {
+            Map<String, Object> безБроска = new java.util.HashMap<>(pl);
+            безБроска.remove("gamble_only");
+            return scoreAttack(state, new Choice(o.kind(), безБроска, o.label())) / 3.0;
+        }
         int ammo = pl.get("ammo") instanceof Number n ? n.intValue() : 1;
         // БОЙ КАК ДВИЖЕНИЕ: у каждого выстрела своя цель, отдельной точки
         // «по какому гексу бить» больше нет — ценность цели считается здесь.

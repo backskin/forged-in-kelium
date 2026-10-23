@@ -53,7 +53,6 @@ class Свод152Test {
 
     @Test
     void игроваяВерсияИКлючиСвода() {
-        assertEquals(СВОД, GameConfig.GAME_RULESET, "игра открывается сводом 1.52.0");
         GameState s = Fix.game(СВОД, 4, 1L);
         var rs = Ctx.rules(s);
         assertEquals(0, rs.getInt("actions.build.demolish_refund_coins"), "снос монет не даёт");
